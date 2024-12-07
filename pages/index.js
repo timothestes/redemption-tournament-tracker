@@ -82,7 +82,10 @@ export default function Home({ tournaments, error }) {
         <>
           <p>Please log in to manage or join a tournament.</p>
           <Link href="/login">
-            <button>Login / Sign Up</button>
+            <button>Login</button>
+          </Link>
+          <Link href="/signup">
+            <button>Sign Up</button>
           </Link>
         </>
       )}
