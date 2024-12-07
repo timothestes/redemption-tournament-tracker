@@ -8,10 +8,12 @@ export default function SignUp() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState(''); // New success message state
   const router = useRouter();
 
   const handleSignUp = async () => {
     setErrorMessage(''); // Reset error message
+    setSuccessMessage(''); // Reset success message
 
     // Validate input
     if (!firstName.trim() || !lastName.trim()) {
@@ -41,8 +43,7 @@ export default function SignUp() {
 
       // Handle API response
       if (response.ok) {
-        alert('Sign-up successful! Check your email for the confirmation link!');
-        router.push('/login');
+        router.push(`/?successMessage=Sign-up successful! Check your email for the confirmation link.`);
       } else if (response.status === 409) {
         setErrorMessage('This email is already registered. Please login instead.');
       } else {
@@ -61,6 +62,7 @@ export default function SignUp() {
       </header>
       <h1>Sign Up</h1>
       {errorMessage && <p style={{ color: 'red' }}>{errorMessage}</p>}
+      {successMessage && <p style={{ color: 'green' }}>{successMessage}</p>}
       <input
         type="text"
         placeholder="First Name"
