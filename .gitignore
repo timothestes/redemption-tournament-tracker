@@ -44,3 +44,6 @@ coverage/
 
 # Build artifacts
 dist/
+.vercel
+
+venv/
