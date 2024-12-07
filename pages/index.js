@@ -61,7 +61,7 @@ export default function Home({ tournaments, error }) {
       <header>
         <button onClick={() => router.push('/')}>Home</button> {/* Home Button */}
       </header>
-      <h1>Welcome to the Tournament Tracker</h1>
+      <h1>Welcome to the Redemption Tournament Tracker</h1>
       {logoutMessage && <p style={{ color: 'green' }}>{logoutMessage}</p>}
       {successMessage && <p style={{ color: 'green' }}>{successMessage}</p>}
       {user ? (
