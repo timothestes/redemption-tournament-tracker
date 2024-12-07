@@ -17,6 +17,9 @@ export default function Login() {
       if (error.message === 'Email not confirmed') {
         setErrorMessage('Please confirm your email before logging in. Check under spam and find the most recent invitation.');
       } else {
+        if (error.message === "Invalid login credentials") {
+          error.message = "Invalid login credentials or account doesn't exist."
+        }
         setErrorMessage(error.message);
       }
       return;
