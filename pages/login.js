@@ -1,33 +1,37 @@
 import { useState } from 'react';
 import { supabase } from '../utils/supabaseClient';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 
-export default function Auth() {
+export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   const router = useRouter();
 
   const handleLogin = async () => {
+    setErrorMessage(''); // Reset error message
+
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
-      alert(error.message);
-    } else {
-      router.push('/');
+      if (error.message === 'Email not confirmed') {
+        setErrorMessage('Please confirm your email before logging in. Check under spam and find the most recent invitation.');
+      } else {
+        setErrorMessage(error.message);
+      }
+      return;
     }
-  };
 
-  const handleSignUp = async () => {
-    const { error } = await supabase.auth.signUp({ email, password });
-    if (error) {
-      alert(error.message);
-    } else {
-      alert('Check your email for the confirmation link!');
-    }
+    router.push('/');
   };
 
   return (
     <div>
-      <h1>Login / Sign Up</h1>
+      <header>
+        <button onClick={() => router.push('/')}>Home</button>
+      </header>
+      <h1>Login</h1>
+      {errorMessage && <p style={{ color: 'red' }}>{errorMessage}</p>}
       <input
         type="email"
         placeholder="Email"
@@ -41,7 +45,9 @@ export default function Auth() {
         onChange={(e) => setPassword(e.target.value)}
       />
       <button onClick={handleLogin}>Login</button>
-      <button onClick={handleSignUp}>Sign Up</button>
+      <p>
+        Don't have an account? <Link href="/signup">Sign Up</Link>
+      </p>
     </div>
   );
 }

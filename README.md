@@ -10,6 +10,18 @@
 
 ---
 
+```sql
+create table user_data (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  first_name text not null,
+  last_name text not null,
+  email text not null unique,
+  created_at timestamp default now(),
+  updated_at timestamp default now()
+);
+```
+
 ## 2. Tournaments Table (`tournaments`)
 Stores information about tournaments.
 

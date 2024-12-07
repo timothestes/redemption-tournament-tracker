@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 
 export default function Home({ tournaments, error }) {
   const [user, setUser] = useState(null);
+  const [logoutMessage, setLogoutMessage] = useState('');
   const router = useRouter();
 
   useEffect(() => {
@@ -20,13 +21,23 @@ export default function Home({ tournaments, error }) {
     fetchUser();
   }, []);
 
+  useEffect(() => {
+    // Listen to route changes to clear logout message
+    const handleRouteChange = () => setLogoutMessage('');
+    router.events.on('routeChangeStart', handleRouteChange);
+
+    return () => {
+      router.events.off('routeChangeStart', handleRouteChange);
+    };
+  }, [router.events]);
+
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) {
-      alert('Error logging out');
+      setLogoutMessage('Error logging out. Please try again.');
     } else {
       setUser(null);
-      alert('You have been logged out.');
+      setLogoutMessage('You have been logged out successfully.');
     }
   };
 
@@ -36,8 +47,11 @@ export default function Home({ tournaments, error }) {
 
   return (
     <div>
+      <header>
+        <button onClick={() => router.push('/')}>Home</button> {/* Home Button */}
+      </header>
       <h1>Welcome to the Tournament Tracker</h1>
-      <button onClick={() => router.push('/')}>Home</button> {/* Home Button */}
+      {logoutMessage && <p style={{ color: 'green' }}>{logoutMessage}</p>}
       {user ? (
         <>
           <p>Logged in as: {user?.email || 'Unknown User'}</p>
@@ -66,8 +80,8 @@ export default function Home({ tournaments, error }) {
         </>
       ) : (
         <>
-          <p>Please log in to manage tournaments.</p>
-          <Link href="/auth">
+          <p>Please log in to manage or join a tournament.</p>
+          <Link href="/login">
             <button>Login / Sign Up</button>
           </Link>
         </>
