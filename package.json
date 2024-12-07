@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@supabase/supabase-js": "^2.47.2",
     "next": "^15.0.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
@@ -8,7 +9,6 @@
   "description": "",
   "version": "1.0.0",
   "main": "index.js",
-  "devDependencies": {},
   "scripts": {
     "dev": "next dev",
     "build": "next build",
