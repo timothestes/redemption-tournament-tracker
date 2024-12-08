@@ -68,7 +68,7 @@ export default function Home({ tournaments, error }) {
           Home
         </button>
       </header>
-      <h1 className={styles.title}>Welcome to the Redemption Tournament Tracker</h1>
+      <h1 className={styles.title}>Welcome to the Land of Redemption Tournament Tracker</h1>
       
       {logoutMessage && <p className={styles.message}>{logoutMessage}</p>}
       {successMessage && <p className={styles.message}>{successMessage}</p>}
