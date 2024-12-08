@@ -11,14 +11,14 @@
     margin-bottom: 1rem;
     padding: 0.5rem 1rem;
     cursor: pointer;
-    background-color: #3498db;
+    background-color: #2174ab;
     color: white;
     border: none;
     border-radius: 4px;
   }
   
   .headerButton:hover {
-    background-color: #20628e;
+    background-color: #174767;
   }
   
   .title {
@@ -27,12 +27,12 @@
   }
   
   .message {
-    color: green;
+    color: rgb(11, 168, 11);
     margin: 1rem 0;
   }
   
   .error {
-    color: red;
+    color: rgb(188, 2, 2);
     margin: 1rem 0;
   }
   
@@ -40,38 +40,38 @@
     padding: 0.75rem 1.5rem;
     margin: 0.5rem;
     cursor: pointer;
-    background-color: #2ecc71;
+    background-color: #197640;
     color: white;
     border: none;
     border-radius: 4px;
   }
   
   .button:hover {
-    background-color: #208349;
+    background-color: #0b2f1a;
   }
 
   .deleteButton {
-    background-color: #e74c3c;
+    background-color: #af3b2e;
   }
   
   .deleteButton:hover {
-    background-color: #6c2018;
+    background-color: #4e1711;
   }
 
   .neutralButton {
-    background-color: #656464;
+    background-color: #a1a0a0;
   }
   
   .neutralButton:hover {
-    background-color: #3b3939;
+    background-color: #4b4848;
   }
   
   .button.secondary {
-    background-color: #e74c3c;
+    background-color: #ac3b2f;
   }
   
   .button.secondary:hover {
-    background-color: #80241a;
+    background-color: #571912;
   }
 
   .fadeOverlay {

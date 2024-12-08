@@ -107,7 +107,7 @@ export default function TournamentView() {
           <button onClick={() => router.push('/')} className={styles.headerButton}>Home</button>
         </header>
         <h1 className={styles.title}>Tournament not found</h1>
-        <button onClick={() => router.push('/tournaments/list')} className={styles.button}>
+        <button onClick={() => router.push('/tournaments/list')} className={styles.headerButton}>
           Back to My Tournaments
         </button>
       </div>
@@ -164,7 +164,7 @@ export default function TournamentView() {
         <p>No participants yet.</p>
       )}
 
-      <button onClick={() => router.push('/tournaments/list')} className={styles.button}>
+      <button onClick={() => router.push('/tournaments/list')} className={styles.headerButton}>
         Back to My Tournaments
       </button>
     </div>
