@@ -98,7 +98,7 @@ export default function NewTournament() {
           {isCreating ? <Spinner /> : 'Create'}
         </button>
       </form>
-      <button onClick={() => router.push('/tournaments/hosted')} className={styles.button}>
+      <button onClick={() => router.push('/tournaments/list')} className={styles.button}>
         Back to My Tournaments
       </button>
     </div>

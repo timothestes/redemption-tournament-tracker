@@ -1,5 +1,3 @@
-// Update this page to remove listing all tournaments and instead direct the user to the hosted tournaments page.
-
 import { supabase } from '../utils/supabaseClient';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -76,8 +74,8 @@ export default function Home() {
           <Link href="/tournaments/join">
             <button className={styles.button}>Join a Tournament</button>
           </Link>
-          <Link href="/tournaments/hosted">
-            <button className={styles.button}>View Your Hosted Tournaments</button>
+          <Link href="/tournaments/list">
+            <button className={styles.button}>View Your Tournaments</button>
           </Link>
         </>
       ) : (
