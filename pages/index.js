@@ -2,11 +2,14 @@ import { supabase } from '../utils/supabaseClient';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import styles from '../components/common.module.css'; // Import CSS Module
+import Spinner from '../components/spinner';
 
 export default function Home({ tournaments, error }) {
   const [user, setUser] = useState(null);
   const [logoutMessage, setLogoutMessage] = useState('');
-  const [successMessage, setSuccessMessage] = useState(''); // New success message state
+  const [successMessage, setSuccessMessage] = useState('');
+  const [isLoggingOut, setIsLoggingOut] = useState(false); // Loading state for logout
   const router = useRouter();
 
   useEffect(() => {
@@ -43,6 +46,7 @@ export default function Home({ tournaments, error }) {
   }, [router.query]);
 
   const handleLogout = async () => {
+    setIsLoggingOut(true); // Start loading
     const { error } = await supabase.auth.signOut();
     if (error) {
       setLogoutMessage('Error logging out. Please try again.');
@@ -50,43 +54,52 @@ export default function Home({ tournaments, error }) {
       setUser(null);
       setLogoutMessage('You have been logged out successfully.');
     }
+    setIsLoggingOut(false); // Stop loading
   };
 
   if (error) {
-    return <div>Error: {error.message}</div>;
+    return <div className={styles.error}>Error: {error.message}</div>;
   }
 
   return (
-    <div>
+    <div className={styles.container}>
       <header>
-        <button onClick={() => router.push('/')}>Home</button> {/* Home Button */}
+        <button onClick={() => router.push('/')} className={styles.headerButton}>
+          Home
+        </button>
       </header>
-      <h1>Welcome to the Redemption Tournament Tracker</h1>
-      {logoutMessage && <p style={{ color: 'green' }}>{logoutMessage}</p>}
-      {successMessage && <p style={{ color: 'green' }}>{successMessage}</p>}
+      <h1 className={styles.title}>Welcome to the Redemption Tournament Tracker</h1>
+      
+      {logoutMessage && <p className={styles.message}>{logoutMessage}</p>}
+      {successMessage && <p className={styles.message}>{successMessage}</p>}
+
       {user ? (
         <>
           <p>Logged in as: {user?.email || 'Unknown User'}</p>
-          <button onClick={handleLogout}>Log Out</button>
+          <button onClick={handleLogout} className={`${styles.button} ${styles.secondary}`} disabled={isLoggingOut}>
+            {isLoggingOut ? <Spinner /> : 'Log Out'}
+          </button>
           <Link href="/tournaments/new">
-            <button>Create a Tournament</button>
+            <button className={styles.button}>Create a Tournament</button>
           </Link>
           <Link href="/tournaments/join">
-            <button>Join a Tournament</button>
+            <button className={styles.button}>Join a Tournament</button>
           </Link>
 
           <h2>Your Tournaments</h2>
-          <ul>
+          <ul className={styles.tournamentsList}>
             {tournaments.length > 0 ? (
               tournaments.map((tournament) => (
-                <li key={tournament.id}>
+                <li key={tournament.id} className={styles.tournamentItem}>
                   <Link href={`/tournaments/${tournament.id}`}>
-                    {tournament.name} - Status: {tournament.status}
+                    <a className={styles.tournamentLink}>
+                      {tournament.name} - Status: {tournament.status}
+                    </a>
                   </Link>
                 </li>
               ))
             ) : (
-              <p>No tournaments found. Create or join one!</p>
+              <p className={styles.noTournaments}>No tournaments found. Create or join one!</p>
             )}
           </ul>
         </>
@@ -94,10 +107,10 @@ export default function Home({ tournaments, error }) {
         <>
           <p>Please log in to manage or join a tournament.</p>
           <Link href="/login">
-            <button>Login</button>
+            <button className={styles.button}>Login</button>
           </Link>
           <Link href="/signup">
-            <button>Sign Up</button>
+            <button className={styles.button}>Sign Up</button>
           </Link>
         </>
       )}

@@ -1,0 +1,81 @@
+/* components/common.module.css */
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+    text-align: center;
+  }
+  
+  .headerButton {
+    margin-bottom: 1rem;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 4px;
+  }
+  
+  .headerButton:hover {
+    background-color: #20628e;
+  }
+  
+  .title {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+  }
+  
+  .message {
+    color: green;
+    margin: 1rem 0;
+  }
+  
+  .error {
+    color: red;
+    margin: 1rem 0;
+  }
+  
+  .button {
+    padding: 0.75rem 1.5rem;
+    margin: 0.5rem;
+    cursor: pointer;
+    background-color: #2ecc71;
+    color: white;
+    border: none;
+    border-radius: 4px;
+  }
+  
+  .button:hover {
+    background-color: #208349;
+  }
+  
+  .button.secondary {
+    background-color: #e74c3c;
+  }
+  
+  .button.secondary:hover {
+    background-color: #80241a;
+  }
+  
+  /* Media Queries for Responsiveness */
+  @media (max-width: 600px) {
+    .container {
+      padding: 1rem;
+    }
+  
+    .title {
+      font-size: 1.5rem;
+    }
+  
+    .button {
+      padding: 0.5rem;
+      font-size: 0.9rem;
+    }
+  
+    .headerButton {
+      padding: 0.4rem 0.8rem;
+      font-size: 0.9rem;
+    }
+  }
+  
