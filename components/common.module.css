@@ -59,11 +59,11 @@
   }
 
   .neutralButton {
-    background-color: #a1a0a0;
+    background-color: #686868;
   }
   
   .neutralButton:hover {
-    background-color: #4b4848;
+    background-color: #262525;
   }
   
   .button.secondary {
@@ -89,7 +89,7 @@
   
   /* Modal box */
   .fadeModal {
-    background: white;
+    background: #1b1e1f;
     padding: 2rem;
     border-radius: 4px;
     max-width: 300px;
