@@ -1,21 +1,28 @@
 // pages/Login.js
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../utils/supabaseClient';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import styles from '../components/common.module.css'; // Ensure the correct casing for the CSS Module
+import styles from '../components/common.module.css';
 import Spinner from '../components/spinner';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(false); // Loading state
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const loginButtonRef = useRef(null);
+
+  useEffect(() => {
+    if (loginButtonRef.current) {
+      loginButtonRef.current.focus();
+    }
+  }, []);
 
   const handleLogin = async () => {
-    setErrorMessage(''); // Reset error message
-    setIsLoading(true); // Start loading
+    setErrorMessage('');
+    setIsLoading(true);
 
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -29,14 +36,13 @@ export default function Login() {
             setErrorMessage(error.message);
           }
         }
-        setIsLoading(false); // Stop loading on error
+        setIsLoading(false);
         return;
       }
-
-      router.push('/'); // Redirect to Home on successful login
+      router.push('/');
     } catch (err) {
       setErrorMessage('An unexpected error occurred. Please try again.');
-      setIsLoading(false); // Stop loading on unexpected error
+      setIsLoading(false);
     }
   };
 
@@ -65,7 +71,7 @@ export default function Login() {
         className={styles.input}
         aria-label="Password"
       />
-      <button onClick={handleLogin} className={styles.button} disabled={isLoading}>
+      <button ref={loginButtonRef} onClick={handleLogin} className={styles.button} disabled={isLoading}>
         {isLoading ? <Spinner /> : 'Login'}
       </button>
       <p>
