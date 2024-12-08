@@ -47,6 +47,16 @@ export default function HostedTournaments() {
     }
   }, [user]);
 
+  const formatDateTime = (timestamp) => {
+    const date = new Date(timestamp);
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
   const confirmDelete = (tournamentId) => {
     setDeleteConfirmationId(tournamentId);
     setShowConfirmation(true);
@@ -109,7 +119,9 @@ export default function HostedTournaments() {
                 <th>Name</th>
                 <th>Code</th>
                 <th>Status</th>
+                <th>Participants</th>
                 <th>Description</th>
+                <th>Date Created</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -123,7 +135,9 @@ export default function HostedTournaments() {
                   </td>
                   <td>{t.code}</td>
                   <td>{t.status}</td>
+                  <td>{t.participant_count || 0}</td>
                   <td>{t.description || 'No description'}</td>
+                  <td>{formatDateTime(t.created_at)}</td>
                   <td>
                     <button
                       className={`${styles.button} ${styles.deleteButton}`}
