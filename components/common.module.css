@@ -49,6 +49,22 @@
   .button:hover {
     background-color: #208349;
   }
+
+  .deleteButton {
+    background-color: #e74c3c;
+  }
+  
+  .deleteButton:hover {
+    background-color: #6c2018;
+  }
+
+  .neutralButton {
+    background-color: #656464;
+  }
+  
+  .neutralButton:hover {
+    background-color: #3b3939;
+  }
   
   .button.secondary {
     background-color: #e74c3c;
@@ -56,6 +72,47 @@
   
   .button.secondary:hover {
     background-color: #80241a;
+  }
+
+  .fadeOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    animation: fadeIn 0.3s ease-in-out;
+  }
+  
+  /* Modal box */
+  .fadeModal {
+    background: white;
+    padding: 2rem;
+    border-radius: 4px;
+    max-width: 300px;
+    width: 100%;
+    text-align: center;
+    animation: slideDown 0.3s ease-in-out;
+  }
+  
+  .modalActions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 1rem;
+  }
+  
+  /* Animations */
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  @keyframes slideDown {
+    from { transform: translateY(-20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
   }
   
   /* Media Queries for Responsiveness */

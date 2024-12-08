@@ -1,32 +1,31 @@
+// Update this page to remove listing all tournaments and instead direct the user to the hosted tournaments page.
+
 import { supabase } from '../utils/supabaseClient';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import styles from '../components/common.module.css'; // Import CSS Module
+import styles from '../components/common.module.css';
 import Spinner from '../components/spinner';
 
-export default function Home({ tournaments, error }) {
+export default function Home() {
   const [user, setUser] = useState(null);
   const [logoutMessage, setLogoutMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-  const [isLoggingOut, setIsLoggingOut] = useState(false); // Loading state for logout
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
-    // Get the logged-in user
-    const fetchUser = async () => {
+    (async () => {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (!user || userError) {
         setUser(null);
       } else {
-        setUser(user); // User contains the email
+        setUser(user);
       }
-    };
-    fetchUser();
+    })();
   }, []);
 
   useEffect(() => {
-    // Listen to route changes to clear logout message
     const handleRouteChange = () => setLogoutMessage('');
     router.events.on('routeChangeStart', handleRouteChange);
 
@@ -36,17 +35,15 @@ export default function Home({ tournaments, error }) {
   }, [router.events]);
 
   useEffect(() => {
-    // Check for success message in query parameters
     if (router.query.successMessage) {
       setSuccessMessage(router.query.successMessage);
-      // Optionally clear the query parameter from the URL
       const { successMessage, ...rest } = router.query;
       router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
     }
   }, [router.query]);
 
   const handleLogout = async () => {
-    setIsLoggingOut(true); // Start loading
+    setIsLoggingOut(true);
     const { error } = await supabase.auth.signOut();
     if (error) {
       setLogoutMessage('Error logging out. Please try again.');
@@ -54,21 +51,15 @@ export default function Home({ tournaments, error }) {
       setUser(null);
       setLogoutMessage('You have been logged out successfully.');
     }
-    setIsLoggingOut(false); // Stop loading
+    setIsLoggingOut(false);
   };
-
-  if (error) {
-    return <div className={styles.error}>Error: {error.message}</div>;
-  }
 
   return (
     <div className={styles.container}>
       <header>
-        <button onClick={() => router.push('/')} className={styles.headerButton}>
-          Home
-        </button>
+        <button onClick={() => router.push('/')} className={styles.headerButton}>Home</button>
       </header>
-      <h1 className={styles.title}>Welcome to the Land of Redemption Tournament Tracker</h1>
+      <h1 className={styles.title}>Land of Redemption Tournament Tracker</h1>
       
       {logoutMessage && <p className={styles.message}>{logoutMessage}</p>}
       {successMessage && <p className={styles.message}>{successMessage}</p>}
@@ -85,23 +76,9 @@ export default function Home({ tournaments, error }) {
           <Link href="/tournaments/join">
             <button className={styles.button}>Join a Tournament</button>
           </Link>
-
-          <h2>Your Tournaments</h2>
-          <ul className={styles.tournamentsList}>
-            {tournaments.length > 0 ? (
-              tournaments.map((tournament) => (
-                <li key={tournament.id} className={styles.tournamentItem}>
-                  <Link href={`/tournaments/${tournament.id}`}>
-                    <a className={styles.tournamentLink}>
-                      {tournament.name} - Status: {tournament.status}
-                    </a>
-                  </Link>
-                </li>
-              ))
-            ) : (
-              <p className={styles.noTournaments}>No tournaments found. Create or join one!</p>
-            )}
-          </ul>
+          <Link href="/tournaments/hosted">
+            <button className={styles.button}>View Your Hosted Tournaments</button>
+          </Link>
         </>
       ) : (
         <>
