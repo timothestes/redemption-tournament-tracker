@@ -117,17 +117,3 @@ export default function Home({ tournaments, error }) {
     </div>
   );
 }
-
-export async function getServerSideProps() {
-  // Fetch tournaments hosted or joined by the logged-in user
-  const { data: tournaments, error } = await supabase
-    .from('tournaments')
-    .select();
-
-  return {
-    props: {
-      tournaments: tournaments || [],
-      error: error || null,
-    },
-  };
-}

@@ -38,7 +38,7 @@ export default function SignUp() {
       }
 
       // Call Flask API to save additional user data
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/save-user-data`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/v1/api/save-user-data`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
