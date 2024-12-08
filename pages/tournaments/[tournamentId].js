@@ -1,4 +1,3 @@
-// pages/tournaments/[tournamentId].js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../../utils/supabaseClient';
@@ -14,6 +13,7 @@ export default function TournamentView() {
   const [tournament, setTournament] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [deleteStatus, setDeleteStatus] = useState('');
   const router = useRouter();
   const { tournamentId } = router.query;
 
@@ -62,6 +62,25 @@ export default function TournamentView() {
     }
   }, [user, tournamentId]);
 
+  const handleRemoveParticipant = async (participantId) => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/v1/participants/${participantId}`, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        setParticipants((prev) => prev.filter((p) => p.id !== participantId));
+        setDeleteStatus('Participant removed successfully.');
+      } else {
+        const data = await res.json();
+        setDeleteStatus(data.error || 'Failed to remove participant.');
+      }
+    } catch (error) {
+      setDeleteStatus('Error: Could not remove participant.');
+      console.error(error);
+    }
+  };
+
   if (!user) {
     return (
       <div className={styles.container}>
@@ -95,6 +114,8 @@ export default function TournamentView() {
     );
   }
 
+  const isHost = user.id === tournament.host_id;
+
   return (
     <div className={styles.container}>
       <header>
@@ -106,19 +127,35 @@ export default function TournamentView() {
       <p><strong>Description:</strong> {tournament.description || 'No description'}</p>
 
       <h2>Participants</h2>
+      {deleteStatus && <p className={styles.message}>{deleteStatus}</p>}
       {participants.length > 0 ? (
         <table className={styles.table}>
           <thead>
             <tr>
-              <th>User ID</th>
+              <th>Email</th>
+              <th>First Name</th>
+              <th>Last Name</th>
               <th>Joined At</th>
+              {isHost && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
             {participants.map((participant) => (
               <tr key={participant.id}>
-                <td>{participant.user_id}</td>
+                <td>{participant.email}</td>
+                <td>{participant.first_name}</td>
+                <td>{participant.last_name}</td>
                 <td>{new Date(participant.created_at).toLocaleString()}</td>
+                {isHost && (
+                  <td>
+                    <button
+                      onClick={() => handleRemoveParticipant(participant.id)}
+                      className={`${styles.button} ${styles.deleteButton}`}
+                    >
+                      Remove
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
