@@ -40,7 +40,11 @@ export default function RootLayout({
                       <HomeIcon /> 
                     </div>
                   </div>
-                  {!hasEnvVars ? <EnvVarWarning /> : <HeaderAuth />}
+                  
+                  {
+                    // @ts-ignore
+                    !hasEnvVars ? <EnvVarWarning /> : <HeaderAuth />
+                  }
                 </div>
               </nav>
               <div className="flex flex-col gap-20 max-w-5xl p-5">
