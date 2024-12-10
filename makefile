@@ -8,8 +8,7 @@ all: setup
 
 # Install dependencies
 install:
-	npm install next react react-dom --legacy-peer-deps @supabase/supabase-js
-
+	npm install
 
 # Run the development server
 run:
