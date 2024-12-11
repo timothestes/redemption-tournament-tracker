@@ -11,14 +11,13 @@ Ensure you have the following installed on your machine:
 - Node.js (latest version recommended)
 - npm (comes with Node.js)
 - Python (for the Flask API)
-- PostgreSQL (for the database)
 
 ### Installation
 
 1. **Clone the repository:**
 
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/timothestes/redemption-tournament-tracker
    cd redemption-tournament-tracker
    ```
 
@@ -52,22 +51,6 @@ After building, you can start the production server with:
 
 ```bash
 npm run start
-```
-
-### Cleaning Up
-
-To remove `node_modules` and lock files, run:
-
-```bash
-make clean
-```
-
-### Fresh Setup
-
-To clean and set up the project from scratch, use:
-
-```bash
-make fresh
 ```
 
 ## Overview
@@ -137,47 +120,4 @@ create table matches (
 );
 
 # Row-level security policies to be implemented
-```
-
-```sql
-create table users (
-  id bigint primary key generated always as identity,
-  username text not null,
-  email text unique not null,
-  password_hash text not null,
-  created_at timestamp with time zone default now()
-);
-
-create table tournaments (
-  id bigint primary key generated always as identity,
-  name text not null,
-  host_id bigint references users (id) on delete cascade,
-  code text unique not null,
-  created_at timestamp with time zone default now(),
-  updated_at timestamp with time zone default now()
-);
-
-create table participants (
-  id bigint primary key generated always as identity,
-  tournament_id bigint references tournaments (id) on delete cascade,
-  user_id bigint references users (id) on delete cascade,
-  joined_at timestamp with time zone default now(),
-  place int
-);
-
-create table matches (
-  id bigint primary key generated always as identity,
-  tournament_id bigint references tournaments (id) on delete cascade,
-  round int not null,
-  player1_id bigint references participants (id) on delete cascade,
-  player2_id bigint references participants (id) on delete cascade,
-  player1_score int not null default 0,
-  player2_score int not null default 0,
-  differential int generated always as (player1_points - player2_points) stored,
-  winner_id bigint references participants (id) on delete cascade,
-  updated_at timestamp with time zone default now(),
-  is_tie boolean default false
-);
-
-# row level security stuff pending 
 ```
