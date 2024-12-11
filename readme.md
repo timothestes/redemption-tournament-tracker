@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project aims to develop a sophisticated and visually appealing web application for managing and tracking tournament brackets. The application will feature a sleek, user-friendly interface with a comprehensive dashboard that allows users to create and join tournaments effortlessly. Key features include:
+This project aims to develop a sophisticated and visually appealing web application for managing and tracking tournament brackets. The frontend of the application will be built using the Next.js framework, providing a sleek, user-friendly interface with a comprehensive dashboard that allows users to create and join tournaments effortlessly. For more complex backend tasks, a Flask API will be utilized, with data stored in a PostgreSQL database hosted by Supabase. Key features include:
 
 - **Authentication System**: Secure login and registration managed by Supabase, ensuring user data protection and privacy.
 - **Tournament Management**: A dedicated section for hosts to oversee multiple tournaments, access participant details, and monitor progress seamlessly.
