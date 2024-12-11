@@ -1,5 +1,75 @@
 # Tournament Bracket Web App
 
+## Getting Started
+
+To run this project locally, follow these steps:
+
+### Prerequisites
+
+Ensure you have the following installed on your machine:
+
+- Node.js (latest version recommended)
+- npm (comes with Node.js)
+- Python (for the Flask API)
+- PostgreSQL (for the database)
+
+### Installation
+
+1. **Clone the repository:**
+
+   ```bash
+   git clone <repository-url>
+   cd redemption-tournament-tracker
+   ```
+
+2. **Install dependencies:**
+
+   ```bash
+   npm install
+   ```
+
+### Running the Development Server
+
+To start the Next.js development server, run:
+
+```bash
+npm run dev
+```
+
+This will start the server at `http://localhost:3000`.
+
+### Building for Production
+
+To build the project for production, use:
+
+```bash
+npm run build
+```
+
+### Starting the Production Server
+
+After building, you can start the production server with:
+
+```bash
+npm run start
+```
+
+### Cleaning Up
+
+To remove `node_modules` and lock files, run:
+
+```bash
+make clean
+```
+
+### Fresh Setup
+
+To clean and set up the project from scratch, use:
+
+```bash
+make fresh
+```
+
 ## Overview
 
 This project aims to develop a sophisticated and visually appealing web application for managing and tracking tournament brackets. The frontend of the application will be built using the Next.js framework, providing a sleek, user-friendly interface with a comprehensive dashboard that allows users to create and join tournaments effortlessly. For more complex backend tasks, a Flask API will be utilized, with data stored in a PostgreSQL database hosted by Supabase. Key features include:
