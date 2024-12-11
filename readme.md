@@ -1,24 +1,73 @@
-Here’s the web app I’d like to build:
+# Tournament Bracket Web App
 
-Design a modern and visually appealing web app interface for hosting and tracking tournament brackets. The app should have a clean, user-friendly layout with a dashboard where users can create and join tournaments. Include features such as:
+## Overview
 
-- A login system for authentication. (managed by supabase)
-- A section for tournament hosts to manage multiple tournaments, view participant details, and track progress.
-- Interactive brackets that dynamically update as games are played.
-- A code-based system for users to join specific tournaments. (probably a random sequence of 4-5 characters)
-- A color scheme and typography that emphasize clarity and engagement.
+This project aims to develop a sophisticated and visually appealing web application for managing and tracking tournament brackets. The application will feature a sleek, user-friendly interface with a comprehensive dashboard that allows users to create and join tournaments effortlessly. Key features include:
 
-The app should also display match pairings, tournament rounds, and the final winner in a clear and organized manner. Use consistent design elements to guide users intuitively through the experience.
+- **Authentication System**: Secure login and registration managed by Supabase, ensuring user data protection and privacy.
+- **Tournament Management**: A dedicated section for hosts to oversee multiple tournaments, access participant details, and monitor progress seamlessly.
+- **Dynamic Brackets**: Interactive tournament brackets that automatically update as matches are played, providing real-time insights.
+- **Join Tournaments**: A unique code-based system enabling users to join specific tournaments easily, using a random sequence of 4-5 characters.
+- **Engaging Design**: A thoughtfully chosen color scheme and typography to enhance clarity and user engagement throughout the app.
 
-The tournament host will need to be able to edit match results if there are errors in reporting.
+## Features
 
-Each match result needs to keep track of the following:
+- **Match Display**: Clear and organized presentation of match pairings, tournament rounds, and the final winner.
+- **User Experience**: Consistent design elements to intuitively guide users through the app.
+- **Editable Match Results**: Allow tournament hosts to correct match results in case of reporting errors.
 
-1. The number of points earned by a player
-2. The number of points earned by the opponent
-3. The difference between the number of points earned by the player and the number of points earned by the opponent (called the differential)
+## Match Result Tracking
 
-Here’s the proposes sql database:
+Each match result will record the following details:
+
+1. **Player Points**: The number of points earned by each player.
+2. **Opponent Points**: The number of points earned by the opponent.
+3. **Point Differential**: The difference between the player's and opponent's points, known as the differential.
+
+## Proposed SQL Database Schema
+
+```sql
+create table users (
+  id bigint primary key generated always as identity,
+  username text not null,
+  email text unique not null,
+  password_hash text not null,
+  created_at timestamp with time zone default now()
+);
+
+create table tournaments (
+  id bigint primary key generated always as identity,
+  name text not null,
+  host_id bigint references users (id) on delete cascade,
+  code text unique not null,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
+);
+
+create table participants (
+  id bigint primary key generated always as identity,
+  tournament_id bigint references tournaments (id) on delete cascade,
+  user_id bigint references users (id) on delete cascade,
+  joined_at timestamp with time zone default now(),
+  place int
+);
+
+create table matches (
+  id bigint primary key generated always as identity,
+  tournament_id bigint references tournaments (id) on delete cascade,
+  round int not null,
+  player1_id bigint references participants (id) on delete cascade,
+  player2_id bigint references participants (id) on delete cascade,
+  player1_score int not null default 0,
+  player2_score int not null default 0,
+  differential int generated always as (player1_points - player2_points) stored,
+  winner_id bigint references participants (id) on delete cascade,
+  updated_at timestamp with time zone default now(),
+  is_tie boolean default false
+);
+
+# Row-level security policies to be implemented
+```
 
 ```sql
 create table users (
