@@ -9,6 +9,7 @@ const supabase = createClient();
 
 export default function TournamentsPage() {
   const [tournaments, setTournaments] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [newTournament, setNewTournament] = useState("");
 
   useEffect(() => {
@@ -19,7 +20,12 @@ export default function TournamentsPage() {
     const { data: tournaments, error } = await supabase
       .from("tournaments")
       .select("*");
-    if (error) console.error("Error fetching tournaments:", error);
+    if (error) {
+      console.error("Error fetching tournaments:", error);
+    } else {
+      setTournaments(tournaments);
+    }
+    setLoading(false);
     else setTournaments(tournaments);
   };
 
@@ -69,7 +75,9 @@ export default function TournamentsPage() {
     <div className="p-4">
       <SideNav />
       <h1 className="text-2xl font-bold">Your tournaments</h1>
-      {tournaments.length === 0 ? (
+      {loading ? (
+        <p>Loading tournaments...</p>
+      ) : tournaments.length === 0 ? (
         <p>No tournaments found.</p>
       ) : (
         <ul className="mt-4">
