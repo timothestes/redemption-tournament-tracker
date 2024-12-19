@@ -77,7 +77,7 @@ export default function TournamentsPage() {
       {loading ? (
         <p>Loading tournaments...</p>
       ) : tournaments.length === 0 ? (
-        <p>No tournaments found.</p>
+        <p>No tournaments found. <a href="/protected/tournaments/host" className="text-blue-500 underline">Create one?</a></p>
       ) : (
         <ul className="mt-4">
           {tournaments.map((tournament) => (
