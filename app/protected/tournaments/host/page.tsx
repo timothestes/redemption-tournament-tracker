@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Modal from "../../../../components/ui/modal";
 import { createClient } from "../../../../utils/supabase/client";
 import { useRouter } from "next/navigation";
 import SideNav from "../../../../components/side-nav";
@@ -10,11 +11,12 @@ const supabase = createClient();
 
 export default function HostTournamentPage() {
   const [newTournament, setNewTournament] = useState("");
+  const [showError, setShowError] = useState(false);
   const router = useRouter();
 
   const addTournament = async () => {
     if (!newTournament.trim()) {
-      alert("Tournament name is required.");
+      setShowError(true);
       return;
     }
 
@@ -61,6 +63,13 @@ export default function HostTournamentPage() {
           Add Tournament
         </button>
       </div>
+      <Modal
+        isOpen={showError}
+        onClose={() => setShowError(false)}
+        title="Error"
+      >
+        <p>Tournament name is required.</p>
+      </Modal>
     </div>
   );
 }
