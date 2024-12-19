@@ -13,6 +13,11 @@ export default function HostTournamentPage() {
   const router = useRouter();
 
   const addTournament = async () => {
+    if (!newTournament.trim()) {
+      alert("Tournament name is required.");
+      return;
+    }
+
     const {
       data: { user },
       error: userError,
