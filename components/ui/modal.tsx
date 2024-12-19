@@ -12,12 +12,12 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white p-4 rounded shadow-lg max-w-sm w-full">
+      <div className="bg-background text-foreground p-4 rounded shadow-lg max-w-sm w-full">
         <h2 className="text-xl font-bold mb-4">{title}</h2>
         <div>{children}</div>
         <button
           onClick={onClose}
-          className="mt-4 p-2 bg-blue-500 text-white rounded"
+          className="mt-4 p-2 bg-primary text-primary-foreground rounded"
         >
           Close
         </button>
