@@ -46,6 +46,8 @@ export default function HostTournamentPage() {
           onChange={(e) => setNewTournament(e.target.value)}
           placeholder="New Tournament Name"
           className="border p-2"
+          required
+          maxLength={50} // Set a reasonable character limit
         />
         <button
           onClick={addTournament}
