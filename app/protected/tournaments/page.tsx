@@ -24,10 +24,20 @@ export default function TournamentsPage() {
   };
 
   const addTournament = async () => {
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError) {
+      console.error("Error fetching user:", userError);
+      return;
+    }
+
     const code = generateCode();
     const { data, error } = await supabase
       .from("tournaments")
-      .insert([{ name: newTournament, code }])
+      .insert([{ name: newTournament, code, host_id: user.id }])
       .select();
     if (error) console.error("Error adding tournament:", error);
     else {
