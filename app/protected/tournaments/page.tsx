@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createClient } from "../../../utils/supabase/client"; // Correct client utility
+import { createClient } from "../../../utils/supabase/client";
 import SideNav from "../../../components/side-nav";
 import { generateCode } from "../../../utils/generateCode";
 
@@ -71,41 +71,54 @@ export default function TournamentsPage() {
   };
 
   return (
-    <div className="p-4">
+    <div className="flex h-screen">
       <SideNav />
-      <h1 className="text-2xl font-bold">Your tournaments</h1>
-      {loading ? (
-        <p>Loading tournaments...</p>
-      ) : tournaments.length === 0 ? (
-        <p>No tournaments found. <a href="/protected/tournaments/host" className="text-blue-500 underline">Create one?</a></p>
-      ) : (
-        <ul className="mt-4">
-          {tournaments.map((tournament) => (
-            <li key={tournament.id} className="flex justify-between items-center">
-              <span>{tournament.name}</span>
-              <div>
-                <button
-                  onClick={() =>
-                    updateTournament(
-                      tournament.id,
-                      prompt("New name:", tournament.name)
-                    )
-                  }
-                  className="mr-2 p-1 bg-yellow-500 text-white"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => deleteTournament(tournament.id)}
-                  className="p-1 bg-red-500 text-white"
-                >
-                  Delete
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+      <div className="flex-grow p-4">
+        <h1 className="text-2xl font-bold">Your tournaments</h1>
+        {loading ? (
+          <p>Loading tournaments...</p>
+        ) : tournaments.length === 0 ? (
+          <p>
+            No tournaments found.{" "}
+            <a
+              href="/protected/tournaments/host"
+              className="text-blue-500 underline"
+            >
+              Create one?
+            </a>
+          </p>
+        ) : (
+          <ul className="mt-4">
+            {tournaments.map((tournament) => (
+              <li
+                key={tournament.id}
+                className="flex justify-between items-center"
+              >
+                <span className="mr-4">{tournament.name}</span>
+                <div>
+                  <button
+                    onClick={() =>
+                      updateTournament(
+                        tournament.id,
+                        prompt("New name:", tournament.name)
+                      )
+                    }
+                    className="mr-2 p-1 bg-yellow-500 text-white"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => deleteTournament(tournament.id)}
+                    className="p-1 bg-red-500 text-white"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
