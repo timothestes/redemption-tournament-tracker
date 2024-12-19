@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "../../../utils/supabase/client"; // Correct client utility
 import SideNav from "../../../components/side-nav";
+import { generateCode } from "../../../utils/generateCode";
 
 const supabase = createClient();
 
@@ -23,9 +24,10 @@ export default function TournamentsPage() {
   };
 
   const addTournament = async () => {
+    const code = generateCode();
     const { data, error } = await supabase
       .from("tournaments")
-      .insert([{ name: newTournament }])
+      .insert([{ name: newTournament, code }])
       .select();
     if (error) console.error("Error adding tournament:", error);
     else {
