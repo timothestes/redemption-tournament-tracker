@@ -53,7 +53,7 @@ export const signInAction = async (formData: FormData) => {
     return encodedRedirect("error", "/protected/tournaments", error.message);
   }
 
-  return redirect("/protected");
+  return redirect("/protected/tournaments");
 };
 
 export const forgotPasswordAction = async (formData: FormData) => {
