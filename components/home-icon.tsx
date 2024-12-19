@@ -5,7 +5,7 @@ import Link from "next/link";
 const HomeIcon: React.FC = () => {
   return (
     <Link href="/" passHref>
-      <div className="cursor-pointer">
+      <div className="cursor-pointer ml-auto">
         <Image
           src="/lor.png"
           alt="Home Icon"
