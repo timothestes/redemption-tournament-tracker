@@ -26,7 +26,6 @@ export default function TournamentsPage() {
       setTournaments(tournaments);
     }
     setLoading(false);
-    else setTournaments(tournaments);
   };
 
   const addTournament = async () => {
