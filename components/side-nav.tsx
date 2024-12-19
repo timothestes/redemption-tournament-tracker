@@ -5,7 +5,7 @@ const SideNav: React.FC = () => {
     <nav className="fixed top-16 left-0 h-full w-64 bg-gray-800 text-white p-4 shadow-lg">
       <ul>
         <li className="mb-2">
-          <a href="#" className="hover:underline">
+          <a href="/protected/tournaments" className="hover:underline">
             Tournaments
           </a>
         </li>
