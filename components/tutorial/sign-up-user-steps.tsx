@@ -4,7 +4,7 @@ import { TutorialStep } from "./tutorial-step";
 export default function SignUpUserSteps() {
   return (
     <ol className="flex flex-col gap-6">
-      <TutorialStep title="Sign up to host or join a tournament">
+      <TutorialStep title="Sign up to host a tournament">
         <p>
           Only users that are{" "}
           <Link
@@ -13,7 +13,7 @@ export default function SignUpUserSteps() {
           >
             signed in
           </Link>{" "}
-          can host or join a tournament
+          can host a tournament
         </p>
       </TutorialStep>
     </ol>

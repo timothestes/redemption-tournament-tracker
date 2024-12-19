@@ -5,7 +5,7 @@ export default function Header() {
       </div>
       <h1 className="sr-only">Welcome message</h1>
       <p className="text-3xl lg:text-4xl !leading-tight mx-auto max-w-xl text-center">
-        A new way to host and join{" "}
+        A new way to host{" "}
         <span className="font-bold text-4xl lg:text-5xl">
           Redemption Tournaments
         </span>
