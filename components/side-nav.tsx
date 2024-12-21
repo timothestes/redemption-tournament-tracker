@@ -39,6 +39,17 @@ const SideNav: React.FC = () => {
                 Report a Bug
               </Sidebar.Item>
             </Sidebar.ItemGroup>
+            <Sidebar.Collapse label="More Options">
+              <Sidebar.Item href="#">
+                Placeholder 1
+              </Sidebar.Item>
+              <Sidebar.Item href="#">
+                Placeholder 2
+              </Sidebar.Item>
+              <Sidebar.Item href="#">
+                Placeholder 3
+              </Sidebar.Item>
+            </Sidebar.Collapse>
           </Sidebar.ItemGroup>
         </Sidebar.Items>
       </Sidebar>
