@@ -113,12 +113,6 @@ export default function TournamentsPage() {
         ) : tournaments.length === 0 ? (
           <p>
             No tournaments found.{" "}
-            <a
-              href="/tracker/tournaments/host"
-              className="text-blue-500 underline"
-            >
-              Create one?
-            </a>
           </p>
         ) : (
           <div className="overflow-x-auto">
