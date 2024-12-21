@@ -17,7 +17,7 @@ const SideNav: React.FC = () => {
     <>
       <button
         onClick={toggleSidebar}
-        className="fixed top-16 left-0 z-20 p-2 bg-primary text-primary-foreground md:hidden"
+        className="fixed top-16 left-0 z-20 p-2 bg-primary text-primary-foreground md:hidden h-full"
       >
         <HiMenu size={24} />
       </button>
