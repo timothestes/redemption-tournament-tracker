@@ -19,7 +19,7 @@ export default function HostTournamentPage() {
 
   useEffect(() => {
     if (showToast) {
-      const timer = setTimeout(() => setShowToast(false), 3000);
+      const timer = setTimeout(() => setShowToast(false), 3000); // 3 seconds
       return () => clearTimeout(timer);
     }
   }, [showToast]);
