@@ -49,6 +49,7 @@ export default function TournamentsPage() {
     else {
       fetchTournaments();
       setShowDeleteToast(true);
+      setTimeout(() => setShowDeleteToast(false), 2000); // 2 seconds
     }
   };
 
