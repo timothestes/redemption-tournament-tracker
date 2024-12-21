@@ -97,7 +97,7 @@ export default function TournamentsPage() {
                         timeZone: "UTC",
                       }).format(new Date(tournament.created_at))}
                     </Table.Cell>
-                    <Table.Cell>
+                    <Table.Cell className="flex items-center space-x-4">
                       <HiPencil
                         onClick={() =>
                           updateTournament(
@@ -105,22 +105,13 @@ export default function TournamentsPage() {
                             prompt("New name:", tournament.name)
                           )
                         }
-                        className="mr-2 p-1 bg-yellow-600 text-white"
-                        color="blue"
-                        onClick={() =>
-                          updateTournament(
-                            tournament.id,
-                            prompt("New name:", tournament.name)
-                          )
-                        }
-                        className="mr-2 text-yellow-600 cursor-pointer"
+                        className="text-blue-500 cursor-pointer hover:text-blue-700 w-6 h-6"
+                        aria-label="Edit"
                       />
                       <HiTrash
                         onClick={() => deleteTournament(tournament.id)}
-                        className="p-1 bg-red-600 text-white"
-                        color="failure"
-                        onClick={() => deleteTournament(tournament.id)}
-                        className="text-red-600 cursor-pointer"
+                        className="text-red-500 cursor-pointer hover:text-red-700 w-6 h-6"
+                        aria-label="Delete"
                       />
                     </Table.Cell>
                   </Table.Row>
