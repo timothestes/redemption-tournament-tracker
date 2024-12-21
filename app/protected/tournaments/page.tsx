@@ -86,13 +86,13 @@ export default function TournamentsPage() {
                         prompt("New name:", tournament.name)
                       )
                     }
-                    className="mr-2 p-1 bg-yellow-500 text-white"
+                    className="mr-2 p-1 bg-yellow-600 text-white"
                   >
                     Edit
                   </button>
                   <button
                     onClick={() => deleteTournament(tournament.id)}
-                    className="p-1 bg-red-500 text-white"
+                    className="p-1 bg-red-600 text-white"
                   >
                     Delete
                   </button>
