@@ -17,9 +17,28 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   const [isModalOpen, setIsModalOpen] = useState(false);
   const router = useRouter();
 
-  const handleAddParticipant = (name: string) => {
-    // Add logic to insert the new participant into the database
-    // Example: await addParticipant(name);
+  const handleAddParticipant = async (name: string) => {
+    try {
+      const { error } = await supabase
+        .from("participants")
+        .insert([{ name, tournament_id: id }]);
+      if (error) {
+        console.error("Error adding participant:", error);
+      } else {
+        // Refresh the participants list
+        const { data, error } = await supabase
+          .from("participants")
+          .select("*")
+          .eq("tournament_id", id);
+        if (error) {
+          console.error("Error fetching participants:", error);
+        } else {
+          setParticipants(data);
+        }
+      }
+    } catch (error) {
+      console.error("Unexpected error:", error);
+    }
     setIsModalOpen(false);
   };
 
