@@ -11,6 +11,7 @@ export default function TournamentsPage() {
   const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newTournament, setNewTournament] = useState("");
+  const [showDeleteToast, setShowDeleteToast] = useState(false);
 
   useEffect(() => {
     fetchTournaments();
@@ -35,7 +36,10 @@ export default function TournamentsPage() {
       .eq("id", id)
       .select();
     if (error) console.error("Error updating tournament:", error);
-    else fetchTournaments();
+    else {
+      fetchTournaments();
+      setShowDeleteToast(true);
+    }
   };
 
   const deleteTournament = async (id) => {
@@ -94,6 +98,19 @@ export default function TournamentsPage() {
               </li>
             ))}
           </ul>
+        )}
+        {showDeleteToast && (
+          <div className="fixed bottom-4 left-4">
+            <Toast>
+              <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-500 dark:bg-red-800 dark:text-red-200">
+                <HiCheck className="h-5 w-5" />
+              </div>
+              <div className="ml-3 text-sm font-normal">
+                Tournament deleted successfully!
+              </div>
+              <Toast.Toggle onClick={() => setShowDeleteToast(false)} />
+            </Toast>
+          </div>
         )}
       </div>
     </div>
