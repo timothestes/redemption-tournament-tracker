@@ -37,17 +37,18 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
         <h2 className="text-xl font-bold mb-4">Add Tournament</h2>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="mb-2 block">
-            <Label htmlFor="name" value="Tournament Name" />
+            <Label htmlFor="name" value="" />
             <TextInput
               id="name"
               name="name"
               type="text"
+              placeholder="My tournament name"
               required
               ref={inputRef}
             />
           </div>
           <div className="flex justify-end gap-3">
-            <Button type="button" outline gradientDuoTone="pinkToOrange" onClick={onClose}>
+            <Button type="button" outline color="red" onClick={onClose}>
               Cancel
             </Button>
             <Button type="submit" outline gradientDuoTone="greenToBlue">Add</Button>

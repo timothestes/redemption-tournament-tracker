@@ -196,7 +196,7 @@ export default function TournamentsPage() {
           </Modal.Body>
           <Modal.Footer className="flex justify-end space-x-2">
             <Button outline gradientDuoTone="greenToBlue" onClick={updateTournament}>Save</Button>
-            <Button outline gradientDuoTone="pinkToOrange" onClick={() => setIsEditModalOpen(false)}>
+            <Button outline color="red" onClick={() => setIsEditModalOpen(false)}>
               Cancel
             </Button>
           </Modal.Footer>

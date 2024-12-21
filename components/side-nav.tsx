@@ -31,7 +31,7 @@ const SideNav: React.FC = () => {
         <Sidebar.Items>
           <Sidebar.ItemGroup>
             <Sidebar.Item href="/tracker/tournaments" icon={FaTrophy}>
-              Your Tournaments
+              Tournaments
             </Sidebar.Item>
             <Sidebar.ItemGroup>
               <Sidebar.Collapse label="Resources" icon={HiDocumentText} className="pl-2">
