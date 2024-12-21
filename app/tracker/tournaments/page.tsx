@@ -5,6 +5,7 @@ import { createClient } from "../../../utils/supabase/client";
 import ToastNotification from "../../../components/ui/toast-notification";
 import { Table } from "flowbite-react";
 import { HiPencil, HiTrash } from "react-icons/hi";
+import { useRouter } from "next/navigation";
 
 const supabase = createClient();
 
@@ -12,6 +13,7 @@ export default function TournamentsPage() {
   const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDeleteToast, setShowDeleteToast] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     fetchTournaments();
@@ -57,7 +59,7 @@ export default function TournamentsPage() {
   return (
     <div className="flex h-screen pl-64">
       <div className="flex-grow p-4">
-      <h1 className="text-2xl font-bold mb-6">Your Tournaments</h1>
+        <h1 className="text-2xl font-bold mb-6">Your Tournaments</h1>
         {loading ? (
           <p>Loading tournaments...</p>
         ) : tournaments.length === 0 ? (
@@ -77,12 +79,16 @@ export default function TournamentsPage() {
                 <Table.HeadCell>Name</Table.HeadCell>
                 <Table.HeadCell>Created At</Table.HeadCell>
                 <Table.HeadCell>
-                  <span className="sr-only">Edit</span>
+                  <span className="sr-only">Actions</span>
                 </Table.HeadCell>
               </Table.Head>
               <Table.Body className="divide-y">
                 {tournaments.map((tournament) => (
-                  <Table.Row key={tournament.id} className="bg-white dark:border-gray-700 dark:bg-gray-800">
+                  <Table.Row
+                    key={tournament.id}
+                    className="bg-white dark:border-gray-700 dark:bg-gray-800 cursor-pointer hover:bg-gray-100"
+                    onClick={() => router.push(`/tracker/tournaments/${tournament.id}`)}
+                  >
                     <Table.Cell className="whitespace-nowrap font-medium text-gray-900 dark:text-white">
                       {tournament.name}
                     </Table.Cell>
@@ -94,22 +100,25 @@ export default function TournamentsPage() {
                         hour: "2-digit",
                         minute: "2-digit",
                         second: "2-digit",
-                        timeZone: "UTC",
                       }).format(new Date(tournament.created_at))}
                     </Table.Cell>
                     <Table.Cell className="flex items-center space-x-4">
                       <HiPencil
-                        onClick={() =>
+                        onClick={(e) => {
+                          e.stopPropagation();
                           updateTournament(
                             tournament.id,
                             prompt("New name:", tournament.name)
-                          )
-                        }
+                          );
+                        }}
                         className="text-blue-500 cursor-pointer hover:text-blue-700 w-6 h-6"
                         aria-label="Edit"
                       />
                       <HiTrash
-                        onClick={() => deleteTournament(tournament.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteTournament(tournament.id);
+                        }}
                         className="text-red-500 cursor-pointer hover:text-red-700 w-6 h-6"
                         aria-label="Delete"
                       />
