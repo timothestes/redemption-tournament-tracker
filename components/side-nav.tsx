@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Sidebar } from "flowbite-react";
-import { HiArrowSmRight, HiUser, HiDocumentText, HiMenu } from "react-icons/hi";
+import { HiArrowSmRight, HiDocumentText, HiMenu } from "react-icons/hi";
 import { FaTrophy, FaPlus, FaBookOpen } from "react-icons/fa6";
 import { PiPencilLineBold } from "react-icons/pi";
 import { TbCardsFilled, TbArrowGuideFilled } from "react-icons/tb";
@@ -86,9 +86,9 @@ const SideNav: React.FC = () => {
               </Sidebar.Collapse>
             </Sidebar.ItemGroup>
             <Sidebar.ItemGroup>
-              <Sidebar.Item href="/tracker/profile" icon={HiUser}>
+              {/* <Sidebar.Item href="/tracker/profile" icon={HiUser}>
                 Profile
-              </Sidebar.Item>
+              </Sidebar.Item> */}
               <Sidebar.Item href="/tracker/bug" icon={HiArrowSmRight}>
                 Report a Bug
               </Sidebar.Item>

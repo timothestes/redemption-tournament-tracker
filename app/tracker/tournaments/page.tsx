@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "../../../utils/supabase/client";
 import ToastNotification from "../../../components/ui/toast-notification";
+import { Table } from "flowbite-react";
 
 const supabase = createClient();
 
@@ -73,8 +74,7 @@ export default function TournamentsPage() {
             <Table hoverable>
               <Table.Head>
                 <Table.HeadCell>Name</Table.HeadCell>
-                <Table.HeadCell>Date</Table.HeadCell>
-                <Table.HeadCell>Location</Table.HeadCell>
+                <Table.HeadCell>Created At</Table.HeadCell>
                 <Table.HeadCell>
                   <span className="sr-only">Edit</span>
                 </Table.HeadCell>
@@ -85,8 +85,17 @@ export default function TournamentsPage() {
                     <Table.Cell className="whitespace-nowrap font-medium text-gray-900 dark:text-white">
                       {tournament.name}
                     </Table.Cell>
-                    <Table.Cell>{tournament.date}</Table.Cell>
-                    <Table.Cell>{tournament.location}</Table.Cell>
+                    <Table.Cell>
+                      {new Intl.DateTimeFormat("en-US", {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                        timeZone: "UTC",
+                      }).format(new Date(tournament.created_at))}
+                    </Table.Cell>
                     <Table.Cell>
                       <button
                         onClick={() =>
