@@ -5,7 +5,7 @@ import { HiArrowSmRight, HiChartPie, HiUser, HiViewBoards } from "react-icons/hi
 
 const SideNav: React.FC = () => {
   return (
-    <Sidebar aria-label="Default sidebar example" className="fixed h-full">
+    <Sidebar aria-label="Default sidebar example" className="fixed h-full top-0 left-0">
       <Sidebar.Items>
         <Sidebar.ItemGroup>
           <Sidebar.Item href="/protected/tournaments" icon={HiChartPie}>
