@@ -13,6 +13,9 @@ install:
 # Run the development server
 run:
 	npm run dev
+	
+dev:
+	npm run dev
 
 # Build the project
 build:
