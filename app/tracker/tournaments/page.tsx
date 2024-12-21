@@ -112,7 +112,7 @@ export default function TournamentsPage() {
           <p>Loading tournaments...</p>
         ) : tournaments.length === 0 ? (
           <p>
-            No tournaments found.{" "}
+            No tournaments found.
           </p>
         ) : (
           <div className="overflow-x-auto">
