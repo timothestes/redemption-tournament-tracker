@@ -3,14 +3,14 @@
 import { useState, useEffect } from "react";
 import { createClient } from "../../../utils/supabase/client";
 import SideNav from "../../../components/side-nav";
-import { generateCode } from "../../../utils/generateCode";
+import { Toast } from "flowbite-react";
+import { HiCheck } from "react-icons/hi";
 
 const supabase = createClient();
 
 export default function TournamentsPage() {
   const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [newTournament, setNewTournament] = useState("");
   const [showDeleteToast, setShowDeleteToast] = useState(false);
 
   useEffect(() => {
@@ -38,7 +38,6 @@ export default function TournamentsPage() {
     if (error) console.error("Error updating tournament:", error);
     else {
       fetchTournaments();
-      setShowDeleteToast(true);
     }
   };
 
@@ -48,7 +47,10 @@ export default function TournamentsPage() {
       .delete()
       .eq("id", id);
     if (error) console.error("Error deleting tournament:", error);
-    else fetchTournaments();
+    else {
+      fetchTournaments();
+      setShowDeleteToast(true);
+    }
   };
 
   return (
@@ -100,7 +102,7 @@ export default function TournamentsPage() {
           </ul>
         )}
         {showDeleteToast && (
-          <div className="fixed bottom-4 left-4">
+          <div className="fixed bottom-4 right-4">
             <Toast>
               <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-500 dark:bg-red-800 dark:text-red-200">
                 <HiCheck className="h-5 w-5" />
