@@ -26,27 +26,28 @@ export default function TournamentsPage() {
 
   const handleAddTournament = async (name: string) => {
     try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError) {
+        console.error("Error fetching user:", userError);
+        return;
+      }
+
       const { error } = await supabase
-        .from("participants")
-        .insert([{ name, tournament_id: id }]);
+        .from("tournaments")
+        .insert([{ name, host_id: user.id }]);
       if (error) {
-        console.error("Error adding participant:", error);
+        console.error("Error adding tournament:", error);
       } else {
-        // Refresh the participants list
-        const { data, error } = await supabase
-          .from("participants")
-          .select("*")
-          .eq("tournament_id", id);
-        if (error) {
-          console.error("Error fetching participants:", error);
-        } else {
-          setParticipants(data);
-        }
+        fetchTournaments();
+        setisAddTournamentModalOpen(false);
       }
     } catch (error) {
       console.error("Unexpected error:", error);
     }
-    setIsModalOpen(false);
   };
 
   const fetchTournaments = async () => {
