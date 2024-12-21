@@ -1,7 +1,5 @@
 "use client";
 
-"use client";
-
 import { useState } from "react";
 import { Sidebar } from "flowbite-react";
 import { HiArrowSmRight, HiChartPie, HiUser, HiViewBoards, HiMenu } from "react-icons/hi";
@@ -17,13 +15,13 @@ const SideNav: React.FC = () => {
     <>
       <button
         onClick={toggleSidebar}
-        className="fixed top-16 left-0 z-20 p-2 bg-primary text-primary-foreground md:hidden"
+        className="fixed top-16 left-0 z-20 p-3.5 bg-primary text-primary-foreground md:hidden rounded"
       >
         <HiMenu size={24} />
       </button>
       <Sidebar
-        aria-label="Default sidebar example"
-        className={`fixed h-full top-16 left-0 bg-primary transform ${isOpen ? "translate-x-0" : "-translate-x-full"} transition-transform md:translate-x-0 rounded-none`}
+        aria-label="sidebar"
+        className={`fixed h-full top-16 left-0 bg-primary transform ${isOpen ? "translate-x-0" : "-translate-x-full"} transition-transform md:translate-x-0 rounded-full`}
       >
         <Sidebar.Items>
           <Sidebar.ItemGroup>
