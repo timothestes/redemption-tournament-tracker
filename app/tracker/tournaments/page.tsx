@@ -54,7 +54,7 @@ export default function TournamentsPage() {
     const { data: tournaments, error } = await supabase
       .from("tournaments")
       .select("*")
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: false });
     if (error) {
       console.error("Error fetching tournaments:", error);
     } else {
