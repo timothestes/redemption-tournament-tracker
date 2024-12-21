@@ -77,7 +77,12 @@ export default function TournamentsPage() {
                 key={tournament.id}
                 className="flex justify-between items-center"
               >
-                <span className="mr-4">{tournament.name}</span>
+                <a
+                  href={`/protected/tournaments/${tournament.id}`}
+                  className="mr-4 text-blue-500 underline"
+                >
+                  {tournament.name}
+                </a>
                 <div>
                   <button
                     onClick={() =>
