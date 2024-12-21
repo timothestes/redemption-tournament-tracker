@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Toast } from "flowbite-react";
+import { HiCheck } from "react-icons/hi";
 import Modal from "../../../../components/ui/modal";
 import { createClient } from "../../../../utils/supabase/client";
 import { useRouter } from "next/navigation";
@@ -83,9 +84,13 @@ export default function HostTournamentPage() {
       {showToast && (
         <div className="fixed bottom-4 left-4">
           <Toast>
-            <Toast.Body className="bg-green-500 text-white">
+            <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-green-100 text-green-500 dark:bg-green-800 dark:text-green-200">
+              <HiCheck className="h-5 w-5" />
+            </div>
+            <div className="ml-3 text-sm font-normal">
               Tournament created successfully!
-            </Toast.Body>
+            </div>
+            <Toast.Toggle />
           </Toast>
         </div>
       )}
