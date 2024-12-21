@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "../../../utils/supabase/client";
 import ToastNotification from "../../../components/ui/toast-notification";
-import { Table } from "flowbite-react";
+import { Table, Button } from "flowbite-react";
 
 const supabase = createClient();
 
@@ -56,7 +56,7 @@ export default function TournamentsPage() {
   return (
     <div className="flex h-screen pl-64">
       <div className="flex-grow p-4">
-        <h1 className="text-2xl font-bold">Your tournaments</h1>
+      <h1 className="text-2xl font-bold mb-6">Your Tournaments</h1>
         {loading ? (
           <p>Loading tournaments...</p>
         ) : tournaments.length === 0 ? (
@@ -97,7 +97,7 @@ export default function TournamentsPage() {
                       }).format(new Date(tournament.created_at))}
                     </Table.Cell>
                     <Table.Cell>
-                      <button
+                      <Button
                         onClick={() =>
                           updateTournament(
                             tournament.id,
@@ -105,15 +105,17 @@ export default function TournamentsPage() {
                           )
                         }
                         className="mr-2 p-1 bg-yellow-600 text-white"
+                        color="blue"
                       >
                         Edit
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         onClick={() => deleteTournament(tournament.id)}
                         className="p-1 bg-red-600 text-white"
+                        color="failure"
                       >
                         Delete
-                      </button>
+                      </Button>
                     </Table.Cell>
                   </Table.Row>
                 ))}
