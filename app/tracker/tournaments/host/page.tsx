@@ -6,6 +6,8 @@ import Modal from "../../../../components/ui/modal";
 import { createClient } from "../../../../utils/supabase/client";
 import { useRouter } from "next/navigation";
 import { generateCode } from "../../../../utils/generateCode";
+import { Button } from "flowbite-react";
+import { HiPlus } from "react-icons/hi";
 
 const supabase = createClient();
 
@@ -64,12 +66,14 @@ export default function HostTournamentPage() {
           required
           maxLength={30}
         />
-        <button
+        <Button
           onClick={addTournament}
-          className="ml-2 p-2 bg-blue-600 text-white"
+          className="flex items-center gap-2"
+          outline gradientDuoTone="greenToBlue"
         >
+          <HiPlus className="w-5 h-5" />
           Add Tournament
-        </button>
+        </Button>
       </div>
       <Modal
         isOpen={showError}

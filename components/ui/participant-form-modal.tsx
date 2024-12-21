@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Button, Label, TextInput } from "flowbite-react";
 
 interface ParticipantFormModalProps {
@@ -12,6 +12,14 @@ const ParticipantFormModal: React.FC<ParticipantFormModalProps> = ({
   onClose,
   onSubmit,
 }) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isOpen]);
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -24,19 +32,25 @@ const ParticipantFormModal: React.FC<ParticipantFormModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg p-4 rounded shadow-lg max-w-sm w-full">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
+      <div className="bg-black p-4 rounded shadow-lg max-w-sm w-full">
         <h2 className="text-xl font-bold mb-4">Add Participant</h2>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="mb-2 block">
             <Label htmlFor="name" value="Participant Name" />
-            <TextInput id="name" name="name" type="text" required />
+            <TextInput
+              id="name"
+              name="name"
+              type="text"
+              required
+              ref={inputRef}
+            />
           </div>
-          <div className="flex justify-end gap-2">
-            <Button type="submit" color="blue">Add</Button>
-            <Button type="button" color="failure" onClick={onClose}>
+          <div className="flex justify-end gap-3">
+            <Button type="button" outline gradientDuoTone="pinkToOrange" onClick={onClose}>
               Cancel
             </Button>
+            <Button type="submit" outline gradientDuoTone="greenToBlue">Add</Button>
           </div>
         </form>
       </div>

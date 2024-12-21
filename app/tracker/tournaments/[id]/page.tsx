@@ -108,7 +108,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
           <Button
             onClick={() => setIsModalOpen(true)}
             className="flex items-center gap-2"
-            color="blue"
+            outline gradientDuoTone="greenToBlue"
           >
               <HiPlus className="w-5 h-5" />
               Add Participant
