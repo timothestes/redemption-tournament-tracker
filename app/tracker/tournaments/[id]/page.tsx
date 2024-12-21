@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../../../../utils/supabase/client";
-import { Table, Button, Label, TextInput } from "flowbite-react";
+import { Table, Button } from "flowbite-react";
+import ParticipantFormModal from "../../../../components/ui/participant-form-modal";
 import { HiPlus } from "react-icons/hi";
 
 const supabase = createClient();
@@ -13,7 +14,14 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   const [tournament, setTournament] = useState(null);
   const [loading, setLoading] = useState(true);
   const [id, setId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const router = useRouter();
+
+  const handleAddParticipant = (name: string) => {
+    // Add logic to insert the new participant into the database
+    // Example: await addParticipant(name);
+    setIsModalOpen(false);
+  };
 
   useEffect(() => {
     const unwrapParams = async () => {
@@ -78,27 +86,18 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
         )}
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">Participants</h2>
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              const formData = new FormData(e.target as HTMLFormElement);
-              const name = formData.get("name")?.toString();
-              if (name) {
-                // Add logic to insert the new participant into the database
-                // Example: await addParticipant(name);
-              }
-            }}
+          <Button
+            onClick={() => setIsModalOpen(true)}
             className="flex items-center gap-2"
           >
-            <div className="mb-2 block">
-              <Label htmlFor="name" value="Participant Name" />
-              <TextInput id="name" name="name" type="text" required />
-            </div>
-            <Button type="submit" className="flex items-center gap-2">
               <HiPlus className="w-5 h-5" />
               Add Participant
             </Button>
-          </form>
+          <ParticipantFormModal
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            onSubmit={handleAddParticipant}
+          />
         </div>
         {loading ? (
           <p>Loading participants...</p>
