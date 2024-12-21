@@ -14,12 +14,14 @@ const SideNav: React.FC = () => {
           <Sidebar.Item href="/protected/tournaments/host" icon={HiViewBoards}>
             Host a Tournament
           </Sidebar.Item>
-          <Sidebar.Item href="/protected/profile" icon={HiUser}>
-            Profile
-          </Sidebar.Item>
-          <Sidebar.Item href="/protected/bug" icon={HiArrowSmRight}>
-            Report a Bug
-          </Sidebar.Item>
+          <Sidebar.ItemGroup>
+            <Sidebar.Item href="/protected/profile" icon={HiUser}>
+              Profile
+            </Sidebar.Item>
+            <Sidebar.Item href="/protected/bug" icon={HiArrowSmRight}>
+              Report a Bug
+            </Sidebar.Item>
+          </Sidebar.ItemGroup>
         </Sidebar.ItemGroup>
       </Sidebar.Items>
     </Sidebar>
