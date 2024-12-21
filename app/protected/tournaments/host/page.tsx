@@ -52,13 +52,13 @@ export default function HostTournamentPage() {
           value={newTournament}
           onChange={(e) => setNewTournament(e.target.value)}
           placeholder="New Tournament Name"
-          className="border p-2"
+          className="border text-black p-2"
           required
-          maxLength={50} // Set a reasonable character limit
+          maxLength={30}
         />
         <button
           onClick={addTournament}
-          className="ml-2 p-2 bg-blue-500 text-white"
+          className="ml-2 p-2 bg-blue-600 text-white"
         >
           Add Tournament
         </button>
