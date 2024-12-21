@@ -33,19 +33,19 @@ const SideNav: React.FC = () => {
             </Sidebar.Item>
             <Sidebar.ItemGroup>
               <Sidebar.Collapse label="Resources">
-                <Sidebar.Item href="#">
-                  REG
+                <Sidebar.Item href="https://landofredemption.com/wp-content/uploads/2023/11/REG_PDF_9.0.0.pdf" target="_blank" rel="noopener noreferrer">
+                  REG (Official Rulebook)
                 </Sidebar.Item>
-                <Sidebar.Item href="#">
-                  ORDIR
+                <Sidebar.Item href="https://landofredemption.com/wp-content/uploads/2023/11/ORDIR_PDF_5.0.0.pdf" target="_blank" rel="noopener noreferrer">
+                  ORDIR (Dictionary)
                 </Sidebar.Item>
-                <Sidebar.Item href="#">
+                <Sidebar.Item href="https://landofredemption.com/wp-content/uploads/2024/10/Deck_Building_Rules_1.2.pdf" target="_blank" rel="noopener noreferrer">
                   Deck Building Rules
                 </Sidebar.Item>
-                <Sidebar.Item href="#">
+                <Sidebar.Item href="https://landofredemption.com/wp-content/uploads/2024/03/Redemption_Host_Guide_2024.pdf" target="_blank" rel="noopener noreferrer">
                   Hosting Guide
                 </Sidebar.Item>
-                <Sidebar.Item href="#">
+                <Sidebar.Item href="https://landofredemption.com/wp-content/uploads/2024/09/Redemption-Tournament-Host-Application-2024.pdf" target="_blank" rel="noopener noreferrer">
                   Hosting Application
                 </Sidebar.Item>
               </Sidebar.Collapse>
