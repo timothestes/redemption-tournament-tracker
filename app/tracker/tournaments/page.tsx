@@ -4,8 +4,9 @@ import { useState, useEffect } from "react";
 import { createClient } from "../../../utils/supabase/client";
 import ToastNotification from "../../../components/ui/toast-notification";
 import { Table, Button, Modal, TextInput } from "flowbite-react";
-import { HiPencil, HiTrash } from "react-icons/hi";
+import { HiPencil, HiTrash, HiPlus } from "react-icons/hi";
 import { useRouter } from "next/navigation";
+import TournamentFormModal from "../../../components/ui/tournament-form-modal";
 
 const supabase = createClient();
 
@@ -14,6 +15,7 @@ export default function TournamentsPage() {
   const [loading, setLoading] = useState(true);
   const [showDeleteToast, setShowDeleteToast] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isAddTournamentModalOpen, setisAddTournamentModalOpen] = useState(false);
   const [currentTournament, setCurrentTournament] = useState(null);
   const [newTournamentName, setNewTournamentName] = useState("");
   const router = useRouter();
@@ -21,6 +23,31 @@ export default function TournamentsPage() {
   useEffect(() => {
     fetchTournaments();
   }, []);
+
+  const handleAddTournament = async (name: string) => {
+    try {
+      const { error } = await supabase
+        .from("participants")
+        .insert([{ name, tournament_id: id }]);
+      if (error) {
+        console.error("Error adding participant:", error);
+      } else {
+        // Refresh the participants list
+        const { data, error } = await supabase
+          .from("participants")
+          .select("*")
+          .eq("tournament_id", id);
+        if (error) {
+          console.error("Error fetching participants:", error);
+        } else {
+          setParticipants(data);
+        }
+      }
+    } catch (error) {
+      console.error("Unexpected error:", error);
+    }
+    setIsModalOpen(false);
+  };
 
   const fetchTournaments = async () => {
     const { data: tournaments, error } = await supabase
@@ -63,7 +90,23 @@ export default function TournamentsPage() {
   return (
     <div className="flex h-screen pl-64">
       <div className="flex-grow p-4">
-        <h1 className="text-2xl font-bold mb-6">Your Tournaments</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Your Tournaments</h1>
+        <Button
+          onClick={() => setisAddTournamentModalOpen(true)}
+          className="flex items-center gap-2"
+          outline
+          gradientDuoTone="greenToBlue"
+        >
+          <HiPlus className="w-5 h-5" />
+          Host a Tournament
+        </Button>
+        <TournamentFormModal
+            isOpen={isAddTournamentModalOpen}
+            onClose={() => setisAddTournamentModalOpen(false)}
+            onSubmit={handleAddTournament}
+          />
+      </div>
         {loading ? (
           <p>Loading tournaments...</p>
         ) : tournaments.length === 0 ? (
