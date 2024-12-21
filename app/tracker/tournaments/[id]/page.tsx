@@ -9,6 +9,7 @@ const supabase = createClient();
 
 export default function TournamentPage({ params }: { params: Promise<{ id: string }> }) {
   const [participants, setParticipants] = useState([]);
+  const [tournament, setTournament] = useState(null);
   const [loading, setLoading] = useState(true);
   const [id, setId] = useState<string | null>(null);
   const router = useRouter();
@@ -25,7 +26,21 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   useEffect(() => {
     if (!id) return;
 
+    const fetchTournamentDetails = async () => {
+      const { data, error } = await supabase
+        .from("tournaments")
+        .select("*")
+        .eq("id", id)
+        .single();
+      if (error) {
+        console.error("Error fetching tournament details:", error);
+      } else {
+        setTournament(data);
+      }
+    };
+
     const fetchParticipants = async () => {
+      await fetchTournamentDetails();
       const { data, error } = await supabase
         .from("participants")
         .select("*")
@@ -44,7 +59,23 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   return (
     <div className="flex h-screen pl-64">
       <div className="flex-grow p-4">
-        <h1 className="text-2xl font-bold mb-6">Participants</h1>
+        {tournament && (
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold">{tournament.name}</h1>
+            <p className="text-sm text-gray-500">
+              Created on:{" "}
+              {new Intl.DateTimeFormat("en-US", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              }).format(new Date(tournament.created_at))}
+            </p>
+          </div>
+        )}
+        <h2 className="text-2xl font-bold mb-6">Participants</h2>
         {loading ? (
           <p>Loading participants...</p>
         ) : participants.length === 0 ? (
