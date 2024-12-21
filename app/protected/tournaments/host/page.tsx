@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Toast } from "flowbite-react";
 import Modal from "../../../../components/ui/modal";
 import { createClient } from "../../../../utils/supabase/client";
 import { useRouter } from "next/navigation";
@@ -12,7 +13,15 @@ const supabase = createClient();
 export default function HostTournamentPage() {
   const [newTournament, setNewTournament] = useState("");
   const [showError, setShowError] = useState(false);
+  const [showToast, setShowToast] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    if (showToast) {
+      const timer = setTimeout(() => setShowToast(false), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [showToast]);
 
   const addTournament = async () => {
     if (!newTournament.trim()) {
@@ -38,6 +47,7 @@ export default function HostTournamentPage() {
     if (error) console.error("Error adding tournament:", error);
     else {
       setNewTournament("");
+      setShowToast(true);
       router.push("/protected/tournaments");
     }
   };
@@ -70,6 +80,15 @@ export default function HostTournamentPage() {
       >
         <p>Tournament name is required.</p>
       </Modal>
+      {showToast && (
+        <div className="fixed bottom-4 left-4">
+          <Toast>
+            <Toast.Body className="bg-green-500 text-white">
+              Tournament created successfully!
+            </Toast.Body>
+          </Toast>
+        </div>
+      )}
     </div>
   );
 }
