@@ -48,7 +48,7 @@ export default function TournamentsPage() {
   };
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen pl-64">
       <SideNav />
       <div className="flex-grow p-4">
         <h1 className="text-2xl font-bold">Your tournaments</h1>
