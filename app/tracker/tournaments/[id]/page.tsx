@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../../../../utils/supabase/client";
-import { Table } from "flowbite-react";
+import { Table, Button } from "flowbite-react";
+import { HiPlus } from "react-icons/hi";
 
 const supabase = createClient();
 
@@ -75,7 +76,22 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
             </p>
           </div>
         )}
-        <h2 className="text-2xl font-bold mb-6">Participants</h2>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold">Participants</h2>
+          <Button
+            onClick={() => {
+              const name = prompt("Enter participant's name:");
+              if (name) {
+                // Add logic to insert the new participant into the database
+                // Example: addParticipant(name);
+              }
+            }}
+            className="flex items-center gap-2"
+          >
+            <HiPlus className="w-5 h-5" />
+            Add Participant
+          </Button>
+        </div>
         {loading ? (
           <p>Loading participants...</p>
         ) : participants.length === 0 ? (
