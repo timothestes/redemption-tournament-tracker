@@ -32,6 +32,25 @@ const SideNav: React.FC = () => {
               Host a Tournament
             </Sidebar.Item>
             <Sidebar.ItemGroup>
+              <Sidebar.Collapse label="Resources">
+                <Sidebar.Item href="#">
+                  REG
+                </Sidebar.Item>
+                <Sidebar.Item href="#">
+                  ORDIR
+                </Sidebar.Item>
+                <Sidebar.Item href="#">
+                  Deck Building Rules
+                </Sidebar.Item>
+                <Sidebar.Item href="#">
+                  Hosting Guide
+                </Sidebar.Item>
+                <Sidebar.Item href="#">
+                  Hosting Application
+                </Sidebar.Item>
+              </Sidebar.Collapse>
+            </Sidebar.ItemGroup>
+            <Sidebar.ItemGroup>
               <Sidebar.Item href="/protected/profile" icon={HiUser}>
                 Profile
               </Sidebar.Item>
@@ -39,17 +58,6 @@ const SideNav: React.FC = () => {
                 Report a Bug
               </Sidebar.Item>
             </Sidebar.ItemGroup>
-            <Sidebar.Collapse label="More Options">
-              <Sidebar.Item href="#">
-                Placeholder 1
-              </Sidebar.Item>
-              <Sidebar.Item href="#">
-                Placeholder 2
-              </Sidebar.Item>
-              <Sidebar.Item href="#">
-                Placeholder 3
-              </Sidebar.Item>
-            </Sidebar.Collapse>
           </Sidebar.ItemGroup>
         </Sidebar.Items>
       </Sidebar>
