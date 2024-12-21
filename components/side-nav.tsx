@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Sidebar } from "flowbite-react";
-import { HiArrowSmRight, HiChartPie, HiUser, HiViewBoards, HiMenu } from "react-icons/hi";
+import { HiArrowSmRight, HiOutlineTrophy, HiUser, HiOutlineDocument, HiOutlinePlusCircle, HiMenu } from "react-icons/hi";
 
 const SideNav: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -25,14 +25,14 @@ const SideNav: React.FC = () => {
       >
         <Sidebar.Items>
           <Sidebar.ItemGroup>
-            <Sidebar.Item href="/protected/tournaments" icon={HiChartPie}>
+            <Sidebar.Item href="/protected/tournaments" icon={HiOutlineTrophy}>
               Your Tournaments
             </Sidebar.Item>
-            <Sidebar.Item href="/protected/tournaments/host" icon={HiViewBoards}>
+            <Sidebar.Item href="/protected/tournaments/host" icon={HiOutlinePlusCircle}>
               Host a Tournament
             </Sidebar.Item>
             <Sidebar.ItemGroup>
-              <Sidebar.Collapse label="Resources">
+              <Sidebar.Collapse label="Resources" icon={HiOutlineDocument}>
                 <Sidebar.Item href="https://landofredemption.com/wp-content/uploads/2023/11/REG_PDF_9.0.0.pdf" target="_blank" rel="noopener noreferrer">
                   REG (Official Rulebook)
                 </Sidebar.Item>
