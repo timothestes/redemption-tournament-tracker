@@ -1,13 +1,13 @@
 import React, { useEffect, useRef } from "react";
 import { Button, Label, TextInput } from "flowbite-react";
 
-interface ParticipantFormModalProps {
+interface TournamentFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (name: string) => void;
 }
 
-const ParticipantFormModal: React.FC<ParticipantFormModalProps> = ({
+const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
@@ -33,11 +33,11 @@ const ParticipantFormModal: React.FC<ParticipantFormModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
-      <div className="bg-black p-4 rounded shadow-lg max-w-sm w-full">
-        <h2 className="text-xl font-bold mb-4">Add Participant</h2>
+      <div className="bg-background p-4 rounded shadow-lg max-w-sm w-full">
+        <h2 className="text-xl font-bold mb-4">Add Tournament</h2>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="mb-2 block">
-            <Label htmlFor="name" value="Participant Name" />
+            <Label htmlFor="name" value="Tournament Name" />
             <TextInput
               id="name"
               name="name"
@@ -58,4 +58,4 @@ const ParticipantFormModal: React.FC<ParticipantFormModalProps> = ({
   );
 };
 
-export default ParticipantFormModal;
+export default TournamentFormModal;
