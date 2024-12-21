@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { createClient } from "../../../utils/supabase/client";
 import ToastNotification from "../../../components/ui/toast-notification";
-import { Table, Button } from "flowbite-react";
+import { Table } from "flowbite-react";
+import { HiPencil, HiTrash } from "react-icons/hi";
 
 const supabase = createClient();
 
@@ -97,7 +98,7 @@ export default function TournamentsPage() {
                       }).format(new Date(tournament.created_at))}
                     </Table.Cell>
                     <Table.Cell>
-                      <Button
+                      <HiPencil
                         onClick={() =>
                           updateTournament(
                             tournament.id,
@@ -106,16 +107,21 @@ export default function TournamentsPage() {
                         }
                         className="mr-2 p-1 bg-yellow-600 text-white"
                         color="blue"
-                      >
-                        Edit
-                      </Button>
-                      <Button
+                        onClick={() =>
+                          updateTournament(
+                            tournament.id,
+                            prompt("New name:", tournament.name)
+                          )
+                        }
+                        className="mr-2 text-yellow-600 cursor-pointer"
+                      />
+                      <HiTrash
                         onClick={() => deleteTournament(tournament.id)}
                         className="p-1 bg-red-600 text-white"
                         color="failure"
-                      >
-                        Delete
-                      </Button>
+                        onClick={() => deleteTournament(tournament.id)}
+                        className="text-red-600 cursor-pointer"
+                      />
                     </Table.Cell>
                   </Table.Row>
                 ))}
