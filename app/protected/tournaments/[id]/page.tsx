@@ -7,16 +7,28 @@ import SideNav from "../../../../components/side-nav";
 
 const supabase = createClient();
 
-export default function TournamentPage({ params }: { params: { id: string } }) {
+export default function TournamentPage({ params }: { params: Promise<{ id: string }> }) {
   const [tournament, setTournament] = useState(null);
+  const [id, setId] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
+    const unwrapParams = async () => {
+      const resolvedParams = await params;
+      setId(resolvedParams.id);
+    };
+
+    unwrapParams();
+  }, [params]);
+
+  useEffect(() => {
+    if (!id) return;
+
     const fetchTournament = async () => {
       const { data, error } = await supabase
         .from("tournaments")
         .select("*")
-        .eq("id", params.id)
+        .eq("id", id)
         .single();
       if (error) {
         console.error("Error fetching tournament:", error);
@@ -27,7 +39,7 @@ export default function TournamentPage({ params }: { params: { id: string } }) {
     };
 
     fetchTournament();
-  }, [params.id, router]);
+  }, [id, router]);
 
   if (!tournament) {
     return <p>Loading tournament data...</p>;
