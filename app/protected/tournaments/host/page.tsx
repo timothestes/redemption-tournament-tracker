@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Toast } from "flowbite-react";
-import { HiCheck } from "react-icons/hi";
+import ToastNotification from "../../../../components/ui/toast-notification";
 import Modal from "../../../../components/ui/modal";
 import { createClient } from "../../../../utils/supabase/client";
 import { useRouter } from "next/navigation";
@@ -81,19 +80,12 @@ export default function HostTournamentPage() {
       >
         <p>Tournament name is required.</p>
       </Modal>
-      {showToast && (
-        <div className="fixed bottom-4 right-4">
-          <Toast>
-            <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-green-100 text-green-500 dark:bg-green-800 dark:text-green-200">
-              <HiCheck className="h-5 w-5" />
-            </div>
-            <div className="ml-3 text-sm font-normal">
-              Tournament created successfully!
-            </div>
-            <Toast.Toggle />
-          </Toast>
-        </div>
-      )}
+      <ToastNotification
+        message="Tournament created successfully!"
+        show={showToast}
+        onClose={() => setShowToast(false)}
+        type="success"
+      />
     </div>
   );
 }

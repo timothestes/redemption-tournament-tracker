@@ -3,8 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "../../../utils/supabase/client";
 import SideNav from "../../../components/side-nav";
-import { Toast } from "flowbite-react";
-import { HiCheck } from "react-icons/hi";
+import ToastNotification from "../../../components/ui/toast-notification";
 
 const supabase = createClient();
 
@@ -101,19 +100,12 @@ export default function TournamentsPage() {
             ))}
           </ul>
         )}
-        {showDeleteToast && (
-          <div className="fixed bottom-4 right-4">
-            <Toast>
-              <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-500 dark:bg-red-800 dark:text-red-200">
-                <HiCheck className="h-5 w-5" />
-              </div>
-              <div className="ml-3 text-sm font-normal">
-                Tournament deleted successfully!
-              </div>
-              <Toast.Toggle onClick={() => setShowDeleteToast(false)} />
-            </Toast>
-          </div>
-        )}
+        <ToastNotification
+          message="Tournament deleted successfully!"
+          show={showDeleteToast}
+          onClose={() => setShowDeleteToast(false)}
+          type="error"
+        />
       </div>
     </div>
   );
