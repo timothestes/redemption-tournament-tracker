@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../../../../utils/supabase/client";
-import { Table, Button } from "flowbite-react";
+import { Table, Button, Label, TextInput } from "flowbite-react";
 import { HiPlus } from "react-icons/hi";
 
 const supabase = createClient();
@@ -78,19 +78,27 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
         )}
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">Participants</h2>
-          <Button
-            onClick={() => {
-              const name = prompt("Enter participant's name:");
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const formData = new FormData(e.target as HTMLFormElement);
+              const name = formData.get("name")?.toString();
               if (name) {
                 // Add logic to insert the new participant into the database
-                // Example: addParticipant(name);
+                // Example: await addParticipant(name);
               }
             }}
             className="flex items-center gap-2"
           >
-            <HiPlus className="w-5 h-5" />
-            Add Participant
-          </Button>
+            <div className="mb-2 block">
+              <Label htmlFor="name" value="Participant Name" />
+              <TextInput id="name" name="name" type="text" required />
+            </div>
+            <Button type="submit" className="flex items-center gap-2">
+              <HiPlus className="w-5 h-5" />
+              Add Participant
+            </Button>
+          </form>
         </div>
         {loading ? (
           <p>Loading participants...</p>
