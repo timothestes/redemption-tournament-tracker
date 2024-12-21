@@ -69,40 +69,48 @@ export default function TournamentsPage() {
             </a>
           </p>
         ) : (
-          <ul className="mt-4">
-            {tournaments.map((tournament) => (
-              <li
-                key={tournament.id}
-                className="flex justify-between items-center"
-              >
-                <a
-                  href={`/tracker/tournaments/${tournament.id}`}
-                  className="mr-4 text-blue-500 underline"
-                >
-                  {tournament.name}
-                </a>
-                <div>
-                  <button
-                    onClick={() =>
-                      updateTournament(
-                        tournament.id,
-                        prompt("New name:", tournament.name)
-                      )
-                    }
-                    className="mr-2 p-1 bg-yellow-600 text-white"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => deleteTournament(tournament.id)}
-                    className="p-1 bg-red-600 text-white"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <div className="overflow-x-auto">
+            <Table hoverable>
+              <Table.Head>
+                <Table.HeadCell>Name</Table.HeadCell>
+                <Table.HeadCell>Date</Table.HeadCell>
+                <Table.HeadCell>Location</Table.HeadCell>
+                <Table.HeadCell>
+                  <span className="sr-only">Edit</span>
+                </Table.HeadCell>
+              </Table.Head>
+              <Table.Body className="divide-y">
+                {tournaments.map((tournament) => (
+                  <Table.Row key={tournament.id} className="bg-white dark:border-gray-700 dark:bg-gray-800">
+                    <Table.Cell className="whitespace-nowrap font-medium text-gray-900 dark:text-white">
+                      {tournament.name}
+                    </Table.Cell>
+                    <Table.Cell>{tournament.date}</Table.Cell>
+                    <Table.Cell>{tournament.location}</Table.Cell>
+                    <Table.Cell>
+                      <button
+                        onClick={() =>
+                          updateTournament(
+                            tournament.id,
+                            prompt("New name:", tournament.name)
+                          )
+                        }
+                        className="mr-2 p-1 bg-yellow-600 text-white"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => deleteTournament(tournament.id)}
+                        className="p-1 bg-red-600 text-white"
+                      >
+                        Delete
+                      </button>
+                    </Table.Cell>
+                  </Table.Row>
+                ))}
+              </Table.Body>
+            </Table>
+          </div>
         )}
         <ToastNotification
           message="Tournament deleted successfully!"
