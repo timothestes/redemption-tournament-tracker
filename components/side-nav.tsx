@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import { Sidebar } from "flowbite-react";
-import { HiArrowSmRight, HiOutlineTrophy, HiUser, HiOutlineDocument, HiOutlinePlusCircle, HiMenu } from "react-icons/hi";
+import { HiArrowSmRight, HiUser, HiDocumentText, HiMenu } from "react-icons/hi";
+import { FaTrophy, FaPlus, FaBookOpen } from "react-icons/fa6";
+import { PiPencilLineBold } from "react-icons/pi";
+import { TbCardsFilled, TbArrowGuideFilled } from "react-icons/tb";
+import { AiOutlineForm } from "react-icons/ai";
+
 
 const SideNav: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -25,27 +30,57 @@ const SideNav: React.FC = () => {
       >
         <Sidebar.Items>
           <Sidebar.ItemGroup>
-            <Sidebar.Item href="/protected/tournaments" icon={HiOutlineTrophy}>
+            <Sidebar.Item href="/protected/tournaments" icon={FaTrophy}>
               Your Tournaments
             </Sidebar.Item>
-            <Sidebar.Item href="/protected/tournaments/host" icon={HiOutlinePlusCircle}>
+            <Sidebar.Item href="/protected/tournaments/host" icon={FaPlus}>
               Host a Tournament
             </Sidebar.Item>
             <Sidebar.ItemGroup>
-              <Sidebar.Collapse label="Resources" icon={HiOutlineDocument}>
-                <Sidebar.Item href="https://landofredemption.com/wp-content/uploads/2023/11/REG_PDF_9.0.0.pdf" target="_blank" rel="noopener noreferrer">
+              <Sidebar.Collapse label="Resources" icon={HiDocumentText} className="pl-2">
+                <Sidebar.Item
+                  href="https://landofredemption.com/wp-content/uploads/2023/11/REG_PDF_9.0.0.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  icon={PiPencilLineBold}
+                  className="pl-4"
+                >
                   REG (Official Rulebook)
                 </Sidebar.Item>
-                <Sidebar.Item href="https://landofredemption.com/wp-content/uploads/2023/11/ORDIR_PDF_5.0.0.pdf" target="_blank" rel="noopener noreferrer">
+                <Sidebar.Item
+                  href="https://landofredemption.com/wp-content/uploads/2023/11/ORDIR_PDF_5.0.0.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  icon={FaBookOpen}
+                  className="pl-4"
+                >
                   ORDIR (Dictionary)
                 </Sidebar.Item>
-                <Sidebar.Item href="https://landofredemption.com/wp-content/uploads/2024/10/Deck_Building_Rules_1.2.pdf" target="_blank" rel="noopener noreferrer">
+                <Sidebar.Item
+                  href="https://landofredemption.com/wp-content/uploads/2024/10/Deck_Building_Rules_1.2.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  icon={TbCardsFilled}
+                  className="pl-4"
+                >
                   Deck Building Rules
                 </Sidebar.Item>
-                <Sidebar.Item href="https://landofredemption.com/wp-content/uploads/2024/03/Redemption_Host_Guide_2024.pdf" target="_blank" rel="noopener noreferrer">
+                <Sidebar.Item
+                  href="https://landofredemption.com/wp-content/uploads/2024/03/Redemption_Host_Guide_2024.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  icon={TbArrowGuideFilled}
+                  className="pl-4"
+                >
                   Hosting Guide
                 </Sidebar.Item>
-                <Sidebar.Item href="https://landofredemption.com/wp-content/uploads/2024/09/Redemption-Tournament-Host-Application-2024.pdf" target="_blank" rel="noopener noreferrer">
+                <Sidebar.Item
+                  href="https://landofredemption.com/wp-content/uploads/2024/09/Redemption-Tournament-Host-Application-2024.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  icon={AiOutlineForm}
+                  className="pl-4"
+                >
                   Hosting Application
                 </Sidebar.Item>
               </Sidebar.Collapse>
