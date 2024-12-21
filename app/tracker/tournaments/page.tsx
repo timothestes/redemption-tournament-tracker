@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "../../../utils/supabase/client";
 import ToastNotification from "../../../components/ui/toast-notification";
-import { Table } from "flowbite-react";
+import { Table, Button, Modal, TextInput } from "flowbite-react";
 import { HiPencil, HiTrash } from "react-icons/hi";
 import { useRouter } from "next/navigation";
 
@@ -13,6 +13,9 @@ export default function TournamentsPage() {
   const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDeleteToast, setShowDeleteToast] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [currentTournament, setCurrentTournament] = useState(null);
+  const [newTournamentName, setNewTournamentName] = useState("");
   const router = useRouter();
 
   useEffect(() => {
@@ -22,7 +25,8 @@ export default function TournamentsPage() {
   const fetchTournaments = async () => {
     const { data: tournaments, error } = await supabase
       .from("tournaments")
-      .select("*");
+      .select("*")
+      .order("created_at", { ascending: true });
     if (error) {
       console.error("Error fetching tournaments:", error);
     } else {
@@ -31,23 +35,23 @@ export default function TournamentsPage() {
     setLoading(false);
   };
 
-  const updateTournament = async (id, newName) => {
+  const updateTournament = async () => {
+    if (!currentTournament || !newTournamentName.trim()) return;
+
     const { data, error } = await supabase
       .from("tournaments")
-      .update({ name: newName })
-      .eq("id", id)
+      .update({ name: newTournamentName })
+      .eq("id", currentTournament.id)
       .select();
     if (error) console.error("Error updating tournament:", error);
     else {
       fetchTournaments();
+      setIsEditModalOpen(false);
     }
   };
 
   const deleteTournament = async (id) => {
-    const { error } = await supabase
-      .from("tournaments")
-      .delete()
-      .eq("id", id);
+    const { error } = await supabase.from("tournaments").delete().eq("id", id);
     if (error) console.error("Error deleting tournament:", error);
     else {
       fetchTournaments();
@@ -87,7 +91,9 @@ export default function TournamentsPage() {
                   <Table.Row
                     key={tournament.id}
                     className="bg-white dark:border-gray-700 dark:bg-gray-800 cursor-pointer hover:bg-gray-100"
-                    onClick={() => router.push(`/tracker/tournaments/${tournament.id}`)}
+                    onClick={() =>
+                      router.push(`/tracker/tournaments/${tournament.id}`)
+                    }
                   >
                     <Table.Cell className="whitespace-nowrap font-medium text-gray-900 dark:text-white">
                       {tournament.name}
@@ -106,10 +112,9 @@ export default function TournamentsPage() {
                       <HiPencil
                         onClick={(e) => {
                           e.stopPropagation();
-                          updateTournament(
-                            tournament.id,
-                            prompt("New name:", tournament.name)
-                          );
+                          setCurrentTournament(tournament);
+                          setNewTournamentName(tournament.name);
+                          setIsEditModalOpen(true);
                         }}
                         className="text-blue-500 cursor-pointer hover:text-blue-700 w-6 h-6"
                         aria-label="Edit"
@@ -129,6 +134,29 @@ export default function TournamentsPage() {
             </Table>
           </div>
         )}
+        <Modal
+          show={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          size="sm"
+        >
+          <Modal.Header>Edit Tournament</Modal.Header>
+          <Modal.Body>
+            <div className="space-y-4">
+              <TextInput
+                value={newTournamentName}
+                onChange={(e) => setNewTournamentName(e.target.value)}
+                placeholder="Tournament Name"
+                required
+              />
+            </div>
+          </Modal.Body>
+          <Modal.Footer className="flex justify-end space-x-2">
+            <Button outline gradientDuoTone="greenToBlue" onClick={updateTournament}>Save</Button>
+            <Button outline gradientDuoTone="pinkToOrange" onClick={() => setIsEditModalOpen(false)}>
+              Cancel
+            </Button>
+          </Modal.Footer>
+        </Modal>
         <ToastNotification
           message="Tournament deleted successfully!"
           show={showDeleteToast}

@@ -54,7 +54,7 @@ export default function HostTournamentPage() {
   };
 
   return (
-    <div className="flex justify-center min-h-screen ">
+    <div className="flex min-h-screen ">
       <div className=" p-6 rounded-lg shadow-lg max-w-md w-full text-center">
         <h1 className="text-3xl font-bold text-white mb-4">Host a Tournament</h1>
         <input
@@ -68,7 +68,7 @@ export default function HostTournamentPage() {
         />
         <Button
           onClick={addTournament}
-          className="w-full flex items-center justify-center text-white"
+          className="w-full flex text-white"
           outline gradientDuoTone="greenToBlue"
           disabled={!newTournament.trim()}
         >
