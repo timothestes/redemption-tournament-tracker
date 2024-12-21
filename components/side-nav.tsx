@@ -1,67 +1,28 @@
-import React from "react";
+"use client";
+
+import { Sidebar } from "flowbite-react";
+import { HiArrowSmRight, HiChartPie, HiUser, HiViewBoards } from "react-icons/hi";
 
 const SideNav: React.FC = () => {
   return (
-    <nav className="w-45 h-full bg-gray-800 text-white flex flex-col p-5 fixed left-0 top-16">
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold mb-2">Tournaments</h2>
-        <ul className="space-y-2">
-          <li>
-            <a
-              href="/protected/tournaments"
-              className="block p-2 rounded hover:bg-gray-700"
-            >
-              Your Tournaments
-            </a>
-          </li>
-          <li>
-            <a
-              href="/protected/tournaments/host"
-              className="block p-2 rounded hover:bg-gray-700"
-            >
-              Host a Tournament
-            </a>
-          </li>
-          {/* <li>
-            <a
-              href="/protected/tournaments/join"
-              className="block p-2 rounded hover:bg-gray-700"
-            >
-              Join a Tournament
-            </a>
-          </li> */}
-        </ul>
-      </div>
-      <div className="border-b border-gray-700 my-4"></div>
-
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold mb-2">Settings</h2>
-        <ul className="space-y-2">
-          <li>
-            <a href="/protected/profile" className="block p-2 rounded hover:bg-gray-700">
-              Profile
-            </a>
-          </li>
-          {/* <li>
-            <a href="/protected/preferences" className="block p-2 rounded hover:bg-gray-700">
-              Preferences
-            </a>
-          </li> */}
-        </ul>
-      </div>
-      <div className="border-b border-gray-700 my-4"></div>
-
-      <div>
-        <h2 className="text-lg font-semibold mb-2">Help</h2>
-        <ul className="space-y-2">
-          <li>
-            <a href="/protected/bug" className="block p-2 rounded hover:bg-gray-700">
-              Report a bug
-            </a>
-          </li>
-        </ul>
-      </div>
-    </nav>
+    <Sidebar aria-label="Default sidebar example">
+      <Sidebar.Items>
+        <Sidebar.ItemGroup>
+          <Sidebar.Item href="/protected/tournaments" icon={HiChartPie}>
+            Your Tournaments
+          </Sidebar.Item>
+          <Sidebar.Item href="/protected/tournaments/host" icon={HiViewBoards}>
+            Host a Tournament
+          </Sidebar.Item>
+          <Sidebar.Item href="/protected/profile" icon={HiUser}>
+            Profile
+          </Sidebar.Item>
+          <Sidebar.Item href="/protected/bug" icon={HiArrowSmRight}>
+            Report a Bug
+          </Sidebar.Item>
+        </Sidebar.ItemGroup>
+      </Sidebar.Items>
+    </Sidebar>
   );
 };
 
