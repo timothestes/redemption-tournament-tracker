@@ -54,40 +54,41 @@ export default function HostTournamentPage() {
   };
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold">Host a Tournament</h1>
-      <div className="mt-4">
+    <div className="flex justify-center min-h-screen ">
+      <div className=" p-6 rounded-lg shadow-lg max-w-md w-full text-center">
+        <h1 className="text-3xl font-bold text-white mb-4">Host a Tournament</h1>
         <input
           type="text"
           value={newTournament}
           onChange={(e) => setNewTournament(e.target.value)}
           placeholder="New Tournament Name"
-          className="border text-black p-2"
+          className="w-full mb-4 p-3 text-lg rounded-lg border border  text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
           required
           maxLength={30}
         />
         <Button
           onClick={addTournament}
-          className="flex items-center gap-2"
+          className="w-full flex items-center justify-center text-white"
           outline gradientDuoTone="greenToBlue"
+          disabled={!newTournament.trim()}
         >
-          <HiPlus className="w-5 h-5" />
+          <HiPlus className="w-6 h-6" />
           Add Tournament
         </Button>
+        <Modal
+          isOpen={showError}
+          onClose={() => setShowError(false)}
+          title="Error"
+        >
+          <p className="text-red-600">Tournament name is required.</p>
+        </Modal>
+        <ToastNotification
+          message="Tournament created successfully!"
+          show={showToast}
+          onClose={() => setShowToast(false)}
+          type="success"
+        />
       </div>
-      <Modal
-        isOpen={showError}
-        onClose={() => setShowError(false)}
-        title="Error"
-      >
-        <p>Tournament name is required.</p>
-      </Modal>
-      <ToastNotification
-        message="Tournament created successfully!"
-        show={showToast}
-        onClose={() => setShowToast(false)}
-        type="success"
-      />
     </div>
   );
 }
