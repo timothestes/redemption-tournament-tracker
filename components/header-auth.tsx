@@ -28,10 +28,10 @@ export default async function AuthButton() {
     <div className="flex justify-end">
       <div className="flex gap-2">
         <Button asChild size="sm" variant={"outline"}>
-          <Link href="/protected/tournaments">Sign in</Link>
+          <Link href="/tracker/tournaments">Sign in</Link>
         </Button>
         <Button asChild size="sm" variant={"default"}>
-          <Link href="/protected/tournaments">Sign up</Link>
+          <Link href="/tracker/tournaments">Sign up</Link>
         </Button>
       </div>
     </div>

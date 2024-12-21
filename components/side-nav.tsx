@@ -30,10 +30,10 @@ const SideNav: React.FC = () => {
       >
         <Sidebar.Items>
           <Sidebar.ItemGroup>
-            <Sidebar.Item href="/protected/tournaments" icon={FaTrophy}>
+            <Sidebar.Item href="/tracker/tournaments" icon={FaTrophy}>
               Your Tournaments
             </Sidebar.Item>
-            <Sidebar.Item href="/protected/tournaments/host" icon={FaPlus}>
+            <Sidebar.Item href="/tracker/tournaments/host" icon={FaPlus}>
               Host a Tournament
             </Sidebar.Item>
             <Sidebar.ItemGroup>
@@ -86,10 +86,10 @@ const SideNav: React.FC = () => {
               </Sidebar.Collapse>
             </Sidebar.ItemGroup>
             <Sidebar.ItemGroup>
-              <Sidebar.Item href="/protected/profile" icon={HiUser}>
+              <Sidebar.Item href="/tracker/profile" icon={HiUser}>
                 Profile
               </Sidebar.Item>
-              <Sidebar.Item href="/protected/bug" icon={HiArrowSmRight}>
+              <Sidebar.Item href="/tracker/bug" icon={HiArrowSmRight}>
                 Report a Bug
               </Sidebar.Item>
             </Sidebar.ItemGroup>

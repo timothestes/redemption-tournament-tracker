@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../../../../utils/supabase/client";
-import SideNav from "../../../../components/side-nav";
 
 const supabase = createClient();
 
@@ -32,7 +31,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
         .single();
       if (error) {
         console.error("Error fetching tournament:", error);
-        router.push("/protected/tournaments");
+        router.push("/tracker/tournaments");
       } else {
         setTournament(data);
       }
@@ -47,7 +46,6 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
 
   return (
     <div className="flex h-screen pl-64">
-      <SideNav />
       <div className="flex-grow p-4">
         <h1 className="text-2xl font-bold">{tournament.name}</h1>
         <p>Code: {tournament.code}</p>

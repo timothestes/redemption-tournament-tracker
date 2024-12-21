@@ -1,9 +1,7 @@
-import SideNav from "../../../components/side-nav";
 
 export default function BugPage() {
   return (
     <div className="flex h-screen bg-50 pl-64">
-      <SideNav />
       <div className="flex flex-col items-start justify-start flex-grow text-left p-0 space-y-4">
         <h1 className="text-3xl font-extrabold text-800">Report a Bug</h1>
         <p className="max-w-lg text-lg text-700 leading-relaxed">

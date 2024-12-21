@@ -50,10 +50,10 @@ export const signInAction = async (formData: FormData) => {
   });
 
   if (error) {
-    return encodedRedirect("error", "/protected/tournaments", error.message);
+    return encodedRedirect("error", "/tracker/tournaments", error.message);
   }
 
-  return redirect("/protected/tournaments");
+  return redirect("/tracker/tournaments");
 };
 
 export const forgotPasswordAction = async (formData: FormData) => {
@@ -67,7 +67,7 @@ export const forgotPasswordAction = async (formData: FormData) => {
   }
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/auth/callback?redirect_to=/protected/reset-password`,
+    redirectTo: `${origin}/auth/callback?redirect_to=/tracker/reset-password`,
   });
 
   if (error) {
@@ -99,7 +99,7 @@ export const resetPasswordAction = async (formData: FormData) => {
   if (!password || !confirmPassword) {
     encodedRedirect(
       "error",
-      "/protected/reset-password",
+      "/tracker/reset-password",
       "Password and confirm password are required",
     );
   }
@@ -107,7 +107,7 @@ export const resetPasswordAction = async (formData: FormData) => {
   if (password !== confirmPassword) {
     encodedRedirect(
       "error",
-      "/protected/reset-password",
+      "/tracker/reset-password",
       "Passwords do not match",
     );
   }
@@ -119,12 +119,12 @@ export const resetPasswordAction = async (formData: FormData) => {
   if (error) {
     encodedRedirect(
       "error",
-      "/protected/reset-password",
+      "/tracker/reset-password",
       "Password update failed. Try using a different password.",
     );
   }
 
-  encodedRedirect("success", "/protected/reset-password", "Password updated");
+  encodedRedirect("success", "/tracker/reset-password", "Password updated");
 };
 
 export const signOutAction = async () => {

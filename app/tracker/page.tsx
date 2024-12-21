@@ -1,8 +1,7 @@
-import SideNav from "../../components/side-nav";
 import { createClient } from "../../utils/supabase/server";
 import { redirect } from "next/navigation";
 
-export default async function ProtectedPage() {
+export default async function TrackerPage() {
   const supabase = await createClient();
 
   const {
@@ -15,7 +14,6 @@ export default async function ProtectedPage() {
 
   return (
     <div className="flex flex-1 w-full">
-      <SideNav />
       <div className="flex-1 flex flex-col gap-12 p-4">
         <div className="w-full">
         </div>

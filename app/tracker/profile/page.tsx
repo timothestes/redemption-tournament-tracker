@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "../../../utils/supabase/client";
-import SideNav from "../../../components/side-nav";
 
 const supabase = createClient();
 
@@ -24,7 +23,6 @@ export default function ProfilePage() {
 
   return (
     <div className="p-4 pl-64">
-      <SideNav />
       <h1 className="text-2xl font-bold">Profile</h1>
       {user ? (
         <div className="mt-4">

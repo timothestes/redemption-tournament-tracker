@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "../../../utils/supabase/client";
-import SideNav from "../../../components/side-nav";
 import ToastNotification from "../../../components/ui/toast-notification";
 
 const supabase = createClient();
@@ -55,7 +54,6 @@ export default function TournamentsPage() {
 
   return (
     <div className="flex h-screen pl-64">
-      <SideNav />
       <div className="flex-grow p-4">
         <h1 className="text-2xl font-bold">Your tournaments</h1>
         {loading ? (
@@ -64,7 +62,7 @@ export default function TournamentsPage() {
           <p>
             No tournaments found.{" "}
             <a
-              href="/protected/tournaments/host"
+              href="/tracker/tournaments/host"
               className="text-blue-500 underline"
             >
               Create one?
@@ -78,7 +76,7 @@ export default function TournamentsPage() {
                 className="flex justify-between items-center"
               >
                 <a
-                  href={`/protected/tournaments/${tournament.id}`}
+                  href={`/tracker/tournaments/${tournament.id}`}
                   className="mr-4 text-blue-500 underline"
                 >
                   {tournament.name}

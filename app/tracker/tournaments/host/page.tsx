@@ -5,7 +5,6 @@ import ToastNotification from "../../../../components/ui/toast-notification";
 import Modal from "../../../../components/ui/modal";
 import { createClient } from "../../../../utils/supabase/client";
 import { useRouter } from "next/navigation";
-import SideNav from "../../../../components/side-nav";
 import { generateCode } from "../../../../utils/generateCode";
 
 const supabase = createClient();
@@ -48,13 +47,12 @@ export default function HostTournamentPage() {
     else {
       setNewTournament("");
       setShowToast(true);
-      router.push("/protected/tournaments");
+      router.push("/tracker/tournaments");
     }
   };
 
   return (
     <div className="p-4">
-      <SideNav />
       <h1 className="text-2xl font-bold">Host a Tournament</h1>
       <div className="mt-4">
         <input
