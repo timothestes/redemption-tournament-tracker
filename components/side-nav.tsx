@@ -23,7 +23,7 @@ const SideNav: React.FC = () => {
       </button>
       <Sidebar
         aria-label="Default sidebar example"
-        className={`fixed h-full top-16 left-0 bg-primary transform ${isOpen ? "translate-x-0" : "-translate-x-full"} transition-transform md:translate-x-0`}
+        className={`fixed h-full top-16 left-0 bg-primary transform ${isOpen ? "translate-x-0" : "-translate-x-full"} transition-transform md:translate-x-0 rounded-none`}
       >
         <Sidebar.Items>
           <Sidebar.ItemGroup>
