@@ -16,6 +16,9 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   const [currentParticipant, setCurrentParticipant] = useState(null);
   const [newParticipantName, setNewParticipantName] = useState("");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [newMatchPoints, setNewMatchPoints] = useState("");
+  const [newDifferential, setNewDifferential] = useState("");
+  const [newDroppedOut, setNewDroppedOut] = useState(false);
   const [loading, setLoading] = useState(true);
   const [id, setId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -100,7 +103,12 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
     try {
       const { error } = await supabase
         .from("participants")
-        .update({ name: newParticipantName })
+        .update({
+          name: newParticipantName,
+          match_points: newMatchPoints,
+          differential: newDifferential,
+          dropped_out: newDroppedOut,
+        })
         .eq("id", currentParticipant.id);
       if (error) throw error;
 
@@ -246,31 +254,56 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
           </div>
         )}
       </div>
-      <Modal
-        show={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        size="sm"
-      >
-        <Modal.Header>Edit Participant</Modal.Header>
-        <Modal.Body>
-          <div className="space-y-4">
-            <TextInput
-              value={newParticipantName}
-              onChange={(e) => setNewParticipantName(e.target.value)}
-              placeholder="Participant Name"
-              required
+    <Modal
+      show={isEditModalOpen}
+      onClose={() => setIsEditModalOpen(false)}
+      size="sm"
+    >
+      <Modal.Header>Edit Participant</Modal.Header>
+      <Modal.Body>
+        <div className="space-y-4">
+          <TextInput
+            value={newParticipantName}
+            onChange={(e) => setNewParticipantName(e.target.value)}
+            placeholder="Participant Name"
+            required
+          />
+          <TextInput
+            value={currentParticipant?.place}
+            disabled
+            placeholder="Place"
+            className="bg-gray-200"
+          />
+          <TextInput
+            value={newMatchPoints}
+            onChange={(e) => setNewMatchPoints(e.target.value)}
+            placeholder="Match Points"
+          />
+          <TextInput
+            value={newDifferential}
+            onChange={(e) => setNewDifferential(e.target.value)}
+            placeholder="Differential"
+          />
+          <div className="flex items-center">
+            <label htmlFor="droppedOut" className="mr-2">Dropped Out</label>
+            <input
+              type="checkbox"
+              id="droppedOut"
+              checked={newDroppedOut}
+              onChange={(e) => setNewDroppedOut(e.target.checked)}
             />
           </div>
-        </Modal.Body>
-        <Modal.Footer className="flex justify-end space-x-2">
-          <Button outline gradientDuoTone="greenToBlue" onClick={updateParticipant}>
-            Save
-          </Button>
-          <Button outline color="red" onClick={() => setIsEditModalOpen(false)}>
-            Cancel
-          </Button>
-        </Modal.Footer>
-      </Modal>
+        </div>
+      </Modal.Body>
+      <Modal.Footer className="flex justify-end space-x-2">
+        <Button outline gradientDuoTone="greenToBlue" onClick={updateParticipant}>
+          Save
+        </Button>
+        <Button outline color="red" onClick={() => setIsEditModalOpen(false)}>
+          Cancel
+        </Button>
+      </Modal.Footer>
+    </Modal>
     </div>
   );
 }
