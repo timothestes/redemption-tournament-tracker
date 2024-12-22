@@ -92,7 +92,7 @@ export default function TournamentsPage() {
     <div className="flex h-screen pl-64">
       <div className="flex-grow p-4">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Your Tournaments</h1>
+        <h1 className="text-2xl font-bold mr-8">Your Tournaments</h1>
         <Button
           onClick={() => setisAddTournamentModalOpen(true)}
           className="flex items-center gap-2"
@@ -103,10 +103,10 @@ export default function TournamentsPage() {
           Host a Tournament
         </Button>
         <TournamentFormModal
-            isOpen={isAddTournamentModalOpen}
-            onClose={() => setisAddTournamentModalOpen(false)}
-            onSubmit={handleAddTournament}
-          />
+          isOpen={isAddTournamentModalOpen}
+          onClose={() => setisAddTournamentModalOpen(false)}
+          onSubmit={handleAddTournament}
+        />
       </div>
         {loading ? (
           <p>Loading tournaments...</p>
