@@ -4,9 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../../../../utils/supabase/client";
 import { Table, Button, TextInput, Modal } from "flowbite-react";
-import { HiPencil, HiTrash } from "react-icons/hi";
+import { HiPencil, HiTrash, HiPlus } from "react-icons/hi";
 import ParticipantFormModal from "../../../../components/ui/participant-form-modal";
-import { HiPlus } from "react-icons/hi";
 
 const supabase = createClient();
 
@@ -21,86 +20,66 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   const [isModalOpen, setIsModalOpen] = useState(false);
   const router = useRouter();
 
+  useEffect(() => {
+    const unwrapParams = async () => {
+      try {
+        const resolvedParams = await params;
+        setId(resolvedParams.id);
+      } catch (error) {
+        console.error("Error resolving params:", error);
+      }
+    };
+    unwrapParams();
+  }, [params]);
+
   const handleAddParticipant = async (name: string) => {
     if (!name.trim()) return;
+
     try {
       const { error } = await supabase
         .from("participants")
         .insert([{ name, tournament_id: id }]);
-      if (error) {
-        console.error("Error adding participant:", error);
-      } else {
-        // Refresh the participants list
-        const { data, error } = await supabase
-          .from("participants")
-          .select("*")
-          .eq("tournament_id", id);
-        if (error) {
-          console.error("Error fetching participants:", error);
-        } else {
-          setParticipants(data);
-        }
-      }
+      if (error) throw error;
+
+      fetchParticipants();
     } catch (error) {
-      console.error("Unexpected error:", error);
+      console.error("Error adding participant:", error);
+    } finally {
+      setIsModalOpen(false);
     }
-    setIsModalOpen(false);
   };
 
-  useEffect(() => {
-    const unwrapParams = async () => {
-      const resolvedParams = await params;
-      setId(resolvedParams.id);
-    };
-
-    unwrapParams();
-  }, [params]);
-
-  useEffect(() => {
-    if (!id) return;
-
-    const fetchTournamentDetails = async () => {
+  const fetchTournamentDetails = async () => {
+    try {
       const { data, error } = await supabase
         .from("tournaments")
         .select("*")
         .eq("id", id)
         .single();
-      if (error) {
-        console.error("Error fetching tournament details:", error);
-      } else {
-        setTournament(data);
-      }
-    };
+      if (error) throw error;
 
-    const fetchParticipants = async () => {
-      await fetchTournamentDetails();
+      setTournament(data);
+    } catch (error) {
+      console.error("Error fetching tournament details:", error);
+    }
+  };
+
+  const fetchParticipants = async () => {
+    if (!id) return;
+
+    try {
       const { data, error } = await supabase
         .from("participants")
         .select("*")
         .eq("tournament_id", id);
-      if (error) {
-        console.error("Error fetching participants:", error);
-      } else {
-        setParticipants(data);
-      }
-      setLoading(false);
-    };
+      if (error) throw error;
 
-    fetchParticipants();
-  }, [id]);
-
-  const fetchParticipants = async () => {
-    await fetchTournamentDetails();
-    const { data, error } = await supabase
-      .from("participants")
-      .select("*")
-      .eq("tournament_id", id);
-    if (error) {
-      console.error("Error fetching participants:", error);
-    } else {
       setParticipants(data);
+    } catch (error) {
+      console.error("Error fetching participants:", error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const updateParticipant = async () => {
@@ -111,32 +90,33 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
         .from("participants")
         .update({ name: newParticipantName })
         .eq("id", currentParticipant.id);
-      if (error) {
-        console.error("Error updating participant:", error);
-      } else {
-        fetchParticipants();
-        setIsEditModalOpen(false);
-      }
+      if (error) throw error;
+
+      fetchParticipants();
+      setIsEditModalOpen(false);
     } catch (error) {
-      console.error("Unexpected error:", error);
+      console.error("Error updating participant:", error);
     }
   };
 
   const deleteParticipant = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from("participants")
-        .delete()
-        .eq("id", id);
-      if (error) {
-        console.error("Error deleting participant:", error);
-      } else {
-        fetchParticipants();
-      }
+      const { error } = await supabase.from("participants").delete().eq("id", id);
+      if (error) throw error;
+
+      fetchParticipants();
     } catch (error) {
-      console.error("Unexpected error:", error);
+      console.error("Error deleting participant:", error);
     }
   };
+
+  useEffect(() => {
+    if (id) {
+      fetchTournamentDetails();
+      fetchParticipants();
+    }
+  }, [id]);
+
   return (
     <div className="flex h-screen pl-64">
       <div className="flex-grow p-4">
@@ -161,11 +141,12 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
           <Button
             onClick={() => setIsModalOpen(true)}
             className="flex items-center gap-2"
-            outline gradientDuoTone="greenToBlue"
+            outline
+            gradientDuoTone="greenToBlue"
           >
-              <HiPlus className="w-5 h-5" />
-              Add Participant
-            </Button>
+            <HiPlus className="w-5 h-5" />
+            Add Participant
+          </Button>
           <ParticipantFormModal
             isOpen={isModalOpen}
             onClose={() => setIsModalOpen(false)}
@@ -192,7 +173,10 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
               </Table.Head>
               <Table.Body className="divide-y">
                 {participants.map((participant) => (
-                  <Table.Row key={participant.id} className="bg-white dark:border-gray-700 dark:bg-gray-800">
+                  <Table.Row
+                    key={participant.id}
+                    className="bg-white dark:border-gray-700 dark:bg-gray-800"
+                  >
                     <Table.Cell className="whitespace-nowrap font-medium text-gray-900 dark:text-white">
                       {participant.name}
                     </Table.Cell>
