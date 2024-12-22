@@ -45,14 +45,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
       if (error) throw error;
 
       fetchParticipants();
-      setShowAddToast(true);
       setTimeout(() => setShowAddToast(false), 2000); // 2 seconds
-      setShowDeleteToast(true);
-      setTimeout(() => setShowDeleteToast(false), 2000); // 2 seconds
-      setShowDeleteToast(true);
-      setTimeout(() => setShowDeleteToast(false), 2000); // 2 seconds
-      setShowDeleteToast(true);
-      setTimeout(() => setShowDeleteToast(false), 2000); // 2 seconds
     } catch (error) {
       console.error("Error adding participant:", error);
     } finally {
