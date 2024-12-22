@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "../../../../utils/supabase/client";
-import { Table, Button, TextInput, Modal } from "flowbite-react";
-import { HiPencil, HiTrash, HiPlus } from "react-icons/hi";
+import { Button, TextInput } from "flowbite-react";
+import { HiPlus } from "react-icons/hi";
 import ParticipantFormModal from "../../../../components/ui/participant-form-modal";
 import ToastNotification from "../../../../components/ui/toast-notification";
+import ParticipantTable from "../../../../components/ui/ParticipantTable";
+import EditParticipantModal from "../../../../components/ui/EditParticipantModal";
 
 const supabase = createClient();
 
@@ -190,123 +192,25 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
           <p>Loading participants...</p>
         ) : participants.length === 0 ? (
           <p>No participants found.</p>
-        ) : (
-          <div className="overflow-x-auto" style={{ maxWidth: '800px' }}>
-            <Table striped hoverable>
-              <Table.Head>
-                <Table.HeadCell>Name</Table.HeadCell>
-                {/* <Table.HeadCell>Joined At</Table.HeadCell> */}
-                <Table.HeadCell>Place</Table.HeadCell>
-                <Table.HeadCell className="whitespace-nowrap">Match Points</Table.HeadCell>
-                <Table.HeadCell>Differential</Table.HeadCell>
-                <Table.HeadCell className="whitespace-nowrap">Dropped Out</Table.HeadCell>
-                <Table.HeadCell>
-                  <span className="sr-only">Actions</span>
-                </Table.HeadCell>
-              </Table.Head>
-              <Table.Body className="divide-y">
-                {participants.map((participant) => (
-                  <Table.Row
-                    key={participant.id}
-                    className="bg-white dark:border-gray-700 dark:bg-gray-800 h-10"
-                  >
-                    <Table.Cell className="whitespace-nowrap font-medium text-gray-900 dark:text-white">
-                      {participant.name}
-                    </Table.Cell>
-                    {/* <Table.Cell className="whitespace-nowrap">
-                      {new Intl.DateTimeFormat("en-US", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit",
-                      }).format(new Date(participant.joined_at))}
-                    </Table.Cell> */}
-                    <Table.Cell>{participant.place}</Table.Cell>
-                    <Table.Cell>{participant.match_points}</Table.Cell>
-                    <Table.Cell>{participant.differential}</Table.Cell>
-                    <Table.Cell>{participant.dropped_out ? "Yes" : "No"}</Table.Cell>
-                    <Table.Cell className="flex items-center space-x-4">
-                      <HiPencil
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setCurrentParticipant(participant);
-                          setNewParticipantName(participant.name);
-                          setIsEditModalOpen(true);
-                        }}
-                        className="text-blue-500 cursor-pointer hover:text-blue-700 w-6 h-6"
-                        aria-label="Edit"
-                      />
-                      <HiTrash
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteParticipant(participant.id);
-                        }}
-                        className="text-red-500 cursor-pointer hover:text-red-700 w-6 h-6"
-                        aria-label="Delete"
-                      />
-                    </Table.Cell>
-                  </Table.Row>
-                ))}
-              </Table.Body>
-            </Table>
-          </div>
-        )}
+        ) : <ParticipantTable participants={participants} onEdit={(participant) => {
+              setCurrentParticipant(participant);
+              setNewParticipantName(participant.name);
+              setIsEditModalOpen(true);
+            }} onDelete={deleteParticipant} />}
       </div>
-    <Modal
-      show={isEditModalOpen}
-      onClose={() => setIsEditModalOpen(false)}
-      size="sm"
-    >
-      <Modal.Header>Edit Participant</Modal.Header>
-      <Modal.Body>
-        <div className="space-y-4">
-          <TextInput
-            value={newParticipantName}
-            onChange={(e) => setNewParticipantName(e.target.value)}
-            placeholder="Participant Name"
-            required
-          />
-          <TextInput
-            value={currentParticipant?.place || ""}
-            disabled
-            placeholder="Place"
-          />
-          <TextInput
-            value={newMatchPoints}
-            onChange={(e) => setNewMatchPoints(e.target.value)}
-            placeholder="Match Points"
-          />
-          <TextInput
-            value={newDifferential}
-            onChange={(e) => setNewDifferential(e.target.value)}
-            placeholder="Differential"
-          />
-          <div className="flex items-center ">
-            <label htmlFor="droppedOut" className="mr-4 ml-1">Dropped Out</label>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                id="droppedOut"
-                className="sr-only peer"
-                checked={newDroppedOut}
-                onChange={(e) => setNewDroppedOut(e.target.checked)}
-              />
-              <div className="w-11 h-6 bg-gray-200 outline rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-            </label>
-          </div>
-        </div>
-      </Modal.Body>
-      <Modal.Footer className="flex justify-end space-x-2">
-        <Button outline gradientDuoTone="greenToBlue" onClick={updateParticipant}>
-          Save
-        </Button>
-        <Button outline color="red" onClick={() => setIsEditModalOpen(false)}>
-          Cancel
-        </Button>
-      </Modal.Footer>
-    </Modal>
-    </div>
+      <EditParticipantModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        participant={currentParticipant}
+        onSave={updateParticipant}
+        newParticipantName={newParticipantName}
+        setNewParticipantName={setNewParticipantName}
+        newMatchPoints={newMatchPoints}
+        setNewMatchPoints={setNewMatchPoints}
+        newDifferential={newDifferential}
+        setNewDifferential={setNewDifferential}
+        newDroppedOut={newDroppedOut}
+        setNewDroppedOut={setNewDroppedOut}
+      />
   );
 }
