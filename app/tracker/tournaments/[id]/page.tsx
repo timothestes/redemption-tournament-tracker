@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "../../../../utils/supabase/client";
 import { Table, Button, TextInput, Modal } from "flowbite-react";
 import { HiPencil, HiTrash, HiPlus } from "react-icons/hi";
-import ToastNotification from "../../../../components/ui/toast-notification";
 import ParticipantFormModal from "../../../../components/ui/participant-form-modal";
+import ToastNotification from "../../../../components/ui/toast-notification";
 
 const supabase = createClient();
 
@@ -19,9 +19,16 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   const [loading, setLoading] = useState(true);
   const [id, setId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [showDeleteToast, setShowDeleteToast] = useState(false);
-  const [showAddToast, setShowAddToast] = useState(false);
-  const router = useRouter();
+  const [toast, setToast] = useState<{ message: string; show: boolean; type?: "success" | "error" }>({
+    message: "",
+    show: false,
+    type: "success",
+  });
+
+  const showToast = (message: string, type: "success" | "error" = "success") => {
+    setToast({ message, show: true, type });
+    setTimeout(() => setToast((prev) => ({ ...prev, show: false })), 2000); // Hide after 2 seconds
+  };
 
   useEffect(() => {
     const unwrapParams = async () => {
@@ -45,10 +52,9 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
       if (error) throw error;
 
       fetchParticipants();
-      setTimeout(() => setShowAddToast(false), 2000); // 2 seconds
-      setShowDeleteToast(true);
-      setTimeout(() => setShowDeleteToast(false), 2000); // 2 seconds
+      showToast("Participant added successfully!", "success");
     } catch (error) {
+      showToast("Error adding participant.", "error");
       console.error("Error adding participant:", error);
     } finally {
       setIsModalOpen(false);
@@ -100,7 +106,9 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
 
       fetchParticipants();
       setIsEditModalOpen(false);
+      showToast("Participant updated successfully!", "success");
     } catch (error) {
+      showToast("Error updating participant.", "error");
       console.error("Error updating participant:", error);
     }
   };
@@ -111,7 +119,9 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
       if (error) throw error;
 
       fetchParticipants();
+      showToast("Participant deleted successfully!", "error");
     } catch (error) {
+      showToast("Error deleting participant.", "error");
       console.error("Error deleting participant:", error);
     }
   };
@@ -125,6 +135,12 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
 
   return (
     <div className="flex h-screen pl-64">
+      <ToastNotification
+        message={toast.message}
+        show={toast.show}
+        onClose={() => setToast((prev) => ({ ...prev, show: false }))}
+        type={toast.type}
+      />
       <div className="flex-grow p-4">
         {tournament && (
           <div className="mb-6">
@@ -252,18 +268,6 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
           </Button>
         </Modal.Footer>
       </Modal>
-      <ToastNotification
-        message="Participant deleted successfully!"
-        show={showDeleteToast}
-        onClose={() => setShowDeleteToast(false)}
-        type="error"
-      />
-      <ToastNotification
-        message="Participant added successfully!"
-        show={showAddToast}
-        onClose={() => setShowAddToast(false)}
-        type="success"
-      />
     </div>
   );
 }
