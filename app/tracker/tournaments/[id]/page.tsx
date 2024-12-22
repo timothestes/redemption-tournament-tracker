@@ -89,20 +89,6 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
     fetchParticipants();
   }, [id]);
 
-  const fetchParticipants = async () => {
-    if (!id) return;
-
-    const { data, error } = await supabase
-      .from("participants")
-      .select("*")
-      .eq("tournament_id", id);
-    if (error) {
-      console.error("Error fetching participants:", error);
-    } else {
-      setParticipants(data);
-    }
-    setLoading(false);
-  };
   const updateParticipant = async () => {
     if (!currentParticipant || !newParticipantName.trim()) return;
 
