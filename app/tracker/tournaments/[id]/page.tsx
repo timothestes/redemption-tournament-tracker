@@ -270,7 +270,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
             required
           />
           <TextInput
-            value={currentParticipant?.place}
+            value={currentParticipant?.place || ""}
             disabled
             placeholder="Place"
           />
