@@ -86,7 +86,8 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
       const { data, error } = await supabase
         .from("participants")
         .select("*")
-        .eq("tournament_id", id);
+        .eq("tournament_id", id)
+        .order("match_points", { ascending: true });
       if (error) throw error;
 
       setParticipants(data);
@@ -283,8 +284,8 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
             onChange={(e) => setNewDifferential(e.target.value)}
             placeholder="Differential"
           />
-          <div className="flex items-center">
-            <label htmlFor="droppedOut" className="mr-2">Dropped Out</label>
+          <div className="flex items-center ">
+            <label htmlFor="droppedOut" className="mr-4 ml-1">Dropped Out</label>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
@@ -293,7 +294,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
                 checked={newDroppedOut}
                 onChange={(e) => setNewDroppedOut(e.target.checked)}
               />
-              <div className="w-11 h-6 bg-gray-200 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              <div className="w-11 h-6 bg-gray-200 outline rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
             </label>
           </div>
         </div>
