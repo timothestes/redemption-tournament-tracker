@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { createClient } from "../../../../utils/supabase/client";
 import { Table, Button, TextInput, Modal } from "flowbite-react";
 import { HiPencil, HiTrash, HiPlus } from "react-icons/hi";
