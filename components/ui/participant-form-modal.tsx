@@ -47,10 +47,10 @@ const ParticipantFormModal: React.FC<ParticipantFormModalProps> = ({
             />
           </div>
           <div className="flex justify-end gap-3">
+            <Button type="submit" outline gradientDuoTone="greenToBlue">Add</Button>
             <Button type="button" outline color="red" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" outline gradientDuoTone="greenToBlue">Add</Button>
           </div>
         </form>
       </div>

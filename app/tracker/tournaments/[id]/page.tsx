@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "../../../../utils/supabase/client";
-import { Button, TextInput } from "flowbite-react";
+import { Button } from "flowbite-react";
 import { HiPlus } from "react-icons/hi";
 import ParticipantFormModal from "../../../../components/ui/participant-form-modal";
 import ToastNotification from "../../../../components/ui/toast-notification";
@@ -13,8 +13,8 @@ const supabase = createClient();
 
 export default function TournamentPage({ params }: { params: Promise<{ id: string }> }) {
   const [participants, setParticipants] = useState([]);
-  const [tournament, setTournament] = useState(null);
-  const [currentParticipant, setCurrentParticipant] = useState(null);
+  const [tournament, setTournament] = useState<any>(null);
+  const [currentParticipant, setCurrentParticipant] = useState<any>(null);
   const [newParticipantName, setNewParticipantName] = useState<string>("");
   const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
   const [newMatchPoints, setNewMatchPoints] = useState<string>("");
@@ -31,7 +31,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, show: true, type });
-    setTimeout(() => setToast((prev) => ({ ...prev, show: false })), 2000); // Hide after 2 seconds
+    setTimeout(() => setToast((prev) => ({ ...prev, show: false })), 2000);
   };
 
   useEffect(() => {
@@ -48,13 +48,9 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
 
   const handleAddParticipant = async (name: string) => {
     if (!name.trim()) return;
-
     try {
-      const { error } = await supabase
-        .from("participants")
-        .insert([{ name, tournament_id: id }]);
+      const { error } = await supabase.from("participants").insert([{ name, tournament_id: id }]);
       if (error) throw error;
-
       fetchParticipants();
       showToast("Participant added successfully!", "success");
     } catch (error) {
@@ -73,7 +69,6 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
         .eq("id", id)
         .single();
       if (error) throw error;
-
       setTournament(data);
     } catch (error) {
       console.error("Error fetching tournament details:", error);
@@ -82,7 +77,6 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
 
   const fetchParticipants = async () => {
     if (!id) return;
-
     try {
       const { data, error } = await supabase
         .from("participants")
@@ -90,7 +84,6 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
         .eq("tournament_id", id)
         .order("match_points", { ascending: false });
       if (error) throw error;
-
       setParticipants(data);
     } catch (error) {
       console.error("Error fetching participants:", error);
@@ -101,7 +94,6 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
 
   const updateParticipant = async () => {
     if (!currentParticipant || !newParticipantName.trim()) return;
-
     try {
       const { error } = await supabase
         .from("participants")
@@ -113,7 +105,6 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
         })
         .eq("id", currentParticipant.id);
       if (error) throw error;
-
       fetchParticipants();
       setIsEditModalOpen(false);
       showToast("Participant updated successfully!", "success");
@@ -127,12 +118,41 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
     try {
       const { error } = await supabase.from("participants").delete().eq("id", id);
       if (error) throw error;
-
       fetchParticipants();
       showToast("Participant deleted successfully!", "error");
     } catch (error) {
       showToast("Error deleting participant.", "error");
       console.error("Error deleting participant:", error);
+    }
+  };
+
+  const handleTournamentStatusToggle = async () => {
+    if (!tournament) {
+      showToast("Tournament is not available yet.", "error");
+      return;
+    }
+    const started = Boolean(tournament.has_started);
+    try {
+      const { data, error } = await supabase
+        .from("tournaments")
+        .update({
+          has_started: !started,
+          has_ended: started ? true : false,
+        })
+        .eq("id", id)
+        .select("*")
+        .single();
+      if (error) throw error;
+      console.log("data");
+      console.log(data);
+      setTournament(data);
+      showToast(
+        `Tournament ${data.has_started ? "started" : "stopped"} successfully!`,
+        "success"
+      );
+    } catch (error) {
+      showToast("Error updating tournament status.", "error");
+      console.error("Error updating tournament status:", error);
     }
   };
 
@@ -166,6 +186,14 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
                 second: "2-digit",
               }).format(new Date(tournament.created_at))}
             </p>
+            <div className="mt-4">
+              <Button
+                color={Boolean(tournament.has_started) ? "failure" : "success"}
+                onClick={handleTournamentStatusToggle}
+              >
+                {Boolean(tournament.has_started) ? "End Tournament" : "Start Tournament"}
+              </Button>
+            </div>
           </div>
         )}
         <div className="flex justify-between items-center mb-6">
@@ -192,11 +220,17 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
           <p>Loading participants...</p>
         ) : participants.length === 0 ? (
           <p>No participants found.</p>
-        ) : <ParticipantTable participants={participants} onEdit={(participant) => {
+        ) : (
+          <ParticipantTable
+            participants={participants}
+            onEdit={(participant: any) => {
               setCurrentParticipant(participant);
               setNewParticipantName(participant.name);
               setIsEditModalOpen(true);
-            }} onDelete={deleteParticipant} />}
+            }}
+            onDelete={deleteParticipant}
+          />
+        )}
       </div>
       <EditParticipantModal
         isOpen={isEditModalOpen}
