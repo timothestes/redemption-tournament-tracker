@@ -272,7 +272,6 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
             value={currentParticipant?.place}
             disabled
             placeholder="Place"
-            className="bg-gray-200"
           />
           <TextInput
             value={newMatchPoints}
@@ -286,15 +285,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
           />
           <div className="flex items-center">
             <label htmlFor="droppedOut" className="mr-2">Dropped Out</label>
-            <label className="switch">
-              <input
-                type="checkbox"
-                id="droppedOut"
-                checked={newDroppedOut}
-                onChange={(e) => setNewDroppedOut(e.target.checked)}
-              />
-              <span className="slider round"></span>
-            </label>
+            {/* TODO: implement dropped out toogle switch here (true is toggled on, false is toggled off) */}
           </div>
         </div>
       </Modal.Body>
