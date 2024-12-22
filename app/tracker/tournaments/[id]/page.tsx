@@ -159,10 +159,13 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
           </div>
         )}
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">Participants</h2>
+          <h2 className="text-2xl font-bold" style={{ width: "200px" }}>
+            Participants
+          </h2>
           <Button
             onClick={() => setIsModalOpen(true)}
             className="flex items-center gap-2"
+            style={{ width: "200px" }}
             outline
             gradientDuoTone="greenToBlue"
           >
@@ -180,15 +183,15 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
         ) : participants.length === 0 ? (
           <p>No participants found.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <Table hoverable>
+          <div className="overflow-x-auto" style={{ maxWidth: '800px' }}>
+            <Table striped hoverable>
               <Table.Head>
                 <Table.HeadCell>Name</Table.HeadCell>
-                <Table.HeadCell>Joined At</Table.HeadCell>
+                {/* <Table.HeadCell>Joined At</Table.HeadCell> */}
                 <Table.HeadCell>Place</Table.HeadCell>
-                <Table.HeadCell>Match Points</Table.HeadCell>
+                <Table.HeadCell className="whitespace-nowrap">Match Points</Table.HeadCell>
                 <Table.HeadCell>Differential</Table.HeadCell>
-                <Table.HeadCell>Dropped Out</Table.HeadCell>
+                <Table.HeadCell className="whitespace-nowrap">Dropped Out</Table.HeadCell>
                 <Table.HeadCell>
                   <span className="sr-only">Actions</span>
                 </Table.HeadCell>
@@ -197,12 +200,12 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
                 {participants.map((participant) => (
                   <Table.Row
                     key={participant.id}
-                    className="bg-white dark:border-gray-700 dark:bg-gray-800"
+                    className="bg-white dark:border-gray-700 dark:bg-gray-800 h-10"
                   >
                     <Table.Cell className="whitespace-nowrap font-medium text-gray-900 dark:text-white">
                       {participant.name}
                     </Table.Cell>
-                    <Table.Cell>
+                    {/* <Table.Cell className="whitespace-nowrap">
                       {new Intl.DateTimeFormat("en-US", {
                         year: "numeric",
                         month: "long",
@@ -211,7 +214,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
                         minute: "2-digit",
                         second: "2-digit",
                       }).format(new Date(participant.joined_at))}
-                    </Table.Cell>
+                    </Table.Cell> */}
                     <Table.Cell>{participant.place}</Table.Cell>
                     <Table.Cell>{participant.match_points}</Table.Cell>
                     <Table.Cell>{participant.differential}</Table.Cell>
