@@ -212,5 +212,6 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
         newDroppedOut={newDroppedOut}
         setNewDroppedOut={setNewDroppedOut}
       />
+    </div>
   );
 }
