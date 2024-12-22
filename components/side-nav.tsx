@@ -26,7 +26,9 @@ const SideNav: React.FC = () => {
       </button>
       <Sidebar
         aria-label="sidebar"
-        className={`fixed h-full top-16 left-0 bg-primary transform ${isOpen ? "translate-x-0" : "-translate-x-full"} transition-transform md:translate-x-0 rounded-full`}
+        className={`fixed top-16 left-0 w-45 h-full bg-primary transform z-50 ${
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        } transition-transform md:translate-x-0 rounded-full`}
       >
         <Sidebar.Items>
           <Sidebar.ItemGroup>

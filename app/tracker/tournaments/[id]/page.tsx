@@ -131,23 +131,32 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
       showToast("Tournament is not available yet.", "error");
       return;
     }
-    const started = Boolean(tournament.has_started);
+    const now = new Date().toISOString();
+    // If not started, start it; if started, end it
+    const updates = !tournament.has_started
+      ? {
+          has_started: true,
+          has_ended: false,
+          started_at: now,
+          ended_at: null,
+        }
+      : {
+          has_started: false,
+          has_ended: true,
+          ended_at: now,
+        };
+
     try {
       const { data, error } = await supabase
         .from("tournaments")
-        .update({
-          has_started: !started,
-          has_ended: started ? true : false,
-        })
+        .update(updates)
         .eq("id", id)
         .select("*")
         .single();
       if (error) throw error;
-      console.log("data");
-      console.log(data);
       setTournament(data);
       showToast(
-        `Tournament ${data.has_started ? "started" : "stopped"} successfully!`,
+        `Tournament ${data.has_started ? "started" : "ended"} successfully!`,
         "success"
       );
     } catch (error) {
@@ -186,6 +195,32 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
                 second: "2-digit",
               }).format(new Date(tournament.created_at))}
             </p>
+            {tournament.started_at && (
+              <p className="text-sm text-gray-500">
+                Started at:{"\u00A0\u00A0\u00A0"}
+                {new Intl.DateTimeFormat("en-US", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                }).format(new Date(tournament.started_at))}
+              </p>
+            )}
+            {tournament.ended_at && (
+              <p className="text-sm text-gray-500">
+                Ended at:{"\u00A0\u00A0\u00A0\u00A0\u00A0"}
+                {new Intl.DateTimeFormat("en-US", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                }).format(new Date(tournament.ended_at))}
+              </p>
+            )}
             <div className="mt-4">
               <Button
                 color={Boolean(tournament.has_started) ? "failure" : "success"}
