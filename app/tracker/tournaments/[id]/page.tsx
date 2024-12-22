@@ -14,11 +14,11 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   const [participants, setParticipants] = useState([]);
   const [tournament, setTournament] = useState(null);
   const [currentParticipant, setCurrentParticipant] = useState(null);
-  const [newParticipantName, setNewParticipantName] = useState("");
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [newMatchPoints, setNewMatchPoints] = useState("");
-  const [newDifferential, setNewDifferential] = useState("");
-  const [newDroppedOut, setNewDroppedOut] = useState(false);
+  const [newParticipantName, setNewParticipantName] = useState<string>("");
+  const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
+  const [newMatchPoints, setNewMatchPoints] = useState<string>("");
+  const [newDifferential, setNewDifferential] = useState<string>("");
+  const [newDroppedOut, setNewDroppedOut] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
   const [id, setId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
