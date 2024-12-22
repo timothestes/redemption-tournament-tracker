@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../../../../utils/supabase/client";
-import { Table, Button } from "flowbite-react";
+import { Table, Button, TextInput, Modal } from "flowbite-react";
+import { HiPencil, HiTrash } from "react-icons/hi";
 import ParticipantFormModal from "../../../../components/ui/participant-form-modal";
 import { HiPlus } from "react-icons/hi";
 
@@ -122,6 +123,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
       console.error("Unexpected error:", error);
     }
   };
+  return (
     <div className="flex h-screen pl-64">
       <div className="flex-grow p-4">
         {tournament && (
@@ -247,5 +249,6 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
         </Modal.Footer>
       </Modal>
     </div>
+  );
   );
 }
