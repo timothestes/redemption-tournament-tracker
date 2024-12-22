@@ -286,12 +286,15 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
           />
           <div className="flex items-center">
             <label htmlFor="droppedOut" className="mr-2">Dropped Out</label>
-            <input
-              type="checkbox"
-              id="droppedOut"
-              checked={newDroppedOut}
-              onChange={(e) => setNewDroppedOut(e.target.checked)}
-            />
+            <label className="switch">
+              <input
+                type="checkbox"
+                id="droppedOut"
+                checked={newDroppedOut}
+                onChange={(e) => setNewDroppedOut(e.target.checked)}
+              />
+              <span className="slider round"></span>
+            </label>
           </div>
         </div>
       </Modal.Body>
