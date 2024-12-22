@@ -49,7 +49,9 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   const handleAddParticipant = async (name: string) => {
     if (!name.trim()) return;
     try {
-      const { error } = await supabase.from("participants").insert([{ name, tournament_id: id }]);
+      const { error } = await supabase
+        .from("participants")
+        .insert([{ name, tournament_id: id }]);
       if (error) throw error;
       fetchParticipants();
       showToast("Participant added successfully!", "success");
@@ -132,7 +134,6 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
       return;
     }
     const now = new Date().toISOString();
-    // If not started, start it; if started, end it
     const updates = !tournament.has_started
       ? {
           has_started: true,
@@ -141,7 +142,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
           ended_at: null,
         }
       : {
-          has_started: false,
+          // has_started: false,
           has_ended: true,
           ended_at: now,
         };
@@ -223,10 +224,23 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
             )}
             <div className="mt-4">
               <Button
-                color={Boolean(tournament.has_started) ? "failure" : "success"}
+                disabled={
+                  Boolean(tournament.has_started) && Boolean(tournament.has_ended)
+                }
+                color={
+                  Boolean(tournament.has_started) && Boolean(tournament.has_ended)
+                    ? "gray"
+                    : Boolean(tournament.has_started)
+                    ? "failure"
+                    : "success"
+                }
                 onClick={handleTournamentStatusToggle}
               >
-                {Boolean(tournament.has_started) ? "End Tournament" : "Start Tournament"}
+                {Boolean(tournament.has_started) && Boolean(tournament.has_ended)
+                  ? "Tournament Ended"
+                  : Boolean(tournament.has_started)
+                  ? "End Tournament"
+                  : "Start Tournament"}
               </Button>
             </div>
           </div>
