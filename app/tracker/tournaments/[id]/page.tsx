@@ -250,5 +250,4 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
       </Modal>
     </div>
   );
-  );
 }
