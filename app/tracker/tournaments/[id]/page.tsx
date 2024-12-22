@@ -141,7 +141,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
         onClose={() => setToast((prev) => ({ ...prev, show: false }))}
         type={toast.type}
       />
-      <div className="flex-grow p-4">
+      <div className="flex-grow p-4 max-w-4xl mx-auto">
         {tournament && (
           <div className="mb-6">
             <h1 className="text-3xl font-bold">{tournament.name}</h1>
