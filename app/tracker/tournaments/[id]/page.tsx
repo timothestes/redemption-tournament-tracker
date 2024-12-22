@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "../../../../utils/supabase/client";
 import { Table, Button, TextInput, Modal } from "flowbite-react";
 import { HiPencil, HiTrash, HiPlus } from "react-icons/hi";
+import ToastNotification from "../../../../components/ui/toast-notification";
 import ParticipantFormModal from "../../../../components/ui/participant-form-modal";
 
 const supabase = createClient();
@@ -18,6 +19,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   const [loading, setLoading] = useState(true);
   const [id, setId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showDeleteToast, setShowDeleteToast] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -42,6 +44,8 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
       if (error) throw error;
 
       fetchParticipants();
+      setShowDeleteToast(true);
+      setTimeout(() => setShowDeleteToast(false), 2000); // 2 seconds
     } catch (error) {
       console.error("Error adding participant:", error);
     } finally {
@@ -246,6 +250,12 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
           </Button>
         </Modal.Footer>
       </Modal>
+      <ToastNotification
+        message="Participant deleted successfully!"
+        show={showDeleteToast}
+        onClose={() => setShowDeleteToast(false)}
+        type="error"
+      />
     </div>
   );
 }
