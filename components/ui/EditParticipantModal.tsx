@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { Button, Label, TextInput, Checkbox } from "flowbite-react";
+import { Button, Label, TextInput } from "flowbite-react";
 
 interface EditParticipantModalProps {
   isOpen: boolean;
@@ -27,8 +27,6 @@ const EditParticipantModal: React.FC<EditParticipantModalProps> = ({
   setNewMatchPoints,
   newDifferential,
   setNewDifferential,
-  newDroppedOut,
-  setNewDroppedOut,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -71,7 +69,6 @@ const EditParticipantModal: React.FC<EditParticipantModalProps> = ({
               type="number"
               value={newMatchPoints}
               onChange={(e) => setNewMatchPoints(e.target.value)}
-              required
             />
           </div>
           <div className="mb-2 block">
@@ -82,16 +79,6 @@ const EditParticipantModal: React.FC<EditParticipantModalProps> = ({
               type="number"
               value={newDifferential}
               onChange={(e) => setNewDifferential(e.target.value)}
-              required
-            />
-          </div>
-          <div className="mb-2 block">
-            <Label htmlFor="dropped_out" value="Dropped Out" />
-            <Checkbox
-              id="dropped_out"
-              name="dropped_out"
-              checked={newDroppedOut}
-              onChange={(e) => setNewDroppedOut(e.target.checked)}
             />
           </div>
           <div className="flex justify-end gap-3">

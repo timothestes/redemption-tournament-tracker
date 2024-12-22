@@ -88,7 +88,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
         .from("participants")
         .select("*")
         .eq("tournament_id", id)
-        .order("match_points", { ascending: true });
+        .order("match_points", { ascending: false });
       if (error) throw error;
 
       setParticipants(data);

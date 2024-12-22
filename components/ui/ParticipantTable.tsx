@@ -1,5 +1,5 @@
 import React from "react";
-import { Table, Button } from "flowbite-react";
+import { Table } from "flowbite-react";
 import { HiPencil, HiTrash } from "react-icons/hi";
 
 interface Participant {
@@ -27,7 +27,6 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
         <Table.HeadCell>Name</Table.HeadCell>
         <Table.HeadCell>Match Points</Table.HeadCell>
         <Table.HeadCell>Differential</Table.HeadCell>
-        <Table.HeadCell>Dropped Out</Table.HeadCell>
         <Table.HeadCell>
           <span className="sr-only">Actions</span>
         </Table.HeadCell>
@@ -43,9 +42,6 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
             </Table.Cell>
             <Table.Cell>{participant.match_points}</Table.Cell>
             <Table.Cell>{participant.differential}</Table.Cell>
-            <Table.Cell>
-              {participant.dropped_out ? "Yes" : "No"}
-            </Table.Cell>
             <Table.Cell className="flex items-center space-x-4">
               <HiPencil
                 onClick={() => onEdit(participant)}

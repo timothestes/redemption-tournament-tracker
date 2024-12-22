@@ -173,6 +173,7 @@ export default function TournamentsPage() {
           </div>
         )}
         <Modal
+          dismissible
           show={isEditModalOpen}
           onClose={() => setIsEditModalOpen(false)}
           size="sm"
