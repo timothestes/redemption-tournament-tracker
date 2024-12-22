@@ -103,6 +103,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
     }
     setLoading(false);
   };
+  const updateParticipant = async () => {
     if (!currentParticipant || !newParticipantName.trim()) return;
 
     try {
