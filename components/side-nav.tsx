@@ -41,6 +41,7 @@ const SideNav: React.FC = () => {
             />
           </div>
         </Link>
+        <hr className="border-t border-gray-200 my-2" />
         <Sidebar.Items>
           <Sidebar.ItemGroup>
             <Sidebar.Item href="/tracker/tournaments" icon={FaTrophy}>
