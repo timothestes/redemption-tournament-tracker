@@ -4,7 +4,7 @@ import Link from "next/link";
 
 const HomeIcon: React.FC = () => {
   return (
-    <Link href="/tracker/tournaments" passHref>
+    <Link href="/" passHref>
       <div className="cursor-pointer ml-auto">
         <Image
           src="/lor.png"

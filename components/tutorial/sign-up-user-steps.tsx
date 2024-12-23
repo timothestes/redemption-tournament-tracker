@@ -11,7 +11,7 @@ export default function SignUpUserSteps() {
             href="/sign-up"
             className="font-bold hover:underline text-foreground/80"
           >
-            signed in
+            signed up
           </Link>{" "}
           can host a tournament
         </p>

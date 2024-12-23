@@ -31,7 +31,7 @@ export default async function AuthButton() {
           <Link href="/tracker/tournaments">Sign in</Link>
         </Button>
         <Button asChild size="sm" variant={"default"}>
-          <Link href="/tracker/tournaments">Sign up</Link>
+          <Link href="/sign-up">Sign up</Link>
         </Button>
       </div>
     </div>
