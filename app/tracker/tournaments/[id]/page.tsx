@@ -96,17 +96,33 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
 
   const updateParticipant = async () => {
     if (!currentParticipant || !newParticipantName.trim()) return;
+  
+    const updateData: {
+      name?: string;
+      match_points?: number;
+      differential?: number;
+      dropped_out?: boolean;
+    } = {
+      name: newParticipantName,
+      dropped_out: newDroppedOut,
+    };
+  
+    if (newMatchPoints !== "") {
+      updateData.match_points = Number(newMatchPoints);
+    }
+  
+    if (newDifferential !== "") {
+      updateData.differential = Number(newDifferential);
+    }
+  
     try {
       const { error } = await supabase
         .from("participants")
-        .update({
-          name: newParticipantName,
-          match_points: newMatchPoints,
-          differential: newDifferential,
-          dropped_out: newDroppedOut,
-        })
+        .update(updateData)
         .eq("id", currentParticipant.id);
+  
       if (error) throw error;
+  
       fetchParticipants();
       setIsEditModalOpen(false);
       showToast("Participant updated successfully!", "success");
@@ -115,6 +131,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
       console.error("Error updating participant:", error);
     }
   };
+  
 
   const deleteParticipant = async (id: string) => {
     try {
