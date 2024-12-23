@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { Sidebar } from "flowbite-react";
 import { HiArrowSmRight, HiDocumentText, HiMenu } from "react-icons/hi";
-import { FaTrophy, FaPlus, FaBookOpen } from "react-icons/fa6";
+import { FaTrophy, FaBookOpen } from "react-icons/fa6";
 import { PiPencilLineBold } from "react-icons/pi";
 import { TbCardsFilled, TbArrowGuideFilled } from "react-icons/tb";
 import { AiOutlineForm } from "react-icons/ai";
-
+import Image from "next/image";
+import Link from "next/link";
 
 const SideNav: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -26,10 +27,20 @@ const SideNav: React.FC = () => {
       </button>
       <Sidebar
         aria-label="sidebar"
-        className={`fixed top-16 left-0 w-45 h-full bg-primary transform z-50 ${
+        className={`fixed top-0 left-0 w-45 h-full bg-primary transform z-50 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         } transition-transform md:translate-x-0 rounded-full`}
       >
+        <Link href="/tracker/tournaments" passHref>
+          <div className="cursor-pointer ml-auto">
+            <Image
+              src="/lor.png"
+              alt="Home Icon"
+              width={180}
+              height={40}
+            />
+          </div>
+        </Link>
         <Sidebar.Items>
           <Sidebar.ItemGroup>
             <Sidebar.Item href="/tracker/tournaments" icon={FaTrophy}>
