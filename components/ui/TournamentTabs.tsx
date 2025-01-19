@@ -2,7 +2,7 @@
 
 import { Tabs } from "flowbite-react";
 import { HiUserGroup } from "react-icons/hi";
-import { MdDashboard } from "react-icons/md";
+import { FaGear } from "react-icons/fa6";
 import ParticipantTable from "./ParticipantTable";
 import ParticipantFormModal from "./participant-form-modal";
 import { Button } from "flowbite-react";
@@ -62,9 +62,9 @@ export default function TournamentTabs({
           />
         )}
       </Tabs.Item>
-      <Tabs.Item title="Pairings" icon={MdDashboard}>
+      <Tabs.Item title="Settings" icon={FaGear}>
         <div className="p-4">
-          <h2 className="text-2xl font-bold mb-4">Pairings</h2>
+          <h2 className="text-2xl font-bold mb-4">Settings</h2>
           <p className="text-gray-500">Coming soon...</p>
         </div>
       </Tabs.Item>
