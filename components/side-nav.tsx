@@ -38,7 +38,7 @@ const SideNav: React.FC = () => {
               alt="Home Icon"
               width={180}
               height={40}
-              style={{ height: 'auto' }}
+              style={{ width: 'auto', height: 'auto' }}
               priority
             />
           </div>
