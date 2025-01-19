@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, Pagination } from "flowbite-react";
+import { Button, Card, Pagination } from "flowbite-react";
 import { useState, useEffect } from "react";
 import { createClient } from "../../utils/supabase/client";
 
@@ -60,13 +60,25 @@ export default function TournamentRounds({
               <h3 className="text-xl font-semibold">
                 Round {currentPage} of {tournamentInfo.n_rounds}
               </h3>
-              <div className="flex overflow-x-auto sm:justify-center">
-                <Pagination 
-                  currentPage={currentPage} 
-                  totalPages={tournamentInfo.current_round || 1}
-                  onPageChange={onPageChange}
-                  showIcons
-                />
+              <div className="space-y-4">
+                <div className="flex overflow-x-auto sm:justify-center">
+                  <Pagination 
+                    currentPage={currentPage} 
+                    totalPages={tournamentInfo.current_round || 1}
+                    onPageChange={onPageChange}
+                    showIcons
+                  />
+                </div>
+                {currentPage === tournamentInfo.current_round && (
+                  <div className="flex justify-center">
+                    <Button
+                      outline
+                      gradientDuoTone="greenToBlue"
+                    >
+                      Start Round
+                    </Button>
+                  </div>
+                )}
               </div>
             </>
           )}
