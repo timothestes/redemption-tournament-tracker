@@ -83,6 +83,30 @@ export default function TournamentRounds({
     }
   }, [tournamentId]);
 
+  const fetchRoundInfo = useCallback(async (roundNumber: number) => {
+    if (!tournamentId) return;
+
+    const client = createClient();
+    const { data: roundData } = await client
+      .from("rounds")
+      .select("started_at, ended_at")
+      .eq("tournament_id", tournamentId)
+      .eq("round_number", roundNumber)
+      .maybeSingle();
+
+    if (roundData) {
+      setRoundInfo({
+        started_at: roundData.started_at,
+        ended_at: roundData.ended_at
+      });
+    } else {
+      setRoundInfo({
+        started_at: null,
+        ended_at: null
+      });
+    }
+  }, [tournamentId]);
+
   useEffect(() => {
     if (isActive) {
       fetchTournamentInfo();
@@ -90,7 +114,7 @@ export default function TournamentRounds({
     }
   }, [fetchTournamentInfo, fetchRoundInfo, isActive, currentPage]);
 
-  const fetchRoundInfo = useCallback(async (roundNumber: number) => {
+  const onPageChange = (page: number) => {
     if (!tournamentId) return;
 
     const client = createClient();
