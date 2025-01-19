@@ -39,6 +39,7 @@ const SideNav: React.FC = () => {
               width={180}
               height={40}
               style={{ height: 'auto' }}
+              priority
             />
           </div>
         </Link>
