@@ -3,7 +3,7 @@
 import { Card } from "flowbite-react";
 import { useState, useEffect } from "react";
 import { suggestNumberOfRounds } from "../../utils/tournamentUtils";
-import { createClient } from "../../utils/supabase/client";
+import { createClient } from "@/utils/supabase/client";
 
 interface TournamentSettingsProps {
   tournamentId: string;
@@ -15,9 +15,7 @@ interface TournamentInfo {
   current_round: number | null;
 }
 
-const supabase = createClient();
-
-export default function TournamentSettings({ 
+export default function TournamentSettings({
   tournamentId,
   participantCount 
 }: TournamentSettingsProps) {
@@ -31,9 +29,8 @@ export default function TournamentSettings({
 
   useEffect(() => {
     const fetchTournamentInfo = async () => {
-      console.log('tournamentId')
-      console.log(tournamentId)
-      const { data, error } = await supabase
+      const client = createClient();
+      const { data, error } = await client
         .from('tournaments')
         .select('n_rounds, current_round')
         .eq('id', tournamentId)
