@@ -3,7 +3,6 @@
 import { Button, Card, Pagination } from "flowbite-react";
 import { createClient } from "../../utils/supabase/client";
 import { useState, useEffect } from "react";
-import { createClient } from "../../utils/supabase/client";
 
 interface TournamentRoundsProps {
   tournamentId: string;
