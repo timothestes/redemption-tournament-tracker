@@ -91,17 +91,17 @@ export default function TournamentsPage() {
 
   return (
     <div className="flex h-screen pl-64">
-      <div className="flex-grow p-4 max-w-4xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         <Breadcrumb
           items={[
             { label: "Tournaments", href: "/tracker/tournaments" }
           ]}
         />
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold mr-8">Your Tournaments</h1>
+        <h1 className="text-2xl font-bold mr-8 mt-2">Your Tournaments</h1>
         <Button
           onClick={() => setisAddTournamentModalOpen(true)}
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 mt-2"
           outline
           gradientDuoTone="greenToBlue"
         >
