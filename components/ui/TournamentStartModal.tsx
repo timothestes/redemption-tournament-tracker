@@ -6,7 +6,7 @@ import { useState } from "react";
 interface TournamentStartModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (numberOfRounds: number) => void;
   participantCount: number;
   suggestedRounds: number;
 }
@@ -40,7 +40,13 @@ export default function TournamentStartModal({
           <div className="space-y-2">
             <Label>Number of Rounds</Label>
             <div className="flex items-center space-x-4">
-              <Button size="sm" onClick={handleDecrement}>-</Button>
+              <Button 
+                size="sm" 
+                onClick={handleDecrement}
+                disabled={numberOfRounds <= 1}
+              >
+                -
+              </Button>
               <span className="text-lg font-semibold">{numberOfRounds}</span>
               <Button size="sm" onClick={handleIncrement}>+</Button>
             </div>
@@ -48,7 +54,9 @@ export default function TournamentStartModal({
         </div>
       </Modal.Body>
       <Modal.Footer>
-        <Button onClick={onConfirm} outline gradientDuoTone="greenToBlue">Start Tournament</Button>
+        <Button onClick={() => onConfirm(numberOfRounds)} outline gradientDuoTone="greenToBlue">
+          Start Tournament
+        </Button>
         <Button color="gray" onClick={onClose}>Cancel</Button>
       </Modal.Footer>
     </Modal>
