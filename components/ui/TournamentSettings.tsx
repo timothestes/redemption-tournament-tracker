@@ -72,7 +72,7 @@ export default function TournamentSettings({
                 Tournament Rounds: {tournamentInfo.n_rounds}
               </p>
             )}
-            {participantCount > 0 && (
+            {participantCount > 0 && typeof tournamentInfo.n_rounds !== 'number' && (
               <p className="text-sm text-gray-500">
                 Suggested Number of Rounds: {suggestedRounds}
               </p>
