@@ -21,6 +21,7 @@ interface TournamentTabsProps {
   onDelete: (id: string) => void;
   loading: boolean;
   tournamentId: string;
+  tournamentStarted?: boolean;
 }
 
 export default function TournamentTabs({
@@ -32,6 +33,7 @@ export default function TournamentTabs({
   onDelete,
   loading,
   tournamentId,
+  tournamentStarted = false,
 }: TournamentTabsProps) {
   const [activeTab, setActiveTab] = useState(0);
   return (
@@ -75,7 +77,7 @@ export default function TournamentTabs({
           </div>
         )}
       </Tabs.Item>
-      <Tabs.Item title="Pairings" icon={MdPeople}>
+      <Tabs.Item title="Pairings" icon={MdPeople} disabled={!tournamentStarted}>
         <div className="p-4">
           <TournamentPairings
             tournamentId={tournamentId}
