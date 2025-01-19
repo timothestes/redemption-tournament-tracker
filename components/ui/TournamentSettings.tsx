@@ -1,21 +1,52 @@
 "use client";
 
 import { Card } from "flowbite-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { suggestNumberOfRounds } from "../../utils/tournamentUtils";
+import { createClient } from "../../utils/supabase/client";
 
 interface TournamentSettingsProps {
   tournamentId: string;
   participantCount: number;
 }
 
+interface TournamentInfo {
+  n_rounds: number | null;
+  current_round: number | null;
+}
+
+const supabase = createClient();
+
 export default function TournamentSettings({ 
   tournamentId,
   participantCount 
 }: TournamentSettingsProps) {
   const [enabled, setEnabled] = useState(false);
+  const [tournamentInfo, setTournamentInfo] = useState<TournamentInfo>({
+    n_rounds: null,
+    current_round: null
+  });
 
   const suggestedRounds = suggestNumberOfRounds(participantCount);
+
+  useEffect(() => {
+    const fetchTournamentInfo = async () => {
+      const { data, error } = await supabase
+        .from('tournaments')
+        .select('n_rounds, current_round')
+        .eq('id', tournamentId)
+        .single();
+      
+      if (error) {
+        console.error('Error fetching tournament info:', error);
+        return;
+      }
+
+      setTournamentInfo(data);
+    };
+
+    fetchTournamentInfo();
+  }, [tournamentId]);
 
   return (
     <div className="space-y-6">
@@ -33,6 +64,16 @@ export default function TournamentSettings({
             {participantCount > 0 && (
               <p className="text-sm text-gray-500">
                 Suggested Number of Rounds: {suggestedRounds}
+              </p>
+            )}
+            {tournamentInfo.n_rounds && (
+              <p className="text-sm text-gray-500">
+                Tournament Rounds: {tournamentInfo.n_rounds}
+              </p>
+            )}
+            {tournamentInfo.current_round && (
+              <p className="text-sm text-gray-500">
+                Current Round: {tournamentInfo.current_round}
               </p>
             )}
           </div>
