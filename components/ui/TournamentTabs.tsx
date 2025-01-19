@@ -3,6 +3,7 @@
 import { Tabs } from "flowbite-react";
 import { HiUserGroup } from "react-icons/hi";
 import { FaGear } from "react-icons/fa6";
+import TournamentSettings from "./TournamentSettings";
 import ParticipantTable from "./ParticipantTable";
 import ParticipantFormModal from "./participant-form-modal";
 import { Button } from "flowbite-react";
@@ -16,6 +17,7 @@ interface TournamentTabsProps {
   onEdit: (participant: any) => void;
   onDelete: (id: string) => void;
   loading: boolean;
+  tournamentId: string;
 }
 
 export default function TournamentTabs({
@@ -66,8 +68,7 @@ export default function TournamentTabs({
       </Tabs.Item>
       <Tabs.Item title="Settings" icon={FaGear}>
         <div className="p-4">
-          <h2 className="text-2xl font-bold mb-4">Settings</h2>
-          <p className="text-gray-500">Coming soon...</p>
+          <TournamentSettings tournamentId={tournamentId} />
         </div>
       </Tabs.Item>
     </Tabs>

@@ -285,6 +285,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
           }}
           onDelete={deleteParticipant}
           loading={loading}
+          tournamentId={id || ''}
         />
       </div>
       <EditParticipantModal

@@ -1,0 +1,39 @@
+"use client";
+
+import { Button, Card } from "flowbite-react";
+import { HiCog } from "react-icons/hi";
+
+interface TournamentSettingsProps {
+  tournamentId: string;
+  // Add more props as needed
+}
+
+export default function TournamentSettings({ tournamentId }: TournamentSettingsProps) {
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Tournament Settings</h2>
+      </div>
+      
+      <Card>
+        <h3 className="text-lg font-semibold mb-2">General Settings</h3>
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm text-gray-500">Tournament ID: {tournamentId}</p>
+          </div>
+          {/* Add more settings sections here */}
+        </div>
+      </Card>
+
+      <Card>
+        <h3 className="text-lg font-semibold mb-2">Advanced Settings</h3>
+        <div className="space-y-4">
+          <Button color="gray" size="sm">
+            <HiCog className="mr-2 h-4 w-4" />
+            Configure Tournament
+          </Button>
+        </div>
+      </Card>
+    </div>
+  );
+}
