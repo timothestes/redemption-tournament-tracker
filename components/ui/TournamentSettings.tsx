@@ -50,7 +50,7 @@ export default function TournamentSettings({
   }, [tournamentId]);
 
   return (
-    <div className="space-y-6 w-full max-w-full sm:max-w-3xl mx-auto px-4">
+    <div className="space-y-6 min-w-[800px] max-w-[1200px] w-full mx-auto">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Tournament Settings</h2>
       </div>
