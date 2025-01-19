@@ -23,7 +23,6 @@ interface TournamentTabsProps {
   tournamentId: string;
   tournamentStarted?: boolean;
   onTournamentEnd?: () => void;
-  onRoundChange?: (roundNumber: number) => void;
 }
 
 export default function TournamentTabs({
@@ -88,7 +87,6 @@ export default function TournamentTabs({
             isActive={activeTab === 1}
             key={activeTab} // Force re-render when tab becomes active
             onTournamentEnd={onTournamentEnd}
-            onRoundChange={onRoundChange}
           />
         </div>
       </Tabs.Item>

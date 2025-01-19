@@ -24,7 +24,6 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   const [loading, setLoading] = useState(true);
   const [id, setId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [currentRound, setCurrentRound] = useState<number | null>(null);
   const [toast, setToast] = useState<{ message: string; show: boolean; type?: "success" | "error" }>({
     message: "",
     show: false,
@@ -221,7 +220,6 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
             items={[
               { label: "Tournaments", href: "/tracker/tournaments" },
               { label: tournament?.name || "Loading..." },
-              ...(currentRound ? [{ label: `Round ${currentRound}` }] : []),
             ]}
           />
           </div>
@@ -312,7 +310,6 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
           tournamentId={id || ''}
           tournamentStarted={tournament?.has_started || false}
           onTournamentEnd={fetchTournamentDetails}
-          onRoundChange={setCurrentRound}
         />
       </div>
       <EditParticipantModal
