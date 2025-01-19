@@ -35,8 +35,7 @@ export default function TournamentRounds({
     }
   };
 
-  useEffect(() => {
-    const fetchTournamentInfo = async () => {
+  const fetchTournamentInfo = async () => {
       if (!tournamentId) return;
       
       const client = createClient();
@@ -72,7 +71,7 @@ export default function TournamentRounds({
     };
 
     fetchTournamentInfo();
-  }, [tournamentId]);
+  }, [tournamentId, fetchTournamentInfo]);
 
   const handleStartRound = async () => {
     const client = createClient();
