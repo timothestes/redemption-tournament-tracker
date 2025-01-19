@@ -6,8 +6,9 @@ const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
       className="min-h-screen w-full relative"
       style={{
         backgroundImage: "url('/login-splash.png')",
-        backgroundSize: "cover",
+        backgroundSize: "50%",
         backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
       }}
     >
       <div className="absolute inset-0 bg-black bg-opacity-50"></div>
