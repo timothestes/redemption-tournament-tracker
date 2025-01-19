@@ -118,14 +118,17 @@ export default function TournamentRounds({
 
       if (roundError) throw roundError;
 
-      const { error: tournamentError } = await client
-        .from("tournaments")
-        .update({
-          current_round: tournamentInfo.current_round! + 1,
-        })
-        .eq("id", tournamentId);
+      // Only increment current_round if we haven't reached the maximum rounds
+      if (tournamentInfo.current_round! < tournamentInfo.n_rounds!) {
+        const { error: tournamentError } = await client
+          .from("tournaments")
+          .update({
+            current_round: tournamentInfo.current_round! + 1,
+          })
+          .eq("id", tournamentId);
 
-      if (tournamentError) throw tournamentError;
+        if (tournamentError) throw tournamentError;
+      }
 
       fetchTournamentInfo();
       setIsRoundActive(false);
