@@ -1,6 +1,7 @@
 "use client";
 
 import { Button, Card, Pagination } from "flowbite-react";
+import { createClient } from "../../utils/supabase/client";
 import { useState, useEffect } from "react";
 import { createClient } from "../../utils/supabase/client";
 
@@ -21,6 +22,7 @@ export default function TournamentRounds({
     current_round: null
   });
   const [currentPage, setCurrentPage] = useState(1);
+  const [isRoundActive, setIsRoundActive] = useState(false);
 
   const onPageChange = (page: number) => {
     // Only allow navigating to current or previous rounds
@@ -46,10 +48,80 @@ export default function TournamentRounds({
       }
 
       setTournamentInfo(data);
+
+      // Check if there's an active round
+      const { data: roundData, error: roundError } = await client
+        .from('rounds')
+        .select('*')
+        .eq('tournament_id', tournamentId)
+        .eq('round_number', data.current_round)
+        .is('ended_at', null)
+        .single();
+
+      if (!roundError && roundData) {
+        setIsRoundActive(true);
+      } else {
+        setIsRoundActive(false);
+      }
     };
 
     fetchTournamentInfo();
   }, [tournamentId]);
+
+  const handleStartRound = async () => {
+    const client = createClient();
+    
+    try {
+      // Insert new round
+      const { error: roundError } = await client
+        .from('rounds')
+        .insert([{
+          tournament_id: tournamentId,
+          round_number: currentPage,
+          started_at: new Date().toISOString(),
+        }]);
+
+      if (roundError) throw roundError;
+      
+      setIsRoundActive(true);
+    } catch (error) {
+      console.error('Error starting round:', error);
+    }
+  };
+
+  const handleEndRound = async () => {
+    const client = createClient();
+    
+    try {
+      // Update round end time
+      const { error: roundError } = await client
+        .from('rounds')
+        .update({ 
+          ended_at: new Date().toISOString(),
+          is_completed: true 
+        })
+        .eq('tournament_id', tournamentId)
+        .eq('round_number', currentPage);
+
+      if (roundError) throw roundError;
+
+      // Increment current round in tournament
+      const { error: tournamentError } = await client
+        .from('tournaments')
+        .update({ 
+          current_round: tournamentInfo.current_round! + 1
+        })
+        .eq('id', tournamentId);
+
+      if (tournamentError) throw tournamentError;
+
+      // Refresh tournament info
+      fetchTournamentInfo();
+      setIsRoundActive(false);
+    } catch (error) {
+      console.error('Error ending round:', error);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -64,9 +136,10 @@ export default function TournamentRounds({
                 {currentPage === tournamentInfo.current_round && (
                   <Button
                     outline
-                    gradientDuoTone="greenToBlue"
+                    gradientDuoTone={isRoundActive ? "pinkToOrange" : "greenToBlue"}
+                    onClick={isRoundActive ? handleEndRound : handleStartRound}
                   >
-                    Start Round
+                    {isRoundActive ? "End Round" : "Start Round"}
                   </Button>
                 )}
               </div>
