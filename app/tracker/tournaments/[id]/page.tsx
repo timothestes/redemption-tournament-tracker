@@ -200,6 +200,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
               { label: tournament?.name || "Loading..." },
             ]}
           />
+          </div>
         <ToastNotification
         message={toast.message}
         show={toast.show}
