@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 
 interface TournamentRoundsProps {
   tournamentId: string;
+  isActive: boolean;
 }
 
 interface TournamentInfo {
@@ -21,6 +22,7 @@ interface RoundInfo {
 
 export default function TournamentRounds({
   tournamentId,
+  isActive
 }: TournamentRoundsProps) {
   const [tournamentInfo, setTournamentInfo] = useState<TournamentInfo>({
     n_rounds: null,
@@ -71,8 +73,10 @@ export default function TournamentRounds({
   }, [tournamentId]);
 
   useEffect(() => {
-    fetchTournamentInfo();
-  }, [fetchTournamentInfo]);
+    if (isActive) {
+      fetchTournamentInfo();
+    }
+  }, [fetchTournamentInfo, isActive]);
 
   const onPageChange = (page: number) => {
     if (page <= (tournamentInfo.current_round || 1)) {

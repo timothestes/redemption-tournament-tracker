@@ -81,6 +81,7 @@ export default function TournamentTabs({
         <div className="p-4">
           <TournamentRounds
             tournamentId={tournamentId}
+            isActive={activeTab === 1}
             key={activeTab} // Force re-render when tab becomes active
           />
         </div>
