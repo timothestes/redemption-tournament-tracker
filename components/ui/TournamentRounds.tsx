@@ -5,7 +5,7 @@ import { createClient } from "../../utils/supabase/client";
 import { useState, useEffect, useCallback } from "react";
 
 const formatDateTime = (timestamp: string | null) => {
-  if (!timestamp) return "Not set";
+  if (!timestamp) return "";
   return new Intl.DateTimeFormat("en-US", {
     year: "numeric",
     month: "long",
