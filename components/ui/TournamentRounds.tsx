@@ -20,6 +20,7 @@ interface TournamentRoundsProps {
   tournamentId: string;
   isActive: boolean;
   onTournamentEnd?: () => void;
+  onRoundChange?: (roundNumber: number) => void;
 }
 
 interface TournamentInfo {
@@ -144,6 +145,7 @@ export default function TournamentRounds({
   const onPageChange = async (page: number) => {
     if (page <= (tournamentInfo.current_round || 1)) {
       setCurrentPage(page);
+      onRoundChange?.(page);
       
       // Immediately fetch round info for the new page
       const client = createClient();
