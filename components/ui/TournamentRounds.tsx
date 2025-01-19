@@ -13,6 +13,10 @@ interface TournamentInfo {
   current_round: number | null;
 }
 
+interface RoundInfo {
+  started_at: string | null;
+}
+
 export default function TournamentRounds({
   tournamentId,
 }: TournamentRoundsProps) {
@@ -22,6 +26,7 @@ export default function TournamentRounds({
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [isRoundActive, setIsRoundActive] = useState(false);
+  const [roundInfo, setRoundInfo] = useState<RoundInfo>({ started_at: null });
 
   const onPageChange = (page: number) => {
     // Only allow navigating to current or previous rounds
@@ -59,8 +64,10 @@ export default function TournamentRounds({
 
       if (!roundError && roundData) {
         setIsRoundActive(true);
+        setRoundInfo({ started_at: roundData.started_at });
       } else {
         setIsRoundActive(false);
+        setRoundInfo({ started_at: null });
       }
     };
 
@@ -129,9 +136,23 @@ export default function TournamentRounds({
           {tournamentInfo.n_rounds && (
             <>
               <div className="flex justify-between items-center">
-                <h3 className="text-xl font-semibold">
-                  Round {currentPage} of {tournamentInfo.n_rounds}
-                </h3>
+                <div>
+                  <h3 className="text-xl font-semibold">
+                    Round {currentPage} of {tournamentInfo.n_rounds}
+                  </h3>
+                  {roundInfo.started_at && (
+                    <p className="text-sm text-gray-500 mt-1">
+                      Started: {new Intl.DateTimeFormat("en-US", {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                      }).format(new Date(roundInfo.started_at))}
+                    </p>
+                  )}
+                </div>
                 {currentPage === tournamentInfo.current_round && (
                   <Button
                     outline
