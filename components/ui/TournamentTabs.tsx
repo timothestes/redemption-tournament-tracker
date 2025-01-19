@@ -6,7 +6,7 @@ import { HiUserGroup } from "react-icons/hi";
 import { FaGear } from "react-icons/fa6";
 import { MdPeople } from "react-icons/md";
 import TournamentSettings from "./TournamentSettings";
-import TournamentPairings from "./TournamentPairings";
+import TournamentRounds from "./TournamentRounds";
 import ParticipantTable from "./ParticipantTable";
 import ParticipantFormModal from "./participant-form-modal";
 import { Button } from "flowbite-react";
@@ -77,9 +77,9 @@ export default function TournamentTabs({
           </div>
         )}
       </Tabs.Item>
-      <Tabs.Item title="Pairings" icon={MdPeople} disabled={!tournamentStarted}>
+      <Tabs.Item title="Rounds" icon={MdPeople} disabled={!tournamentStarted}>
         <div className="p-4">
-          <TournamentPairings
+          <TournamentRounds
             tournamentId={tournamentId}
             key={activeTab} // Force re-render when tab becomes active
           />
