@@ -3,7 +3,7 @@
 import { Card } from "flowbite-react";
 import { useState, useEffect } from "react";
 import { suggestNumberOfRounds } from "../../utils/tournamentUtils";
-import { createClient } from "@/utils/supabase/client";
+import { createClient } from "../../utils/supabase/client";
 
 interface TournamentSettingsProps {
   tournamentId: string;
