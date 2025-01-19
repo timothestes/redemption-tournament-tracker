@@ -51,6 +51,18 @@ export default function TournamentRounds({
 
     setTournamentInfo(data);
 
+    // Check if there's an active round
+    const { data: activeRound } = await client
+      .from("rounds")
+      .select("*")
+      .eq("tournament_id", tournamentId)
+      .eq("round_number", data.current_round)
+      .eq("is_completed", false)
+      .maybeSingle();
+
+    setIsRoundActive(!!activeRound);
+
+    // Get round info for display regardless of active status
     const { data: roundData } = await client
       .from("rounds")
       .select("*")
@@ -59,13 +71,11 @@ export default function TournamentRounds({
       .maybeSingle();
 
     if (roundData) {
-      setIsRoundActive(true);
       setRoundInfo({ 
         started_at: roundData.started_at,
         ended_at: roundData.ended_at
       });
     } else {
-      setIsRoundActive(false);
       setRoundInfo({ 
         started_at: null,
         ended_at: null 
