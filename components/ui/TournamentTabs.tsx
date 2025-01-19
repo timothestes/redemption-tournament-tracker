@@ -36,7 +36,6 @@ export default function TournamentTabs({
   tournamentId,
   tournamentStarted = false,
   onTournamentEnd,
-  onRoundChange,
 }: TournamentTabsProps) {
   const [activeTab, setActiveTab] = useState(0);
   return (
