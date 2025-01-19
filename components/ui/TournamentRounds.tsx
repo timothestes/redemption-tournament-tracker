@@ -89,7 +89,9 @@ export default function TournamentRounds({
 
       if (roundError) throw roundError;
       
+      const now = new Date().toISOString();
       setIsRoundActive(true);
+      setRoundInfo({ started_at: now });
     } catch (error) {
       console.error('Error starting round:', error);
     }
