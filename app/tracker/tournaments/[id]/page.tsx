@@ -276,9 +276,9 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
             )}
             <div className="mt-4">
               <Button
-                disabled={participants.length === 0 || (Boolean(tournament?.has_started) && Boolean(tournament?.has_ended))}
+                disabled={participants.length === 0 || tournament?.has_ended}
                 color={
-                  Boolean(tournament?.has_started) && Boolean(tournament?.has_ended)
+                  tournament?.has_ended
                     ? "gray"
                     : Boolean(tournament?.has_started)
                     ? "failure"
@@ -286,7 +286,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
                 }
                 onClick={handleTournamentStatusToggle}
               >
-                {Boolean(tournament?.has_started) && Boolean(tournament?.has_ended)
+                {tournament?.has_ended
                   ? "Tournament Ended"
                   : Boolean(tournament?.has_started)
                   ? "End Tournament"

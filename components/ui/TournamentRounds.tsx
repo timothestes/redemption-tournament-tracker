@@ -135,6 +135,12 @@ export default function TournamentRounds({
           .eq("id", tournamentId);
 
         if (tournamentError) throw tournamentError;
+        
+        // Update local state to reflect tournament end
+        setTournamentInfo(prev => ({
+          ...prev,
+          has_ended: true
+        }));
       } else {
         // Increment current round if not the last round
         const { error: tournamentError } = await client
