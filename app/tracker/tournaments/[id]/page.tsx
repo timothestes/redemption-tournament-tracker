@@ -192,13 +192,15 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   }, [id]);
 
   return (
-    <div className="flex h-screen pl-64">
-        <Breadcrumb
-          items={[
-            { label: "Tournaments", href: "/tracker/tournaments" },
-            { label: tournament?.name || "Loading..." },
-          ]}
-        />
+      <div className="flex h-screen pl-64">
+          <div className="absolute top-36 left-400">
+            <Breadcrumb
+              items={[
+                { label: "Tournaments", href: "/tracker/tournaments" },
+                { label: tournament?.name || "Loading..." },
+              ]}
+            />
+          </div>
         <ToastNotification
         message={toast.message}
         show={toast.show}
