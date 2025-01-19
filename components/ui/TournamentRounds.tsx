@@ -4,6 +4,18 @@ import { Button, Card, Pagination } from "flowbite-react";
 import { createClient } from "../../utils/supabase/client";
 import { useState, useEffect, useCallback } from "react";
 
+const formatDateTime = (timestamp: string | null) => {
+  if (!timestamp) return "Not set";
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(new Date(timestamp));
+};
+
 interface TournamentRoundsProps {
   tournamentId: string;
   isActive: boolean;
@@ -21,6 +33,11 @@ interface RoundInfo {
   ended_at: string | null;
 }
 
+interface ErrorState {
+  message: string | null;
+  type: 'fetch' | 'update' | null;
+}
+
 export default function TournamentRounds({
   tournamentId,
   isActive,
@@ -31,6 +48,8 @@ export default function TournamentRounds({
     current_round: null,
     has_ended: false,
   });
+  const [error, setError] = useState<ErrorState>({ message: null, type: null });
+  const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [isRoundActive, setIsRoundActive] = useState(false);
   const [roundInfo, setRoundInfo] = useState<RoundInfo>({
@@ -40,20 +59,30 @@ export default function TournamentRounds({
 
   const fetchTournamentInfo = useCallback(async () => {
     if (!tournamentId) return;
+    
+    setIsLoading(true);
+    setError({ message: null, type: null });
 
-    const client = createClient();
-    const { data, error } = await client
-      .from("tournaments")
-      .select("n_rounds, current_round, has_ended")
-      .eq("id", tournamentId)
-      .single();
+    try {
+      const client = createClient();
+      const { data, error } = await client
+        .from("tournaments")
+        .select("n_rounds, current_round, has_ended")
+        .eq("id", tournamentId)
+        .single();
 
-    if (error) {
-      console.error("Error fetching tournament info:", error);
-      return;
+      if (error) throw error;
+
+      setTournamentInfo(data);
+    } catch (err) {
+      setError({ 
+        message: "Failed to fetch tournament information", 
+        type: 'fetch' 
+      });
+      console.error("Error fetching tournament info:", err);
+    } finally {
+      setIsLoading(false);
     }
-
-    setTournamentInfo(data);
 
     // Check if there's an active round
     const { data: activeRound } = await client
@@ -229,7 +258,17 @@ export default function TournamentRounds({
   return (
     <div className="space-y-6">
       <Card>
-        <div className="space-y-4">
+        {error.message && (
+          <div className="p-4 mb-4 text-sm text-red-800 rounded-lg bg-red-50">
+            {error.message}
+          </div>
+        )}
+        {isLoading ? (
+          <div className="flex items-center justify-center p-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+          </div>
+        ) : (
+          <div className="space-y-4">
           {tournamentInfo.n_rounds && (
             <>
               <div className="flex justify-between items-center">
@@ -239,30 +278,10 @@ export default function TournamentRounds({
                   </h3>
                   <div className="space-y-1">
                     <p className="text-sm text-gray-500 mr-4">
-                      Started:{" "}
-                      {roundInfo.started_at
-                        ? new Intl.DateTimeFormat("en-US", {
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            second: "2-digit",
-                          }).format(new Date(roundInfo.started_at))
-                        : ""}
+                      Started: {formatDateTime(roundInfo.started_at)}
                     </p>
                     <p className="text-sm text-gray-500 mr-4">
-                      Ended:{" "}
-                      {roundInfo.ended_at
-                        ? new Intl.DateTimeFormat("en-US", {
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            second: "2-digit",
-                          }).format(new Date(roundInfo.ended_at))
-                        : ""}
+                      Ended: {formatDateTime(roundInfo.ended_at)}
                     </p>
                   </div>
                 </div>
