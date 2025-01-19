@@ -22,7 +22,12 @@ export default function TournamentPairings({
   });
   const [currentPage, setCurrentPage] = useState(1);
 
-  const onPageChange = (page: number) => setCurrentPage(page);
+  const onPageChange = (page: number) => {
+    // Only allow navigating to current or previous rounds
+    if (page <= (tournamentInfo.current_round || 1)) {
+      setCurrentPage(page);
+    }
+  };
 
   useEffect(() => {
     const fetchTournamentInfo = async () => {
@@ -62,7 +67,7 @@ export default function TournamentPairings({
               <div className="flex overflow-x-auto sm:justify-center">
                 <Pagination 
                   currentPage={currentPage} 
-                  totalPages={tournamentInfo.n_rounds} 
+                  totalPages={tournamentInfo.current_round || 1}
                   onPageChange={onPageChange}
                   showIcons
                 />
