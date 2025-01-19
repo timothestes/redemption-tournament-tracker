@@ -110,9 +110,30 @@ export default function TournamentRounds({
     }
   }, [currentPage, fetchRoundInfo, isActive]);
 
-  const onPageChange = (page: number) => {
+  const onPageChange = async (page: number) => {
     if (page <= (tournamentInfo.current_round || 1)) {
       setCurrentPage(page);
+      
+      // Immediately fetch round info for the new page
+      const client = createClient();
+      const { data: roundData } = await client
+        .from("rounds")
+        .select("started_at, ended_at")
+        .eq("tournament_id", tournamentId)
+        .eq("round_number", page)
+        .maybeSingle();
+
+      if (roundData) {
+        setRoundInfo({
+          started_at: roundData.started_at,
+          ended_at: roundData.ended_at
+        });
+      } else {
+        setRoundInfo({
+          started_at: null,
+          ended_at: null
+        });
+      }
     }
   };
 
