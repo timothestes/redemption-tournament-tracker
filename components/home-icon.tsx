@@ -9,8 +9,10 @@ const HomeIcon: React.FC = () => {
         <Image
           src="/lor.png"
           alt="Home Icon"
-          width={180} // Set the desired width
-          height={40} // Set the desired height
+          width={180}
+          height={40}
+          style={{ width: 'auto', height: 'auto' }}
+          priority
         />
       </div>
     </Link>

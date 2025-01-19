@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Breadcrumb from "../../../components/ui/breadcrumb";
 import { createClient } from "../../../utils/supabase/client";
 import ToastNotification from "../../../components/ui/toast-notification";
 import { Table, Button, Modal, TextInput } from "flowbite-react";
@@ -90,12 +91,17 @@ export default function TournamentsPage() {
 
   return (
     <div className="flex h-screen pl-64">
-      <div className="flex-grow p-4">
+      <div className="max-w-4xl mx-auto">
+        <Breadcrumb
+          items={[
+            { label: "Tournaments", href: "/tracker/tournaments" }
+          ]}
+        />
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold mr-8">Your Tournaments</h1>
+        <h1 className="text-2xl font-bold mr-8 mt-2">Your Tournaments</h1>
         <Button
           onClick={() => setisAddTournamentModalOpen(true)}
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 mt-2"
           outline
           gradientDuoTone="greenToBlue"
         >
@@ -150,9 +156,7 @@ export default function TournamentsPage() {
                       <HiPencil
                         onClick={(e) => {
                           e.stopPropagation();
-                          setCurrentTournament(tournament);
-                          setNewTournamentName(tournament.name);
-                          setIsEditModalOpen(true);
+                          router.push(`/tracker/tournaments/${tournament.id}`);
                         }}
                         className="text-blue-500 cursor-pointer hover:text-blue-700 w-6 h-6"
                         aria-label="Edit"
@@ -172,30 +176,6 @@ export default function TournamentsPage() {
             </Table>
           </div>
         )}
-        <Modal
-          dismissible
-          show={isEditModalOpen}
-          onClose={() => setIsEditModalOpen(false)}
-          size="sm"
-        >
-          <Modal.Header>Edit Tournament</Modal.Header>
-          <Modal.Body>
-            <div className="space-y-4">
-              <TextInput
-                value={newTournamentName}
-                onChange={(e) => setNewTournamentName(e.target.value)}
-                placeholder="Tournament Name"
-                required
-              />
-            </div>
-          </Modal.Body>
-          <Modal.Footer className="flex justify-end space-x-2">
-            <Button outline gradientDuoTone="greenToBlue" onClick={updateTournament}>Save</Button>
-            <Button outline color="red" onClick={() => setIsEditModalOpen(false)}>
-              Cancel
-            </Button>
-          </Modal.Footer>
-        </Modal>
         <ToastNotification
           message="Tournament deleted successfully!"
           show={showDeleteToast}

@@ -1,13 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { suggestNumberOfRounds } from "../../../../utils/tournamentUtils";
+import TournamentStartModal from "../../../../components/ui/TournamentStartModal";
+import Breadcrumb from "../../../../components/ui/breadcrumb";
 import { createClient } from "../../../../utils/supabase/client";
 import { Button } from "flowbite-react";
-import { HiPlus } from "react-icons/hi";
-import ParticipantFormModal from "../../../../components/ui/participant-form-modal";
+import { HiPencil } from "react-icons/hi";
+import EditTournamentNameModal from "../../../../components/ui/EditTournamentNameModal";
+import TournamentTabs from "../../../../components/ui/TournamentTabs";
 import ToastNotification from "../../../../components/ui/toast-notification";
-import ParticipantTable from "../../../../components/ui/ParticipantTable";
 import EditParticipantModal from "../../../../components/ui/EditParticipantModal";
+import CountdownTimer from "../../../../components/ui/CountdownTimer";
 
 const supabase = createClient();
 
@@ -16,13 +20,15 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   const [tournament, setTournament] = useState<any>(null);
   const [currentParticipant, setCurrentParticipant] = useState<any>(null);
   const [newParticipantName, setNewParticipantName] = useState<string>("");
-  const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
+  const [isEditTournamentModalOpen, setIsEditTournamentModalOpen] = useState<boolean>(false);
+  const [isEditParticipantModalOpen, setIsEditParticipantModalOpen] = useState<boolean>(false);
   const [newMatchPoints, setNewMatchPoints] = useState<string>("");
   const [newDifferential, setNewDifferential] = useState<string>("");
   const [newDroppedOut, setNewDroppedOut] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
   const [id, setId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newTournamentName, setNewTournamentName] = useState("");
   const [toast, setToast] = useState<{ message: string; show: boolean; type?: "success" | "error" }>({
     message: "",
     show: false,
@@ -124,7 +130,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
       if (error) throw error;
   
       fetchParticipants();
-      setIsEditModalOpen(false);
+      setIsEditParticipantModalOpen(false);
       showToast("Participant updated successfully!", "success");
     } catch (error) {
       showToast("Error updating participant.", "error");
@@ -145,41 +151,66 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
     }
   };
 
+  const [showStartModal, setShowStartModal] = useState(false);
+  const [isRoundActive, setIsRoundActive] = useState(false);
+  const [roundInfo, setRoundInfo] = useState<{ started_at: string | null }>({ started_at: null });
+
   const handleTournamentStatusToggle = async () => {
     if (!tournament) {
       showToast("Tournament is not available yet.", "error");
       return;
     }
-    const now = new Date().toISOString();
-    const updates = !tournament.has_started
-      ? {
-          has_started: true,
-          has_ended: false,
-          started_at: now,
-          ended_at: null,
-        }
-      : {
-          // has_started: false,
-          has_ended: true,
-          ended_at: now,
-        };
 
+    if (!tournament.has_started) {
+      setShowStartModal(true);
+      return;
+    }
+
+    // Handle tournament end
+    const now = new Date().toISOString();
     try {
       const { data, error } = await supabase
         .from("tournaments")
-        .update(updates)
+        .update({
+          has_ended: true,
+          ended_at: now,
+        })
         .eq("id", id)
         .select("*")
         .single();
       if (error) throw error;
       setTournament(data);
-      showToast(
-        `Tournament ${data.has_started ? "started" : "ended"} successfully!`,
-        "success"
-      );
+      showToast("Tournament ended successfully!", "success");
     } catch (error) {
       showToast("Error updating tournament status.", "error");
       console.error("Error updating tournament status:", error);
+    }
+  };
+
+  const handleStartTournament = async (numberOfRounds: number, roundLength: number) => {
+    const now = new Date().toISOString();
+    try {
+      const { data, error } = await supabase
+        .from("tournaments")
+        .update({
+          has_started: true,
+          has_ended: false,
+          started_at: now,
+          ended_at: null,
+          n_rounds: numberOfRounds,
+          current_round: 1,
+          round_length: roundLength
+        })
+        .eq("id", id)
+        .select("*")
+        .single();
+      if (error) throw error;
+      setTournament(data);
+      setShowStartModal(false);
+      showToast("Tournament started successfully!", "success");
+    } catch (error) {
+      showToast("Error starting tournament.", "error");
+      console.error("Error starting tournament:", error);
     }
   };
 
@@ -191,8 +222,16 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   }, [id]);
 
   return (
-    <div className="flex h-screen pl-64">
-      <ToastNotification
+      <div className="w-full pl-64 pt-4">
+        <div className="max-w-4xl mx-auto">
+          <Breadcrumb
+            items={[
+              { label: "Tournaments", href: "/tracker/tournaments" },
+              { label: tournament?.name || "Loading..." },
+            ]}
+          />
+          </div>
+        <ToastNotification
         message={toast.message}
         show={toast.show}
         onClose={() => setToast((prev) => ({ ...prev, show: false }))}
@@ -201,8 +240,44 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
       <div className="flex-grow p-4 max-w-4xl mx-auto">
         {tournament && (
           <div className="mb-6">
-            <h1 className="text-3xl font-bold">{tournament.name}</h1>
-            <p className="text-sm text-gray-500">
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-bold">{tournament.name}</h1>
+              <HiPencil
+                onClick={() => {
+                  setNewTournamentName(tournament.name);
+                  setIsEditTournamentModalOpen(true);
+                }}
+                className="text-gray-500 cursor-pointer hover:text-gray-700 w-6 h-6"
+                aria-label="Edit tournament name"
+              />
+            </div>
+            <EditTournamentNameModal
+              isOpen={isEditTournamentModalOpen}
+              onClose={() => setIsEditTournamentModalOpen(false)}
+              onSave={async () => {
+                try {
+                  const { error } = await supabase
+                    .from("tournaments")
+                    .update({ name: newTournamentName })
+                    .eq("id", id);
+                  
+                  if (error) throw error;
+                  
+                  setTournament(prev => ({
+                    ...prev,
+                    name: newTournamentName
+                  }));
+                  setIsEditTournamentModalOpen(false);
+                  showToast("Tournament name updated successfully!", "success");
+                } catch (error) {
+                  console.error("Error updating tournament name:", error);
+                  showToast("Error updating tournament name", "error");
+                }
+              }}
+              tournamentName={newTournamentName}
+              setTournamentName={setNewTournamentName}
+            />
+            <p className="text-sm text-gray-500 mt-2">
               Created on:{" "}
               {new Intl.DateTimeFormat("en-US", {
                 year: "numeric",
@@ -239,68 +314,67 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
                 }).format(new Date(tournament.ended_at))}
               </p>
             )}
-            <div className="mt-4">
+            {participants.length === 0 && (
+              <p className="text-sm text-gray-500 mt-2">
+              To start a tournament, first add some participants</p>
+            )}
+            <div className="flex flex-col gap-4 mt-4">
               <Button
-                disabled={
-                  Boolean(tournament.has_started) && Boolean(tournament.has_ended)
-                }
+                disabled={participants.length === 0 || tournament?.has_ended}
                 color={
-                  Boolean(tournament.has_started) && Boolean(tournament.has_ended)
+                  tournament?.has_ended
                     ? "gray"
-                    : Boolean(tournament.has_started)
+                    : Boolean(tournament?.has_started)
                     ? "failure"
                     : "success"
                 }
                 onClick={handleTournamentStatusToggle}
+                className="w-fit"
               >
-                {Boolean(tournament.has_started) && Boolean(tournament.has_ended)
+                {tournament?.has_ended
                   ? "Tournament Ended"
-                  : Boolean(tournament.has_started)
+                  : Boolean(tournament?.has_started)
                   ? "End Tournament"
                   : "Start Tournament"}
               </Button>
+              {tournament?.has_started && !tournament?.has_ended && tournament?.round_length && (
+                <CountdownTimer 
+                  key={roundInfo?.started_at || 'inactive'} // Force re-render on start time change
+                  startTime={isRoundActive ? roundInfo?.started_at : null} 
+                  durationMinutes={tournament.round_length} 
+                />
+              )}
             </div>
           </div>
         )}
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold" style={{ width: "200px" }}>
-            Participants
-          </h2>
-          <Button
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2"
-            style={{ width: "200px" }}
-            outline
-            gradientDuoTone="greenToBlue"
-          >
-            <HiPlus className="w-5 h-5" />
-            Add Participant
-          </Button>
-          <ParticipantFormModal
-            isOpen={isModalOpen}
-            onClose={() => setIsModalOpen(false)}
-            onSubmit={handleAddParticipant}
-          />
-        </div>
-        {loading ? (
-          <p>Loading participants...</p>
-        ) : participants.length === 0 ? (
-          <p>No participants found.</p>
-        ) : (
-          <ParticipantTable
-            participants={participants}
-            onEdit={(participant: any) => {
-              setCurrentParticipant(participant);
-              setNewParticipantName(participant.name);
-              setIsEditModalOpen(true);
-            }}
-            onDelete={deleteParticipant}
-          />
-        )}
+        <TournamentTabs
+          participants={participants}
+          isModalOpen={isModalOpen}
+          setIsModalOpen={setIsModalOpen}
+          onAddParticipant={handleAddParticipant}
+          onEdit={(participant: any) => {
+            setCurrentParticipant(participant);
+            setNewParticipantName(participant.name);
+            setNewMatchPoints(participant.match_points?.toString() || "");
+            setNewDifferential(participant.differential?.toString() || "");
+            setNewDroppedOut(participant.dropped_out || false);
+            setIsEditParticipantModalOpen(true);
+          }}
+          onDelete={deleteParticipant}
+          loading={loading}
+          tournamentId={id || ''}
+          tournamentStarted={tournament?.has_started || false}
+          onTournamentEnd={fetchTournamentDetails}
+          onRoundActiveChange={(isActive, roundStartTime) => {
+            setIsRoundActive(isActive);
+            setRoundInfo(prev => ({ ...prev, started_at: roundStartTime }));
+            fetchTournamentDetails();
+          }}
+        />
       </div>
       <EditParticipantModal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
+        isOpen={isEditParticipantModalOpen}
+        onClose={() => setIsEditParticipantModalOpen(false)}
         participant={currentParticipant}
         onSave={updateParticipant}
         newParticipantName={newParticipantName}
@@ -311,6 +385,13 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
         setNewDifferential={setNewDifferential}
         newDroppedOut={newDroppedOut}
         setNewDroppedOut={setNewDroppedOut}
+      />
+      <TournamentStartModal
+        isOpen={showStartModal}
+        onClose={() => setShowStartModal(false)}
+        onConfirm={handleStartTournament}
+        participantCount={participants.length}
+        suggestedRounds={suggestNumberOfRounds(participants.length)}
       />
     </div>
   );
