@@ -77,18 +77,29 @@ export default function TournamentRounds({
 
       // Check if there's an active round
       const { data: activeRound } = await client
-      .from("rounds")
-      .select("*")
-      .eq("tournament_id", tournamentId)
-      .eq("round_number", data.current_round)
-      .eq("is_completed", false)
-      .maybeSingle();
+        .from("rounds")
+        .select("*")
+        .eq("tournament_id", tournamentId)
+        .eq("round_number", data.current_round)
+        .eq("is_completed", false)
+        .maybeSingle();
 
-    setIsRoundActive(!!activeRound);
+      setIsRoundActive(!!activeRound);
 
-    // Get round info for display
-    if (data.current_round) fetchRoundInfo(data.current_round);
-  }, [tournamentId]);
+      // Get round info for display
+      if (data.current_round) {
+        fetchRoundInfo(data.current_round);
+      }
+    } catch (err) {
+      setError({ 
+        message: "Failed to fetch tournament information", 
+        type: 'fetch' 
+      });
+      console.error("Error fetching tournament info:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [tournamentId, fetchRoundInfo]);
 
   const fetchRoundInfo = useCallback(
     async (roundNumber: number) => {
