@@ -4,7 +4,9 @@ import { Tabs } from "flowbite-react";
 import { useState } from "react";
 import { HiUserGroup } from "react-icons/hi";
 import { FaGear } from "react-icons/fa6";
+import { MdPeople } from "react-icons/md";
 import TournamentSettings from "./TournamentSettings";
+import TournamentPairings from "./TournamentPairings";
 import ParticipantTable from "./ParticipantTable";
 import ParticipantFormModal from "./participant-form-modal";
 import { Button } from "flowbite-react";
@@ -78,6 +80,14 @@ export default function TournamentTabs({
           <TournamentSettings 
             tournamentId={tournamentId}
             participantCount={participants.length}
+            key={activeTab} // Force re-render when tab becomes active
+          />
+        </div>
+      </Tabs.Item>
+      <Tabs.Item title="Pairings" icon={MdPeople}>
+        <div className="p-4">
+          <TournamentPairings
+            tournamentId={tournamentId}
             key={activeTab} // Force re-render when tab becomes active
           />
         </div>
