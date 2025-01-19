@@ -1,6 +1,7 @@
 "use client";
 
 import { Tabs } from "flowbite-react";
+import { useState } from "react";
 import { HiUserGroup } from "react-icons/hi";
 import { FaGear } from "react-icons/fa6";
 import TournamentSettings from "./TournamentSettings";
@@ -30,8 +31,13 @@ export default function TournamentTabs({
   loading,
   tournamentId,
 }: TournamentTabsProps) {
+  const [activeTab, setActiveTab] = useState(0);
   return (
-    <Tabs aria-label="Tournament tabs" style={{ marginTop: "1rem" }}>
+    <Tabs 
+      aria-label="Tournament tabs" 
+      style={{ marginTop: "1rem" }}
+      onActiveTabChange={(tab) => setActiveTab(tab)}
+    >
       <Tabs.Item active title="Participants" icon={HiUserGroup}>
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold" style={{ width: "200px" }}>
@@ -72,6 +78,7 @@ export default function TournamentTabs({
           <TournamentSettings 
             tournamentId={tournamentId}
             participantCount={participants.length}
+            key={activeTab} // Force re-render when tab becomes active
           />
         </div>
       </Tabs.Item>
