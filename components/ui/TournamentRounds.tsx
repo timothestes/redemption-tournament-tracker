@@ -111,59 +111,60 @@ export default function TournamentRounds({
 
   const handleEndRound = async () => {
     const client = createClient();
-
+  
     try {
+      const now = new Date().toISOString();
       const { error: roundError } = await client
         .from("rounds")
         .update({
-          ended_at: new Date().toISOString(),
+          ended_at: now,
           is_completed: true,
         })
         .eq("tournament_id", tournamentId)
         .eq("round_number", currentPage);
-
+  
       if (roundError) throw roundError;
-
-      // Check if this is the last round
+  
+      setRoundInfo((prev) => ({
+        ...prev,
+        ended_at: now,
+      }));
+  
       if (tournamentInfo.current_round === tournamentInfo.n_rounds) {
-        // End the tournament
-        const now = new Date().toISOString();
         const { error: tournamentError } = await client
           .from("tournaments")
           .update({
             has_ended: true,
-            ended_at: now
+            ended_at: now,
           })
           .eq("id", tournamentId);
-
+  
         if (tournamentError) throw tournamentError;
-        
-        // Update local state to reflect tournament end
-        setTournamentInfo(prev => ({
+  
+        setTournamentInfo((prev) => ({
           ...prev,
-          has_ended: true
+          has_ended: true,
         }));
-        
-        // Notify parent component about tournament end
+  
         onTournamentEnd?.();
       } else {
-        // Increment current round if not the last round
         const { error: tournamentError } = await client
           .from("tournaments")
           .update({
             current_round: tournamentInfo.current_round! + 1,
           })
           .eq("id", tournamentId);
-
+  
         if (tournamentError) throw tournamentError;
       }
-
+  
       fetchTournamentInfo();
       setIsRoundActive(false);
     } catch (error) {
       console.error("Error ending round:", error);
     }
   };
+  
 
   return (
     <div className="space-y-6">
