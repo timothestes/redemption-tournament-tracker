@@ -53,10 +53,6 @@ export default function TournamentRounds({
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Tournament Rounds</h2>
-      </div>
-      
       <Card>
         <div className="space-y-4">
           {tournamentInfo.n_rounds && (
