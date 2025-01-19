@@ -1,6 +1,6 @@
 "use client";
 
-import { Card } from "flowbite-react";
+import { Card, Pagination } from "flowbite-react";
 import { useState, useEffect } from "react";
 import { createClient } from "../../utils/supabase/client";
 
@@ -20,6 +20,9 @@ export default function TournamentPairings({
     n_rounds: null,
     current_round: null
   });
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const onPageChange = (page: number) => setCurrentPage(page);
 
   useEffect(() => {
     const fetchTournamentInfo = async () => {
@@ -51,10 +54,20 @@ export default function TournamentPairings({
       
       <Card>
         <div className="space-y-4">
-          {tournamentInfo.current_round && tournamentInfo.n_rounds && (
-            <h3 className="text-xl font-semibold">
-              Round {tournamentInfo.current_round} of {tournamentInfo.n_rounds}
-            </h3>
+          {tournamentInfo.n_rounds && (
+            <>
+              <h3 className="text-xl font-semibold">
+                Round {currentPage} of {tournamentInfo.n_rounds}
+              </h3>
+              <div className="flex overflow-x-auto sm:justify-center">
+                <Pagination 
+                  currentPage={currentPage} 
+                  totalPages={tournamentInfo.n_rounds} 
+                  onPageChange={onPageChange}
+                  showIcons
+                />
+              </div>
+            </>
           )}
         </div>
       </Card>
