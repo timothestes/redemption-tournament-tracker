@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, Label, Modal } from "flowbite-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface TournamentStartModalProps {
   isOpen: boolean;
@@ -19,6 +19,12 @@ export default function TournamentStartModal({
   suggestedRounds,
 }: TournamentStartModalProps) {
   const [numberOfRounds, setNumberOfRounds] = useState(suggestedRounds);
+
+  useEffect(() => {
+    if (isOpen) {
+      setNumberOfRounds(suggestedRounds);
+    }
+  }, [isOpen, suggestedRounds]);
 
   const handleIncrement = () => {
     setNumberOfRounds(prev => prev + 1);
