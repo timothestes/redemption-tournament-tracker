@@ -29,6 +29,8 @@ export default function TournamentSettings({
 
   useEffect(() => {
     const fetchTournamentInfo = async () => {
+      if (!tournamentId) return;
+      
       const client = createClient();
       const { data, error } = await client
         .from('tournaments')
