@@ -91,7 +91,7 @@ export default function TournamentsPage() {
 
   return (
     <div className="flex h-screen pl-64">
-      <div className="flex-grow p-4">
+      <div className="flex-grow p-4 max-w-4xl mx-auto">
         <Breadcrumb
           items={[
             { label: "Tournaments", href: "/tracker/tournaments" }
