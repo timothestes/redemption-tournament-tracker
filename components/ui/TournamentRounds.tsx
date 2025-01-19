@@ -70,7 +70,7 @@ export default function TournamentRounds({
                   />
                 </div>
                 {currentPage === tournamentInfo.current_round && (
-                  <div className="flex justify-center">
+                  <div className="flex justify-right">
                     <Button
                       outline
                       gradientDuoTone="greenToBlue"
