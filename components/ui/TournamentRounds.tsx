@@ -219,7 +219,7 @@ export default function TournamentRounds({
                             minute: "2-digit",
                             second: "2-digit",
                           }).format(new Date(roundInfo.started_at))
-                        : "Not started"}
+                        : ""}
                     </p>
                     <p className="text-sm text-gray-500 mr-4">
                       Ended:{" "}
@@ -232,7 +232,7 @@ export default function TournamentRounds({
                             minute: "2-digit",
                             second: "2-digit",
                           }).format(new Date(roundInfo.ended_at))
-                        : "Not ended"}
+                        : ""}
                     </p>
                   </div>
                 </div>
