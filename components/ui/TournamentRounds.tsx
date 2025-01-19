@@ -11,6 +11,7 @@ interface TournamentRoundsProps {
 interface TournamentInfo {
   n_rounds: number | null;
   current_round: number | null;
+  has_ended: boolean;
 }
 
 interface RoundInfo {
@@ -35,7 +36,7 @@ export default function TournamentRounds({
     const client = createClient();
     const { data, error } = await client
       .from("tournaments")
-      .select("n_rounds, current_round")
+      .select("n_rounds, current_round, has_ended")
       .eq("id", tournamentId)
       .single();
 
@@ -118,8 +119,21 @@ export default function TournamentRounds({
 
       if (roundError) throw roundError;
 
-      // Only increment current_round if we haven't reached the maximum rounds
-      if (tournamentInfo.current_round! < tournamentInfo.n_rounds!) {
+      // Check if this is the last round
+      if (tournamentInfo.current_round === tournamentInfo.n_rounds) {
+        // End the tournament
+        const now = new Date().toISOString();
+        const { error: tournamentError } = await client
+          .from("tournaments")
+          .update({
+            has_ended: true,
+            ended_at: now
+          })
+          .eq("id", tournamentId);
+
+        if (tournamentError) throw tournamentError;
+      } else {
+        // Increment current round if not the last round
         const { error: tournamentError } = await client
           .from("tournaments")
           .update({
@@ -177,7 +191,7 @@ export default function TournamentRounds({
                     </div>
                   )}
                 </div>
-                {currentPage === tournamentInfo.current_round && (
+                {currentPage === tournamentInfo.current_round && !tournamentInfo.has_ended && (
                   <Button
                     outline
                     gradientDuoTone={
