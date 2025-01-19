@@ -28,6 +28,7 @@ export default function TournamentTabs({
   onEdit,
   onDelete,
   loading,
+  tournamentId,
 }: TournamentTabsProps) {
   return (
     <Tabs aria-label="Tournament tabs" style={{ marginTop: "1rem" }}>
