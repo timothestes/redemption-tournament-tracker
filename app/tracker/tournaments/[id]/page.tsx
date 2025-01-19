@@ -202,7 +202,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
         {tournament && (
           <div className="mb-6">
             <h1 className="text-3xl font-bold">{tournament.name}</h1>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 mt-2">
               Created on:{" "}
               {new Intl.DateTimeFormat("en-US", {
                 year: "numeric",
@@ -239,23 +239,25 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
                 }).format(new Date(tournament.ended_at))}
               </p>
             )}
+            {participants.length === 0 && (
+              <p className="text-sm text-gray-500 mt-2">
+              To start a tournament, first add some participants</p>
+            )}
             <div className="mt-4">
               <Button
-                disabled={
-                  Boolean(tournament.has_started) && Boolean(tournament.has_ended)
-                }
+                disabled={participants.length === 0 || (Boolean(tournament?.has_started) && Boolean(tournament?.has_ended))}
                 color={
-                  Boolean(tournament.has_started) && Boolean(tournament.has_ended)
+                  Boolean(tournament?.has_started) && Boolean(tournament?.has_ended)
                     ? "gray"
-                    : Boolean(tournament.has_started)
+                    : Boolean(tournament?.has_started)
                     ? "failure"
                     : "success"
                 }
                 onClick={handleTournamentStatusToggle}
               >
-                {Boolean(tournament.has_started) && Boolean(tournament.has_ended)
+                {Boolean(tournament?.has_started) && Boolean(tournament?.has_ended)
                   ? "Tournament Ended"
-                  : Boolean(tournament.has_started)
+                  : Boolean(tournament?.has_started)
                   ? "End Tournament"
                   : "Start Tournament"}
               </Button>
