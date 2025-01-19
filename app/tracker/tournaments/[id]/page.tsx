@@ -309,6 +309,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
           loading={loading}
           tournamentId={id || ''}
           tournamentStarted={tournament?.has_started || false}
+          onTournamentEnd={fetchTournamentDetails}
         />
       </div>
       <EditParticipantModal

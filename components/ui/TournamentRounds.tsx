@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback } from "react";
 interface TournamentRoundsProps {
   tournamentId: string;
   isActive: boolean;
+  onTournamentEnd?: () => void;
 }
 
 interface TournamentInfo {
@@ -141,6 +142,9 @@ export default function TournamentRounds({
           ...prev,
           has_ended: true
         }));
+        
+        // Notify parent component about tournament end
+        onTournamentEnd?.();
       } else {
         // Increment current round if not the last round
         const { error: tournamentError } = await client

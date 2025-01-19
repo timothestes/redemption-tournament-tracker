@@ -22,6 +22,7 @@ interface TournamentTabsProps {
   loading: boolean;
   tournamentId: string;
   tournamentStarted?: boolean;
+  onTournamentEnd?: () => void;
 }
 
 export default function TournamentTabs({
@@ -83,6 +84,7 @@ export default function TournamentTabs({
             tournamentId={tournamentId}
             isActive={activeTab === 1}
             key={activeTab} // Force re-render when tab becomes active
+            onTournamentEnd={onTournamentEnd}
           />
         </div>
       </Tabs.Item>
