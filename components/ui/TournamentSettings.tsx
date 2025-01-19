@@ -66,12 +66,12 @@ export default function TournamentSettings({
                 Suggested Number of Rounds: {suggestedRounds}
               </p>
             )}
-            {tournamentInfo.n_rounds && (
+            {typeof tournamentInfo.n_rounds === 'number' && (
               <p className="text-sm text-gray-500">
                 Tournament Rounds: {tournamentInfo.n_rounds}
               </p>
             )}
-            {tournamentInfo.current_round && (
+            {typeof tournamentInfo.current_round === 'number' && (
               <p className="text-sm text-gray-500">
                 Current Round: {tournamentInfo.current_round}
               </p>
