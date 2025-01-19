@@ -269,46 +269,47 @@ export default function TournamentRounds({
           </div>
         ) : (
           <div className="space-y-4">
-          {tournamentInfo.n_rounds && (
-            <>
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="text-xl font-semibold">
-                    Round {currentPage} of {tournamentInfo.n_rounds}
-                  </h3>
-                  <div className="space-y-1">
-                    <p className="text-sm text-gray-500 mr-4">
-                      Started: {formatDateTime(roundInfo.started_at)}
-                    </p>
-                    <p className="text-sm text-gray-500 mr-4">
-                      Ended: {formatDateTime(roundInfo.ended_at)}
-                    </p>
+            {tournamentInfo.n_rounds && (
+              <>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="text-xl font-semibold">
+                      Round {currentPage} of {tournamentInfo.n_rounds}
+                    </h3>
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500 mr-4">
+                        Started: {formatDateTime(roundInfo.started_at)}
+                      </p>
+                      <p className="text-sm text-gray-500 mr-4">
+                        Ended: {formatDateTime(roundInfo.ended_at)}
+                      </p>
+                    </div>
                   </div>
+                  {currentPage === tournamentInfo.current_round &&
+                    !tournamentInfo.has_ended && (
+                      <Button
+                        outline
+                        gradientDuoTone={
+                          isRoundActive ? "pinkToOrange" : "greenToBlue"
+                        }
+                        onClick={isRoundActive ? handleEndRound : handleStartRound}
+                      >
+                        {isRoundActive ? "End Round" : "Start Round"}
+                      </Button>
+                    )}
                 </div>
-                {currentPage === tournamentInfo.current_round &&
-                  !tournamentInfo.has_ended && (
-                    <Button
-                      outline
-                      gradientDuoTone={
-                        isRoundActive ? "pinkToOrange" : "greenToBlue"
-                      }
-                      onClick={isRoundActive ? handleEndRound : handleStartRound}
-                    >
-                      {isRoundActive ? "End Round" : "Start Round"}
-                    </Button>
-                  )}
-              </div>
-              <div className="flex overflow-x-auto sm:justify-center">
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={tournamentInfo.current_round || 1}
-                  onPageChange={onPageChange}
-                  showIcons
-                />
-              </div>
-            </>
-          )}
-        </div>
+                <div className="flex overflow-x-auto sm:justify-center">
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={tournamentInfo.current_round || 1}
+                    onPageChange={onPageChange}
+                    showIcons
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </Card>
     </div>
   );
