@@ -49,14 +49,14 @@ export default function TournamentRounds({
 
     setTournamentInfo(data);
 
-    const { data: roundData, error: roundError } = await client
+    const { data: roundData } = await client
       .from("rounds")
       .select("*")
       .eq("tournament_id", tournamentId)
       .eq("round_number", data.current_round)
-      .single();
+      .maybeSingle();
 
-    if (!roundError && roundData) {
+    if (roundData) {
       setIsRoundActive(true);
       setRoundInfo({ 
         started_at: roundData.started_at,
