@@ -187,34 +187,34 @@ export default function TournamentRounds({
                   <h3 className="text-xl font-semibold">
                     Round {currentPage} of {tournamentInfo.n_rounds}
                   </h3>
-                  {roundInfo.started_at && (
-                    <div className="space-y-1">
-                      <p className="text-sm text-gray-500 mr-4">
-                        Started:{" "}
-                        {new Intl.DateTimeFormat("en-US", {
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          second: "2-digit",
-                        }).format(new Date(roundInfo.started_at))}
-                      </p>
-                      {roundInfo.ended_at && (
-                        <p className="text-sm text-gray-500 mr-4">
-                          Ended:{" "}
-                          {new Intl.DateTimeFormat("en-US", {
+                  <div className="space-y-1">
+                    <p className="text-sm text-gray-500 mr-4">
+                      Started:{" "}
+                      {roundInfo.started_at 
+                        ? new Intl.DateTimeFormat("en-US", {
                             year: "numeric",
                             month: "long",
                             day: "numeric",
                             hour: "2-digit",
                             minute: "2-digit",
                             second: "2-digit",
-                          }).format(new Date(roundInfo.ended_at))}
-                        </p>
-                      )}
-                    </div>
-                  )}
+                          }).format(new Date(roundInfo.started_at))
+                        : "Not started"}
+                    </p>
+                    <p className="text-sm text-gray-500 mr-4">
+                      Ended:{" "}
+                      {roundInfo.ended_at
+                        ? new Intl.DateTimeFormat("en-US", {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            second: "2-digit",
+                          }).format(new Date(roundInfo.ended_at))
+                        : "Not ended"}
+                    </p>
+                  </div>
                 </div>
                 {currentPage === tournamentInfo.current_round && !tournamentInfo.has_ended && (
                   <Button
