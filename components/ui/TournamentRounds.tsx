@@ -23,7 +23,8 @@ interface RoundInfo {
 
 export default function TournamentRounds({
   tournamentId,
-  isActive
+  isActive,
+  onTournamentEnd
 }: TournamentRoundsProps) {
   const [tournamentInfo, setTournamentInfo] = useState<TournamentInfo>({
     n_rounds: null,
