@@ -216,6 +216,11 @@ export default function TournamentRounds({
 
       fetchTournamentInfo();
       setIsRoundActive(false);
+      
+      // If not on the last round, go to the next page
+      if (currentPage < tournamentInfo.n_rounds) {
+        setCurrentPage(currentPage + 1);
+      }
     } catch (error) {
       console.error("Error ending round:", error);
     }
