@@ -57,114 +57,61 @@ export default function TournamentRounds({
     ended_at: null,
   });
 
-  const fetchRoundInfo = useCallback(
-    async (roundNumber: number) => {
-      if (!tournamentId) return;
-  
-      // Set roundInfo to "loading" state
-      setRoundInfo({
-        started_at: null,
-        ended_at: null,
-      });
-  
-      const client = createClient();
-      const { data: roundData } = await client
-        .from("rounds")
-        .select("started_at, ended_at")
-        .eq("tournament_id", tournamentId)
-        .eq("round_number", roundNumber)
-        .maybeSingle();
-  
-      if (roundData) {
-        setRoundInfo({
-          started_at: roundData.started_at,
-          ended_at: roundData.ended_at,
-        });
-      }
-    },
-    [tournamentId]
-  );
-
-  const fetchTournamentInfo = useCallback(async () => {
+  const fetchTournamentAndRoundInfo = useCallback(async () => {
     if (!tournamentId) return;
-    
+
     setIsLoading(true);
     setError({ message: null, type: null });
 
     const client = createClient();
+
     try {
-      const { data, error } = await client
+      // Fetch tournament data
+      const { data: tournamentData, error: tournamentError } = await client
         .from("tournaments")
         .select("n_rounds, current_round, has_ended")
         .eq("id", tournamentId)
         .single();
 
-      if (error) throw error;
+      if (tournamentError) throw tournamentError;
 
-      setTournamentInfo(data);
-
-      // Check if there's an active round
-      const { data: activeRound } = await client
+      // Fetch round data
+      const { data: roundData, error: roundError } = await client
         .from("rounds")
-        .select("*")
+        .select("started_at, ended_at, is_completed")
         .eq("tournament_id", tournamentId)
-        .eq("round_number", data.current_round)
-        .eq("is_completed", false)
+        .eq("round_number", currentPage)
         .maybeSingle();
 
-      setIsRoundActive(!!activeRound);
+      if (roundError) throw roundError;
 
-      // Get round info for display
-      if (data.current_round) {
-        fetchRoundInfo(data.current_round);
-      }
-    } catch (err) {
-      setError({ 
-        message: "Failed to fetch tournament information", 
-        type: 'fetch' 
+      // Update all states at once
+      setTournamentInfo(tournamentData);
+      setRoundInfo({
+        started_at: roundData?.started_at || null,
+        ended_at: roundData?.ended_at || null,
       });
-      console.error("Error fetching tournament info:", err);
+      setIsRoundActive(!!roundData && !roundData.is_completed);
+    } catch (err) {
+      setError({
+        message: "Failed to fetch tournament and round information",
+        type: "fetch",
+      });
+      console.error("Error fetching data:", err);
     } finally {
       setIsLoading(false);
     }
-  }, [tournamentId]);
+  }, [tournamentId, currentPage]);
 
   useEffect(() => {
     if (isActive) {
-      fetchTournamentInfo();
+      fetchTournamentAndRoundInfo();
     }
-  }, [fetchTournamentInfo, isActive]);
+  }, [fetchTournamentAndRoundInfo, isActive]);
 
-  useEffect(() => {
-    if (isActive && currentPage) {
-      fetchRoundInfo(currentPage);
-    }
-  }, [currentPage, fetchRoundInfo, isActive]);
-
-  const onPageChange = async (page: number) => {
+  const onPageChange = (page: number) => {
     if (page <= (tournamentInfo.current_round || 1)) {
       setCurrentPage(page);
-      
-      // Immediately fetch round info for the new page
-      const client = createClient();
-      const { data: roundData } = await client
-        .from("rounds")
-        .select("started_at, ended_at")
-        .eq("tournament_id", tournamentId)
-        .eq("round_number", page)
-        .maybeSingle();
-
-      if (roundData) {
-        setRoundInfo({
-          started_at: roundData.started_at,
-          ended_at: roundData.ended_at
-        });
-      } else {
-        setRoundInfo({
-          started_at: null,
-          ended_at: null
-        });
-      }
     }
   };
 
