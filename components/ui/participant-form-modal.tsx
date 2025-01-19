@@ -44,6 +44,8 @@ const ParticipantFormModal: React.FC<ParticipantFormModalProps> = ({
               type="text"
               required
               ref={inputRef}
+              maxLength={35}
+              placeholder="Max 35 characters"
             />
           </div>
           <div className="flex justify-end gap-3">
