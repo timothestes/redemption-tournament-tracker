@@ -101,21 +101,18 @@ export default function TournamentRounds({
   useEffect(() => {
     if (isActive) {
       fetchTournamentInfo();
+    }
+  }, [fetchTournamentInfo, isActive]);
+
+  useEffect(() => {
+    if (isActive && currentPage) {
       fetchRoundInfo(currentPage);
     }
-  }, [fetchTournamentInfo, fetchRoundInfo, isActive, currentPage]);
+  }, [currentPage, fetchRoundInfo, isActive]);
 
   const onPageChange = (page: number) => {
     if (page <= (tournamentInfo.current_round || 1)) {
       setCurrentPage(page);
-  
-      // Clear the current round info to avoid showing stale data
-      setRoundInfo({
-        started_at: null,
-        ended_at: null,
-      });
-  
-      fetchRoundInfo(page);
     }
   };
 
