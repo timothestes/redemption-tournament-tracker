@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Breadcrumb from "../../../components/ui/breadcrumb";
 import { createClient } from "../../../utils/supabase/client";
 import ToastNotification from "../../../components/ui/toast-notification";
 import { Table, Button, Modal, TextInput } from "flowbite-react";
@@ -91,6 +92,11 @@ export default function TournamentsPage() {
   return (
     <div className="flex h-screen pl-64">
       <div className="flex-grow p-4">
+        <Breadcrumb
+          items={[
+            { label: "Tournaments", href: "/tracker/tournaments" }
+          ]}
+        />
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold mr-8">Your Tournaments</h1>
         <Button
