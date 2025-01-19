@@ -15,6 +15,7 @@ interface TournamentInfo {
 
 interface RoundInfo {
   started_at: string | null;
+  ended_at: string | null;
 }
 
 export default function TournamentRounds({
@@ -55,10 +56,16 @@ export default function TournamentRounds({
 
     if (!roundError && roundData) {
       setIsRoundActive(true);
-      setRoundInfo({ started_at: roundData.started_at });
+      setRoundInfo({ 
+        started_at: roundData.started_at,
+        ended_at: roundData.ended_at
+      });
     } else {
       setIsRoundActive(false);
-      setRoundInfo({ started_at: null });
+      setRoundInfo({ 
+        started_at: null,
+        ended_at: null 
+      });
     }
   }, [tournamentId]);
 
@@ -139,17 +146,32 @@ export default function TournamentRounds({
                     Round {currentPage} of {tournamentInfo.n_rounds}
                   </h3>
                   {roundInfo.started_at && (
-                    <p className="text-sm text-gray-500 mt-1 mr-4">
-                      Started:{" "}
-                      {new Intl.DateTimeFormat("en-US", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit",
-                      }).format(new Date(roundInfo.started_at))}
-                    </p>
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500 mr-4">
+                        Started:{" "}
+                        {new Intl.DateTimeFormat("en-US", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          second: "2-digit",
+                        }).format(new Date(roundInfo.started_at))}
+                      </p>
+                      {roundInfo.ended_at && (
+                        <p className="text-sm text-gray-500 mr-4">
+                          Ended:{" "}
+                          {new Intl.DateTimeFormat("en-US", {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            second: "2-digit",
+                          }).format(new Date(roundInfo.ended_at))}
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
                 {currentPage === tournamentInfo.current_round && (
