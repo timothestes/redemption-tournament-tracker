@@ -63,8 +63,8 @@ export default function TournamentRounds({
     setIsLoading(true);
     setError({ message: null, type: null });
 
+    const client = createClient();
     try {
-      const client = createClient();
       const { data, error } = await client
         .from("tournaments")
         .select("n_rounds, current_round, has_ended")
@@ -74,18 +74,9 @@ export default function TournamentRounds({
       if (error) throw error;
 
       setTournamentInfo(data);
-    } catch (err) {
-      setError({ 
-        message: "Failed to fetch tournament information", 
-        type: 'fetch' 
-      });
-      console.error("Error fetching tournament info:", err);
-    } finally {
-      setIsLoading(false);
-    }
 
-    // Check if there's an active round
-    const { data: activeRound } = await client
+      // Check if there's an active round
+      const { data: activeRound } = await client
       .from("rounds")
       .select("*")
       .eq("tournament_id", tournamentId)
