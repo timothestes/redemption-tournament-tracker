@@ -145,6 +145,15 @@ export default function TournamentRounds({
 
     try {
       const now = new Date().toISOString();
+      
+      // Update round info state first
+      setRoundInfo((prev) => ({
+        ...prev,
+        ended_at: now,
+      }));
+      setIsRoundActive(false);
+
+      // Then update the database
       const { error: roundError } = await client
         .from("rounds")
         .update({
@@ -155,11 +164,6 @@ export default function TournamentRounds({
         .eq("round_number", currentPage);
 
       if (roundError) throw roundError;
-
-      setRoundInfo((prev) => ({
-        ...prev,
-        ended_at: now,
-      }));
 
       if (tournamentInfo.current_round === tournamentInfo.n_rounds) {
         const { error: tournamentError } = await client
