@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { suggestNumberOfRounds } from "../../../../utils/tournamentUtils";
+import TournamentStartModal from "../../../../components/ui/TournamentStartModal";
 import Breadcrumb from "../../../../components/ui/breadcrumb";
 import { createClient } from "../../../../utils/supabase/client";
 import { Button } from "flowbite-react";
@@ -144,41 +146,61 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
     }
   };
 
+  const [showStartModal, setShowStartModal] = useState(false);
+
   const handleTournamentStatusToggle = async () => {
     if (!tournament) {
       showToast("Tournament is not available yet.", "error");
       return;
     }
-    const now = new Date().toISOString();
-    const updates = !tournament.has_started
-      ? {
-          has_started: true,
-          has_ended: false,
-          started_at: now,
-          ended_at: null,
-        }
-      : {
-          // has_started: false,
-          has_ended: true,
-          ended_at: now,
-        };
 
+    if (!tournament.has_started) {
+      setShowStartModal(true);
+      return;
+    }
+
+    // Handle tournament end
+    const now = new Date().toISOString();
     try {
       const { data, error } = await supabase
         .from("tournaments")
-        .update(updates)
+        .update({
+          has_ended: true,
+          ended_at: now,
+        })
         .eq("id", id)
         .select("*")
         .single();
       if (error) throw error;
       setTournament(data);
-      showToast(
-        `Tournament ${data.has_started ? "started" : "ended"} successfully!`,
-        "success"
-      );
+      showToast("Tournament ended successfully!", "success");
     } catch (error) {
       showToast("Error updating tournament status.", "error");
       console.error("Error updating tournament status:", error);
+    }
+  };
+
+  const handleStartTournament = async () => {
+    const now = new Date().toISOString();
+    try {
+      const { data, error } = await supabase
+        .from("tournaments")
+        .update({
+          has_started: true,
+          has_ended: false,
+          started_at: now,
+          ended_at: null,
+        })
+        .eq("id", id)
+        .select("*")
+        .single();
+      if (error) throw error;
+      setTournament(data);
+      setShowStartModal(false);
+      showToast("Tournament started successfully!", "success");
+    } catch (error) {
+      showToast("Error starting tournament.", "error");
+      console.error("Error starting tournament:", error);
     }
   };
 
@@ -299,6 +321,13 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
         setNewDifferential={setNewDifferential}
         newDroppedOut={newDroppedOut}
         setNewDroppedOut={setNewDroppedOut}
+      />
+      <TournamentStartModal
+        isOpen={showStartModal}
+        onClose={() => setShowStartModal(false)}
+        onConfirm={handleStartTournament}
+        participantCount={participants.length}
+        suggestedRounds={suggestNumberOfRounds(participants.length)}
       />
     </div>
   );
