@@ -141,7 +141,7 @@ export default function TournamentRounds({
                     Round {currentPage} of {tournamentInfo.n_rounds}
                   </h3>
                   {roundInfo.started_at && (
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="text-sm text-gray-500 mt-1 mr-4">
                       Started: {new Intl.DateTimeFormat("en-US", {
                         year: "numeric",
                         month: "long",
