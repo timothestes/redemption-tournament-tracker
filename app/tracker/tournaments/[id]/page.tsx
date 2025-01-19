@@ -5,9 +5,7 @@ import Breadcrumb from "../../../../components/ui/breadcrumb";
 import { createClient } from "../../../../utils/supabase/client";
 import { Button } from "flowbite-react";
 import TournamentTabs from "../../../../components/ui/TournamentTabs";
-import ParticipantFormModal from "../../../../components/ui/participant-form-modal";
 import ToastNotification from "../../../../components/ui/toast-notification";
-import ParticipantTable from "../../../../components/ui/ParticipantTable";
 import EditParticipantModal from "../../../../components/ui/EditParticipantModal";
 
 const supabase = createClient();
