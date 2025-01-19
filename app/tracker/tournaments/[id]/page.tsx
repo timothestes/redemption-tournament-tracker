@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Breadcrumb from "../../../../components/ui/breadcrumb";
 import { createClient } from "../../../../utils/supabase/client";
 import { Button } from "flowbite-react";
-import { HiPlus } from "react-icons/hi";
+import TournamentTabs from "../../../../components/ui/TournamentTabs";
 import ParticipantFormModal from "../../../../components/ui/participant-form-modal";
 import ToastNotification from "../../../../components/ui/toast-notification";
 import ParticipantTable from "../../../../components/ui/ParticipantTable";
@@ -273,41 +273,19 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
             </div>
           </div>
         )}
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold" style={{ width: "200px" }}>
-            Participants
-          </h2>
-          <Button
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2"
-            style={{ width: "200px" }}
-            outline
-            gradientDuoTone="greenToBlue"
-          >
-            <HiPlus className="w-5 h-5" />
-            Add Participant
-          </Button>
-          <ParticipantFormModal
-            isOpen={isModalOpen}
-            onClose={() => setIsModalOpen(false)}
-            onSubmit={handleAddParticipant}
-          />
-        </div>
-        {loading ? (
-          <p>Loading participants...</p>
-        ) : participants.length === 0 ? (
-          <p>No participants found.</p>
-        ) : (
-          <ParticipantTable
-            participants={participants}
-            onEdit={(participant: any) => {
-              setCurrentParticipant(participant);
-              setNewParticipantName(participant.name);
-              setIsEditModalOpen(true);
-            }}
-            onDelete={deleteParticipant}
-          />
-        )}
+        <TournamentTabs
+          participants={participants}
+          isModalOpen={isModalOpen}
+          setIsModalOpen={setIsModalOpen}
+          onAddParticipant={handleAddParticipant}
+          onEdit={(participant: any) => {
+            setCurrentParticipant(participant);
+            setNewParticipantName(participant.name);
+            setIsEditModalOpen(true);
+          }}
+          onDelete={deleteParticipant}
+          loading={loading}
+        />
       </div>
       <EditParticipantModal
         isOpen={isEditModalOpen}
