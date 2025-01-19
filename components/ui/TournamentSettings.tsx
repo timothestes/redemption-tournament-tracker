@@ -7,26 +7,14 @@ import { suggestNumberOfRounds } from "../../utils/tournamentUtils";
 
 interface TournamentSettingsProps {
   tournamentId: string;
+  participantCount: number;
 }
 
-const supabase = createClient();
-
-export default function TournamentSettings({ tournamentId }: TournamentSettingsProps) {
+export default function TournamentSettings({ 
+  tournamentId,
+  participantCount 
+}: TournamentSettingsProps) {
   const [enabled, setEnabled] = useState(false);
-  const [participantCount, setParticipantCount] = useState(0);
-
-  useEffect(() => {
-    const fetchParticipantCount = async () => {
-      const { count } = await supabase
-        .from('participants')
-        .select('*', { count: 'exact', head: true })
-        .eq('tournament_id', tournamentId);
-      
-      setParticipantCount(count || 0);
-    };
-
-    fetchParticipantCount();
-  }, [tournamentId]);
 
   const suggestedRounds = suggestNumberOfRounds(participantCount);
 

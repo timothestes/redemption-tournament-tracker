@@ -69,7 +69,10 @@ export default function TournamentTabs({
       </Tabs.Item>
       <Tabs.Item title="Settings" icon={FaGear}>
         <div className="p-4">
-          <TournamentSettings tournamentId={tournamentId} />
+          <TournamentSettings 
+            tournamentId={tournamentId}
+            participantCount={participants.length}
+          />
         </div>
       </Tabs.Item>
     </Tabs>
