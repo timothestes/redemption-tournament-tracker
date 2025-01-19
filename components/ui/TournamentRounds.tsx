@@ -57,6 +57,34 @@ export default function TournamentRounds({
     ended_at: null,
   });
 
+  const fetchRoundInfo = useCallback(
+    async (roundNumber: number) => {
+      if (!tournamentId) return;
+  
+      // Set roundInfo to "loading" state
+      setRoundInfo({
+        started_at: null,
+        ended_at: null,
+      });
+  
+      const client = createClient();
+      const { data: roundData } = await client
+        .from("rounds")
+        .select("started_at, ended_at")
+        .eq("tournament_id", tournamentId)
+        .eq("round_number", roundNumber)
+        .maybeSingle();
+  
+      if (roundData) {
+        setRoundInfo({
+          started_at: roundData.started_at,
+          ended_at: roundData.ended_at,
+        });
+      }
+    },
+    [tournamentId]
+  );
+
   const fetchTournamentInfo = useCallback(async () => {
     if (!tournamentId) return;
     
@@ -99,35 +127,7 @@ export default function TournamentRounds({
     } finally {
       setIsLoading(false);
     }
-  }, [tournamentId, fetchRoundInfo]);
-
-  const fetchRoundInfo = useCallback(
-    async (roundNumber: number) => {
-      if (!tournamentId) return;
-  
-      // Set roundInfo to "loading" state
-      setRoundInfo({
-        started_at: null,
-        ended_at: null,
-      });
-  
-      const client = createClient();
-      const { data: roundData } = await client
-        .from("rounds")
-        .select("started_at, ended_at")
-        .eq("tournament_id", tournamentId)
-        .eq("round_number", roundNumber)
-        .maybeSingle();
-  
-      if (roundData) {
-        setRoundInfo({
-          started_at: roundData.started_at,
-          ended_at: roundData.ended_at,
-        });
-      }
-    },
-    [tournamentId]
-  );
+  }, [tournamentId]);
 
   useEffect(() => {
     if (isActive) {
