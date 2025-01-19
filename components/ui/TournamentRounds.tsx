@@ -24,15 +24,19 @@ interface RoundInfo {
 export default function TournamentRounds({
   tournamentId,
   isActive,
-  onTournamentEnd
+  onTournamentEnd,
 }: TournamentRoundsProps) {
   const [tournamentInfo, setTournamentInfo] = useState<TournamentInfo>({
     n_rounds: null,
     current_round: null,
+    has_ended: false,
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [isRoundActive, setIsRoundActive] = useState(false);
-  const [roundInfo, setRoundInfo] = useState<RoundInfo>({ started_at: null });
+  const [roundInfo, setRoundInfo] = useState<RoundInfo>({
+    started_at: null,
+    ended_at: null,
+  });
 
   const fetchTournamentInfo = useCallback(async () => {
     if (!tournamentId) return;
@@ -62,50 +66,37 @@ export default function TournamentRounds({
 
     setIsRoundActive(!!activeRound);
 
-    // Get round info for display regardless of active status
-    const { data: roundData } = await client
-      .from("rounds")
-      .select("*")
-      .eq("tournament_id", tournamentId)
-      .eq("round_number", data.current_round)
-      .maybeSingle();
-
-    if (roundData) {
-      setRoundInfo({ 
-        started_at: roundData.started_at,
-        ended_at: roundData.ended_at
-      });
-    } else {
-      setRoundInfo({ 
-        started_at: null,
-        ended_at: null 
-      });
-    }
+    // Get round info for display
+    if (data.current_round) fetchRoundInfo(data.current_round);
   }, [tournamentId]);
 
-  const fetchRoundInfo = useCallback(async (roundNumber: number) => {
-    if (!tournamentId) return;
-
-    const client = createClient();
-    const { data: roundData } = await client
-      .from("rounds")
-      .select("started_at, ended_at")
-      .eq("tournament_id", tournamentId)
-      .eq("round_number", roundNumber)
-      .maybeSingle();
-
-    if (roundData) {
-      setRoundInfo({
-        started_at: roundData.started_at,
-        ended_at: roundData.ended_at
-      });
-    } else {
+  const fetchRoundInfo = useCallback(
+    async (roundNumber: number) => {
+      if (!tournamentId) return;
+  
+      // Set roundInfo to "loading" state
       setRoundInfo({
         started_at: null,
-        ended_at: null
+        ended_at: null,
       });
-    }
-  }, [tournamentId]);
+  
+      const client = createClient();
+      const { data: roundData } = await client
+        .from("rounds")
+        .select("started_at, ended_at")
+        .eq("tournament_id", tournamentId)
+        .eq("round_number", roundNumber)
+        .maybeSingle();
+  
+      if (roundData) {
+        setRoundInfo({
+          started_at: roundData.started_at,
+          ended_at: roundData.ended_at,
+        });
+      }
+    },
+    [tournamentId]
+  );
 
   useEffect(() => {
     if (isActive) {
@@ -117,6 +108,13 @@ export default function TournamentRounds({
   const onPageChange = (page: number) => {
     if (page <= (tournamentInfo.current_round || 1)) {
       setCurrentPage(page);
+  
+      // Clear the current round info to avoid showing stale data
+      setRoundInfo({
+        started_at: null,
+        ended_at: null,
+      });
+  
       fetchRoundInfo(page);
     }
   };
@@ -125,21 +123,21 @@ export default function TournamentRounds({
     const client = createClient();
 
     try {
+      const now = new Date().toISOString();
       const { error: roundError } = await client
         .from("rounds")
         .insert([
           {
             tournament_id: tournamentId,
             round_number: currentPage,
-            started_at: new Date().toISOString(),
+            started_at: now,
           },
         ]);
 
       if (roundError) throw roundError;
 
-      const now = new Date().toISOString();
       setIsRoundActive(true);
-      setRoundInfo({ started_at: now });
+      setRoundInfo((prev) => ({ ...prev, started_at: now }));
     } catch (error) {
       console.error("Error starting round:", error);
     }
@@ -147,7 +145,7 @@ export default function TournamentRounds({
 
   const handleEndRound = async () => {
     const client = createClient();
-  
+
     try {
       const now = new Date().toISOString();
       const { error: roundError } = await client
@@ -158,14 +156,14 @@ export default function TournamentRounds({
         })
         .eq("tournament_id", tournamentId)
         .eq("round_number", currentPage);
-  
+
       if (roundError) throw roundError;
-  
+
       setRoundInfo((prev) => ({
         ...prev,
         ended_at: now,
       }));
-  
+
       if (tournamentInfo.current_round === tournamentInfo.n_rounds) {
         const { error: tournamentError } = await client
           .from("tournaments")
@@ -174,33 +172,32 @@ export default function TournamentRounds({
             ended_at: now,
           })
           .eq("id", tournamentId);
-  
+
         if (tournamentError) throw tournamentError;
-  
+
         setTournamentInfo((prev) => ({
           ...prev,
           has_ended: true,
         }));
-  
+
         onTournamentEnd?.();
       } else {
         const { error: tournamentError } = await client
           .from("tournaments")
           .update({
-            current_round: tournamentInfo.current_round! + 1,
+            current_round: (tournamentInfo.current_round || 0) + 1,
           })
           .eq("id", tournamentId);
-  
+
         if (tournamentError) throw tournamentError;
       }
-  
+
       fetchTournamentInfo();
       setIsRoundActive(false);
     } catch (error) {
       console.error("Error ending round:", error);
     }
   };
-  
 
   return (
     <div className="space-y-6">
@@ -216,7 +213,7 @@ export default function TournamentRounds({
                   <div className="space-y-1">
                     <p className="text-sm text-gray-500 mr-4">
                       Started:{" "}
-                      {roundInfo.started_at 
+                      {roundInfo.started_at
                         ? new Intl.DateTimeFormat("en-US", {
                             year: "numeric",
                             month: "long",
@@ -242,17 +239,18 @@ export default function TournamentRounds({
                     </p>
                   </div>
                 </div>
-                {currentPage === tournamentInfo.current_round && !tournamentInfo.has_ended && (
-                  <Button
-                    outline
-                    gradientDuoTone={
-                      isRoundActive ? "pinkToOrange" : "greenToBlue"
-                    }
-                    onClick={isRoundActive ? handleEndRound : handleStartRound}
-                  >
-                    {isRoundActive ? "End Round" : "Start Round"}
-                  </Button>
-                )}
+                {currentPage === tournamentInfo.current_round &&
+                  !tournamentInfo.has_ended && (
+                    <Button
+                      outline
+                      gradientDuoTone={
+                        isRoundActive ? "pinkToOrange" : "greenToBlue"
+                      }
+                      onClick={isRoundActive ? handleEndRound : handleStartRound}
+                    >
+                      {isRoundActive ? "End Round" : "Start Round"}
+                    </Button>
+                  )}
               </div>
               <div className="flex overflow-x-auto sm:justify-center">
                 <Pagination
