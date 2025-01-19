@@ -62,9 +62,9 @@ export default function TournamentSettings({
           </div>
           <div>
             <p className="text-sm text-gray-500">Current Participants: {participantCount}</p>
-            {participantCount > 0 && (
+            {typeof tournamentInfo.current_round === 'number' && (
               <p className="text-sm text-gray-500">
-                Suggested Number of Rounds: {suggestedRounds}
+                Current Round: {tournamentInfo.current_round}
               </p>
             )}
             {typeof tournamentInfo.n_rounds === 'number' && (
@@ -72,9 +72,9 @@ export default function TournamentSettings({
                 Tournament Rounds: {tournamentInfo.n_rounds}
               </p>
             )}
-            {typeof tournamentInfo.current_round === 'number' && (
+            {participantCount > 0 && (
               <p className="text-sm text-gray-500">
-                Current Round: {tournamentInfo.current_round}
+                Suggested Number of Rounds: {suggestedRounds}
               </p>
             )}
           </div>
