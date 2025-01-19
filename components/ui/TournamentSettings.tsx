@@ -31,6 +31,8 @@ export default function TournamentSettings({
 
   useEffect(() => {
     const fetchTournamentInfo = async () => {
+      console.log('tournamentId')
+      console.log(tournamentId)
       const { data, error } = await supabase
         .from('tournaments')
         .select('n_rounds, current_round')
