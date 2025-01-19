@@ -64,10 +64,20 @@ create table matches (
   updated_at timestamp with time zone default now(),
   is_tie boolean default false
 );
+
+create table rounds (
+  id uuid primary key default gen_random_uuid(),
+  tournament_id uuid references tournaments (id) on delete cascade,
+  round_number int not null,
+  started_at timestamp with time zone default now(),
+  ended_at timestamp with time zone,
+  is_completed boolean default false,
+  unique (tournament_id, round_number)
+);
 ```
 
 # Row-level security policies:
-```
+```sql
 -- Enable row-level security on all tables
 alter table tournaments enable row level security;
 alter table participants enable row level security;
@@ -93,4 +103,16 @@ with check (auth.uid() = (select host_id from tournaments where tournaments.id =
 
 -- Ensure only authorized users can perform actions
 grant select, insert, update, delete on tournaments, participants, matches to authenticated;
+
+-- Enable row-level security on the rounds table
+alter table rounds enable row level security;
+
+-- Create a policy for viewing and editing rounds (host-only)
+create policy host_can_access_rounds
+on rounds
+using (auth.uid() = (select host_id from tournaments where tournaments.id = rounds.tournament_id))
+with check (auth.uid() = (select host_id from tournaments where tournaments.id = rounds.tournament_id));
+
+-- Ensure only authenticated users can perform actions
+grant select, insert, update, delete on rounds to authenticated;
 ```
