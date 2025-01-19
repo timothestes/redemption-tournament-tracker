@@ -75,19 +75,19 @@ export default function TournamentTabs({
           </div>
         )}
       </Tabs.Item>
+      <Tabs.Item title="Pairings" icon={MdPeople}>
+        <div className="p-4">
+          <TournamentPairings
+            tournamentId={tournamentId}
+            key={activeTab} // Force re-render when tab becomes active
+          />
+        </div>
+      </Tabs.Item>
       <Tabs.Item title="Settings" icon={FaGear}>
         <div className="p-4">
           <TournamentSettings 
             tournamentId={tournamentId}
             participantCount={participants.length}
-            key={activeTab} // Force re-render when tab becomes active
-          />
-        </div>
-      </Tabs.Item>
-      <Tabs.Item title="Pairings" icon={MdPeople}>
-        <div className="p-4">
-          <TournamentPairings
-            tournamentId={tournamentId}
             key={activeTab} // Force re-render when tab becomes active
           />
         </div>
