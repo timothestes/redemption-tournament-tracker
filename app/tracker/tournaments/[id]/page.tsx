@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Breadcrumb from "../../../../components/ui/breadcrumb";
 import { createClient } from "../../../../utils/supabase/client";
 import { Button } from "flowbite-react";
 import { HiPlus } from "react-icons/hi";
@@ -192,7 +193,13 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
 
   return (
     <div className="flex h-screen pl-64">
-      <ToastNotification
+        <Breadcrumb
+          items={[
+            { label: "Tournaments", href: "/tracker/tournaments" },
+            { label: tournament?.name || "Loading..." },
+          ]}
+        />
+        <ToastNotification
         message={toast.message}
         show={toast.show}
         onClose={() => setToast((prev) => ({ ...prev, show: false }))}
