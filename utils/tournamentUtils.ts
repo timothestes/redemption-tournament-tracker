@@ -1,4 +1,5 @@
 export function suggestNumberOfRounds(participantCount: number): number {
+  // suggestions come from this article: https://www.channelfireball.com/article/How-to-Read-Standings-in-a-MTG-Tournament-The-Basics/9defa014-9753-42a1-9528-a1dfceb94d29/
   if (participantCount <= 0) return 0;
   if (participantCount <= 4) return Math.max(3, participantCount - 1);
   

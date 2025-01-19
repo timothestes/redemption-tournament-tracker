@@ -1,8 +1,7 @@
 "use client";
 
 import { Card } from "flowbite-react";
-import { useState, useEffect } from "react";
-import { createClient } from "../../utils/supabase/client";
+import { useState } from "react";
 import { suggestNumberOfRounds } from "../../utils/tournamentUtils";
 
 interface TournamentSettingsProps {
