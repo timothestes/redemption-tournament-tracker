@@ -258,7 +258,7 @@ export default function TournamentRounds({
   };
 
   return (
-    <div className="space-y-6 min-w-[800px] max-w-[1200px] w-full mx-auto">
+    <div className="space-y-6 w-full max-w-full sm:max-w-3xl mx-auto px-4">
       <Card>
         {error.message && (
           <div className="p-4 mb-4 text-sm text-red-800 rounded-lg bg-red-50">

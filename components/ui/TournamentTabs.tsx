@@ -70,7 +70,7 @@ export default function TournamentTabs({
         ) : participants.length === 0 ? (
           <p>No participants found.</p>
         ) : (
-          <div className="min-w-[800px] max-w-[1200px] w-full mx-auto overflow-x-auto">
+          <div className="w-full max-w-full sm:max-w-3xl mx-auto overflow-x-auto px-4">
             <ParticipantTable
               participants={participants}
               onEdit={onEdit}
@@ -80,7 +80,7 @@ export default function TournamentTabs({
         )}
       </Tabs.Item>
       <Tabs.Item title="Rounds" icon={MdPeople} disabled={!tournamentStarted}>
-        <div className="p-4 min-w-[800px] max-w-[1200px] w-full mx-auto">
+        <div className="p-4 w-full max-w-full sm:max-w-3xl mx-auto">
           <TournamentRounds
             tournamentId={tournamentId}
             isActive={activeTab === 1}
