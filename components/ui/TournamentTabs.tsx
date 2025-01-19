@@ -55,11 +55,13 @@ export default function TournamentTabs({
         ) : participants.length === 0 ? (
           <p>No participants found.</p>
         ) : (
-          <ParticipantTable
-            participants={participants}
-            onEdit={onEdit}
-            onDelete={onDelete}
-          />
+          <div className="max-w-4xl overflow-x-auto">
+            <ParticipantTable
+              participants={participants}
+              onEdit={onEdit}
+              onDelete={onDelete}
+            />
+          </div>
         )}
       </Tabs.Item>
       <Tabs.Item title="Settings" icon={FaGear}>
