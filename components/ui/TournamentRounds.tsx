@@ -54,7 +54,6 @@ export default function TournamentRounds({
       .select("*")
       .eq("tournament_id", tournamentId)
       .eq("round_number", data.current_round)
-      .is("ended_at", null)
       .single();
 
     if (!roundError && roundData) {
