@@ -34,7 +34,9 @@ create table tournaments (
   started_at timestamp with time zone,
   ended_at timestamp with time zone, 
   has_started boolean default false,
-  has_ended boolean default false   
+  has_ended boolean default false,
+  n_rounds int,
+  current_round int
 );
 
 create table participants (
