@@ -192,7 +192,6 @@ export default function TournamentRounds({
         if (tournamentError) throw tournamentError;
       }
 
-      fetchTournamentInfo();
       setIsRoundActive(false);
       
       // If not on the last round, go to the next page
