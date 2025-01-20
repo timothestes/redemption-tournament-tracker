@@ -36,8 +36,11 @@ export default function CountdownTimer({ startTime, durationMinutes }: Countdown
   }, [startTime, durationMinutes]);
 
   return (
-    <div className="text-4xl font-mono font-bold bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg">
-      {timeLeft}
+    <div className="flex flex-col items-center">
+      <div className="text-sm text-gray-500 mb-2">Current Round Timer</div>
+      <div className="text-4xl font-mono font-bold bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg">
+        {timeLeft}
+      </div>
     </div>
   );
 }

@@ -316,7 +316,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
               <p className="text-sm text-gray-500 mt-2">
               To start a tournament, first add some participants</p>
             )}
-            <div className="flex items-center gap-6 mt-4">
+            <div className="flex flex-col gap-4 mt-4">
               <Button
                 disabled={participants.length === 0 || tournament?.has_ended}
                 color={
@@ -327,6 +327,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
                     : "success"
                 }
                 onClick={handleTournamentStatusToggle}
+                className="w-fit"
               >
                 {tournament?.has_ended
                   ? "Tournament Ended"
