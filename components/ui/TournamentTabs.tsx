@@ -116,6 +116,7 @@ export default function TournamentTabs({
             isActive={activeTab === 1}
             key={activeTab} // Force re-render when tab becomes active
             onTournamentEnd={onTournamentEnd}
+            onRoundActiveChange={(isActive) => setIsRoundActive(isActive)}
           />
         </div>
       </Tabs.Item>
