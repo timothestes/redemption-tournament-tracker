@@ -242,7 +242,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
                   setNewTournamentName(tournament.name);
                   setIsEditModalOpen(true);
                 }}
-                className="text-blue-500 cursor-pointer hover:text-blue-700 w-6 h-6"
+                className="text-gray-500 cursor-pointer hover:text-gray-700 w-6 h-6"
                 aria-label="Edit tournament name"
               />
             </div>
