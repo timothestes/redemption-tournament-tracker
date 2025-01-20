@@ -49,16 +49,18 @@ export default function TournamentTabs({
           <h2 className="text-2xl font-bold" style={{ width: "200px" }}>
             Participants
           </h2>
-          <Button
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2"
-            style={{ width: "200px" }}
-            outline
-            gradientDuoTone="greenToBlue"
-          >
-            <HiPlus className="w-5 h-5" />
-            Add Participant
-          </Button>
+          {!tournamentStarted && (
+            <Button
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center gap-2"
+              style={{ width: "200px" }}
+              outline
+              gradientDuoTone="greenToBlue"
+            >
+              <HiPlus className="w-5 h-5" />
+              Add Participant
+            </Button>
+          )}
           <ParticipantFormModal
             isOpen={isModalOpen}
             onClose={() => setIsModalOpen(false)}
