@@ -42,8 +42,9 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
               id="name"
               name="name"
               type="text"
-              placeholder="My tournament name"
+              placeholder="Tournament Name (max 35 characters)"
               required
+              maxLength={35}
               ref={inputRef}
             />
           </div>
