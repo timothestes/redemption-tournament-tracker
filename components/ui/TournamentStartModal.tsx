@@ -40,8 +40,8 @@ export default function TournamentStartModal({
       <Modal.Body>
         <div className="space-y-4">
           <div>
-            <p className="text-sm text-gray-500">Current Participants: {participantCount}</p>
-            <p className="text-sm text-gray-500">Suggested Number of Rounds: {suggestedRounds}</p>
+            <p className="text-sm text-white-500">Current Participants: {participantCount}</p>
+            <p className="text-sm text-white-500">Suggested Number of Rounds: {suggestedRounds}</p>
           </div>
           <div className="space-y-2">
             <Label>Number of Rounds</Label>
