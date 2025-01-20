@@ -49,7 +49,7 @@ export default function TournamentTabs({
           <h2 className="text-2xl font-bold" style={{ width: "200px" }}>
             Participants
           </h2>
-          <div className="relative" title={tournamentStarted ? "Cannot add participants after tournament has started" : ""}>
+          <div className="relative group">
             <Button
               onClick={() => !tournamentStarted && setIsModalOpen(true)}
               className={`flex items-center gap-2 ${tournamentStarted ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -61,6 +61,12 @@ export default function TournamentTabs({
               <HiPlus className="w-5 h-5" />
               Add Participant
             </Button>
+            {tournamentStarted && (
+              <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+                Cannot add participants after tournament has started
+                <div className="absolute left-1/2 -translate-x-1/2 top-full -mt-1 border-4 border-transparent border-t-gray-900"></div>
+              </div>
+            )}
           </div>
           <ParticipantFormModal
             isOpen={isModalOpen}
