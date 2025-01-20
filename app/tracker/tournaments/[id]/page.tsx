@@ -19,8 +19,8 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   const [tournament, setTournament] = useState<any>(null);
   const [currentParticipant, setCurrentParticipant] = useState<any>(null);
   const [newParticipantName, setNewParticipantName] = useState<string>("");
-  const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
+  const [isEditTournamentModalOpen, setIsEditTournamentModalOpen] = useState<boolean>(false);
+  const [isEditParticipantModalOpen, setIsEditParticipantModalOpen] = useState<boolean>(false);
   const [newMatchPoints, setNewMatchPoints] = useState<string>("");
   const [newDifferential, setNewDifferential] = useState<string>("");
   const [newDroppedOut, setNewDroppedOut] = useState<boolean>(false);
@@ -129,7 +129,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
       if (error) throw error;
   
       fetchParticipants();
-      setIsEditModalOpen(false);
+      setIsEditParticipantModalOpen(false);
       showToast("Participant updated successfully!", "success");
     } catch (error) {
       showToast("Error updating participant.", "error");
@@ -241,15 +241,15 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
               <HiPencil
                 onClick={() => {
                   setNewTournamentName(tournament.name);
-                  setIsEditModalOpen(true);
+                  setIsEditTournamentModalOpen(true);
                 }}
                 className="text-gray-500 cursor-pointer hover:text-gray-700 w-6 h-6"
                 aria-label="Edit tournament name"
               />
             </div>
             <EditTournamentNameModal
-              isOpen={isEditModalOpen}
-              onClose={() => setIsEditModalOpen(false)}
+              isOpen={isEditTournamentModalOpen}
+              onClose={() => setIsEditTournamentModalOpen(false)}
               onSave={async () => {
                 try {
                   const { error } = await supabase
@@ -263,7 +263,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
                     ...prev,
                     name: newTournamentName
                   }));
-                  setIsEditModalOpen(false);
+                  setIsEditTournamentModalOpen(false);
                   showToast("Tournament name updated successfully!", "success");
                 } catch (error) {
                   console.error("Error updating tournament name:", error);
@@ -346,7 +346,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
             setNewMatchPoints(participant.match_points?.toString() || "");
             setNewDifferential(participant.differential?.toString() || "");
             setNewDroppedOut(participant.dropped_out || false);
-            setIsEditModalOpen(true);
+            setIsEditParticipantModalOpen(true);
           }}
           onDelete={deleteParticipant}
           loading={loading}
@@ -356,8 +356,8 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
         />
       </div>
       <EditParticipantModal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
+        isOpen={isEditParticipantModalOpen}
+        onClose={() => setIsEditParticipantModalOpen(false)}
         participant={currentParticipant}
         onSave={updateParticipant}
         newParticipantName={newParticipantName}
