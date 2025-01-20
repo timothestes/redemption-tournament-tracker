@@ -43,6 +43,7 @@ export default function TournamentRounds({
   tournamentId,
   isActive,
   onTournamentEnd,
+  onRoundActiveChange,
 }: TournamentRoundsProps) {
   const [tournamentInfo, setTournamentInfo] = useState<TournamentInfo>({
     n_rounds: null,
