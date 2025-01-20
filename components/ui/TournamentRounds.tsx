@@ -188,6 +188,11 @@ export default function TournamentRounds({
         if (tournamentError) throw tournamentError;
       }
 
+      // Update local state after successful database updates
+      setRoundInfo((prev) => ({
+        ...prev,
+        ended_at: now,
+      }));
       setIsRoundActive(false);
       onRoundActiveChange?.(false);
       
