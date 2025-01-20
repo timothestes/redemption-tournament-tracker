@@ -20,7 +20,7 @@ interface TournamentRoundsProps {
   tournamentId: string;
   isActive: boolean;
   onTournamentEnd?: () => void;
-  onRoundActiveChange?: (isActive: boolean) => void;
+  onRoundActiveChange?: (isActive: boolean, roundStartTime: string | null) => void;
   roundInfo?: RoundInfo;
 }
 
@@ -146,7 +146,7 @@ export default function TournamentRounds({
 
       setIsRoundActive(true);
       setRoundInfo((prev) => ({ ...prev, started_at: now }));
-      onRoundActiveChange?.(true);
+      onRoundActiveChange?.(true, now);
     } catch (error) {
       console.error("Error starting round:", error);
     }
@@ -204,7 +204,7 @@ export default function TournamentRounds({
         ended_at: now,
       }));
       setIsRoundActive(false);
-      onRoundActiveChange?.(false);
+      onRoundActiveChange?.(false, null);
       
       // If not on the last round, go to the next page
       if (currentPage < tournamentInfo.n_rounds) {
