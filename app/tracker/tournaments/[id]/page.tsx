@@ -20,6 +20,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   const [currentParticipant, setCurrentParticipant] = useState<any>(null);
   const [newParticipantName, setNewParticipantName] = useState<string>("");
   const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
   const [newMatchPoints, setNewMatchPoints] = useState<string>("");
   const [newDifferential, setNewDifferential] = useState<string>("");
   const [newDroppedOut, setNewDroppedOut] = useState<boolean>(false);
@@ -342,6 +343,9 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
           onEdit={(participant: any) => {
             setCurrentParticipant(participant);
             setNewParticipantName(participant.name);
+            setNewMatchPoints(participant.match_points?.toString() || "");
+            setNewDifferential(participant.differential?.toString() || "");
+            setNewDroppedOut(participant.dropped_out || false);
             setIsEditModalOpen(true);
           }}
           onDelete={deleteParticipant}
