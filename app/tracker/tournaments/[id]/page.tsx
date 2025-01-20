@@ -6,6 +6,8 @@ import TournamentStartModal from "../../../../components/ui/TournamentStartModal
 import Breadcrumb from "../../../../components/ui/breadcrumb";
 import { createClient } from "../../../../utils/supabase/client";
 import { Button } from "flowbite-react";
+import { HiPencil } from "react-icons/hi";
+import EditTournamentNameModal from "../../../../components/ui/EditTournamentNameModal";
 import TournamentTabs from "../../../../components/ui/TournamentTabs";
 import ToastNotification from "../../../../components/ui/toast-notification";
 import EditParticipantModal from "../../../../components/ui/EditParticipantModal";
@@ -24,6 +26,8 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   const [loading, setLoading] = useState(true);
   const [id, setId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [newTournamentName, setNewTournamentName] = useState("");
   const [toast, setToast] = useState<{ message: string; show: boolean; type?: "success" | "error" }>({
     message: "",
     show: false,
@@ -232,7 +236,17 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
       <div className="flex-grow p-4 max-w-4xl mx-auto">
         {tournament && (
           <div className="mb-6">
-            <h1 className="text-3xl font-bold">{tournament.name}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-bold">{tournament.name}</h1>
+              <HiPencil
+                onClick={() => {
+                  setNewTournamentName(tournament.name);
+                  setIsEditModalOpen(true);
+                }}
+                className="text-blue-500 cursor-pointer hover:text-blue-700 w-6 h-6"
+                aria-label="Edit tournament name"
+              />
+            </div>
             <p className="text-sm text-gray-500 mt-2">
               Created on:{" "}
               {new Intl.DateTimeFormat("en-US", {
