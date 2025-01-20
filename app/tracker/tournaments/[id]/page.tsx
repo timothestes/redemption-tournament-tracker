@@ -152,6 +152,8 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   };
 
   const [showStartModal, setShowStartModal] = useState(false);
+  const [isRoundActive, setIsRoundActive] = useState(false);
+  const [roundInfo, setRoundInfo] = useState<{ started_at: string | null }>({ started_at: null });
 
   const handleTournamentStatusToggle = async () => {
     if (!tournament) {
