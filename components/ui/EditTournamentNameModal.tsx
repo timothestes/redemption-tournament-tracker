@@ -28,8 +28,9 @@ export default function EditTournamentNameModal({
           <TextInput
             value={tournamentName}
             onChange={(e) => setTournamentName(e.target.value)}
-            placeholder="Tournament Name"
+            placeholder="Tournament Name (max 35 characters)"
             required
+            maxLength={35}
           />
         </div>
       </Modal.Body>
