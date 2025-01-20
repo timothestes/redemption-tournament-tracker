@@ -56,32 +56,6 @@ const ParticipantFormModal: React.FC<ParticipantFormModalProps> = ({
           </div>
         </form>
       </div>
-      <EditTournamentNameModal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        onSave={async () => {
-          try {
-            const { error } = await supabase
-              .from("tournaments")
-              .update({ name: newTournamentName })
-              .eq("id", id);
-            
-            if (error) throw error;
-            
-            setTournament(prev => ({
-              ...prev,
-              name: newTournamentName
-            }));
-            setIsEditModalOpen(false);
-            showToast("Tournament name updated successfully!", "success");
-          } catch (error) {
-            console.error("Error updating tournament name:", error);
-            showToast("Error updating tournament name", "error");
-          }
-        }}
-        tournamentName={newTournamentName}
-        setTournamentName={setNewTournamentName}
-      />
     </div>
   );
 };

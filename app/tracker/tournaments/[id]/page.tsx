@@ -246,6 +246,32 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
                 aria-label="Edit tournament name"
               />
             </div>
+            <EditTournamentNameModal
+              isOpen={isEditModalOpen}
+              onClose={() => setIsEditModalOpen(false)}
+              onSave={async () => {
+                try {
+                  const { error } = await supabase
+                    .from("tournaments")
+                    .update({ name: newTournamentName })
+                    .eq("id", id);
+                  
+                  if (error) throw error;
+                  
+                  setTournament(prev => ({
+                    ...prev,
+                    name: newTournamentName
+                  }));
+                  setIsEditModalOpen(false);
+                  showToast("Tournament name updated successfully!", "success");
+                } catch (error) {
+                  console.error("Error updating tournament name:", error);
+                  showToast("Error updating tournament name", "error");
+                }
+              }}
+              tournamentName={newTournamentName}
+              setTournamentName={setNewTournamentName}
+            />
             <p className="text-sm text-gray-500 mt-2">
               Created on:{" "}
               {new Intl.DateTimeFormat("en-US", {
