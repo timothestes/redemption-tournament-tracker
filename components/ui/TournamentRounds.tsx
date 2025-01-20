@@ -148,14 +148,7 @@ export default function TournamentRounds({
     try {
       const now = new Date().toISOString();
       
-      // Update round info state first
-      setRoundInfo((prev) => ({
-        ...prev,
-        ended_at: now,
-      }));
-      setIsRoundActive(false);
-
-      // Then update the database
+      // Update the database first
       const { error: roundError } = await client
         .from("rounds")
         .update({
