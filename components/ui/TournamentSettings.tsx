@@ -13,6 +13,7 @@ interface TournamentSettingsProps {
 interface TournamentInfo {
   n_rounds: number | null;
   current_round: number | null;
+  round_length: number | null;
 }
 
 export default function TournamentSettings({
@@ -34,7 +35,7 @@ export default function TournamentSettings({
       const client = createClient();
       const { data, error } = await client
         .from('tournaments')
-        .select('n_rounds, current_round')
+        .select('n_rounds, current_round, round_length')
         .eq('id', tournamentId)
         .single();
       
@@ -70,6 +71,11 @@ export default function TournamentSettings({
             {typeof tournamentInfo.n_rounds === 'number' && (
               <p className="text-sm text-gray-500">
                 Total Rounds: {tournamentInfo.n_rounds}
+              </p>
+            )}
+            {typeof tournamentInfo.round_length === 'number' && (
+              <p className="text-sm text-gray-500">
+                Round Length: {tournamentInfo.round_length} minutes
               </p>
             )}
             {participantCount > 0 && (!tournamentInfo.n_rounds || tournamentInfo.n_rounds === 0) && (
