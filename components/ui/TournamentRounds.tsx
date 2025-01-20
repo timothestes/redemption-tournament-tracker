@@ -135,7 +135,7 @@ export default function TournamentRounds({
 
       setIsRoundActive(true);
       setRoundInfo((prev) => ({ ...prev, started_at: now }));
-      props.onRoundActiveChange?.(true);
+      onRoundActiveChange?.(true);
     } catch (error) {
       console.error("Error starting round:", error);
     }
@@ -195,7 +195,7 @@ export default function TournamentRounds({
       }
 
       setIsRoundActive(false);
-      props.onRoundActiveChange?.(false);
+      onRoundActiveChange?.(false);
       
       // If not on the last round, go to the next page
       if (currentPage < tournamentInfo.n_rounds) {
