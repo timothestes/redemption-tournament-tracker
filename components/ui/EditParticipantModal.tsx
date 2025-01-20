@@ -82,11 +82,11 @@ const EditParticipantModal: React.FC<EditParticipantModalProps> = ({
             />
           </div>
           <div className="flex justify-end gap-3">
-            <Button type="button" outline color="red" onClick={onClose}>
-              Cancel
-            </Button>
             <Button type="submit" outline gradientDuoTone="greenToBlue">
               Save
+            </Button>
+            <Button type="button" outline color="red" onClick={onClose}>
+              Cancel
             </Button>
           </div>
         </form>
