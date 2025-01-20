@@ -1,6 +1,6 @@
 "use client";
 
-import { Tabs } from "flowbite-react";
+import { Tabs, Card } from "flowbite-react";
 import { useState } from "react";
 import { HiUserGroup } from "react-icons/hi";
 import { FaGear } from "react-icons/fa6";
@@ -77,7 +77,14 @@ export default function TournamentTabs({
         {loading ? (
           <p>Loading participants...</p>
         ) : participants.length === 0 ? (
-          <p>No participants found.</p>
+          <div className="min-w-[800px] max-w-[1200px] w-full mx-auto overflow-x-auto">
+            <Card>
+              <div className="flex flex-col items-center justify-center py-8">
+                <p className="text-gray-500 mb-4">No participants found</p>
+                <p className="text-sm text-gray-400">Add participants to get started</p>
+              </div>
+            </Card>
+          </div>
         ) : (
           <div className="min-w-[800px] max-w-[1200px] w-full mx-auto overflow-x-auto">
             <ParticipantTable
