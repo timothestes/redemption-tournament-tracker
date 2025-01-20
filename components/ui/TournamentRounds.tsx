@@ -21,6 +21,7 @@ interface TournamentRoundsProps {
   isActive: boolean;
   onTournamentEnd?: () => void;
   onRoundActiveChange?: (isActive: boolean) => void;
+  roundInfo?: RoundInfo;
 }
 
 interface TournamentInfo {
@@ -58,6 +59,13 @@ export default function TournamentRounds({
     started_at: null,
     ended_at: null,
   });
+
+  // Make roundInfo available to parent component
+  useEffect(() => {
+    if (isActive) {
+      onRoundActiveChange?.(isRoundActive);
+    }
+  }, [isRoundActive, isActive, onRoundActiveChange]);
 
   const fetchTournamentAndRoundInfo = useCallback(async () => {
     if (!tournamentId) return;
