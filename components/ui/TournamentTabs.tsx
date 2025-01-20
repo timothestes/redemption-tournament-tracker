@@ -39,8 +39,8 @@ export default function TournamentTabs({
 }: TournamentTabsProps) {
   const [activeTab, setActiveTab] = useState(0);
   return (
-    <Tabs 
-      aria-label="Tournament tabs" 
+    <Tabs
+      aria-label="Tournament tabs"
       style={{ marginTop: "1rem" }}
       onActiveTabChange={(tab) => setActiveTab(tab)}
     >
@@ -95,7 +95,21 @@ export default function TournamentTabs({
           </div>
         )}
       </Tabs.Item>
-      <Tabs.Item title="Rounds" icon={MdPeople} disabled={!tournamentStarted}>
+      <Tabs.Item
+        title={
+          <div className="relative group">
+            Rounds
+            {!tournamentStarted && (
+              <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-4 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+                Add participants and start the tournament to enable this tab
+                <div className="absolute left-1/2 -translate-x-1/2 top-full -mt-1 border-4 border-transparent border-t-gray-900"></div>
+              </div>
+            )}
+          </div>
+        }
+        icon={MdPeople}
+        disabled={!tournamentStarted}
+      >
         <div className="min-w-[800px] max-w-[1200px] w-full mx-auto overflow-x-auto">
           <TournamentRounds
             tournamentId={tournamentId}
@@ -107,7 +121,7 @@ export default function TournamentTabs({
       </Tabs.Item>
       <Tabs.Item title="Settings" icon={FaGear}>
         <div className="p-4 min-w-[800px] max-w-[1200px] w-full mx-auto">
-          <TournamentSettings 
+          <TournamentSettings
             tournamentId={tournamentId}
             participantCount={participants.length}
             key={activeTab} // Force re-render when tab becomes active
