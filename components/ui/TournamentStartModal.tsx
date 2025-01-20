@@ -81,7 +81,7 @@ export default function TournamentStartModal({
         <Button onClick={() => onConfirm(numberOfRounds, roundLength)} outline gradientDuoTone="greenToBlue">
           Start Tournament
         </Button>
-        <Button color="gray" onClick={onClose}>Cancel</Button>
+        <Button outline color="red" onClick={onClose}>Cancel</Button>
       </Modal.Footer>
     </Modal>
   );
