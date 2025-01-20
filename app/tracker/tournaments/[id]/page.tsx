@@ -11,6 +11,7 @@ import EditTournamentNameModal from "../../../../components/ui/EditTournamentNam
 import TournamentTabs from "../../../../components/ui/TournamentTabs";
 import ToastNotification from "../../../../components/ui/toast-notification";
 import EditParticipantModal from "../../../../components/ui/EditParticipantModal";
+import CountdownTimer from "../../../../components/ui/CountdownTimer";
 
 const supabase = createClient();
 
@@ -315,7 +316,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
               <p className="text-sm text-gray-500 mt-2">
               To start a tournament, first add some participants</p>
             )}
-            <div className="mt-4">
+            <div className="flex items-center gap-6 mt-4">
               <Button
                 disabled={participants.length === 0 || tournament?.has_ended}
                 color={
@@ -333,6 +334,12 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
                   ? "End Tournament"
                   : "Start Tournament"}
               </Button>
+              {tournament?.has_started && !tournament?.has_ended && tournament?.round_length && (
+                <CountdownTimer 
+                  startTime={tournament.started_at} 
+                  durationMinutes={tournament.round_length} 
+                />
+              )}
             </div>
           </div>
         )}
