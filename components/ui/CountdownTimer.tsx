@@ -10,6 +10,13 @@ export default function CountdownTimer({ startTime, durationMinutes }: Countdown
 
   useEffect(() => {
     const calculateTimeLeft = () => {
+      if (!startTime) {
+        // If no start time, show the full duration
+        const hours = Math.floor(durationMinutes / 60);
+        const minutes = durationMinutes % 60;
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00`;
+      }
+
       const start = new Date(startTime).getTime();
       const end = start + (durationMinutes * 60 * 1000);
       const now = new Date().getTime();
@@ -26,13 +33,15 @@ export default function CountdownTimer({ startTime, durationMinutes }: Countdown
       return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     };
 
-    const timer = setInterval(() => {
+    const timer = startTime ? setInterval(() => {
       setTimeLeft(calculateTimeLeft());
-    }, 1000);
+    }, 1000) : null;
 
     setTimeLeft(calculateTimeLeft());
 
-    return () => clearInterval(timer);
+    return () => {
+      if (timer) clearInterval(timer);
+    };
   }, [startTime, durationMinutes]);
 
   return (

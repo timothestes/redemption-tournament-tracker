@@ -337,9 +337,9 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
                   ? "End Tournament"
                   : "Start Tournament"}
               </Button>
-              {tournament?.has_started && !tournament?.has_ended && tournament?.round_length && isRoundActive && (
+              {tournament?.has_started && !tournament?.has_ended && tournament?.round_length && (
                 <CountdownTimer 
-                  startTime={roundInfo?.started_at} 
+                  startTime={isRoundActive ? roundInfo?.started_at : null} 
                   durationMinutes={tournament.round_length} 
                 />
               )}
