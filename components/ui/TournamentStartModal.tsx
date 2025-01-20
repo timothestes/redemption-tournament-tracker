@@ -71,7 +71,7 @@ export default function TournamentStartModal({
                 }}
                 min="0"
                 max="120"
-                className="rounded-lg border border-gray-300 bg-gray-50 text-gray-900 focus:border-blue-500 focus:ring-blue-500 block w-full p-2.5"
+                className="rounded-lg border border-gray-300 bg-gray-50 text-gray-900 focus:border-blue-500 focus:ring-blue-500 block w-24 p-2.5"
               />
             </div>
           </div>
