@@ -26,7 +26,6 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   const [loading, setLoading] = useState(true);
   const [id, setId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [newTournamentName, setNewTournamentName] = useState("");
   const [toast, setToast] = useState<{ message: string; show: boolean; type?: "success" | "error" }>({
     message: "",
