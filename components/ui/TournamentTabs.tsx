@@ -88,7 +88,18 @@ export default function TournamentTabs({
           </div>
         )}
       </Tabs.Item>
-      <Tabs.Item title="Rounds" icon={MdPeople} disabled={!tournamentStarted}>
+      <Tabs.Item 
+        title="Rounds" 
+        icon={MdPeople} 
+        disabled={!tournamentStarted}
+        className="relative group"
+      >
+        {!tournamentStarted && (
+          <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+            Rounds will be available after tournament starts
+            <div className="absolute left-1/2 -translate-x-1/2 top-full -mt-1 border-4 border-transparent border-t-gray-900"></div>
+          </div>
+        )}
         <div className="min-w-[800px] max-w-[1200px] w-full mx-auto overflow-x-auto">
           <TournamentRounds
             tournamentId={tournamentId}
