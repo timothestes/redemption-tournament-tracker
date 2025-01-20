@@ -366,7 +366,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
           onTournamentEnd={fetchTournamentDetails}
           onRoundActiveChange={(isActive, roundStartTime) => {
             setIsRoundActive(isActive);
-            setRoundInfo({ started_at: roundStartTime });
+            setRoundInfo(prev => ({ ...prev, started_at: roundStartTime }));
             fetchTournamentDetails();
           }}
         />

@@ -63,9 +63,9 @@ export default function TournamentRounds({
   // Make roundInfo available to parent component
   useEffect(() => {
     if (isActive) {
-      onRoundActiveChange?.(isRoundActive);
+      onRoundActiveChange?.(isRoundActive, roundInfo.started_at);
     }
-  }, [isRoundActive, isActive, onRoundActiveChange]);
+  }, [isRoundActive, isActive, onRoundActiveChange, roundInfo.started_at]);
 
   const fetchTournamentAndRoundInfo = useCallback(async () => {
     if (!tournamentId) return;
