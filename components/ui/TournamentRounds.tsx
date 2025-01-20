@@ -135,13 +135,6 @@ export default function TournamentRounds({
 
       if (roundError) throw roundError;
 
-      // Update the tournament with current round start time
-      const { error: tournamentError } = await client
-        .from("tournaments")
-        .update({ current_round_start: now })
-        .eq("id", tournamentId);
-
-      if (tournamentError) throw tournamentError;
 
       setIsRoundActive(true);
       setRoundInfo((prev) => ({ ...prev, started_at: now }));
@@ -191,7 +184,6 @@ export default function TournamentRounds({
           .from("tournaments")
           .update({
             current_round: (tournamentInfo.current_round || 0) + 1,
-            current_round_start: null
           })
           .eq("id", tournamentId);
 
