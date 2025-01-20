@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 interface TournamentStartModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (numberOfRounds: number) => void;
+  onConfirm: (numberOfRounds: number, roundLength: number) => void;
   participantCount: number;
   suggestedRounds: number;
 }
@@ -19,10 +19,12 @@ export default function TournamentStartModal({
   suggestedRounds,
 }: TournamentStartModalProps) {
   const [numberOfRounds, setNumberOfRounds] = useState(suggestedRounds);
+  const [roundLength, setRoundLength] = useState(45);
 
   useEffect(() => {
     if (isOpen) {
       setNumberOfRounds(suggestedRounds);
+      setRoundLength(45);
     }
   }, [isOpen, suggestedRounds]);
 
@@ -43,24 +45,40 @@ export default function TournamentStartModal({
             <p className="text-sm text-white-500">Current Participants: {participantCount}</p>
             <p className="text-sm text-white-500">Suggested Number of Rounds: {suggestedRounds}</p>
           </div>
-          <div className="space-y-2">
-            <Label>Number of Rounds</Label>
-            <div className="flex items-center space-x-4">
-              <Button 
-                size="sm" 
-                onClick={handleDecrement}
-                disabled={numberOfRounds <= 1}
-              >
-                -
-              </Button>
-              <span className="text-lg font-semibold">{numberOfRounds}</span>
-              <Button size="sm" onClick={handleIncrement}>+</Button>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Number of Rounds</Label>
+              <div className="flex items-center space-x-4">
+                <Button 
+                  size="sm" 
+                  onClick={handleDecrement}
+                  disabled={numberOfRounds <= 1}
+                >
+                  -
+                </Button>
+                <span className="text-lg font-semibold">{numberOfRounds}</span>
+                <Button size="sm" onClick={handleIncrement}>+</Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Round Length in minutes</Label>
+              <input
+                type="number"
+                value={roundLength}
+                onChange={(e) => {
+                  const value = Math.min(120, Math.max(0, parseInt(e.target.value) || 0));
+                  setRoundLength(value);
+                }}
+                min="0"
+                max="120"
+                className="rounded-lg border border-gray-300 bg-gray-50 text-gray-900 focus:border-blue-500 focus:ring-blue-500 block w-full p-2.5"
+              />
             </div>
           </div>
         </div>
       </Modal.Body>
       <Modal.Footer>
-        <Button onClick={() => onConfirm(numberOfRounds)} outline gradientDuoTone="greenToBlue">
+        <Button onClick={() => onConfirm(numberOfRounds, roundLength)} outline gradientDuoTone="greenToBlue">
           Start Tournament
         </Button>
         <Button color="gray" onClick={onClose}>Cancel</Button>

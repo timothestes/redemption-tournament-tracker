@@ -184,7 +184,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
     }
   };
 
-  const handleStartTournament = async (numberOfRounds: number) => {
+  const handleStartTournament = async (numberOfRounds: number, roundLength: number) => {
     const now = new Date().toISOString();
     try {
       const { data, error } = await supabase
@@ -195,7 +195,8 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
           started_at: now,
           ended_at: null,
           n_rounds: numberOfRounds,
-          current_round: 1
+          current_round: 1,
+          round_length: roundLength
         })
         .eq("id", id)
         .select("*")
