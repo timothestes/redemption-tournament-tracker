@@ -152,7 +152,6 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
   };
 
   const [showStartModal, setShowStartModal] = useState(false);
-  const [isRoundActive, setIsRoundActive] = useState(false);
 
   const handleTournamentStatusToggle = async () => {
     if (!tournament) {
@@ -336,7 +335,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
                   ? "End Tournament"
                   : "Start Tournament"}
               </Button>
-              {tournament?.has_started && !tournament?.has_ended && tournament?.round_length && isRoundActive && (
+              {tournament?.has_started && !tournament?.has_ended && tournament?.round_length && (
                 <CountdownTimer 
                   startTime={tournament.started_at} 
                   durationMinutes={tournament.round_length} 
