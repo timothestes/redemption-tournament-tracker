@@ -1,36 +1,41 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 interface CountdownTimerProps {
   startTime: string | null;
   durationMinutes: number;
+  key?: string; // Add key prop
 }
 
 export default function CountdownTimer({ startTime, durationMinutes }: CountdownTimerProps) {
   const [remainingSeconds, setRemainingSeconds] = useState<number>(durationMinutes * 60);
 
-  useEffect(() => {
-    // If there's no start time, just show the full duration
+  const calculateRemainingTime = useCallback(() => {
     if (!startTime) {
-      setRemainingSeconds(durationMinutes * 60);
-      return;
+      return durationMinutes * 60;
     }
 
-    // Calculate initial remaining time
     const startTimeMs = new Date(startTime).getTime();
     const endTimeMs = startTimeMs + (durationMinutes * 60 * 1000);
     const nowMs = new Date().getTime();
-    const initialRemainingMs = Math.max(0, endTimeMs - nowMs);
-    setRemainingSeconds(Math.floor(initialRemainingMs / 1000));
+    const remainingMs = Math.max(0, endTimeMs - nowMs);
+    return Math.floor(remainingMs / 1000);
+  }, [startTime, durationMinutes]);
 
-    // Set up interval
+  useEffect(() => {
+    // Immediately set initial time
+    setRemainingSeconds(calculateRemainingTime());
+
+    // Only set up interval if we have a start time
+    if (!startTime) {
+      return;
+    }
+
     const intervalId = setInterval(() => {
-      const currentMs = new Date().getTime();
-      const remainingMs = Math.max(0, endTimeMs - currentMs);
-      setRemainingSeconds(Math.floor(remainingMs / 1000));
+      setRemainingSeconds(calculateRemainingTime());
     }, 1000);
 
     return () => clearInterval(intervalId);
-  }, [startTime, durationMinutes]);
+  }, [startTime, calculateRemainingTime]);
 
   // Format the time
   const hours = Math.floor(remainingSeconds / 3600);
