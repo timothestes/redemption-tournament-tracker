@@ -149,7 +149,6 @@ export default function TournamentsPage() {
                         day: "numeric",
                         hour: "2-digit",
                         minute: "2-digit",
-                        second: "2-digit",
                       }).format(new Date(tournament.created_at))}
                     </Table.Cell>
                     <Table.Cell className="flex items-center space-x-4">

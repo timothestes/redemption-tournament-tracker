@@ -6,7 +6,7 @@ import { HiUserGroup } from "react-icons/hi";
 import { FaGear } from "react-icons/fa6";
 import { MdPeople } from "react-icons/md";
 import TournamentSettings from "./TournamentSettings";
-import TournamentRounds from "./TournamentRounds";
+import RoundsPage from "../../app/tracker/tournaments/[id]/rounds/page";
 import ParticipantTable from "./ParticipantTable";
 import ParticipantFormModal from "./participant-form-modal";
 import { Button } from "flowbite-react";
@@ -111,7 +111,7 @@ export default function TournamentTabs({
         disabled={!tournamentStarted}
       >
         <div className="min-w-[800px] max-w-[1200px] w-full mx-auto overflow-x-auto">
-          <TournamentRounds
+          <RoundsPage
             tournamentId={tournamentId}
             isActive={activeTab === 1}
             key={activeTab} // Force re-render when tab becomes active
