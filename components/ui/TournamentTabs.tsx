@@ -23,6 +23,7 @@ interface TournamentTabsProps {
   tournamentId: string;
   tournamentStarted?: boolean;
   onTournamentEnd?: () => void;
+  onRoundActiveChange?: (isActive: boolean, roundStartTime: string | null) => void;
 }
 
 export default function TournamentTabs({
