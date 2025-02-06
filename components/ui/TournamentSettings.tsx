@@ -5,15 +5,15 @@ import { useState, useEffect } from "react";
 import { suggestNumberOfRounds } from "../../utils/tournamentUtils";
 import { createClient } from "../../utils/supabase/client";
 
-interface TournamentSettingsProps {
-  tournamentId: string;
-  participantCount: number;
-}
-
 interface TournamentInfo {
   n_rounds: number | null;
   current_round: number | null;
   round_length: number | null;
+}
+
+interface TournamentSettingsProps {
+  tournamentId: string;
+  participantCount: number;
 }
 
 export default function TournamentSettings({
