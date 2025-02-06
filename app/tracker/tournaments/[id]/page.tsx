@@ -11,6 +11,7 @@ import EditTournamentNameModal from "../../../../components/ui/EditTournamentNam
 import TournamentTabs from "../../../../components/ui/TournamentTabs";
 import ToastNotification from "../../../../components/ui/toast-notification";
 import EditParticipantModal from "../../../../components/ui/EditParticipantModal";
+import CountdownTimer from "../../../../components/ui/CountdownTimer";
 
 const supabase = createClient();
 
@@ -284,6 +285,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
                 day: "numeric",
                 hour: "2-digit",
                 minute: "2-digit",
+                second: "2-digit",
               }).format(new Date(tournament.created_at))}
             </p>
             {tournament.started_at && (
@@ -295,6 +297,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
                   day: "numeric",
                   hour: "2-digit",
                   minute: "2-digit",
+                  second: "2-digit",
                 }).format(new Date(tournament.started_at))}
               </p>
             )}
@@ -307,6 +310,7 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
                   day: "numeric",
                   hour: "2-digit",
                   minute: "2-digit",
+                  second: "2-digit",
                 }).format(new Date(tournament.ended_at))}
               </p>
             )}
@@ -333,6 +337,13 @@ export default function TournamentPage({ params }: { params: Promise<{ id: strin
                   ? "End Tournament"
                   : "Start Tournament"}
               </Button>
+              {tournament?.has_started && !tournament?.has_ended && tournament?.round_length && (
+                <CountdownTimer 
+                  key={roundInfo?.started_at || 'inactive'} // Force re-render on start time change
+                  startTime={isRoundActive ? roundInfo?.started_at : null} 
+                  durationMinutes={tournament.round_length} 
+                />
+              )}
             </div>
           </div>
         )}

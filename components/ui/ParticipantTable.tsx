@@ -43,26 +43,16 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
             <Table.Cell>{participant.match_points}</Table.Cell>
             <Table.Cell>{participant.differential}</Table.Cell>
             <Table.Cell className="flex items-center space-x-4">
-              <div className="group relative">
-                <HiPencil
-                  onClick={() => onEdit(participant)}
-                  className="text-blue-500 cursor-pointer hover:text-blue-700 w-6 h-6"
-                  aria-label="Edit"
-                />
-                <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-2 py-1 rounded text-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                  Edit participant
-                </span>
-              </div>
-              <div className="group relative">
-                <HiTrash
-                  onClick={() => onDelete(participant.id)}
-                  className="text-red-500 cursor-pointer hover:text-red-700 w-6 h-6"
-                  aria-label="Delete"
-                />
-                <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-2 py-1 rounded text-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                  Drop participant
-                </span>
-              </div>
+              <HiPencil
+                onClick={() => onEdit(participant)}
+                className="text-blue-500 cursor-pointer hover:text-blue-700 w-6 h-6"
+                aria-label="Edit"
+              />
+              <HiTrash
+                onClick={() => onDelete(participant.id)}
+                className="text-red-500 cursor-pointer hover:text-red-700 w-6 h-6"
+                aria-label="Delete"
+              />
             </Table.Cell>
           </Table.Row>
         ))}
