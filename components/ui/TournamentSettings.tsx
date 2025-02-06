@@ -23,7 +23,8 @@ export default function TournamentSettings({
   const [enabled, setEnabled] = useState(false);
   const [tournamentInfo, setTournamentInfo] = useState<TournamentInfo>({
     n_rounds: null,
-    current_round: null
+    current_round: null,
+    round_length: null
   });
 
   const suggestedRounds = suggestNumberOfRounds(participantCount);
