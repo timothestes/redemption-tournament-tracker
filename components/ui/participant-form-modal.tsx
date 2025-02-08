@@ -32,11 +32,11 @@ const ParticipantFormModal: React.FC<ParticipantFormModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
-      <div className="bg-black p-4 rounded shadow-lg max-w-sm w-full">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
+      <div className="bg-[#1F2937] border-2 border-zinc-300/10 py-6 px-6 rounded-lg shadow-lg max-w-sm w-full">
         <h2 className="text-xl font-bold mb-4">Add Participant</h2>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="mb-2 block">
+          <div className="mb-2 block space-y-1">
             <Label htmlFor="name" value="Participant Name" />
             <TextInput
               id="name"
@@ -49,7 +49,9 @@ const ParticipantFormModal: React.FC<ParticipantFormModalProps> = ({
             />
           </div>
           <div className="flex justify-end gap-3">
-            <Button type="submit" outline gradientDuoTone="greenToBlue">Add</Button>
+            <Button type="submit" outline gradientDuoTone="greenToBlue">
+              Add
+            </Button>
             <Button type="button" outline color="red" onClick={onClose}>
               Cancel
             </Button>

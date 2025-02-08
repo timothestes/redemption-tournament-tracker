@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Sidebar } from "flowbite-react";
 import { HiArrowSmRight, HiDocumentText, HiMenu } from "react-icons/hi";
+import { IoClose } from "react-icons/io5";
 import { FaTrophy, FaBookOpen } from "react-icons/fa6";
 import { PiPencilLineBold } from "react-icons/pi";
 import { TbCardsFilled, TbArrowGuideFilled } from "react-icons/tb";
@@ -21,24 +22,32 @@ const SideNav: React.FC = () => {
     <>
       <button
         onClick={toggleSidebar}
-        className="fixed top-16 left-0 z-20 p-3.5 bg-primary text-primary-foreground md:hidden rounded"
+        className="max-md:absolute top-[14px] left-3 z-20 p-2 bg-primary text-primary-foreground md:hidden rounded"
       >
-        <HiMenu size={24} />
+        <HiMenu size={20} />
       </button>
       <Sidebar
         aria-label="sidebar"
-        className={`fixed top-0 left-0 w-45 h-full bg-primary transform z-50 ${
+        className={`max-md:fixed top-0 sticky left-0 w-45 h-lvh shrink-0 bg-primary transform z-50 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
-        } transition-transform md:translate-x-0 rounded-full`}
+        } transition-transform md:translate-x-0 shadow-2xl rounded-full`}
       >
+        <div className="">
+          <button
+            onClick={toggleSidebar}
+            className="bg-primary p-1 text-primary-foreground md:hidden rounded"
+          >
+            <IoClose size={20} />
+          </button>
+        </div>
         <Link href="/tracker/tournaments" passHref>
-          <div className="cursor-pointer ml-auto">
+          <div className="cursor-pointer">
             <Image
               src="/lor.png"
               alt="Home Icon"
               width={180}
               height={40}
-              style={{ width: 'auto', height: 'auto' }}
+              style={{ width: "auto", height: "auto" }}
               priority
             />
           </div>
@@ -50,7 +59,11 @@ const SideNav: React.FC = () => {
               Tournaments
             </Sidebar.Item>
             <Sidebar.ItemGroup>
-              <Sidebar.Collapse label="Resources" icon={HiDocumentText} className="pl-2">
+              <Sidebar.Collapse
+                label="Resources"
+                icon={HiDocumentText}
+                className="pl-2"
+              >
                 <Sidebar.Item
                   href="https://landofredemption.com/wp-content/uploads/2023/11/REG_PDF_9.0.0.pdf"
                   target="_blank"
