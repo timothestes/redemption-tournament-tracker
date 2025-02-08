@@ -34,18 +34,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <Background>
-            <main className="min-h-screen flex">
-              <SideNav />
-              <div className="flex-1 w-full flex flex-col gap-20 items-center">
-                <Header />
-                <div className="flex flex-col w-full">{children}</div>
-                {/* Insert footer here! */}
-                {/* <footer className="w-full flex items-center justify-center border-t mx-auto text-center text-xs py-16"> */}
-                {/* <p>Switch theme</p> */}
-                {/* <ThemeSwitcher /> */}
-                {/* </footer> */}
-              </div>
-            </main>
+            <main className="min-h-screen flex">{children}</main>
           </Background>
         </ThemeProvider>
       </body>

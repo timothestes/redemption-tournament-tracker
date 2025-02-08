@@ -18,13 +18,13 @@ interface TournamentSettingsProps {
 
 export default function TournamentSettings({
   tournamentId,
-  participantCount 
+  participantCount,
 }: TournamentSettingsProps) {
   const [enabled, setEnabled] = useState(false);
   const [tournamentInfo, setTournamentInfo] = useState<TournamentInfo>({
     n_rounds: null,
     current_round: null,
-    round_length: null
+    round_length: null,
   });
 
   const suggestedRounds = suggestNumberOfRounds(participantCount);
@@ -32,16 +32,16 @@ export default function TournamentSettings({
   useEffect(() => {
     const fetchTournamentInfo = async () => {
       if (!tournamentId) return;
-      
+
       const client = createClient();
       const { data, error } = await client
-        .from('tournaments')
-        .select('n_rounds, current_round, round_length')
-        .eq('id', tournamentId)
+        .from("tournaments")
+        .select("n_rounds, current_round, round_length")
+        .eq("id", tournamentId)
         .single();
-      
+
       if (error) {
-        console.error('Error fetching tournament info:', error);
+        console.error("Error fetching tournament info:", error);
         return;
       }
 
@@ -52,38 +52,43 @@ export default function TournamentSettings({
   }, [tournamentId]);
 
   return (
-    <div className="space-y-6 min-w-[800px] max-w-[1200px] w-full mx-auto">
-      <div className="flex justify-between items-center">
+    <div className="w-[800px] max-xl:w-full mx-auto overflow-x-auto">
+      <div className="flex justify-between items-center mb-4">
         <h2 className="text-2xl font-bold">Tournament Settings</h2>
       </div>
-      
+
       <Card>
         <div className="space-y-4">
           <div>
-            <p className="text-sm text-gray-500">Tournament ID: {tournamentId}</p>
+            <p className="text-sm text-gray-500">
+              Tournament ID: {tournamentId}
+            </p>
           </div>
           <div>
-            <p className="text-sm text-gray-500">Current Participants: {participantCount}</p>
-            {typeof tournamentInfo.current_round === 'number' && (
+            <p className="text-sm text-gray-500">
+              Current Participants: {participantCount}
+            </p>
+            {typeof tournamentInfo.current_round === "number" && (
               <p className="text-sm text-gray-500">
                 Current Round: {tournamentInfo.current_round}
               </p>
             )}
-            {typeof tournamentInfo.n_rounds === 'number' && (
+            {typeof tournamentInfo.n_rounds === "number" && (
               <p className="text-sm text-gray-500">
                 Total Rounds: {tournamentInfo.n_rounds}
               </p>
             )}
-            {typeof tournamentInfo.round_length === 'number' && (
+            {typeof tournamentInfo.round_length === "number" && (
               <p className="text-sm text-gray-500">
                 Round Length: {tournamentInfo.round_length} minutes
               </p>
             )}
-            {participantCount > 0 && (!tournamentInfo.n_rounds || tournamentInfo.n_rounds === 0) && (
-              <p className="text-sm text-gray-500">
-                Suggested Number of Rounds: {suggestedRounds}
-              </p>
-            )}
+            {participantCount > 0 &&
+              (!tournamentInfo.n_rounds || tournamentInfo.n_rounds === 0) && (
+                <p className="text-sm text-gray-500">
+                  Suggested Number of Rounds: {suggestedRounds}
+                </p>
+              )}
           </div>
         </div>
       </Card>

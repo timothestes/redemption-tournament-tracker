@@ -22,7 +22,7 @@ const SideNav: React.FC = () => {
     <>
       <button
         onClick={toggleSidebar}
-        className="max-md:absolute top-4 left-3 z-20 p-2 bg-primary text-primary-foreground md:hidden rounded"
+        className="max-md:absolute top-[14px] left-3 z-20 p-2 bg-primary text-primary-foreground md:hidden rounded"
       >
         <HiMenu size={20} />
       </button>

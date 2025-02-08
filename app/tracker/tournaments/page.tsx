@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Breadcrumb from "../../../components/ui/breadcrumb";
 import { createClient } from "../../../utils/supabase/client";
 import ToastNotification from "../../../components/ui/toast-notification";
-import { Table, Button, Modal, TextInput } from "flowbite-react";
+import { Table, Button } from "flowbite-react";
 import { HiPencil, HiTrash, HiPlus } from "react-icons/hi";
 import { useRouter } from "next/navigation";
 import TournamentFormModal from "../../../components/ui/tournament-form-modal";
@@ -92,7 +92,7 @@ export default function TournamentsPage() {
 
   return (
     <div className="flex h-screen px-5 w-full">
-      <div className="max-w-5xl mx-auto w-full">
+      <div className="max-w-4xl mx-auto space-y-3 w-full">
         <Breadcrumb
           items={[{ label: "Tournaments", href: "/tracker/tournaments" }]}
         />
@@ -129,7 +129,7 @@ export default function TournamentsPage() {
                   <span className="sr-only">Actions</span>
                 </Table.HeadCell>
               </Table.Head>
-              <Table.Body className="divide-y w-full overflow-auto">
+              <Table.Body className="divide-y w-full overflow-x-auto rounded-lg">
                 {tournaments.map((tournament) => (
                   <Table.Row
                     key={tournament.id}
@@ -151,13 +151,13 @@ export default function TournamentsPage() {
                         second: "2-digit",
                       }).format(new Date(tournament.created_at))}
                     </Table.Cell>
-                    <Table.Cell className="flex items-center space-x-4">
+                    <Table.Cell className="flex items-center justify-end space-x-4">
                       <HiPencil
                         onClick={(e) => {
                           e.stopPropagation();
                           router.push(`/tracker/tournaments/${tournament.id}`);
                         }}
-                        className="text-blue-500 cursor-pointer hover:text-blue-700 w-6 h-6"
+                        className="text-blue-500 cursor-pointer hover:text-blue-600 w-6 h-6"
                         aria-label="Edit"
                       />
                       <HiTrash
