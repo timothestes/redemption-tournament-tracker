@@ -51,7 +51,7 @@ export async function AuthLogo() {
     </div>
   ) : (
     <div className="flex items-center">
-      <img src="lor.webp" className="w-28" />
+      <img src="lor.png" className="w-48" />
     </div>
   );
 }
