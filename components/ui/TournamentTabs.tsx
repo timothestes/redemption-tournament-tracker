@@ -23,7 +23,10 @@ interface TournamentTabsProps {
   tournamentId: string;
   tournamentStarted?: boolean;
   onTournamentEnd?: () => void;
-  onRoundActiveChange?: (isActive: boolean, roundStartTime: string | null) => void;
+  onRoundActiveChange?: (
+    isActive: boolean,
+    roundStartTime: string | null
+  ) => void;
 }
 
 export default function TournamentTabs({
@@ -46,21 +49,23 @@ export default function TournamentTabs({
       onActiveTabChange={(tab) => setActiveTab(tab)}
     >
       <Tabs.Item active title="Participants" icon={HiUserGroup}>
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between flex-wrap gap-3 items-center mb-6">
           <h2 className="text-2xl font-bold" style={{ width: "200px" }}>
             Participants
           </h2>
           <div className="relative group">
             <Button
               onClick={() => !tournamentStarted && setIsModalOpen(true)}
-              className={`flex items-center gap-2 ${tournamentStarted ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`flex items-center gap-2 ${tournamentStarted ? "opacity-50 cursor-not-allowed" : ""}`}
               style={{ width: "200px" }}
               outline
               gradientDuoTone="greenToBlue"
               disabled={tournamentStarted}
             >
-              <HiPlus className="w-5 h-5" />
-              Add Participant
+              <div className="flex gap-2">
+                <HiPlus className="w-5 h-5" />
+                Add Participant
+              </div>
             </Button>
             {tournamentStarted && (
               <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
@@ -78,16 +83,18 @@ export default function TournamentTabs({
         {loading ? (
           <p>Loading participants...</p>
         ) : participants.length === 0 ? (
-          <div className="min-w-[800px] max-w-[1200px] w-full mx-auto overflow-x-auto">
+          <div className="w-[800px] max-xl:w-full mx-auto overflow-x-auto">
             <Card>
               <div className="flex flex-col items-center justify-center py-8">
                 <p className="text-gray-500 mb-4">No participants found</p>
-                <p className="text-sm text-gray-400">Add participants to get started</p>
+                <p className="text-sm text-gray-400">
+                  Add participants to get started
+                </p>
               </div>
             </Card>
           </div>
         ) : (
-          <div className="min-w-[800px] max-w-[1200px] w-full mx-auto overflow-x-auto">
+          <div className="w-[800px] max-xl:w-full mx-auto overflow-x-auto">
             <ParticipantTable
               participants={participants}
               onEdit={onEdit}
@@ -111,7 +118,7 @@ export default function TournamentTabs({
         icon={MdPeople}
         disabled={!tournamentStarted}
       >
-        <div className="min-w-[800px] max-w-[1200px] w-full mx-auto overflow-x-auto">
+        <div className="min-w-[800px] max-xl:min-w-full w-full mx-auto overflow-x-auto">
           <TournamentRounds
             tournamentId={tournamentId}
             isActive={activeTab === 1}
@@ -121,7 +128,7 @@ export default function TournamentTabs({
         </div>
       </Tabs.Item>
       <Tabs.Item title="Settings" icon={FaGear}>
-        <div className="p-4 min-w-[800px] max-w-[1200px] w-full mx-auto">
+        <div className="w-full">
           <TournamentSettings
             tournamentId={tournamentId}
             participantCount={participants.length}
