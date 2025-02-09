@@ -1,11 +1,11 @@
-
 export default function BugPage() {
   return (
-    <div className="flex h-screen bg-50 pl-64">
+    <div className="flex h-screen bg-50 justify-center mx-auto px-6">
       <div className="flex flex-col items-start justify-start flex-grow text-left p-0 space-y-4">
         <h1 className="text-3xl font-extrabold text-800">Report a Bug</h1>
         <p className="max-w-lg text-lg text-700 leading-relaxed">
-          Found a bug? Let us know so we can fix it! You can send a screenshot to BaboonyTim on the {" "}
+          Found a bug? Let us know so we can fix it! You can send a screenshot
+          to BaboonyTim on the{" "}
           <a
             href="https://discord.com/invite/jREJdTysPp"
             className="text-blue-600 underline font-medium hover:text-blue-800"
@@ -22,9 +22,10 @@ export default function BugPage() {
             rel="noopener noreferrer"
           >
             here
-          </a>.
+          </a>
+          .
         </p>
-        <div className="flex flex-row items-start space-x-4 mt-4">
+        <div className="flex flex-row flex-wrap gap-6 items-start mt-4">
           <a
             href="https://discord.com/invite/jREJdTysPp"
             className="px-6 py-3 bg-blue-600 text-white rounded-lg shadow-lg hover:bg-blue-700"
