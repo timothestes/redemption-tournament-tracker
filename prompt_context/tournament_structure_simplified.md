@@ -10,7 +10,7 @@ In a game of Redemption, the winner is the one who gets to 5 *game points* first
 
 For example, if I score 5 *game points* and you score 3 *game points*, I've earned a win and will be awared 3 **match points**. Since you lost, you'd receive 0 **match points**.
 
-If I score 4 *game points* and you score 3 *game points*, I've earned a timed win and will be awarded 2 **match points**. (It's a timed win b/c I didn't reach to the full 5 I). Its still a loss for you and you'd receieve 0 **match points**.
+If I score 4 *game points* and you score 3 *game points*, I've earned a timed win and will be awarded 2 **match points**. (It's a timed win b/c I didn't reach to the full 5 *game points*). Its still a loss for you and you'd receieve 0 **match points**.
 
 If we both score 4 *game points*, we will both get 1.5 **match points**, because the game points are tied.
 
