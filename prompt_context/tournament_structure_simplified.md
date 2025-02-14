@@ -3,7 +3,19 @@
 We want to implement a Swiss Style Tournament. In a Swiss style tournament, all players play out a set number of rounds. Players can drop at any time. 
 
 ## Match Points
-Players earn 3 match points for a win, 2 match points for a timed win, 1.5 points for a draw and 0 match points for a loss.
+Players earn 3 **match points** for a win, 2 **match points** for a timed win, 1.5 points for a draw and 0 **match points** for a loss.
+
+## Game Points
+In a game of Redemption, the winner is the one who gets to 5 *game points* first. These are different than **match points**. Its possible to end the round before a player has gotten all 5 points. If this is the case, its called a "timed win" for the player who is ahead in *game points*
+
+For example, if I score 5 *game points* and you score 3 *game points*, I've earned a win and will be awared 3 **match points**. Since you lost, you'd receive 0 **match points**.
+
+If I score 4 *game points* and you score 3 *game points*, I've earned a timed win and will be awarded 2 **match points**. (It's a timed win b/c I didn't reach to the full 5 I). Its still a loss for you and you'd receieve 0 **match points**.
+
+If we both score 4 *game points*, we will both get 1.5 **match points**, because the game points are tied.
+
+If I score 2 *game points* and you score 5 *game points*, I get 0 **match points** and you get 3 **match points.**
+
 
 ## Ranking
 Your standing in the tournament is determined first by your number of match points, and then by "score differential", an internal metric calculated by keeping track of the score difference in your games, which will be explained in more detail later.
