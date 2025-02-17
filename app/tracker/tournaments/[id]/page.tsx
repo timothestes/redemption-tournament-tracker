@@ -169,9 +169,6 @@ export default function TournamentPage({
 
   const [showStartModal, setShowStartModal] = useState(false);
   const [isRoundActive, setIsRoundActive] = useState(false);
-  const [roundInfo, setRoundInfo] = useState<{ started_at: string | null }>({
-    started_at: null,
-  });
 
   const handleTournamentStatusToggle = async () => {
     if (!tournament) {
@@ -235,20 +232,27 @@ export default function TournamentPage({
     }
   };
 
-  useEffect(()=>{
-    if(tournament){
-      (async ()=>{
+  useEffect(() => {
+    if (tournament) {
+      (async () => {
         const client = createClient();
-  
-        const {data, error} = await client.from("rounds").select("round_number, started_at, ended_at, is_completed").eq("tournament_id", tournament.id).eq("round_number", tournament.current_round).single();
 
-        setLatestRound(data);
-        if(!data.is_completed && data.started_at && !data.ended_at){
-          setIsRoundActive(true);
+        const { data, error } = await client
+          .from("rounds")
+          .select("round_number, started_at, ended_at, is_completed")
+          .eq("tournament_id", tournament.id)
+          .eq("round_number", tournament.current_round)
+          .single();
+
+        if (data) {
+          setLatestRound(data);
+          if (!data.is_completed && data.started_at && !data.ended_at) {
+            setIsRoundActive(true);
+          }
         }
-      })()
-    } 
-  }, [tournament])
+      })();
+    }
+  }, [tournament]);
 
   useEffect(() => {
     if (id) {
@@ -408,7 +412,6 @@ export default function TournamentPage({
             onTournamentEnd={fetchTournamentDetails}
             onRoundActiveChange={(isActive, roundStartTime) => {
               setIsRoundActive(isActive);
-              setRoundInfo((prev) => ({ ...prev, started_at: roundStartTime }));
               fetchTournamentDetails();
             }}
           />

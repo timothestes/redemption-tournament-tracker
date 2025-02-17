@@ -1,13 +1,7 @@
-import { EnvVarWarning } from "../components/env-var-warning";
-import HeaderAuth from "../components/header-auth";
-import { hasEnvVars } from "../utils/supabase/check-env-vars";
 import { GeistSans } from "geist/font/sans";
 import { ThemeProvider } from "next-themes";
-import HomeIcon from "../components/home-icon";
 import Background from "../components/ui/background";
 import "./globals.css";
-import Header from "../components/header";
-import SideNav from "../components/side-nav";
 
 const defaultUrl = process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`

@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Card, Pagination } from "flowbite-react";
+import { Button, Card, Pagination, Table } from "flowbite-react";
 import { createClient } from "../../utils/supabase/client";
 import { useState, useEffect, useCallback } from "react";
 
@@ -20,7 +20,10 @@ interface TournamentRoundsProps {
   tournamentId: string;
   isActive: boolean;
   onTournamentEnd?: () => void;
-  onRoundActiveChange?: (isActive: boolean, roundStartTime: string | null) => void;
+  onRoundActiveChange?: (
+    isActive: boolean,
+    roundStartTime: string | null
+  ) => void;
   roundInfo?: RoundInfo;
 }
 
@@ -37,7 +40,7 @@ interface RoundInfo {
 
 interface ErrorState {
   message: string | null;
-  type: 'fetch' | 'update' | null;
+  type: "fetch" | "update" | null;
 }
 
 export default function TournamentRounds({
@@ -51,6 +54,7 @@ export default function TournamentRounds({
     current_round: null,
     has_ended: false,
   });
+  const client = createClient();
   const [error, setError] = useState<ErrorState>({ message: null, type: null });
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -59,6 +63,8 @@ export default function TournamentRounds({
     started_at: null,
     ended_at: null,
   });
+  const [matches, setMatches] = useState<any[]>([]);
+  const [matchLoading, setMatchLoading] = useState(false);
 
   // Make roundInfo available to parent component
   useEffect(() => {
@@ -126,38 +132,104 @@ export default function TournamentRounds({
   };
 
   const handleStartRound = async () => {
-    const client = createClient();
-
     try {
       const now = new Date().toISOString();
       // Insert the new round
-      const { error: roundError } = await client
-        .from("rounds")
-        .insert([
-          {
-            tournament_id: tournamentId,
-            round_number: currentPage,
-            started_at: now,
-          },
-        ]);
+      const { error: roundError } = await client.from("rounds").insert([
+        {
+          tournament_id: tournamentId,
+          round_number: currentPage,
+          started_at: now,
+        },
+      ]);
 
       if (roundError) throw roundError;
-
 
       setIsRoundActive(true);
       setRoundInfo((prev) => ({ ...prev, started_at: now }));
       onRoundActiveChange?.(true, now);
+
+      setMatchLoading(true);
+
+      // Pairing Logic
+      // TODO: Implement pairing logic here (e.g., using an algorithm like Swiss-System)
+
+      // If the current round is 1
+      const { data } = await client
+        .from("participants")
+        .select("id, match_points, differential, name")
+        .eq("tournament_id", tournamentId);
+
+      let userArray = data;
+      let pairingMatches = [];
+
+      // Creating matches by picking random players
+      while (userArray.length > 1) {
+        let randomIndex1 = Math.floor(Math.random() * userArray.length);
+        let randomIndex2 = Math.floor(Math.random() * userArray.length);
+
+        while (randomIndex1 === randomIndex2) {
+          randomIndex2 = Math.floor(Math.random() * userArray.length);
+        }
+
+        let randomParticipant1 = userArray[randomIndex1];
+        let randomParticipant2 = userArray[randomIndex2];
+
+        matches.push({
+          tournament_id: tournamentId,
+          round: currentPage,
+          player1_id: randomParticipant1.id,
+          player2_id: randomParticipant2.id,
+          match_points: 0,
+          player1_score: 0,
+          player2_score: 0,
+          player1_match_points: 0,
+          player2_match_points: 0,
+        });
+
+        userArray.splice(randomIndex1, 1);
+        if (randomIndex2 > randomIndex1) randomIndex2--;
+        userArray.splice(randomIndex2, 1);
+      }
+
+      // Insert the matches into the database
+      const { error: matchesError, data: matchesData } = await client
+        .from("matches")
+        .insert(pairingMatches);
+
+      if (!matchesError) {
+        setMatches(pairingMatches);
+      }
+      setMatchLoading(false);
     } catch (error) {
       console.error("Error starting round:", error);
     }
   };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const { data, error } = await client
+        .from("matches")
+        .select(
+          "player1_match_points, player2_match_points, differential, player1_id:participants!matches_player1_id_fkey(name), player2_id:participants!matches_player2_id_fkey(name), player1_score, player2_score"
+        )
+        .eq("tournament_id", tournamentId)
+        .eq("round", currentPage);
+
+      console.log(data, error);
+
+      setMatches(data || []);
+    };
+
+    fetchData();
+  }, [currentPage]);
 
   const handleEndRound = async () => {
     const client = createClient();
 
     try {
       const now = new Date().toISOString();
-      
+
       // Update the database first
       const { error: roundError, data: roundData } = await client
         .from("rounds")
@@ -205,7 +277,7 @@ export default function TournamentRounds({
       }));
       setIsRoundActive(false);
       onRoundActiveChange?.(false, null);
-      
+
       // If not on the last round, go to the next page
       if (currentPage < tournamentInfo.n_rounds) {
         setCurrentPage(currentPage + 1);
@@ -252,12 +324,57 @@ export default function TournamentRounds({
                         gradientDuoTone={
                           isRoundActive ? "pinkToOrange" : "greenToBlue"
                         }
-                        onClick={isRoundActive ? handleEndRound : handleStartRound}
+                        onClick={
+                          isRoundActive ? handleEndRound : handleStartRound
+                        }
                       >
                         {isRoundActive ? "End Round" : "Start Round"}
                       </Button>
                     )}
                 </div>
+                <Table hoverable striped border={1}>
+                  <Table.Head>
+                    <Table.HeadCell>Index</Table.HeadCell>
+                    <Table.HeadCell>Match Points</Table.HeadCell>
+                    <Table.HeadCell>Differential</Table.HeadCell>
+                    <Table.HeadCell>Name</Table.HeadCell>
+                    <Table.HeadCell>Opponent</Table.HeadCell>
+                    <Table.HeadCell>
+                      <span className="sr-only">Actions</span>
+                    </Table.HeadCell>
+                  </Table.Head>
+                  <Table.Body>
+                    {matches.length > 0 &&
+                      matches.map((match, index) => (
+                        <>
+                          <Table.Row key={match.id}>
+                            <Table.Cell>{index + 1}</Table.Cell>
+                            <Table.Cell>
+                              {match.player1_match_points}
+                            </Table.Cell>
+                            <Table.Cell>{match.differential}</Table.Cell>
+                            <Table.Cell>{match.player1_id.name}</Table.Cell>
+                            <Table.Cell>{match.player2_id.name}</Table.Cell>
+                            <Table.Cell>
+                              <Button size="small">Edit</Button>
+                            </Table.Cell>
+                          </Table.Row>
+                          <Table.Row key={match.id}>
+                            <Table.Cell>{index + 1}</Table.Cell>
+                            <Table.Cell>
+                              {match.player2_match_points}
+                            </Table.Cell>
+                            <Table.Cell>{match.differential}</Table.Cell>
+                            <Table.Cell>{match.player2_id.name}</Table.Cell>
+                            <Table.Cell>{match.player1_id.name}</Table.Cell>
+                            <Table.Cell>
+                              <Button size="small">Edit</Button>
+                            </Table.Cell>
+                          </Table.Row>
+                        </>
+                      ))}
+                  </Table.Body>
+                </Table>
                 <div className="flex overflow-x-auto sm:justify-center">
                   <Pagination
                     currentPage={currentPage}
