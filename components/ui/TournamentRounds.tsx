@@ -159,7 +159,7 @@ export default function TournamentRounds({
       const now = new Date().toISOString();
       
       // Update the database first
-      const { error: roundError } = await client
+      const { error: roundError, data: roundData } = await client
         .from("rounds")
         .update({
           ended_at: now,

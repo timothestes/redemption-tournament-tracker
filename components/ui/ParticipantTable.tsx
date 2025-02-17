@@ -31,7 +31,7 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
           <span className="sr-only">Actions</span>
         </Table.HeadCell>
       </Table.Head>
-      <Table.Body className="divide-y">
+      <Table.Body>
         {participants.map((participant) => (
           <Table.Row
             key={participant.id}
@@ -40,8 +40,8 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
             <Table.Cell className="whitespace-nowrap font-medium text-gray-900 dark:text-white">
               {participant.name}
             </Table.Cell>
-            <Table.Cell>{participant.match_points}</Table.Cell>
-            <Table.Cell>{participant.differential}</Table.Cell>
+            <Table.Cell>{participant.match_points || "N/A"}</Table.Cell>
+            <Table.Cell>{participant.differential || "N/A"}</Table.Cell>
             <Table.Cell className="flex items-center space-x-4">
               <HiPencil
                 onClick={() => onEdit(participant)}

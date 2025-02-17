@@ -27,16 +27,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={GeistSans.className} suppressHydrationWarning>
       <body className="bg-background text-foreground">
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <Background>
-            <main className="min-h-screen flex">{children}</main>
-          </Background>
-        </ThemeProvider>
+        <Background>
+          <main className="min-h-screen flex">{children}</main>
+        </Background>
       </body>
     </html>
   );

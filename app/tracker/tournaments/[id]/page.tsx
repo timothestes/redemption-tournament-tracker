@@ -44,6 +44,7 @@ export default function TournamentPage({
     show: false,
     type: "success",
   });
+  const [latestRound, setLatestRound] = useState<any>(null);
 
   const showToast = (
     message: string,
@@ -234,6 +235,21 @@ export default function TournamentPage({
     }
   };
 
+  useEffect(()=>{
+    if(tournament){
+      (async ()=>{
+        const client = createClient();
+  
+        const {data, error} = await client.from("rounds").select("round_number, started_at, ended_at, is_completed").eq("tournament_id", tournament.id).eq("round_number", tournament.current_round).single();
+
+        setLatestRound(data);
+        if(!data.is_completed && data.started_at && !data.ended_at){
+          setIsRoundActive(true);
+        }
+      })()
+    } 
+  }, [tournament])
+
   useEffect(() => {
     if (id) {
       fetchTournamentDetails();
@@ -242,7 +258,7 @@ export default function TournamentPage({
   }, [id]);
 
   return (
-    <div className="flex h-screen px-5 w-full">
+    <div className="flex min-h-screen px-5 w-full">
       <div className="max-w-4xl max-md:max-w-full mx-auto space-y-5">
         <Breadcrumb
           items={[
@@ -364,8 +380,8 @@ export default function TournamentPage({
                   !tournament?.has_ended &&
                   tournament?.round_length && (
                     <CountdownTimer
-                      key={roundInfo?.started_at || "inactive"} // Force re-render on start time change
-                      startTime={isRoundActive ? roundInfo?.started_at : null}
+                      key={latestRound?.started_at || "inactive"} // Force re-render on start time change
+                      startTime={isRoundActive ? latestRound?.started_at : null}
                       durationMinutes={tournament.round_length}
                     />
                   )}
