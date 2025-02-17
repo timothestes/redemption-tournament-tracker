@@ -152,15 +152,21 @@ export default function TournamentRounds({
       setMatchLoading(true);
 
       // Pairing Logic
-      // TODO: Implement pairing logic here (e.g., using an algorithm like Swiss-System)
 
       // If the current round is 1
-      const { data } = await client
+      const { data, error: participantSelectError } = await client
         .from("participants")
         .select("id, match_points, differential, name")
         .eq("tournament_id", tournamentId);
 
+      if (participantSelectError) {
+        console.log(participantSelectError);
+      }
+
       let userArray = data;
+
+      console.log(userArray);
+
       let pairingMatches = [];
 
       // Creating matches by picking random players
@@ -175,12 +181,11 @@ export default function TournamentRounds({
         let randomParticipant1 = userArray[randomIndex1];
         let randomParticipant2 = userArray[randomIndex2];
 
-        matches.push({
+        pairingMatches.push({
           tournament_id: tournamentId,
           round: currentPage,
           player1_id: randomParticipant1.id,
           player2_id: randomParticipant2.id,
-          match_points: 0,
           player1_score: 0,
           player2_score: 0,
           player1_match_points: 0,
@@ -193,35 +198,38 @@ export default function TournamentRounds({
       }
 
       // Insert the matches into the database
-      const { error: matchesError, data: matchesData } = await client
+      const { error: matchesError } = await client
         .from("matches")
         .insert(pairingMatches);
 
       if (!matchesError) {
         setMatches(pairingMatches);
       }
+      fetchCurrentRoundData();
       setMatchLoading(false);
+
+      console.log(matchesError, pairingMatches);
     } catch (error) {
       console.error("Error starting round:", error);
     }
   };
 
+  const fetchCurrentRoundData = async () => {
+    const { data, error } = await client
+      .from("matches")
+      .select(
+        "player1_match_points, player2_match_points, differential, player1_id:participants!matches_player1_id_fkey(name), player2_id:participants!matches_player2_id_fkey(name), player1_score, player2_score"
+      )
+      .eq("tournament_id", tournamentId)
+      .eq("round", currentPage);
+
+    console.log(data, error);
+
+    setMatches(data || []);
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      const { data, error } = await client
-        .from("matches")
-        .select(
-          "player1_match_points, player2_match_points, differential, player1_id:participants!matches_player1_id_fkey(name), player2_id:participants!matches_player2_id_fkey(name), player1_score, player2_score"
-        )
-        .eq("tournament_id", tournamentId)
-        .eq("round", currentPage);
-
-      console.log(data, error);
-
-      setMatches(data || []);
-    };
-
-    fetchData();
+    fetchCurrentRoundData();
   }, [currentPage]);
 
   const handleEndRound = async () => {
