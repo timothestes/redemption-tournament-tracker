@@ -1,8 +1,18 @@
 "use client";
 
-import { Button, Card, Pagination, Table } from "flowbite-react";
+import { Button, Card, Pagination } from "flowbite-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+} from "@mui/material";
 import { createClient } from "../../utils/supabase/client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
+import { Pencil } from "lucide-react";
 
 const formatDateTime = (timestamp: string | null) => {
   if (!timestamp) return "";
@@ -296,7 +306,7 @@ export default function TournamentRounds({
   };
 
   return (
-    <div className="min-w-[800px] max-w-[1200px] w-full mx-auto overflow-x-auto">
+    <div className="w-[800px] max-xl:w-full mx-auto overflow-x-auto">
       <Card>
         {error.message && (
           <div className="p-4 mb-4 text-sm text-red-800 rounded-lg bg-red-50">
@@ -308,7 +318,7 @@ export default function TournamentRounds({
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-4  max-w-full">
             {tournamentInfo.n_rounds && (
               <>
                 <div className="flex justify-between items-center">
@@ -340,49 +350,86 @@ export default function TournamentRounds({
                       </Button>
                     )}
                 </div>
-                <Table hoverable striped border={1}>
-                  <Table.Head>
-                    <Table.HeadCell>Index</Table.HeadCell>
-                    <Table.HeadCell>Match Points</Table.HeadCell>
-                    <Table.HeadCell>Differential</Table.HeadCell>
-                    <Table.HeadCell>Name</Table.HeadCell>
-                    <Table.HeadCell>Opponent</Table.HeadCell>
-                    <Table.HeadCell>
-                      <span className="sr-only">Actions</span>
-                    </Table.HeadCell>
-                  </Table.Head>
-                  <Table.Body>
-                    {matches.length > 0 &&
-                      matches.map((match, index) => (
-                        <>
-                          <Table.Row key={match.id}>
-                            <Table.Cell>{index + 1}</Table.Cell>
-                            <Table.Cell>
-                              {match.player1_match_points}
-                            </Table.Cell>
-                            <Table.Cell>{match.differential}</Table.Cell>
-                            <Table.Cell>{match.player1_id.name}</Table.Cell>
-                            <Table.Cell>{match.player2_id.name}</Table.Cell>
-                            <Table.Cell>
-                              <Button size="small">Edit</Button>
-                            </Table.Cell>
-                          </Table.Row>
-                          <Table.Row key={match.id}>
-                            <Table.Cell>{index + 1}</Table.Cell>
-                            <Table.Cell>
-                              {match.player2_match_points}
-                            </Table.Cell>
-                            <Table.Cell>{match.differential}</Table.Cell>
-                            <Table.Cell>{match.player2_id.name}</Table.Cell>
-                            <Table.Cell>{match.player1_id.name}</Table.Cell>
-                            <Table.Cell>
-                              <Button size="small">Edit</Button>
-                            </Table.Cell>
-                          </Table.Row>
-                        </>
-                      ))}
-                  </Table.Body>
-                </Table>
+                <div className="overflow-x-auto max-w-full bg-gray-800 text-white">
+                  <table className="min-w-full text-sm text-left text-gray-400 border-2 border-gray-300">
+                    <thead className="text-xs text-zinc-100 uppercase font-normal bg-gray-900 border-b-2 border-gray-300 rounded-t-lg">
+                      <tr>
+                        <th scope="col" className="px-6 py-4">
+                          Index
+                        </th>
+                        <th scope="col" className="px-4 py-2 text-center">
+                          Match Points
+                        </th>
+                        <th scope="col" className="px-4 py-2 text-center">
+                          Differential
+                        </th>
+                        <th scope="col" className="px-4 py-2 text-center">
+                          Name
+                        </th>
+                        <th scope="col" className="px-4 py-2 text-center">
+                          Opponent
+                        </th>
+                        <th scope="col" className="px-4 py-2 text-right">
+                          <span className="sr-only">Actions</span>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {matches.length > 0 &&
+                        matches.map((match, index) => (
+                          <Fragment key={match.id}>
+                            <tr className="border-b border-gray-400/70">
+                              <td className="px-4 py-2 text-center border-r border-zinc-400">
+                                {index + 1}
+                              </td>
+                              <td className="px-4 py-2 text-center border-r border-zinc-400">
+                                {match.player1_match_points}
+                              </td>
+                              <td className="px-4 py-2 text-center border-r border-zinc-400">
+                                {match.differential}
+                              </td>
+                              <td className="px-4 py-2 text-center border-r border-zinc-400">
+                                {match.player1_id.name}
+                              </td>
+                              <td className="px-4 py-2 text-center border-r border-zinc-400">
+                                {match.player2_id.name}
+                              </td>
+                              <td className="px-2">
+                                <Pencil
+                                  className="text-blue-300 hover:text-blue-500 transition cursor-pointer"
+                                  size={16}
+                                />
+                              </td>
+                            </tr>
+                            <tr className="border-b-2 border-gray-300">
+                              <td className="px-4 py-2 text-center border-r border-zinc-400">
+                                {index + 1}
+                              </td>
+                              <td className="px-4 py-2 text-center border-r border-zinc-400">
+                                {match.player2_match_points}
+                              </td>
+                              <td className="px-4 py-2 text-center border-r border-zinc-400">
+                                {match.differential}
+                              </td>
+                              <td className="px-4 py-2 text-center border-r border-zinc-400">
+                                {match.player2_id.name}
+                              </td>
+                              <td className="px-4 py-2 text-center border-r border-zinc-400">
+                                {match.player1_id.name}
+                              </td>
+                              <td className="px-2">
+                                <Pencil
+                                  className="text-blue-300 hover:text-blue-500 transition cursor-pointer"
+                                  size={16}
+                                />
+                              </td>
+                            </tr>
+                          </Fragment>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+
                 <div className="flex overflow-x-auto sm:justify-center">
                   <Pagination
                     currentPage={currentPage}

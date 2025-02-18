@@ -24,7 +24,9 @@ const ToastNotification: React.FC<ToastNotificationProps> = ({
   return (
     <div className="fixed bottom-4 right-4">
       <Toast>
-        <div className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${bgColor}`}>
+        <div
+          className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${bgColor}`}
+        >
           <HiCheck className="h-5 w-5" />
         </div>
         <div className="ml-3 text-sm font-normal">{message}</div>
