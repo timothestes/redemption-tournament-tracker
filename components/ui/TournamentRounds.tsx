@@ -13,6 +13,7 @@ import {
 import { createClient } from "../../utils/supabase/client";
 import { useState, useEffect, useCallback, Fragment } from "react";
 import { Pencil } from "lucide-react";
+import MatchEditModal from "./match-edit";
 
 const formatDateTime = (timestamp: string | null) => {
   if (!timestamp) return "";
@@ -175,8 +176,6 @@ export default function TournamentRounds({
 
       let userArray = data;
 
-      console.log(userArray);
-
       let pairingMatches = [];
 
       // Creating matches by picking random players
@@ -228,13 +227,13 @@ export default function TournamentRounds({
     const { data, error } = await client
       .from("matches")
       .select(
-        "player1_match_points, player2_match_points, differential, player1_id:participants!matches_player1_id_fkey(name), player2_id:participants!matches_player2_id_fkey(name), player1_score, player2_score"
+        "id, player1_match_points, player2_match_points, differential, player1_id:participants!matches_player1_id_fkey(name,id), player2_id:participants!matches_player2_id_fkey(name,id), player2_id, player1_score, player2_score"
       )
       .eq("tournament_id", tournamentId)
-      .eq("round", currentPage);
+      .eq("round", currentPage)
+      .order("id", { ascending: true });
 
-    console.log(data, error);
-
+    console.log(error);
     setMatches(data || []);
   };
 
@@ -388,16 +387,16 @@ export default function TournamentRounds({
                               <td className="px-4 py-2 text-center border-r border-zinc-400">
                                 {match.differential}
                               </td>
-                              <td className="px-4 py-2 text-center border-r border-zinc-400">
+                              <td className="px-4 py-2 text-center border-r border-zinc-400 text-zinc-200">
                                 {match.player1_id.name}
                               </td>
-                              <td className="px-4 py-2 text-center border-r border-zinc-400">
+                              <td className="px-4 py-2 text-center border-r border-zinc-400 text-zinc-200">
                                 {match.player2_id.name}
                               </td>
                               <td className="px-2">
-                                <Pencil
-                                  className="text-blue-300 hover:text-blue-500 transition cursor-pointer"
-                                  size={16}
+                                <MatchEditModal
+                                  match={match}
+                                  fetchCurrentRoundData={fetchCurrentRoundData}
                                 />
                               </td>
                             </tr>
@@ -409,18 +408,18 @@ export default function TournamentRounds({
                                 {match.player2_match_points}
                               </td>
                               <td className="px-4 py-2 text-center border-r border-zinc-400">
-                                {match.differential}
+                                {match.player2_score - match.player1_score}
                               </td>
-                              <td className="px-4 py-2 text-center border-r border-zinc-400">
+                              <td className="px-4 py-2 text-center border-r border-zinc-400 text-zinc-200">
                                 {match.player2_id.name}
                               </td>
-                              <td className="px-4 py-2 text-center border-r border-zinc-400">
+                              <td className="px-4 py-2 text-center border-r border-zinc-400 text-zinc-200">
                                 {match.player1_id.name}
                               </td>
                               <td className="px-2">
-                                <Pencil
-                                  className="text-blue-300 hover:text-blue-500 transition cursor-pointer"
-                                  size={16}
+                                <MatchEditModal
+                                  match={match}
+                                  fetchCurrentRoundData={fetchCurrentRoundData}
                                 />
                               </td>
                             </tr>
