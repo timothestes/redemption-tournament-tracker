@@ -9,6 +9,7 @@ interface CountdownTimerProps {
 }
 
 export default function CountdownTimer({ startTime, durationMinutes }: CountdownTimerProps) {
+  console.log(startTime + "" + durationMinutes);
   const [remainingSeconds, setRemainingSeconds] = useState<number>(durationMinutes * 60);
 
   const calculateRemainingTime = useCallback(() => {

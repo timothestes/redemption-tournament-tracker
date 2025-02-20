@@ -47,8 +47,6 @@ export default function MatchEditModal({
       alert("Some error occurred!");
     }
   };
-
-  console.log(match);
   return (
     <>
       <Pencil

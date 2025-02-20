@@ -1,18 +1,8 @@
 "use client";
 
 import { Button, Card, Pagination } from "flowbite-react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-} from "@mui/material";
 import { createClient } from "../../utils/supabase/client";
-import { useState, useEffect, useCallback, Fragment } from "react";
-import { Pencil } from "lucide-react";
+import { useState, useEffect, useCallback, Fragment, Dispatch, SetStateAction } from "react";
 import MatchEditModal from "./match-edit";
 
 const formatDateTime = (timestamp: string | null) => {
@@ -36,6 +26,7 @@ interface TournamentRoundsProps {
     roundStartTime: string | null
   ) => void;
   roundInfo?: RoundInfo;
+  setLatestRound: Dispatch<SetStateAction<any>>;
 }
 
 interface TournamentInfo {
@@ -59,6 +50,7 @@ export default function TournamentRounds({
   isActive,
   onTournamentEnd,
   onRoundActiveChange,
+  setLatestRound,
 }: TournamentRoundsProps) {
   const [tournamentInfo, setTournamentInfo] = useState<TournamentInfo>({
     n_rounds: null,
@@ -157,7 +149,7 @@ export default function TournamentRounds({
       if (roundError) throw roundError;
 
       setIsRoundActive(true);
-      setRoundInfo((prev) => ({ ...prev, started_at: now }));
+      setLatestRound((prev) => ({ round_number: currentPage, started_at: now }));
       onRoundActiveChange?.(true, now);
 
       setMatchLoading(true);
@@ -211,13 +203,9 @@ export default function TournamentRounds({
         .from("matches")
         .insert(pairingMatches);
 
-      if (!matchesError) {
-        setMatches(pairingMatches);
-      }
       fetchCurrentRoundData();
       setMatchLoading(false);
 
-      console.log(matchesError, pairingMatches);
     } catch (error) {
       console.error("Error starting round:", error);
     }
@@ -293,7 +281,7 @@ export default function TournamentRounds({
         ended_at: now,
       }));
       setIsRoundActive(false);
-      onRoundActiveChange?.(false, null);
+      setLatestRound((prev) => ({ round_number: currentPage, started_at: null }));
 
       // If not on the last round, go to the next page
       if (currentPage < tournamentInfo.n_rounds) {

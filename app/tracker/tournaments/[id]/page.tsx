@@ -45,6 +45,7 @@ export default function TournamentPage({
     type: "success",
   });
   const [latestRound, setLatestRound] = useState<any>(null);
+  console.log(latestRound)
 
   const showToast = (
     message: string,
@@ -385,7 +386,7 @@ export default function TournamentPage({
                   tournament?.round_length && (
                     <CountdownTimer
                       key={latestRound?.started_at || "inactive"} // Force re-render on start time change
-                      startTime={isRoundActive ? latestRound?.started_at : null}
+                      startTime={latestRound?.started_at || null}
                       durationMinutes={tournament.round_length}
                     />
                   )}
@@ -405,6 +406,7 @@ export default function TournamentPage({
               setNewDroppedOut(participant.dropped_out || false);
               setIsEditParticipantModalOpen(true);
             }}
+            setLatestRound={setLatestRound}
             onDelete={deleteParticipant}
             loading={loading}
             tournamentId={id || ""}
