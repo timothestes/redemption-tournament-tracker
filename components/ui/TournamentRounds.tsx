@@ -68,6 +68,7 @@ export default function TournamentRounds({
   });
   const [matches, setMatches] = useState<any[]>([]);
   const [matchLoading, setMatchLoading] = useState(false);
+  const [byes, setByes] = useState<any[]>([]);
 
   // Make roundInfo available to parent component
   useEffect(() => {
@@ -166,6 +167,11 @@ export default function TournamentRounds({
         console.log(participantSelectError);
       }
 
+      setRoundInfo({
+        started_at: now,
+        ended_at: null,
+      });
+
       let userArray = data;
 
       let pairingMatches = [];
@@ -203,9 +209,30 @@ export default function TournamentRounds({
         .from("matches")
         .insert(pairingMatches);
 
-      fetchCurrentRoundData();
-      setMatchLoading(false);
+      // Setting byes
+      if (userArray.length > 0) {
+        let error = false;
+        userArray.forEach(async (user) => {
+          const { error: byesError } = await client.from("byes").insert({
+            tournament_id: tournamentId,
+            round_number: currentPage,
+            participant_id: user.id,
+          });
 
+          if (byesError) {
+            console.log(byesError);
+            error = true;
+          }
+        });
+
+        if (!error) {
+          fetchCurrentRoundData();
+          setMatchLoading(false);
+        }
+      } else {
+        fetchCurrentRoundData();
+        setMatchLoading(false);
+      }
     } catch (error) {
       console.error("Error starting round:", error);
     }
@@ -221,14 +248,27 @@ export default function TournamentRounds({
       .eq("round", currentPage)
       .order("id", { ascending: true });
 
-    console.log(error);
+    if (error) console.log(error);
     setMatches(data || []);
+
+    const { data: byeData, error: byeError } = await client
+      .from("byes")
+      .select(
+        "id, participant_id:participants(name)"
+      )
+      .eq("tournament_id", tournamentId)
+      .eq("round_number", currentPage)
+      .order("id", { ascending: true });
+
+    if (byeError) console.log(byeError);
+    setByes(byeData);
   };
 
   useEffect(() => {
     fetchCurrentRoundData();
   }, [currentPage]);
 
+  console.log(byes);
   const handleEndRound = async () => {
     const client = createClient();
 
@@ -246,6 +286,11 @@ export default function TournamentRounds({
         .eq("round_number", currentPage);
 
       if (roundError) throw roundError;
+
+      setRoundInfo({
+        started_at: roundInfo.started_at,
+        ended_at: now,
+      });
 
       if (tournamentInfo.current_round === tournamentInfo.n_rounds) {
         const { error: tournamentError } = await client
@@ -305,20 +350,20 @@ export default function TournamentRounds({
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
           </div>
         ) : (
-          <div className="space-y-4  max-w-full">
+          <div className="mt-4 max-w-full">
             {tournamentInfo.n_rounds && (
               <>
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center mb-4">
                   <div>
-                    <h3 className="text-xl font-semibold">
+                    <h3 className="text-xl font-semibold mb-1">
                       Round {currentPage} of {tournamentInfo.n_rounds}
                     </h3>
                     <div className="space-y-1">
                       <p className="text-sm text-gray-500 mr-4">
-                        Started: {formatDateTime(roundInfo.started_at)}
+                        Started at: <span className="text-zinc-400">{formatDateTime(roundInfo.started_at)}</span>
                       </p>
                       <p className="text-sm text-gray-500 mr-4">
-                        Ended: {formatDateTime(roundInfo.ended_at)}
+                        Ended at: <span className="text-zinc-400">{formatDateTime(roundInfo.ended_at)}</span>
                       </p>
                     </div>
                   </div>
@@ -338,7 +383,7 @@ export default function TournamentRounds({
                     )}
                 </div>
                 <div className="overflow-x-auto max-w-full bg-gray-800 text-white">
-                  <table className="min-w-full text-sm text-left text-gray-400 border-2 border-gray-300">
+                  {matches && matches.length > 0 && <table className="min-w-full text-sm text-left text-gray-400 border-2 border-gray-300">
                     <thead className="text-xs text-zinc-100 uppercase font-normal bg-gray-900 border-b-2 border-gray-300 rounded-t-lg">
                       <tr>
                         <th scope="col" className="px-6 py-4">
@@ -414,8 +459,55 @@ export default function TournamentRounds({
                           </Fragment>
                         ))}
                     </tbody>
-                  </table>
+                  </table>}
                 </div>
+
+                {/* Byes Table */}
+                {byes && byes.length > 0 && <>
+                  <h3 className="text-white text-lg font-semibold mt-7 mb-3 text-center">Game Byes</h3>
+                  <div className="overflow-x-auto max-w-full bg-gray-800 text-white">
+                    <table className="min-w-full text-sm text-left text-gray-400 border-2 border-gray-300">
+                      <thead className="text-xs text-zinc-100 uppercase font-normal bg-gray-900 border-b-2 border-gray-300 rounded-t-lg">
+                        <tr>
+                          <th scope="col" className="px-4 py-2 text-center">
+                            Index
+                          </th>
+                          <th scope="col" className="px-4 py-2 text-center">
+                            Match Points
+                          </th>
+                          <th scope="col" className="px-4 py-2 text-center">
+                            Name
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {byes.length > 0 &&
+                          byes.map((bye, index) => (
+                            <Fragment key={bye.id}>
+                              <tr className="border-b border-gray-400/70">
+                                <td className="px-4 py-2 text-center border-r border-zinc-400">
+                                  {index + 1}
+                                </td>
+                                <td className="px-4 py-2 text-center border-r border-zinc-400">
+                                  0
+                                </td>
+                                <td className="px-4 py-2 text-center border-r border-zinc-400">
+                                  {bye.participant_id.name}
+                                </td>
+                                {/* <td className="px-2">
+                                <MatchEditModal
+                                  match={match}
+                                  fetchCurrentRoundData={fetchCurrentRoundData}
+                                />
+                              </td> */}
+                              </tr>
+
+                            </Fragment>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>}
 
                 <div className="flex overflow-x-auto sm:justify-center">
                   <Pagination
