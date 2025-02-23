@@ -28,6 +28,7 @@ interface TournamentTabsProps {
     isActive: boolean,
     roundStartTime: string | null
   ) => void;
+  createPairing: (round: number) => void;
 }
 
 export default function TournamentTabs({
@@ -42,6 +43,7 @@ export default function TournamentTabs({
   tournamentStarted = false,
   onTournamentEnd,
   setLatestRound,
+  createPairing,
 }: TournamentTabsProps) {
   const [activeTab, setActiveTab] = useState(0);
   return (
@@ -127,6 +129,7 @@ export default function TournamentTabs({
             key={activeTab} // Force re-render when tab becomes active
             onTournamentEnd={onTournamentEnd}
             setLatestRound={setLatestRound}
+            createPairing={createPairing}
           />
         </div>
       </Tabs.Item>

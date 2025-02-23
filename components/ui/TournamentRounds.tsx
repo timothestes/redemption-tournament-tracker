@@ -27,6 +27,7 @@ interface TournamentRoundsProps {
   ) => void;
   roundInfo?: RoundInfo;
   setLatestRound: Dispatch<SetStateAction<any>>;
+  createPairing: (round: number) => void
 }
 
 interface TournamentInfo {
@@ -51,6 +52,7 @@ export default function TournamentRounds({
   onTournamentEnd,
   onRoundActiveChange,
   setLatestRound,
+  createPairing,
 }: TournamentRoundsProps) {
   const [tournamentInfo, setTournamentInfo] = useState<TournamentInfo>({
     n_rounds: null,
@@ -69,6 +71,7 @@ export default function TournamentRounds({
   const [matches, setMatches] = useState<any[]>([]);
   const [matchLoading, setMatchLoading] = useState(false);
   const [byes, setByes] = useState<any[]>([]);
+  const [matchErrorIndex, setMatchErrorIndex] = useState<number[]>([])
 
   // Make roundInfo available to parent component
   useEffect(() => {
@@ -149,90 +152,16 @@ export default function TournamentRounds({
 
       if (roundError) throw roundError;
 
-      setIsRoundActive(true);
-      setLatestRound((prev) => ({ round_number: currentPage, started_at: now }));
-      onRoundActiveChange?.(true, now);
-
-      setMatchLoading(true);
-
-      // Pairing Logic
-
-      // If the current round is 1
-      const { data, error: participantSelectError } = await client
-        .from("participants")
-        .select("id, match_points, differential, name")
-        .eq("tournament_id", tournamentId);
-
-      if (participantSelectError) {
-        console.log(participantSelectError);
-      }
-
       setRoundInfo({
         started_at: now,
         ended_at: null,
       });
 
-      let userArray = data;
+      setIsRoundActive(true);
+      setLatestRound((prev) => ({ round_number: currentPage, started_at: now }));
+      onRoundActiveChange?.(true, now);
 
-      let pairingMatches = [];
-
-      // Creating matches by picking random players
-      while (userArray.length > 1) {
-        let randomIndex1 = Math.floor(Math.random() * userArray.length);
-        let randomIndex2 = Math.floor(Math.random() * userArray.length);
-
-        while (randomIndex1 === randomIndex2) {
-          randomIndex2 = Math.floor(Math.random() * userArray.length);
-        }
-
-        let randomParticipant1 = userArray[randomIndex1];
-        let randomParticipant2 = userArray[randomIndex2];
-
-        pairingMatches.push({
-          tournament_id: tournamentId,
-          round: currentPage,
-          player1_id: randomParticipant1.id,
-          player2_id: randomParticipant2.id,
-          player1_score: 0,
-          player2_score: 0,
-          player1_match_points: 0,
-          player2_match_points: 0,
-        });
-
-        userArray.splice(randomIndex1, 1);
-        if (randomIndex2 > randomIndex1) randomIndex2--;
-        userArray.splice(randomIndex2, 1);
-      }
-
-      // Insert the matches into the database
-      const { error: matchesError } = await client
-        .from("matches")
-        .insert(pairingMatches);
-
-      // Setting byes
-      if (userArray.length > 0) {
-        let error = false;
-        userArray.forEach(async (user) => {
-          const { error: byesError } = await client.from("byes").insert({
-            tournament_id: tournamentId,
-            round_number: currentPage,
-            participant_id: user.id,
-          });
-
-          if (byesError) {
-            console.log(byesError);
-            error = true;
-          }
-        });
-
-        if (!error) {
-          fetchCurrentRoundData();
-          setMatchLoading(false);
-        }
-      } else {
-        fetchCurrentRoundData();
-        setMatchLoading(false);
-      }
+      setMatchLoading(true);
     } catch (error) {
       console.error("Error starting round:", error);
     }
@@ -268,14 +197,79 @@ export default function TournamentRounds({
     fetchCurrentRoundData();
   }, [currentPage]);
 
-  console.log(byes);
   const handleEndRound = async () => {
     const client = createClient();
+
+
+    // Creating the pairing for the next round
+    await createPairing(currentPage + 1);
+
+    // Checking if the user has not added the score
+    matches.forEach((match, index) => {
+      if (match.player1_score === null || match.player2_score === null) {
+        setMatchErrorIndex((matchErrorIndex) => [...matchErrorIndex, index]);
+      }
+    });
+
+    if (matchErrorIndex.length > 0) {
+      alert("Please add scores to all matches.");
+      return;
+    }
 
     try {
       const now = new Date().toISOString();
 
-      // Update the database first
+      // Updating the matches
+      matches.forEach(async (match) => {
+        // Participant 1
+        const { error: participant1SelectError, data: participant1 } = await client.from("participants").select().eq("id", match.player1_id.id).single();
+        if (participant1SelectError) throw participant1SelectError;
+
+        // Participant 2
+        const { error: participant2SelectError, data: participant2 } = await client.from("participants").select().eq("id", match.player1_id.id).single();
+        if (participant2SelectError) throw participant2SelectError;
+
+        if (match.player2_score === match.player1_score) {
+          // If there's a Draw
+          const { error: participant1UpdateError } = await client.from("participants").update({
+            match_points: (participant1.match_points || 0) + 1.5,
+            differential: (match.player1_score - match.player2_score) + (participant1.differential || 0),
+          }).eq("id", match.player1_id.id);
+          const { error: participant2UpdateError } = await client.from("participants").update({
+            match_points: (participant2.match_points || 0) + 1.5,
+            differential: (match.player2_score - match.player1_score) + (participant2.differential || 0),
+          }).eq("id", match.player2_id.id);
+        } else if (match.player1_score === 5) {
+          // If first player won
+          const { error: participantUpdateError } = await client.from("participants").update({
+            match_points: (participant1.match_points || 0) + 3,
+            differential: (match.player1_score - match.player2_score) + (participant1.differential || 0),
+          }).eq("id", match.player1_id.id);
+
+        } else if (match.player2_score === 5) {
+          // If second player won
+          const { error: participantUpdateError } = await client.from("participants").update({
+            match_points: (participant2.match_points || 0) + 3,
+            differential: (match.player2_score - match.player1_score) + (participant2.differential || 0),
+          }).eq("id", match.player2_id.id);
+
+        } else if (match.player1_score > match.player2_score) {
+          // If first player won in time.
+          const { error: participantUpdateError } = await client.from("participants").update({
+            match_points: (participant1.match_points || 0) + 2,
+            differential: (match.player1_score - match.player2_score) + (participant1.differential || 0),
+          }).eq("id", match.player1_id.id);
+
+        } else if (match.player2_score > match.player1_score) {
+          // If second player won in time.
+          const { error: participantUpdateError } = await client.from("participants").update({
+            match_points: (participant2.match_points || 0) + 2,
+            differential: (match.player2_score - match.player1_score) + (participant2.differential || 0),
+          }).eq("id", match.player2_id.id);
+        }
+      })
+
+      // Update the database
       const { error: roundError, data: roundData } = await client
         .from("rounds")
         .update({
@@ -411,19 +405,19 @@ export default function TournamentRounds({
                         matches.map((match, index) => (
                           <Fragment key={match.id}>
                             <tr className="border-b border-gray-400/70">
-                              <td className="px-4 py-2 text-center border-r border-zinc-400">
+                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
                                 {index + 1}
                               </td>
-                              <td className="px-4 py-2 text-center border-r border-zinc-400">
+                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
                                 {match.player1_match_points}
                               </td>
-                              <td className="px-4 py-2 text-center border-r border-zinc-400">
+                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
                                 {match.differential}
                               </td>
-                              <td className="px-4 py-2 text-center border-r border-zinc-400 text-zinc-200">
+                              <td className={`px-4 py-2 text-center border-r  text-zinc-200 ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
                                 {match.player1_id.name}
                               </td>
-                              <td className="px-4 py-2 text-center border-r border-zinc-400 text-zinc-200">
+                              <td className={`px-4 py-2 text-center border-r  text-zinc-200 ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
                                 {match.player2_id.name}
                               </td>
                               <td className="px-2">
@@ -434,19 +428,19 @@ export default function TournamentRounds({
                               </td>
                             </tr>
                             <tr className="border-b-2 border-gray-300">
-                              <td className="px-4 py-2 text-center border-r border-zinc-400">
+                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
                                 {index + 1}
                               </td>
-                              <td className="px-4 py-2 text-center border-r border-zinc-400">
+                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
                                 {match.player2_match_points}
                               </td>
-                              <td className="px-4 py-2 text-center border-r border-zinc-400">
+                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
                                 {match.player2_score - match.player1_score}
                               </td>
-                              <td className="px-4 py-2 text-center border-r border-zinc-400 text-zinc-200">
+                              <td className={`px-4 py-2 text-center border-r  text-zinc-200 ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
                                 {match.player2_id.name}
                               </td>
-                              <td className="px-4 py-2 text-center border-r border-zinc-400 text-zinc-200">
+                              <td className={`px-4 py-2 text-center border-r  text-zinc-200 ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
                                 {match.player1_id.name}
                               </td>
                               <td className="px-2">
@@ -509,7 +503,7 @@ export default function TournamentRounds({
                   </div>
                 </>}
 
-                <div className="flex overflow-x-auto sm:justify-center">
+                <div className="flex overflow-x-auto sm:justify-center pb-3">
                   <Pagination
                     currentPage={currentPage}
                     totalPages={tournamentInfo.current_round || 1}

@@ -226,12 +226,86 @@ export default function TournamentPage({
       if (error) throw error;
       setTournament(data);
       setShowStartModal(false);
+      // Creating pairing for the first round if the user has started the tournament.
+      createPairing(1);
       showToast("Tournament started successfully!", "success");
     } catch (error) {
       showToast("Error starting tournament.", "error");
       console.error("Error starting tournament:", error);
     }
   };
+
+  const createPairing = async (round: number) => {
+    const client = await createClient();
+
+    const now = new Date().toISOString();
+    // Pairing Logic
+
+    // If the current round is 1
+    const { data, error: participantSelectError } = await client
+      .from("participants")
+      .select("id, match_points, differential, name")
+      .eq("tournament_id", tournament.id);
+
+    if (participantSelectError) {
+      console.log(participantSelectError);
+    }
+
+    let userArray = data;
+
+    let pairingMatches = [];
+
+    // if (currentPage === 1) {
+    // Creating matches by picking random players
+    while (userArray.length > 1) {
+      let randomIndex1 = Math.floor(Math.random() * userArray.length);
+      let randomIndex2 = Math.floor(Math.random() * userArray.length);
+
+      while (randomIndex1 === randomIndex2) {
+        randomIndex2 = Math.floor(Math.random() * userArray.length);
+      }
+
+      let randomParticipant1 = userArray[randomIndex1];
+      let randomParticipant2 = userArray[randomIndex2];
+
+      pairingMatches.push({
+        tournament_id: tournament.id,
+        round: round,
+        player1_id: randomParticipant1.id,
+        player2_id: randomParticipant2.id,
+        player1_score: 0,
+        player2_score: 0,
+        player1_match_points: 0,
+        player2_match_points: 0,
+      });
+
+      userArray.splice(randomIndex1, 1);
+      if (randomIndex2 > randomIndex1) randomIndex2--;
+      userArray.splice(randomIndex2, 1);
+    }
+
+    // Insert the matches into the database
+    const { error: matchesError } = await client
+      .from("matches")
+      .insert(pairingMatches);
+
+    // Setting byes
+    if (userArray.length > 0) {
+      let error = false;
+      userArray.forEach(async (user) => {
+        const { error: byesError } = await client.from("byes").insert({
+          tournament_id: tournament.id,
+          round_number: round,
+          participant_id: user.id,
+        });
+
+        if (byesError) {
+          console.log(byesError);
+          error = true;
+        }
+      });
+    }
+  }
 
   useEffect(() => {
     if (tournament) {
@@ -416,6 +490,7 @@ export default function TournamentPage({
               setIsRoundActive(isActive);
               fetchTournamentDetails();
             }}
+            createPairing={createPairing}
           />
         </div>
         <EditParticipantModal
