@@ -2,15 +2,19 @@
 
 import { Button, Label, TextInput } from "flowbite-react";
 import { Pencil } from "lucide-react";
-import { FormEvent, useRef, useState } from "react";
+import { Dispatch, FormEvent, SetStateAction, useRef, useState } from "react";
 import { createClient } from "../../utils/supabase/client";
 
 export default function MatchEditModal({
   match,
   fetchCurrentRoundData,
+  setMatchErrorIndex,
+  index
 }: {
   match: any;
   fetchCurrentRoundData: any;
+  setMatchErrorIndex: Dispatch<SetStateAction<number[]>>;
+  index: number;
 }) {
   const [open, setOpen] = useState(false);
   const [player1Score, setPlayer1Score] = useState(match.player1_score);
@@ -49,6 +53,12 @@ export default function MatchEditModal({
         updated_at: new Date(),
       })
       .eq("id", match.id);
+
+    setMatchErrorIndex((matchErrorIndex) => {
+      return matchErrorIndex.filter((singleMatchErrorIndex) => {
+        return singleMatchErrorIndex !== index;
+      });
+    })
 
     if (!error) {
       fetchCurrentRoundData();

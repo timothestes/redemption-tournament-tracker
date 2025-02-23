@@ -232,39 +232,39 @@ export default function TournamentRounds({
         if (match.player2_score === match.player1_score) {
           // If there's a Draw
           const { error: participant1UpdateError } = await client.from("participants").update({
-            match_points: (participant1.match_points || 0) + 1.5,
-            differential: (match.player1_score - match.player2_score) + (participant1.differential || 0),
+            match_points: (participant1.match_points ?? 0) + 1.5,
+            differential: (match.differential) + (participant1.differential ?? 0),
           }).eq("id", match.player1_id.id);
           const { error: participant2UpdateError } = await client.from("participants").update({
-            match_points: (participant2.match_points || 0) + 1.5,
-            differential: (match.player2_score - match.player1_score) + (participant2.differential || 0),
+            match_points: (participant2.match_points ?? 0) + 1.5,
+            differential: (match.differential2) + (participant2.differential ?? 0),
           }).eq("id", match.player2_id.id);
         } else if (match.player1_score === 5) {
           // If first player won
           const { error: participantUpdateError } = await client.from("participants").update({
-            match_points: (participant1.match_points || 0) + 3,
-            differential: (match.player1_score - match.player2_score) + (participant1.differential || 0),
+            match_points: (participant1.match_points ?? 0) + 3,
+            differential: (match.player1_score - match.player2_score) + (participant1.differential ?? 0),
           }).eq("id", match.player1_id.id);
 
         } else if (match.player2_score === 5) {
           // If second player won
           const { error: participantUpdateError } = await client.from("participants").update({
-            match_points: (participant2.match_points || 0) + 3,
-            differential: (match.player2_score - match.player1_score) + (participant2.differential || 0),
+            match_points: (participant2.match_points ?? 0) + 3,
+            differential: (match.player2_score - match.player1_score) + (participant2.differential ?? 0),
           }).eq("id", match.player2_id.id);
 
         } else if (match.player1_score > match.player2_score) {
           // If first player won in time.
           const { error: participantUpdateError } = await client.from("participants").update({
-            match_points: (participant1.match_points || 0) + 2,
-            differential: (match.player1_score - match.player2_score) + (participant1.differential || 0),
+            match_points: (participant1.match_points ?? 0) + 2,
+            differential: (match.player1_score - match.player2_score) + (participant1.differential ?? 0),
           }).eq("id", match.player1_id.id);
 
         } else if (match.player2_score > match.player1_score) {
           // If second player won in time.
           const { error: participantUpdateError } = await client.from("participants").update({
-            match_points: (participant2.match_points || 0) + 2,
-            differential: (match.player2_score - match.player1_score) + (participant2.differential || 0),
+            match_points: (participant2.match_points ?? 0) + 2,
+            differential: (match.player2_score - match.player1_score) + (participant2.differential ?? 0),
           }).eq("id", match.player2_id.id);
         }
       })
@@ -415,7 +415,7 @@ export default function TournamentRounds({
                                 {match.player1_match_points}
                               </td>
                               <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
-                                {match.differential || "N/A"}
+                                {match.differential ?? "N/A"}
                               </td>
                               <td className={`px-4 py-2 text-center border-r  text-zinc-200 ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
                                 {match.player1_id.name}
@@ -428,6 +428,8 @@ export default function TournamentRounds({
                                   key={match.player1_score + match.player2_score}
                                   match={match}
                                   fetchCurrentRoundData={fetchCurrentRoundData}
+                                  setMatchErrorIndex={setMatchErrorIndex}
+                                  index={index}
                                 />
                               </td>
                             </tr>
@@ -439,7 +441,7 @@ export default function TournamentRounds({
                                 {match.player2_match_points}
                               </td>
                               <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
-                                {match.differential2 || "N/A"}
+                                {match.differential2 ?? "N/A"}
                               </td>
                               <td className={`px-4 py-2 text-center border-r  text-zinc-200 ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
                                 {match.player2_id.name}
@@ -452,6 +454,8 @@ export default function TournamentRounds({
                                   key={match.player1_score + match.player2_score}
                                   match={match}
                                   fetchCurrentRoundData={fetchCurrentRoundData}
+                                  setMatchErrorIndex={setMatchErrorIndex}
+                                  index={index}
                                 />
                               </td>
                             </tr>
