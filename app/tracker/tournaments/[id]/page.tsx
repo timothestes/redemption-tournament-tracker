@@ -273,8 +273,8 @@ export default function TournamentPage({
         round: round,
         player1_id: randomParticipant1.id,
         player2_id: randomParticipant2.id,
-        player1_score: 0,
-        player2_score: 0,
+        player1_score: null,
+        player2_score: null,
         player1_match_points: 0,
         player2_match_points: 0,
       });

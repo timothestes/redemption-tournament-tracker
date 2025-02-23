@@ -31,11 +31,21 @@ export default function MatchEditModal({
 
     const client = createClient();
 
+    const player1 = await client.from("participants").select("differential").eq("id", match.player1_id.id).single();
+    const player2 = await client.from("participants").select("differential").eq("id", match.player1_id.id).single();
+
+    if (player1.error || player2.error) {
+      console.log(player1.error, player2.error);
+      return;
+    }
+
     const { data, error } = await client
       .from("matches")
       .update({
         player1_score: player1Score,
         player2_score: player2Score,
+        differential: (player1.data.differential ?? 0) + (player1Score - player2Score),
+        differential2: (player2.data.differential ?? 0) + (player2Score - player1Score),
         updated_at: new Date(),
       })
       .eq("id", match.id);
@@ -44,6 +54,7 @@ export default function MatchEditModal({
       fetchCurrentRoundData();
       setOpen(false);
     } else {
+      console.log(error);
       alert("Some error occurred!");
     }
   };
@@ -71,7 +82,7 @@ export default function MatchEditModal({
                   <TextInput
                     type="number"
                     placeholder="Enter points"
-                    value={player1Score}
+                    value={player1Score ?? ""}
                     onChange={(event) => {
                       setPlayer1Score(Number(event.target.value));
                     }}
@@ -86,7 +97,7 @@ export default function MatchEditModal({
                   <TextInput
                     type="number"
                     placeholder="Enter points"
-                    defaultValue={player2Score}
+                    defaultValue={player2Score ?? ""}
                     onChange={(event) => {
                       setPlayer2Score(Number(event.target.value));
                     }}

@@ -135,6 +135,7 @@ export default function TournamentRounds({
   const onPageChange = (page: number) => {
     if (page <= (tournamentInfo.current_round || 1)) {
       setCurrentPage(page);
+      setMatchErrorIndex([]);
     }
   };
 
@@ -171,7 +172,7 @@ export default function TournamentRounds({
     const { data, error } = await client
       .from("matches")
       .select(
-        "id, player1_match_points, player2_match_points, differential, player1_id:participants!matches_player1_id_fkey(name,id), player2_id:participants!matches_player2_id_fkey(name,id), player2_id, player1_score, player2_score"
+        "id, player1_match_points, player2_match_points, differential, differential2,  player1_id:participants!matches_player1_id_fkey(name,id), player2_id:participants!matches_player2_id_fkey(name,id), player2_id, player1_score, player2_score"
       )
       .eq("tournament_id", tournamentId)
       .eq("round", currentPage)
@@ -412,7 +413,7 @@ export default function TournamentRounds({
                                 {match.player1_match_points}
                               </td>
                               <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
-                                {match.differential}
+                                {match.differential || "N/A"}
                               </td>
                               <td className={`px-4 py-2 text-center border-r  text-zinc-200 ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
                                 {match.player1_id.name}
@@ -422,6 +423,7 @@ export default function TournamentRounds({
                               </td>
                               <td className="px-2">
                                 <MatchEditModal
+                                  key={match.player1_score + match.player2_score}
                                   match={match}
                                   fetchCurrentRoundData={fetchCurrentRoundData}
                                 />
@@ -435,7 +437,7 @@ export default function TournamentRounds({
                                 {match.player2_match_points}
                               </td>
                               <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
-                                {match.player2_score - match.player1_score}
+                                {match.differential2 || "N/A"}
                               </td>
                               <td className={`px-4 py-2 text-center border-r  text-zinc-200 ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
                                 {match.player2_id.name}
@@ -445,6 +447,7 @@ export default function TournamentRounds({
                               </td>
                               <td className="px-2">
                                 <MatchEditModal
+                                  key={match.player1_score + match.player2_score}
                                   match={match}
                                   fetchCurrentRoundData={fetchCurrentRoundData}
                                 />
