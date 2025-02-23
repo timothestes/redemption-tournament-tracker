@@ -201,18 +201,17 @@ export default function TournamentRounds({
   const handleEndRound = async () => {
     const client = createClient();
 
-
-    // Creating the pairing for the next round
-    await createPairing(currentPage + 1);
+    let matchErrorIndexArr = [];
 
     // Checking if the user has not added the score
     matches.forEach((match, index) => {
       if (match.player1_score === null || match.player2_score === null) {
         setMatchErrorIndex((matchErrorIndex) => [...matchErrorIndex, index]);
+        matchErrorIndexArr.push(matchErrorIndex);
       }
     });
 
-    if (matchErrorIndex.length > 0) {
+    if (matchErrorIndexArr.length > 0) {
       alert("Please add scores to all matches.");
       return;
     }
@@ -305,6 +304,9 @@ export default function TournamentRounds({
 
         onTournamentEnd?.();
       } else {
+        // Creating the pairing for the next round
+        await createPairing(currentPage + 1);
+
         const { error: tournamentError } = await client
           .from("tournaments")
           .update({
@@ -405,7 +407,7 @@ export default function TournamentRounds({
                       {matches.length > 0 &&
                         matches.map((match, index) => (
                           <Fragment key={match.id}>
-                            <tr className="border-b border-gray-400/70">
+                            <tr className={`border-b border-gray-400/70 ${matchErrorIndex.includes(index) && "bg-red-600/20"}`}>
                               <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
                                 {index + 1}
                               </td>
@@ -429,7 +431,7 @@ export default function TournamentRounds({
                                 />
                               </td>
                             </tr>
-                            <tr className="border-b-2 border-gray-300">
+                            <tr className={`border-b border-gray-300 ${matchErrorIndex.includes(index) && "bg-red-600/20"}`}>
                               <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
                                 {index + 1}
                               </td>
@@ -517,8 +519,9 @@ export default function TournamentRounds({
               </>
             )}
           </div>
-        )}
-      </Card>
-    </div>
+        )
+        }
+      </Card >
+    </div >
   );
 }
