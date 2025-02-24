@@ -198,7 +198,7 @@ export default function TournamentRounds({
     fetchCurrentRoundData();
   }, [currentPage]);
 
-  const handleEndRound = async () => {
+  const handleEndRound = useCallback(async () => {
     const client = createClient();
 
     let matchErrorIndexArr = [];
@@ -248,10 +248,16 @@ export default function TournamentRounds({
 
         } else if (match.player1_score === 5) {
           // If first player won
-          const { error: participantUpdateError } = await client.from("participants").update({
+          const { error: participant1UpdateError } = await client.from("participants").update({
             match_points: (participant1.match_points ?? 0) + 3,
             differential: (match.player1_score - match.player2_score) + (participant1.differential ?? 0),
           }).eq("id", match.player1_id.id);
+
+          // Then second will get 0 match points and differential
+          const { error: participant2UpdateError } = await client.from("participants").update({
+            match_points: (participant2.match_points ?? 0),
+            differential: (match.player2_score - match.player1_score) + (participant2.differential ?? 0),
+          }).eq("id", match.player2_id.id);
 
           // Adding match scores
           const { error: participantMatchPointsError } = await client.from("matches").update({
@@ -265,6 +271,12 @@ export default function TournamentRounds({
             differential: (match.player2_score - match.player1_score) + (participant2.differential ?? 0),
           }).eq("id", match.player2_id.id);
 
+          // Then first will get 0 match points and differential
+          const { error: participant1UpdateError } = await client.from("participants").update({
+            match_points: (participant1.match_points ?? 0),
+            differential: (match.player1_score - match.player2_score) + (participant1.differential ?? 0),
+          }).eq("id", match.player1_id.id);
+
           // Adding match scores
           const { error: participantMatchPointsError } = await client.from("matches").update({
             player2_match_points: 3,
@@ -272,22 +284,34 @@ export default function TournamentRounds({
 
         } else if (match.player1_score > match.player2_score) {
           // If first player won in time.
-          const { error: participantUpdateError } = await client.from("participants").update({
+          const { error: participant1UpdateError } = await client.from("participants").update({
             match_points: (participant1.match_points ?? 0) + 2,
             differential: (match.player1_score - match.player2_score) + (participant1.differential ?? 0),
           }).eq("id", match.player1_id.id);
 
+          // Then second will get 0 match points and differential
+          const { error: participant2UpdateError } = await client.from("participants").update({
+            match_points: (participant2.match_points ?? 0),
+            differential: (match.player2_score - match.player1_score) + (participant2.differential ?? 0),
+          }).eq("id", match.player2_id.id);
+
           // Adding match scores
-          const { error: participantMatchPointsError } = await client.from("matches").update({
+          const { error: participant1MatchPointsError } = await client.from("matches").update({
             player1_match_points: 2,
           }).eq("id", match.id);
 
         } else if (match.player2_score > match.player1_score) {
           // If second player won in time.
-          const { error: participantUpdateError } = await client.from("participants").update({
+          const { error: participant2UpdateError } = await client.from("participants").update({
             match_points: (participant2.match_points ?? 0) + 2,
             differential: (match.player2_score - match.player1_score) + (participant2.differential ?? 0),
           }).eq("id", match.player2_id.id);
+
+          // If first player won in time.
+          const { error: participant1UpdateError } = await client.from("participants").update({
+            match_points: (participant1.match_points ?? 0),
+            differential: (match.player1_score - match.player2_score) + (participant1.differential ?? 0),
+          }).eq("id", match.player1_id.id);
 
           // Adding match scores
           const { error: participantMatchPointsError } = await client.from("matches").update({
@@ -359,7 +383,7 @@ export default function TournamentRounds({
     } catch (error) {
       console.error("Error ending round:", error);
     }
-  };
+  }, [matches]);
 
   return (
     <div className="w-[800px] max-xl:w-full mx-auto overflow-x-auto">
