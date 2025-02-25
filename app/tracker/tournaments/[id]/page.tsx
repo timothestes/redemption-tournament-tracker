@@ -245,7 +245,9 @@ export default function TournamentPage({
     const { data, error: participantSelectError } = await client
       .from("participants")
       .select("id, match_points, differential, name")
-      .eq("tournament_id", tournament.id);
+      .eq("tournament_id", tournament.id)
+      .order('match_points', { ascending: false })
+      .order('differential', { ascending: false });
 
     if (participantSelectError) {
       console.log(participantSelectError);
@@ -255,56 +257,231 @@ export default function TournamentPage({
 
     let pairingMatches = [];
 
-    // if (currentPage === 1) {
-    // Creating matches by picking random players
-    while (userArray.length > 1) {
-      let randomIndex1 = Math.floor(Math.random() * userArray.length);
-      let randomIndex2 = Math.floor(Math.random() * userArray.length);
+    if (round === 1) {
+      // Creating matches by picking random players
+      while (userArray.length > 1) {
+        let randomIndex1 = Math.floor(Math.random() * userArray.length);
+        let randomIndex2 = Math.floor(Math.random() * userArray.length);
 
-      while (randomIndex1 === randomIndex2) {
-        randomIndex2 = Math.floor(Math.random() * userArray.length);
+        while (randomIndex1 === randomIndex2) {
+          randomIndex2 = Math.floor(Math.random() * userArray.length);
+        }
+
+        let randomParticipant1 = userArray[randomIndex1];
+        let randomParticipant2 = userArray[randomIndex2];
+
+        pairingMatches.push({
+          tournament_id: tournament.id,
+          round: round,
+          player1_id: randomParticipant1.id,
+          player2_id: randomParticipant2.id,
+          player1_score: null,
+          player2_score: null,
+          player1_match_points: 0,
+          player2_match_points: 0,
+        });
+
+        userArray.splice(randomIndex1, 1);
+        if (randomIndex2 > randomIndex1) randomIndex2--;
+        userArray.splice(randomIndex2, 1);
       }
 
-      let randomParticipant1 = userArray[randomIndex1];
-      let randomParticipant2 = userArray[randomIndex2];
+      // Setting byes
+      if (userArray.length > 0) {
+        let error = false;
+        userArray.forEach(async (user) => {
+          const { error: byesError } = await client.from("byes").insert({
+            tournament_id: tournament.id,
+            round_number: round,
+            participant_id: user.id,
+          });
 
-      pairingMatches.push({
-        tournament_id: tournament.id,
-        round: round,
-        player1_id: randomParticipant1.id,
-        player2_id: randomParticipant2.id,
-        player1_score: null,
-        player2_score: null,
-        player1_match_points: 0,
-        player2_match_points: 0,
+          if (byesError) {
+            console.log(byesError);
+            error = true;
+          }
+        });
+      }
+    } else if (round > 1) {
+      const participantsData = data;
+
+      // Sort participants by match points (descending)
+      participantsData.sort((a, b) => b.match_points - a.match_points);
+
+      // Fetch previous matches to check existing pairings
+      const { data: previousMatches, error: fetchMatchesError } = await client
+        .from('matches')
+        .select('player1_id, player2_id')
+        .eq('tournament_id', tournament.id);
+
+      if (fetchMatchesError) {
+        console.error('Error fetching previous matches:', fetchMatchesError);
+        return;
+      }
+
+      // Build a map to track opponents each participant has faced
+      const opponentsMap = new Map();
+      previousMatches.forEach(match => {
+        const p1 = match.player1_id;
+        const p2 = match.player2_id;
+
+        if (!opponentsMap.has(p1)) {
+          opponentsMap.set(p1, new Set());
+        }
+        opponentsMap.get(p1).add(p2);
+
+        if (!opponentsMap.has(p2)) {
+          opponentsMap.set(p2, new Set());
+        }
+        opponentsMap.get(p2).add(p1);
       });
 
-      userArray.splice(randomIndex1, 1);
-      if (randomIndex2 > randomIndex1) randomIndex2--;
-      userArray.splice(randomIndex2, 1);
+      // Helper function to check if two participants have played against each other
+      const hasPlayedAgainst = (participant1, participant2) => {
+        if (!opponentsMap.has(participant1.id)) return false;
+        return opponentsMap.get(participant1.id).has(participant2.id);
+      };
+
+      const paired = new Array(participantsData.length).fill(false);
+      const newPairingMatches = [];
+
+      // Group participants by match points
+      const pointGroups = {};
+      participantsData.forEach(participant => {
+        const points = participant.match_points || 0;
+        if (!pointGroups[points]) {
+          pointGroups[points] = [];
+        }
+        pointGroups[points].push(participant);
+      });
+
+      // Get unique point values and sort them in descending order
+      const pointValues = Object.keys(pointGroups).map(Number).sort((a, b) => b - a);
+
+      // Process each point group, starting with highest points
+      for (const points of pointValues) {
+        let group = pointGroups[points].filter(p =>
+          !paired[participantsData.findIndex(pd => pd.id === p.id)]
+        );
+
+        // If odd number in current group and there's a next lower group,
+        // pull someone up from the next group
+        if (group.length % 2 === 1 && pointValues.indexOf(points) < pointValues.length - 1) {
+          const nextPoints = pointValues[pointValues.indexOf(points) + 1];
+          const nextGroup = pointGroups[nextPoints].filter(p =>
+            !paired[participantsData.findIndex(pd => pd.id === p.id)]
+          );
+
+          if (nextGroup.length > 0) {
+            // Find best candidate from next group that hasn't played against current group
+            let candidateIndex = -1;
+            for (let i = 0; i < nextGroup.length; i++) {
+              let canPair = true;
+              for (const currentPlayer of group) {
+                if (hasPlayedAgainst(nextGroup[i], currentPlayer)) {
+                  canPair = false;
+                  break;
+                }
+              }
+              if (canPair) {
+                candidateIndex = i;
+                break;
+              }
+            }
+
+            // If found a valid candidate, move them up
+            if (candidateIndex !== -1) {
+              const candidate = nextGroup[candidateIndex];
+              group.push(candidate);
+              pointGroups[nextPoints] = pointGroups[nextPoints].filter(p => p.id !== candidate.id);
+            }
+          }
+        }
+
+        // Shuffle the group to add some randomness within same point group
+        for (let i = group.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [group[i], group[j]] = [group[j], group[i]];
+        }
+
+        // Pair players within the group
+        while (group.length >= 2) {
+          const player1 = group[0];
+          group.splice(0, 1);
+
+          // Find an opponent who hasn't played against player1
+          let opponentIndex = -1;
+          for (let i = 0; i < group.length; i++) {
+            if (!hasPlayedAgainst(player1, group[i])) {
+              opponentIndex = i;
+              break;
+            }
+          }
+
+          // If no valid opponent found, just take the first one
+          // (This would be a rare case where we have to break the "same-opponent-twice" rule)
+          if (opponentIndex === -1 && group.length > 0) {
+            opponentIndex = 0;
+            console.warn(`Warning: Had to pair ${player1.id} with ${group[0].id} again.`);
+          }
+
+          if (opponentIndex !== -1) {
+            const player2 = group[opponentIndex];
+            group.splice(opponentIndex, 1);
+
+            // Mark as paired
+            paired[participantsData.findIndex(p => p.id === player1.id)] = true;
+            paired[participantsData.findIndex(p => p.id === player2.id)] = true;
+
+            // Create the match
+            newPairingMatches.push({
+              tournament_id: tournament.id,
+              round: round,
+              player1_id: player1.id,
+              player2_id: player2.id,
+              player1_score: null,
+              player2_score: null,
+              player1_match_points: 0,
+              player2_match_points: 0,
+            });
+          }
+        }
+      }
+
+      // Handle odd number of participants (assign a bye)
+      const unpairedIndex = paired.findIndex(status => !status);
+      if (unpairedIndex !== -1) {
+        const byeParticipant = participantsData[unpairedIndex];
+        console.log(`Participant ${byeParticipant.id} gets a bye in round ${round}.`);
+
+        // Setting byes
+        const { error: byesError } = await client.from("byes").insert({
+          tournament_id: tournament.id,
+          round_number: round,
+          participant_id: byeParticipant.id,
+        });
+
+        if (byesError) {
+          console.log(byesError);
+        }
+      }
+
+      // Insert generated matches into the database
+      if (newPairingMatches.length > 0) {
+        const { error: insertError } = await client
+          .from('matches')
+          .insert(newPairingMatches);
+
+        if (insertError) {
+          console.error('Error inserting new matches:', insertError);
+        }
+      }
     }
 
     // Insert the matches into the database
     const { error: matchesError } = await client
       .from("matches")
       .insert(pairingMatches);
-
-    // Setting byes
-    if (userArray.length > 0) {
-      let error = false;
-      userArray.forEach(async (user) => {
-        const { error: byesError } = await client.from("byes").insert({
-          tournament_id: tournament.id,
-          round_number: round,
-          participant_id: user.id,
-        });
-
-        if (byesError) {
-          console.log(byesError);
-          error = true;
-        }
-      });
-    }
   }
 
   useEffect(() => {
