@@ -184,7 +184,7 @@ export default function TournamentRounds({
     const { data: byeData, error: byeError } = await client
       .from("byes")
       .select(
-        "id, participant_id:participants(name)"
+        "id, participant_id:participants(id, name, match_points, differential)"
       )
       .eq("tournament_id", tournamentId)
       .eq("round_number", currentPage)
@@ -320,6 +320,17 @@ export default function TournamentRounds({
         }
       })
 
+      // Updating byes
+      if (byes && byes.length > 0) {
+        byes.forEach(async (bye) => {
+          // Updating the participant match_points
+          const { error: participantUpdateError } = await client.from("participants").update({
+            match_points: (bye.participant_id.match_points ?? 0) + 3,
+            differential: (bye.participant_id.differential ?? 0),
+          }).eq("id", bye.participant_id.id);
+        })
+      }
+
       // Update the database
       const { error: roundError, data: roundData } = await client
         .from("rounds")
@@ -331,11 +342,6 @@ export default function TournamentRounds({
         .eq("round_number", currentPage);
 
       if (roundError) throw roundError;
-
-      setRoundInfo({
-        started_at: roundInfo.started_at,
-        ended_at: now,
-      });
 
       if (tournamentInfo.current_round === tournamentInfo.n_rounds) {
         const { error: tournamentError } = await client
