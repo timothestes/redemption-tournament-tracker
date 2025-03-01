@@ -27,7 +27,9 @@ interface TournamentRoundsProps {
   ) => void;
   roundInfo?: RoundInfo;
   setLatestRound: Dispatch<SetStateAction<any>>;
-  createPairing: (round: number) => void
+  createPairing: (round: number) => void;
+  matchErrorIndex: any;
+  setMatchErrorIndex: Dispatch<SetStateAction<any>>;
 }
 
 interface TournamentInfo {
@@ -53,6 +55,8 @@ export default function TournamentRounds({
   onRoundActiveChange,
   setLatestRound,
   createPairing,
+  matchErrorIndex,
+  setMatchErrorIndex
 }: TournamentRoundsProps) {
   const [tournamentInfo, setTournamentInfo] = useState<TournamentInfo>({
     n_rounds: null,
@@ -71,7 +75,6 @@ export default function TournamentRounds({
   const [matches, setMatches] = useState<any[]>([]);
   const [matchLoading, setMatchLoading] = useState(false);
   const [byes, setByes] = useState<any[]>([]);
-  const [matchErrorIndex, setMatchErrorIndex] = useState<number[]>([])
 
   // Make roundInfo available to parent component
   useEffect(() => {

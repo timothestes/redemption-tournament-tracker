@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { suggestNumberOfRounds } from "../../../../utils/tournamentUtils";
 import TournamentStartModal from "../../../../components/ui/TournamentStartModal";
 import Breadcrumb from "../../../../components/ui/breadcrumb";
@@ -35,6 +35,9 @@ export default function TournamentPage({
   const [id, setId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newTournamentName, setNewTournamentName] = useState("");
+  const [showStartModal, setShowStartModal] = useState(false);
+  const [isRoundActive, setIsRoundActive] = useState(false);
+  const [matchErrorIndex, setMatchErrorIndex] = useState<number[]>([])
   const [toast, setToast] = useState<{
     message: string;
     show: boolean;
@@ -44,8 +47,8 @@ export default function TournamentPage({
     show: false,
     type: "success",
   });
+
   const [latestRound, setLatestRound] = useState<any>(null);
-  console.log(latestRound)
 
   const showToast = (
     message: string,
@@ -168,9 +171,6 @@ export default function TournamentPage({
     }
   };
 
-  const [showStartModal, setShowStartModal] = useState(false);
-  const [isRoundActive, setIsRoundActive] = useState(false);
-
   const handleTournamentStatusToggle = async () => {
     if (!tournament) {
       showToast("Tournament is not available yet.", "error");
@@ -184,6 +184,33 @@ export default function TournamentPage({
 
     // Handle tournament end
     const now = new Date().toISOString();
+    if (!latestRound.is_completed) {
+      const client = await createClient();
+
+      const { data, error } = await client
+        .from("matches")
+        .select(
+          "id, player1_match_points, player2_match_points, differential, differential2,  player1_id:participants!matches_player1_id_fkey(name,id), player2_id:participants!matches_player2_id_fkey(name,id), player2_id, player1_score, player2_score"
+        )
+        .eq("tournament_id", tournament.id)
+        .eq("round", latestRound.round_number)
+        .order("id", { ascending: true });
+
+      if (error) throw error;
+
+      const { data: byeData, error: byeError } = await client
+        .from("byes")
+        .select(
+          "id, participant_id:participants(id, name, match_points, differential)"
+        )
+        .eq("tournament_id", tournament.id)
+        .eq("round_number", latestRound.round_number)
+        .order("id", { ascending: true });
+
+      if (byeError) throw byeError;
+
+      handleEndRound(data, setMatchErrorIndex, byeData, latestRound.round_number);
+    }
     try {
       const { data, error } = await supabase
         .from("tournaments")
@@ -202,6 +229,192 @@ export default function TournamentPage({
       console.error("Error updating tournament status:", error);
     }
   };
+
+  const handleEndRound = useCallback(async (matches: any[], setMatchErrorIndex: any, byes: any[], round: number) => {
+    const client = createClient();
+
+    let matchErrorIndexArr = [];
+
+    const now = new Date().toISOString();
+
+    // Checking if the user has not added the score
+    matches.forEach((match, index) => {
+      if (match.player1_score === null || match.player2_score === null) {
+        setMatchErrorIndex((matchErrorIndex) => [...matchErrorIndex, index]);
+        matchErrorIndexArr.push(index);
+      }
+    });
+
+    if (matchErrorIndexArr.length > 0) {
+      alert("Please add scores to all matches.");
+      return;
+    }
+
+    try {
+      const now = new Date().toISOString();
+
+      // Updating the matches
+      matches.forEach(async (match) => {
+        // Participant 1
+        const { error: participant1SelectError, data: participant1 } = await client.from("participants").select().eq("id", match.player1_id.id).single();
+        if (participant1SelectError) throw participant1SelectError;
+
+        // Participant 2
+        const { error: participant2SelectError, data: participant2 } = await client.from("participants").select().eq("id", match.player1_id.id).single();
+        if (participant2SelectError) throw participant2SelectError;
+
+        if (match.player2_score === match.player1_score) {
+          // If there's a Draw
+          const { error: participant1UpdateError } = await client.from("participants").update({
+            match_points: (participant1.match_points ?? 0) + 1.5,
+            differential: (match.differential) + (participant1.differential ?? 0),
+          }).eq("id", match.player1_id.id);
+          const { error: participant2UpdateError } = await client.from("participants").update({
+            match_points: (participant2.match_points ?? 0) + 1.5,
+            differential: (match.differential2) + (participant2.differential ?? 0),
+          }).eq("id", match.player2_id.id);
+
+          // Adding match scores
+          const { error: participantMatchPointsError } = await client.from("matches").update({
+            player1_match_points: 1.5,
+            player2_match_points: 1.5,
+          }).eq("id", match.id);
+
+        } else if (match.player1_score === 5) {
+          // If first player won
+          const { error: participant1UpdateError } = await client.from("participants").update({
+            match_points: (participant1.match_points ?? 0) + 3,
+            differential: (match.player1_score - match.player2_score) + (participant1.differential ?? 0),
+          }).eq("id", match.player1_id.id);
+
+          // Then second will get 0 match points and differential
+          const { error: participant2UpdateError } = await client.from("participants").update({
+            match_points: (participant2.match_points ?? 0),
+            differential: (match.player2_score - match.player1_score) + (participant2.differential ?? 0),
+          }).eq("id", match.player2_id.id);
+
+          // Adding match scores
+          const { error: participantMatchPointsError } = await client.from("matches").update({
+            player1_match_points: 3,
+          }).eq("id", match.id);
+
+        } else if (match.player2_score === 5) {
+          // If second player won
+          const { error: participantUpdateError } = await client.from("participants").update({
+            match_points: (participant2.match_points ?? 0) + 3,
+            differential: (match.player2_score - match.player1_score) + (participant2.differential ?? 0),
+          }).eq("id", match.player2_id.id);
+
+          // Then first will get 0 match points and differential
+          const { error: participant1UpdateError } = await client.from("participants").update({
+            match_points: (participant1.match_points ?? 0),
+            differential: (match.player1_score - match.player2_score) + (participant1.differential ?? 0),
+          }).eq("id", match.player1_id.id);
+
+          // Adding match scores
+          const { error: participantMatchPointsError } = await client.from("matches").update({
+            player2_match_points: 3,
+          }).eq("id", match.id);
+
+        } else if (match.player1_score > match.player2_score) {
+          // If first player won in time.
+          const { error: participant1UpdateError } = await client.from("participants").update({
+            match_points: (participant1.match_points ?? 0) + 2,
+            differential: (match.player1_score - match.player2_score) + (participant1.differential ?? 0),
+          }).eq("id", match.player1_id.id);
+
+          // Then second will get 0 match points and differential
+          const { error: participant2UpdateError } = await client.from("participants").update({
+            match_points: (participant2.match_points ?? 0),
+            differential: (match.player2_score - match.player1_score) + (participant2.differential ?? 0),
+          }).eq("id", match.player2_id.id);
+
+          // Adding match scores
+          const { error: participant1MatchPointsError } = await client.from("matches").update({
+            player1_match_points: 2,
+          }).eq("id", match.id);
+
+        } else if (match.player2_score > match.player1_score) {
+          // If second player won in time.
+          const { error: participant2UpdateError } = await client.from("participants").update({
+            match_points: (participant2.match_points ?? 0) + 2,
+            differential: (match.player2_score - match.player1_score) + (participant2.differential ?? 0),
+          }).eq("id", match.player2_id.id);
+
+          // If first player won in time.
+          const { error: participant1UpdateError } = await client.from("participants").update({
+            match_points: (participant1.match_points ?? 0),
+            differential: (match.player1_score - match.player2_score) + (participant1.differential ?? 0),
+          }).eq("id", match.player1_id.id);
+
+          // Adding match scores
+          const { error: participantMatchPointsError } = await client.from("matches").update({
+            player2_match_points: 2,
+          }).eq("id", match.id);
+        }
+      })
+
+      // Updating byes
+      if (byes && byes.length > 0) {
+        byes.forEach(async (bye) => {
+          // Updating the participant match_points
+          const { error: participantUpdateError } = await client.from("participants").update({
+            match_points: (bye.participant_id.match_points ?? 0) + 3,
+            differential: (bye.participant_id.differential ?? 0),
+          }).eq("id", bye.participant_id.id);
+        })
+      }
+
+      // Update the database
+      const { error: roundError, data: roundData } = await client
+        .from("rounds")
+        .update({
+          ended_at: now,
+          is_completed: true,
+        })
+        .eq("tournament_id", tournament.id)
+        .eq("round_number", round);
+
+      if (roundError) throw roundError;
+
+      if (round === tournament.n_rounds) {
+        const { error: tournamentError } = await client
+          .from("tournaments")
+          .update({
+            has_ended: true,
+            ended_at: now,
+          })
+          .eq("id", tournament.id);
+
+        if (tournamentError) throw tournamentError;
+
+        setTournament((prev) => ({
+          ...prev,
+          has_ended: true,
+        }));
+
+        fetchTournamentDetails();
+      } else {
+        // Creating the pairing for the next round
+        await createPairing(round + 1);
+
+        const { error: tournamentError } = await client
+          .from("tournaments")
+          .update({
+            current_round: (tournament.current_round || 0) + 1,
+          })
+          .eq("id", tournament.id);
+
+        if (tournamentError) throw tournamentError;
+      }
+
+      // Update local state after successful database updates
+      setIsRoundActive(false);
+      setLatestRound((prev) => ({ ...prev, round_number: round, ended_at: now }));
+    } catch (error) {
+      console.error("Error ending round:", error);
+    }
+  }, []);
 
   const handleStartTournament = async (
     numberOfRounds: number,
@@ -668,6 +881,8 @@ export default function TournamentPage({
               fetchTournamentDetails();
             }}
             createPairing={createPairing}
+            matchErrorIndex={matchErrorIndex}
+            setMatchErrorIndex={setMatchErrorIndex}
           />
         </div>
         <EditParticipantModal
