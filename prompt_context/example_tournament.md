@@ -16,7 +16,9 @@ Player names:
 
 Each player will always score the number of round points associated with their player number. For example, Player 5 will always score 5 points, Player 4 will always score 4 points, and so on. At the end of the tournament, the player with the most match points wins. Since player 5 will always win every round they play, we can expect them to win every time.
 
-1 player will always get a bye and automatically get 3 match points. The player who gets the bye should be the player with the lowest number of match points. If there is a tie, the player with the lowest differential should get the bye. Its possible for a player to get a bye more than once.
+Since there are an odd number of players, one of them will always get a bye and automatically get 3 match points. The player who gets the bye should be the player with the lowest number of match points. If there is a tie, the player with the lowest differential should get the bye. If its a tie between differential AND match points, assign the player with a bye at random.
+
+**Note**: Its possible for a player to get a bye more than once.
 
 ### What to check
 
