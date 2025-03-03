@@ -22,7 +22,7 @@ Since there are an odd number of players, one of them will always get a bye and 
 
 ### What to check
 
-- Player 5 should have 9 match points (3 full wins)
+- At the end of the tournament Player 5 should always have 9 match points (3 full wins)
 - Player 5 should NOT get a bye on round 3 (if the player does, explain to me why)
 
-So far in my testing, Player 5 ends up with 8 points and sometimes gets a bye in round 3. These are unexpected results. 
+So far in my testing, Player 5 ends up with 8 points and sometimes gets a bye in round 3. These are unexpected results and should be remedied.
