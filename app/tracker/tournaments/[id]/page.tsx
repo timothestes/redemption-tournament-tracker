@@ -260,7 +260,7 @@ export default function TournamentPage({
         if (participant1SelectError) throw participant1SelectError;
 
         // Participant 2
-        const { error: participant2SelectError, data: participant2 } = await client.from("participants").select().eq("id", match.player1_id.id).single();
+        const { error: participant2SelectError, data: participant2 } = await client.from("participants").select().eq("id", match.player2_id.id).single();
         if (participant2SelectError) throw participant2SelectError;
 
         if (match.player2_score === match.player1_score) {
