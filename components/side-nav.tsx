@@ -101,13 +101,31 @@ const SideNav: React.FC = () => {
                   Hosting Guide
                 </Sidebar.Item>
                 <Sidebar.Item
-                  href="https://landofredemption.com/wp-content/uploads/2024/09/Redemption-Tournament-Host-Application-2024.pdf"
+                  href="https://landofredemption.com/wp-content/uploads/2025/03/Redemption-Tournament-Host-Application-2025.pdf"
                   target="_blank"
                   rel="noopener noreferrer"
                   icon={AiOutlineForm}
                   className="pl-4"
                 >
-                  Hosting Application
+                  2025 Hosting Application
+                </Sidebar.Item>
+                <Sidebar.Item
+                  href="https://landofredemption.com/wp-content/uploads/2025/03/host_sign_in_sheets.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  icon={AiOutlineForm}
+                  className="pl-4"
+                >
+                  Sign In Sheet
+                </Sidebar.Item>
+                <Sidebar.Item
+                  href="https://landofredemption.com/wp-content/uploads/2025/03/host_winners_list.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  icon={AiOutlineForm}
+                  className="pl-4"
+                >
+                  Winners Form
                 </Sidebar.Item>
               </Sidebar.Collapse>
             </Sidebar.ItemGroup>
