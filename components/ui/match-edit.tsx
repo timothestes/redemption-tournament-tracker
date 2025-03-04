@@ -35,8 +35,8 @@ export default function MatchEditModal({
 
     const client = createClient();
 
-    const player1 = await client.from("participants").select("differential, match_points").eq("id", match.player1_id.id).single();
-    const player2 = await client.from("participants").select("differential, match_points").eq("id", match.player2_id.id).single();
+    const player1 = await client.from("participants").select("differential, match_points, id").eq("id", match.player1_id.id).single();
+    const player2 = await client.from("participants").select("differential, match_points, id").eq("id", match.player2_id.id).single();
 
     if (player1.error || player2.error) {
       console.log(player1.error, player2.error);
@@ -62,6 +62,9 @@ export default function MatchEditModal({
       player2_match_points = 2;
     }
 
+
+    console.log(player1.data, player2.data);
+
     const { data, error } = await client
       .from("matches")
       .update({
@@ -69,8 +72,8 @@ export default function MatchEditModal({
         player2_score: player2Score,
         differential: (player1.data.differential ?? 0) + (player1Score - player2Score),
         differential2: (player2.data.differential ?? 0) + (player2Score - player1Score),
-        player1_match_points: (player1.data.match_points ?? 0) + player1_match_points,
-        player2_match_points: (player2.data.match_points ?? 0) + player2_match_points,
+        player1_match_points: (player1.data.match_points || 0) + player1_match_points,
+        player2_match_points: (player2.data.match_points || 0) + player2_match_points,
         updated_at: new Date(),
       })
       .eq("id", match.id);

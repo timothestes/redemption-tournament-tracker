@@ -223,82 +223,94 @@ export default function TournamentRounds({
       const now = new Date().toISOString();
 
       // Updating the matches
-      matches.forEach(async (match) => {
-        // Participant 1
-        const { error: participant1SelectError, data: participant1 } = await client.from("participants").select().eq("id", match.player1_id.id).single();
+      for (const match of matches) {
+        // Fetch Participant 1
+        const { error: participant1SelectError, data: participant1 } = await client
+          .from("participants")
+          .select()
+          .eq("id", match.player1_id.id)
+          .single();
         if (participant1SelectError) throw participant1SelectError;
 
-        // Participant 2
-        const { error: participant2SelectError, data: participant2 } = await client.from("participants").select().eq("id", match.player1_id.id).single();
+        // Fetch Participant 2
+        const { error: participant2SelectError, data: participant2 } = await client
+          .from("participants")
+          .select()
+          .eq("id", match.player2_id.id)
+          .single();
         if (participant2SelectError) throw participant2SelectError;
 
         if (match.player2_score === match.player1_score) {
-          // If there's a Draw
-          const { error: participant1UpdateError } = await client.from("participants").update({
-            match_points: (participant1.match_points ?? 0) + 1.5,
-            differential: (match.differential) + (participant1.differential ?? 0),
-          }).eq("id", match.player1_id.id);
-          const { error: participant2UpdateError } = await client.from("participants").update({
-            match_points: (participant2.match_points ?? 0) + 1.5,
-            differential: (match.differential2) + (participant2.differential ?? 0),
-          }).eq("id", match.player2_id.id);
+          // Draw: Both get 1.5 points
+          await Promise.all([
+            client.from("participants").update({
+              match_points: (participant1.match_points || 0) + 1.5,
+              differential: (match.differential || 0) + (participant1.differential || 0),
+            }).eq("id", match.player1_id.id),
+
+            client.from("participants").update({
+              match_points: (participant2.match_points || 0) + 1.5,
+              differential: (match.differential2 || 0) + (participant2.differential || 0),
+            }).eq("id", match.player2_id.id),
+          ]);
 
         } else if (match.player1_score === 5) {
-          // If first player won
-          const { error: participant1UpdateError } = await client.from("participants").update({
-            match_points: (participant1.match_points ?? 0) + 3,
-            differential: (match.player1_score - match.player2_score) + (participant1.differential ?? 0),
-          }).eq("id", match.player1_id.id);
+          // Player 1 Wins (3 points), Player 2 gets 0
+          await Promise.all([
+            client.from("participants").update({
+              match_points: (participant1.match_points || 0) + 3,
+              differential: (match.player1_score - match.player2_score) + (participant1.differential || 0),
+            }).eq("id", match.player1_id.id),
 
-          // Then second will get 0 match points and differential
-          const { error: participant2UpdateError } = await client.from("participants").update({
-            match_points: (participant2.match_points ?? 0),
-            differential: (match.player2_score - match.player1_score) + (participant2.differential ?? 0),
-          }).eq("id", match.player2_id.id);
+            client.from("participants").update({
+              match_points: (participant2.match_points || 0),
+              differential: (match.player2_score - match.player1_score) + (participant2.differential || 0),
+            }).eq("id", match.player2_id.id),
+          ]);
 
         } else if (match.player2_score === 5) {
-          // If second player won
-          const { error: participantUpdateError } = await client.from("participants").update({
-            match_points: (participant2.match_points ?? 0) + 3,
-            differential: (match.player2_score - match.player1_score) + (participant2.differential ?? 0),
-          }).eq("id", match.player2_id.id);
+          // Player 2 Wins (3 points), Player 1 gets 0
+          await Promise.all([
+            client.from("participants").update({
+              match_points: (participant2.match_points || 0) + 3,
+              differential: (match.player2_score - match.player1_score) + (participant2.differential || 0),
+            }).eq("id", match.player2_id.id),
 
-          // Then first will get 0 match points and differential
-          const { error: participant1UpdateError } = await client.from("participants").update({
-            match_points: (participant1.match_points ?? 0),
-            differential: (match.player1_score - match.player2_score) + (participant1.differential ?? 0),
-          }).eq("id", match.player1_id.id);
-
+            client.from("participants").update({
+              match_points: (participant1.match_points || 0),
+              differential: (match.player1_score - match.player2_score) + (participant1.differential || 0),
+            }).eq("id", match.player1_id.id),
+          ]);
 
         } else if (match.player1_score > match.player2_score) {
-          // If first player won in time.
-          const { error: participant1UpdateError } = await client.from("participants").update({
-            match_points: (participant1.match_points ?? 0) + 2,
-            differential: (match.player1_score - match.player2_score) + (participant1.differential ?? 0),
-          }).eq("id", match.player1_id.id);
+          // Player 1 Wins (2 points), Player 2 gets 0
+          await Promise.all([
+            client.from("participants").update({
+              match_points: (participant1.match_points || 0) + 2,
+              differential: (match.player1_score - match.player2_score) + (participant1.differential || 0),
+            }).eq("id", match.player1_id.id),
 
-          // Then second will get 0 match points and differential
-          const { error: participant2UpdateError } = await client.from("participants").update({
-            match_points: (participant2.match_points ?? 0),
-            differential: (match.player2_score - match.player1_score) + (participant2.differential ?? 0),
-          }).eq("id", match.player2_id.id);
-
+            client.from("participants").update({
+              match_points: (participant2.match_points || 0),
+              differential: (match.player2_score - match.player1_score) + (participant2.differential || 0),
+            }).eq("id", match.player2_id.id),
+          ]);
 
         } else if (match.player2_score > match.player1_score) {
-          // If second player won in time.
-          const { error: participant2UpdateError } = await client.from("participants").update({
-            match_points: (participant2.match_points ?? 0) + 2,
-            differential: (match.player2_score - match.player1_score) + (participant2.differential ?? 0),
-          }).eq("id", match.player2_id.id);
+          // Player 2 Wins (2 points), Player 1 gets 0
+          await Promise.all([
+            client.from("participants").update({
+              match_points: (participant2.match_points || 0) + 2,
+              differential: (match.player2_score - match.player1_score) + (participant2.differential || 0),
+            }).eq("id", match.player2_id.id),
 
-          // If first player won in time.
-          const { error: participant1UpdateError } = await client.from("participants").update({
-            match_points: (participant1.match_points ?? 0),
-            differential: (match.player1_score - match.player2_score) + (participant1.differential ?? 0),
-          }).eq("id", match.player1_id.id);
-
+            client.from("participants").update({
+              match_points: (participant1.match_points || 0),
+              differential: (match.player1_score - match.player2_score) + (participant1.differential || 0),
+            }).eq("id", match.player1_id.id),
+          ]);
         }
-      })
+      }
 
       // Updating byes
       if (byes && byes.length > 0) {
