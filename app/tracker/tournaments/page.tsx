@@ -91,7 +91,7 @@ export default function TournamentsPage() {
   };
 
   return (
-    <div className="flex h-screen px-5 w-full">
+    <div className="flex min-h-screen px-5 w-full">
       <div className="max-w-4xl mx-auto space-y-3 w-full">
         <Breadcrumb
           items={[{ label: "Tournaments", href: "/tracker/tournaments" }]}

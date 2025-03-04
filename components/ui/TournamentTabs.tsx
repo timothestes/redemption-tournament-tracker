@@ -1,7 +1,7 @@
 "use client";
 
 import { Tabs, Card } from "flowbite-react";
-import { useState } from "react";
+import { Dispatch, SetStateAction, useState } from "react";
 import { HiUserGroup } from "react-icons/hi";
 import { FaGear } from "react-icons/fa6";
 import { MdPeople } from "react-icons/md";
@@ -23,10 +23,14 @@ interface TournamentTabsProps {
   tournamentId: string;
   tournamentStarted?: boolean;
   onTournamentEnd?: () => void;
+  setLatestRound: Dispatch<SetStateAction<any>>;
   onRoundActiveChange?: (
     isActive: boolean,
     roundStartTime: string | null
   ) => void;
+  createPairing: (round: number) => void;
+  matchErrorIndex: any;
+  setMatchErrorIndex: Dispatch<SetStateAction<any>>;
 }
 
 export default function TournamentTabs({
@@ -40,6 +44,10 @@ export default function TournamentTabs({
   tournamentId,
   tournamentStarted = false,
   onTournamentEnd,
+  setLatestRound,
+  createPairing,
+  matchErrorIndex,
+  setMatchErrorIndex
 }: TournamentTabsProps) {
   const [activeTab, setActiveTab] = useState(0);
   return (
@@ -124,6 +132,10 @@ export default function TournamentTabs({
             isActive={activeTab === 1}
             key={activeTab} // Force re-render when tab becomes active
             onTournamentEnd={onTournamentEnd}
+            setLatestRound={setLatestRound}
+            createPairing={createPairing}
+            matchErrorIndex={matchErrorIndex}
+            setMatchErrorIndex={setMatchErrorIndex}
           />
         </div>
       </Tabs.Item>
