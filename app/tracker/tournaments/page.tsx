@@ -118,7 +118,10 @@ export default function TournamentsPage() {
         {loading ? (
           <p>Loading tournaments...</p>
         ) : tournaments.length === 0 ? (
-          <p>No tournaments found.</p>
+          <div className="space-y-2">
+            <p>No tournaments found.</p>
+            <p>Get started by clicking <strong>Host A Tournament</strong></p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <Table hoverable>
