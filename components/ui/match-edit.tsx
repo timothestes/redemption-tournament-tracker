@@ -69,8 +69,8 @@ export default function MatchEditModal({
         player2_score: player2Score,
         differential: (player1.data.differential ?? 0) + (player1Score - player2Score),
         differential2: (player2.data.differential ?? 0) + (player2Score - player1Score),
-        player1_match_points,
-        player2_match_points,
+        player1_match_points: (player1.data.match_points ?? 0) + player1_match_points,
+        player2_match_points: (player2.data.match_points ?? 0) + player2_match_points,
         updated_at: new Date(),
       })
       .eq("id", match.id);
@@ -82,13 +82,15 @@ export default function MatchEditModal({
     })
 
     if (!error) {
-      fetchCurrentRoundData();
       setOpen(false);
     } else {
       console.log(error);
       alert("Some error occurred!");
     }
+
+    fetchCurrentRoundData();
   };
+
   return (
     <>
       <Pencil
