@@ -322,7 +322,7 @@ export default function TournamentPage({
             }).eq("id", match.player1_id.id),
 
             client.from("participants").update({
-              match_points: (participant2.match_points || 0),
+              match_points: (participant2.match_points || 0) + 1,
               differential: (match.player2_score - match.player1_score) + (participant2.differential || 0),
             }).eq("id", match.player2_id.id),
           ]);
@@ -336,7 +336,7 @@ export default function TournamentPage({
             }).eq("id", match.player2_id.id),
 
             client.from("participants").update({
-              match_points: (participant1.match_points || 0),
+              match_points: (participant1.match_points || 0) + 1,
               differential: (match.player1_score - match.player2_score) + (participant1.differential || 0),
             }).eq("id", match.player1_id.id),
           ]);
@@ -782,12 +782,25 @@ export default function TournamentPage({
    */
   const assignBye = async (client, tournamentId, round, playerId) => {
     try {
+      const { data: participant, error: participantError } = await client
+        .from("participants")
+        .select("id, match_points, differential")
+        .eq("id", playerId).eq("tournament_id", tournamentId)
+        .single();
+
+      if (participantError) {
+        console.error("Error fetching participant:", participantError);
+        return;
+      }
+
       // Add a bye record for this player
       const { error: byeError } = await client
         .from("byes")
         .insert({
           tournament_id: tournamentId,
           round_number: round,
+          match_points: (participant.match_points || 0) + 3,
+          differential: (participant.differential || 0),
           participant_id: playerId
         });
 

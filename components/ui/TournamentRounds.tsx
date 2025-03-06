@@ -187,7 +187,7 @@ export default function TournamentRounds({
     const { data: byeData, error: byeError } = await client
       .from("byes")
       .select(
-        "id, participant_id:participants(id, name, match_points, differential)"
+        "id, participant_id:participants(id, name), match_points, differential"
       )
       .eq("tournament_id", tournamentId)
       .eq("round_number", currentPage)
@@ -291,7 +291,7 @@ export default function TournamentRounds({
             }).eq("id", match.player1_id.id),
 
             client.from("participants").update({
-              match_points: (participant2.match_points || 0),
+              match_points: (participant2.match_points || 0) + 1,
               differential: (match.player2_score - match.player1_score) + (participant2.differential || 0),
             }).eq("id", match.player2_id.id),
           ]);
@@ -305,7 +305,7 @@ export default function TournamentRounds({
             }).eq("id", match.player2_id.id),
 
             client.from("participants").update({
-              match_points: (participant1.match_points || 0),
+              match_points: (participant1.match_points || 0) + 1,
               differential: (match.player1_score - match.player2_score) + (participant1.differential || 0),
             }).eq("id", match.player1_id.id),
           ]);
@@ -528,6 +528,9 @@ export default function TournamentRounds({
                             Match Points
                           </th>
                           <th scope="col" className="px-4 py-2 text-center">
+                            Differential
+                          </th>
+                          <th scope="col" className="px-4 py-2 text-center">
                             Name
                           </th>
                         </tr>
@@ -541,7 +544,10 @@ export default function TournamentRounds({
                                   {index + 1}
                                 </td>
                                 <td className="px-4 py-2 text-center border-r border-zinc-400">
-                                  0
+                                  {bye.match_points}
+                                </td>
+                                <td className="px-4 py-2 text-center border-r border-zinc-400">
+                                  {bye.differential}
                                 </td>
                                 <td className="px-4 py-2 text-center border-r border-zinc-400">
                                   {bye.participant_id.name}
