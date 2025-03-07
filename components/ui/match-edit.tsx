@@ -58,8 +58,8 @@ export default function MatchEditModal({
       player1_match_points = 2;
       player2_match_points = 1;
     } else if (player2Score > player1Score) {
-      player1_match_points = 0;
-      player2_match_points = 1;
+      player1_match_points = 1;
+      player2_match_points = 2;
     }
 
 
