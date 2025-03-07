@@ -792,7 +792,6 @@ export default function TournamentPage({
         console.error("Error fetching participant:", participantError);
         return;
       }
-
       // Add a bye record for this player
       const { error: byeError } = await client
         .from("byes")
@@ -919,7 +918,6 @@ export default function TournamentPage({
                   day: "numeric",
                   hour: "2-digit",
                   minute: "2-digit",
-                  second: "2-digit",
                 }).format(new Date(tournament.created_at))}
               </p>
               {tournament.started_at && (
@@ -931,7 +929,6 @@ export default function TournamentPage({
                     day: "numeric",
                     hour: "2-digit",
                     minute: "2-digit",
-                    second: "2-digit",
                   }).format(new Date(tournament.started_at))}
                 </p>
               )}
@@ -944,7 +941,6 @@ export default function TournamentPage({
                     day: "numeric",
                     hour: "2-digit",
                     minute: "2-digit",
-                    second: "2-digit",
                   }).format(new Date(tournament.ended_at))}
                 </p>
               )}

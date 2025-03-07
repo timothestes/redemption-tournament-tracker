@@ -15,7 +15,7 @@
     "flowbite-react": "^0.10.2",
     "geist": "^1.2.1",
     "lucide-react": "^0.456.0",
-    "next": "latest",
+    "next": "^15.2.1",
     "next-themes": "^0.4.3",
     "prettier": "^3.3.3",
     "react": "^19.0.0",
