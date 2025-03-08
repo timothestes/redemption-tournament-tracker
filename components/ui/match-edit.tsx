@@ -33,6 +33,11 @@ export default function MatchEditModal({
       return;
     }
 
+    if (player1Score === 5 && player2Score === 5) {
+      alert("Score cannot be 5-5.");
+      return;
+    }
+
     const client = createClient();
 
     const player1 = await client.from("participants").select("differential, match_points, id").eq("id", match.player1_id.id).single();
@@ -61,9 +66,6 @@ export default function MatchEditModal({
       player1_match_points = 1;
       player2_match_points = 2;
     }
-
-
-    console.log(player1.data, player2.data);
 
     const { data, error } = await client
       .from("matches")
