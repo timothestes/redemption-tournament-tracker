@@ -14,6 +14,7 @@ interface EditParticipantModalProps {
   setNewDifferential: (differential: string) => void;
   newDroppedOut: boolean;
   setNewDroppedOut: (droppedOut: boolean) => void;
+  isTournamentStarted: boolean;
 }
 
 const EditParticipantModal: React.FC<EditParticipantModalProps> = ({
@@ -27,6 +28,7 @@ const EditParticipantModal: React.FC<EditParticipantModalProps> = ({
   setNewMatchPoints,
   newDifferential,
   setNewDifferential,
+  isTournamentStarted
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -69,6 +71,7 @@ const EditParticipantModal: React.FC<EditParticipantModalProps> = ({
               type="number"
               value={newMatchPoints}
               onChange={(e) => setNewMatchPoints(e.target.value)}
+              disabled={!isTournamentStarted}
             />
           </div>
           <div className="mb-2 block space-y-1">
@@ -79,6 +82,7 @@ const EditParticipantModal: React.FC<EditParticipantModalProps> = ({
               type="number"
               value={newDifferential}
               onChange={(e) => setNewDifferential(e.target.value)}
+              disabled={!isTournamentStarted}
             />
           </div>
           <div className="flex justify-end gap-3">

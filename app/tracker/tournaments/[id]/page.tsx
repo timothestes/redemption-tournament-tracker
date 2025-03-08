@@ -1021,6 +1021,7 @@ export default function TournamentPage({
           setNewDifferential={setNewDifferential}
           newDroppedOut={newDroppedOut}
           setNewDroppedOut={setNewDroppedOut}
+          isTournamentStarted={tournament?.has_started}
         />
         <TournamentStartModal
           isOpen={showStartModal}
