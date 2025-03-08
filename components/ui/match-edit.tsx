@@ -9,11 +9,13 @@ export default function MatchEditModal({
   match,
   fetchCurrentRoundData,
   setMatchErrorIndex,
+  isRoundActive,
   index
 }: {
   match: any;
   fetchCurrentRoundData: any;
   setMatchErrorIndex: Dispatch<SetStateAction<number[]>>;
+  isRoundActive: boolean;
   index: number;
 }) {
   const [open, setOpen] = useState(false);
@@ -99,9 +101,13 @@ export default function MatchEditModal({
   return (
     <>
       <Pencil
-        className="text-blue-300 hover:text-blue-500 transition cursor-pointer"
+        className={`${isRoundActive ? "text-blue-300 hover:text-blue-500 transition cursor-pointer" : ""}`}
         size={16}
-        onClick={() => setOpen(!open)}
+        onClick={() => {
+          if (isRoundActive) {
+            setOpen(!open)
+          }
+        }}
       />
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">

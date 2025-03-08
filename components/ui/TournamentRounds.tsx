@@ -75,6 +75,8 @@ export default function TournamentRounds({
   const [matchLoading, setMatchLoading] = useState(false);
   const [byes, setByes] = useState<any[]>([]);
 
+  console.log(isRoundActive);
+
   // Make roundInfo available to parent component
   useEffect(() => {
     if (isActive) {
@@ -477,6 +479,7 @@ export default function TournamentRounds({
                                   match={match}
                                   fetchCurrentRoundData={fetchCurrentRoundData}
                                   setMatchErrorIndex={setMatchErrorIndex}
+                                  isRoundActive={isRoundActive}
                                   index={index}
                                 />
                               </td>
@@ -503,6 +506,7 @@ export default function TournamentRounds({
                                   match={match}
                                   fetchCurrentRoundData={fetchCurrentRoundData}
                                   setMatchErrorIndex={setMatchErrorIndex}
+                                  isRoundActive={isRoundActive}
                                   index={index}
                                 />
                               </td>
