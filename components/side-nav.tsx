@@ -127,6 +127,24 @@ const SideNav: React.FC = () => {
                 >
                   Winners Form
                 </Sidebar.Item>
+                <Sidebar.Item
+                  href="https://landofredemption.com/wp-content/uploads/2025/03/T1-Deck-Check-Sheet.png"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  icon={AiOutlineForm}
+                  className="pl-4"
+                  >
+                  T1 Deck Check Sheet
+                </Sidebar.Item>
+                <Sidebar.Item
+                  href="https://landofredemption.com/wp-content/uploads/2025/03/T2-Deck-Check-Sheet.png"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  icon={AiOutlineForm}
+                  className="pl-4"
+                >
+                  T2 Deck Check Sheet
+                </Sidebar.Item>
               </Sidebar.Collapse>
             </Sidebar.ItemGroup>
             <Sidebar.ItemGroup>
