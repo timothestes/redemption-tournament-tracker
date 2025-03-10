@@ -29,6 +29,7 @@ interface TournamentRoundsProps {
   createPairing: (round: number) => void;
   matchErrorIndex: any;
   setMatchErrorIndex: Dispatch<SetStateAction<any>>;
+  activeTab: number;
 }
 
 interface TournamentInfo {
@@ -55,7 +56,8 @@ export default function TournamentRounds({
   setLatestRound,
   createPairing,
   matchErrorIndex,
-  setMatchErrorIndex
+  setMatchErrorIndex,
+  activeTab
 }: TournamentRoundsProps) {
   const [tournamentInfo, setTournamentInfo] = useState<TournamentInfo>({
     n_rounds: null,
@@ -75,7 +77,10 @@ export default function TournamentRounds({
   const [matchLoading, setMatchLoading] = useState(false);
   const [byes, setByes] = useState<any[]>([]);
 
-  console.log(isRoundActive);
+  // Making the fetch funcationality work if the activeTab is changed
+  useEffect(() => {
+    fetchTournamentAndRoundInfo()
+  }, [activeTab])
 
   // Make roundInfo available to parent component
   useEffect(() => {
@@ -128,7 +133,7 @@ export default function TournamentRounds({
     } finally {
       setIsLoading(false);
     }
-  }, [tournamentId, currentPage]);
+  }, [tournamentId, currentPage, activeTab]);
 
   useEffect(() => {
     if (isActive) {

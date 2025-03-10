@@ -185,7 +185,7 @@ export default function TournamentPage({
 
     // Handle tournament end
     const now = new Date().toISOString();
-    if (!latestRound.is_completed) {
+    if (latestRound && !latestRound?.is_completed) {
       const client = await createClient();
 
       const { data, error } = await client
@@ -430,9 +430,9 @@ export default function TournamentPage({
       if (error) throw error;
       setTournament(data);
       setShowStartModal(false);
-      setActiveTab(1);
       // Creating pairing for the first round if the user has started the tournament.
-      createPairing(1);
+      await createPairing(1);
+      setActiveTab(1);
       showToast("Tournament started successfully!", "success");
     } catch (error) {
       showToast("Error starting tournament.", "error");

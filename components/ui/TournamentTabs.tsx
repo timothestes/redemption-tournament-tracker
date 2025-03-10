@@ -154,6 +154,7 @@ export default function TournamentTabs({
             createPairing={createPairing}
             matchErrorIndex={matchErrorIndex}
             setMatchErrorIndex={setMatchErrorIndex}
+            activeTab={activeTab}
           />
         </div>
       </Tabs.Item>
