@@ -128,7 +128,7 @@ const SideNav: React.FC = () => {
                   Winners Form
                 </Sidebar.Item>
                 <Sidebar.Item
-                  href="https://landofredemption.com/wp-content/uploads/2025/03/Type-1-Deck-Check-Sheet.pdf"
+                  href="https://landofredemption.com/wp-content/uploads/2025/03/Type-1-Deck-Check-Sheet-1.pdf"
                   target="_blank"
                   rel="noopener noreferrer"
                   icon={AiOutlineForm}
