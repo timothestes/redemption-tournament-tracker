@@ -851,6 +851,7 @@ export default function TournamentPage({
     if (id) {
       fetchTournamentDetails();
       fetchParticipants();
+
     }
   }, [id]);
 
@@ -1012,6 +1013,7 @@ export default function TournamentPage({
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             fetchParticipants={fetchParticipants}
+            currentRound={tournament?.current_round}
           />
         </div>
         <EditParticipantModal

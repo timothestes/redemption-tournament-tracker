@@ -30,6 +30,7 @@ interface TournamentRoundsProps {
   matchErrorIndex: any;
   setMatchErrorIndex: Dispatch<SetStateAction<any>>;
   activeTab: number;
+  currentRound: number;
 }
 
 interface TournamentInfo {
@@ -57,7 +58,8 @@ export default function TournamentRounds({
   createPairing,
   matchErrorIndex,
   setMatchErrorIndex,
-  activeTab
+  activeTab,
+  currentRound
 }: TournamentRoundsProps) {
   const [tournamentInfo, setTournamentInfo] = useState<TournamentInfo>({
     n_rounds: null,
@@ -67,7 +69,7 @@ export default function TournamentRounds({
   const client = createClient();
   const [error, setError] = useState<ErrorState>({ message: null, type: null });
   const [isLoading, setIsLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(currentRound || 1);
   const [isRoundActive, setIsRoundActive] = useState(false);
   const [roundInfo, setRoundInfo] = useState<RoundInfo>({
     started_at: null,
