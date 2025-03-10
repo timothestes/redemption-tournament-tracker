@@ -1011,6 +1011,7 @@ export default function TournamentPage({
             setMatchErrorIndex={setMatchErrorIndex}
             activeTab={activeTab}
             setActiveTab={setActiveTab}
+            fetchParticipants={fetchParticipants}
           />
         </div>
         <EditParticipantModal

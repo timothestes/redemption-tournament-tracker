@@ -33,6 +33,7 @@ interface TournamentTabsProps {
   setMatchErrorIndex: Dispatch<SetStateAction<any>>;
   activeTab: number;
   setActiveTab: Dispatch<SetStateAction<number>>;
+  fetchParticipants: () => void;
 }
 
 export default function TournamentTabs({
@@ -51,7 +52,8 @@ export default function TournamentTabs({
   matchErrorIndex,
   setMatchErrorIndex,
   activeTab,
-  setActiveTab
+  setActiveTab,
+  fetchParticipants
 }: TournamentTabsProps) {
   const tabsRef = useRef(null);
 
@@ -59,6 +61,10 @@ export default function TournamentTabs({
   useEffect(() => {
     if (tabsRef.current) {
       tabsRef.current.setActiveTab(activeTab);
+    }
+
+    if (activeTab === 0) {
+      fetchParticipants();
     }
   }, [activeTab]);
   return (
