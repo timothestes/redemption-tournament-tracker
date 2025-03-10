@@ -49,8 +49,10 @@ export const signInAction = async (formData: FormData) => {
     password,
   });
 
+  console.log(error.message);
+
   if (error) {
-    return encodedRedirect("error", "/tracker/tournaments", error.message);
+    return encodedRedirect("error", "/sign-in", error.message);
   }
 
   return redirect("/tracker/tournaments");
