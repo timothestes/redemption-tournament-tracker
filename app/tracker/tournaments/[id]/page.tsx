@@ -430,6 +430,7 @@ export default function TournamentPage({
       if (error) throw error;
       setTournament(data);
       setShowStartModal(false);
+      setActiveTab(1);
       // Creating pairing for the first round if the user has started the tournament.
       createPairing(1);
       showToast("Tournament started successfully!", "success");
@@ -982,6 +983,7 @@ export default function TournamentPage({
             </div>
           )}
           <TournamentTabs
+            key={activeTab}
             participants={participants}
             isModalOpen={isModalOpen}
             setIsModalOpen={setIsModalOpen}

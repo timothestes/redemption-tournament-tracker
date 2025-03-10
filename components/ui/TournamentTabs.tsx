@@ -1,7 +1,7 @@
 "use client";
 
 import { Tabs, Card } from "flowbite-react";
-import { Dispatch, SetStateAction, useState } from "react";
+import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
 import { HiUserGroup } from "react-icons/hi";
 import { FaGear } from "react-icons/fa6";
 import { MdPeople } from "react-icons/md";
@@ -53,13 +53,22 @@ export default function TournamentTabs({
   activeTab,
   setActiveTab
 }: TournamentTabsProps) {
+  const tabsRef = useRef(null);
+
+  // Use effect to programmatically change tabs when activeTab state changes
+  useEffect(() => {
+    if (tabsRef.current) {
+      tabsRef.current.setActiveTab(activeTab);
+    }
+  }, [activeTab]);
   return (
     <Tabs
+      ref={tabsRef}
       aria-label="Tournament tabs"
       style={{ marginTop: "1rem" }}
       onActiveTabChange={(tab) => setActiveTab(tab)}
     >
-      <Tabs.Item active title="Participants" icon={HiUserGroup}>
+      <Tabs.Item title="Participants" icon={HiUserGroup}>
         <div className="flex justify-between flex-wrap gap-3 items-center mb-6">
           <h2 className="text-2xl font-bold" style={{ width: "200px" }}>
             Participants
