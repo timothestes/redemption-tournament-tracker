@@ -31,6 +31,8 @@ interface TournamentTabsProps {
   createPairing: (round: number) => void;
   matchErrorIndex: any;
   setMatchErrorIndex: Dispatch<SetStateAction<any>>;
+  activeTab: number;
+  setActiveTab: Dispatch<SetStateAction<number>>;
 }
 
 export default function TournamentTabs({
@@ -47,9 +49,10 @@ export default function TournamentTabs({
   setLatestRound,
   createPairing,
   matchErrorIndex,
-  setMatchErrorIndex
+  setMatchErrorIndex,
+  activeTab,
+  setActiveTab
 }: TournamentTabsProps) {
-  const [activeTab, setActiveTab] = useState(0);
   return (
     <Tabs
       aria-label="Tournament tabs"

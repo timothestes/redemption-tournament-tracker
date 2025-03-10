@@ -26,6 +26,7 @@ export default function TournamentPage({
   const [newParticipantName, setNewParticipantName] = useState<string>("");
   const [isEditTournamentModalOpen, setIsEditTournamentModalOpen] =
     useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState(0);
   const [isEditParticipantModalOpen, setIsEditParticipantModalOpen] =
     useState<boolean>(false);
   const [newMatchPoints, setNewMatchPoints] = useState<string>("");
@@ -1006,6 +1007,8 @@ export default function TournamentPage({
             createPairing={createPairing}
             matchErrorIndex={matchErrorIndex}
             setMatchErrorIndex={setMatchErrorIndex}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
           />
         </div>
         <EditParticipantModal

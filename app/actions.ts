@@ -49,8 +49,6 @@ export const signInAction = async (formData: FormData) => {
     password,
   });
 
-  console.log(error.message);
-
   if (error) {
     return encodedRedirect("error", "/sign-in", error.message);
   }
