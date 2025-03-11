@@ -21,6 +21,18 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
   onEdit,
   onDelete,
 }) => {
+  const sortedParticipants = participants.sort((a, b) => {
+    const mpA = a.match_points !== null ? a.match_points : -Infinity;
+    const mpB = b.match_points !== null ? b.match_points : -Infinity;
+
+    if (mpA !== mpB) {
+      return mpB - mpA; // sort descending by match_points
+    }
+
+    const diffA = a.differential !== null ? a.differential : -Infinity;
+    const diffB = b.differential !== null ? b.differential : -Infinity;
+    return diffB - diffA; // sort descending by differential if match_points are equal
+  });
   return (
     <Table hoverable>
       <Table.Head>
@@ -32,7 +44,7 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
         </Table.HeadCell>
       </Table.Head>
       <Table.Body>
-        {participants.map((participant) => (
+        {sortedParticipants.map((participant) => (
           <Table.Row
             key={participant.id}
             className="bg-white dark:border-gray-700 dark:bg-gray-800"
