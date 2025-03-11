@@ -1013,7 +1013,6 @@ export default function TournamentPage({
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             fetchParticipants={fetchParticipants}
-            currentRound={tournament?.current_round}
           />
         </div>
         <EditParticipantModal

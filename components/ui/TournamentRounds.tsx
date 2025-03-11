@@ -2,7 +2,7 @@
 
 import { Button, Card, Pagination } from "flowbite-react";
 import { createClient } from "../../utils/supabase/client";
-import { useState, useEffect, useCallback, Fragment, Dispatch, SetStateAction } from "react";
+import { useState, useEffect, useCallback, Fragment, Dispatch, SetStateAction, useRef } from "react";
 import MatchEditModal from "./match-edit";
 
 const formatDateTime = (timestamp: string | null) => {
@@ -30,7 +30,6 @@ interface TournamentRoundsProps {
   matchErrorIndex: any;
   setMatchErrorIndex: Dispatch<SetStateAction<any>>;
   activeTab: number;
-  currentRound: number;
 }
 
 interface TournamentInfo {
@@ -58,18 +57,18 @@ export default function TournamentRounds({
   createPairing,
   matchErrorIndex,
   setMatchErrorIndex,
-  activeTab,
-  currentRound
+  activeTab
 }: TournamentRoundsProps) {
   const [tournamentInfo, setTournamentInfo] = useState<TournamentInfo>({
     n_rounds: null,
     current_round: null,
     has_ended: false,
   });
+  const hasFetchedTournament = useRef<boolean>(false);
   const client = createClient();
   const [error, setError] = useState<ErrorState>({ message: null, type: null });
   const [isLoading, setIsLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(currentRound || 1);
+  const [currentPage, setCurrentPage] = useState(tournamentInfo.current_round || 1);
   const [isRoundActive, setIsRoundActive] = useState(false);
   const [roundInfo, setRoundInfo] = useState<RoundInfo>({
     started_at: null,
@@ -90,6 +89,14 @@ export default function TournamentRounds({
       onRoundActiveChange?.(isRoundActive, roundInfo.started_at);
     }
   }, [isRoundActive, isActive, onRoundActiveChange, roundInfo.started_at]);
+
+  // To get the current page when shifting between tabs.
+  useEffect(() => {
+    if (tournamentInfo.current_round && !hasFetchedTournament.current) {
+      setCurrentPage(tournamentInfo.current_round);
+      hasFetchedTournament.current = true;
+    }
+  }, [tournamentInfo, hasFetchedTournament])
 
   const fetchTournamentAndRoundInfo = useCallback(async () => {
     if (!tournamentId) return;

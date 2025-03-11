@@ -34,7 +34,6 @@ interface TournamentTabsProps {
   activeTab: number;
   setActiveTab: Dispatch<SetStateAction<number>>;
   fetchParticipants: () => void;
-  currentRound: number | null;
 }
 
 export default function TournamentTabs({
@@ -55,7 +54,6 @@ export default function TournamentTabs({
   activeTab,
   setActiveTab,
   fetchParticipants,
-  currentRound
 }: TournamentTabsProps) {
   const tabsRef = useRef(null);
 
@@ -157,7 +155,6 @@ export default function TournamentTabs({
             matchErrorIndex={matchErrorIndex}
             setMatchErrorIndex={setMatchErrorIndex}
             activeTab={activeTab}
-            currentRound={currentRound}
           />
         </div>
       </Tabs.Item>
