@@ -194,9 +194,10 @@ export default function TournamentRounds({
       )
       .eq("tournament_id", tournamentId)
       .eq("round", currentPage)
-      .order("id", { ascending: true });
+      .order("player1_match_points", { ascending: false });
 
     if (error) console.log(error);
+    console.log(JSON.stringify(data));
     setMatches(data || []);
 
     const { data: byeData, error: byeError } = await client
