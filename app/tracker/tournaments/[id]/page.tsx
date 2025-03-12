@@ -202,7 +202,7 @@ export default function TournamentPage({
       const { data: byeData, error: byeError } = await client
         .from("byes")
         .select(
-          "id, participant_id:participants(id, name, match_points, differential)"
+          "id, participant_id:participants(id, name), match_points, differential"
         )
         .eq("tournament_id", tournament.id)
         .eq("round_number", latestRound.round_number)
@@ -344,15 +344,15 @@ export default function TournamentPage({
         }
       }
 
-
       // Updating byes
       if (byes && byes.length > 0) {
         byes.forEach(async (bye) => {
           // Updating the participant match_points
           const { error: participantUpdateError } = await client.from("participants").update({
-            match_points: (bye.participant_id.match_points ?? 0) + 3,
-            differential: (bye.participant_id.differential ?? 0),
+            match_points: (bye.match_points ?? 0),
+            differential: (bye.differential ?? 0),
           }).eq("id", bye.participant_id.id);
+          if (participantUpdateError) console.log(participantUpdateError);
         })
       }
 
@@ -811,15 +811,15 @@ export default function TournamentPage({
       }
 
       // Update player's match points - a bye counts as a win (3 match points)
-      const { error: updateError } = await client
-        .from("participants")
-        .update({ match_points: client.raw('match_points + 3') })
-        .eq("id", playerId)
-        .eq("tournament_id", tournamentId);
+      // const { error: updateError } = await client
+      //   .from("participants")
+      //   .update({ match_points: (participant.match_points || 0) + 3 })
+      //   .eq("id", playerId)
+      //   .eq("tournament_id", tournamentId);
 
-      if (updateError) {
-        console.error("Error updating match points for bye:", updateError);
-      }
+      // if (updateError) {
+      //   console.error("Error updating match points for bye:", updateError);
+      // }
     } catch (error) {
       console.error("Error in assignBye:", error);
     }

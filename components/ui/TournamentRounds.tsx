@@ -332,10 +332,11 @@ export default function TournamentRounds({
         byes.forEach(async (bye) => {
           // Updating the participant match_points
           const { error: participantUpdateError } = await client.from("participants").update({
-            match_points: (bye.participant_id.match_points ?? 0) + 3,
-            differential: (bye.participant_id.differential ?? 0),
+            match_points: (bye.match_points ?? 0),
+            differential: (bye.differential ?? 0),
           }).eq("id", bye.participant_id.id);
-        })
+          if (participantUpdateError) console.log(participantUpdateError);
+        });
       }
 
       // Update the database

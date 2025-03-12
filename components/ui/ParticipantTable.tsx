@@ -1,6 +1,7 @@
 import React from "react";
 import { Table } from "flowbite-react";
 import { HiPencil, HiTrash } from "react-icons/hi";
+import { Crown } from "lucide-react";
 
 interface Participant {
   id: string;
@@ -33,6 +34,9 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
     const diffB = b.differential !== null ? b.differential : -Infinity;
     return diffB - diffA; // sort descending by differential if match_points are equal
   });
+
+  const winnerMatchPoints = sortedParticipants[0].match_points || 0;
+  const winnerDifferential = sortedParticipants[0].differential || 0;
   return (
     <Table hoverable>
       <Table.Head>
@@ -44,13 +48,14 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
         </Table.HeadCell>
       </Table.Head>
       <Table.Body>
-        {sortedParticipants.map((participant) => (
-          <Table.Row
+        {sortedParticipants.map((participant, index) => {
+          const isWinner = participant.match_points === winnerMatchPoints && participant.differential === winnerDifferential;
+          return <Table.Row
             key={participant.id}
-            className="bg-white dark:border-gray-700 dark:bg-gray-800"
+            className={`${isWinner ? "dark:border-yellow-700 dark:bg-yellow-500/50" : "dark:border-gray-700 dark:bg-gray-800"} `}
           >
-            <Table.Cell className="whitespace-nowrap font-medium text-gray-900 dark:text-white">
-              {participant.name}
+            <Table.Cell className="whitespace-nowrap font-medium text-gray-900 dark:text-white inline-flex items-center gap-2">
+              {isWinner && <Crown className="w-4 h-4 text-orange-300" />} {participant.name}
             </Table.Cell>
             <Table.Cell>{participant.match_points}</Table.Cell>
             <Table.Cell>{participant.differential}</Table.Cell>
@@ -67,7 +72,7 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
               />
             </Table.Cell>
           </Table.Row>
-        ))}
+        })}
       </Table.Body>
     </Table>
   );
