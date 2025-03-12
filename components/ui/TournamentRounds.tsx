@@ -77,6 +77,7 @@ export default function TournamentRounds({
   const [matches, setMatches] = useState<any[]>([]);
   const [matchLoading, setMatchLoading] = useState(false);
   const [byes, setByes] = useState<any[]>([]);
+  const [matchEnding, setMatchEnding] = useState(false);
 
   // Making the fetch funcationality work if the activeTab is changed
   useEffect(() => {
@@ -197,7 +198,6 @@ export default function TournamentRounds({
       .order("player1_match_points", { ascending: false });
 
     if (error) console.log(error);
-    console.log(JSON.stringify(data));
     setMatches(data || []);
 
     const { data: byeData, error: byeError } = await client
@@ -221,6 +221,7 @@ export default function TournamentRounds({
     const client = createClient();
 
     let matchErrorIndexArr = [];
+    setMatchEnding(true);
 
     // Checking if the user has not added the score
     matches.forEach((match, index) => {
@@ -390,6 +391,7 @@ export default function TournamentRounds({
       }));
       setIsRoundActive(false);
       setLatestRound((prev) => ({ round_number: currentPage, started_at: null }));
+      setMatchEnding(false);
 
       // If not on the last round, go to the next page
       if (currentPage < tournamentInfo.n_rounds) {
@@ -440,6 +442,7 @@ export default function TournamentRounds({
                         onClick={
                           isRoundActive ? handleEndRound : handleStartRound
                         }
+                        disabled={matchEnding}
                       >
                         {isRoundActive ? "End Round" : "Start Round"}
                       </Button>
