@@ -65,7 +65,7 @@ const SideNav: React.FC = () => {
                 className="pl-2"
               >
                 <Sidebar.Item
-                  href="https://landofredemption.com/wp-content/uploads/2023/11/REG_PDF_9.0.0.pdf"
+                  href="https://landofredemption.com/wp-content/uploads/2025/03/REG_PDF_10.0.0.pdf"
                   target="_blank"
                   rel="noopener noreferrer"
                   icon={PiPencilLineBold}
@@ -74,7 +74,7 @@ const SideNav: React.FC = () => {
                   REG (Official Rulebook)
                 </Sidebar.Item>
                 <Sidebar.Item
-                  href="https://landofredemption.com/wp-content/uploads/2023/11/ORDIR_PDF_5.0.0.pdf"
+                  href="https://landofredemption.com/wp-content/uploads/2025/03/ORDIR_PDF_6.0.0.pdf"
                   target="_blank"
                   rel="noopener noreferrer"
                   icon={FaBookOpen}
@@ -92,7 +92,7 @@ const SideNav: React.FC = () => {
                   Deck Building Rules
                 </Sidebar.Item>
                 <Sidebar.Item
-                  href="https://landofredemption.com/wp-content/uploads/2024/03/Redemption_Host_Guide_2024.pdf"
+                  href="https://landofredemption.com/wp-content/uploads/2025/03/Redemption_Host_Guide_2025.pdf"
                   target="_blank"
                   rel="noopener noreferrer"
                   icon={TbArrowGuideFilled}
