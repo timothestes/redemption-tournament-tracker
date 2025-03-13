@@ -9,11 +9,13 @@ export default function MatchEditModal({
   match,
   fetchCurrentRoundData,
   setMatchErrorIndex,
+  isRoundActive,
   index
 }: {
   match: any;
   fetchCurrentRoundData: any;
   setMatchErrorIndex: Dispatch<SetStateAction<number[]>>;
+  isRoundActive: boolean;
   index: number;
 }) {
   const [open, setOpen] = useState(false);
@@ -30,6 +32,11 @@ export default function MatchEditModal({
       player2Score > 5
     ) {
       alert("Invalid scores. Scores must be between 0 and 5, inclusive.");
+      return;
+    }
+
+    if (player1Score === 5 && player2Score === 5) {
+      alert("Score cannot be 5-5.");
       return;
     }
 
@@ -56,14 +63,11 @@ export default function MatchEditModal({
       player2_match_points = 3;
     } else if (player1Score > player2Score) {
       player1_match_points = 2;
-      player2_match_points = 0;
+      player2_match_points = 1;
     } else if (player2Score > player1Score) {
-      player1_match_points = 0;
+      player1_match_points = 1;
       player2_match_points = 2;
     }
-
-
-    console.log(player1.data, player2.data);
 
     const { data, error } = await client
       .from("matches")
@@ -97,9 +101,13 @@ export default function MatchEditModal({
   return (
     <>
       <Pencil
-        className="text-blue-300 hover:text-blue-500 transition cursor-pointer"
+        className={`${isRoundActive ? "text-blue-300 hover:text-blue-500 transition cursor-pointer" : ""}`}
         size={16}
-        onClick={() => setOpen(!open)}
+        onClick={() => {
+          if (isRoundActive) {
+            setOpen(!open)
+          }
+        }}
       />
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">

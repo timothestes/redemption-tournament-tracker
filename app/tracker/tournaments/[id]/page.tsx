@@ -26,6 +26,7 @@ export default function TournamentPage({
   const [newParticipantName, setNewParticipantName] = useState<string>("");
   const [isEditTournamentModalOpen, setIsEditTournamentModalOpen] =
     useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState(0);
   const [isEditParticipantModalOpen, setIsEditParticipantModalOpen] =
     useState<boolean>(false);
   const [newMatchPoints, setNewMatchPoints] = useState<string>("");
@@ -184,7 +185,7 @@ export default function TournamentPage({
 
     // Handle tournament end
     const now = new Date().toISOString();
-    if (!latestRound.is_completed) {
+    if (latestRound && !latestRound?.is_completed) {
       const client = await createClient();
 
       const { data, error } = await client
@@ -201,7 +202,7 @@ export default function TournamentPage({
       const { data: byeData, error: byeError } = await client
         .from("byes")
         .select(
-          "id, participant_id:participants(id, name, match_points, differential)"
+          "id, participant_id:participants(id, name), match_points, differential"
         )
         .eq("tournament_id", tournament.id)
         .eq("round_number", latestRound.round_number)
@@ -322,7 +323,7 @@ export default function TournamentPage({
             }).eq("id", match.player1_id.id),
 
             client.from("participants").update({
-              match_points: (participant2.match_points || 0),
+              match_points: (participant2.match_points || 0) + 1,
               differential: (match.player2_score - match.player1_score) + (participant2.differential || 0),
             }).eq("id", match.player2_id.id),
           ]);
@@ -336,22 +337,22 @@ export default function TournamentPage({
             }).eq("id", match.player2_id.id),
 
             client.from("participants").update({
-              match_points: (participant1.match_points || 0),
+              match_points: (participant1.match_points || 0) + 1,
               differential: (match.player1_score - match.player2_score) + (participant1.differential || 0),
             }).eq("id", match.player1_id.id),
           ]);
         }
       }
 
-
       // Updating byes
       if (byes && byes.length > 0) {
         byes.forEach(async (bye) => {
           // Updating the participant match_points
           const { error: participantUpdateError } = await client.from("participants").update({
-            match_points: (bye.participant_id.match_points ?? 0) + 3,
-            differential: (bye.participant_id.differential ?? 0),
+            match_points: (bye.match_points ?? 0),
+            differential: (bye.differential ?? 0),
           }).eq("id", bye.participant_id.id);
+          if (participantUpdateError) console.log(participantUpdateError);
         })
       }
 
@@ -430,7 +431,8 @@ export default function TournamentPage({
       setTournament(data);
       setShowStartModal(false);
       // Creating pairing for the first round if the user has started the tournament.
-      createPairing(1);
+      await createPairing(1);
+      setActiveTab(1);
       showToast("Tournament started successfully!", "success");
     } catch (error) {
       showToast("Error starting tournament.", "error");
@@ -465,6 +467,7 @@ export default function TournamentPage({
       .from("participants")
       .select("id, match_points, differential, name")
       .eq("tournament_id", tournament.id)
+      .eq("dropped_out", false)
       .order('match_points', { ascending: false })
       .order('differential', { ascending: false });
 
@@ -548,6 +551,7 @@ export default function TournamentPage({
         .from("participants")
         .select("id, match_points, differential, name")
         .eq("tournament_id", tournamentId)
+        .eq("dropped_out", false)
         .order('match_points', { ascending: false })
         .order('differential', { ascending: false });
 
@@ -782,12 +786,24 @@ export default function TournamentPage({
    */
   const assignBye = async (client, tournamentId, round, playerId) => {
     try {
+      const { data: participant, error: participantError } = await client
+        .from("participants")
+        .select("id, match_points, differential")
+        .eq("id", playerId).eq("tournament_id", tournamentId)
+        .single();
+
+      if (participantError) {
+        console.error("Error fetching participant:", participantError);
+        return;
+      }
       // Add a bye record for this player
       const { error: byeError } = await client
         .from("byes")
         .insert({
           tournament_id: tournamentId,
           round_number: round,
+          match_points: (participant.match_points || 0) + 3,
+          differential: (participant.differential || 0),
           participant_id: playerId
         });
 
@@ -797,19 +813,46 @@ export default function TournamentPage({
       }
 
       // Update player's match points - a bye counts as a win (3 match points)
-      const { error: updateError } = await client
-        .from("participants")
-        .update({ match_points: client.raw('match_points + 3') })
-        .eq("id", playerId)
-        .eq("tournament_id", tournamentId);
+      // const { error: updateError } = await client
+      //   .from("participants")
+      //   .update({ match_points: (participant.match_points || 0) + 3 })
+      //   .eq("id", playerId)
+      //   .eq("tournament_id", tournamentId);
 
-      if (updateError) {
-        console.error("Error updating match points for bye:", updateError);
-      }
+      // if (updateError) {
+      //   console.error("Error updating match points for bye:", updateError);
+      // }
     } catch (error) {
       console.error("Error in assignBye:", error);
     }
   };
+
+  const dropOutParticipant = async (id: string) => {
+    const { error } = await supabase
+      .from("participants")
+      .update({ dropped_out: true })
+      .eq("id", id);
+    if (error) {
+      console.error("Error dropping participant:", error);
+
+      return false;
+    }
+    fetchParticipants();
+    return true;
+  }
+
+  const dropInParticipant = async (id: string) => {
+    const { error } = await supabase
+      .from("participants")
+      .update({ dropped_out: false })
+      .eq("id", id);
+    if (error) {
+      console.error("Error dropping participant:", error);
+      return false;
+    }
+    fetchParticipants();
+    return true;
+  }
 
   useEffect(() => {
     if (tournament) {
@@ -837,6 +880,7 @@ export default function TournamentPage({
     if (id) {
       fetchTournamentDetails();
       fetchParticipants();
+
     }
   }, [id]);
 
@@ -969,6 +1013,7 @@ export default function TournamentPage({
             </div>
           )}
           <TournamentTabs
+            key={activeTab}
             participants={participants}
             isModalOpen={isModalOpen}
             setIsModalOpen={setIsModalOpen}
@@ -983,6 +1028,8 @@ export default function TournamentPage({
             }}
             setLatestRound={setLatestRound}
             onDelete={deleteParticipant}
+            onDropOut={dropOutParticipant}
+            onDropIn={dropInParticipant}
             loading={loading}
             tournamentId={id || ""}
             tournamentStarted={tournament?.has_started || false}
@@ -994,6 +1041,9 @@ export default function TournamentPage({
             createPairing={createPairing}
             matchErrorIndex={matchErrorIndex}
             setMatchErrorIndex={setMatchErrorIndex}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            fetchParticipants={fetchParticipants}
           />
         </div>
         <EditParticipantModal
@@ -1009,6 +1059,7 @@ export default function TournamentPage({
           setNewDifferential={setNewDifferential}
           newDroppedOut={newDroppedOut}
           setNewDroppedOut={setNewDroppedOut}
+          isTournamentStarted={tournament?.has_started}
         />
         <TournamentStartModal
           isOpen={showStartModal}

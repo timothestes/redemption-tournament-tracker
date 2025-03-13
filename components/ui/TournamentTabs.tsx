@@ -1,7 +1,7 @@
 "use client";
 
 import { Tabs, Card } from "flowbite-react";
-import { Dispatch, SetStateAction, useState } from "react";
+import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
 import { HiUserGroup } from "react-icons/hi";
 import { FaGear } from "react-icons/fa6";
 import { MdPeople } from "react-icons/md";
@@ -19,6 +19,8 @@ interface TournamentTabsProps {
   onAddParticipant: (name: string) => void;
   onEdit: (participant: any) => void;
   onDelete: (id: string) => void;
+  onDropOut: (id: string) => void;
+  onDropIn: (id: string) => void;
   loading: boolean;
   tournamentId: string;
   tournamentStarted?: boolean;
@@ -31,6 +33,9 @@ interface TournamentTabsProps {
   createPairing: (round: number) => void;
   matchErrorIndex: any;
   setMatchErrorIndex: Dispatch<SetStateAction<any>>;
+  activeTab: number;
+  setActiveTab: Dispatch<SetStateAction<number>>;
+  fetchParticipants: () => void;
 }
 
 export default function TournamentTabs({
@@ -40,6 +45,8 @@ export default function TournamentTabs({
   onAddParticipant,
   onEdit,
   onDelete,
+  onDropOut,
+  onDropIn,
   loading,
   tournamentId,
   tournamentStarted = false,
@@ -47,16 +54,31 @@ export default function TournamentTabs({
   setLatestRound,
   createPairing,
   matchErrorIndex,
-  setMatchErrorIndex
+  setMatchErrorIndex,
+  activeTab,
+  setActiveTab,
+  fetchParticipants,
 }: TournamentTabsProps) {
-  const [activeTab, setActiveTab] = useState(0);
+  const tabsRef = useRef(null);
+
+  // Use effect to programmatically change tabs when activeTab state changes
+  useEffect(() => {
+    if (tabsRef.current) {
+      tabsRef.current.setActiveTab(activeTab);
+    }
+
+    if (activeTab === 0) {
+      fetchParticipants();
+    }
+  }, [activeTab]);
   return (
     <Tabs
+      ref={tabsRef}
       aria-label="Tournament tabs"
       style={{ marginTop: "1rem" }}
       onActiveTabChange={(tab) => setActiveTab(tab)}
     >
-      <Tabs.Item active title="Participants" icon={HiUserGroup}>
+      <Tabs.Item title="Participants" icon={HiUserGroup}>
         <div className="flex justify-between flex-wrap gap-3 items-center mb-6">
           <h2 className="text-2xl font-bold" style={{ width: "200px" }}>
             Participants
@@ -104,9 +126,12 @@ export default function TournamentTabs({
         ) : (
           <div className="w-[800px] max-xl:w-full mx-auto overflow-x-auto">
             <ParticipantTable
+              tournamentStarted={tournamentStarted}
               participants={participants}
               onEdit={onEdit}
               onDelete={onDelete}
+              onDropOut={onDropOut}
+              onDropIn={onDropIn}
             />
           </div>
         )}
@@ -136,6 +161,7 @@ export default function TournamentTabs({
             createPairing={createPairing}
             matchErrorIndex={matchErrorIndex}
             setMatchErrorIndex={setMatchErrorIndex}
+            activeTab={activeTab}
           />
         </div>
       </Tabs.Item>

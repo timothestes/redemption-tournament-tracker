@@ -5,7 +5,7 @@ export default function TournamentsLayout({ children }) {
   return (
     <>
       <SideNav />
-      <div className="flex-1 w-full overflow-hidden flex flex-col gap-20 items-center">
+      <div className="flex-1 w-full overflow-hidden flex flex-col gap-9 items-center">
         <Header />
         <div className="flex flex-col w-full">
           <div className="w-full flex">{children}</div>

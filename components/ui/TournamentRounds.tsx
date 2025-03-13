@@ -2,7 +2,7 @@
 
 import { Button, Card, Pagination } from "flowbite-react";
 import { createClient } from "../../utils/supabase/client";
-import { useState, useEffect, useCallback, Fragment, Dispatch, SetStateAction } from "react";
+import { useState, useEffect, useCallback, Fragment, Dispatch, SetStateAction, useRef } from "react";
 import MatchEditModal from "./match-edit";
 
 const formatDateTime = (timestamp: string | null) => {
@@ -29,6 +29,7 @@ interface TournamentRoundsProps {
   createPairing: (round: number) => void;
   matchErrorIndex: any;
   setMatchErrorIndex: Dispatch<SetStateAction<any>>;
+  activeTab: number;
 }
 
 interface TournamentInfo {
@@ -55,17 +56,19 @@ export default function TournamentRounds({
   setLatestRound,
   createPairing,
   matchErrorIndex,
-  setMatchErrorIndex
+  setMatchErrorIndex,
+  activeTab
 }: TournamentRoundsProps) {
   const [tournamentInfo, setTournamentInfo] = useState<TournamentInfo>({
     n_rounds: null,
     current_round: null,
     has_ended: false,
   });
+  const hasFetchedTournament = useRef<boolean>(false);
   const client = createClient();
   const [error, setError] = useState<ErrorState>({ message: null, type: null });
   const [isLoading, setIsLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(tournamentInfo.current_round || 1);
   const [isRoundActive, setIsRoundActive] = useState(false);
   const [roundInfo, setRoundInfo] = useState<RoundInfo>({
     started_at: null,
@@ -74,6 +77,12 @@ export default function TournamentRounds({
   const [matches, setMatches] = useState<any[]>([]);
   const [matchLoading, setMatchLoading] = useState(false);
   const [byes, setByes] = useState<any[]>([]);
+  const [matchEnding, setMatchEnding] = useState(false);
+
+  // Making the fetch funcationality work if the activeTab is changed
+  useEffect(() => {
+    fetchTournamentAndRoundInfo()
+  }, [activeTab])
 
   // Make roundInfo available to parent component
   useEffect(() => {
@@ -81,6 +90,14 @@ export default function TournamentRounds({
       onRoundActiveChange?.(isRoundActive, roundInfo.started_at);
     }
   }, [isRoundActive, isActive, onRoundActiveChange, roundInfo.started_at]);
+
+  // To get the current page when shifting between tabs.
+  useEffect(() => {
+    if (tournamentInfo.current_round && !hasFetchedTournament.current) {
+      setCurrentPage(tournamentInfo.current_round);
+      hasFetchedTournament.current = true;
+    }
+  }, [tournamentInfo, hasFetchedTournament])
 
   const fetchTournamentAndRoundInfo = useCallback(async () => {
     if (!tournamentId) return;
@@ -126,7 +143,7 @@ export default function TournamentRounds({
     } finally {
       setIsLoading(false);
     }
-  }, [tournamentId, currentPage]);
+  }, [tournamentId, currentPage, activeTab]);
 
   useEffect(() => {
     if (isActive) {
@@ -178,7 +195,7 @@ export default function TournamentRounds({
       )
       .eq("tournament_id", tournamentId)
       .eq("round", currentPage)
-      .order("id", { ascending: true });
+      .order("player1_match_points", { ascending: false });
 
     if (error) console.log(error);
     setMatches(data || []);
@@ -186,7 +203,7 @@ export default function TournamentRounds({
     const { data: byeData, error: byeError } = await client
       .from("byes")
       .select(
-        "id, participant_id:participants(id, name, match_points, differential)"
+        "id, participant_id:participants(id, name), match_points, differential"
       )
       .eq("tournament_id", tournamentId)
       .eq("round_number", currentPage)
@@ -204,6 +221,7 @@ export default function TournamentRounds({
     const client = createClient();
 
     let matchErrorIndexArr = [];
+    setMatchEnding(true);
 
     // Checking if the user has not added the score
     matches.forEach((match, index) => {
@@ -290,7 +308,7 @@ export default function TournamentRounds({
             }).eq("id", match.player1_id.id),
 
             client.from("participants").update({
-              match_points: (participant2.match_points || 0),
+              match_points: (participant2.match_points || 0) + 1,
               differential: (match.player2_score - match.player1_score) + (participant2.differential || 0),
             }).eq("id", match.player2_id.id),
           ]);
@@ -304,7 +322,7 @@ export default function TournamentRounds({
             }).eq("id", match.player2_id.id),
 
             client.from("participants").update({
-              match_points: (participant1.match_points || 0),
+              match_points: (participant1.match_points || 0) + 1,
               differential: (match.player1_score - match.player2_score) + (participant1.differential || 0),
             }).eq("id", match.player1_id.id),
           ]);
@@ -316,10 +334,11 @@ export default function TournamentRounds({
         byes.forEach(async (bye) => {
           // Updating the participant match_points
           const { error: participantUpdateError } = await client.from("participants").update({
-            match_points: (bye.participant_id.match_points ?? 0) + 3,
-            differential: (bye.participant_id.differential ?? 0),
+            match_points: (bye.match_points ?? 0),
+            differential: (bye.differential ?? 0),
           }).eq("id", bye.participant_id.id);
-        })
+          if (participantUpdateError) console.log(participantUpdateError);
+        });
       }
 
       // Update the database
@@ -372,6 +391,7 @@ export default function TournamentRounds({
       }));
       setIsRoundActive(false);
       setLatestRound((prev) => ({ round_number: currentPage, started_at: null }));
+      setMatchEnding(false);
 
       // If not on the last round, go to the next page
       if (currentPage < tournamentInfo.n_rounds) {
@@ -422,6 +442,7 @@ export default function TournamentRounds({
                         onClick={
                           isRoundActive ? handleEndRound : handleStartRound
                         }
+                        disabled={matchEnding}
                       >
                         {isRoundActive ? "End Round" : "Start Round"}
                       </Button>
@@ -477,6 +498,7 @@ export default function TournamentRounds({
                                   match={match}
                                   fetchCurrentRoundData={fetchCurrentRoundData}
                                   setMatchErrorIndex={setMatchErrorIndex}
+                                  isRoundActive={isRoundActive}
                                   index={index}
                                 />
                               </td>
@@ -503,6 +525,7 @@ export default function TournamentRounds({
                                   match={match}
                                   fetchCurrentRoundData={fetchCurrentRoundData}
                                   setMatchErrorIndex={setMatchErrorIndex}
+                                  isRoundActive={isRoundActive}
                                   index={index}
                                 />
                               </td>
@@ -527,6 +550,9 @@ export default function TournamentRounds({
                             Match Points
                           </th>
                           <th scope="col" className="px-4 py-2 text-center">
+                            Differential
+                          </th>
+                          <th scope="col" className="px-4 py-2 text-center">
                             Name
                           </th>
                         </tr>
@@ -540,7 +566,10 @@ export default function TournamentRounds({
                                   {index + 1}
                                 </td>
                                 <td className="px-4 py-2 text-center border-r border-zinc-400">
-                                  0
+                                  {bye.match_points}
+                                </td>
+                                <td className="px-4 py-2 text-center border-r border-zinc-400">
+                                  {bye.differential}
                                 </td>
                                 <td className="px-4 py-2 text-center border-r border-zinc-400">
                                   {bye.participant_id.name}
