@@ -121,11 +121,11 @@ export default function MatchEditModal({
                     <span className="text-white font-medium">
                       {match.player1_id.name}
                     </span>
-                    " Points:{" "}
+                    " Lost Souls:{" "}
                   </h3>
                   <TextInput
                     type="number"
-                    placeholder="Enter points"
+                    placeholder="Souls Rescued"
                     value={player1Score ?? ""}
                     onChange={(event) => {
                       setPlayer1Score(Number(event.target.value));
@@ -140,7 +140,7 @@ export default function MatchEditModal({
                   </h3>
                   <TextInput
                     type="number"
-                    placeholder="Enter points"
+                    placeholder="Souls Rescued"
                     defaultValue={player2Score ?? ""}
                     onChange={(event) => {
                       setPlayer2Score(Number(event.target.value));
