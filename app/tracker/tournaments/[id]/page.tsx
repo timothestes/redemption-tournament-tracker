@@ -467,6 +467,7 @@ export default function TournamentPage({
       .from("participants")
       .select("id, match_points, differential, name")
       .eq("tournament_id", tournament.id)
+      .eq("dropped_out", false)
       .order('match_points', { ascending: false })
       .order('differential', { ascending: false });
 
@@ -550,6 +551,7 @@ export default function TournamentPage({
         .from("participants")
         .select("id, match_points, differential, name")
         .eq("tournament_id", tournamentId)
+        .eq("dropped_out", false)
         .order('match_points', { ascending: false })
         .order('differential', { ascending: false });
 
@@ -825,6 +827,33 @@ export default function TournamentPage({
     }
   };
 
+  const dropOutParticipant = async (id: string) => {
+    const { error } = await supabase
+      .from("participants")
+      .update({ dropped_out: true })
+      .eq("id", id);
+    if (error) {
+      console.error("Error dropping participant:", error);
+
+      return false;
+    }
+    fetchParticipants();
+    return true;
+  }
+
+  const dropInParticipant = async (id: string) => {
+    const { error } = await supabase
+      .from("participants")
+      .update({ dropped_out: false })
+      .eq("id", id);
+    if (error) {
+      console.error("Error dropping participant:", error);
+      return false;
+    }
+    fetchParticipants();
+    return true;
+  }
+
   useEffect(() => {
     if (tournament) {
       (async () => {
@@ -999,6 +1028,8 @@ export default function TournamentPage({
             }}
             setLatestRound={setLatestRound}
             onDelete={deleteParticipant}
+            onDropOut={dropOutParticipant}
+            onDropIn={dropInParticipant}
             loading={loading}
             tournamentId={id || ""}
             tournamentStarted={tournament?.has_started || false}

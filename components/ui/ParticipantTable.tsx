@@ -1,7 +1,7 @@
 import React from "react";
 import { Table } from "flowbite-react";
 import { HiPencil, HiTrash } from "react-icons/hi";
-import { Crown } from "lucide-react";
+import { CircleMinus, CirclePlus, Crown } from "lucide-react";
 
 interface Participant {
   id: string;
@@ -12,15 +12,21 @@ interface Participant {
 }
 
 interface ParticipantTableProps {
+  tournamentStarted: boolean;
   participants: Participant[];
   onEdit: (participant: Participant) => void;
   onDelete: (id: string) => void;
+  onDropOut: (id: string) => void;
+  onDropIn: (id: string) => void;
 }
 
 const ParticipantTable: React.FC<ParticipantTableProps> = ({
+  tournamentStarted,
   participants,
   onEdit,
   onDelete,
+  onDropOut,
+  onDropIn,
 }) => {
   const sortedParticipants = participants.sort((a, b) => {
     const mpA = a.match_points !== null ? a.match_points : -Infinity;
@@ -55,7 +61,7 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
             className={`${isWinner ? "dark:border-yellow-700 dark:bg-yellow-500/50" : "dark:border-gray-700 dark:bg-gray-800"} `}
           >
             <Table.Cell className="whitespace-nowrap font-medium text-gray-900 dark:text-white inline-flex items-center gap-2">
-              {isWinner && <Crown className="w-4 h-4 text-orange-300" />} {participant.name}
+              {isWinner && <Crown className="w-4 h-4 text-orange-300" />} {participant.name} {participant.dropped_out && <span className="text-red-500 text-[12px]">( Dropped )</span>}
             </Table.Cell>
             <Table.Cell>{participant.match_points}</Table.Cell>
             <Table.Cell>{participant.differential}</Table.Cell>
@@ -65,11 +71,24 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
                 className="text-blue-500 cursor-pointer hover:text-blue-700 w-6 h-6"
                 aria-label="Edit"
               />
-              <HiTrash
-                onClick={() => onDelete(participant.id)}
-                className="text-red-500 cursor-pointer hover:text-red-700 w-6 h-6"
-                aria-label="Delete"
-              />
+              {tournamentStarted ?
+                participant.dropped_out ? <CirclePlus
+                  onClick={() => onDropIn(participant.id)}
+                  className="text-gray-400 cursor-pointer hover:text-gray-300 w-6 h-6"
+                  aria-label="Delete"
+                /> :
+                  <CircleMinus
+                    onClick={() => onDropOut(participant.id)}
+                    className="text-red-400 cursor-pointer hover:text-red-600 w-6 h-6"
+                    aria-label="Delete"
+                  />
+                : (
+                  <HiTrash
+                    onClick={() => onDelete(participant.id)}
+                    className="text-red-500 cursor-pointer hover:text-red-700 w-6 h-6"
+                    aria-label="Drop"
+                  />
+                )}
             </Table.Cell>
           </Table.Row>
         })}

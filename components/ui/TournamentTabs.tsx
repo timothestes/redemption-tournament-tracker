@@ -19,6 +19,8 @@ interface TournamentTabsProps {
   onAddParticipant: (name: string) => void;
   onEdit: (participant: any) => void;
   onDelete: (id: string) => void;
+  onDropOut: (id: string) => void;
+  onDropIn: (id: string) => void;
   loading: boolean;
   tournamentId: string;
   tournamentStarted?: boolean;
@@ -43,6 +45,8 @@ export default function TournamentTabs({
   onAddParticipant,
   onEdit,
   onDelete,
+  onDropOut,
+  onDropIn,
   loading,
   tournamentId,
   tournamentStarted = false,
@@ -122,9 +126,12 @@ export default function TournamentTabs({
         ) : (
           <div className="w-[800px] max-xl:w-full mx-auto overflow-x-auto">
             <ParticipantTable
+              tournamentStarted={tournamentStarted}
               participants={participants}
               onEdit={onEdit}
               onDelete={onDelete}
+              onDropOut={onDropOut}
+              onDropIn={onDropIn}
             />
           </div>
         )}
