@@ -65,7 +65,7 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
             </Table.Cell>
             <Table.Cell>{participant.match_points}</Table.Cell>
             <Table.Cell>{participant.differential}</Table.Cell>
-            <Table.Cell className="flex items-center space-x-4">
+            <Table.Cell className="flex items-center space-x-8">
               <HiPencil
                 onClick={() => onEdit(participant)}
                 className="text-blue-500 cursor-pointer hover:text-blue-700 w-6 h-6"
@@ -79,7 +79,7 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
                 /> :
                   <CircleMinus
                     onClick={() => onDropOut(participant.id)}
-                    className="text-red-400 cursor-pointer hover:text-red-600 w-6 h-6"
+                    className="text-red-500 cursor-pointer hover:text-red-600 w-6 h-6"
                     aria-label="Delete"
                   />
                 : (

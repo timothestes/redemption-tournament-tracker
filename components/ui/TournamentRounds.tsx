@@ -509,17 +509,17 @@ export default function TournamentRounds({
                               <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
                                 {index + 1}
                               </td>
+                              <td className={`px-4 py-2 text-center border-r  text-zinc-200 ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
+                                {match.player1_id.name}
+                              </td>
+                              <td className={`px-4 py-2 text-center border-r  text-zinc-200 ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
+                                {match.player2_id.name}
+                              </td>
                               <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
                                 {match.player2_match_points}
                               </td>
                               <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
                                 {match.differential2 ?? "N/A"}
-                              </td>
-                              <td className={`px-4 py-2 text-center border-r  text-zinc-200 ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
-                                {match.player2_id.name}
-                              </td>
-                              <td className={`px-4 py-2 text-center border-r  text-zinc-200 ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
-                                {match.player1_id.name}
                               </td>
                               <td className="px-2">
                                 <MatchEditModal
