@@ -452,20 +452,20 @@ export default function TournamentRounds({
                   {matches && matches.length > 0 && <table className="min-w-full text-sm text-left text-gray-400 border-2 border-gray-300">
                     <thead className="text-xs text-zinc-100 uppercase font-normal bg-gray-900 border-b-2 border-gray-300 rounded-t-lg">
                       <tr>
-                        <th scope="col" className="px-6 py-4">
-                          Index
-                        </th>
                         <th scope="col" className="px-4 py-2 text-center">
-                          Match Points
-                        </th>
-                        <th scope="col" className="px-4 py-2 text-center">
-                          Differential
+                          Table
                         </th>
                         <th scope="col" className="px-4 py-2 text-center">
                           Name
                         </th>
                         <th scope="col" className="px-4 py-2 text-center">
                           Opponent
+                        </th>
+                        <th scope="col" className="px-4 py-2 text-center">
+                          Match Points
+                        </th>
+                        <th scope="col" className="px-4 py-2 text-center">
+                          Differential
                         </th>
                         <th scope="col" className="px-4 py-2 text-right">
                           <span className="sr-only">Actions</span>
@@ -480,17 +480,17 @@ export default function TournamentRounds({
                               <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
                                 {index + 1}
                               </td>
-                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
-                                {match.player1_match_points}
-                              </td>
-                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
-                                {match.differential ?? "N/A"}
-                              </td>
                               <td className={`px-4 py-2 text-center border-r  text-zinc-200 ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
                                 {match.player1_id.name}
                               </td>
                               <td className={`px-4 py-2 text-center border-r  text-zinc-200 ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
                                 {match.player2_id.name}
+                              </td>
+                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
+                                {match.player1_match_points}
+                              </td>
+                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-zinc-400"}`}>
+                                {match.differential ?? "N/A"}
                               </td>
                               <td className="px-2">
                                 <MatchEditModal
@@ -544,7 +544,13 @@ export default function TournamentRounds({
                       <thead className="text-xs text-zinc-100 uppercase font-normal bg-gray-900 border-b-2 border-gray-300 rounded-t-lg">
                         <tr>
                           <th scope="col" className="px-4 py-2 text-center">
-                            Index
+                            Table
+                          </th>
+                          <th scope="col" className="px-4 py-2 text-center">
+                            Name
+                          </th>
+                          <th scope="col" className="px-4 py-2 text-center">
+                            Opponent
                           </th>
                           <th scope="col" className="px-4 py-2 text-center">
                             Match Points
@@ -552,8 +558,8 @@ export default function TournamentRounds({
                           <th scope="col" className="px-4 py-2 text-center">
                             Differential
                           </th>
-                          <th scope="col" className="px-4 py-2 text-center">
-                            Name
+                          <th scope="col" className="px-4 py-2 text-right">
+                            <span className="sr-only">Actions</span>
                           </th>
                         </tr>
                       </thead>
@@ -566,13 +572,16 @@ export default function TournamentRounds({
                                   {index + 1}
                                 </td>
                                 <td className="px-4 py-2 text-center border-r border-zinc-400">
+                                  {bye.participant_id.name}
+                                </td>
+                                <td className="px-4 py-2 text-center border-r border-zinc-400">
+                                  N/A
+                                </td>
+                                <td className="px-4 py-2 text-center border-r border-zinc-400">
                                   {bye.match_points}
                                 </td>
                                 <td className="px-4 py-2 text-center border-r border-zinc-400">
                                   {bye.differential}
-                                </td>
-                                <td className="px-4 py-2 text-center border-r border-zinc-400">
-                                  {bye.participant_id.name}
                                 </td>
                                 {/* <td className="px-2">
                                 <MatchEditModal
