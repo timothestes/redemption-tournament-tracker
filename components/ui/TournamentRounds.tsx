@@ -221,7 +221,6 @@ export default function TournamentRounds({
     const client = createClient();
 
     let matchErrorIndexArr = [];
-    setMatchEnding(true);
 
     // Checking if the user has not added the score
     matches.forEach((match, index) => {
@@ -235,6 +234,8 @@ export default function TournamentRounds({
       alert("Please add scores to all matches.");
       return;
     }
+
+    setMatchEnding(true);
 
     try {
       const now = new Date().toISOString();
@@ -399,6 +400,7 @@ export default function TournamentRounds({
       }
     } catch (error) {
       console.error("Error ending round:", error);
+      setMatchEnding(false);
     }
   }, [matches]);
 
