@@ -1,8 +1,8 @@
 "use client";
 
 import { Button, Card, Pagination } from "flowbite-react";
+import { Dispatch, Fragment, SetStateAction, useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "../../utils/supabase/client";
-import { useState, useEffect, useCallback, Fragment, Dispatch, SetStateAction, useRef } from "react";
 import MatchEditModal from "./match-edit";
 
 const formatDateTime = (timestamp: string | null) => {
@@ -195,7 +195,7 @@ export default function TournamentRounds({
       )
       .eq("tournament_id", tournamentId)
       .eq("round", currentPage)
-      .order("player1_match_points", { ascending: false });
+      .order("id", { ascending: true });
 
     if (error) console.log(error);
     setMatches(data || []);
