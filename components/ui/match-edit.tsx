@@ -100,15 +100,17 @@ export default function MatchEditModal({
 
   return (
     <>
-      <Pencil
-        className={`${isRoundActive ? "text-blue-300 hover:text-blue-500 transition cursor-pointer" : ""}`}
-        size={16}
-        onClick={() => {
-          if (isRoundActive) {
-            setOpen(!open)
-          }
-        }}
-      />
+      <div className="flex items-center justify-center w-full h-full" title={isRoundActive ? "" : "Cannot input scores until round is started"}>
+        <Pencil
+          className={`${isRoundActive ? "text-blue-300 hover:text-blue-500 transition cursor-pointer" : "text-gray-500/50"}`}
+          size={16}
+          onClick={() => {
+            if (isRoundActive) {
+              setOpen(!open)
+            }
+          }}
+        />
+      </div>
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
           <div className="bg-[#1F2937] border-2 border-zinc-300/10 py-6 px-6 rounded-lg shadow-lg max-w-sm w-full">
@@ -136,7 +138,7 @@ export default function MatchEditModal({
                 <div className="flex items-center gap-3">
                   <h3 className="text-lg text-zinc-200 w-full text-end">
                     "<span className="text-white">{match.player2_id.name}</span>
-                    " Points:{" "}
+                    " Lost Souls:{" "}
                   </h3>
                   <TextInput
                     type="number"
