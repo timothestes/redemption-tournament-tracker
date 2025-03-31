@@ -1,17 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { suggestNumberOfRounds } from "../../../../utils/tournamentUtils";
-import TournamentStartModal from "../../../../components/ui/TournamentStartModal";
-import Breadcrumb from "../../../../components/ui/breadcrumb";
-import { createClient } from "../../../../utils/supabase/client";
 import { Button } from "flowbite-react";
+import { useCallback, useEffect, useState } from "react";
 import { HiPencil } from "react-icons/hi";
-import EditTournamentNameModal from "../../../../components/ui/EditTournamentNameModal";
-import TournamentTabs from "../../../../components/ui/TournamentTabs";
-import ToastNotification from "../../../../components/ui/toast-notification";
-import EditParticipantModal from "../../../../components/ui/EditParticipantModal";
 import CountdownTimer from "../../../../components/ui/CountdownTimer";
+import EditParticipantModal from "../../../../components/ui/EditParticipantModal";
+import EditTournamentNameModal from "../../../../components/ui/EditTournamentNameModal";
+import TournamentStartModal from "../../../../components/ui/TournamentStartModal";
+import TournamentTabs from "../../../../components/ui/TournamentTabs";
+import Breadcrumb from "../../../../components/ui/breadcrumb";
+import ToastNotification from "../../../../components/ui/toast-notification";
+import { createClient } from "../../../../utils/supabase/client";
+import { suggestNumberOfRounds } from "../../../../utils/tournamentUtils";
 
 const supabase = createClient();
 
@@ -468,36 +468,23 @@ export default function TournamentPage({
       .select("id, match_points, differential, name")
       .eq("tournament_id", tournament.id)
       .eq("dropped_out", false)
-      .order('match_points', { ascending: false })
-      .order('differential', { ascending: false });
-
+      .order("match_points", { ascending: false })
+      .order("differential", { ascending: false });
+  
     if (participantError) {
       console.error("Error fetching participants:", participantError);
       return;
     }
-    // Create a copy of participants to work with
     let remainingPlayers = [...participants];
     let matches = [];
-
-    // Create random pairings until 0-1 players remain
     while (remainingPlayers.length > 1) {
-      // Select two random players
       const index1 = Math.floor(Math.random() * remainingPlayers.length);
       let index2 = Math.floor(Math.random() * remainingPlayers.length);
-
-      // Make sure we don't select the same player twice
       while (index1 === index2) {
         index2 = Math.floor(Math.random() * remainingPlayers.length);
       }
-
-      // Get the two randomly selected players
       const player1 = remainingPlayers[index1];
       const player2 = remainingPlayers[index2];
-
-      console.log(player1);
-      console.log(player2);
-
-      // Create a match between these players
       matches.push({
         tournament_id: tournamentId,
         round: round,
@@ -509,10 +496,9 @@ export default function TournamentPage({
         player2_match_points: player2.match_points || 0,
         differential: player1.differential || 0,
         differential2: player2.differential || 0,
+        match_order: matches.length + 1, // Set initial order
       });
-
-      // Remove these players from the pool
-      // Remove higher index first to avoid index shifting issues
+      // Remove players (remove higher index first to avoid shifting issues)
       if (index1 > index2) {
         remainingPlayers.splice(index1, 1);
         remainingPlayers.splice(index2, 1);
@@ -521,24 +507,20 @@ export default function TournamentPage({
         remainingPlayers.splice(index1, 1);
       }
     }
-
     // Handle odd number of players (assign a bye)
     if (remainingPlayers.length > 0) {
       const byePlayer = remainingPlayers[0];
       await assignBye(client, tournamentId, round, byePlayer.id);
     }
-
-    // Insert matches into database
+    // Insert matches into the database
     if (matches.length > 0) {
-      const { error: matchError } = await client
-        .from("matches")
-        .insert(matches);
-
+      const { error: matchError } = await client.from("matches").insert(matches);
       if (matchError) {
         console.error("Error inserting matches:", matchError);
       }
     }
   };
+  
 
   /**
    * Creates pairings for rounds after the first round
@@ -546,228 +528,98 @@ export default function TournamentPage({
    */
   const handleLaterRoundPairings = async (client, tournamentId, round) => {
     try {
-      // Get all participants sorted by match points and differential
+      // 1. Fetch participants sorted by match_points (desc) and differential (desc)
       const { data: participants, error: participantError } = await client
         .from("participants")
         .select("id, match_points, differential, name")
         .eq("tournament_id", tournamentId)
         .eq("dropped_out", false)
-        .order('match_points', { ascending: false })
-        .order('differential', { ascending: false });
-
+        .order("match_points", { ascending: false })
+        .order("differential", { ascending: false });
+    
       if (participantError) {
         console.error("Error fetching participants:", participantError);
         return;
       }
-
-      // Check if we have an odd number of players
-      const isOddPlayers = participants.length % 2 !== 0;
-
-      // If odd number of players, find the player with lowest match points and differential for a bye
-      let byePlayer = null;
-      let activePlayers = [...participants];
-
-      if (isOddPlayers) {
-        // Sort players by match points (ascending) and differential (ascending)
-        // to find the player with the lowest scores
-        const sortedForBye = [...participants].sort((a, b) => {
-          // Sort by match points (ascending)
-          const pointsDiff = (a.match_points || 0) - (b.match_points || 0);
-          if (pointsDiff !== 0) return pointsDiff;
-
-          // If match points are tied, sort by differential (ascending)
-          const diffDiff = (a.differential || 0) - (b.differential || 0);
-          if (diffDiff !== 0) return diffDiff;
-
-          // If both are tied, pick randomly (by returning random -1 or 1)
-          return Math.random() > 0.5 ? 1 : -1;
-        });
-
-        // The first player in the sorted array will have the lowest match points and differential
-        byePlayer = sortedForBye[0];
-
-        // Remove the bye player from active players
-        activePlayers = participants.filter(p => p.id !== byePlayer.id);
-      }
-
-      // Get previous matches to avoid rematches
+    
+      // 2. Use the sorted list of players
+      let sortedPlayers = [...participants];
+    
+      // 3. Retrieve previous matches (only from the immediately preceding round) to avoid rematches
       const { data: previousMatches, error: matchError } = await client
         .from("matches")
         .select("player1_id, player2_id")
         .eq("tournament_id", tournamentId)
-        .lt("round", round);
-
+        .eq("round", round - 1);
       if (matchError) {
         console.error("Error fetching previous matches:", matchError);
         return;
       }
-
-      // Create a set of previously played matchups
+    
+      // Build a set of played matchups (both directions)
       const playedMatchups = new Set();
       previousMatches.forEach(match => {
-        // Add both directions to handle either player1 or player2 perspective
         playedMatchups.add(`${match.player1_id}-${match.player2_id}`);
         playedMatchups.add(`${match.player2_id}-${match.player1_id}`);
       });
-
-      // Group players by match points
-      const playersByPoints = {};
-      activePlayers.forEach(player => {
-        const points = player.match_points || 0;
-        if (!playersByPoints[points]) {
-          playersByPoints[points] = [];
-        }
-        playersByPoints[points].push(player);
-      });
-
-      // Get unique match point values and sort them in descending order
-      const pointGroups = Object.keys(playersByPoints)
-        .map(Number)
-        .sort((a, b) => b - a);
-
-      let matches = [];
-      let pairedPlayers = new Set();
-
-      // First attempt to pair within each match point group
-      pointGroups.forEach(points => {
-        const playersInGroup = playersByPoints[points].filter(
-          player => !pairedPlayers.has(player.id)
-        );
-
-        // Sort players by differential (already done in the query, but just to be explicit)
-        playersInGroup.sort((a, b) => (b.differential || 0) - (a.differential || 0));
-
-        let i = 0;
-        while (i < playersInGroup.length) {
-          const player1 = playersInGroup[i];
-          i++;
-
-          // Skip if player1 is already paired
-          if (pairedPlayers.has(player1.id)) continue;
-
-          // Find a valid opponent
-          let foundOpponent = false;
-
-          // First try to find an opponent with same match points and similar differential
-          for (let j = i; j < playersInGroup.length; j++) {
-            const player2 = playersInGroup[j];
-
-            // Skip if player2 is already paired or is the same as player1
-            if (pairedPlayers.has(player2.id) || player1.id === player2.id) continue;
-
-            // Check if these players have already played each other
-            if (!playedMatchups.has(`${player1.id}-${player2.id}`)) {
-              // Create a match
-              matches.push({
-                tournament_id: tournamentId,
-                round: round,
-                player1_id: player1.id,
-                player2_id: player2.id,
-                player1_score: null,
-                player2_score: null,
-                player1_match_points: player1.match_points || 0,
-                player2_match_points: player2.match_points || 0,
-                differential: player1.differential || 0,
-                differential2: player2.differential || 0,
-              });
-
-              // Mark both players as paired
-              pairedPlayers.add(player1.id);
-              pairedPlayers.add(player2.id);
-
-              foundOpponent = true;
+    
+      // 4. If odd number of players, remove the lowest-ranked for a bye
+      let byePlayer = null;
+      if (sortedPlayers.length % 2 !== 0) {
+        byePlayer = sortedPlayers.pop();
+      }
+    
+      // 5. Sequentially pair players while checking for rematches
+      const matches = [];
+      for (let i = 0; i < sortedPlayers.length; i += 2) {
+        let player1 = sortedPlayers[i];
+        let player2 = sortedPlayers[i + 1];
+    
+        // Check if this pairing is a rematch (from the previous round only)
+        if (playedMatchups.has(`${player1.id}-${player2.id}`)) {
+          // Try to find an alternative candidate for player2 among the remaining players
+          let swapFound = false;
+          for (let j = i + 2; j < sortedPlayers.length; j++) {
+            let candidate = sortedPlayers[j];
+            if (!playedMatchups.has(`${player1.id}-${candidate.id}`)) {
+              // Swap candidate with player2
+              sortedPlayers[i + 1] = candidate;
+              sortedPlayers[j] = player2;
+              player2 = candidate;
+              swapFound = true;
               break;
             }
           }
-        }
-      });
-
-      // Handle players who couldn't be paired within their match point group
-      // Pair them with players from adjacent match point groups
-      const unpaired = activePlayers.filter(player => !pairedPlayers.has(player.id));
-
-      while (unpaired.length > 1) {
-        const player1 = unpaired.shift(); // Take the highest ranked unpaired player
-
-        // Find a valid opponent for player1
-        let opponentIndex = -1;
-
-        for (let i = 0; i < unpaired.length; i++) {
-          const player2 = unpaired[i];
-
-          // Check if these players have already played each other
-          if (!playedMatchups.has(`${player1.id}-${player2.id}`)) {
-            opponentIndex = i;
-            break;
+          if (!swapFound) {
+            console.warn(
+              `Forced pairing for ${player1.id} and ${player2.id} due to rematch constraint.`
+            );
           }
         }
-
-        // If we found a valid opponent
-        if (opponentIndex !== -1) {
-          const player2 = unpaired[opponentIndex];
-          unpaired.splice(opponentIndex, 1); // Remove player2 from unpaired list
-
-          // Create a match
-          matches.push({
-            tournament_id: tournamentId,
-            round: round,
-            player1_id: player1.id,
-            player2_id: player2.id,
-            player1_score: null,
-            player2_score: null,
-            player1_match_points: player1.match_points || 0,
-            player2_match_points: player2.match_points || 0,
-            differential: player1.differential || 0,
-            differential2: player2.differential || 0,
-          });
-        } else {
-          // If no valid opponent found, put player1 back in the unpaired list
-          // This can happen if all potential pairings would be rematches
-          unpaired.push(player1);
-
-          // Break the loop if we couldn't make any progress to avoid infinite loop
-          if (unpaired.length === 0 || unpaired.length % 2 === 0) {
-            console.warn("Couldn't avoid rematches for all players. Forcing pairings.");
-
-            // Force pairings even if they're rematches
-            while (unpaired.length > 1) {
-              const p1 = unpaired.shift();
-              const p2 = unpaired.shift();
-
-              matches.push({
-                tournament_id: tournamentId,
-                round: round,
-                player1_id: p1.id,
-                player2_id: p2.id,
-                player1_score: null,
-                player2_score: null,
-                player1_match_points: p1.match_points || 0,
-                player2_match_points: p2.match_points || 0,
-                differential: p1.differential || 0,
-                differential2: p2.differential || 0,
-              });
-            }
-          }
-        }
+    
+        matches.push({
+          tournament_id: tournamentId,
+          round: round,
+          player1_id: player1.id,
+          player2_id: player2.id,
+          player1_score: null,
+          player2_score: null,
+          player1_match_points: player1.match_points || 0,
+          player2_match_points: player2.match_points || 0,
+          differential: player1.differential || 0,
+          differential2: player2.differential || 0,
+          match_order: matches.length + 1, // Save stable match order
+        });
       }
-
-      // If we still have unpaired players plus the bye player, that's an error
-      // We should only have the bye player left if there was an odd number
-      if (unpaired.length > 0 && byePlayer) {
-        console.error("Error: Have both unpaired players and a bye player");
-      }
-
-      // Handle the bye player (should have been determined at the beginning if there was an odd number)
+    
+      // 6. Assign bye if applicable
       if (byePlayer) {
         await assignBye(client, tournamentId, round, byePlayer.id);
       }
-
-      // Insert matches into database
+    
+      // 7. Insert the matches into the database
       if (matches.length > 0) {
-        const { error: insertError } = await client
-          .from("matches")
-          .insert(matches);
-
+        const { error: insertError } = await client.from("matches").insert(matches);
         if (insertError) {
           console.error("Error inserting matches:", insertError);
         }
@@ -776,6 +628,9 @@ export default function TournamentPage({
       console.error("Error in handleLaterRoundPairings:", error);
     }
   };
+  
+  
+  
 
   /**
    * Assigns a bye to a player for a round
@@ -789,43 +644,29 @@ export default function TournamentPage({
       const { data: participant, error: participantError } = await client
         .from("participants")
         .select("id, match_points, differential")
-        .eq("id", playerId).eq("tournament_id", tournamentId)
+        .eq("id", playerId)
+        .eq("tournament_id", tournamentId)
         .single();
-
       if (participantError) {
         console.error("Error fetching participant:", participantError);
         return;
       }
-      // Add a bye record for this player
-      const { error: byeError } = await client
-        .from("byes")
-        .insert({
-          tournament_id: tournamentId,
-          round_number: round,
-          match_points: (participant.match_points || 0) + 3,
-          differential: (participant.differential || 0),
-          participant_id: playerId
-        });
-
+      const { error: byeError } = await client.from("byes").insert({
+        tournament_id: tournamentId,
+        round_number: round,
+        match_points: (participant.match_points || 0) + 3,
+        differential: participant.differential || 0,
+        participant_id: playerId,
+      });
       if (byeError) {
         console.error("Error assigning bye:", byeError);
         return;
       }
-
-      // Update player's match points - a bye counts as a win (3 match points)
-      // const { error: updateError } = await client
-      //   .from("participants")
-      //   .update({ match_points: (participant.match_points || 0) + 3 })
-      //   .eq("id", playerId)
-      //   .eq("tournament_id", tournamentId);
-
-      // if (updateError) {
-      //   console.error("Error updating match points for bye:", updateError);
-      // }
     } catch (error) {
       console.error("Error in assignBye:", error);
     }
   };
+  
 
   const dropOutParticipant = async (id: string) => {
     const { error } = await supabase

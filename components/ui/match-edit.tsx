@@ -1,8 +1,8 @@
 "use client";
 
-import { Button, Label, TextInput } from "flowbite-react";
+import { Button, TextInput } from "flowbite-react";
 import { Pencil } from "lucide-react";
-import { Dispatch, FormEvent, SetStateAction, useRef, useState } from "react";
+import { Dispatch, FormEvent, SetStateAction, useState } from "react";
 import { createClient } from "../../utils/supabase/client";
 
 export default function MatchEditModal({
@@ -10,7 +10,7 @@ export default function MatchEditModal({
   fetchCurrentRoundData,
   setMatchErrorIndex,
   isRoundActive,
-  index
+  index,
 }: {
   match: any;
   fetchCurrentRoundData: any;
@@ -34,16 +34,22 @@ export default function MatchEditModal({
       alert("Invalid scores. Scores must be between 0 and 5, inclusive.");
       return;
     }
-
     if (player1Score === 5 && player2Score === 5) {
       alert("Score cannot be 5-5.");
       return;
     }
-
     const client = createClient();
 
-    const player1 = await client.from("participants").select("differential, match_points, id").eq("id", match.player1_id.id).single();
-    const player2 = await client.from("participants").select("differential, match_points, id").eq("id", match.player2_id.id).single();
+    const player1 = await client
+      .from("participants")
+      .select("differential, match_points, id")
+      .eq("id", match.player1_id.id)
+      .single();
+    const player2 = await client
+      .from("participants")
+      .select("differential, match_points, id")
+      .eq("id", match.player2_id.id)
+      .single();
 
     if (player1.error || player2.error) {
       console.log(player1.error, player2.error);
@@ -69,6 +75,7 @@ export default function MatchEditModal({
       player2_match_points = 2;
     }
 
+    // Update the match without modifying match_order
     const { data, error } = await client
       .from("matches")
       .update({
@@ -82,11 +89,7 @@ export default function MatchEditModal({
       })
       .eq("id", match.id);
 
-    setMatchErrorIndex((matchErrorIndex) => {
-      return matchErrorIndex.filter((singleMatchErrorIndex) => {
-        return singleMatchErrorIndex !== index;
-      });
-    })
+    setMatchErrorIndex((prev) => prev.filter((i) => i !== index));
 
     if (!error) {
       setOpen(false);
@@ -100,13 +103,20 @@ export default function MatchEditModal({
 
   return (
     <>
-      <div className="flex items-center justify-center w-full h-full" title={isRoundActive ? "" : "Cannot input scores until round is started"}>
+      <div
+        className="flex items-center justify-center w-full h-full"
+        title={isRoundActive ? "" : "Cannot input scores until round is started"}
+      >
         <Pencil
-          className={`${isRoundActive ? "text-blue-300 hover:text-blue-500 transition cursor-pointer" : "text-gray-500/50"}`}
+          className={`${
+            isRoundActive
+              ? "text-blue-300 hover:text-blue-500 transition cursor-pointer"
+              : "text-gray-500/50"
+          }`}
           size={16}
           onClick={() => {
             if (isRoundActive) {
-              setOpen(!open)
+              setOpen(!open);
             }
           }}
         />
@@ -119,34 +129,25 @@ export default function MatchEditModal({
               <div className="mb-2 block space-y-3">
                 <div className="flex items-center gap-3">
                   <h3 className="text-lg text-zinc-300 w-full text-end font-normal">
-                    "
-                    <span className="text-white font-medium">
-                      {match.player1_id.name}
-                    </span>
-                    " Lost Souls:{" "}
+                    "<span className="text-white font-medium">{match.player1_id.name}</span>" Lost Souls:
                   </h3>
                   <TextInput
                     type="number"
                     placeholder="Souls Rescued"
                     value={player1Score ?? ""}
-                    onChange={(event) => {
-                      setPlayer1Score(Number(event.target.value));
-                    }}
+                    onChange={(e) => setPlayer1Score(Number(e.target.value))}
                     className="min-w-[50px]"
                   />
                 </div>
                 <div className="flex items-center gap-3">
                   <h3 className="text-lg text-zinc-200 w-full text-end">
-                    "<span className="text-white">{match.player2_id.name}</span>
-                    " Lost Souls:{" "}
+                    "<span className="text-white">{match.player2_id.name}</span>" Lost Souls:
                   </h3>
                   <TextInput
                     type="number"
                     placeholder="Souls Rescued"
                     defaultValue={player2Score ?? ""}
-                    onChange={(event) => {
-                      setPlayer2Score(Number(event.target.value));
-                    }}
+                    onChange={(e) => setPlayer2Score(Number(e.target.value))}
                     className="min-w-[50px]"
                   />
                 </div>
@@ -159,9 +160,7 @@ export default function MatchEditModal({
                   type="button"
                   outline
                   color="red"
-                  onClick={() => {
-                    setOpen(false);
-                  }}
+                  onClick={() => setOpen(false)}
                 >
                   Cancel
                 </Button>
