@@ -191,27 +191,24 @@ export default function TournamentRounds({
     const { data, error } = await client
       .from("matches")
       .select(
-        "id, player1_match_points, player2_match_points, differential, differential2,  player1_id:participants!matches_player1_id_fkey(name,id), player2_id:participants!matches_player2_id_fkey(name,id), player2_id, player1_score, player2_score"
+        "id, match_order, player1_match_points, player2_match_points, differential, differential2, player1_id:participants!matches_player1_id_fkey(name,id), player2_id:participants!matches_player2_id_fkey(name,id), player1_score, player2_score"
       )
       .eq("tournament_id", tournamentId)
       .eq("round", currentPage)
-      .order("id", { ascending: true });
-
+      .order("match_order", { ascending: true });
     if (error) console.log(error);
     setMatches(data || []);
-
+  
     const { data: byeData, error: byeError } = await client
       .from("byes")
-      .select(
-        "id, participant_id:participants(id, name), match_points, differential"
-      )
+      .select("id, participant_id:participants(id, name), match_points, differential")
       .eq("tournament_id", tournamentId)
       .eq("round_number", currentPage)
       .order("id", { ascending: true });
-
     if (byeError) console.log(byeError);
     setByes(byeData);
   };
+  
 
   useEffect(() => {
     fetchCurrentRoundData();

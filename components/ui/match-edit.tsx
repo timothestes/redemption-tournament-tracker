@@ -1,8 +1,8 @@
 "use client";
 
-import { Button, Label, TextInput } from "flowbite-react";
+import { Button, TextInput } from "flowbite-react";
 import { Pencil } from "lucide-react";
-import { Dispatch, FormEvent, SetStateAction, useRef, useState } from "react";
+import { Dispatch, FormEvent, SetStateAction, useState } from "react";
 import { createClient } from "../../utils/supabase/client";
 
 export default function MatchEditModal({
@@ -34,24 +34,30 @@ export default function MatchEditModal({
       alert("Invalid scores. Scores must be between 0 and 5, inclusive.");
       return;
     }
-
     if (player1Score === 5 && player2Score === 5) {
       alert("Score cannot be 5-5.");
       return;
     }
-
     const client = createClient();
-
-    const player1 = await client.from("participants").select("differential, match_points, id").eq("id", match.player1_id.id).single();
-    const player2 = await client.from("participants").select("differential, match_points, id").eq("id", match.player2_id.id).single();
-
+  
+    const player1 = await client
+      .from("participants")
+      .select("differential, match_points, id")
+      .eq("id", match.player1_id.id)
+      .single();
+    const player2 = await client
+      .from("participants")
+      .select("differential, match_points, id")
+      .eq("id", match.player2_id.id)
+      .single();
+  
     if (player1.error || player2.error) {
       console.log(player1.error, player2.error);
       return;
     }
-
+  
     let player1_match_points, player2_match_points;
-
+  
     if (player2Score === player1Score) {
       player1_match_points = 1.5;
       player2_match_points = 1.5;
@@ -68,35 +74,37 @@ export default function MatchEditModal({
       player1_match_points = 1;
       player2_match_points = 2;
     }
-
+  
+    // Update the match without modifying match_order
     const { data, error } = await client
       .from("matches")
       .update({
         player1_score: player1Score,
         player2_score: player2Score,
-        differential: (player1.data.differential ?? 0) + (player1Score - player2Score),
-        differential2: (player2.data.differential ?? 0) + (player2Score - player1Score),
-        player1_match_points: (player1.data.match_points || 0) + player1_match_points,
-        player2_match_points: (player2.data.match_points || 0) + player2_match_points,
+        differential:
+          (player1.data.differential ?? 0) + (player1Score - player2Score),
+        differential2:
+          (player2.data.differential ?? 0) + (player2Score - player1Score),
+        player1_match_points:
+          (player1.data.match_points || 0) + player1_match_points,
+        player2_match_points:
+          (player2.data.match_points || 0) + player2_match_points,
         updated_at: new Date(),
       })
       .eq("id", match.id);
-
-    setMatchErrorIndex((matchErrorIndex) => {
-      return matchErrorIndex.filter((singleMatchErrorIndex) => {
-        return singleMatchErrorIndex !== index;
-      });
-    })
-
+  
+    setMatchErrorIndex((prev) => prev.filter((i) => i !== index));
+  
     if (!error) {
       setOpen(false);
     } else {
       console.log(error);
       alert("Some error occurred!");
     }
-
+  
     fetchCurrentRoundData();
   };
+  
 
   return (
     <>
