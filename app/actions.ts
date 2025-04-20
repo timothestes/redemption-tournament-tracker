@@ -50,10 +50,7 @@ export const signInAction = async (formData: FormData) => {
   });
 
   if (error) {
-    const searchParams = new URLSearchParams();
-    searchParams.append('email', email);
-    searchParams.append('error', error.message);
-    return encodedRedirect("error", `/sign-in?${searchParams.toString()}`, error.message);
+    return encodedRedirect("error", "/sign-in", error.message);
   }
 
   return redirect("/tracker/tournaments");
