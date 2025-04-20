@@ -51,7 +51,7 @@ export async function AuthLogo() {
     </div>
   ) : (
     <div className="flex items-center">
-      <img src="lor.png" className="w-48" />
+      <img src="/lor.png" className="w-48" alt="Land of Redemption Logo" />
     </div>
   );
 }

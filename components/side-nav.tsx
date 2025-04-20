@@ -59,6 +59,11 @@ const SideNav: React.FC = () => {
               Tournaments
             </Sidebar.Item>
             <Sidebar.ItemGroup>
+              <Sidebar.Item href="/decklist/generate" icon={TbCardsFilled}>
+                Deck Check PDF
+              </Sidebar.Item>
+            </Sidebar.ItemGroup>
+            <Sidebar.ItemGroup>
               <Sidebar.Collapse
                 label="Resources"
                 icon={HiDocumentText}
@@ -133,7 +138,7 @@ const SideNav: React.FC = () => {
                   rel="noopener noreferrer"
                   icon={AiOutlineForm}
                   className="pl-4"
-                  >
+                >
                   T1 Deck Check Sheet
                 </Sidebar.Item>
                 <Sidebar.Item
