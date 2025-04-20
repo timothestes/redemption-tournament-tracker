@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "../utils/supabase/client";
 import { hasEnvVars } from "../utils/supabase/check-env-vars";
-import EnvVarWarning from "./env-var-warning";
+import { EnvVarWarning } from "./env-var-warning";
 import Link from "next/link";
 import { Button } from "./ui/button";
 
