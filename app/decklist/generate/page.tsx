@@ -103,7 +103,7 @@ export default function GenerateDeckList() {
   };
 
   return (
-    <div className="flex-1 w-full flex flex-col gap-6 max-w-2xl mx-auto p-4">
+    <div className="flex-1 w-full flex flex-col gap-6 max-w-2xl mx-auto p-5">
       <div className="w-full">
         <h2 className="text-2xl font-semibold mb-4">Generate Deck Check PDF</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
