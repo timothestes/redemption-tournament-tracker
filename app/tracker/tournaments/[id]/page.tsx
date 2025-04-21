@@ -411,7 +411,8 @@ export default function TournamentPage({
     numberOfRounds: number,
     roundLength: number,
     maxScore: number,
-    byePoints: number
+    byePoints: number,
+    byeDifferential: number
   ) => {
     const now = new Date().toISOString();
     try {
@@ -427,6 +428,7 @@ export default function TournamentPage({
           round_length: roundLength,
           max_score: maxScore,
           bye_points: byePoints,
+          bye_differential: byeDifferential,
         })
         .eq("id", id)
         .select("*")
@@ -660,7 +662,7 @@ export default function TournamentPage({
       // First get the tournament to know how many points to award for a bye
       const { data: tournament, error: tournamentError } = await client
         .from("tournaments")
-        .select("bye_points")
+        .select("bye_points, bye_differential")
         .eq("id", tournamentId)
         .single();
 
@@ -681,14 +683,14 @@ export default function TournamentPage({
         return;
       }
 
-      // Add a bye record for this player using the configured bye points
+      // Add a bye record for this player using the configured bye points and differential
       const { error: byeError } = await client
         .from("byes")
         .insert({
           tournament_id: tournamentId,
           round_number: round,
           match_points: (participant.match_points || 0) + tournament.bye_points,
-          differential: (participant.differential || 0),
+          differential: (participant.differential || 0) + (tournament.bye_differential || 0),
           participant_id: playerId
         });
 
