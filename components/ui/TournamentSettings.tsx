@@ -10,6 +10,7 @@ interface TournamentInfo {
   current_round: number | null;
   round_length: number | null;
   max_score: number | null;
+  bye_points: number | null;
 }
 
 interface TournamentSettingsProps {
@@ -27,6 +28,7 @@ export default function TournamentSettings({
     current_round: null,
     round_length: null,
     max_score: null,
+    bye_points: null,
   });
 
   const suggestedRounds = suggestNumberOfRounds(participantCount);
@@ -38,7 +40,7 @@ export default function TournamentSettings({
       const client = createClient();
       const { data, error } = await client
         .from("tournaments")
-        .select("n_rounds, current_round, round_length, max_score")
+        .select("n_rounds, current_round, round_length, max_score, bye_points")
         .eq("id", tournamentId)
         .single();
 
@@ -88,6 +90,11 @@ export default function TournamentSettings({
             {typeof tournamentInfo.max_score === "number" && (
               <p className="text-sm text-gray-500">
                 Maximum Lost Souls Score: {tournamentInfo.max_score}
+              </p>
+            )}
+            {typeof tournamentInfo.bye_points === "number" && (
+              <p className="text-sm text-gray-500">
+                Match Points for Bye: {tournamentInfo.bye_points}
               </p>
             )}
             {participantCount > 0 &&

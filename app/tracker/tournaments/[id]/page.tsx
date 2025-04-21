@@ -410,7 +410,8 @@ export default function TournamentPage({
   const handleStartTournament = async (
     numberOfRounds: number,
     roundLength: number,
-    maxScore: number
+    maxScore: number,
+    byePoints: number
   ) => {
     const now = new Date().toISOString();
     try {
@@ -425,6 +426,7 @@ export default function TournamentPage({
           current_round: 1,
           round_length: roundLength,
           max_score: maxScore,
+          bye_points: byePoints,
         })
         .eq("id", id)
         .select("*")
@@ -655,23 +657,37 @@ export default function TournamentPage({
    */
   const assignBye = async (client, tournamentId, round, playerId) => {
     try {
+      // First get the tournament to know how many points to award for a bye
+      const { data: tournament, error: tournamentError } = await client
+        .from("tournaments")
+        .select("bye_points")
+        .eq("id", tournamentId)
+        .single();
+
+      if (tournamentError) {
+        console.error("Error fetching tournament:", tournamentError);
+        return;
+      }
+
       const { data: participant, error: participantError } = await client
         .from("participants")
         .select("id, match_points, differential")
-        .eq("id", playerId).eq("tournament_id", tournamentId)
+        .eq("id", playerId)
+        .eq("tournament_id", tournamentId)
         .single();
 
       if (participantError) {
         console.error("Error fetching participant:", participantError);
         return;
       }
-      // Add a bye record for this player
+
+      // Add a bye record for this player using the configured bye points
       const { error: byeError } = await client
         .from("byes")
         .insert({
           tournament_id: tournamentId,
           round_number: round,
-          match_points: (participant.match_points || 0) + 3,
+          match_points: (participant.match_points || 0) + tournament.bye_points,
           differential: (participant.differential || 0),
           participant_id: playerId
         });
@@ -680,17 +696,6 @@ export default function TournamentPage({
         console.error("Error assigning bye:", byeError);
         return;
       }
-
-      // Update player's match points - a bye counts as a win (3 match points)
-      // const { error: updateError } = await client
-      //   .from("participants")
-      //   .update({ match_points: (participant.match_points || 0) + 3 })
-      //   .eq("id", playerId)
-      //   .eq("tournament_id", tournamentId);
-
-      // if (updateError) {
-      //   console.error("Error updating match points for bye:", updateError);
-      // }
     } catch (error) {
       console.error("Error in assignBye:", error);
     }

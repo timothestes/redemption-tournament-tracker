@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 interface TournamentStartModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (numberOfRounds: number, roundLength: number, maxScore: number) => void;
+  onConfirm: (numberOfRounds: number, roundLength: number, maxScore: number, byePoints: number) => void;
   participantCount: number;
   suggestedRounds: number;
 }
@@ -21,12 +21,14 @@ export default function TournamentStartModal({
   const [numberOfRounds, setNumberOfRounds] = useState(suggestedRounds);
   const [roundLength, setRoundLength] = useState(45);
   const [maxScore, setMaxScore] = useState(5);
+  const [byePoints, setByePoints] = useState(3);
 
   useEffect(() => {
     if (isOpen) {
       setNumberOfRounds(suggestedRounds);
       setRoundLength(45);
       setMaxScore(5);
+      setByePoints(3);
     }
   }, [isOpen, suggestedRounds]);
 
@@ -87,11 +89,24 @@ export default function TournamentStartModal({
                 <option value="7">7</option>
               </select>
             </div>
+            <div className="space-y-2">
+              <Label>Match Points for Bye</Label>
+              <select
+                value={byePoints}
+                onChange={(e) => setByePoints(Number(e.target.value))}
+                className="rounded-lg border border-gray-300 bg-gray-50 text-gray-900 focus:border-blue-500 focus:ring-blue-500 block w-24 p-2.5"
+              >
+                <option value="1">1</option>
+                <option value="1.5">1.5</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+              </select>
+            </div>
           </div>
         </div>
       </Modal.Body>
       <Modal.Footer>
-        <Button onClick={() => onConfirm(numberOfRounds, roundLength, maxScore)} outline gradientDuoTone="greenToBlue">
+        <Button onClick={() => onConfirm(numberOfRounds, roundLength, maxScore, byePoints)} outline gradientDuoTone="greenToBlue">
           Start Tournament
         </Button>
         <Button outline color="red" onClick={onClose}>Cancel</Button>
