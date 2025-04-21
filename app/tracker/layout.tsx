@@ -1,20 +1,20 @@
-import Header from "../../components/header";
+import HeaderServer from "../../components/header-server";
 import SideNav from "../../components/side-nav";
+import { createClient } from "../../utils/supabase/server";
 
-export default function TournamentsLayout({ children }) {
+export default async function TournamentsLayout({ children }) {
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  const isAuthenticated = !!session;
+
   return (
     <>
-      <SideNav />
+      {isAuthenticated && <SideNav />}
       <div className="flex-1 w-full overflow-hidden flex flex-col gap-9 items-center">
-        <Header />
+        <HeaderServer />
         <div className="flex flex-col w-full">
           <div className="w-full flex">{children}</div>
         </div>
-        {/* Insert footer here! */}
-        {/* <footer className="w-full flex items-center justify-center border-t mx-auto text-center text-xs py-16"> */}
-        {/* <p>Switch theme</p> */}
-        {/* <ThemeSwitcher /> */}
-        {/* </footer> */}
       </div>
     </>
   );

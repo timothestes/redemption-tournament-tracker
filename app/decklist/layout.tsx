@@ -1,39 +1,17 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import Header from "../../components/header";
+import HeaderServer from "../../components/header-server";
 import SideNav from "../../components/side-nav";
-import { createClient } from "../../utils/supabase/client";
-import { useRouter } from "next/navigation";
+import { createClient } from "../../utils/supabase/server";
 
-const supabase = createClient();
-
-export default function DecklistLayout({ children }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const router = useRouter();
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setIsAuthenticated(!!session);
-    };
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsAuthenticated(!!session);
-    });
-
-    checkAuth();
-
-    return () => subscription.unsubscribe();
-  }, []);
+export default async function DecklistLayout({ children }) {
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  const isAuthenticated = !!session;
 
   return (
     <>
       {isAuthenticated && <SideNav />}
       <div className="flex-1 w-full overflow-hidden flex flex-col gap-9 items-center">
-        <Header />
+        <HeaderServer />
         <div className="flex flex-col w-full">
           <div className="w-full flex">{children}</div>
         </div>
