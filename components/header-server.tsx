@@ -1,13 +1,31 @@
-import { createClient } from "../utils/supabase/server";
+"use client";
+
+import { useEffect, useState } from "react";
+import { createClient } from "../utils/supabase/client";
 import { hasEnvVars } from "../utils/supabase/check-env-vars";
 import { EnvVarWarning } from "./env-var-warning";
 import Link from "next/link";
 import { Button } from "./ui/button";
 import { signOutAction } from "../app/actions";
 
-export default async function HeaderServer() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+export default function HeaderServer() {
+  const [user, setUser] = useState(null);
+  const supabase = createClient();
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      setUser(currentUser);
+    };
+
+    getUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   return (
     <nav className="w-full flex justify-center border-b border-b-foreground/10 h-17">
@@ -18,7 +36,10 @@ export default async function HeaderServer() {
             {user ? (
               <div className="flex items-center gap-4">
                 <div className="max-w-12:block hidden">Hey, {user.email}!</div>
-                <form action={signOutAction}>
+                <form
+                  // @ts-expect-error - Server Actions are not properly typed
+                  action={signOutAction}
+                >
                   <Button type="submit" variant="outline">
                     Sign out
                   </Button>
