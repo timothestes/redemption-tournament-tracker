@@ -28,11 +28,11 @@ const SideNav: React.FC = () => {
       </button>
       <Sidebar
         aria-label="sidebar"
-        className={`max-md:fixed top-0 sticky left-0 w-45 h-lvh shrink-0 bg-primary transform z-50 ${
+        className={`max-md:fixed top-0 sticky left-0 w-64 h-screen shrink-0 bg-primary transform z-50 overflow-hidden ${
           isOpen ? "translate-x-0" : "-translate-x-full"
-        } transition-transform md:translate-x-0 shadow-2xl rounded-full`}
+        } transition-transform md:translate-x-0 shadow-lg rounded border-none`}
       >
-        <div className="">
+        <div className="bg-primary">
           <button
             onClick={toggleSidebar}
             className="bg-primary p-1 text-primary-foreground md:hidden rounded"

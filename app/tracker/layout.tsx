@@ -8,14 +8,14 @@ export default async function TournamentsLayout({ children }) {
   const isAuthenticated = !!session;
 
   return (
-    <>
+    <div className="flex">
       {isAuthenticated && <SideNav />}
-      <div className="flex-1 w-full overflow-hidden flex flex-col gap-9 items-center">
+      <main className="flex-1 min-h-screen flex flex-col">
         <HeaderServer />
-        <div className="flex flex-col w-full">
-          <div className="w-full flex">{children}</div>
+        <div className="flex-1 p-4">
+          {children}
         </div>
-      </div>
-    </>
+      </main>
+    </div>
   );
 }

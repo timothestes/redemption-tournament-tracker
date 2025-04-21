@@ -45,7 +45,7 @@ export default function Header() {
                   action={signOutAction}
                 >
                   <Button type="submit" variant="outline">
-                    Sign out
+                    Sign outz
                   </Button>
                 </form>
               </div>
