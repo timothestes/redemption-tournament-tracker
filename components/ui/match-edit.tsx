@@ -110,16 +110,23 @@ export default function MatchEditModal({
 
   return (
     <>
-      <div className="flex items-center justify-center w-full h-full" title={isRoundActive ? "" : "Cannot input scores until round is started"}>
-        <Pencil
-          className={`${isRoundActive ? "text-blue-300 hover:text-blue-500 transition cursor-pointer" : "text-gray-500/50"}`}
-          size={16}
+      <div className="flex items-center justify-center w-full h-full" title={isRoundActive ? "Edit match scores" : "Cannot input scores until round is started"}>
+        <button 
+          className={`p-2 rounded-md flex items-center justify-center ${
+            isRoundActive 
+              ? "bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 hover:text-blue-400 transition cursor-pointer" 
+              : "text-gray-500/50"
+          }`}
           onClick={() => {
             if (isRoundActive) {
               setOpen(!open)
             }
           }}
-        />
+          disabled={!isRoundActive}
+          aria-label="Edit match scores"
+        >
+          <Pencil size={20} />
+        </button>
       </div>
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
