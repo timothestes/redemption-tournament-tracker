@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "flowbite-react";
+import { Button, ToggleSwitch } from "flowbite-react";
 import ToastNotification from "../../../components/ui/toast-notification";
 
 export default function GenerateDeckList() {
@@ -12,6 +12,7 @@ export default function GenerateDeckList() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<{ url: string; message: string } | null>(null);
+  const [showAlignment, setShowAlignment] = useState(false);
 
   const validateForm = (list: string, name: string, event: string): { valid: boolean; message?: string } => {
     if (!list.trim()) {
@@ -81,7 +82,8 @@ export default function GenerateDeckList() {
           decklist,
           decklist_type: deckType,
           name,
-          event
+          event,
+          show_alignment: showAlignment,
         }),
       });
 
@@ -143,20 +145,35 @@ export default function GenerateDeckList() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Deck Type
-            </label>
-            <select
-              value={deckType}
-              onChange={(e) => setDeckType(e.target.value)}
-              className="w-full p-2 border rounded-md bg-background"
-            >
-              <option value="type_1">Type 1</option>
-              <option value="type_2">Type 2</option>
-            </select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Deck Type
+              </label>
+              <select
+                value={deckType}
+                onChange={(e) => setDeckType(e.target.value)}
+                className="w-full p-2 border rounded-md bg-background"
+              >
+                <option value="type_1">Type 1</option>
+                <option value="type_2">Type 2</option>
+              </select>
+            </div>
+            
+            <div className="flex flex-col gap-4">
+              <label className="block text-sm font-medium">
+                PDF Options
+              </label>
+              <div className="flex items-center justify-between">
+                <ToggleSwitch
+                  label="Show Card Alignments"
+                  checked={showAlignment}
+                  onChange={setShowAlignment}
+                />
+              </div>
+            </div>
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium mb-2">
               Lackey Decklist
