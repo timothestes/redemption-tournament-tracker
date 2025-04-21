@@ -81,10 +81,74 @@ export default function TournamentRounds({
   const [byes, setByes] = useState<any[]>([]);
   const [matchEnding, setMatchEnding] = useState(false);
 
-  // Making the fetch funcationality work if the activeTab is changed
+  // Making the fetch functionality work if the activeTab is changed
   useEffect(() => {
-    fetchTournamentAndRoundInfo()
-  }, [activeTab])
+    if (isActive) {
+      fetchTournamentAndRoundInfo();
+    }
+  }, [activeTab, isActive]);
+
+  const fetchTournamentAndRoundInfo = useCallback(async () => {
+    if (!tournamentId) return;
+
+    setIsLoading(true);
+    setError({ message: null, type: null });
+
+    try {
+      const [tournamentResult, roundResult] = await Promise.all([
+        client
+          .from("tournaments")
+          .select("n_rounds, current_round, has_ended, max_score")
+          .eq("id", tournamentId)
+          .single(),
+        client
+          .from("rounds")
+          .select("started_at, ended_at, is_completed")
+          .eq("tournament_id", tournamentId)
+          .eq("round_number", currentPage)
+          .maybeSingle()
+      ]);
+
+      if (tournamentResult.error) throw tournamentResult.error;
+      if (roundResult.error) throw roundResult.error;
+
+      const tournamentData = tournamentResult.data;
+      const roundData = roundResult.data;
+
+      setTournamentInfo(tournamentData);
+      setRoundInfo({
+        started_at: roundData?.started_at || null,
+        ended_at: roundData?.ended_at || null,
+      });
+
+      // Only set round as active if:
+      // 1. Round data exists
+      // 2. Round is not completed
+      // 3. Tournament is not ended
+      const shouldBeActive = !!(
+        roundData && 
+        !roundData.is_completed && 
+        !tournamentData.has_ended &&
+        roundData.started_at && 
+        !roundData.ended_at
+      );
+      
+      setIsRoundActive(shouldBeActive);
+      
+      // Fetch match data after round status is confirmed
+      if (shouldBeActive) {
+        await fetchCurrentRoundData();
+      }
+    } catch (err) {
+      setError({
+        message: "Failed to fetch tournament and round information",
+        type: "fetch",
+      });
+      console.error("Error fetching data:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [tournamentId, currentPage]);
 
   // Make roundInfo available to parent component
   useEffect(() => {
@@ -99,53 +163,7 @@ export default function TournamentRounds({
       setCurrentPage(tournamentInfo.current_round);
       hasFetchedTournament.current = true;
     }
-  }, [tournamentInfo, hasFetchedTournament])
-
-  const fetchTournamentAndRoundInfo = useCallback(async () => {
-    if (!tournamentId) return;
-
-    setIsLoading(true);
-    setError({ message: null, type: null });
-
-    const client = createClient();
-
-    try {
-      // Fetch tournament data
-      const { data: tournamentData, error: tournamentError } = await client
-        .from("tournaments")
-        .select("n_rounds, current_round, has_ended, max_score")
-        .eq("id", tournamentId)
-        .single();
-
-      if (tournamentError) throw tournamentError;
-
-      // Fetch round data
-      const { data: roundData, error: roundError } = await client
-        .from("rounds")
-        .select("started_at, ended_at, is_completed")
-        .eq("tournament_id", tournamentId)
-        .eq("round_number", currentPage)
-        .maybeSingle();
-
-      if (roundError) throw roundError;
-
-      // Update all states at once
-      setTournamentInfo(tournamentData);
-      setRoundInfo({
-        started_at: roundData?.started_at || null,
-        ended_at: roundData?.ended_at || null,
-      });
-      setIsRoundActive(!!roundData && !roundData.is_completed);
-    } catch (err) {
-      setError({
-        message: "Failed to fetch tournament and round information",
-        type: "fetch",
-      });
-      console.error("Error fetching data:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [tournamentId, currentPage, activeTab]);
+  }, [tournamentInfo, hasFetchedTournament]);
 
   useEffect(() => {
     if (isActive) {
