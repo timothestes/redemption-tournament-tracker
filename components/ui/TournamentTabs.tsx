@@ -24,6 +24,7 @@ interface TournamentTabsProps {
   loading: boolean;
   tournamentId: string;
   tournamentStarted?: boolean;
+  tournamentEnded?: boolean;
   onTournamentEnd?: () => void;
   setLatestRound: Dispatch<SetStateAction<any>>;
   onRoundActiveChange?: (
@@ -50,6 +51,7 @@ export default function TournamentTabs({
   loading,
   tournamentId,
   tournamentStarted = false,
+  tournamentEnded = false,
   onTournamentEnd,
   setLatestRound,
   createPairing,
@@ -127,6 +129,7 @@ export default function TournamentTabs({
           <div className="w-[800px] max-xl:w-full mx-auto overflow-x-auto">
             <ParticipantTable
               tournamentStarted={tournamentStarted}
+              tournamentEnded={tournamentEnded}
               participants={participants}
               onEdit={onEdit}
               onDelete={onDelete}

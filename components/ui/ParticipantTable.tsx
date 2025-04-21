@@ -18,6 +18,7 @@ interface ParticipantTableProps {
   onDelete: (id: string) => void;
   onDropOut: (id: string) => void;
   onDropIn: (id: string) => void;
+  tournamentEnded?: boolean;
 }
 
 const ParticipantTable: React.FC<ParticipantTableProps> = ({
@@ -27,6 +28,7 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
   onDelete,
   onDropOut,
   onDropIn,
+  tournamentEnded = false,
 }) => {
   const sortedParticipants = participants.sort((a, b) => {
     const mpA = a.match_points !== null ? a.match_points : -Infinity;
@@ -46,10 +48,10 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
   return (
     <Table hoverable>
       <Table.Head>
-        <Table.HeadCell>Name</Table.HeadCell>
-        <Table.HeadCell>Match Points</Table.HeadCell>
-        <Table.HeadCell>Differential</Table.HeadCell>
-        <Table.HeadCell>
+        <Table.HeadCell className="py-3">Name</Table.HeadCell>
+        <Table.HeadCell className="py-3">Match Points</Table.HeadCell>
+        <Table.HeadCell className="py-3">Differential</Table.HeadCell>
+        <Table.HeadCell className="py-3">
           <span className="sr-only">Actions</span>
         </Table.HeadCell>
       </Table.Head>
@@ -58,14 +60,18 @@ const ParticipantTable: React.FC<ParticipantTableProps> = ({
           const isWinner = participant.match_points === winnerMatchPoints && participant.differential === winnerDifferential;
           return <Table.Row
             key={participant.id}
-            className={`${isWinner ? "dark:border-yellow-700 dark:bg-yellow-500/50" : "dark:border-gray-700 dark:bg-gray-800"} `}
+            className={`${isWinner && tournamentEnded ? "dark:border-yellow-700 dark:bg-yellow-500/50" : "dark:border-gray-700 dark:bg-gray-800"} `}
           >
-            <Table.Cell className="whitespace-nowrap font-medium text-gray-900 dark:text-white inline-flex items-center gap-2">
-              {isWinner && <Crown className="w-4 h-4 text-orange-300" />} {participant.name} {participant.dropped_out && <span className="text-red-500 text-[12px]">( Dropped )</span>}
+            <Table.Cell className="whitespace-nowrap font-medium text-gray-900 dark:text-white py-3">
+              <div className="flex items-center gap-2">
+                {isWinner && tournamentEnded && <Crown className="w-4 h-4 text-orange-300 flex-shrink-0" />}
+                <span>{participant.name}</span>
+                {participant.dropped_out && <span className="text-red-500 text-[12px] flex-shrink-0">( Dropped )</span>}
+              </div>
             </Table.Cell>
-            <Table.Cell>{participant.match_points}</Table.Cell>
-            <Table.Cell>{participant.differential}</Table.Cell>
-            <Table.Cell className="flex items-center space-x-8">
+            <Table.Cell className="py-3">{participant.match_points}</Table.Cell>
+            <Table.Cell className="py-3">{participant.differential}</Table.Cell>
+            <Table.Cell className="flex items-center space-x-8 py-3">
               <HiPencil
                 onClick={() => onEdit(participant)}
                 className="text-blue-500 cursor-pointer hover:text-blue-700 w-6 h-6"

@@ -286,7 +286,7 @@ export default function TournamentPage({
             }).eq("id", match.player2_id.id),
           ]);
 
-        } else if (match.player1_score === 5) {
+        } else if (match.player1_score === tournament.max_score) {
           // Player 1 Wins (3 points), Player 2 gets 0
           await Promise.all([
             client.from("participants").update({
@@ -300,7 +300,7 @@ export default function TournamentPage({
             }).eq("id", match.player2_id.id),
           ]);
 
-        } else if (match.player2_score === 5) {
+        } else if (match.player2_score === tournament.max_score) {
           // Player 2 Wins (3 points), Player 1 gets 0
           await Promise.all([
             client.from("participants").update({
@@ -409,7 +409,8 @@ export default function TournamentPage({
 
   const handleStartTournament = async (
     numberOfRounds: number,
-    roundLength: number
+    roundLength: number,
+    maxScore: number
   ) => {
     const now = new Date().toISOString();
     try {
@@ -423,6 +424,7 @@ export default function TournamentPage({
           n_rounds: numberOfRounds,
           current_round: 1,
           round_length: roundLength,
+          max_score: maxScore,
         })
         .eq("id", id)
         .select("*")
@@ -506,7 +508,7 @@ export default function TournamentPage({
         player2_match_points: player2.match_points || 0,
         differential: player1.differential || 0,
         differential2: player2.differential || 0,
-        match_order: matches.length + 1, // Set initial stable order
+        match_order: matches.length + 1
       });
 
       // Remove these players from the pool (remove higher index first to avoid shifting)
@@ -622,7 +624,7 @@ export default function TournamentPage({
           player2_match_points: player2.match_points || 0,
           differential: player1.differential || 0,
           differential2: player2.differential || 0,
-          match_order: matches.length + 1, // Save stable match order
+          match_order: matches.length + 1
         });
       }
       
@@ -885,7 +887,7 @@ export default function TournamentPage({
             isModalOpen={isModalOpen}
             setIsModalOpen={setIsModalOpen}
             onAddParticipant={handleAddParticipant}
-            onEdit={(participant: any) => {
+            onEdit={(participant) => {
               setCurrentParticipant(participant);
               setNewParticipantName(participant.name);
               setNewMatchPoints(participant.match_points?.toString() || "");
@@ -900,6 +902,7 @@ export default function TournamentPage({
             loading={loading}
             tournamentId={id || ""}
             tournamentStarted={tournament?.has_started || false}
+            tournamentEnded={tournament?.has_ended || false}
             onTournamentEnd={fetchTournamentDetails}
             onRoundActiveChange={(isActive, roundStartTime) => {
               setIsRoundActive(isActive);

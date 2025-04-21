@@ -10,13 +10,15 @@ export default function MatchEditModal({
   fetchCurrentRoundData,
   setMatchErrorIndex,
   isRoundActive,
-  index
+  index,
+  tournament
 }: {
   match: any;
   fetchCurrentRoundData: any;
   setMatchErrorIndex: Dispatch<SetStateAction<number[]>>;
   isRoundActive: boolean;
   index: number;
+  tournament: any;
 }) {
   const [open, setOpen] = useState(false);
   const [player1Score, setPlayer1Score] = useState(match.player1_score);
@@ -28,14 +30,14 @@ export default function MatchEditModal({
       isNaN(player2Score) ||
       player1Score < 0 ||
       player2Score < 0 ||
-      player1Score > 5 ||
-      player2Score > 5
+      player1Score > tournament.max_score ||
+      player2Score > tournament.max_score
     ) {
-      alert("Invalid scores. Scores must be between 0 and 5, inclusive.");
+      alert(`Invalid scores. Scores must be between 0 and ${tournament.max_score}, inclusive.`);
       return;
     }
-    if (player1Score === 5 && player2Score === 5) {
-      alert("Score cannot be 5-5.");
+    if (player1Score === tournament.max_score && player2Score === tournament.max_score) {
+      alert("Score cannot be " + tournament.max_score + "-" + tournament.max_score + ".");
       return;
     }
     const client = createClient();
@@ -61,10 +63,10 @@ export default function MatchEditModal({
     if (player2Score === player1Score) {
       player1_match_points = 1.5;
       player2_match_points = 1.5;
-    } else if (player1Score === 5) {
+    } else if (player1Score === tournament.max_score) {
       player1_match_points = 3;
       player2_match_points = 0;
-    } else if (player2Score === 5) {
+    } else if (player2Score === tournament.max_score) {
       player1_match_points = 0;
       player2_match_points = 3;
     } else if (player1Score > player2Score) {

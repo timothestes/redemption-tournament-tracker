@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 interface TournamentStartModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (numberOfRounds: number, roundLength: number) => void;
+  onConfirm: (numberOfRounds: number, roundLength: number, maxScore: number) => void;
   participantCount: number;
   suggestedRounds: number;
 }
@@ -20,11 +20,13 @@ export default function TournamentStartModal({
 }: TournamentStartModalProps) {
   const [numberOfRounds, setNumberOfRounds] = useState(suggestedRounds);
   const [roundLength, setRoundLength] = useState(45);
+  const [maxScore, setMaxScore] = useState(5);
 
   useEffect(() => {
     if (isOpen) {
       setNumberOfRounds(suggestedRounds);
       setRoundLength(45);
+      setMaxScore(5);
     }
   }, [isOpen, suggestedRounds]);
 
@@ -74,11 +76,22 @@ export default function TournamentStartModal({
                 className="rounded-lg border border-gray-300 bg-gray-50 text-gray-900 focus:border-blue-500 focus:ring-blue-500 block w-24 p-2.5"
               />
             </div>
+            <div className="space-y-2">
+              <Label>Maximum Lost Souls Score</Label>
+              <select
+                value={maxScore}
+                onChange={(e) => setMaxScore(Number(e.target.value))}
+                className="rounded-lg border border-gray-300 bg-gray-50 text-gray-900 focus:border-blue-500 focus:ring-blue-500 block w-24 p-2.5"
+              >
+                <option value="5">5</option>
+                <option value="7">7</option>
+              </select>
+            </div>
           </div>
         </div>
       </Modal.Body>
       <Modal.Footer>
-        <Button onClick={() => onConfirm(numberOfRounds, roundLength)} outline gradientDuoTone="greenToBlue">
+        <Button onClick={() => onConfirm(numberOfRounds, roundLength, maxScore)} outline gradientDuoTone="greenToBlue">
           Start Tournament
         </Button>
         <Button outline color="red" onClick={onClose}>Cancel</Button>

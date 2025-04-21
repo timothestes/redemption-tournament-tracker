@@ -36,6 +36,7 @@ interface TournamentInfo {
   n_rounds: number | null;
   current_round: number | null;
   has_ended: boolean;
+  max_score: number | null;
 }
 
 interface RoundInfo {
@@ -63,6 +64,7 @@ export default function TournamentRounds({
     n_rounds: null,
     current_round: null,
     has_ended: false,
+    max_score: null,
   });
   const hasFetchedTournament = useRef<boolean>(false);
   const client = createClient();
@@ -111,7 +113,7 @@ export default function TournamentRounds({
       // Fetch tournament data
       const { data: tournamentData, error: tournamentError } = await client
         .from("tournaments")
-        .select("n_rounds, current_round, has_ended")
+        .select("n_rounds, current_round, has_ended, max_score")
         .eq("id", tournamentId)
         .single();
 
@@ -269,7 +271,7 @@ export default function TournamentRounds({
             }).eq("id", match.player2_id.id),
           ]);
 
-        } else if (match.player1_score === 5) {
+        } else if (match.player1_score === tournamentInfo.max_score) {
           // Player 1 Wins (3 points), Player 2 gets 0
           await Promise.all([
             client.from("participants").update({
@@ -283,7 +285,7 @@ export default function TournamentRounds({
             }).eq("id", match.player2_id.id),
           ]);
 
-        } else if (match.player2_score === 5) {
+        } else if (match.player2_score === tournamentInfo.max_score) {
           // Player 2 Wins (3 points), Player 1 gets 0
           await Promise.all([
             client.from("participants").update({
@@ -499,6 +501,7 @@ export default function TournamentRounds({
                                   setMatchErrorIndex={setMatchErrorIndex}
                                   isRoundActive={isRoundActive}
                                   index={index}
+                                  tournament={tournamentInfo}
                                 />
                               </td>
                             </tr>
@@ -526,6 +529,7 @@ export default function TournamentRounds({
                                   setMatchErrorIndex={setMatchErrorIndex}
                                   isRoundActive={isRoundActive}
                                   index={index}
+                                  tournament={tournamentInfo}
                                 />
                               </td>
                             </tr>
