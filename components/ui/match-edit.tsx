@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, TextInput } from "flowbite-react";
+import { Button } from "flowbite-react";
 import { Pencil } from "lucide-react";
 import { Dispatch, FormEvent, SetStateAction, useState } from "react";
 import { createClient } from "../../utils/supabase/client";
@@ -23,6 +23,16 @@ export default function MatchEditModal({
   const [open, setOpen] = useState(false);
   const [player1Score, setPlayer1Score] = useState(match.player1_score);
   const [player2Score, setPlayer2Score] = useState(match.player2_score);
+
+  // Reset scores to 0 only if they haven't been set yet
+  const handleOpenModal = () => {
+    if (isRoundActive) {
+      // Use existing scores if available, otherwise default to 0
+      setPlayer1Score(match.player1_score !== null ? match.player1_score : 0);
+      setPlayer2Score(match.player2_score !== null ? match.player2_score : 0);
+      setOpen(true);
+    }
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -106,7 +116,44 @@ export default function MatchEditModal({
   
     fetchCurrentRoundData();
   };
-  
+
+  // Generate score options based on tournament.max_score
+  const scoreOptions = Array.from({ length: tournament.max_score + 1 }, (_, i) => i);
+
+  // Score selector component
+  const ScoreSelector = ({ 
+    player, 
+    selectedScore, 
+    setScore 
+  }: { 
+    player: string, 
+    selectedScore: number, 
+    setScore: (score: number) => void 
+  }) => {
+    return (
+      <div className="mb-4">
+        <h3 className="text-lg text-zinc-300 font-normal mb-2">
+          <span className="text-white font-medium">{player}</span> Lost Souls:
+        </h3>
+        <div className="flex gap-2">
+          {scoreOptions.map((score) => (
+            <button
+              key={score}
+              type="button"
+              onClick={() => setScore(score)}
+              className={`w-10 h-10 rounded-md flex items-center justify-center transition-colors border ${
+                selectedScore === score
+                  ? "bg-blue-600 text-white border-blue-400"
+                  : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700 border-zinc-400"
+              }`}
+            >
+              {score}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <>
@@ -117,11 +164,7 @@ export default function MatchEditModal({
               ? "bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 hover:text-blue-400 transition cursor-pointer" 
               : "text-gray-500/50"
           }`}
-          onClick={() => {
-            if (isRoundActive) {
-              setOpen(!open)
-            }
-          }}
+          onClick={handleOpenModal}
           disabled={!isRoundActive}
           aria-label="Edit match scores"
         >
@@ -130,45 +173,27 @@ export default function MatchEditModal({
       </div>
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
-          <div className="bg-[#1F2937] border-2 border-zinc-300/10 py-6 px-6 rounded-lg shadow-lg max-w-sm w-full">
-            <h2 className="text-xl font-bold mb-4 text-zinc-100">Edit Match</h2>
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-              <div className="mb-2 block space-y-3">
-                <div className="flex items-center gap-3">
-                  <h3 className="text-lg text-zinc-300 w-full text-end font-normal">
-                    "
-                    <span className="text-white font-medium">
-                      {match.player1_id.name}
-                    </span>
-                    " Lost Souls:{" "}
-                  </h3>
-                  <TextInput
-                    type="number"
-                    placeholder="Souls Rescued"
-                    value={player1Score ?? ""}
-                    onChange={(event) => {
-                      setPlayer1Score(Number(event.target.value));
-                    }}
-                    className="min-w-[50px]"
-                  />
-                </div>
-                <div className="flex items-center gap-3">
-                  <h3 className="text-lg text-zinc-200 w-full text-end">
-                    "<span className="text-white">{match.player2_id.name}</span>
-                    " Lost Souls:{" "}
-                  </h3>
-                  <TextInput
-                    type="number"
-                    placeholder="Souls Rescued"
-                    defaultValue={player2Score ?? ""}
-                    onChange={(event) => {
-                      setPlayer2Score(Number(event.target.value));
-                    }}
-                    className="min-w-[50px]"
-                  />
-                </div>
+          <div className="bg-[#1F2937] border-2 border-zinc-300/10 py-8 px-8 rounded-lg shadow-lg max-w-md w-full">
+            <h2 className="text-xl font-bold mb-6 text-zinc-100">Edit Match</h2>
+            <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+              <div className="block space-y-5">
+                <ScoreSelector 
+                  player={match.player1_id.name} 
+                  selectedScore={player1Score} 
+                  setScore={setPlayer1Score} 
+                />
+                <ScoreSelector 
+                  player={match.player2_id.name} 
+                  selectedScore={player2Score} 
+                  setScore={setPlayer2Score} 
+                />
+                {player1Score === tournament.max_score && player2Score === tournament.max_score && (
+                  <p className="text-red-500 text-sm">
+                    Score cannot be {tournament.max_score}-{tournament.max_score}.
+                  </p>
+                )}
               </div>
-              <div className="flex justify-end gap-3">
+              <div className="flex justify-end gap-3 mt-2">
                 <Button type="submit" outline gradientDuoTone="greenToBlue">
                   Update
                 </Button>
