@@ -281,15 +281,15 @@ export default function TournamentRounds({
           await Promise.all([
             client.from("participants").update({
               match_points: (participant1.match_points || 0) + 1.5,
-              differential: (match.differential || 0) + (participant1.differential || 0),
+              // In a draw, the score differential is always 0
+              differential: (participant1.differential || 0), // No change to differential in a draw
             }).eq("id", match.player1_id.id),
 
             client.from("participants").update({
               match_points: (participant2.match_points || 0) + 1.5,
-              differential: (match.differential2 || 0) + (participant2.differential || 0),
+              differential: (participant2.differential || 0), // No change to differential in a draw
             }).eq("id", match.player2_id.id),
           ]);
-
         } else if (match.player1_score === tournamentInfo.max_score) {
           // Player 1 Wins (3 points), Player 2 gets 0
           await Promise.all([

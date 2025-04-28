@@ -565,10 +565,13 @@ export default function TournamentPage({
       // 2. Use the sorted list of players
       let sortedPlayers = [...participants];
       
+      // Debug output for top standings only
+      console.log(`Creating pairings for round ${round} with ${sortedPlayers.length} players`);
+      
       // 3. Retrieve all previous matches to avoid rematches from any round
       const { data: previousMatches, error: matchError } = await client
         .from("matches")
-        .select("player1_id, player2_id")
+        .select("player1_id, player2_id, round")
         .eq("tournament_id", tournamentId)
         .lt("round", round); // Get matches from all previous rounds
         
@@ -579,10 +582,29 @@ export default function TournamentPage({
       
       // Build a set of played matchups (both directions)
       const playedMatchups = new Set();
+      const latestRoundPlayed = new Map(); // To track which players played each other most recently
+      
       previousMatches.forEach(match => {
-        playedMatchups.add(`${match.player1_id}-${match.player2_id}`);
-        playedMatchups.add(`${match.player2_id}-${match.player1_id}`);
+        const pair1 = `${match.player1_id}-${match.player2_id}`;
+        const pair2 = `${match.player2_id}-${match.player1_id}`;
+        
+        playedMatchups.add(pair1);
+        playedMatchups.add(pair2);
+        
+        // Track the most recent round these players played against each other
+        if (!latestRoundPlayed.has(pair1) || latestRoundPlayed.get(pair1) < match.round) {
+          latestRoundPlayed.set(pair1, match.round);
+          latestRoundPlayed.set(pair2, match.round);
+        }
       });
+
+      // Only check previous matchups for top 3 players (reduced logging)
+      if (sortedPlayers.length >= 2) {
+        const top2 = sortedPlayers.slice(0, 2);
+        const pairKey = `${top2[0].id}-${top2[1].id}`;
+        const hasPriorMatch = playedMatchups.has(pairKey);
+        console.log(`Top 2 players can be paired: ${!hasPriorMatch}`);
+      }
       
       // 4. If odd number of players, remove the lowest-ranked for a bye
       let byePlayer = null;
@@ -590,184 +612,176 @@ export default function TournamentPage({
         byePlayer = sortedPlayers.pop();
       }
       
-      // 5. Group players by match points
-      const playersByMatchPoints = new Map();
-      for (const player of sortedPlayers) {
-        const matchPoints = player.match_points || 0;
-        if (!playersByMatchPoints.has(matchPoints)) {
-          playersByMatchPoints.set(matchPoints, []);
+      // New approach: Create ALL possible valid pairings first, then select the best ones
+      const allValidPairings = [];
+      
+      // Generate all possible pairs that haven't already played each other
+      for (let i = 0; i < sortedPlayers.length; i++) {
+        for (let j = i + 1; j < sortedPlayers.length; j++) {
+          const player1 = sortedPlayers[i];
+          const player2 = sortedPlayers[j];
+          const pairKey = `${player1.id}-${player2.id}`;
+          
+          // Only consider pairs that haven't played before
+          if (!playedMatchups.has(pairKey)) {
+            allValidPairings.push({
+              player1,
+              player2,
+              scoreDifference: Math.abs((player1.match_points || 0) - (player2.match_points || 0)),
+              combinedPoints: (player1.match_points || 0) + (player2.match_points || 0),
+              rankDifference: j - i // Position difference in standings
+            });
+          }
         }
-        playersByMatchPoints.get(matchPoints).push(player);
       }
       
-      // 6. Create pairings within each match point group first
+      // Sort valid pairings prioritizing:
+      // 1. Smallest score difference (pair players with similar scores)
+      // 2. Highest combined points (prioritize top tables)
+      // 3. Smallest rank difference (avoid "jumping" too many positions)
+      allValidPairings.sort((a, b) => {
+        // First prioritize close score matches
+        if (a.scoreDifference !== b.scoreDifference) {
+          return a.scoreDifference - b.scoreDifference;
+        }
+        
+        // Then prioritize higher tables
+        if (a.combinedPoints !== b.combinedPoints) {
+          return b.combinedPoints - a.combinedPoints;
+        }
+        
+        // Finally, prefer pairing players close in rank
+        return a.rankDifference - b.rankDifference;
+      });
+      
+      // Use a greedy algorithm to select pairings
       const matches = [];
       const assignedPlayers = new Set();
       
-      // First pass: Try to pair within same match point groups
-      for (const [matchPoints, players] of playersByMatchPoints.entries()) {
-        // Skip if there's only 1 player in this group (will be handled in the second pass)
-        if (players.length <= 1) continue;
-        
-        // Try to find as many valid pairings within this match point group as possible
-        for (let i = 0; i < players.length; i++) {
-          // Skip if this player already has a match
-          if (assignedPlayers.has(players[i].id)) continue;
-          
-          let player1 = players[i];
-          let foundMatch = false;
-          
-          // Look for a valid opponent in the same score group
-          for (let j = i + 1; j < players.length; j++) {
-            if (assignedPlayers.has(players[j].id)) continue;
-            
-            let potentialOpponent = players[j];
-            const pairKey = `${player1.id}-${potentialOpponent.id}`;
-            
-            // Check if they haven't played each other before
-            if (!playedMatchups.has(pairKey)) {
-              // Valid match found!
-              matches.push({
-                tournament_id: tournamentId,
-                round: round,
-                player1_id: player1.id,
-                player2_id: potentialOpponent.id,
-                player1_score: null,
-                player2_score: null,
-                player1_match_points: player1.match_points || 0,
-                player2_match_points: potentialOpponent.match_points || 0,
-                differential: player1.differential || 0,
-                differential2: potentialOpponent.differential || 0,
-                match_order: 0 // Will be set after all matches are created
-              });
-              
-              assignedPlayers.add(player1.id);
-              assignedPlayers.add(potentialOpponent.id);
-              foundMatch = true;
-              break;
-            }
-          }
-          
-          // If no valid opponent in the same score group, we'll handle in the second pass
-          if (!foundMatch) {
-            console.log(`Could not find a valid opponent in the same score group for ${player1.name}`);
-          }
+      // First, try to assign the highest tables possible
+      for (const pairing of allValidPairings) {
+        if (assignedPlayers.has(pairing.player1.id) || assignedPlayers.has(pairing.player2.id)) {
+          continue; // Skip if either player is already paired
         }
+        
+        // Create a match with these players
+        matches.push({
+          tournament_id: tournamentId,
+          round: round,
+          player1_id: pairing.player1.id,
+          player2_id: pairing.player2.id,
+          player1_score: null,
+          player2_score: null,
+          player1_match_points: pairing.player1.match_points || 0,
+          player2_match_points: pairing.player2.match_points || 0,
+          differential: pairing.player1.differential || 0,
+          differential2: pairing.player2.differential || 0,
+          match_order: 0 // Will be set after all matches are created
+        });
+        
+        // Mark these players as used
+        assignedPlayers.add(pairing.player1.id);
+        assignedPlayers.add(pairing.player2.id);
       }
       
-      // Second pass: Handle players who couldn't be paired in their own match point group
-      const unassignedPlayers = sortedPlayers.filter(p => !assignedPlayers.has(p.id));
+      // Check if any players weren't paired (should only happen if there are no valid pairings)
+      const unpairedPlayers = sortedPlayers.filter(p => !assignedPlayers.has(p.id));
       
-      if (unassignedPlayers.length > 0) {
-        console.log(`${unassignedPlayers.length} players need cross-score group pairing to avoid rematches`);
+      if (unpairedPlayers.length > 0) {
+        console.warn(`${unpairedPlayers.length} players could not be paired without creating rematches`);
         
-        // For each unassigned player, try to find the best opponent from other score groups
-        for (let i = 0; i < unassignedPlayers.length; i++) {
-          // Skip if this player was already assigned in this loop
-          if (assignedPlayers.has(unassignedPlayers[i].id)) continue;
-          
-          let player1 = unassignedPlayers[i];
-          let bestOpponentIndex = -1;
-          let bestScoreDifference = Infinity;
-          
-          // Try to find the closest valid opponent by match points
-          for (let j = 0; j < unassignedPlayers.length; j++) {
-            if (i === j || assignedPlayers.has(unassignedPlayers[j].id)) continue;
+        // Create a matrix of ALL remaining pairs (including rematches)
+        const remainingPairOptions = [];
+        
+        for (let i = 0; i < unpairedPlayers.length; i++) {
+          for (let j = i + 1; j < unpairedPlayers.length; j++) {
+            const player1 = unpairedPlayers[i];
+            const player2 = unpairedPlayers[j];
+            const pairKey = `${player1.id}-${player2.id}`;
             
-            let potentialOpponent = unassignedPlayers[j];
-            const pairKey = `${player1.id}-${potentialOpponent.id}`;
-            
-            // Check if they haven't played each other before
-            if (!playedMatchups.has(pairKey)) {
-              const scoreDifference = Math.abs(
-                (player1.match_points || 0) - (potentialOpponent.match_points || 0)
-              );
-              
-              // Find the opponent with the closest match points
-              if (scoreDifference < bestScoreDifference) {
-                bestOpponentIndex = j;
-                bestScoreDifference = scoreDifference;
-              }
-            }
-          }
-          
-          // If found a valid opponent
-          if (bestOpponentIndex !== -1) {
-            const opponent = unassignedPlayers[bestOpponentIndex];
-            
-            // Log that we're doing a cross-score pairing
-            console.log(
-              `Cross-score pairing: ${player1.name} (${player1.match_points} pts) with ${opponent.name} (${opponent.match_points} pts) to avoid rematch`
-            );
-            
-            matches.push({
-              tournament_id: tournamentId,
-              round: round,
-              player1_id: player1.id,
-              player2_id: opponent.id,
-              player1_score: null,
-              player2_score: null,
-              player1_match_points: player1.match_points || 0,
-              player2_match_points: opponent.match_points || 0,
-              differential: player1.differential || 0,
-              differential2: opponent.differential || 0,
-              match_order: 0 // Will be set after all matches are created
+            remainingPairOptions.push({
+              player1,
+              player2,
+              isRematch: playedMatchups.has(pairKey),
+              lastPlayedRound: latestRoundPlayed.get(pairKey) || 0,
+              scoreDifference: Math.abs((player1.match_points || 0) - (player2.match_points || 0)),
+              combinedPoints: (player1.match_points || 0) + (player2.match_points || 0)
             });
-            
-            assignedPlayers.add(player1.id);
-            assignedPlayers.add(opponent.id);
           }
         }
-      }
-      
-      // Third pass: If there are still unassigned players, we have to allow rematches
-      const stillUnassignedPlayers = sortedPlayers.filter(p => !assignedPlayers.has(p.id));
-      
-      if (stillUnassignedPlayers.length > 0) {
-        console.warn(`${stillUnassignedPlayers.length} players must be paired with rematches`);
         
-        // Sort by match points to ensure we at least preserve match point pairings
-        stillUnassignedPlayers.sort((a, b) => 
-          (b.match_points || 0) - (a.match_points || 0) || 
-          (b.differential || 0) - (a.differential || 0)
-        );
+        // Sort remaining options to minimize impact of rematches
+        remainingPairOptions.sort((a, b) => {
+          // First prioritize non-rematches
+          if (a.isRematch !== b.isRematch) {
+            return a.isRematch ? 1 : -1;
+          }
+          
+          // Then prioritize rematches from earlier rounds
+          if (a.isRematch && b.isRematch && a.lastPlayedRound !== b.lastPlayedRound) {
+            return a.lastPlayedRound - b.lastPlayedRound;
+          }
+          
+          // Then prioritize close score matches
+          if (a.scoreDifference !== b.scoreDifference) {
+            return a.scoreDifference - b.scoreDifference;
+          }
+          
+          // Finally prioritize higher tables
+          return b.combinedPoints - a.combinedPoints;
+        });
         
-        for (let i = 0; i < stillUnassignedPlayers.length; i += 2) {
-          if (i + 1 >= stillUnassignedPlayers.length) break; // Skip the last player if odd number
+        // Pair remaining players
+        const finallyAssignedPlayers = new Set();
+        for (const pairing of remainingPairOptions) {
+          if (finallyAssignedPlayers.has(pairing.player1.id) || finallyAssignedPlayers.has(pairing.player2.id)) {
+            continue;
+          }
           
-          let player1 = stillUnassignedPlayers[i];
-          let player2 = stillUnassignedPlayers[i + 1];
-          
-          // This is a forced rematch
-          const pairKey = `${player1.id}-${player2.id}`;
-          if (playedMatchups.has(pairKey)) {
-            console.warn(
-              `Forced rematch between ${player1.name} (${player1.id}) and ${player2.name} (${player2.id})`
-            );
+          if (pairing.isRematch) {
+            console.warn(`Creating rematch between ${pairing.player1.name} and ${pairing.player2.name} (last played round ${pairing.lastPlayedRound})`);
           }
           
           matches.push({
             tournament_id: tournamentId,
             round: round,
-            player1_id: player1.id,
-            player2_id: player2.id,
+            player1_id: pairing.player1.id,
+            player2_id: pairing.player2.id,
             player1_score: null,
             player2_score: null,
-            player1_match_points: player1.match_points || 0,
-            player2_match_points: player2.match_points || 0,
-            differential: player1.differential || 0,
-            differential2: player2.differential || 0,
+            player1_match_points: pairing.player1.match_points || 0,
+            player2_match_points: pairing.player2.match_points || 0,
+            differential: pairing.player1.differential || 0,
+            differential2: pairing.player2.differential || 0,
             match_order: 0 // Will be set after all matches are created
           });
+          
+          finallyAssignedPlayers.add(pairing.player1.id);
+          finallyAssignedPlayers.add(pairing.player2.id);
+        }
+        
+        // Handle any remaining odd player (should be at most one)
+        const stillUnpaired = unpairedPlayers.filter(p => !finallyAssignedPlayers.has(p.id));
+        if (stillUnpaired.length === 1 && !byePlayer) {
+          byePlayer = stillUnpaired[0];
+          console.log(`Assigning bye to ${byePlayer.name} as remaining unpaired player`);
+        } else if (stillUnpaired.length > 1) {
+          console.error(`ERROR: Multiple unpaired players remain: ${stillUnpaired.map(p => p.name).join(', ')}`);
         }
       }
       
-      // Order matches by the highest match points and assign match_order values
-      // This is the key change to make high-ranked players appear at top tables
+      // Handle any remaining odd player from original set (should be at most one)
+      const unpairedFromMainSet = sortedPlayers.filter(p => !assignedPlayers.has(p.id));
+      if (unpairedFromMainSet.length === 1 && !byePlayer) {
+        byePlayer = unpairedFromMainSet[0];
+        console.log(`Assigning bye to ${byePlayer.name} as odd player out`);
+      }
+      
+      // Order matches by the highest combined match points (descending)
       matches.sort((a, b) => {
-        const highestPointsA = Math.max(a.player1_match_points || 0, a.player2_match_points || 0);
-        const highestPointsB = Math.max(b.player1_match_points || 0, b.player2_match_points || 0);
-        return highestPointsB - highestPointsA; // Descending order by match points
+        const combinedA = (a.player1_match_points || 0) + (a.player2_match_points || 0);
+        const combinedB = (b.player1_match_points || 0) + (b.player2_match_points || 0);
+        return combinedB - combinedA;
       });
       
       // Assign match_order based on sorted order
@@ -775,19 +789,28 @@ export default function TournamentPage({
         match.match_order = index + 1;
       });
       
-      // If we have an odd number of remaining players and we haven't assigned a bye yet
-      const finalUnassignedPlayers = sortedPlayers.filter(p => !assignedPlayers.has(p.id));
-      if (finalUnassignedPlayers.length % 2 !== 0 && !byePlayer) {
-        byePlayer = finalUnassignedPlayers[finalUnassignedPlayers.length - 1];
-      }
+      // Final validation: check for problematic pairings (but with less logging)
+      matches.forEach(match => {
+        const currentPair1 = `${match.player1_id}-${match.player2_id}`;
+        const currentPair2 = `${match.player2_id}-${match.player1_id}`;
+        
+        // Check for rematches against previous rounds
+        if (playedMatchups.has(currentPair1) || playedMatchups.has(currentPair2)) {
+          const p1 = sortedPlayers.find(p => p.id === match.player1_id) || { name: "Unknown" };
+          const p2 = sortedPlayers.find(p => p.id === match.player2_id) || { name: "Unknown" };
+          console.warn(`REMATCH: ${p1.name} vs ${p2.name} (previously played in round ${latestRoundPlayed.get(currentPair1) || latestRoundPlayed.get(currentPair2)})`);
+        }
+      });
       
       // 7. Assign bye if applicable
       if (byePlayer) {
         await assignBye(client, tournamentId, round, byePlayer.id);
+        console.log(`Assigned bye to ${byePlayer.name} for round ${round}`);
       }
       
       // 8. Insert the matches into the database
       if (matches.length > 0) {
+        console.log(`Created ${matches.length} matches for round ${round}`);
         const { error: insertError } = await client.from("matches").insert(matches);
         if (insertError) {
           console.error("Error inserting matches:", insertError);
