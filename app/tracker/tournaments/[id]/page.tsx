@@ -481,24 +481,29 @@ export default function TournamentPage({
       console.error("Error fetching participants:", participantError);
       return;
     }
-    // Create a copy of participants to work with
-    let remainingPlayers = [...participants];
+    
+    // Create a copy of participants to work with and shuffle them for random pairings
+    let remainingPlayers = shuffleArray([...participants]);
     let matches = [];
-
-    // Create random pairings until 0-1 players remain
+    
+    // Handle odd number of players (assign a bye randomly)
+    let byePlayer = null;
+    if (remainingPlayers.length % 2 !== 0) {
+      // For round 1, assign bye randomly
+      const randomIndex = Math.floor(Math.random() * remainingPlayers.length);
+      
+      // Assign bye to a randomly selected player
+      byePlayer = remainingPlayers[randomIndex];
+      
+      // Remove bye player from pairing pool
+      remainingPlayers.splice(randomIndex, 1);
+    }
+    
+    // Create pairings until no players remain
     while (remainingPlayers.length > 1) {
-      // Select two random players
-      const index1 = Math.floor(Math.random() * remainingPlayers.length);
-      let index2 = Math.floor(Math.random() * remainingPlayers.length);
-
-      // Ensure we don't select the same player twice
-      while (index1 === index2) {
-        index2 = Math.floor(Math.random() * remainingPlayers.length);
-      }
-
-      // Get the two randomly selected players
-      const player1 = remainingPlayers[index1];
-      const player2 = remainingPlayers[index2];
+      // Take the first two players (the array is already randomly shuffled)
+      const player1 = remainingPlayers.pop();
+      const player2 = remainingPlayers.pop();
 
       // Create a match between these players with a stable match_order
       matches.push({
@@ -514,25 +519,21 @@ export default function TournamentPage({
         differential2: player2.differential || 0,
         match_order: matches.length + 1
       });
-
-      // Remove these players from the pool (remove higher index first to avoid shifting)
-      if (index1 > index2) {
-        remainingPlayers.splice(index1, 1);
-        remainingPlayers.splice(index2, 1);
-      } else {
-        remainingPlayers.splice(index2, 1);
-        remainingPlayers.splice(index1, 1);
-      }
     }
 
-    // Handle odd number of players (assign a bye)
-    if (remainingPlayers.length > 0) {
-      const byePlayer = remainingPlayers[0];
+    // Verify we've used all players except possibly the bye
+    if (remainingPlayers.length > 0 && !byePlayer) {
+      console.error(`Error: ${remainingPlayers.length} players left unpaired`);
+    }
+    
+    // Assign bye if applicable
+    if (byePlayer) {
       await assignBye(client, tournamentId, round, byePlayer.id);
     }
 
     // Insert matches into database
     if (matches.length > 0) {
+      console.log(`Created ${matches.length} matches for round ${round}`);
       const { error: matchError } = await client.from("matches").insert(matches);
       if (matchError) {
         console.error("Error inserting matches:", matchError);
@@ -540,6 +541,17 @@ export default function TournamentPage({
     }
   };
 
+  /**
+   * Helper function to shuffle an array randomly (Fisher-Yates algorithm)
+   * Used for random round 1 pairings
+   */
+  const shuffleArray = (array) => {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+  };
 
   /**
    * Creates pairings for rounds after the first round
@@ -579,6 +591,25 @@ export default function TournamentPage({
         console.error("Error fetching previous matches:", matchError);
         return;
       }
+
+      // 3.5 Get previous byes to avoid giving byes to the same player
+      const { data: previousByes, error: byeError } = await client
+        .from("byes")
+        .select("participant_id, round_number")
+        .eq("tournament_id", tournamentId)
+        .lt("round_number", round);
+
+      if (byeError) {
+        console.error("Error fetching previous byes:", byeError);
+        return;
+      }
+
+      // Create a map to track how many byes each player has received
+      const byeCount = new Map();
+      previousByes?.forEach(bye => {
+        const id = bye.participant_id;
+        byeCount.set(id, (byeCount.get(id) || 0) + 1);
+      });
       
       // Build a set of played matchups (both directions)
       const playedMatchups = new Set();
@@ -598,7 +629,7 @@ export default function TournamentPage({
         }
       });
 
-      // Only check previous matchups for top 3 players (reduced logging)
+      // Only check previous matchups for top 2 players
       if (sortedPlayers.length >= 2) {
         const top2 = sortedPlayers.slice(0, 2);
         const pairKey = `${top2[0].id}-${top2[1].id}`;
@@ -606,10 +637,34 @@ export default function TournamentPage({
         console.log(`Top 2 players can be paired: ${!hasPriorMatch}`);
       }
       
-      // 4. If odd number of players, remove the lowest-ranked for a bye
+      // 4. If odd number of players, identify suitable bye candidate
       let byePlayer = null;
       if (sortedPlayers.length % 2 !== 0) {
-        byePlayer = sortedPlayers.pop();
+        // Find players who haven't had a bye yet, starting from the bottom of the standings
+        const reverseRankedPlayers = [...sortedPlayers].reverse();
+        
+        // First, try to find a player with no previous byes
+        let candidatesWithoutByes = reverseRankedPlayers.filter(p => !byeCount.has(p.id));
+        
+        if (candidatesWithoutByes.length > 0) {
+          byePlayer = candidatesWithoutByes[0]; // Take the lowest ranked player without a previous bye
+        } else {
+          // If everyone has had at least one bye, find the player with the fewest byes
+          // Sort by bye count (ascending), then by match points (ascending), then by differential (ascending)
+          reverseRankedPlayers.sort((a, b) => {
+            const aCount = byeCount.get(a.id) || 0;
+            const bCount = byeCount.get(b.id) || 0;
+            
+            if (aCount !== bCount) return aCount - bCount;
+            if ((a.match_points || 0) !== (b.match_points || 0)) return (a.match_points || 0) - (b.match_points || 0);
+            return (a.differential || 0) - (b.differential || 0);
+          });
+          
+          byePlayer = reverseRankedPlayers[0];
+        }
+        
+        // Remove the bye player from the pairing pool
+        sortedPlayers = sortedPlayers.filter(p => p.id !== byePlayer.id);
       }
       
       // New approach: Create ALL possible valid pairings first, then select the best ones
@@ -688,7 +743,7 @@ export default function TournamentPage({
       const unpairedPlayers = sortedPlayers.filter(p => !assignedPlayers.has(p.id));
       
       if (unpairedPlayers.length > 0) {
-        console.warn(`${unpairedPlayers.length} players could not be paired without creating rematches`);
+        console.log(`${unpairedPlayers.length} players need rematches`);
         
         // Create a matrix of ALL remaining pairs (including rematches)
         const remainingPairOptions = [];
@@ -738,10 +793,6 @@ export default function TournamentPage({
             continue;
           }
           
-          if (pairing.isRematch) {
-            console.warn(`Creating rematch between ${pairing.player1.name} and ${pairing.player2.name} (last played round ${pairing.lastPlayedRound})`);
-          }
-          
           matches.push({
             tournament_id: tournamentId,
             round: round,
@@ -764,7 +815,6 @@ export default function TournamentPage({
         const stillUnpaired = unpairedPlayers.filter(p => !finallyAssignedPlayers.has(p.id));
         if (stillUnpaired.length === 1 && !byePlayer) {
           byePlayer = stillUnpaired[0];
-          console.log(`Assigning bye to ${byePlayer.name} as remaining unpaired player`);
         } else if (stillUnpaired.length > 1) {
           console.error(`ERROR: Multiple unpaired players remain: ${stillUnpaired.map(p => p.name).join(', ')}`);
         }
@@ -774,7 +824,6 @@ export default function TournamentPage({
       const unpairedFromMainSet = sortedPlayers.filter(p => !assignedPlayers.has(p.id));
       if (unpairedFromMainSet.length === 1 && !byePlayer) {
         byePlayer = unpairedFromMainSet[0];
-        console.log(`Assigning bye to ${byePlayer.name} as odd player out`);
       }
       
       // Order matches by the highest combined match points (descending)
@@ -789,23 +838,9 @@ export default function TournamentPage({
         match.match_order = index + 1;
       });
       
-      // Final validation: check for problematic pairings (but with less logging)
-      matches.forEach(match => {
-        const currentPair1 = `${match.player1_id}-${match.player2_id}`;
-        const currentPair2 = `${match.player2_id}-${match.player1_id}`;
-        
-        // Check for rematches against previous rounds
-        if (playedMatchups.has(currentPair1) || playedMatchups.has(currentPair2)) {
-          const p1 = sortedPlayers.find(p => p.id === match.player1_id) || { name: "Unknown" };
-          const p2 = sortedPlayers.find(p => p.id === match.player2_id) || { name: "Unknown" };
-          console.warn(`REMATCH: ${p1.name} vs ${p2.name} (previously played in round ${latestRoundPlayed.get(currentPair1) || latestRoundPlayed.get(currentPair2)})`);
-        }
-      });
-      
       // 7. Assign bye if applicable
       if (byePlayer) {
         await assignBye(client, tournamentId, round, byePlayer.id);
-        console.log(`Assigned bye to ${byePlayer.name} for round ${round}`);
       }
       
       // 8. Insert the matches into the database
