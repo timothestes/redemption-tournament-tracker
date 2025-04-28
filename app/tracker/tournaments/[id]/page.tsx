@@ -544,7 +544,7 @@ export default function TournamentPage({
   /**
    * Creates pairings for rounds after the first round
    * Pairs players based on match points and differential while avoiding rematches
-   * (only checking the immediately preceding round for rematches)
+   * from all previous rounds, not just the last one
    */
   const handleLaterRoundPairings = async (client, tournamentId, round) => {
     try {
@@ -565,12 +565,13 @@ export default function TournamentPage({
       // 2. Use the sorted list of players
       let sortedPlayers = [...participants];
       
-      // 3. Retrieve previous matches (only from the immediately preceding round) to avoid rematches
+      // 3. Retrieve all previous matches to avoid rematches from any round
       const { data: previousMatches, error: matchError } = await client
         .from("matches")
         .select("player1_id, player2_id")
         .eq("tournament_id", tournamentId)
-        .eq("round", round - 1);
+        .lt("round", round); // Get matches from all previous rounds
+        
       if (matchError) {
         console.error("Error fetching previous matches:", matchError);
         return;
@@ -591,32 +592,67 @@ export default function TournamentPage({
       
       // 5. Sequentially pair players while checking for rematches
       const matches = [];
-      for (let i = 0; i < sortedPlayers.length; i += 2) {
-        let player1 = sortedPlayers[i];
-        let player2 = sortedPlayers[i + 1];
       
-        // Check if this pairing is a rematch (from the previous round only)
-        if (playedMatchups.has(`${player1.id}-${player2.id}`)) {
-          // Try to find an alternative candidate for player2 among the remaining players
-          let swapFound = false;
-          for (let j = i + 2; j < sortedPlayers.length; j++) {
-            let candidate = sortedPlayers[j];
-            if (!playedMatchups.has(`${player1.id}-${candidate.id}`)) {
-              // Swap candidate with player2
-              sortedPlayers[i + 1] = candidate;
-              sortedPlayers[j] = player2;
-              player2 = candidate;
-              swapFound = true;
-              break;
-            }
-          }
-          if (!swapFound) {
-            console.warn(
-              `Forced pairing for ${player1.id} and ${player2.id} due to rematch constraint.`
-            );
+      // Track which players have been assigned matches
+      const assignedPlayers = new Set();
+      
+      // First attempt at pairing - go through players in order and try to find suitable opponents
+      for (let i = 0; i < sortedPlayers.length; i++) {
+        // Skip if this player already has a match
+        if (assignedPlayers.has(sortedPlayers[i].id)) continue;
+        
+        let player1 = sortedPlayers[i];
+        let matchFound = false;
+        
+        // Try to find a valid opponent (not already paired, not previously played against)
+        for (let j = i + 1; j < sortedPlayers.length; j++) {
+          let potentialOpponent = sortedPlayers[j];
+          
+          if (!assignedPlayers.has(potentialOpponent.id) && 
+              !playedMatchups.has(`${player1.id}-${potentialOpponent.id}`)) {
+            // Valid match found
+            matches.push({
+              tournament_id: tournamentId,
+              round: round,
+              player1_id: player1.id,
+              player2_id: potentialOpponent.id,
+              player1_score: null,
+              player2_score: null,
+              player1_match_points: player1.match_points || 0,
+              player2_match_points: potentialOpponent.match_points || 0,
+              differential: player1.differential || 0,
+              differential2: potentialOpponent.differential || 0,
+              match_order: matches.length + 1
+            });
+            
+            // Mark both players as assigned
+            assignedPlayers.add(player1.id);
+            assignedPlayers.add(potentialOpponent.id);
+            matchFound = true;
+            break;
           }
         }
+        
+        // If we couldn't find a match without causing a rematch, we'll have to allow a rematch
+        // as a last resort for the remaining unmatched players
+        if (!matchFound && !assignedPlayers.has(player1.id)) {
+          console.warn(`Couldn't find a non-rematch opponent for ${player1.name} (${player1.id})`);
+        }
+      }
       
+      // Second pass: force pairings for any unassigned players, even if it causes rematches
+      const unassignedPlayers = sortedPlayers.filter(p => !assignedPlayers.has(p.id));
+      
+      for (let i = 0; i < unassignedPlayers.length; i += 2) {
+        if (i + 1 >= unassignedPlayers.length) break; // Skip the last player if odd number
+        
+        let player1 = unassignedPlayers[i];
+        let player2 = unassignedPlayers[i + 1];
+        
+        console.warn(
+          `Forced rematch between ${player1.name} (${player1.id}) and ${player2.name} (${player2.id})`
+        );
+        
         matches.push({
           tournament_id: tournamentId,
           round: round,
@@ -630,6 +666,11 @@ export default function TournamentPage({
           differential2: player2.differential || 0,
           match_order: matches.length + 1
         });
+      }
+      
+      // If we have an odd unassigned player left and we haven't assigned a bye yet
+      if (unassignedPlayers.length % 2 !== 0 && !byePlayer) {
+        byePlayer = unassignedPlayers[unassignedPlayers.length - 1];
       }
       
       // 6. Assign bye if applicable
@@ -648,7 +689,6 @@ export default function TournamentPage({
       console.error("Error in handleLaterRoundPairings:", error);
     }
   };
-
 
   /**
    * Assigns a bye to a player for a round
