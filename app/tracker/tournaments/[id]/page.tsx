@@ -638,7 +638,7 @@ export default function TournamentPage({
                 player2_match_points: potentialOpponent.match_points || 0,
                 differential: player1.differential || 0,
                 differential2: potentialOpponent.differential || 0,
-                match_order: matches.length + 1
+                match_order: 0 // Will be set after all matches are created
               });
               
               assignedPlayers.add(player1.id);
@@ -711,7 +711,7 @@ export default function TournamentPage({
               player2_match_points: opponent.match_points || 0,
               differential: player1.differential || 0,
               differential2: opponent.differential || 0,
-              match_order: matches.length + 1
+              match_order: 0 // Will be set after all matches are created
             });
             
             assignedPlayers.add(player1.id);
@@ -757,10 +757,23 @@ export default function TournamentPage({
             player2_match_points: player2.match_points || 0,
             differential: player1.differential || 0,
             differential2: player2.differential || 0,
-            match_order: matches.length + 1
+            match_order: 0 // Will be set after all matches are created
           });
         }
       }
+      
+      // Order matches by the highest match points and assign match_order values
+      // This is the key change to make high-ranked players appear at top tables
+      matches.sort((a, b) => {
+        const highestPointsA = Math.max(a.player1_match_points || 0, a.player2_match_points || 0);
+        const highestPointsB = Math.max(b.player1_match_points || 0, b.player2_match_points || 0);
+        return highestPointsB - highestPointsA; // Descending order by match points
+      });
+      
+      // Assign match_order based on sorted order
+      matches.forEach((match, index) => {
+        match.match_order = index + 1;
+      });
       
       // If we have an odd number of remaining players and we haven't assigned a bye yet
       const finalUnassignedPlayers = sortedPlayers.filter(p => !assignedPlayers.has(p.id));

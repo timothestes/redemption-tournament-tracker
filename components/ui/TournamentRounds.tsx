@@ -216,6 +216,7 @@ export default function TournamentRounds({
       .eq("tournament_id", tournamentId)
       .eq("round", currentPage)
       .order("match_order", { ascending: true });
+    
     if (error) console.log(error);
     setMatches(data || []);
   
@@ -225,10 +226,10 @@ export default function TournamentRounds({
       .eq("tournament_id", tournamentId)
       .eq("round_number", currentPage)
       .order("id", { ascending: true });
+    
     if (byeError) console.log(byeError);
     setByes(byeData);
   };
-  
 
   useEffect(() => {
     fetchCurrentRoundData();
