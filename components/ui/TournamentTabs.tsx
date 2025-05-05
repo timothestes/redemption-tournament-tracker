@@ -62,6 +62,7 @@ export default function TournamentTabs({
   fetchParticipants,
 }: TournamentTabsProps) {
   const tabsRef = useRef(null);
+  const addParticipantButtonRef = useRef<HTMLButtonElement>(null);
 
   // Use effect to programmatically change tabs when activeTab state changes
   useEffect(() => {
@@ -87,6 +88,7 @@ export default function TournamentTabs({
           </h2>
           <div className="relative group">
             <Button
+              ref={addParticipantButtonRef}
               onClick={() => !tournamentStarted && setIsModalOpen(true)}
               className={`flex items-center gap-2 ${tournamentStarted ? "opacity-50 cursor-not-allowed" : ""}`}
               style={{ width: "200px" }}
@@ -108,8 +110,22 @@ export default function TournamentTabs({
           </div>
           <ParticipantFormModal
             isOpen={isModalOpen}
-            onClose={() => setIsModalOpen(false)}
-            onSubmit={onAddParticipant}
+            onClose={() => {
+              setIsModalOpen(false);
+              // Focus on the Add Participant button after closing the modal
+              setTimeout(() => {
+                addParticipantButtonRef.current?.focus();
+              }, 0);
+            }}
+            onSubmit={(name) => {
+              onAddParticipant(name);
+              // Close the modal after adding a participant
+              setIsModalOpen(false);
+              // Focus on the Add Participant button after closing the modal
+              setTimeout(() => {
+                addParticipantButtonRef.current?.focus();
+              }, 0);
+            }}
           />
         </div>
         {loading ? (
