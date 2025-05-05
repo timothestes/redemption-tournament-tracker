@@ -4,6 +4,8 @@ import { Button, Card, Pagination } from "flowbite-react";
 import { Dispatch, Fragment, SetStateAction, useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "../../utils/supabase/client";
 import MatchEditModal from "./match-edit";
+import RepairPairingModal from "./RepairPairingModal";
+import { ArrowUpDown } from "lucide-react";
 
 const formatDateTime = (timestamp: string | null) => {
   if (!timestamp) return "";
@@ -80,6 +82,10 @@ export default function TournamentRounds({
   const [matchLoading, setMatchLoading] = useState(false);
   const [byes, setByes] = useState<any[]>([]);
   const [matchEnding, setMatchEnding] = useState(false);
+  const [repairModalOpen, setRepairModalOpen] = useState(false);
+  const [selectedMatch, setSelectedMatch] = useState<any>(null);
+  const [repairMode, setRepairMode] = useState(false);
+  const [repairSourceMatch, setRepairSourceMatch] = useState<any>(null);
 
   // Making the fetch functionality work if the activeTab is changed
   useEffect(() => {
@@ -422,6 +428,299 @@ export default function TournamentRounds({
     }
   }, [matches]);
 
+  const handleRepairClick = (match: any, isPlayer2 = false) => {
+    if (repairMode) {
+      // Already in repair mode
+      if (repairSourceMatch.isBye) {
+        // If source is a bye player and target is a regular player
+        handleSwapPlayerWithBye(match, isPlayer2, repairSourceMatch.byeId);
+      } else {
+        // If source is a regular player and target is also a regular player
+        handleSwapPlayers(repairSourceMatch.match, match, repairSourceMatch.isPlayer2, isPlayer2);
+      }
+      setRepairMode(false);
+      setRepairSourceMatch(null);
+    } else {
+      // Enter repair mode
+      setRepairMode(true);
+      setRepairSourceMatch({ match, isPlayer2 });
+    }
+  };
+
+  const handleByeRepairClick = (bye: any) => {
+    if (repairMode) {
+      // Already in repair mode
+      if (repairSourceMatch.isBye) {
+        // Swapping between two byes
+        handleSwapPlayersWithBye(repairSourceMatch.byeId, bye.id);
+      } else {
+        // Swapping a match player with a bye player
+        handleSwapPlayerWithBye(repairSourceMatch.match, repairSourceMatch.isPlayer2, bye.id);
+      }
+      setRepairMode(false);
+      setRepairSourceMatch(null);
+    } else {
+      // Enter repair mode with a bye player selected
+      setRepairMode(true);
+      setRepairSourceMatch({ isBye: true, byeId: bye.id });
+    }
+  };
+
+  const handleSwapPlayers = async (sourceMatch: any, targetMatch: any, isSourcePlayer2: boolean, isTargetPlayer2: boolean) => {
+    setIsLoading(true);
+    try {
+      // Check if we're swapping players across different matches
+      if (sourceMatch.id !== targetMatch.id) {
+        // Determine which player IDs to swap
+        const sourcePlayerId = isSourcePlayer2 ? sourceMatch.player2_id.id : sourceMatch.player1_id.id;
+        const sourcePlayerMatchPoints = isSourcePlayer2 ? sourceMatch.player2_match_points : sourceMatch.player1_match_points;
+        const sourceDifferential = isSourcePlayer2 ? sourceMatch.differential2 : sourceMatch.differential;
+        
+        const targetPlayerId = isTargetPlayer2 ? targetMatch.player2_id.id : targetMatch.player1_id.id;
+        const targetPlayerMatchPoints = isTargetPlayer2 ? targetMatch.player2_match_points : targetMatch.player1_match_points;
+        const targetDifferential = isTargetPlayer2 ? targetMatch.differential2 : targetMatch.differential;
+        
+        // Update source match
+        if (isSourcePlayer2) {
+          await client.from("matches").update({
+            player2_id: targetPlayerId,
+            player2_match_points: targetPlayerMatchPoints,
+            differential2: targetDifferential,
+            player1_score: null,
+            player2_score: null,
+          }).eq("id", sourceMatch.id);
+        } else {
+          await client.from("matches").update({
+            player1_id: targetPlayerId,
+            player1_match_points: targetPlayerMatchPoints,
+            differential: targetDifferential,
+            player1_score: null,
+            player2_score: null,
+          }).eq("id", sourceMatch.id);
+        }
+        
+        // Update target match
+        if (isTargetPlayer2) {
+          await client.from("matches").update({
+            player2_id: sourcePlayerId,
+            player2_match_points: sourcePlayerMatchPoints,
+            differential2: sourceDifferential,
+            player1_score: null,
+            player2_score: null,
+          }).eq("id", targetMatch.id);
+        } else {
+          await client.from("matches").update({
+            player1_id: sourcePlayerId,
+            player1_match_points: sourcePlayerMatchPoints,
+            differential: sourceDifferential,
+            player1_score: null,
+            player2_score: null,
+          }).eq("id", targetMatch.id);
+        }
+      } else {
+        // This is swapping player1 and player2 in the same match
+        await client.from("matches").update({
+          player1_id: sourceMatch.player2_id.id,
+          player2_id: sourceMatch.player1_id.id,
+          player1_match_points: sourceMatch.player2_match_points,
+          player2_match_points: sourceMatch.player1_match_points,
+          differential: sourceMatch.differential2,
+          differential2: sourceMatch.differential,
+          player1_score: null,
+          player2_score: null,
+        }).eq("id", sourceMatch.id);
+      }
+
+      // Refresh the matches data
+      await fetchCurrentRoundData();
+      
+    } catch (error) {
+      console.error("Error swapping players:", error);
+      alert("Error swapping players. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSwapPlayersWithBye = async (sourceByeId: number, targetByeId: number) => {
+    setIsLoading(true);
+    try {
+      // Swap participants between byes
+      const sourceBye = byes.find((bye) => bye.id === sourceByeId);
+      const targetBye = byes.find((bye) => bye.id === targetByeId);
+
+      if (!sourceBye || !targetBye) {
+        throw new Error("Invalid bye IDs");
+      }
+
+      await Promise.all([
+        client.from("byes").update({
+          participant_id: targetBye.participant_id.id,
+          match_points: targetBye.match_points,
+          differential: targetBye.differential,
+        }).eq("id", sourceByeId),
+
+        client.from("byes").update({
+          participant_id: sourceBye.participant_id.id,
+          match_points: sourceBye.match_points,
+          differential: sourceBye.differential,
+        }).eq("id", targetByeId),
+      ]);
+
+      // Refresh the byes data
+      await fetchCurrentRoundData();
+    } catch (error) {
+      console.error("Error swapping players with bye:", error);
+      alert("Error swapping players with bye. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSwapPlayerWithBye = async (sourceMatch: any, isSourcePlayer2: boolean, targetByeId: string) => {
+    setIsLoading(true);
+    try {
+      // Get the bye information
+      const bye = byes.find((b) => b.id === targetByeId);
+      if (!bye) throw new Error("Bye not found");
+
+      // Get the tournament bye settings
+      const { data: tournament, error: tournamentError } = await client
+        .from("tournaments")
+        .select("bye_points, bye_differential")
+        .eq("id", tournamentId)
+        .single();
+
+      if (tournamentError) throw tournamentError;
+
+      // Get player information from the match
+      const playerId = isSourcePlayer2 ? sourceMatch.player2_id.id : sourceMatch.player1_id.id;
+      const playerName = isSourcePlayer2 ? sourceMatch.player2_id.name : sourceMatch.player1_id.name;
+      const playerMatchPoints = isSourcePlayer2 ? sourceMatch.player2_match_points : sourceMatch.player1_match_points;
+      const playerDiff = isSourcePlayer2 ? sourceMatch.differential2 : sourceMatch.differential;
+      
+      // Fetch the original player info from the database to get their original match points (without bye)
+      const { data: byePlayerData, error: byePlayerError } = await client
+        .from("participants")
+        .select("match_points, differential")
+        .eq("id", bye.participant_id.id)
+        .single();
+      
+      if (byePlayerError) throw byePlayerError;
+      
+      // Calculate the player's actual points without the bye bonus
+      const byePlayerOriginalPoints = Math.max(0, (byePlayerData.match_points || 0) - tournament.bye_points);
+      const byePlayerOriginalDiff = (byePlayerData.differential || 0) - tournament.bye_differential;
+      
+      // Calculate new points for player being moved to bye
+      const newByePlayerPoints = playerMatchPoints + tournament.bye_points;
+      const newByePlayerDiff = playerDiff + tournament.bye_differential;
+      
+      // 1. Move the bye player into the match (without their bye points)
+      if (isSourcePlayer2) {
+        await client.from("matches").update({
+          player2_id: bye.participant_id.id,
+          player2_match_points: byePlayerOriginalPoints,
+          differential2: byePlayerOriginalDiff,
+          player1_score: null,
+          player2_score: null,
+        }).eq("id", sourceMatch.id);
+      } else {
+        await client.from("matches").update({
+          player1_id: bye.participant_id.id,
+          player1_match_points: byePlayerOriginalPoints,
+          differential: byePlayerOriginalDiff,
+          player1_score: null,
+          player2_score: null,
+        }).eq("id", sourceMatch.id);
+      }
+
+      // 2. Move the player from the match to the bye and add bye points
+      await client.from("byes").update({
+        participant_id: playerId,
+        match_points: newByePlayerPoints,
+        differential: newByePlayerDiff,
+      }).eq("id", targetByeId);
+
+      // 3. Update participants table to reflect these changes
+      await Promise.all([
+        // Update the former bye player - remove bye points
+        client.from("participants").update({
+          match_points: byePlayerOriginalPoints,
+          differential: byePlayerOriginalDiff,
+        }).eq("id", bye.participant_id.id),
+        
+        // Update the new bye player - add bye points
+        client.from("participants").update({
+          match_points: newByePlayerPoints,
+          differential: newByePlayerDiff,
+        }).eq("id", playerId)
+      ]);
+
+      // 4. Update local state to immediately reflect changes without waiting for a refresh
+      setByes(prevByes => {
+        const updatedByes = [...prevByes];
+        const byeIndex = updatedByes.findIndex(b => b.id === targetByeId);
+        
+        if (byeIndex !== -1) {
+          // Update the bye with new player info and adjusted points
+          updatedByes[byeIndex] = {
+            ...updatedByes[byeIndex],
+            participant_id: {
+              id: playerId,
+              name: playerName
+            },
+            match_points: newByePlayerPoints,
+            differential: newByePlayerDiff
+          };
+        }
+        
+        return updatedByes;
+      });
+      
+      setMatches(prevMatches => {
+        const updatedMatches = [...prevMatches];
+        const matchIndex = updatedMatches.findIndex(m => m.id === sourceMatch.id);
+        
+        if (matchIndex !== -1) {
+          const updatedMatch = {...updatedMatches[matchIndex]};
+          
+          // Update the appropriate player in the match
+          if (isSourcePlayer2) {
+            updatedMatch.player2_id = {
+              id: bye.participant_id.id,
+              name: bye.participant_id.name
+            };
+            updatedMatch.player2_match_points = byePlayerOriginalPoints;
+            updatedMatch.differential2 = byePlayerOriginalDiff;
+          } else {
+            updatedMatch.player1_id = {
+              id: bye.participant_id.id,
+              name: bye.participant_id.name
+            };
+            updatedMatch.player1_match_points = byePlayerOriginalPoints;
+            updatedMatch.differential = byePlayerOriginalDiff;
+          }
+          
+          updatedMatch.player1_score = null;
+          updatedMatch.player2_score = null;
+          
+          updatedMatches[matchIndex] = updatedMatch;
+        }
+        
+        return updatedMatches;
+      });
+
+      // Refresh the data to ensure everything is in sync
+      await fetchCurrentRoundData();
+    } catch (error) {
+      console.error("Error swapping player with bye:", error);
+      alert("Error swapping player with bye. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="w-[800px] max-xl:w-full mx-auto overflow-x-auto">
       <Card>
@@ -469,6 +768,22 @@ export default function TournamentRounds({
                     )}
                 </div>
                 <div className="overflow-x-auto max-w-full bg-gray-800 text-white">
+                  {repairMode && (
+                    <div className="bg-blue-900/30 border border-blue-700 p-3 mb-4 rounded-lg text-center">
+                      <p className="text-white">
+                        Re-pair Mode Active - <span className="font-semibold text-yellow-300">Select another player</span> to swap with {
+                          repairSourceMatch.isBye 
+                            ? byes.find(b => b.id === repairSourceMatch.byeId)?.participant_id.name 
+                            : (repairSourceMatch.isPlayer2 
+                              ? repairSourceMatch.match?.player2_id?.name 
+                              : repairSourceMatch.match?.player1_id?.name)
+                        }
+                      </p>
+                      <p className="text-sm text-gray-300 mt-1">
+                        Click any player or <button onClick={() => {setRepairMode(false); setRepairSourceMatch(null);}} className="text-blue-400 hover:text-blue-300 underline">cancel</button>
+                      </p>
+                    </div>
+                  )}
                   {matches && matches.length > 0 && <table className="min-w-full text-sm text-left text-gray-400 border-2 border-gray-300">
                     <thead className="text-xs text-zinc-100 uppercase font-normal bg-gray-900 border-b-2 border-gray-300 rounded-t-lg">
                       <tr>
@@ -513,15 +828,40 @@ export default function TournamentRounds({
                                 {match.differential ?? "N/A"}
                               </td>
                               <td className="px-2">
-                                <MatchEditModal
-                                  key={match.player1_score + match.player2_score}
-                                  match={match}
-                                  fetchCurrentRoundData={fetchCurrentRoundData}
-                                  setMatchErrorIndex={setMatchErrorIndex}
-                                  isRoundActive={isRoundActive}
-                                  index={index}
-                                  tournament={tournamentInfo}
-                                />
+                                <div className="flex items-center space-x-1">
+                                  <MatchEditModal
+                                    key={match.player1_score + match.player2_score}
+                                    match={match}
+                                    fetchCurrentRoundData={fetchCurrentRoundData}
+                                    setMatchErrorIndex={setMatchErrorIndex}
+                                    isRoundActive={isRoundActive}
+                                    index={index}
+                                    tournament={tournamentInfo}
+                                  />
+                                  <button
+                                    title={currentPage === tournamentInfo.current_round ? (!roundInfo.started_at ? "Re-pair pairing" : "Cannot re-pair pairing once round has started") : "Can only re-pair current round"}
+                                    className={`p-2 rounded-md flex items-center justify-center ${
+                                      currentPage === tournamentInfo.current_round && !roundInfo.started_at
+                                        ? repairMode && repairSourceMatch && 
+                                          (repairSourceMatch.isBye 
+                                            ? false // A bye player can't highlight a regular match player
+                                            : (repairSourceMatch.match && repairSourceMatch.match.id === match.id && !repairSourceMatch.isPlayer2))
+                                          ? "text-yellow-400 bg-blue-900/40 hover:bg-blue-900/60 hover:text-yellow-300 cursor-pointer" 
+                                          : repairMode 
+                                            ? "text-green-400 hover:bg-gray-700 hover:text-green-300 cursor-pointer" 
+                                            : "text-blue-400 hover:bg-gray-700 hover:text-blue-300 cursor-pointer"
+                                        : "text-gray-600 cursor-not-allowed"
+                                    }`}
+                                    onClick={() => {
+                                      if (currentPage === tournamentInfo.current_round && !roundInfo.started_at) {
+                                        handleRepairClick(match, false);
+                                      }
+                                    }}
+                                    disabled={currentPage !== tournamentInfo.current_round || roundInfo.started_at}
+                                  >
+                                    <ArrowUpDown className="h-4 w-4" />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                             <tr className={`border-b border-gray-300 ${matchErrorIndex.includes(index) ? "bg-red-600/20" : "bg-slate-700"}`}>
@@ -541,15 +881,40 @@ export default function TournamentRounds({
                                 {match.differential2 ?? "N/A"}
                               </td>
                               <td className="px-2">
-                                <MatchEditModal
-                                  key={match.player1_score + match.player2_score}
-                                  match={match}
-                                  fetchCurrentRoundData={fetchCurrentRoundData}
-                                  setMatchErrorIndex={setMatchErrorIndex}
-                                  isRoundActive={isRoundActive}
-                                  index={index}
-                                  tournament={tournamentInfo}
-                                />
+                                <div className="flex items-center space-x-1">
+                                  <MatchEditModal
+                                    key={match.player1_score + match.player2_score}
+                                    match={match}
+                                    fetchCurrentRoundData={fetchCurrentRoundData}
+                                    setMatchErrorIndex={setMatchErrorIndex}
+                                    isRoundActive={isRoundActive}
+                                    index={index}
+                                    tournament={tournamentInfo}
+                                  />
+                                  <button
+                                    title={currentPage === tournamentInfo.current_round ? (!roundInfo.started_at ? "Re-pair pairing" : "Cannot re-pair pairing once round has started") : "Can only re-pair current round"}
+                                    className={`p-2 rounded-md flex items-center justify-center ${
+                                      currentPage === tournamentInfo.current_round && !roundInfo.started_at
+                                        ? repairMode && repairSourceMatch && 
+                                          (repairSourceMatch.isBye 
+                                            ? false // A bye player can't highlight a regular match player
+                                            : (repairSourceMatch.match && repairSourceMatch.match.id === match.id && repairSourceMatch.isPlayer2))
+                                          ? "text-yellow-400 bg-blue-900/40 hover:bg-blue-900/60 hover:text-yellow-300 cursor-pointer" 
+                                          : repairMode 
+                                            ? "text-green-400 hover:bg-gray-700 hover:text-green-300 cursor-pointer" 
+                                            : "text-blue-400 hover:bg-gray-700 hover:text-blue-300 cursor-pointer"
+                                        : "text-gray-600 cursor-not-allowed"
+                                    }`}
+                                    onClick={() => {
+                                      if (currentPage === tournamentInfo.current_round && !roundInfo.started_at) {
+                                        handleRepairClick(match, true);
+                                      }
+                                    }}
+                                    disabled={currentPage !== tournamentInfo.current_round || roundInfo.started_at}
+                                  >
+                                    <ArrowUpDown className="h-4 w-4" />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           </Fragment>
@@ -604,7 +969,28 @@ export default function TournamentRounds({
                                 <td className="px-4 py-2 text-center border-r border-zinc-400">
                                   {bye.differential}
                                 </td>
-                                <td></td>
+                                <td className="px-2">
+                                  <button
+                                    title={currentPage === tournamentInfo.current_round ? (!roundInfo.started_at ? "Re-pair pairing" : "Cannot re-pair pairing once round has started") : "Can only re-pair current round"}
+                                    className={`p-2 rounded-md flex items-center justify-center ${
+                                      currentPage === tournamentInfo.current_round && !roundInfo.started_at
+                                        ? repairMode && repairSourceMatch && repairSourceMatch.isBye && repairSourceMatch.byeId === bye.id
+                                          ? "text-yellow-400 bg-blue-900/40 hover:bg-blue-900/60 hover:text-yellow-300 cursor-pointer" 
+                                          : repairMode 
+                                            ? "text-green-400 hover:bg-gray-700 hover:text-green-300 cursor-pointer" 
+                                            : "text-blue-400 hover:bg-gray-700 hover:text-blue-300 cursor-pointer"
+                                        : "text-gray-600 cursor-not-allowed"
+                                    }`}
+                                    onClick={() => {
+                                      if (currentPage === tournamentInfo.current_round && !roundInfo.started_at) {
+                                        handleByeRepairClick(bye);
+                                      }
+                                    }}
+                                    disabled={currentPage !== tournamentInfo.current_round || roundInfo.started_at}
+                                  >
+                                    <ArrowUpDown className="h-4 w-4" />
+                                  </button>
+                                </td>
                               </tr>
 
                             </Fragment>
@@ -628,6 +1014,19 @@ export default function TournamentRounds({
         )
         }
       </Card >
+      
+      {/* Repair Pairing Modal */}
+      {selectedMatch && (
+        <RepairPairingModal
+          isOpen={repairModalOpen}
+          onClose={() => setRepairModalOpen(false)}
+          match={selectedMatch}
+          tournamentId={tournamentId}
+          roundNumber={currentPage}
+          fetchCurrentRoundData={fetchCurrentRoundData}
+          isRoundActive={isRoundActive}
+        />
+      )}
     </div >
   );
 }
