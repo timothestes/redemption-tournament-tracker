@@ -45,18 +45,24 @@ export default function Header() {
                   action={signOutAction}
                 >
                   <Button type="submit" variant="outline">
-                    Sign outz
+                    Sign out
                   </Button>
                 </form>
               </div>
             ) : (
               <div className="flex gap-3">
-                <Button asChild size="sm" variant="outline">
-                  <Link href="/tracker/tournaments">Sign in</Link>
-                </Button>
-                <Button asChild size="sm" variant="default">
-                  <Link href="/sign-up">Sign up</Link>
-                </Button>
+                <Link 
+                  href="/tracker/tournaments"
+                  className="bg-zinc-600/80 hover:bg-zinc-500/80 text-white px-6 py-2 rounded-md border border-zinc-500 font-medium text-center"
+                >
+                  Sign in
+                </Link>
+                <Link 
+                  href="/sign-up"
+                  className="bg-white hover:bg-gray-100 text-black px-6 py-2 rounded-md font-medium text-center"
+                >
+                  Sign up
+                </Link>
               </div>
             )}
           </div>

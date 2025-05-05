@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button, ToggleSwitch } from "flowbite-react";
 import ToastNotification from "../../../components/ui/toast-notification";
 
@@ -13,6 +13,17 @@ export default function GenerateDeckList() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<{ url: string; message: string } | null>(null);
   const [showAlignment, setShowAlignment] = useState(false);
+  const successRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to success message when it appears
+  useEffect(() => {
+    if (success && successRef.current) {
+      successRef.current.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center' 
+      });
+    }
+  }, [success]);
 
   const validateForm = (list: string, name: string, event: string): { valid: boolean; message?: string } => {
     if (!list.trim()) {
@@ -221,7 +232,7 @@ export default function GenerateDeckList() {
         )}
 
         {success && (
-          <div className="mt-6">
+          <div className="mt-6" ref={successRef}>
             <div className="mt-4 p-8 bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-900 rounded-lg flex flex-col items-center">
               <h3 className="text-2xl font-semibold text-green-700 dark:text-green-400 mb-4">
                 🎉 Your Deck Check PDF is Ready!

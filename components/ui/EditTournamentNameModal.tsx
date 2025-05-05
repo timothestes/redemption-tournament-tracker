@@ -38,7 +38,12 @@ export default function EditTournamentNameModal({
         <Button outline gradientDuoTone="greenToBlue" onClick={onSave}>
           Save
         </Button>
-        <Button outline color="red" onClick={onClose}>
+        <Button 
+          outline 
+          gradientDuoTone="pinkToOrange" 
+          onClick={onClose}
+          className="border-red-500 hover:bg-red-500/10"
+        >
           Cancel
         </Button>
       </Modal.Footer>

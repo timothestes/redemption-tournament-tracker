@@ -2,6 +2,7 @@
 
 import { Button, Label, Modal } from "flowbite-react";
 import { useState, useEffect } from "react";
+import { useTheme } from "next-themes";
 
 interface TournamentStartModalProps {
   isOpen: boolean;
@@ -24,8 +25,12 @@ export default function TournamentStartModal({
   const [byePoints, setByePoints] = useState(3);
   const [byeDifferential, setByeDifferential] = useState(0);
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const { theme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
+    
     if (isOpen) {
       setNumberOfRounds(suggestedRounds);
       setRoundLength(45);
@@ -43,24 +48,28 @@ export default function TournamentStartModal({
     setNumberOfRounds(prev => Math.max(1, prev - 1));
   };
 
+  // Don't render theme-specific styling until client-side to avoid hydration mismatch
+  const currentTheme = mounted ? (theme === 'system' ? resolvedTheme : theme) : 'dark';
+  const isLightTheme = currentTheme === 'light';
+
   return (
     <Modal show={isOpen} onClose={onClose} size="lg">
-      <Modal.Header className="border-b border-gray-600 bg-gray-800">
-        <span className="text-xl font-semibold text-white">Start Tournament</span>
+      <Modal.Header className={`border-b ${isLightTheme ? 'border-gray-200 bg-white' : 'border-gray-600 bg-gray-800'}`}>
+        <span className={`text-xl font-semibold ${isLightTheme ? 'text-gray-800' : 'text-white'}`}>Start Tournament</span>
       </Modal.Header>
-      <Modal.Body className="bg-gray-800 space-y-6 p-6">
+      <Modal.Body className={`${isLightTheme ? 'bg-gray-50' : 'bg-gray-800'} space-y-6 p-6`}>
         {/* Tournament Settings Section */}
-        <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
-          <h4 className="text-lg font-medium text-white mb-4">Tournament Settings</h4>
+        <div className={`${isLightTheme ? 'bg-white/90 border-gray-200' : 'bg-gray-700/50 border-gray-600'} rounded-lg p-4 border`}>
+          <h4 className={`text-lg font-medium ${isLightTheme ? 'text-gray-800' : 'text-white'} mb-4`}>Tournament Settings</h4>
           
           <div className="grid gap-6">
             {/* Number of Rounds */}
             <div className="flex flex-col items-center">
               <div className="text-center mb-2">
-                <Label className="text-sm font-medium text-gray-300">
+                <Label className={`text-sm font-medium ${isLightTheme ? 'text-gray-700' : 'text-gray-300'}`}>
                   Number of Rounds
                 </Label>
-                <div className="flex items-center gap-2 text-sm text-gray-400 mt-1 justify-center">
+                <div className={`flex items-center gap-2 text-sm ${isLightTheme ? 'text-gray-600' : 'text-gray-400'} mt-1 justify-center`}>
                   <span>{participantCount} participants</span>
                   <span>•</span>
                   <span>Suggested: {suggestedRounds}</span>
@@ -71,17 +80,17 @@ export default function TournamentStartModal({
                   size="sm" 
                   onClick={handleDecrement}
                   disabled={numberOfRounds <= 1}
-                  className="bg-gray-700 hover:bg-gray-600 w-10 h-10 p-0 flex items-center justify-center"
+                  className={`${isLightTheme ? 'bg-gray-100 hover:bg-gray-200' : 'bg-gray-700 hover:bg-gray-600'} w-10 h-10 p-0 flex items-center justify-center`}
                 >
                   <span className="text-lg">−</span>
                 </Button>
-                <span className="text-xl font-semibold text-white min-w-[3ch] text-center bg-gray-900/50 py-1.5 px-3 rounded">
+                <span className={`text-xl font-semibold ${isLightTheme ? 'text-gray-800 bg-gray-100' : 'text-white bg-gray-900/50'} min-w-[3ch] text-center py-1.5 px-3 rounded`}>
                   {numberOfRounds}
                 </span>
                 <Button 
                   size="sm" 
                   onClick={handleIncrement}
-                  className="bg-gray-700 hover:bg-gray-600 w-10 h-10 p-0 flex items-center justify-center"
+                  className={`${isLightTheme ? 'bg-gray-100 hover:bg-gray-200' : 'bg-gray-700 hover:bg-gray-600'} w-10 h-10 p-0 flex items-center justify-center`}
                 >
                   <span className="text-lg">+</span>
                 </Button>
@@ -90,7 +99,7 @@ export default function TournamentStartModal({
 
             {/* Round Length */}
             <div className="flex flex-col items-center">
-              <Label className="text-sm font-medium text-gray-300 mb-2">
+              <Label className={`text-sm font-medium ${isLightTheme ? 'text-gray-700' : 'text-gray-300'} mb-2`}>
                 Round Length (minutes)
               </Label>
               <div className="flex items-center gap-2">
@@ -103,18 +112,18 @@ export default function TournamentStartModal({
                   }}
                   min="0"
                   max="120"
-                  className="w-24 bg-gray-900/50 border border-gray-600 text-white rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 text-center"
+                  className={`w-24 ${isLightTheme ? 'bg-white border-gray-300 text-gray-900' : 'bg-gray-900/50 border-gray-600 text-white'} rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 text-center`}
                   placeholder="Minutes"
                 />
-                <span className="text-sm text-gray-400">max 120</span>
+                <span className={`text-sm ${isLightTheme ? 'text-gray-600' : 'text-gray-400'}`}>max 120</span>
               </div>
             </div>
 
             {/* Advanced Settings Section */}
-            <div className="border-t border-gray-600 pt-4">
+            <div className={`border-t ${isLightTheme ? 'border-gray-200' : 'border-gray-600'} pt-4`}>
               <button
                 onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
-                className="flex items-center gap-2 text-sm text-gray-300 hover:text-white transition-colors"
+                className={`flex items-center gap-2 text-sm ${isLightTheme ? 'text-gray-700 hover:text-gray-900' : 'text-gray-300 hover:text-white'} transition-colors`}
               >
                 <svg
                   className={`w-4 h-4 transition-transform ${isAdvancedOpen ? 'rotate-90' : ''}`}
@@ -135,13 +144,13 @@ export default function TournamentStartModal({
               <div className={`space-y-4 mt-4 ${isAdvancedOpen ? '' : 'hidden'}`}>
                 {/* Maximum Score */}
                 <div>
-                  <Label className="text-sm font-medium text-gray-300 mb-2">
+                  <Label className={`text-sm font-medium ${isLightTheme ? 'text-gray-700' : 'text-gray-300'} mb-2`}>
                     Maximum Lost Souls Score
                   </Label>
                   <select
                     value={maxScore}
                     onChange={(e) => setMaxScore(Number(e.target.value))}
-                    className="w-full bg-gray-900/50 border border-gray-600 text-white rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5"
+                    className={`w-full ${isLightTheme ? 'bg-white border-gray-300 text-gray-900' : 'bg-gray-900/50 border-gray-600 text-white'} rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5`}
                   >
                     <option value="5">5 Lost Souls</option>
                     <option value="7">7 Lost Souls</option>
@@ -150,13 +159,13 @@ export default function TournamentStartModal({
 
                 {/* Bye Points */}
                 <div>
-                  <Label className="text-sm font-medium text-gray-300 mb-2">
+                  <Label className={`text-sm font-medium ${isLightTheme ? 'text-gray-700' : 'text-gray-300'} mb-2`}>
                     Match Points for Bye
                   </Label>
                   <select
                     value={byePoints}
                     onChange={(e) => setByePoints(Number(e.target.value))}
-                    className="w-full bg-gray-900/50 border border-gray-600 text-white rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5"
+                    className={`w-full ${isLightTheme ? 'bg-white border-gray-300 text-gray-900' : 'bg-gray-900/50 border-gray-600 text-white'} rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5`}
                   >
                     <option value="1">1 Point</option>
                     <option value="1.5">1.5 Points</option>
@@ -167,13 +176,13 @@ export default function TournamentStartModal({
 
                 {/* Bye Differential */}
                 <div>
-                  <Label className="text-sm font-medium text-gray-300 mb-2">
+                  <Label className={`text-sm font-medium ${isLightTheme ? 'text-gray-700' : 'text-gray-300'} mb-2`}>
                     Differential for Bye
                   </Label>
                   <select
                     value={byeDifferential}
                     onChange={(e) => setByeDifferential(Number(e.target.value))}
-                    className="w-full bg-gray-900/50 border border-gray-600 text-white rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5"
+                    className={`w-full ${isLightTheme ? 'bg-white border-gray-300 text-gray-900' : 'bg-gray-900/50 border-gray-600 text-white'} rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5`}
                   >
                     <option value="0">0 (No Differential)</option>
                     <option value="1">+1</option>
@@ -189,7 +198,7 @@ export default function TournamentStartModal({
         </div>
       </Modal.Body>
       
-      <Modal.Footer className="border-t border-gray-600 bg-gray-800">
+      <Modal.Footer className={`border-t ${isLightTheme ? 'border-gray-200 bg-gray-50' : 'border-gray-600 bg-gray-800'}`}>
         <div className="flex justify-end gap-3 w-full">
           <Button
             onClick={() => onConfirm(numberOfRounds, roundLength, maxScore, byePoints, byeDifferential)}
@@ -199,9 +208,9 @@ export default function TournamentStartModal({
             Start Tournament
           </Button>
           <Button 
-            color="gray"
+            color="none"
             onClick={onClose}
-            className="px-6"
+            className="px-6 bg-gradient-to-r from-red-500 to-pink-500 text-white font-medium border-0"
           >
             Cancel
           </Button>

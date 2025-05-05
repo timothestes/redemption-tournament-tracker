@@ -11,43 +11,60 @@ export default async function Signup(props: {
   const searchParams = await props.searchParams;
   if ("message" in searchParams) {
     return (
-      <div className="w-full flex-1 flex items-center min-h-screen sm:max-w-md justify-center gap-2 p-4">
+      <div className="w-full">
         <FormMessage message={searchParams} />
       </div>
     );
   }
 
   return (
-    <>
-      <form className="flex flex-col min-w-64 max-w-64 mx-auto">
-        <h1 className="text-2xl font-medium">Sign up</h1>
-        <p className="text-sm text text-foreground">
-          Already have an account?{" "}
-          <Link className="text-primary font-medium underline" href="/sign-in">
-            Sign in
-          </Link>
-        </p>
-        <div className="flex flex-col gap-2 [&>input]:mb-3 mt-8">
-          <Label htmlFor="email">Email</Label>
-          <Input name="email" placeholder="you@example.com" required />
-          <Label htmlFor="password">Password</Label>
-          <Input
-            type="password"
-            name="password"
-            placeholder="Your password"
-            minLength={6}
-            required
-          />
-          <SubmitButton
-            // @ts-ignore
-            formAction={signUpAction}
-            pendingText="Signing up..."
-          >
-            Sign up
-          </SubmitButton>
-          <FormMessage message={searchParams} />
+    <div className="w-full">
+      <h1 className="text-2xl font-medium mb-2 text-white">Sign up</h1>
+      <p className="text-sm text-gray-400 mb-6">
+        Already have an account?{" "}
+        <Link className="text-white hover:text-gray-200 underline" href="/sign-in">
+          Sign in
+        </Link>
+      </p>
+      
+      <form className="flex flex-col w-full">
+        <div className="space-y-4 mb-6">
+          <div className="space-y-2">
+            <Label htmlFor="email" className="text-white">Email</Label>
+            <Input 
+              name="email" 
+              id="email"
+              placeholder="you@example.com" 
+              required 
+              className="bg-zinc-800 border-zinc-700 text-white w-full"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="password" className="text-white">Password</Label>
+            <Input
+              type="password"
+              name="password"
+              id="password"
+              placeholder="Your password"
+              minLength={6}
+              required
+              className="bg-zinc-800 border-zinc-700 text-white w-full"
+            />
+          </div>
         </div>
+        
+        <SubmitButton
+          className="w-full bg-white hover:bg-gray-200 text-black py-2 font-medium rounded-md"
+          // @ts-ignore
+          formAction={signUpAction}
+          pendingText="Signing up..."
+        >
+          Sign up
+        </SubmitButton>
+        
+        <FormMessage message={searchParams} />
       </form>
-    </>
+    </div>
   );
 }

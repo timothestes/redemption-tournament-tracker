@@ -1,6 +1,7 @@
 import { GeistSans } from "geist/font/sans";
 import { ThemeProvider } from "next-themes";
 import Background from "../components/ui/background";
+import { ThemeSwitcher } from "../components/theme-switcher";
 import "./globals.css";
 
 const defaultUrl = process.env.VERCEL_URL
@@ -23,12 +24,15 @@ export default function RootLayout({
       <body className="bg-background text-foreground">
         <ThemeProvider
           attribute="class"
-          defaultTheme="dark"
+          defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
           <Background>
             <main className="min-h-screen flex flex-col">{children}</main>
+            <footer className="flex justify-center py-4">
+              <ThemeSwitcher />
+            </footer>
           </Background>
         </ThemeProvider>
       </body>

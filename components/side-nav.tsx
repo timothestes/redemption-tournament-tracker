@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sidebar } from "flowbite-react";
 import { HiArrowSmRight, HiDocumentText, HiMenu } from "react-icons/hi";
 import { IoClose } from "react-icons/io5";
@@ -10,13 +10,24 @@ import { TbCardsFilled, TbArrowGuideFilled } from "react-icons/tb";
 import { AiOutlineForm } from "react-icons/ai";
 import Image from "next/image";
 import Link from "next/link";
+import { ThemeSwitcher } from "./theme-switcher";
+import { useTheme } from "next-themes";
 
 const SideNav: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const { theme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  const [logoSrc, setLogoSrc] = useState('/lor.png');
 
   const toggleSidebar = () => {
     setIsOpen(!isOpen);
   };
+
+  useEffect(() => {
+    setMounted(true);
+    const currentTheme = theme === 'system' ? resolvedTheme : theme;
+    setLogoSrc(currentTheme === 'light' ? '/lor-lightmode.png' : '/lor.png');
+  }, [theme, resolvedTheme]);
 
   return (
     <>
@@ -30,7 +41,7 @@ const SideNav: React.FC = () => {
         aria-label="sidebar"
         className={`max-md:fixed top-0 sticky left-0 w-64 h-screen shrink-0 bg-primary transform z-50 overflow-hidden ${
           isOpen ? "translate-x-0" : "-translate-x-full"
-        } transition-transform md:translate-x-0 shadow-lg rounded border-none`}
+        } transition-transform md:translate-x-0 shadow-lg rounded border-none flex flex-col`}
       >
         <div className="bg-primary">
           <button
@@ -42,18 +53,20 @@ const SideNav: React.FC = () => {
         </div>
         <Link href="/tracker/tournaments" passHref>
           <div className="cursor-pointer">
-            <Image
-              src="/lor.png"
-              alt="Home Icon"
-              width={180}
-              height={40}
-              style={{ width: "auto", height: "auto" }}
-              priority
-            />
+            {mounted && (
+              <Image
+                src={logoSrc}
+                alt="Home Icon"
+                width={180}
+                height={40}
+                style={{ width: "auto", height: "auto" }}
+                priority
+              />
+            )}
           </div>
         </Link>
         <hr className="border-t border-gray-200 my-2 mb-6" />
-        <Sidebar.Items>
+        <Sidebar.Items className="flex-grow">
           <Sidebar.ItemGroup>
             <Sidebar.Item href="/tracker/tournaments" icon={FaTrophy}>
               Tournaments
@@ -162,6 +175,11 @@ const SideNav: React.FC = () => {
             </Sidebar.ItemGroup>
           </Sidebar.ItemGroup>
         </Sidebar.Items>
+        
+        {/* Theme toggle at bottom of sidebar */}
+        <div className="p-4 border-t border-gray-200 mt-auto flex justify-center">
+          <ThemeSwitcher />
+        </div>
       </Sidebar>
     </>
   );

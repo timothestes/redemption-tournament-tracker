@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Button, Label, TextInput } from "flowbite-react";
+import { useTheme } from "next-themes";
 
 interface EditParticipantModalProps {
   isOpen: boolean;
@@ -31,19 +32,28 @@ const EditParticipantModal: React.FC<EditParticipantModalProps> = ({
   isTournamentStarted
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
-
+  const { theme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  
+  // Only run on client to avoid hydration mismatch
   useEffect(() => {
+    setMounted(true);
+    
     if (isOpen && inputRef.current) {
       inputRef.current.focus();
     }
   }, [isOpen]);
 
   if (!isOpen || !participant) return null;
+  
+  // Don't render theme-specific styling until client-side to avoid hydration mismatch
+  const currentTheme = mounted ? (theme === 'system' ? resolvedTheme : theme) : 'dark';
+  const isLightTheme = currentTheme === 'light';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
-      <div className="bg-[#1F2937] border-2 border-zinc-300/10 py-6 px-6 rounded-lg shadow-lg max-w-sm w-full">
-        <h2 className="text-xl font-bold mb-4">Edit Participant</h2>
+      <div className={`${isLightTheme ? 'bg-white border-gray-200' : 'bg-[#1F2937] border-zinc-300/10'} border-2 py-6 px-6 rounded-lg shadow-lg max-w-sm w-full`}>
+        <h2 className={`text-xl font-bold mb-4 ${isLightTheme ? 'text-gray-800' : 'text-white'}`}>Edit Participant</h2>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -52,7 +62,7 @@ const EditParticipantModal: React.FC<EditParticipantModalProps> = ({
           className="flex flex-col gap-4"
         >
           <div className="mb-2 block space-y-1">
-            <Label htmlFor="name" value="Participant Name" />
+            <Label htmlFor="name" value="Participant Name" className={isLightTheme ? 'text-gray-700' : ''} />
             <TextInput
               id="name"
               name="name"
@@ -61,10 +71,11 @@ const EditParticipantModal: React.FC<EditParticipantModalProps> = ({
               onChange={(e) => setNewParticipantName(e.target.value)}
               required
               ref={inputRef}
+              className={isLightTheme ? 'bg-gray-50 border-gray-300' : ''}
             />
           </div>
           <div className="mb-2 block space-y-1">
-            <Label htmlFor="match_points" value="Match Points" />
+            <Label htmlFor="match_points" value="Match Points" className={isLightTheme ? 'text-gray-700' : ''} />
             <TextInput
               id="match_points"
               name="match_points"
@@ -72,10 +83,11 @@ const EditParticipantModal: React.FC<EditParticipantModalProps> = ({
               value={newMatchPoints}
               onChange={(e) => setNewMatchPoints(e.target.value)}
               disabled={!isTournamentStarted}
+              className={isLightTheme ? 'bg-gray-50 border-gray-300' : ''}
             />
           </div>
           <div className="mb-2 block space-y-1">
-            <Label htmlFor="differential" value="Differential" />
+            <Label htmlFor="differential" value="Differential" className={isLightTheme ? 'text-gray-700' : ''} />
             <TextInput
               id="differential"
               name="differential"
@@ -83,13 +95,20 @@ const EditParticipantModal: React.FC<EditParticipantModalProps> = ({
               value={newDifferential}
               onChange={(e) => setNewDifferential(e.target.value)}
               disabled={!isTournamentStarted}
+              className={isLightTheme ? 'bg-gray-50 border-gray-300' : ''}
             />
           </div>
           <div className="flex justify-end gap-3">
             <Button type="submit" outline gradientDuoTone="greenToBlue">
               Save
             </Button>
-            <Button type="button" outline color="red" onClick={onClose}>
+            <Button 
+              type="button" 
+              outline 
+              gradientDuoTone="pinkToOrange" 
+              onClick={onClose}
+              className="border-red-500 hover:bg-red-500/10"
+            >
               Cancel
             </Button>
           </div>

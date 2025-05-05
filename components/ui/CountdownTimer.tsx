@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from 'react';
+import { useTheme } from 'next-themes';
 
 interface CountdownTimerProps {
   startTime: string | null;
@@ -10,6 +11,12 @@ interface CountdownTimerProps {
 
 export default function CountdownTimer({ startTime, durationMinutes }: CountdownTimerProps) {
   const [remainingSeconds, setRemainingSeconds] = useState<number>(durationMinutes * 60);
+  const { theme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const calculateRemainingTime = useCallback(() => {
     if (!startTime) {
@@ -46,10 +53,14 @@ export default function CountdownTimer({ startTime, durationMinutes }: Countdown
 
   const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
+  // Don't render theme-specific styling until client-side to avoid hydration mismatch
+  const currentTheme = mounted ? (theme === 'system' ? resolvedTheme : theme) : 'dark';
+  const isLightTheme = currentTheme === 'light';
+
   return (
     <div className="flex flex-col items-center">
-      <div className="text-sm text-gray-500 mb-2">Current Round Timer</div>
-      <div className="text-4xl font-mono font-bold bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg">
+      <div className={`text-sm ${isLightTheme ? 'text-gray-600' : 'text-gray-500'} mb-2`}>Current Round Timer</div>
+      <div className={`text-4xl font-mono font-bold ${isLightTheme ? 'bg-gray-100 text-gray-800 border border-gray-300' : 'bg-gray-800 text-white'} px-6 py-3 rounded-lg shadow-lg`}>
         {timeString}
       </div>
     </div>

@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Button, Label, TextInput } from "flowbite-react";
+import { useTheme } from "next-themes";
 
 interface TournamentFormModalProps {
   isOpen: boolean;
@@ -13,8 +14,13 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
   onSubmit,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
-
+  const { theme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  
+  // Only run on client to avoid hydration mismatch
   useEffect(() => {
+    setMounted(true);
+    
     if (isOpen && inputRef.current) {
       inputRef.current.focus();
     }
@@ -30,11 +36,15 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
   };
 
   if (!isOpen) return null;
+  
+  // Don't render theme-specific styling until client-side to avoid hydration mismatch
+  const currentTheme = mounted ? (theme === 'system' ? resolvedTheme : theme) : 'dark';
+  const isLightTheme = currentTheme === 'light';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
-      <div className="bg-[#1F2937] border-2 border-zinc-300/10 py-6 px-6 rounded-lg shadow-lg max-w-sm w-full">
-        <h2 className="text-xl font-bold mb-4">Add Tournament</h2>
+      <div className={`${isLightTheme ? 'bg-white border-gray-200' : 'bg-[#1F2937] border-zinc-300/10'} border-2 py-6 px-6 rounded-lg shadow-lg max-w-sm w-full`}>
+        <h2 className={`text-xl font-bold mb-4 ${isLightTheme ? 'text-gray-800' : 'text-white'}`}>Add Tournament</h2>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="mb-2 block">
             <Label htmlFor="name" value="" />
@@ -46,13 +56,20 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
               required
               maxLength={35}
               ref={inputRef}
+              className={isLightTheme ? 'bg-gray-50 border-gray-300' : ''}
             />
           </div>
           <div className="flex justify-end gap-3">
             <Button type="submit" outline gradientDuoTone="greenToBlue">
               Add
             </Button>
-            <Button type="button" outline color="red" onClick={onClose}>
+            <Button 
+              type="button" 
+              outline 
+              gradientDuoTone="pinkToOrange" 
+              onClick={onClose}
+              className="border-red-500 hover:bg-red-500/10"
+            >
               Cancel
             </Button>
           </div>

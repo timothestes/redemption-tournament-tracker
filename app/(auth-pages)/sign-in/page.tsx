@@ -23,39 +23,61 @@ export default async function Login({
     : undefined;
   
   return (
-    <form className="flex-1 flex flex-col min-w-64">
-      <h1 className="text-2xl font-medium">Sign in</h1>
-      <p className="text-sm text-foreground">
+    <div className="w-full">
+      <h1 className="text-2xl font-medium mb-2 text-white">Sign in</h1>
+      <p className="text-sm text-gray-400 mb-6">
         Don't have an account?{" "}
-        <Link className="text-foreground font-medium underline" href="/sign-up">
+        <Link className="text-white hover:text-gray-200 underline" href="/sign-up">
           Sign up
         </Link>
       </p>
-      <div className="flex flex-col gap-2 [&>input]:mb-3 mt-8">
-        <Label htmlFor="email">Email</Label>
-        <Input name="email" placeholder="you@example.com" required defaultValue={emailValue} />
-        <div className="flex justify-between items-center">
-          <Label htmlFor="password">Password</Label>
-          <Link
-            className="text-xs text-foreground underline"
-            href="/forgot-password"
-          >
-            Forgot Password?
-          </Link>
+      
+      <form className="flex flex-col w-full">
+        <div className="space-y-4 mb-6">
+          <div className="space-y-2">
+            <Label htmlFor="email" className="text-white">Email</Label>
+            <Input 
+              name="email" 
+              id="email"
+              placeholder="you@example.com" 
+              required 
+              defaultValue={emailValue} 
+              className="bg-zinc-800 border-zinc-700 text-white w-full"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <Label htmlFor="password" className="text-white">Password</Label>
+              <Link
+                className="text-xs text-gray-400 hover:text-white"
+                href="/forgot-password"
+              >
+                Forgot Password?
+              </Link>
+            </div>
+            <Input
+              type="password"
+              name="password"
+              id="password"
+              placeholder="Your password"
+              required
+              className="bg-zinc-800 border-zinc-700 text-white w-full"
+            />
+          </div>
         </div>
-        <Input
-          type="password"
-          name="password"
-          placeholder="Your password"
-          required
-        />
-        <SubmitButton pendingText="Signing In..."
+        
+        <SubmitButton 
+          pendingText="Signing In..."
+          className="w-full bg-white hover:bg-gray-200 text-black py-2 font-medium rounded-md"
           // @ts-ignore
-          formAction={signInAction}>
+          formAction={signInAction}
+        >
           Sign in
         </SubmitButton>
+        
         <FormMessage message={message} />
-      </div>
-    </form>
+      </form>
+    </div>
   );
 }
