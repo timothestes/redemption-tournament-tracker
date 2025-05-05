@@ -163,6 +163,24 @@ const SideNav: React.FC = () => {
                 >
                   T2 Deck Check Sheet
                 </Sidebar.Item>
+                <Sidebar.Item
+                  href="https://landofredemption.com/wp-content/uploads/2025/03/Reserve-List-Type-2.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  icon={AiOutlineForm}
+                  className="pl-4"
+                >
+                  T2 Reserve List
+                </Sidebar.Item>
+                <Sidebar.Item
+                  href="https://landofredemption.com/wp-content/uploads/2025/03/Reserve-List-T1.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  icon={AiOutlineForm}
+                  className="pl-4"
+                >
+                  T1 Reserve List
+                </Sidebar.Item>
               </Sidebar.Collapse>
             </Sidebar.ItemGroup>
             <Sidebar.ItemGroup>
