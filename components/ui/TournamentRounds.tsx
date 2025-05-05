@@ -857,7 +857,7 @@ export default function TournamentRounds({
                                         handleRepairClick(match, false);
                                       }
                                     }}
-                                    disabled={currentPage !== tournamentInfo.current_round || roundInfo.started_at}
+                                    disabled={currentPage !== tournamentInfo.current_round || (roundInfo.started_at && !isRoundActive)}
                                   >
                                     <ArrowUpDown className="h-4 w-4" />
                                   </button>
