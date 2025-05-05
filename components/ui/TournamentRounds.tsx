@@ -857,7 +857,7 @@ export default function TournamentRounds({
                                         handleRepairClick(match, false);
                                       }
                                     }}
-                                    disabled={currentPage !== tournamentInfo.current_round || (roundInfo.started_at && !isRoundActive)}
+                                    disabled={currentPage !== tournamentInfo.current_round || !!roundInfo.started_at}
                                   >
                                     <ArrowUpDown className="h-4 w-4" />
                                   </button>
@@ -910,7 +910,7 @@ export default function TournamentRounds({
                                         handleRepairClick(match, true);
                                       }
                                     }}
-                                    disabled={currentPage !== tournamentInfo.current_round || roundInfo.started_at}
+                                    disabled={currentPage !== tournamentInfo.current_round || !!roundInfo.started_at}
                                   >
                                     <ArrowUpDown className="h-4 w-4" />
                                   </button>
@@ -986,7 +986,7 @@ export default function TournamentRounds({
                                         handleByeRepairClick(bye);
                                       }
                                     }}
-                                    disabled={currentPage !== tournamentInfo.current_round || roundInfo.started_at}
+                                    disabled={currentPage !== tournamentInfo.current_round || !!roundInfo.started_at}
                                   >
                                     <ArrowUpDown className="h-4 w-4" />
                                   </button>
