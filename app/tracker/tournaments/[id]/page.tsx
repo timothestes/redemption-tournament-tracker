@@ -72,6 +72,15 @@ export default function TournamentPage({
     unwrapParams();
   }, [params]);
 
+  // Update document title when tournament name changes
+  useEffect(() => {
+    if (tournament?.name) {
+      document.title = `${tournament.name} - Land of Redemption Tournament Tracker`;
+    } else {
+      document.title = "Land of Redemption Tournament Tracker";
+    }
+  }, [tournament?.name]);
+
   const handleAddParticipant = async (name: string) => {
     if (!name.trim()) return;
     try {
