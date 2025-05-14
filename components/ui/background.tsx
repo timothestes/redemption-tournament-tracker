@@ -30,7 +30,7 @@ const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
               backgroundSize: "cover",
             }
           : {
-              backgroundImage: "url('/login-splash.png')",
+              backgroundImage: "url('/lor-login-splash.webp')",
               backgroundSize: "cover",
               backgroundPosition: "center",
               transformOrigin: "center",
