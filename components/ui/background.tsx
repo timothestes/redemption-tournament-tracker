@@ -22,12 +22,13 @@ const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
 
   return (
     <div
-      className={`min-h-screen w-full relative ${
-        isLightTheme ? 'bg-gray-100' : ''
-      }`}
+      className="min-h-screen w-full relative"
       style={
         isLightTheme 
-          ? {} 
+          ? {
+              backgroundImage: "linear-gradient(to right, rgba(243,244,246,1), rgba(255,255,255,1), rgba(243,244,246,1))",
+              backgroundSize: "cover",
+            }
           : {
               backgroundImage: "url('/login-splash.png')",
               backgroundSize: "cover",

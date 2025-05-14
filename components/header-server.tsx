@@ -7,6 +7,7 @@ import { EnvVarWarning } from "./env-var-warning";
 import Link from "next/link";
 import { Button } from "./ui/button";
 import { signOutAction } from "../app/actions";
+import { ThemeSwitcher } from "./theme-switcher";
 
 export default function HeaderServer() {
   const [user, setUser] = useState(null);
@@ -36,6 +37,9 @@ export default function HeaderServer() {
             {user ? (
               <div className="flex items-center gap-4">
                 <div className="max-w-12:block hidden">Hey, {user.email}!</div>
+                <div className="mr-2">
+                  <ThemeSwitcher />
+                </div>
                 <form
                   // @ts-expect-error - Server Actions are not properly typed
                   action={signOutAction}
@@ -46,7 +50,10 @@ export default function HeaderServer() {
                 </form>
               </div>
             ) : (
-              <div className="flex gap-3">
+              <div className="flex gap-3 items-center">
+                <div className="mr-2">
+                  <ThemeSwitcher />
+                </div>
                 <Button asChild size="sm" variant="outline">
                   <Link href="/tracker/tournaments">Sign in</Link>
                 </Button>

@@ -10,7 +10,6 @@ import { TbCardsFilled, TbArrowGuideFilled } from "react-icons/tb";
 import { AiOutlineForm } from "react-icons/ai";
 import Image from "next/image";
 import Link from "next/link";
-import { ThemeSwitcher } from "./theme-switcher";
 import { useTheme } from "next-themes";
 
 const SideNav: React.FC = () => {
@@ -193,11 +192,6 @@ const SideNav: React.FC = () => {
             </Sidebar.ItemGroup>
           </Sidebar.ItemGroup>
         </Sidebar.Items>
-        
-        {/* Theme toggle at bottom of sidebar */}
-        <div className="p-4 border-t border-gray-200 mt-auto flex justify-center">
-          <ThemeSwitcher />
-        </div>
       </Sidebar>
     </>
   );

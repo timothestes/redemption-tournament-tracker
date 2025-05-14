@@ -12,17 +12,19 @@ export default async function Index() {
       <div className="flex flex-col justify-center items-center w-full gap-6">
         <Hero />
         <main className="flex-1 flex flex-col gap-4 px-4 text-center w-full">
-          <h2 className="font-medium text-xl mb-2 text-center">New Here?</h2>
-          <div className="flex flex-col gap-3 items-center">
-            <Link 
-              href="/decklist/generate"
-              className="text-lg hover:underline text-blue-500"
-            >
-              Generate a deck check sheet
-            </Link>
-            <div className="text-lg">or</div>
+          <div className="bg-white/80 dark:bg-black/60 p-6 rounded-lg shadow-lg border border-gray-200 dark:border-zinc-700 max-w-lg mx-auto">
+            <h2 className="font-medium text-2xl mb-4 text-center text-gray-800 dark:text-white">New Here?</h2>
+            <div className="flex flex-col gap-4 items-center">
+              <Link 
+                href="/decklist/generate"
+                className="text-lg hover:underline text-blue-600 dark:text-blue-400 font-medium transition-all duration-200 hover:text-blue-800 dark:hover:text-blue-300"
+              >
+                Generate a deck check sheet
+              </Link>
+              <div className="text-lg text-gray-700 dark:text-gray-300">or</div>
+            </div>
+            {hasEnvVars ? <SignUpUserSteps /> : <ConnectSupabaseSteps />}
           </div>
-          {hasEnvVars ? <SignUpUserSteps /> : <ConnectSupabaseSteps />}
         </main>
       </div>
     </div>

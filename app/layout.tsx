@@ -30,9 +30,6 @@ export default function RootLayout({
         >
           <Background>
             <main className="min-h-screen flex flex-col">{children}</main>
-            <footer className="flex justify-center py-4">
-              <ThemeSwitcher />
-            </footer>
           </Background>
         </ThemeProvider>
       </body>

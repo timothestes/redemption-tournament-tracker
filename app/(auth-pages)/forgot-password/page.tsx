@@ -11,10 +11,10 @@ export default async function ForgotPassword(props: {
   const searchParams = await props.searchParams;
   return (
     <div className="w-full">
-      <h1 className="text-2xl font-medium mb-2 text-white">Reset Password</h1>
-      <p className="text-sm text-gray-400 mb-6">
+      <h1 className="text-2xl font-medium mb-2 text-black dark:text-white">Reset Password</h1>
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
         Already have an account?{" "}
-        <Link className="text-white hover:text-gray-200 underline" href="/sign-in">
+        <Link className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium underline" href="/sign-in">
           Sign in
         </Link>
       </p>
@@ -22,19 +22,19 @@ export default async function ForgotPassword(props: {
       <form className="flex flex-col w-full">
         <div className="space-y-4 mb-6">
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-white">Email</Label>
+            <Label htmlFor="email" className="text-gray-800 dark:text-gray-200">Email</Label>
             <Input 
               name="email" 
               id="email"
               placeholder="you@example.com" 
               required 
-              className="bg-zinc-800 border-zinc-700 text-white w-full"
+              className="bg-white dark:bg-zinc-800 border-gray-300 dark:border-zinc-700 text-gray-900 dark:text-white w-full focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </div>
         
         <SubmitButton 
-          className="w-full bg-white hover:bg-gray-200 text-black py-2 font-medium rounded-md"
+          className="w-full bg-gray-800 hover:bg-gray-900 text-white py-2 font-medium rounded-md transition-all duration-200 shadow-md border border-gray-700"
           // @ts-ignore
           formAction={forgotPasswordAction}>
           Reset Password

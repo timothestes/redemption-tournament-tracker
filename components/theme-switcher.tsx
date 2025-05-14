@@ -30,24 +30,28 @@ const ThemeSwitcher = () => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size={"sm"}>
+        <Button 
+          variant="outline" 
+          size={"sm"} 
+          className="bg-white dark:bg-zinc-800 border border-gray-300 dark:border-zinc-700 shadow-sm rounded-full h-8 w-8 p-0 flex items-center justify-center"
+        >
           {theme === "light" ? (
             <Sun
               key="light"
               size={ICON_SIZE}
-              className={"text-muted-foreground"}
+              className={"text-amber-500"}
             />
           ) : theme === "dark" ? (
             <Moon
               key="dark"
               size={ICON_SIZE}
-              className={"text-muted-foreground"}
+              className={"text-indigo-400"}
             />
           ) : (
             <Laptop
               key="system"
               size={ICON_SIZE}
-              className={"text-muted-foreground"}
+              className={"text-gray-600 dark:text-gray-300"}
             />
           )}
         </Button>

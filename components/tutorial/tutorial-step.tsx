@@ -8,18 +8,15 @@ export function TutorialStep({
   children: React.ReactNode;
 }) {
   return (
-    <li className="relative">
-      <label
-        htmlFor={title}
-        className={`relative text-base text-foreground peer-checked:line-through font-medium`}
-      >
-        <span className="ml-8">{title}</span>
-        <div
-          className={`ml-8 text-sm peer-checked:line-through font-normal text-muted-foreground`}
-        >
+    <li className="relative py-3">
+      <div className="flex flex-col">
+        <h3 className="text-lg font-medium text-gray-800 dark:text-gray-100 mb-2 text-center">
+          {title}
+        </h3>
+        <div className="text-sm text-gray-600 dark:text-gray-300">
           {children}
         </div>
-      </label>
+      </div>
     </li>
   );
 }
