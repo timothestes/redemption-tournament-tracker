@@ -38,20 +38,22 @@ const SideNav: React.FC = () => {
       </button>
       <Sidebar
         aria-label="sidebar"
-        className={`max-md:fixed top-0 sticky left-0 w-64 h-screen shrink-0 bg-primary transform z-50 overflow-hidden ${
+        className={`max-md:fixed top-0 sticky left-0 w-64 h-screen shrink-0 transform z-50 overflow-hidden ${
           isOpen ? "translate-x-0" : "-translate-x-full"
-        } transition-transform md:translate-x-0 shadow-lg rounded border-none flex flex-col`}
+        } transition-transform md:translate-x-0 shadow-lg rounded border-none flex flex-col
+        bg-gradient-to-b from-white to-gray-100 dark:from-gray-900 dark:to-gray-800
+        `}
       >
-        <div className="bg-primary">
+        <div className="bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
           <button
             onClick={toggleSidebar}
-            className="bg-primary p-1 text-primary-foreground md:hidden rounded"
+            className="p-1 text-primary-foreground md:hidden rounded"
           >
             <IoClose size={20} />
           </button>
         </div>
         <Link href="/tracker/tournaments" passHref>
-          <div className="cursor-pointer">
+          <div className="cursor-pointer px-3 py-2">
             {mounted && (
               <Image
                 src={logoSrc}
@@ -64,29 +66,42 @@ const SideNav: React.FC = () => {
             )}
           </div>
         </Link>
-        <hr className="border-t border-gray-200 my-2 mb-6" />
+        <div className="px-4">
+          <hr className="border-t border-gray-200 dark:border-gray-700 my-2 mb-6 opacity-60" />
+        </div>
         <Sidebar.Items className="flex-grow">
-          <Sidebar.ItemGroup>
-            <Sidebar.Item href="/tracker/tournaments" icon={FaTrophy}>
+          <Sidebar.ItemGroup className="space-y-1">
+            <Sidebar.Item 
+              href="/tracker/tournaments" 
+              icon={FaTrophy}
+              className="hover:bg-gray-100/70 dark:hover:bg-gray-700/70 transition-colors duration-200"
+            >
               Tournaments
             </Sidebar.Item>
-            <Sidebar.ItemGroup>
-              <Sidebar.Item href="/decklist/generate" icon={TbCardsFilled}>
+            <Sidebar.ItemGroup className="space-y-1">
+              <Sidebar.Item 
+                href="/decklist/generate" 
+                icon={TbCardsFilled}
+                className="hover:bg-gray-100/70 dark:hover:bg-gray-700/70 transition-colors duration-200"
+              >
                 Deck Check PDF
               </Sidebar.Item>
             </Sidebar.ItemGroup>
-            <Sidebar.ItemGroup>
+            <Sidebar.ItemGroup className="space-y-1">
               <Sidebar.Collapse
                 label="Resources"
                 icon={HiDocumentText}
-                className="pl-2"
+                className="pl-2 hover:bg-gray-100/70 dark:hover:bg-gray-700/70 transition-colors duration-200 font-medium
+                          [&[data-active='true']]:border-l-4 [&[data-active='true']]:border-gray-300 [&[data-active='true']]:dark:border-gray-600"
               >
+                {/* Tournament Resources Heading */}
+                <div className="pl-4 pt-2 pb-1 text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">TOURNAMENT RESOURCES</div>
                 <Sidebar.Item
                   href="https://landofredemption.com/wp-content/uploads/2025/03/REG_PDF_10.0.0.pdf"
                   target="_blank"
                   rel="noopener noreferrer"
                   icon={PiPencilLineBold}
-                  className="pl-4"
+                  className="pl-4 hover:bg-gray-100/70 dark:hover:bg-gray-700/70 transition-colors duration-200"
                 >
                   REG (Official Rulebook)
                 </Sidebar.Item>
@@ -95,7 +110,7 @@ const SideNav: React.FC = () => {
                   target="_blank"
                   rel="noopener noreferrer"
                   icon={FaBookOpen}
-                  className="pl-4"
+                  className="pl-4 hover:bg-gray-100/70 dark:hover:bg-gray-700/70 transition-colors duration-200"
                 >
                   ORDIR (Dictionary)
                 </Sidebar.Item>
@@ -104,16 +119,18 @@ const SideNav: React.FC = () => {
                   target="_blank"
                   rel="noopener noreferrer"
                   icon={TbCardsFilled}
-                  className="pl-4"
+                  className="pl-4 hover:bg-gray-100/70 dark:hover:bg-gray-700/70 transition-colors duration-200"
                 >
                   Deck Building Rules
                 </Sidebar.Item>
+                
+                {/* Host Resources Heading */}
+                <div className="pl-4 pt-2 pb-1 text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">HOST RESOURCES</div>
                 <Sidebar.Item
                   href="https://landofredemption.com/wp-content/uploads/2025/03/Redemption_Host_Guide_2025.pdf"
                   target="_blank"
                   rel="noopener noreferrer"
-                  icon={TbArrowGuideFilled}
-                  className="pl-4"
+                  className="pl-4 hover:bg-gray-100/70 dark:hover:bg-gray-700/70 transition-colors duration-200"
                 >
                   Hosting Guide
                 </Sidebar.Item>
@@ -121,44 +138,39 @@ const SideNav: React.FC = () => {
                   href="https://landofredemption.com/wp-content/uploads/2025/03/Redemption-Tournament-Host-Application-2025.pdf"
                   target="_blank"
                   rel="noopener noreferrer"
-                  icon={AiOutlineForm}
-                  className="pl-4"
+                  className="pl-4 hover:bg-gray-100/70 dark:hover:bg-gray-700/70 transition-colors duration-200"
                 >
-                  2025 Hosting Application
+                  Hosting Application
                 </Sidebar.Item>
                 <Sidebar.Item
                   href="https://landofredemption.com/wp-content/uploads/2025/03/host_sign_in_sheets.pdf"
                   target="_blank"
                   rel="noopener noreferrer"
-                  icon={AiOutlineForm}
-                  className="pl-4"
+                  className="pl-4 hover:bg-gray-100/70 dark:hover:bg-gray-700/70 transition-colors duration-200"
                 >
                   Sign In Sheet
-                </Sidebar.Item>
-                <Sidebar.Item
-                  href="https://landofredemption.com/wp-content/uploads/2025/03/host_winners_list.pdf"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  icon={AiOutlineForm}
-                  className="pl-4"
-                >
-                  Winners Form
                 </Sidebar.Item>
                 <Sidebar.Item
                   href="https://landofredemption.com/wp-content/uploads/2025/03/Type-1-Deck-Check-Sheet-1.pdf"
                   target="_blank"
                   rel="noopener noreferrer"
-                  icon={AiOutlineForm}
-                  className="pl-4"
+                  className="pl-4 hover:bg-gray-100/70 dark:hover:bg-gray-700/70 transition-colors duration-200"
                 >
                   T1 Deck Check Sheet
+                </Sidebar.Item>
+                <Sidebar.Item
+                  href="https://landofredemption.com/wp-content/uploads/2025/03/Reserve-List-T1.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="pl-4 hover:bg-gray-100/70 dark:hover:bg-gray-700/70 transition-colors duration-200"
+                >
+                  T1 Reserve List
                 </Sidebar.Item>
                 <Sidebar.Item
                   href="https://landofredemption.com/wp-content/uploads/2025/03/T2-Deck-Check-Sheet.pdf"
                   target="_blank"
                   rel="noopener noreferrer"
-                  icon={AiOutlineForm}
-                  className="pl-4"
+                  className="pl-4 hover:bg-gray-100/70 dark:hover:bg-gray-700/70 transition-colors duration-200"
                 >
                   T2 Deck Check Sheet
                 </Sidebar.Item>
@@ -166,27 +178,29 @@ const SideNav: React.FC = () => {
                   href="https://landofredemption.com/wp-content/uploads/2025/03/Reserve-List-Type-2.pdf"
                   target="_blank"
                   rel="noopener noreferrer"
-                  icon={AiOutlineForm}
-                  className="pl-4"
+                  className="pl-4 hover:bg-gray-100/70 dark:hover:bg-gray-700/70 transition-colors duration-200"
                 >
                   T2 Reserve List
                 </Sidebar.Item>
                 <Sidebar.Item
-                  href="https://landofredemption.com/wp-content/uploads/2025/03/Reserve-List-T1.pdf"
+                  href="https://landofredemption.com/wp-content/uploads/2025/03/host_winners_list.pdf"
                   target="_blank"
                   rel="noopener noreferrer"
-                  icon={AiOutlineForm}
-                  className="pl-4"
+                  className="pl-4 hover:bg-gray-100/70 dark:hover:bg-gray-700/70 transition-colors duration-200"
                 >
-                  T1 Reserve List
+                  Winners Form
                 </Sidebar.Item>
               </Sidebar.Collapse>
             </Sidebar.ItemGroup>
-            <Sidebar.ItemGroup>
+            <Sidebar.ItemGroup className="space-y-1">
               {/* <Sidebar.Item href="/tracker/profile" icon={HiUser}>
                 Profile
               </Sidebar.Item> */}
-              <Sidebar.Item href="/tracker/bug" icon={HiArrowSmRight}>
+              <Sidebar.Item 
+                href="/tracker/bug" 
+                icon={HiArrowSmRight}
+                className="hover:bg-gray-100/70 dark:hover:bg-gray-700/70 transition-colors duration-200"
+              >
                 Report a Bug
               </Sidebar.Item>
             </Sidebar.ItemGroup>

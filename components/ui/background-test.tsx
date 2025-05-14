@@ -13,8 +13,12 @@ const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
     setMounted(true);
   }, []);
 
-  // Use a safe default for server-side rendering and initial load
-  const currentTheme = mounted ? (theme === 'system' ? resolvedTheme : theme) : 'light';
+  // Don't render anything until client-side to avoid hydration mismatch
+  if (!mounted) {
+    return <div className="min-h-screen w-full">{children}</div>;
+  }
+
+  const currentTheme = theme === 'system' ? resolvedTheme : theme;
   const isLightTheme = currentTheme === 'light';
 
   return (
@@ -37,8 +41,6 @@ const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
               : 'brightness(1.05) contrast(0.95)'
           }}
           priority
-          placeholder="blur"
-          blurDataURL="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiPjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiNmZmZmZmYiLz48L3N2Zz4="
         />
         
         {/* White overlay for light mode to further enhance readability */}

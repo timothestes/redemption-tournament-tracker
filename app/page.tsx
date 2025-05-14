@@ -12,7 +12,7 @@ export default async function Index() {
       <div className="flex flex-col justify-center items-center w-full gap-6">
         <Hero />
         <main className="flex-1 flex flex-col gap-4 px-4 text-center w-full">
-          <div className="bg-white/90 dark:bg-black/80 p-8 rounded-lg shadow-lg border border-gray-200 dark:border-zinc-800 max-w-lg mx-auto">
+          <div className="bg-white/70 dark:bg-black/80 p-8 rounded-lg shadow-lg border border-gray-200 dark:border-zinc-800 max-w-lg mx-auto">
             <h2 className="font-medium text-2xl mb-4 text-center text-gray-800 dark:text-white">New Here?</h2>
             <div className="flex flex-col gap-4 items-center">
               <Link 

@@ -1,7 +1,6 @@
 import { GeistSans } from "geist/font/sans";
 import { ThemeProvider } from "next-themes";
-import Background from "../components/ui/background";
-import { ThemeSwitcher } from "../components/theme-switcher";
+import Background from "../components/ui/background"; // Using the improved background
 import "./globals.css";
 
 const defaultUrl = process.env.VERCEL_URL
