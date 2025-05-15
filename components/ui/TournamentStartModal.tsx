@@ -7,7 +7,7 @@ import { useTheme } from "next-themes";
 interface TournamentStartModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (numberOfRounds: number, roundLength: number, maxScore: number, byePoints: number, byeDifferential: number) => void;
+  onConfirm: (numberOfRounds: number, roundLength: number, maxScore: number, byePoints: number, byeDifferential: number, startingTableNumber: number) => void;
   participantCount: number;
   suggestedRounds: number;
 }
@@ -24,6 +24,7 @@ export default function TournamentStartModal({
   const [maxScore, setMaxScore] = useState(5);
   const [byePoints, setByePoints] = useState(3);
   const [byeDifferential, setByeDifferential] = useState(0);
+  const [startingTableNumber, setStartingTableNumber] = useState(1);
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const { theme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -37,6 +38,7 @@ export default function TournamentStartModal({
       setMaxScore(5);
       setByePoints(3);
       setByeDifferential(0);
+      setStartingTableNumber(1);
     }
   }, [isOpen, suggestedRounds]);
 
@@ -192,6 +194,29 @@ export default function TournamentStartModal({
                     <option value="5">+5</option>
                   </select>
                 </div>
+                
+                {/* Starting Table Number */}
+                <div>
+                  <Label className={`text-sm font-medium ${isLightTheme ? 'text-gray-700' : 'text-gray-300'} mb-2`}>
+                    Starting Table Number
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={startingTableNumber}
+                      onChange={(e) => {
+                        const value = Math.max(1, parseInt(e.target.value) || 1);
+                        setStartingTableNumber(value);
+                      }}
+                      min="1"
+                      className={`w-24 ${isLightTheme ? 'bg-white border-gray-300 text-gray-900' : 'bg-gray-900/50 border-gray-600 text-white'} rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 text-center`}
+                      placeholder="Table #"
+                    />
+                    <span className={`text-sm ${isLightTheme ? 'text-gray-600' : 'text-gray-400'}`}>
+                      Tables will be numbered starting from this value
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -201,7 +226,7 @@ export default function TournamentStartModal({
       <Modal.Footer className={`border-t ${isLightTheme ? 'border-gray-200 bg-gray-50' : 'border-gray-600 bg-gray-800'}`}>
         <div className="flex justify-end gap-3 w-full">
           <Button
-            onClick={() => onConfirm(numberOfRounds, roundLength, maxScore, byePoints, byeDifferential)}
+            onClick={() => onConfirm(numberOfRounds, roundLength, maxScore, byePoints, byeDifferential, startingTableNumber)}
             gradientDuoTone="greenToBlue"
             className="px-6"
           >

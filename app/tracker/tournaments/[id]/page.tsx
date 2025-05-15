@@ -422,7 +422,8 @@ export default function TournamentPage({
     roundLength: number,
     maxScore: number,
     byePoints: number,
-    byeDifferential: number
+    byeDifferential: number,
+    startingTableNumber: number
   ) => {
     const now = new Date().toISOString();
     try {
@@ -439,6 +440,7 @@ export default function TournamentPage({
           max_score: maxScore,
           bye_points: byePoints,
           bye_differential: byeDifferential,
+          starting_table_number: startingTableNumber,
         })
         .eq("id", id)
         .select("*")
@@ -674,6 +676,7 @@ export default function TournamentPage({
             tournamentId={id || ""}
             tournamentStarted={tournament?.has_started || false}
             tournamentEnded={tournament?.has_ended || false}
+            tournamentName={tournament?.name}
             onTournamentEnd={fetchTournamentDetails}
             onRoundActiveChange={(isActive, roundStartTime) => {
               setIsRoundActive(isActive);

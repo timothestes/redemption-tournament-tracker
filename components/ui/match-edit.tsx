@@ -2,8 +2,9 @@
 
 import { Button } from "flowbite-react";
 import { Pencil } from "lucide-react";
-import { Dispatch, FormEvent, SetStateAction, useState } from "react";
+import { Dispatch, FormEvent, SetStateAction, useState, useEffect } from "react";
 import { createClient } from "../../utils/supabase/client";
+import { useTheme } from "next-themes";
 
 export default function MatchEditModal({
   match,
@@ -23,6 +24,12 @@ export default function MatchEditModal({
   const [open, setOpen] = useState(false);
   const [player1Score, setPlayer1Score] = useState(match.player1_score);
   const [player2Score, setPlayer2Score] = useState(match.player2_score);
+  const { theme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Reset scores to 0 only if they haven't been set yet
   const handleOpenModal = () => {
@@ -120,6 +127,10 @@ export default function MatchEditModal({
   // Generate score options based on tournament.max_score
   const scoreOptions = Array.from({ length: tournament.max_score + 1 }, (_, i) => i);
 
+  // Don't render theme-specific styling until client-side to avoid hydration mismatch
+  const currentTheme = mounted ? (theme === 'system' ? resolvedTheme : theme) : 'dark';
+  const isLightTheme = currentTheme === 'light';
+
   // Score selector component
   const ScoreSelector = ({ 
     player, 
@@ -132,8 +143,8 @@ export default function MatchEditModal({
   }) => {
     return (
       <div className="mb-4">
-        <h3 className="text-lg text-zinc-300 font-normal mb-2">
-          <span className="text-white font-medium">{player}</span> Lost Souls:
+        <h3 className={`text-lg ${isLightTheme ? 'text-gray-600' : 'text-zinc-300'} font-normal mb-2`}>
+          <span className={`${isLightTheme ? 'text-gray-800' : 'text-white'} font-medium`}>{player}</span> Lost Souls:
         </h3>
         <div className="flex gap-2">
           {scoreOptions.map((score) => (
@@ -144,7 +155,9 @@ export default function MatchEditModal({
               className={`w-10 h-10 rounded-md flex items-center justify-center transition-colors border ${
                 selectedScore === score
                   ? "bg-blue-600 text-white border-blue-400"
-                  : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700 border-zinc-400"
+                  : isLightTheme
+                    ? "bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-300"
+                    : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700 border-zinc-400"
               }`}
             >
               {score}
@@ -161,8 +174,12 @@ export default function MatchEditModal({
         <button 
           className={`p-2 rounded-md flex items-center justify-center ${
             isRoundActive 
-              ? "bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 hover:text-blue-400 transition cursor-pointer" 
-              : "text-gray-500/50"
+              ? isLightTheme 
+                ? "bg-blue-100 text-blue-600 hover:bg-blue-200 hover:text-blue-700 transition cursor-pointer"
+                : "bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 hover:text-blue-400 transition cursor-pointer" 
+              : isLightTheme 
+                ? "text-gray-300"
+                : "text-gray-500/50"
           }`}
           onClick={handleOpenModal}
           disabled={!isRoundActive}
@@ -173,8 +190,8 @@ export default function MatchEditModal({
       </div>
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
-          <div className="bg-[#1F2937] border-2 border-zinc-300/10 py-8 px-8 rounded-lg shadow-lg max-w-md w-full">
-            <h2 className="text-xl font-bold mb-6 text-zinc-100">Edit Match</h2>
+          <div className={`${isLightTheme ? 'bg-white' : 'bg-[#1F2937]'} border-2 ${isLightTheme ? 'border-gray-200' : 'border-zinc-300/10'} py-8 px-8 rounded-lg shadow-lg max-w-md w-full`}>
+            <h2 className={`text-xl font-bold mb-6 ${isLightTheme ? 'text-gray-800' : 'text-zinc-100'}`}>Edit Match</h2>
             <form onSubmit={handleSubmit} className="flex flex-col gap-6">
               <div className="block space-y-5">
                 <ScoreSelector 

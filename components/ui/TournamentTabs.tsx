@@ -25,6 +25,7 @@ interface TournamentTabsProps {
   tournamentId: string;
   tournamentStarted?: boolean;
   tournamentEnded?: boolean;
+  tournamentName?: string | null;
   onTournamentEnd?: () => void;
   setLatestRound: Dispatch<SetStateAction<any>>;
   onRoundActiveChange?: (
@@ -52,6 +53,7 @@ export default function TournamentTabs({
   tournamentId,
   tournamentStarted = false,
   tournamentEnded = false,
+  tournamentName,
   onTournamentEnd,
   setLatestRound,
   createPairing,
@@ -181,6 +183,7 @@ export default function TournamentTabs({
             matchErrorIndex={matchErrorIndex}
             setMatchErrorIndex={setMatchErrorIndex}
             activeTab={activeTab}
+            tournamentName={tournamentName}
           />
         </div>
       </Tabs.Item>

@@ -7,6 +7,7 @@ import MatchEditModal from "./match-edit";
 import RepairPairingModal from "./RepairPairingModal";
 import { ArrowUpDown } from "lucide-react";
 import { useTheme } from "next-themes";
+import { printTournamentPairings, printFinalStandings } from "../../utils/printUtils";
 
 const formatDateTime = (timestamp: string | null) => {
   if (!timestamp) return "";
@@ -33,6 +34,7 @@ interface TournamentRoundsProps {
   matchErrorIndex: any;
   setMatchErrorIndex: Dispatch<SetStateAction<any>>;
   activeTab: number;
+  tournamentName?: string | null;
 }
 
 interface TournamentInfo {
@@ -40,6 +42,8 @@ interface TournamentInfo {
   current_round: number | null;
   has_ended: boolean;
   max_score: number | null;
+  starting_table_number: number | null;
+  name: string | null;
 }
 
 interface RoundInfo {
@@ -61,13 +65,16 @@ export default function TournamentRounds({
   createPairing,
   matchErrorIndex,
   setMatchErrorIndex,
-  activeTab
+  activeTab,
+  tournamentName
 }: TournamentRoundsProps) {
   const [tournamentInfo, setTournamentInfo] = useState<TournamentInfo>({
     n_rounds: null,
     current_round: null,
     has_ended: false,
     max_score: null,
+    starting_table_number: 1,
+    name: tournamentName || null,
   });
   const hasFetchedTournament = useRef<boolean>(false);
   const client = createClient();
@@ -110,7 +117,7 @@ export default function TournamentRounds({
       const [tournamentResult, roundResult] = await Promise.all([
         client
           .from("tournaments")
-          .select("n_rounds, current_round, has_ended, max_score")
+          .select("n_rounds, current_round, has_ended, max_score, starting_table_number, name")
           .eq("id", tournamentId)
           .single(),
         client
@@ -174,7 +181,7 @@ export default function TournamentRounds({
     if (isActive) {
       fetchTournamentAndRoundInfo();
     }
-  }, [fetchTournamentAndRoundInfo, isActive]);
+  }, [fetchTournamentAndRoundInfo, isActive, tournamentName]);
 
   const onPageChange = (page: number) => {
     if (page <= (tournamentInfo.current_round || 1)) {
@@ -672,6 +679,55 @@ export default function TournamentRounds({
     }
   };
 
+  const handlePrintPairings = () => {
+    printTournamentPairings(
+      matches, 
+      byes, 
+      currentPage, 
+      tournamentInfo.starting_table_number || 1,
+      tournamentName || tournamentInfo.name // Use prop value first if available
+    );
+  };
+  
+  const [participants, setParticipants] = useState<any[]>([]);
+
+  const fetchAllParticipants = async () => {
+    try {
+      const { data, error } = await client
+        .from("participants")
+        .select("id, name, match_points, differential, dropped_out")
+        .eq("tournament_id", tournamentId)
+        .order("match_points", { ascending: false })
+        .order("differential", { ascending: false });
+      
+      if (error) throw error;
+      setParticipants(data || []);
+    } catch (error) {
+      console.error("Error fetching participants:", error);
+    }
+  };
+
+  const handlePrintFinalStandings = () => {
+    printFinalStandings(participants, tournamentName || tournamentInfo.name);
+  };
+  
+  // Update local tournament name from parent prop when it changes
+  useEffect(() => {
+    if (tournamentName !== undefined && tournamentName !== tournamentInfo.name) {
+      setTournamentInfo(prev => ({
+        ...prev,
+        name: tournamentName
+      }));
+    }
+  }, [tournamentName]);
+
+  // Fetch all participants when the tournament has ended
+  useEffect(() => {
+    if (tournamentInfo.has_ended) {
+      fetchAllParticipants();
+    }
+  }, [tournamentInfo.has_ended]);
+
   const currentTheme = mounted ? (theme === 'system' ? resolvedTheme : theme) : 'dark';
   const isLightTheme = currentTheme === 'light';
 
@@ -705,20 +761,40 @@ export default function TournamentRounds({
                       </p>
                     </div>
                   </div>
-                  {currentPage === tournamentInfo.current_round &&
-                    !tournamentInfo.has_ended && (
-                      <Button
-                        outline
-                        gradientDuoTone={
-                          isRoundActive ? "pinkToOrange" : "greenToBlue"
-                        }
-                        onClick={
-                          isRoundActive ? handleEndRound : handleStartRound
-                        }
-                        disabled={matchEnding}
-                      >
-                        {isRoundActive ? "End Round" : "Start Round"}
-                      </Button>
+                  {currentPage === tournamentInfo.current_round && (
+                      <div className="flex gap-2">
+                        {tournamentInfo.has_ended ? (
+                          <Button
+                            outline
+                            gradientDuoTone="purpleToBlue"
+                            onClick={handlePrintFinalStandings}
+                          >
+                            Print Final Standings
+                          </Button>
+                        ) : (
+                          <>
+                            <Button
+                              outline
+                              gradientDuoTone="purpleToBlue"
+                              onClick={handlePrintPairings}
+                            >
+                              Print Pairings
+                            </Button>
+                            <Button
+                              outline
+                              gradientDuoTone={
+                                isRoundActive ? "pinkToOrange" : "greenToBlue"
+                              }
+                              onClick={
+                                isRoundActive ? handleEndRound : handleStartRound
+                              }
+                              disabled={matchEnding}
+                            >
+                              {isRoundActive ? "End Round" : "Start Round"}
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     )}
                 </div>
                 <div className={`overflow-x-auto max-w-full ${isLightTheme ? 'bg-white text-gray-800' : 'bg-gray-800 text-white'}`}>
@@ -767,7 +843,7 @@ export default function TournamentRounds({
                           <Fragment key={match.id}>
                             <tr className={`border-b ${isLightTheme ? 'border-gray-200' : 'border-gray-400/70'} ${matchErrorIndex.includes(index) ? "bg-red-600/20" : isLightTheme ? 'bg-gray-50' : 'bg-slate-800'}`}>
                               <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : isLightTheme ? 'border-gray-200' : 'border-zinc-400'}`}>
-                                {index + 1}
+                                {index + (tournamentInfo.starting_table_number || 1)}
                               </td>
                               <td className={`px-4 py-2 text-center border-r ${isLightTheme ? 'text-gray-800 border-gray-200' : 'text-zinc-200 border-zinc-400'} ${matchErrorIndex.includes(index) ? "border-red-400" : ""}`}>
                                 {match.player1_id.name}
@@ -820,7 +896,7 @@ export default function TournamentRounds({
                             </tr>
                             <tr className={`border-b ${isLightTheme ? 'border-gray-200' : 'border-gray-300'} ${matchErrorIndex.includes(index) ? "bg-red-600/20" : isLightTheme ? 'bg-white' : 'bg-slate-700'}`}>
                               <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : isLightTheme ? 'border-gray-200' : 'border-zinc-400'}`}>
-                                {index + 1}
+                                {index + (tournamentInfo.starting_table_number || 1)}
                               </td>
                               <td className={`px-4 py-2 text-center border-r ${isLightTheme ? 'text-gray-800 border-gray-200' : 'text-zinc-200 border-zinc-400'} ${matchErrorIndex.includes(index) ? "border-red-400" : ""}`}>
                                 {match.player2_id.name}
