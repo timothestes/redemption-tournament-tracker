@@ -135,7 +135,7 @@ const SideNav: React.FC = () => {
                   Hosting Guide
                 </Sidebar.Item>
                 <Sidebar.Item
-                  href="https://landofredemption.com/wp-content/uploads/2025/03/Redemption-Tournament-Host-Application-2025.pdf"
+                  href="https://landofredemption.com/wp-content/uploads/2025/05/Redemption-Tournament-Host-Application-2025-1.pdf"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="pl-4 hover:bg-gray-100/70 dark:hover:bg-gray-700/70 transition-colors duration-200"
