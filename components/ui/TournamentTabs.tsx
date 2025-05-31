@@ -1,7 +1,7 @@
 "use client";
 
-import { Tabs, Card } from "flowbite-react";
-import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
+import { Tabs, Card, Button } from "flowbite-react";
+import { Dispatch, SetStateAction, useEffect, useRef } from "react";
 import { HiUserGroup } from "react-icons/hi";
 import { FaGear } from "react-icons/fa6";
 import { MdPeople } from "react-icons/md";
@@ -9,7 +9,6 @@ import TournamentSettings from "./TournamentSettings";
 import TournamentRounds from "./TournamentRounds";
 import ParticipantTable from "./ParticipantTable";
 import ParticipantFormModal from "./participant-form-modal";
-import { Button } from "flowbite-react";
 import { HiPlus } from "react-icons/hi";
 
 interface TournamentTabsProps {

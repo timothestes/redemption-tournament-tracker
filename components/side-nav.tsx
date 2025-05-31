@@ -6,8 +6,7 @@ import { HiArrowSmRight, HiDocumentText, HiMenu } from "react-icons/hi";
 import { IoClose } from "react-icons/io5";
 import { FaTrophy, FaBookOpen } from "react-icons/fa6";
 import { PiPencilLineBold } from "react-icons/pi";
-import { TbCardsFilled, TbArrowGuideFilled } from "react-icons/tb";
-import { AiOutlineForm } from "react-icons/ai";
+import { TbCardsFilled } from "react-icons/tb";
 import Image from "next/image";
 import Link from "next/link";
 import { useTheme } from "next-themes";
@@ -193,9 +192,6 @@ const SideNav: React.FC = () => {
               </Sidebar.Collapse>
             </Sidebar.ItemGroup>
             <Sidebar.ItemGroup className="space-y-1">
-              {/* <Sidebar.Item href="/tracker/profile" icon={HiUser}>
-                Profile
-              </Sidebar.Item> */}
               <Sidebar.Item 
                 href="/tracker/bug" 
                 icon={HiArrowSmRight}
