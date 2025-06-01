@@ -17,7 +17,7 @@ interface Participant {
 interface Match {
   round: number;
   player_1: { id: string; points: number; gameScore?: number };
-  player_2: { id: string; points: number; gameScore?: number };
+  player_2: { id: string | null; points: number; gameScore?: number };
 }
 
 interface Mapping {
@@ -58,15 +58,17 @@ function getStandings(round: number, participants: Participant[], matches: Match
   matches.forEach(match => {
     // Use match points (3 for win, 2 for timed win, 1.5 for draw, 0 for loss)
     standings[match.player_1.id].wins += match.player_1.points;
-    standings[match.player_1.id].losses += match.player_2.points;
     
-    // Calculate differential from game scores if available
-    if (match.player_1.gameScore !== undefined && match.player_2.gameScore !== undefined) {
-      standings[match.player_1.id].differential += (match.player_1.gameScore - match.player_2.gameScore);
-    }
-    
-    // Handle player 2 (ignore null opponents/BYEs)
+    // Only access player_2 data if it's not a bye match
     if (match.player_2.id) {
+      standings[match.player_1.id].losses += match.player_2.points;
+      
+      // Calculate differential from game scores if available
+      if (match.player_1.gameScore !== undefined && match.player_2.gameScore !== undefined) {
+        standings[match.player_1.id].differential += (match.player_1.gameScore - match.player_2.gameScore);
+      }
+      
+      // Handle player 2 stats
       standings[match.player_2.id].wins += match.player_2.points;
       standings[match.player_2.id].losses += match.player_1.points;
       
@@ -75,6 +77,7 @@ function getStandings(round: number, participants: Participant[], matches: Match
         standings[match.player_2.id].differential += (match.player_2.gameScore - match.player_1.gameScore);
       }
     }
+    // For bye matches, player_1 gets the win but no losses (opponent is null)
   });
   
   return Object.entries(standings).reduce((standingsArray, [key, value]) => {
@@ -195,12 +198,15 @@ function getMappings(participants: Participant[], matches: Match[]): Mapping[] {
   return participants.reduce((acc, participant) => {
     acc.push(matches.filter(match => {
       return match.player_1.id === participant.id ||
-        match.player_2.id === participant.id;
+        (match.player_2.id && match.player_2.id === participant.id);
     }).reduce((acc, match) => {
       if (match.player_1.id === participant.id) {
         acc.points += match.player_1.points;
-        acc.opponents.push(match.player_2.id);
-      } else if (match.player_2.id === participant.id) {
+        // Only add opponent if it's not a bye (null opponent)
+        if (match.player_2.id) {
+          acc.opponents.push(match.player_2.id);
+        }
+      } else if (match.player_2.id && match.player_2.id === participant.id) {
         acc.points += match.player_2.points;
         acc.opponents.push(match.player_1.id);
       }
@@ -266,7 +272,6 @@ export {
   convertParticipantsToSwissFormat,
   convertMatchesToSwissFormat,
   convertMatchupsToDbFormat,
-  findByePlayer,
   type Options,
   type Participant,
   type Match,
@@ -363,10 +368,3 @@ function convertMatchupsToDbFormat(
     });
 }
 
-/**
- * Finds the bye player from matchups (player_2 is null)
- */
-function findByePlayer(matchups: Matchup[]): string | null {
-  const byeMatchup = matchups.find(matchup => matchup.player_1 !== null && matchup.player_2 === null);
-  return byeMatchup?.player_1 || null;
-}

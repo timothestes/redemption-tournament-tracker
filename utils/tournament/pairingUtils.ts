@@ -9,7 +9,6 @@ import createSwissPairing, {
   convertParticipantsToSwissFormat,
   convertMatchesToSwissFormat,
   convertMatchupsToDbFormat,
-  findByePlayer,
   type DatabaseParticipant,
 } from "./swissPairingUtils";
 
@@ -161,6 +160,47 @@ export const createFirstRoundPairings = async (client, tournamentId: string, rou
 };
 
 /**
+ * Selects the player who should receive a bye based on custom logic:
+ * 1. Lowest match points
+ * 2. Among tied players, lowest differential
+ * 3. Among players tied on both, prioritize those who haven't had a bye
+ * 4. If still tied, assign randomly
+ */
+const selectByePlayer = (participants: any[], previousByes: any[]): string => {
+  // Create a set of player IDs who have had byes before
+  const playersWithPreviousByes = new Set(previousByes.map(bye => bye.participant_id));
+  
+  // Sort participants by: match_points (asc), differential (asc), then by whether they've had a bye before
+  const sortedForBye = [...participants].sort((a, b) => {
+    // Primary: match points (ascending - lowest first)
+    const matchPointsA = a.match_points || 0;
+    const matchPointsB = b.match_points || 0;
+    if (matchPointsA !== matchPointsB) {
+      return matchPointsA - matchPointsB;
+    }
+    
+    // Secondary: differential (ascending - lowest first)
+    const diffA = a.differential || 0;
+    const diffB = b.differential || 0;
+    if (diffA !== diffB) {
+      return diffA - diffB;
+    }
+    
+    // Tertiary: prioritize players who haven't had a bye (false comes before true when sorted)
+    const hadByeA = playersWithPreviousByes.has(a.id);
+    const hadByeB = playersWithPreviousByes.has(b.id);
+    if (hadByeA !== hadByeB) {
+      return hadByeA ? 1 : -1; // Players without bye come first
+    }
+    
+    // Quaternary: random (using player ID as tiebreaker for consistency)
+    return a.id.localeCompare(b.id);
+  });
+  
+  return sortedForBye[0].id;
+};
+
+/**
  * Creates Swiss-style pairings using the improved Swiss pairing algorithm
  */
 export const createSwissPairings = async (client, tournamentId: string, round: number) => {
@@ -205,11 +245,51 @@ export const createSwissPairings = async (client, tournamentId: string, round: n
 
     console.log(`Creating Swiss pairings for round ${round} with ${participants.length} players`);
 
-    // 3. Convert data to Swiss pairing format
-    const swissParticipants = convertParticipantsToSwissFormat(participants);
-    const swissMatches = convertMatchesToSwissFormat(previousMatches || []);
+    // 3. Handle bye assignment with custom logic if odd number of players
+    let byePlayerId = null;
+    let participantsForPairing = participants;
+    
+    if (participants.length % 2 === 1) {
+      // Custom bye assignment logic
+      byePlayerId = selectByePlayer(participants, previousByes || []);
+      console.log(`Selected player ${byePlayerId} for bye`);
+      
+      // Remove bye player from pairing pool
+      participantsForPairing = participants.filter(p => p.id !== byePlayerId);
+    }
 
-    // 4. Create Swiss pairing instance with optimal settings
+    // 4. Convert data to Swiss pairing format and combine with bye history
+    const swissParticipants = convertParticipantsToSwissFormat(participantsForPairing);
+    
+    // Only include matches involving current participants (filter out matches with dropped players)
+    const participantIds = new Set(participantsForPairing.map(p => p.id));
+    const filteredMatches = (previousMatches || []).filter(match => 
+      participantIds.has(match.player1_id) && participantIds.has(match.player2_id)
+    );
+    const swissMatches = convertMatchesToSwissFormat(filteredMatches);
+    
+    // 4b. Convert bye history to Swiss format (as matches with null opponents)
+    // Only include bye matches for players who are still in the tournament (participantsForPairing)
+    const byeMatches = (previousByes || [])
+      .filter(bye => participantIds.has(bye.participant_id)) // Only include byes for current participants
+      .map(bye => ({
+        round: bye.round_number,
+        player_1: {
+          id: bye.participant_id,
+          points: bye.match_points || 0,
+          gameScore: 0 // Byes don't have game scores
+        },
+        player_2: {
+          id: null as any, // null opponent indicates a bye
+          points: 0,
+          gameScore: 0
+        }
+      }));
+    
+    // 4c. Combine regular matches with bye history
+    const allMatches = [...swissMatches, ...byeMatches];
+
+    // 5. Create Swiss pairing instance with optimal settings
     const swissPairing = createSwissPairing({
       maxPerRound: 3, // Maximum match points possible (full win = 3 points)
       rematchWeight: 100, // High penalty for rematches
@@ -217,22 +297,22 @@ export const createSwissPairings = async (client, tournamentId: string, round: n
       seedMultiplier: 6781 // Randomization seed
     });
 
-    // 5. Generate optimal matchups using the Swiss algorithm
-    const matchups = swissPairing.getMatchups(round, swissParticipants, swissMatches);
+    // 6. Generate optimal matchups using the Swiss algorithm with combined match history
+    const matchups = swissPairing.getMatchups(round, swissParticipants, allMatches);
 
-    // 6. Check for bye player
-    const byePlayerId = findByePlayer(matchups);
+    // 7. Assign bye if we selected one
+    // 7. Assign bye if we selected one
     if (byePlayerId) {
       await assignBye(client, tournamentId, round, byePlayerId);
     }
 
-    // 7. Convert matchups back to database format
+    // 8. Convert matchups back to database format
     const participantsMap = new Map<string, DatabaseParticipant>(
-      participants.map(p => [p.id, p as DatabaseParticipant])
+      participantsForPairing.map(p => [p.id, p as DatabaseParticipant])
     );
     const dbMatches = convertMatchupsToDbFormat(matchups, tournamentId, round, participantsMap);
 
-    // 8. Insert matches into database
+    // 9. Insert matches into database
     if (dbMatches.length > 0) {
       console.log(`Created ${dbMatches.length} matches for round ${round}`);
       const { error: insertError } = await client.from("matches").insert(dbMatches);
