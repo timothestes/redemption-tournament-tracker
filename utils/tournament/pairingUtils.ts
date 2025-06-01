@@ -163,14 +163,20 @@ export const createFirstRoundPairings = async (client, tournamentId: string, rou
  * Selects the player who should receive a bye based on custom logic:
  * 1. Lowest match points
  * 2. Among tied players, lowest differential
- * 3. Among players tied on both, prioritize those who haven't had a bye
- * 4. If still tied, assign randomly
+ * 3. Among players tied on both, prioritize those who haven't had a bye in the previous round (PREVENTS CONSECUTIVE BYES)
+ * 4. Among players tied on the above, prioritize those who haven't had any bye
+ * 5. If still tied, assign randomly
  */
-const selectByePlayer = (participants: any[], previousByes: any[]): string => {
-  // Create a set of player IDs who have had byes before
+const selectByePlayer = (participants: any[], previousByes: any[], currentRound: number): string => {
+  // Create sets of player IDs who have had byes in different scenarios
   const playersWithPreviousByes = new Set(previousByes.map(bye => bye.participant_id));
+  const playersWithRecentBye = new Set(
+    previousByes
+      .filter(bye => bye.round_number === currentRound - 1) // Only previous round
+      .map(bye => bye.participant_id)
+  );
   
-  // Sort participants by: match_points (asc), differential (asc), then by whether they've had a bye before
+  // Sort participants by bye assignment priority
   const sortedForBye = [...participants].sort((a, b) => {
     // Primary: match points (ascending - lowest first)
     const matchPointsA = a.match_points || 0;
@@ -186,18 +192,32 @@ const selectByePlayer = (participants: any[], previousByes: any[]): string => {
       return diffA - diffB;
     }
     
-    // Tertiary: prioritize players who haven't had a bye (false comes before true when sorted)
+    // Tertiary: STRONGLY prioritize players who didn't have a bye in the previous round
+    const hadRecentByeA = playersWithRecentBye.has(a.id);
+    const hadRecentByeB = playersWithRecentBye.has(b.id);
+    if (hadRecentByeA !== hadRecentByeB) {
+      return hadRecentByeA ? 1 : -1; // Players without recent bye come first
+    }
+    
+    // Quaternary: prioritize players who haven't had any bye (false comes before true when sorted)
     const hadByeA = playersWithPreviousByes.has(a.id);
     const hadByeB = playersWithPreviousByes.has(b.id);
     if (hadByeA !== hadByeB) {
-      return hadByeA ? 1 : -1; // Players without bye come first
+      return hadByeA ? 1 : -1; // Players without any bye come first
     }
     
-    // Quaternary: random (using player ID as tiebreaker for consistency)
+    // Quinary: random (using player ID as tiebreaker for consistency)
     return a.id.localeCompare(b.id);
   });
   
-  return sortedForBye[0].id;
+  const selectedPlayer = sortedForBye[0];
+  const hadRecentBye = playersWithRecentBye.has(selectedPlayer.id);
+  
+  if (hadRecentBye) {
+    console.log(`WARNING: Player ${selectedPlayer.id} had a bye in round ${currentRound - 1} but is getting another bye in round ${currentRound}. This may indicate all eligible players had recent byes.`);
+  }
+  
+  return selectedPlayer.id;
 };
 
 /**
@@ -251,7 +271,7 @@ export const createSwissPairings = async (client, tournamentId: string, round: n
     
     if (participants.length % 2 === 1) {
       // Custom bye assignment logic
-      byePlayerId = selectByePlayer(participants, previousByes || []);
+      byePlayerId = selectByePlayer(participants, previousByes || [], round);
       console.log(`Selected player ${byePlayerId} for bye`);
       
       // Remove bye player from pairing pool
@@ -276,13 +296,11 @@ export const createSwissPairings = async (client, tournamentId: string, round: n
         round: bye.round_number,
         player_1: {
           id: bye.participant_id,
-          points: bye.match_points || 0,
-          gameScore: 0 // Byes don't have game scores
+          points: bye.match_points || 0
         },
         player_2: {
           id: null as any, // null opponent indicates a bye
-          points: 0,
-          gameScore: 0
+          points: 0
         }
       }));
     
@@ -294,13 +312,13 @@ export const createSwissPairings = async (client, tournamentId: string, round: n
       maxPerRound: 3, // Maximum match points possible (full win = 3 points)
       rematchWeight: 100, // High penalty for rematches
       standingPower: 2, // Quadratic penalty for point differences
-      seedMultiplier: 6781 // Randomization seed
+      seedMultiplier: 6781, // Randomization seed
+      differentialWeight: 0.1 // Weight for differential tiebreaker when points are equal
     });
 
     // 6. Generate optimal matchups using the Swiss algorithm with combined match history
     const matchups = swissPairing.getMatchups(round, swissParticipants, allMatches);
-
-    // 7. Assign bye if we selected one
+    
     // 7. Assign bye if we selected one
     if (byePlayerId) {
       await assignBye(client, tournamentId, round, byePlayerId);

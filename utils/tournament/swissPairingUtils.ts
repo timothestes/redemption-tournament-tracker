@@ -5,6 +5,7 @@ interface Options {
   rematchWeight?: number;
   standingPower?: number;
   seedMultiplier?: number;
+  differentialWeight?: number;
 }
 
 interface Participant {
@@ -16,8 +17,8 @@ interface Participant {
 
 interface Match {
   round: number;
-  player_1: { id: string; points: number; gameScore?: number };
-  player_2: { id: string | null; points: number; gameScore?: number };
+  player_1: { id: string; points: number };
+  player_2: { id: string | null; points: number };
 }
 
 interface Mapping {
@@ -50,7 +51,7 @@ function getStandings(round: number, participants: Participant[], matches: Match
       seed: participant.seed,
       wins: 0,
       losses: 0,
-      differential: 0 // Calculate differential from match game scores, not stored value
+      differential: participant.differential || 0 // Use stored differential value from database
     };
     return standings;
   }, {} as { [key: string]: { seed: number, wins: number, losses: number, differential: number } });
@@ -63,21 +64,12 @@ function getStandings(round: number, participants: Participant[], matches: Match
     if (match.player_2.id) {
       standings[match.player_1.id].losses += match.player_2.points;
       
-      // Calculate differential from game scores if available
-      if (match.player_1.gameScore !== undefined && match.player_2.gameScore !== undefined) {
-        standings[match.player_1.id].differential += (match.player_1.gameScore - match.player_2.gameScore);
-      }
-      
       // Handle player 2 stats
       standings[match.player_2.id].wins += match.player_2.points;
       standings[match.player_2.id].losses += match.player_1.points;
-      
-      // Calculate differential for player 2
-      if (match.player_1.gameScore !== undefined && match.player_2.gameScore !== undefined) {
-        standings[match.player_2.id].differential += (match.player_2.gameScore - match.player_1.gameScore);
-      }
     }
     // For bye matches, player_1 gets the win but no losses (opponent is null)
+    // Note: Differential is already maintained in the database and passed via participants
   });
   
   return Object.entries(standings).reduce((standingsArray, [key, value]) => {
@@ -145,18 +137,25 @@ function getMatchups(options: Options, round: number, participants: Participant[
     for (const opp of opps) {
       // Calculate pairing weight based on:
       // 1. Point difference (primary factor)
-      // 2. Differential difference (secondary factor, increased weight since it's primary tiebreaker)
-      // 3. Rematch penalty
+      // 2. Differential difference (tiebreaker when points are same - pairs players with similar differentials)
+      // 3. Rematch penalty (avoids repeat matches)
       const pointDifference = Math.pow(team.points - opp.points, options.standingPower || 2);
-      const differentialDifference = Math.abs((team.differential || 0) - (opp.differential || 0)) * 0.5; // Increased weight for differential
+      
+      // Add differential tiebreaker - prefer pairing players with similar differentials
+      // Only apply when point difference is small (same or very close points)
+      const differentialWeight = team.points === opp.points ? 
+        Math.abs((team.differential || 0) - (opp.differential || 0)) * (options.differentialWeight || 0.1) : 0;
+      
       const rematchPenalty = (options.rematchWeight || 100) * team.opponents.reduce((n, o) => {
         return n + (o === mapIds.get(opp.id as number) ? 1 : 0);
       }, 0);
       
+      const totalWeight = pointDifference + differentialWeight + rematchPenalty;
+      
       arr.push([
         team.id as number,
         opp.id as number,
-        -1 * (pointDifference + differentialDifference + rematchPenalty)
+        -1 * totalWeight
       ]);
     }
     return arr;
@@ -195,8 +194,8 @@ function getMatchups(options: Options, round: number, participants: Participant[
 }
 
 function getMappings(participants: Participant[], matches: Match[]): Mapping[] {
-  return participants.reduce((acc, participant) => {
-    acc.push(matches.filter(match => {
+  const mappings = participants.reduce((acc, participant) => {
+    const mapping = matches.filter(match => {
       return match.player_1.id === participant.id ||
         (match.player_2.id && match.player_2.id === participant.id);
     }).reduce((acc, match) => {
@@ -218,9 +217,15 @@ function getMappings(participants: Participant[], matches: Match[]): Mapping[] {
       points: 0,
       opponents: [],
       differential: participant.differential || 0
-    } as Mapping));
+    } as Mapping);
+    
+    // Debug logging for player mappings
+    console.log(`Player mapping: ${participant.id} - Points: ${mapping.points}, Opponents: [${mapping.opponents.join(', ')}], Differential: ${mapping.differential}`);
+    
+    acc.push(mapping);
     return acc;
   }, [] as Mapping[]);
+  return mappings;
 }
 
 // Knuth shuffle from stack overflow
@@ -255,6 +260,7 @@ export default function createSwissPairing(options?: Options): SwissPairing {
     rematchWeight: options?.rematchWeight || 100,
     standingPower: options?.standingPower || 2,
     seedMultiplier: options?.seedMultiplier || 6781,
+    differentialWeight: options?.differentialWeight || 0.1,
   };
 
   return {
@@ -326,13 +332,11 @@ function convertMatchesToSwissFormat(dbMatches: DatabaseMatch[]): Match[] {
     round: match.round,
     player_1: {
       id: match.player1_id,
-      points: match.player1_match_points || 0,
-      gameScore: match.player1_score || 0
+      points: match.player1_match_points || 0
     },
     player_2: {
       id: match.player2_id,
-      points: match.player2_match_points || 0,
-      gameScore: match.player2_score || 0
+      points: match.player2_match_points || 0
     }
   }));
 }
