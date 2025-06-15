@@ -52,3 +52,19 @@ After building, you can start the production server with:
 ```bash
 npm run start
 ```
+
+I'd like you to implement a new feature: the print match slips button.
+
+It should go next to the "print round pairings" button.
+
+Do you know what the concept of a match slip is?
+
+Each player's name is clearly visible
+
+It has a place to write each player's score
+
+Then it has a place for each player to write their signature.
+
+Do you think anything else should be included on a givne match slip
+
+We will want to let the host print it out easily

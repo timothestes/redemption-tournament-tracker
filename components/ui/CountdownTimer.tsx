@@ -6,17 +6,41 @@ import { useTheme } from 'next-themes';
 interface CountdownTimerProps {
   startTime: string | null;
   durationMinutes: number;
+  soundNotifications?: boolean;
   key?: string; // Add key prop
 }
 
-export default function CountdownTimer({ startTime, durationMinutes }: CountdownTimerProps) {
+export default function CountdownTimer({ startTime, durationMinutes, soundNotifications = false }: CountdownTimerProps) {
   const [remainingSeconds, setRemainingSeconds] = useState<number>(durationMinutes * 60);
+  const [soundPlayed, setSoundPlayed] = useState<boolean>(false);
   const { theme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const playNotificationSound = useCallback(() => {
+    if (!soundNotifications || soundPlayed) return;
+    
+    try {
+      // Play MP3 notification sound
+      const audio = new Audio('/notification-alert.mp3');
+      audio.volume = 0.5; // Set volume to 50%
+      
+      // Ensure we only play once
+      audio.addEventListener('loadstart', () => {
+        setSoundPlayed(true);
+      });
+      
+      audio.play().catch((error) => {
+        console.warn('Could not play notification sound:', error);
+      });
+      
+    } catch (error) {
+      console.warn('Could not play notification sound:', error);
+    }
+  }, [soundNotifications, soundPlayed]);
 
   const calculateRemainingTime = useCallback(() => {
     if (!startTime) {
@@ -32,7 +56,11 @@ export default function CountdownTimer({ startTime, durationMinutes }: Countdown
 
   useEffect(() => {
     // Immediately set initial time
-    setRemainingSeconds(calculateRemainingTime());
+    const initialTime = calculateRemainingTime();
+    setRemainingSeconds(initialTime);
+    
+    // Reset sound played state when timer restarts
+    setSoundPlayed(false);
 
     // Only set up interval if we have a start time
     if (!startTime) {
@@ -40,11 +68,19 @@ export default function CountdownTimer({ startTime, durationMinutes }: Countdown
     }
 
     const intervalId = setInterval(() => {
-      setRemainingSeconds(calculateRemainingTime());
+      const currentTime = calculateRemainingTime();
+      const previousTime = remainingSeconds;
+      
+      setRemainingSeconds(currentTime);
+      
+      // Play sound only when timer transitions from 1 to 0 (not when it stays at 0)
+      if (previousTime > 0 && currentTime === 0 && !soundPlayed) {
+        playNotificationSound();
+      }
     }, 1000);
 
     return () => clearInterval(intervalId);
-  }, [startTime, calculateRemainingTime]);
+  }, [startTime, calculateRemainingTime, playNotificationSound]);
 
   // Format the time
   const hours = Math.floor(remainingSeconds / 3600);

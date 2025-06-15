@@ -14,6 +14,7 @@ interface TournamentInfo {
   bye_points: number | null;
   bye_differential: number | null;
   starting_table_number: number | null;
+  sound_notifications: boolean | null;
 }
 
 interface TournamentSettingsProps {
@@ -34,6 +35,7 @@ export default function TournamentSettings({
     bye_points: null,
     bye_differential: null,
     starting_table_number: null,
+    sound_notifications: null,
   });
 
   const suggestedRounds = suggestNumberOfRounds(participantCount);
@@ -45,7 +47,7 @@ export default function TournamentSettings({
       const client = createClient();
       const { data, error } = await client
         .from("tournaments")
-        .select("n_rounds, current_round, round_length, max_score, bye_points, bye_differential, starting_table_number")
+        .select("n_rounds, current_round, round_length, max_score, bye_points, bye_differential, starting_table_number, sound_notifications")
         .eq("id", tournamentId)
         .single();
 
@@ -193,6 +195,71 @@ export default function TournamentSettings({
                       Suggested Number of Rounds: <span className={isLightTheme ? 'text-gray-800' : 'text-zinc-300'}>{suggestedRounds}</span>
                     </p>
                   )}
+              </div>
+            </div>
+
+            {/* Advanced Settings Section */}
+            <div className={`p-4 rounded-lg ${isLightTheme ? 'bg-gray-50' : 'bg-gray-700/20'}`}>
+              <h3 className={`text-sm font-semibold uppercase tracking-wider mb-4 ${isLightTheme ? 'text-gray-600' : 'text-gray-300'}`}>Advanced Settings</h3>
+              <div className="space-y-4">
+                <div className="flex items-center">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${isLightTheme ? 'bg-orange-100 text-orange-600' : 'bg-orange-900/30 text-orange-400'}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5L6 9H2v6h4l5 4V5zM19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.08" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <label className={`flex items-center cursor-pointer`}>
+                      <input
+                        type="checkbox"
+                        checked={tournamentInfo.sound_notifications ?? false}
+                        onChange={async (e) => {
+                          const newValue = e.target.checked;
+                          
+                          // Update local state immediately for responsive UI
+                          setTournamentInfo(prev => ({
+                            ...prev,
+                            sound_notifications: newValue
+                          }));
+
+                          // Update database
+                          try {
+                            const client = createClient();
+                            const { error } = await client
+                              .from("tournaments")
+                              .update({ sound_notifications: newValue })
+                              .eq("id", tournamentId);
+                            
+                            if (error) {
+                              console.error("Error updating sound notifications:", error);
+                              // Revert local state on error
+                              setTournamentInfo(prev => ({
+                                ...prev,
+                                sound_notifications: !newValue
+                              }));
+                            }
+                          } catch (error) {
+                            console.error("Error updating sound notifications:", error);
+                            // Revert local state on error
+                            setTournamentInfo(prev => ({
+                              ...prev,
+                              sound_notifications: !newValue
+                            }));
+                          }
+                        }}
+                        className={`mr-3 h-4 w-4 rounded border-2 ${isLightTheme ? 'border-gray-300 text-blue-600 focus:ring-blue-500' : 'border-gray-600 text-blue-500 bg-gray-800 focus:ring-blue-400'} focus:ring-2 focus:ring-offset-0`}
+                      />
+                      <div>
+                        <p className={`text-sm font-medium ${isLightTheme ? 'text-gray-800' : 'text-zinc-200'}`}>
+                          Sound Notification
+                        </p>
+                        <p className={`text-xs ${isLightTheme ? 'text-gray-500' : 'text-gray-400'}`}>
+                          Play a sound when the round timer expires
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

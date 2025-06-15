@@ -251,3 +251,240 @@ export const printTournamentPairings = (
   printWindow.document.write(printContent);
   printWindow.document.close();
 };
+
+/**
+ * Prints compact match slips in a printer-friendly format - multiple slips per page
+ * 
+ * @param matches - Array of match objects containing pairing information
+ * @param roundNumber - Current round number
+ * @param startingTableNumber - Table number to start from
+ * @param tournamentName - Name of the tournament
+ * @returns void - Opens a new window with printable content
+ */
+export const printMatchSlips = (
+  matches: any[],
+  roundNumber: number,
+  startingTableNumber: number = 1,
+  tournamentName?: string | null
+): void => {
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    alert('Please allow popups for this site to print match slips');
+    return;
+  }
+  
+  const pageTitle = tournamentName 
+    ? `${tournamentName} - Round ${roundNumber} Match Slips`
+    : `Round ${roundNumber} Match Slips`;
+  
+  // Generate a match slip for each match
+  const matchSlipsHtml = matches.map((match, index) => {
+    const tableNumber = index + startingTableNumber;
+    const isLastSlip = index === matches.length - 1;
+    
+    return `
+      <div class="match-slip">
+        <div class="match-header">
+          <strong>${tournamentName || 'Tournament'}</strong> - Round ${roundNumber} - Table ${tableNumber}
+        </div>
+        
+        <table class="players-table">
+          <thead>
+            <tr class="header-row">
+              <th class="name-header">Name</th>
+              <th class="score-header">Score</th>
+              <th class="signature-header">Signature</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="player-row">
+              <td class="player-name">${match.player1_id.name}</td>
+              <td class="score-cell"><div class="score-box"></div></td>
+              <td class="signature-cell"><div class="signature-line"></div></td>
+            </tr>
+            <tr class="player-row">
+              <td class="player-name">${match.player2_id.name}</td>
+              <td class="score-cell"><div class="score-box"></div></td>
+              <td class="signature-cell"><div class="signature-line"></div></td>
+            </tr>
+          </tbody>
+        </table>
+        
+        <div class="instructions">Please fill in match score, have both players sign, and return to tournament organizer</div>
+        ${!isLastSlip ? '<div class="cut-line"></div>' : ''}
+      </div>
+    `;
+  }).join('');
+
+  // Create the print content HTML
+  const printContent = `
+    <html>
+      <head>
+        <title>${pageTitle}</title>
+        <style>
+          @media print {
+            @page {
+              margin: 0.3in;
+              size: letter;
+            }
+            body {
+              -webkit-print-color-adjust: exact;
+            }
+            button { display: none; }
+          }
+          
+          body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 10px;
+            background: white;
+            font-size: 12px;
+          }
+          
+          .match-slip {
+            border: 1px solid #000;
+            margin-bottom: 25px;
+            padding: 10px;
+            page-break-inside: avoid;
+            background: white;
+            min-height: 115px;
+            box-sizing: border-box;
+            position: relative;
+            width: 80%;
+            margin-left: auto;
+            margin-right: auto;
+            display: flex;
+            flex-direction: column;
+          }
+          
+          .cut-line {
+            position: absolute;
+            bottom: -12px;
+            left: 10%;
+            right: 10%;
+            border-bottom: 2px dotted #666;
+            text-align: center;
+            font-size: 8px;
+            color: #999;
+            height: 2px;
+          }
+          
+          .cut-line::before {
+            content: "✂ cut here";
+            background: white;
+            padding: 0 8px;
+            position: relative;
+            top: -6px;
+          }
+          
+          .match-header {
+            text-align: center;
+            font-size: 11px;
+            margin-bottom: 6px;
+            padding-bottom: 3px;
+            border-bottom: 1px solid #ccc;
+          }
+          
+          .players-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 6px;
+            table-layout: fixed;
+            flex-shrink: 0;
+          }
+          
+          .header-row {
+            height: 20px;
+            background-color: #f0f0f0;
+          }
+          
+          .name-header, .score-header, .signature-header {
+            font-size: 10px;
+            font-weight: bold;
+            text-align: center;
+            padding: 3px 4px;
+            border: 1px solid #ccc;
+            background-color: #f0f0f0;
+          }
+          
+          .name-header {
+            width: 55%;
+          }
+          
+          .score-header {
+            width: 15%;
+          }
+          
+          .signature-header {
+            width: 30%;
+          }
+          
+          .player-row {
+            height: 26px;
+            border: none;
+          }
+          
+          .player-name {
+            font-weight: bold;
+            font-size: 12px;
+            padding: 4px 8px;
+            border: 1px solid #ccc;
+            background: #f9f9f9;
+            width: 55%;
+            text-align: left;
+            vertical-align: middle;
+          }
+          
+          .score-cell {
+            text-align: center;
+            padding: 4px;
+            border: 1px solid #ccc;
+            width: 15%;
+            vertical-align: middle;
+          }
+          
+          .score-box {
+            width: 28px;
+            height: 20px;
+            border: 2px solid #000;
+            background: white;
+            margin: 0 auto;
+            display: block;
+          }
+          
+          .signature-cell {
+            padding: 4px 8px;
+            border: 1px solid #ccc;
+            width: 30%;
+            vertical-align: middle;
+          }
+          
+          .signature-line {
+            border-bottom: 1px solid #000;
+            height: 16px;
+            width: 100%;
+          }
+          
+          .instructions {
+            font-size: 9px;
+            color: #666;
+            text-align: center;
+            margin-top: auto;
+            margin-bottom: 5px;
+            font-style: italic;
+            line-height: 1.2;
+            flex-shrink: 0;
+          }
+        </style>
+      </head>
+      <body>
+        <button onclick="window.print();return false;" style="position:fixed; top:10px; right:10px; padding:10px 20px; background:#4a90e2; color:white; border:none; border-radius:4px; cursor:pointer; z-index:1000;">Print All Slips</button>
+        ${matchSlipsHtml}
+      </body>
+    </html>
+  `;
+  
+  // Write to the new window and close the document writing
+  printWindow.document.write(printContent);
+  printWindow.document.close();
+};
