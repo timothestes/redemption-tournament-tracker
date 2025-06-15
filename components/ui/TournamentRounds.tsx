@@ -7,7 +7,7 @@ import MatchEditModal from "./match-edit";
 import RepairPairingModal from "./RepairPairingModal";
 import { ArrowUpDown } from "lucide-react";
 import { useTheme } from "next-themes";
-import { printTournamentPairings, printFinalStandings } from "../../utils/printUtils";
+import { printTournamentPairings, printFinalStandings, printMatchSlips } from "../../utils/printUtils";
 
 const formatDateTime = (timestamp: string | null) => {
   if (!timestamp) return "";
@@ -688,6 +688,15 @@ export default function TournamentRounds({
       tournamentName || tournamentInfo.name // Use prop value first if available
     );
   };
+
+  const handlePrintMatchSlips = () => {
+    printMatchSlips(
+      matches,
+      currentPage,
+      tournamentInfo.starting_table_number || 1,
+      tournamentName || tournamentInfo.name
+    );
+  };
   
   const [participants, setParticipants] = useState<any[]>([]);
 
@@ -779,6 +788,13 @@ export default function TournamentRounds({
                               onClick={handlePrintPairings}
                             >
                               Print Pairings
+                            </Button>
+                            <Button
+                              outline
+                              gradientDuoTone="purpleToBlue"
+                              onClick={handlePrintMatchSlips}
+                            >
+                              Print Match Slips
                             </Button>
                             <Button
                               outline

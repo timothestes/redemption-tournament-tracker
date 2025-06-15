@@ -424,7 +424,8 @@ export default function TournamentPage({
     maxScore: number,
     byePoints: number,
     byeDifferential: number,
-    startingTableNumber: number
+    startingTableNumber: number,
+    soundNotifications: boolean
   ) => {
     const now = new Date().toISOString();
     try {
@@ -442,6 +443,7 @@ export default function TournamentPage({
           bye_points: byePoints,
           bye_differential: byeDifferential,
           starting_table_number: startingTableNumber,
+          sound_notifications: soundNotifications,
         })
         .eq("id", id)
         .select("*")
@@ -680,6 +682,7 @@ export default function TournamentPage({
                       key={latestRound?.started_at || "inactive"} // Force re-render on start time change
                       startTime={latestRound?.started_at || null}
                       durationMinutes={tournament.round_length}
+                      soundNotifications={tournament.sound_notifications ?? false}
                     />
                   )}
               </div>

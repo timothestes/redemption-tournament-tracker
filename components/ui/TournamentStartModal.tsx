@@ -7,7 +7,7 @@ import { useTheme } from "next-themes";
 interface TournamentStartModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (numberOfRounds: number, roundLength: number, maxScore: number, byePoints: number, byeDifferential: number, startingTableNumber: number) => void;
+  onConfirm: (numberOfRounds: number, roundLength: number, maxScore: number, byePoints: number, byeDifferential: number, startingTableNumber: number, soundNotifications: boolean) => void;
   participantCount: number;
   suggestedRounds: number;
 }
@@ -25,6 +25,7 @@ export default function TournamentStartModal({
   const [byePoints, setByePoints] = useState(3);
   const [byeDifferential, setByeDifferential] = useState(0);
   const [startingTableNumber, setStartingTableNumber] = useState(1);
+  const [soundNotifications, setSoundNotifications] = useState(false);
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const { theme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -39,6 +40,7 @@ export default function TournamentStartModal({
       setByePoints(3);
       setByeDifferential(0);
       setStartingTableNumber(1);
+      setSoundNotifications(false);
     }
   }, [isOpen, suggestedRounds]);
 
@@ -217,6 +219,29 @@ export default function TournamentStartModal({
                     </span>
                   </div>
                 </div>
+
+                {/* Sound Notifications */}
+                <div>
+                  <Label className={`text-sm font-medium ${isLightTheme ? 'text-gray-700' : 'text-gray-300'} mb-2`}>
+                    Sound Notifications
+                  </Label>
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={soundNotifications}
+                      onChange={(e) => setSoundNotifications(e.target.checked)}
+                      className={`mr-3 h-4 w-4 rounded border-2 ${isLightTheme ? 'border-gray-300 text-blue-600 focus:ring-blue-500' : 'border-gray-600 text-blue-500 bg-gray-800 focus:ring-blue-400'} focus:ring-2 focus:ring-offset-0`}
+                    />
+                    <div>
+                      <span className={`text-sm ${isLightTheme ? 'text-gray-800' : 'text-gray-200'}`}>
+                        Play sound when timer expires
+                      </span>
+                      <p className={`text-xs ${isLightTheme ? 'text-gray-500' : 'text-gray-400'}`}>
+                        A notification sound will play when each round timer reaches zero
+                      </p>
+                    </div>
+                  </label>
+                </div>
               </div>
             </div>
           </div>
@@ -226,7 +251,7 @@ export default function TournamentStartModal({
       <Modal.Footer className={`border-t ${isLightTheme ? 'border-gray-200 bg-gray-50' : 'border-gray-600 bg-gray-800'}`}>
         <div className="flex justify-end gap-3 w-full">
           <Button
-            onClick={() => onConfirm(numberOfRounds, roundLength, maxScore, byePoints, byeDifferential, startingTableNumber)}
+            onClick={() => onConfirm(numberOfRounds, roundLength, maxScore, byePoints, byeDifferential, startingTableNumber, soundNotifications)}
             gradientDuoTone="greenToBlue"
             className="px-6"
           >
