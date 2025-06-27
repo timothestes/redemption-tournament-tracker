@@ -18,6 +18,7 @@ export default function GenerateDeckList() {
   const [nCardColumns, setNCardColumns] = useState(10);
   const [activeTab, setActiveTab] = useState<'pdf' | 'screenshot'>('pdf');
   const successRef = useRef<HTMLDivElement>(null);
+  const screenshotSuccessRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to success message when it appears
   useEffect(() => {
@@ -28,6 +29,16 @@ export default function GenerateDeckList() {
       });
     }
   }, [success]);
+
+  // Auto-scroll to screenshot success message when it appears
+  useEffect(() => {
+    if (screenshotSuccess && screenshotSuccessRef.current) {
+      screenshotSuccessRef.current.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center' 
+      });
+    }
+  }, [screenshotSuccess]);
 
   const validateForm = (list: string, name?: string, event?: string, isScreenshot: boolean = false): { valid: boolean; message?: string } => {
     if (!list.trim()) {
@@ -463,7 +474,7 @@ export default function GenerateDeckList() {
         )}
 
         {screenshotSuccess && (
-          <div className="mt-6">
+          <div className="mt-6" ref={screenshotSuccessRef}>
             <div className="p-6 bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-900 rounded-lg">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
