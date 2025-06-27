@@ -16,6 +16,7 @@ export default function GenerateDeckList() {
   const [screenshotSuccess, setScreenshotSuccess] = useState<{ url: string; message: string } | null>(null);
   const [showAlignment, setShowAlignment] = useState(false);
   const [nCardColumns, setNCardColumns] = useState(10);
+  const [activeTab, setActiveTab] = useState<'pdf' | 'screenshot'>('pdf');
   const successRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to success message when it appears
@@ -28,25 +29,28 @@ export default function GenerateDeckList() {
     }
   }, [success]);
 
-  const validateForm = (list: string, name: string, event: string): { valid: boolean; message?: string } => {
+  const validateForm = (list: string, name?: string, event?: string, isScreenshot: boolean = false): { valid: boolean; message?: string } => {
     if (!list.trim()) {
       return { valid: false, message: "Decklist cannot be empty" };
     }
 
-    if (!name.trim()) {
-      return { valid: false, message: "Name is required" };
-    }
+    // For PDF generation, name and event are required
+    if (!isScreenshot) {
+      if (!name?.trim()) {
+        return { valid: false, message: "Player name is required for PDF generation" };
+      }
 
-    if (name.length > 50) {
-      return { valid: false, message: "Name must be 50 characters or less" };
-    }
+      if (name.length > 50) {
+        return { valid: false, message: "Player name must be 50 characters or less" };
+      }
 
-    if (!event.trim()) {
-      return { valid: false, message: "Event is required" };
-    }
+      if (!event?.trim()) {
+        return { valid: false, message: "Event name is required for PDF generation" };
+      }
 
-    if (event.length > 100) {
-      return { valid: false, message: "Event must be 100 characters or less" };
+      if (event.length > 100) {
+        return { valid: false, message: "Event name must be 100 characters or less" };
+      }
     }
 
     // Check reasonable length (e.g., max 10000 characters)
@@ -79,7 +83,7 @@ export default function GenerateDeckList() {
     setError(null);
     setSuccess(null);
     
-    const validation = validateForm(decklist, name, event);
+    const validation = validateForm(decklist, name, event, false);
     if (!validation.valid) {
       setError(validation.message || "Invalid form data");
       return;
@@ -119,20 +123,10 @@ export default function GenerateDeckList() {
   };
 
   const handleGenerateScreenshot = async () => {
-    if (!decklist.trim()) {
-      setError("Decklist cannot be empty");
+    const validation = validateForm(decklist, undefined, undefined, true);
+    if (!validation.valid) {
+      setError(validation.message || "Invalid decklist format");
       return;
-    }
-
-    // Basic decklist format validation (without requiring name/event)
-    const lines = decklist.split("\n").filter(line => line.trim());
-    for (const line of lines) {
-      if (!line.trim() || line.trim() === "Reserve:" || line.trim() === "Tokens:") continue;
-      const match = line.match(/^\d+[\t ]+.+/);
-      if (!match) {
-        setError("Each line must start with a number, followed by spaces or a tab, then a card name");
-        return;
-      }
     }
 
     setError(null);
@@ -171,148 +165,263 @@ export default function GenerateDeckList() {
   };
 
   return (
-    <div className="flex-1 w-full flex flex-col gap-4 max-w-2xl mx-auto p-3">
+    <div className="flex-1 w-full flex flex-col gap-6 max-w-4xl mx-auto p-4">
       <div className="w-full">
-        <h2 className="text-2xl font-semibold">Generate Deck Check PDF</h2>
-        <form onSubmit={handleSubmit} className="mt-3 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Player Name
-                <span className="text-xs text-gray-500 ml-2">
-                  (Required for generating a decklist)
-                </span>
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full p-2 border rounded-md bg-background"
-                placeholder="Your name"
-                maxLength={50}
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Event
-                <span className="text-xs text-gray-500 ml-2">
-                  (Required for generating a decklist)
-                </span>
-              </label>
-              <input
-                type="text"
-                value={event}
-                onChange={(e) => setEvent(e.target.value)}
-                className="w-full p-2 border rounded-md bg-background"
-                placeholder="Tournament or event name"
-                maxLength={100}
-              />
-            </div>
-          </div>
+        <h2 className="text-3xl font-bold mb-2">Decklist Generator</h2>
+        <p className="text-gray-600 dark:text-gray-400 mb-6">
+          Generate a formatted PDF for tournament play or create a visual screenshot of your deck
+        </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Deck Type
-              </label>
-              <select
-                value={deckType}
-                onChange={(e) => setDeckType(e.target.value)}
-                className="w-full p-2 border rounded-md bg-background"
-              >
-                <option value="type_1">Type 1</option>
-                <option value="type_2">Type 2</option>
-              </select>
+        {/* Tab Navigation */}
+        <div className="flex space-x-1 rounded-lg bg-gray-100 dark:bg-gray-800 p-1 mb-6">
+          <button
+            onClick={() => setActiveTab('pdf')}
+            className={`flex-1 rounded-md py-2 px-4 text-sm font-medium transition-colors ${
+              activeTab === 'pdf'
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+            }`}
+          >
+            📄 Tournament PDF
+          </button>
+          <button
+            onClick={() => setActiveTab('screenshot')}
+            className={`flex-1 rounded-md py-2 px-4 text-sm font-medium transition-colors ${
+              activeTab === 'screenshot'
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+            }`}
+          >
+            📸 Visual Screenshot
+          </button>
+        </div>
+
+        {/* Content based on active tab */}
+        {activeTab === 'pdf' ? (
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <h3 className="text-xl font-semibold">Generate Tournament PDF</h3>
+              <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full">
+                Official Format
+              </span>
             </div>
-            
-            <div className="flex flex-col gap-4">
-              <label className="block text-sm font-medium">
-                PDF Options
-              </label>
-              <div className="flex items-center justify-between">
-                <ToggleSwitch
-                  label="Show Card Alignments"
-                  checked={showAlignment}
-                  onChange={setShowAlignment}
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              Creates a properly formatted PDF suitable for tournament deck checks with player information and card alignments.
+            </p>
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Player Information */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Player Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full p-3 border rounded-lg bg-background focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter your name"
+                    maxLength={50}
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Event Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={event}
+                    onChange={(e) => setEvent(e.target.value)}
+                    className="w-full p-3 border rounded-lg bg-background focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Tournament or event name"
+                    maxLength={100}
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Deck Configuration */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Deck Type
+                  </label>
+                  <select
+                    value={deckType}
+                    onChange={(e) => setDeckType(e.target.value)}
+                    className="w-full p-3 border rounded-lg bg-background focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="type_1">Type 1</option>
+                    <option value="type_2">Type 2</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    PDF Options
+                  </label>
+                  <div className="flex items-center p-3 border rounded-lg bg-gray-50 dark:bg-gray-700">
+                    <ToggleSwitch
+                      label="Show Card Alignments"
+                      checked={showAlignment}
+                      onChange={setShowAlignment}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Decklist Input */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Lackey Decklist <span className="text-red-500">*</span>
+                </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  Build a deck in{" "}
+                  <a 
+                    href="https://landofredemption.com/installing-lackey-with-redemption-plugin/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:underline"
+                  >
+                    Lackey
+                  </a>
+                  , then click the "Copy" button and paste here
+                </p>
+                <textarea
+                  value={decklist}
+                  onChange={(e) => setDecklist(e.target.value)}
+                  className="w-full h-64 p-3 font-mono text-sm border rounded-lg bg-background focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="1 Card Name [Set]"
+                  required
                 />
               </div>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div></div>
-            <div className="flex flex-col gap-4">
-              <label className="block text-sm font-medium">
-                Screenshot Options
-              </label>
-              <div className="flex items-center justify-between">
-                <label className="text-sm">Number of Card Columns:</label>
-                <select
-                  value={nCardColumns}
-                  onChange={(e) => setNCardColumns(parseInt(e.target.value))}
-                  className="p-1 border rounded-md bg-background text-sm w-20"
-                >
-                  <option value={6}>6</option>
-                  <option value={8}>8</option>
-                  <option value={10}>10</option>
-                  <option value={12}>12</option>
-                  <option value={15}>15</option>
-                </select>
-              </div>
-            </div>
+              <Button
+                type="submit" 
+                disabled={loading || !decklist.trim()}
+                outline
+                gradientDuoTone="greenToBlue"
+                className="w-full"
+                size="lg"
+              >
+                {loading ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Generating PDF...
+                  </>
+                ) : (
+                  "Generate Tournament PDF"
+                )}
+              </Button>
+            </form>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Lackey Decklist
-              <span className="text-xs text-gray-500 ml-2">
-                (Build a deck in{" "}
-                <a 
-                  href="https://landofredemption.com/installing-lackey-with-redemption-plugin/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-500 hover:underline"
-                >
-                  Lackey
-                </a>
-                , then click the "Copy" button and paste here)
+        ) : (
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <h3 className="text-xl font-semibold">Generate Visual Screenshot</h3>
+              <span className="text-xs bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 px-2 py-1 rounded-full">
+                Visual Format
               </span>
-            </label>
-            <textarea
-              value={decklist}
-              onChange={(e) => setDecklist(e.target.value)}
-              className="w-full h-64 p-2 font-mono text-sm border rounded-md bg-background"
-              placeholder="1 Card Name [Set]"
-            />
-          </div>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              Creates a visual screenshot of your deck list. No player information required - just your decklist!
+            </p>
 
-          <div className="flex gap-4 mb-6">
-            <Button
-              type="submit" 
-              disabled={loading || !decklist.trim()}
-              outline
-              gradientDuoTone="greenToBlue"
-              className="w-full flex items-center gap-3"
-            >
-              {loading ? "Generating..." : "Generate Deck Check PDF"}
-            </Button>
-            
-            <Button
-              type="button"
-              onClick={handleGenerateScreenshot}
-              disabled={screenshotLoading || !decklist.trim()}
-              outline
-              gradientDuoTone="purpleToBlue"
-              className="w-full flex items-center gap-3"
-            >
-              {screenshotLoading ? "Generating..." : "Generate Deck Screenshot"}
-            </Button>
-          </div>
-        </form>
+            <div className="space-y-6">
+              {/* Screenshot Configuration */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Deck Type
+                  </label>
+                  <select
+                    value={deckType}
+                    onChange={(e) => setDeckType(e.target.value)}
+                    className="w-full p-3 border rounded-lg bg-background focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    <option value="type_1">Type 1</option>
+                    <option value="type_2">Type 2</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Card Columns
+                  </label>
+                  <select
+                    value={nCardColumns}
+                    onChange={(e) => setNCardColumns(parseInt(e.target.value))}
+                    className="w-full p-3 border rounded-lg bg-background focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    <option value={6}>6 columns</option>
+                    <option value={8}>8 columns</option>
+                    <option value={10}>10 columns</option>
+                    <option value={12}>12 columns</option>
+                    <option value={15}>15 columns</option>
+                  </select>
+                </div>
+              </div>
 
+              {/* Decklist Input */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Lackey Decklist <span className="text-red-500">*</span>
+                </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  Build a deck in{" "}
+                  <a 
+                    href="https://landofredemption.com/installing-lackey-with-redemption-plugin/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:underline"
+                  >
+                    Lackey
+                  </a>
+                  , then click the "Copy" button and paste here
+                </p>
+                <textarea
+                  value={decklist}
+                  onChange={(e) => setDecklist(e.target.value)}
+                  className="w-full h-64 p-3 font-mono text-sm border rounded-lg bg-background focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="1 Card Name [Set]"
+                  required
+                />
+              </div>
+
+              <Button
+                type="button"
+                onClick={handleGenerateScreenshot}
+                disabled={screenshotLoading || !decklist.trim()}
+                outline
+                gradientDuoTone="purpleToBlue"
+                className="w-full"
+                size="lg"
+              >
+                {screenshotLoading ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Generating Screenshot...
+                  </>
+                ) : (
+                  "Generate Deck Screenshot"
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Error Display */}
         {error && (
-          <div className="mt-4">
+          <div className="mt-6">
             <ToastNotification
               message={error}
               type="error"
@@ -322,19 +431,32 @@ export default function GenerateDeckList() {
           </div>
         )}
 
+        {/* Success Messages */}
         {success && (
           <div className="mt-6" ref={successRef}>
-            <div className="mt-4 p-8 bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-900 rounded-lg flex flex-col items-center">
-              <h3 className="text-2xl font-semibold text-green-700 dark:text-green-400 mb-4">
-                🎉 Your Deck Check PDF is Ready!
-              </h3>
+            <div className="p-6 bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-900 rounded-lg">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-green-700 dark:text-green-400">
+                    PDF Generated Successfully!
+                  </h3>
+                  <p className="text-sm text-green-600 dark:text-green-300">
+                    Your tournament deck check PDF is ready for download
+                  </p>
+                </div>
+              </div>
               <Button
                 onClick={() => window.open(success.url, '_blank')}
-                gradientDuoTone="purpleToBlue"
+                gradientDuoTone="greenToBlue"
                 size="lg"
-                className="font-semibold min-w-[200px] justify-center"
+                className="font-semibold"
               >
-                Download PDF
+                📄 Download PDF
               </Button>
             </div>
           </div>
@@ -342,26 +464,44 @@ export default function GenerateDeckList() {
 
         {screenshotSuccess && (
           <div className="mt-6">
-            <div className="mt-4 p-8 bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-900 rounded-lg flex flex-col items-center">
-              <h3 className="text-2xl font-semibold text-blue-700 dark:text-blue-400 mb-4">
-                📸 Your Deck Screenshot is Ready!
-              </h3>
-              <div className="flex gap-4">
+            <div className="p-6 bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-900 rounded-lg">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-blue-700 dark:text-blue-400">
+                    Screenshot Generated Successfully!
+                  </h3>
+                  <p className="text-sm text-blue-600 dark:text-blue-300">
+                    Your deck screenshot is ready to view and download
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-3">
                 <Button
                   onClick={() => window.open(screenshotSuccess.url, '_blank')}
                   gradientDuoTone="purpleToBlue"
                   size="lg"
-                  className="font-semibold min-w-[200px] justify-center"
+                  className="font-semibold"
                 >
-                  Download Screenshot
+                  📸 View Screenshot
                 </Button>
                 <Button
-                  onClick={() => window.open(screenshotSuccess.url, '_blank')}
+                  onClick={() => {
+                    const link = document.createElement('a');
+                    link.href = screenshotSuccess.url;
+                    link.download = 'deck-screenshot.png';
+                    link.click();
+                  }}
+                  outline
                   gradientDuoTone="grayToBlue"
                   size="lg"
-                  className="font-semibold min-w-[200px] justify-center"
+                  className="font-semibold"
                 >
-                  View Screenshot
+                  💾 Download
                 </Button>
               </div>
             </div>
