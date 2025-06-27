@@ -10,9 +10,12 @@ export default function GenerateDeckList() {
   const [name, setName] = useState("");
   const [event, setEvent] = useState("");
   const [loading, setLoading] = useState(false);
+  const [screenshotLoading, setScreenshotLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<{ url: string; message: string } | null>(null);
+  const [screenshotSuccess, setScreenshotSuccess] = useState<{ url: string; message: string } | null>(null);
   const [showAlignment, setShowAlignment] = useState(false);
+  const [nCardColumns, setNCardColumns] = useState(10);
   const successRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to success message when it appears
@@ -115,6 +118,58 @@ export default function GenerateDeckList() {
     }
   };
 
+  const handleGenerateScreenshot = async () => {
+    if (!decklist.trim()) {
+      setError("Decklist cannot be empty");
+      return;
+    }
+
+    // Basic decklist format validation (without requiring name/event)
+    const lines = decklist.split("\n").filter(line => line.trim());
+    for (const line of lines) {
+      if (!line.trim() || line.trim() === "Reserve:" || line.trim() === "Tokens:") continue;
+      const match = line.match(/^\d+[\t ]+.+/);
+      if (!match) {
+        setError("Each line must start with a number, followed by spaces or a tab, then a card name");
+        return;
+      }
+    }
+
+    setError(null);
+    setScreenshotSuccess(null);
+    setScreenshotLoading(true);
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_TOURNAMENT_API_ENDPOINT}/v1/generate-decklist-image`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          decklist,
+          decklist_type: deckType,
+          n_card_columns: nCardColumns,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.status === 'success') {
+        setScreenshotSuccess({
+          url: result.data.downloadUrl,
+          message: "Screenshot generated successfully",
+        });
+      } else {
+        setError('Failed to generate screenshot: ' + result.message);
+      }
+    } catch (error) {
+      console.error('Error generating screenshot:', error);
+      setError('Failed to generate screenshot. Please try again.');
+    } finally {
+      setScreenshotLoading(false);
+    }
+  };
+
   return (
     <div className="flex-1 w-full flex flex-col gap-4 max-w-2xl mx-auto p-3">
       <div className="w-full">
@@ -125,7 +180,7 @@ export default function GenerateDeckList() {
               <label className="block text-sm font-medium mb-2">
                 Player Name
                 <span className="text-xs text-gray-500 ml-2">
-                  (Required)
+                  (Required for generating a decklist)
                 </span>
               </label>
               <input
@@ -142,7 +197,7 @@ export default function GenerateDeckList() {
               <label className="block text-sm font-medium mb-2">
                 Event
                 <span className="text-xs text-gray-500 ml-2">
-                  (Required)
+                  (Required for generating a decklist)
                 </span>
               </label>
               <input
@@ -185,6 +240,29 @@ export default function GenerateDeckList() {
             </div>
           </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div></div>
+            <div className="flex flex-col gap-4">
+              <label className="block text-sm font-medium">
+                Screenshot Options
+              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-sm">Number of Card Columns:</label>
+                <select
+                  value={nCardColumns}
+                  onChange={(e) => setNCardColumns(parseInt(e.target.value))}
+                  className="p-1 border rounded-md bg-background text-sm w-20"
+                >
+                  <option value={6}>6</option>
+                  <option value={8}>8</option>
+                  <option value={10}>10</option>
+                  <option value={12}>12</option>
+                  <option value={15}>15</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm font-medium mb-2">
               Lackey Decklist
@@ -209,15 +287,28 @@ export default function GenerateDeckList() {
             />
           </div>
 
-          <Button 
-            type="submit" 
-            disabled={loading || !decklist.trim()}
-            outline
-            gradientDuoTone="greenToBlue"
-            className="w-full flex items-center gap-3"
-          >
-            {loading ? "Generating..." : "Generate Deck Check PDF"}
-          </Button>
+          <div className="flex gap-4 mb-6">
+            <Button
+              type="submit" 
+              disabled={loading || !decklist.trim()}
+              outline
+              gradientDuoTone="greenToBlue"
+              className="w-full flex items-center gap-3"
+            >
+              {loading ? "Generating..." : "Generate Deck Check PDF"}
+            </Button>
+            
+            <Button
+              type="button"
+              onClick={handleGenerateScreenshot}
+              disabled={screenshotLoading || !decklist.trim()}
+              outline
+              gradientDuoTone="purpleToBlue"
+              className="w-full flex items-center gap-3"
+            >
+              {screenshotLoading ? "Generating..." : "Generate Deck Screenshot"}
+            </Button>
+          </div>
         </form>
 
         {error && (
@@ -245,6 +336,34 @@ export default function GenerateDeckList() {
               >
                 Download PDF
               </Button>
+            </div>
+          </div>
+        )}
+
+        {screenshotSuccess && (
+          <div className="mt-6">
+            <div className="mt-4 p-8 bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-900 rounded-lg flex flex-col items-center">
+              <h3 className="text-2xl font-semibold text-blue-700 dark:text-blue-400 mb-4">
+                📸 Your Deck Screenshot is Ready!
+              </h3>
+              <div className="flex gap-4">
+                <Button
+                  onClick={() => window.open(screenshotSuccess.url, '_blank')}
+                  gradientDuoTone="purpleToBlue"
+                  size="lg"
+                  className="font-semibold min-w-[200px] justify-center"
+                >
+                  Download Screenshot
+                </Button>
+                <Button
+                  onClick={() => window.open(screenshotSuccess.url, '_blank')}
+                  gradientDuoTone="grayToBlue"
+                  size="lg"
+                  className="font-semibold min-w-[200px] justify-center"
+                >
+                  View Screenshot
+                </Button>
+              </div>
             </div>
           </div>
         )}
