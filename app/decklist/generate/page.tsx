@@ -487,7 +487,7 @@ export default function GenerateDeckList() {
                     Screenshot Generated Successfully!
                   </h3>
                   <p className="text-sm text-blue-600 dark:text-blue-300">
-                    Your deck screenshot is ready to view and download
+                    Your deck screenshot is ready to view
                   </p>
                 </div>
               </div>
@@ -499,20 +499,6 @@ export default function GenerateDeckList() {
                   className="font-semibold"
                 >
                   📸 View Screenshot
-                </Button>
-                <Button
-                  onClick={() => {
-                    const link = document.createElement('a');
-                    link.href = screenshotSuccess.url;
-                    link.download = 'deck-screenshot.png';
-                    link.click();
-                  }}
-                  outline
-                  gradientDuoTone="grayToBlue"
-                  size="lg"
-                  className="font-semibold"
-                >
-                  💾 Download
                 </Button>
               </div>
             </div>
