@@ -17,6 +17,7 @@ export default function GenerateDeckList() {
   const [showAlignment, setShowAlignment] = useState(false);
   const [nCardColumns, setNCardColumns] = useState(10);
   const [activeTab, setActiveTab] = useState<'pdf' | 'screenshot'>('pdf');
+  const [mCount, setMCount] = useState(false);
   const successRef = useRef<HTMLDivElement>(null);
   const screenshotSuccessRef = useRef<HTMLDivElement>(null);
 
@@ -113,6 +114,7 @@ export default function GenerateDeckList() {
           name,
           event,
           show_alignment: showAlignment,
+          m_count: mCount,
         }),
       });
 
@@ -154,6 +156,7 @@ export default function GenerateDeckList() {
           decklist,
           decklist_type: deckType,
           n_card_columns: nCardColumns,
+          m_count: mCount,
         }),
       });
 
@@ -255,7 +258,7 @@ export default function GenerateDeckList() {
               </div>
 
               {/* Deck Configuration */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">
                     Deck Type
@@ -280,6 +283,12 @@ export default function GenerateDeckList() {
                       checked={showAlignment}
                       onChange={setShowAlignment}
                     />
+                  </div>
+                </div>
+                <div title="The M count (Matthew Count) represents average number of unique brigades when randomly drawing 8 non-lost soul cards from a deck. Higher M count = more brigades in opening hand, on average">
+                  <label className="block text-sm font-medium mb-2">Matthew Count</label>
+                  <div className="flex items-center p-3 border rounded-lg bg-gray-50 dark:bg-gray-700">
+                    <ToggleSwitch label="M Count" checked={mCount} onChange={setMCount} />
                   </div>
                 </div>
               </div>
@@ -346,7 +355,7 @@ export default function GenerateDeckList() {
 
             <div className="space-y-6">
               {/* Screenshot Configuration */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">
                     Deck Type
@@ -360,7 +369,6 @@ export default function GenerateDeckList() {
                     <option value="type_2">Type 2</option>
                   </select>
                 </div>
-                
                 <div>
                   <label className="block text-sm font-medium mb-2">
                     Card Columns
@@ -376,6 +384,12 @@ export default function GenerateDeckList() {
                     <option value={12}>12 columns</option>
                     <option value={15}>15 columns</option>
                   </select>
+                </div>
+                <div title="The M count (Matthew Count) represents average number of unique brigades when randomly drawing 8 non-lost soul cards from a deck. Higher M count = more brigades in opening hand, on average">
+                  <label className="block text-sm font-medium mb-2">Matthew Count</label>
+                  <div className="flex items-center p-3 border rounded-lg bg-gray-50 dark:bg-gray-700">
+                    <ToggleSwitch label="Matthew Count" checked={mCount} onChange={setMCount} />
+                  </div>
                 </div>
               </div>
 
