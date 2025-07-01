@@ -286,11 +286,18 @@ export default function GenerateDeckList() {
                   </div>
                 </div>
                 <div title="The M count (Matthew Count) represents average number of unique brigades when randomly drawing 8 non-lost soul cards from a deck. Higher M count = more brigades in opening hand, on average">
-                  <label className="block text-sm font-medium mb-2">Matthew Count</label>
-                  <div className="flex items-center p-3 border rounded-lg bg-gray-50 dark:bg-gray-700">
-                    <ToggleSwitch label="M Count" checked={mCount} onChange={setMCount} />
-                  </div>
-                </div>
+                  <label className="block text-sm font-medium mb-2 flex items-center">
+                    Matthew Count
+                    <span className="ml-1 text-gray-400 hover:text-gray-600" title="The M count (Matthew Count) represents average number of unique brigades when randomly drawing 8 non-lost soul cards from a deck. Higher M count = more brigades in opening hand, on average">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 11-0 20 10 10 0 010-20z" />
+                      </svg>
+                    </span>
+                  </label>
+                   <div className="flex items-center p-3 border rounded-lg bg-gray-50 dark:bg-gray-700">
+                     <ToggleSwitch label="M Count" checked={mCount} onChange={setMCount} />
+                   </div>
+                 </div>
               </div>
 
               {/* Decklist Input */}
@@ -386,11 +393,18 @@ export default function GenerateDeckList() {
                   </select>
                 </div>
                 <div title="The M count (Matthew Count) represents average number of unique brigades when randomly drawing 8 non-lost soul cards from a deck. Higher M count = more brigades in opening hand, on average">
-                  <label className="block text-sm font-medium mb-2">Matthew Count</label>
-                  <div className="flex items-center p-3 border rounded-lg bg-gray-50 dark:bg-gray-700">
-                    <ToggleSwitch label="Matthew Count" checked={mCount} onChange={setMCount} />
-                  </div>
-                </div>
+                  <label className="block text-sm font-medium mb-2 flex items-center">
+                    Matthew Count
+                    <span className="ml-1 text-gray-400 hover:text-gray-600" title="The M count (Matthew Count) represents average number of unique brigades when randomly drawing 8 non-lost soul cards from a deck. Higher M count = more brigades in opening hand, on average">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 11-0 20 10 10 0 010-20z" />
+                      </svg>
+                    </span>
+                  </label>
+                   <div className="flex items-center p-3 border rounded-lg bg-gray-50 dark:bg-gray-700">
+                     <ToggleSwitch label="Matthew Count" checked={mCount} onChange={setMCount} />
+                   </div>
+                 </div>
               </div>
 
               {/* Decklist Input */}
