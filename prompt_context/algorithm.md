@@ -26,7 +26,7 @@ If a player loses the round while behind behhind in "game points" when time is c
 
 # Round Pairing
 
-Depending on the round, a different pairing method will be used. In each round, players are paired with an opponent and report their game scores that will be used to decide how many match points they are awared for the round. The "differential" they get each game will be kept track of cumulatively throughout the tournament. Over the rounds, they will also accumulate match points. At the end of the tournament, whoever has the most match points will be declared the winner. If there is a tie, between the players that have the most match points, whoever has the highest "differential" will be declared the winner. If there is still a tie between number of match points and differential, a tie is declared.
+Depending on the round, a different pairing method will be used. In each round, players are paired with an opponent and report their game scores that will be used to decide how many match points they are awared for the round. The "differential" they get each game will be kept track of cumulatively throughout the tournament. The differential can be a negative number. Over the rounds, they will also accumulate match points. Match points can never be negative. At the end of the tournament, whoever has the most match points will be declared the winner. If there is a tie, between the players that have the most match points, whoever has the highest "differential" will be declared the winner. If there is still a tie between number of match points and differential, a tie is declared.
 
 ## Byes
 
@@ -54,8 +54,8 @@ sorted_list_of_players = [
     {"name": "player_a", "match_points": 10, "differential": 11,},
     {"name": "player_b", "match_points": 10, "differential": 9},
     {"name": "player_c", "match_points": 10, "differential": 4},
-    {"name": "player_d", "match_points": 9, "differential": 10},
     {"name": "player_d", "match_points": 9, "differential": 4},
+    {"name": "player_d", "match_points": 9, "differential": -10},
 ]
 
 for player in reverse(sorted_list_of_players):
@@ -96,7 +96,7 @@ then use this logic:
 
 ```python
 # go through the list again, but this time pair the players if the next player in the list didn't play
-# each other the previous round. This is a more permissive pairing rule
+# each other the previous round. This is a more permissive pairing rule. If you reach the bottom of the list and both players at the bottom already played each other last round, pair them again.
 ```
 
 # Data Examples
@@ -225,3 +225,22 @@ create table public.byes (
 - `byes` belongs-to `participants` via `participant_id`
 - `byes` belongs-to `rounds` via `round_id`
 - `byes` belongs-to `tournaments` via `tournament_id`
+
+
+# Storing Data Example
+
+For example, if two players have been plaired to play and they finish their match, this is how their match points and differential would be determined.
+
+Sally vs Billy
+
+Sally got the full 5 game points within the time limit.
+Billy got 3 game points
+
+Sally is awarded 3 match points and +2 differential
+Billy is awared 0 match points and a -2 differential
+
+Before the match, Sally had 3 match points a 5 differential. After this match results are added to her score, she will have 6 match points and a 7 differential.
+
+Before the match, Billy had 5 match points and a 3 differntial. After this match results are added to his score, he will have 5 match points and a 1 differential.
+
+After all the scores of each match have been reported, the current round ends and a new one begins where new pairings will be determined. This happens until the pre-determined number of rounds in the tournament have been reached. The winner is the player with the most number of match points, and if there is a tie there, the highest differential.
