@@ -49,7 +49,7 @@ Any subsequent rounds played after the first round should follow these pairing r
 - Starting with the player on the bottom of the list, go through this checklist to decide if they get the bye or not:
 
 ```python
-# assume tournament_history exists: a table that contains information about if a player got a bye in a given round
+# assume "byes" exists: a table that contains information about if a player got a bye in a given round
 sorted_list_of_players = [
     {"name": "player_a", "match_points": 10, "differential": 11,},
     {"name": "player_b", "match_points": 10, "differential": 9},
@@ -74,7 +74,7 @@ for player in reverse(sorted_list_of_players):
 ```python
 # pairing psuedocode
 
-# assume tournament_history exists: a table that contains a list of who played who during each round
+# assume "matches" exists: a table that contains a list of who played who during each round
 sorted_list_of_players = [
     {"name": "player_a", "match_points": 10, "differential": 11,},
     {"name": "player_b", "match_points": 10, "differential": 9},
@@ -129,6 +129,11 @@ create table public.tournaments (
   constraint tournaments_host_id_fkey foreign KEY (host_id) references auth.users (id) on delete CASCADE
 ) TABLESPACE pg_default;
 ```
+**Relations:**
+- `tournaments` 1-to-many `rounds` (`rounds.tournament_id` → `tournaments.id`)
+- `tournaments` 1-to-many `participants` (`participants.tournament_id` → `tournaments.id`)
+- `tournaments` 1-to-many `matches` (`matches.tournament_id` → `tournaments.id`)
+- `tournaments` 1-to-many `byes` (`byes.tournament_id` → `tournaments.id`)
 
 ## Rounds Table
 ```sql
@@ -144,9 +149,12 @@ create table public.rounds (
   constraint rounds_tournament_id_fkey foreign KEY (tournament_id) references tournaments (id) on update CASCADE on delete CASCADE
 ) TABLESPACE pg_default;
 ```
+**Relations:**
+- `rounds` belongs-to `tournaments` via `tournament_id`
+- `rounds` 1-to-many `matches` (matches.round refers to `rounds.round_number` within same tournament)
+- `rounds` 1-to-many `byes` (`byes.round_id` → `rounds.id`)
 
 ## Participants Table
-
 ```sql
 create table public.participants (
   id uuid not null default gen_random_uuid (),
@@ -161,9 +169,12 @@ create table public.participants (
   constraint participants_tournament_id_fkey foreign KEY (tournament_id) references tournaments (id) on update CASCADE on delete CASCADE
 ) TABLESPACE pg_default;
 ```
+**Relations:**
+- `participants` belongs-to `tournaments` via `tournament_id`
+- `participants` 1-to-many `matches` as `player1` and `player2` (`matches.player1_id`, `matches.player2_id`)
+- `participants` 1-to-many `byes` (`byes.participant_id`)
 
 ## Matches Table
-
 ```sql
 create table public.matches (
   id uuid not null default gen_random_uuid (),
@@ -188,9 +199,12 @@ create table public.matches (
   constraint matches_winner_id_fkey foreign KEY (winner_id) references participants (id) on delete CASCADE
 ) TABLESPACE pg_default;
 ```
+**Relations:**
+- `matches` belongs-to `tournaments` via `tournament_id`
+- `matches` belongs-to two `participants` via `player1_id` and `player2_id`
+- `matches` winner is one `participant` via `winner_id`
 
 ## Byes Table
-
 ```sql
 create table public.byes (
   id uuid not null default gen_random_uuid (),
@@ -207,3 +221,7 @@ create table public.byes (
   constraint byes_tournament_id_fkey foreign KEY (tournament_id) references tournaments (id) on update CASCADE on delete CASCADE
 ) TABLESPACE pg_default;
 ```
+**Relations:**
+- `byes` belongs-to `participants` via `participant_id`
+- `byes` belongs-to `rounds` via `round_id`
+- `byes` belongs-to `tournaments` via `tournament_id`
