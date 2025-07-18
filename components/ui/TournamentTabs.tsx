@@ -85,7 +85,7 @@ export default function TournamentTabs({
       <Tabs.Item title="Participants" icon={HiUserGroup}>
         <div className="flex justify-between flex-wrap gap-3 items-center mb-6">
           <h2 className="text-2xl font-bold" style={{ width: "200px" }}>
-            Participants
+            Participants{participants.length > 0 && ` (${participants.length})`}
           </h2>
           <div className="relative group">
             <Button
