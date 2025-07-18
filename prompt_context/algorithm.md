@@ -93,7 +93,7 @@ sorted_list_of_players = [
 
 for i, player in enum(sorted_list_of_players)
     if sorted_list_of_players[i+1] havent_played_yet:
-        # then pair them
+        # then pair them. First players paired via this method should be the first players in the resulting set of matches.
     else: # they have played
         continue # keep going down the line until you find someone you haven't played yet
 ```
