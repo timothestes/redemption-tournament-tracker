@@ -48,8 +48,8 @@ export const assignBye = async (
       differential: (participant.differential || 0) + tournament.bye_differential,
       participant_id: playerId
     });
-  } catch {
-    // swallow errors
+  } catch (error) {
+    console.error("Error in assignBye:", error);
   }
 };
 
