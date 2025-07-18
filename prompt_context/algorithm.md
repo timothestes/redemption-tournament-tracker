@@ -64,7 +64,14 @@ for player in reverse(sorted_list_of_players):
     else:
         continue
 
-# assume there will never be the scenario where all players have gotten a bye
+# if you get to the bottom of the list and have determined all players have already
+# gotten a bye, then go through the list again, using a more permissive selection rule
+for player in reverse(sorted_list_of_players):
+    if player hasn't gotten a bye in the last round:
+        give them a bye
+    else:
+        continue
+# this will always generate a bye
 ```
 
 - After the bye has been decided, remove the player with the bye from the sorted list, then decide on the pairing for the rest of the players.
