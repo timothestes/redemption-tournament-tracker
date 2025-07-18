@@ -1,32 +1,39 @@
 I'm going to attempt to describe how the pairing algorithm for a swiss redemption tournament should work.
-It is a slightly modified version of a normal swiss pairing system, expect it uses a tiebreaker called a "differential".
+It is a slightly modified version of a normal swiss pairing system, except it uses a tiebreaker called a "differential".
 
 First, let's define some terms.
 
 A game is played between two players.
+
 A game can have different outcomes (described in the match points section)
+
 A tournament consists of at least two players.
+
 A tournament's number of rounds is declared by the handbook.
 
 # Game Points
 - In a game, players play until "time" in round is called or whoever gets N "game points" first
 
-- The number of game points players playt to is decided at the beginning of the tournament.
+- The number of game points players play to is decided at the beginning of the tournament.
 
 - It can be 5 or 7.
 
 # Match Points
 
 If a player wins a match by getting to the full N points in their game before time is called, they are awarded 3 "match points". This is called a full win.
-If a player wins by being ahead in "game points" when time is called, they are awared 2 "match points". This is called a partial win.
-If both players have the same numer of "game points" when time is called, they are each awared 1.5 "match points". This is called a tie.
+
+If a player wins by being ahead in "game points" when time is called, they are awarded 2 "match points". This is called a partial win.
+
+If both players have the same number of "game points" when time is called, they are each awarded 1.5 "match points". This is called a tie.
+
 If a player loses the round when the opponent gets the full N points in their game, they get 0 "match points". This is called a full loss.
-If a player loses the round while behind behhind in "game points" when time is called, they get 1 "match point". This is called a partial loss.
+
+If a player loses the round while behind in "game points" when time is called, they get 1 "match point". This is called a partial loss.
 
 
 # Round Pairing
 
-Depending on the round, a different pairing method will be used. In each round, players are paired with an opponent and report their game scores that will be used to decide how many match points they are awared for the round. The "differential" they get each game will be kept track of cumulatively throughout the tournament. The differential can be a negative number. Over the rounds, they will also accumulate match points. Match points can never be negative. At the end of the tournament, whoever has the most match points will be declared the winner. If there is a tie, between the players that have the most match points, whoever has the highest "differential" will be declared the winner. If there is still a tie between number of match points and differential, a tie is declared.
+Depending on the round, a different pairing method will be used. In each round, players are paired with an opponent and report their game scores that will be used to decide how many match points they are awarded for the round. The "differential" they get each game will be kept track of cumulatively throughout the tournament. The differential can be a negative number. Over the rounds, they will also accumulate match points. Match points can never be negative. At the end of the tournament, whoever has the most match points will be declared the winner. If there is a tie, between the players that have the most match points, whoever has the highest "differential" will be declared the winner. If there is still a tie between number of match points and differential, a tie is declared.
 
 ## Byes
 
@@ -236,7 +243,7 @@ create table public.byes (
 
 # Storing Data Example
 
-For example, if two players have been plaired to play and they finish their match, this is how their match points and differential would be determined.
+For example, if two players have been paired to play and they finish their match, this is how their match points and differential would be determined.
 
 Sally vs Billy
 
@@ -244,11 +251,11 @@ Sally got the full 5 game points within the time limit.
 Billy got 3 game points
 
 Sally is awarded 3 match points and +2 differential
-Billy is awared 0 match points and a -2 differential
+ Billy is awarded 0 match points and a -2 differential
 
-Before the match, Sally had 3 match points a 5 differential. After this match results are added to her score, she will have 6 match points and a 7 differential.
+ Before the match, Sally had 3 match points and a 5 differential. After this match results are added to her score, she will have 6 match points and a 7 differential.
 
-Before the match, Billy had 5 match points and a 3 differntial. After this match results are added to his score, he will have 5 match points and a 1 differential.
+ Before the match, Billy had 5 match points and a 3 differential. After this match results are added to his score, he will have 5 match points and a 1 differential.
 
 After all the scores of each match have been reported, the current round ends and a new one begins where new pairings will be determined. This happens until the pre-determined number of rounds in the tournament have been reached. The winner is the player with the most number of match points, and if there is a tie there, the highest differential.
 
