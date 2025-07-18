@@ -294,5 +294,3 @@ export const createPairing = async (
     return false;
   }
 };
-
-export {};
