@@ -36,7 +36,7 @@ If there are an odd number of players, a player is chosen to get the "bye", mean
 
 For the first round, matchups between players should be randomized. If a bye is present, the person who gets the bye should be assigned randomly. This is the simplest the pairing logic will get. Subsequent rounds have a more involved pairing algorithm.
 
-## Non-first Rounds
+## Later Rounds
 
 Any subsequent rounds played after the first round should follow these pairing rules.
 
