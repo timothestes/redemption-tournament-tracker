@@ -251,3 +251,8 @@ Before the match, Sally had 3 match points a 5 differential. After this match re
 Before the match, Billy had 5 match points and a 3 differntial. After this match results are added to his score, he will have 5 match points and a 1 differential.
 
 After all the scores of each match have been reported, the current round ends and a new one begins where new pairings will be determined. This happens until the pre-determined number of rounds in the tournament have been reached. The winner is the player with the most number of match points, and if there is a tie there, the highest differential.
+
+
+## Dropping Out
+
+After a round has completed, players can choose to drop out of the tournament. They will no longer be considered when performing pairings.
