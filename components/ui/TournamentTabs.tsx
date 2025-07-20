@@ -1,7 +1,8 @@
 "use client";
 
 import { Tabs, Card, Button } from "flowbite-react";
-import { Dispatch, SetStateAction, useEffect, useRef } from "react";
+import PodGenerationModal from "./PodGenerationModal";
+import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
 import { HiUserGroup } from "react-icons/hi";
 import { FaGear } from "react-icons/fa6";
 import { MdPeople } from "react-icons/md";
@@ -10,6 +11,7 @@ import TournamentRounds from "./TournamentRounds";
 import ParticipantTable from "./ParticipantTable";
 import ParticipantFormModal from "./participant-form-modal";
 import { HiPlus } from "react-icons/hi";
+import { GiCardPickup } from "react-icons/gi";
 
 interface TournamentTabsProps {
   participants: any[];
@@ -62,6 +64,10 @@ export default function TournamentTabs({
   setActiveTab,
   fetchParticipants,
 }: TournamentTabsProps) {
+  // state for booster draft pods
+  const [showPodsModal, setShowPodsModal] = useState(false);
+  const [podSize, setPodSize] = useState(4);
+  const [pods, setPods] = useState<any[][]>([]);
   const tabsRef = useRef(null);
   const addParticipantButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -76,58 +82,75 @@ export default function TournamentTabs({
     }
   }, [activeTab]);
   return (
-    <Tabs
+    <>
+      <Tabs
       ref={tabsRef}
       aria-label="Tournament tabs"
       style={{ marginTop: "1rem" }}
       onActiveTabChange={(tab) => setActiveTab(tab)}
     >
       <Tabs.Item title="Participants" icon={HiUserGroup}>
-        <div className="flex justify-between flex-wrap gap-3 items-center mb-6">
+        <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold" style={{ width: "200px" }}>
             Participants{participants.length > 0 && ` (${participants.length})`}
           </h2>
-          <div className="relative group">
-            <Button
-              ref={addParticipantButtonRef}
-              onClick={() => !tournamentStarted && setIsModalOpen(true)}
-              className={`flex items-center gap-2 ${tournamentStarted ? "opacity-50 cursor-not-allowed" : ""}`}
-              style={{ width: "200px" }}
-              outline
-              gradientDuoTone="greenToBlue"
-              disabled={tournamentStarted}
-            >
-              <div className="flex gap-2">
-                <HiPlus className="w-5 h-5" />
-                Add Participant
-              </div>
-            </Button>
-            {tournamentStarted && (
-              <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-                Cannot add participants after tournament has started
-                <div className="absolute left-1/2 -translate-x-1/2 top-full -mt-1 border-4 border-transparent border-t-gray-900"></div>
+          <div className="flex items-center gap-3">
+            {/* generate pods button only if more than one participant */}
+            {participants.length > 1 && (
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={() => setShowPodsModal(true)}
+                  className="inline-flex items-center justify-center p-2 rounded-md border border-blue-500 text-blue-500 hover:bg-blue-500 hover:text-white"
+                  aria-label="Generate booster draft pods"
+                >
+                  <GiCardPickup className="w-5 h-5" />
+                </button>
+                <div className="absolute left-1/2 transform -translate-x-1/2 bottom-full mb-2 px-3 py-1 bg-gray-900 text-white text-sm rounded-md opacity-0 group-hover:opacity-100 transition-opacity">
+                  Generate booster draft pods
+                  <div className="absolute left-1/2 transform -translate-x-1/2 top-full -mt-1 border-4 border-transparent border-t-gray-900"></div>
+                </div>
               </div>
             )}
+            <div className="relative group">
+              <Button
+                ref={addParticipantButtonRef}
+                onClick={() => !tournamentStarted && setIsModalOpen(true)}
+                className={`flex items-center gap-2 ${tournamentStarted ? "opacity-50 cursor-not-allowed" : ""}`}
+                style={{ width: "200px" }}
+                outline
+                gradientDuoTone="greenToBlue"
+                disabled={tournamentStarted}
+              >
+                <div className="flex gap-2">
+                  <HiPlus className="w-5 h-5" />
+                  Add Participant
+                </div>
+              </Button>
+              {tournamentStarted && (
+                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+                  Cannot add participants after tournament has started
+                  <div className="absolute left-1/2 -translate-x-1/2 top-full -mt-1 border-4 border-transparent border-t-gray-900"></div>
+                </div>
+              )}
+            </div>
+            <ParticipantFormModal
+              isOpen={isModalOpen}
+              onClose={() => {
+                setIsModalOpen(false);
+                setTimeout(() => {
+                  addParticipantButtonRef.current?.focus();
+                }, 0);
+              }}
+              onSubmit={(name) => {
+                onAddParticipant(name);
+                setIsModalOpen(false);
+                setTimeout(() => {
+                  addParticipantButtonRef.current?.focus();
+                }, 0);
+              }}
+            />
           </div>
-          <ParticipantFormModal
-            isOpen={isModalOpen}
-            onClose={() => {
-              setIsModalOpen(false);
-              // Focus on the Add Participant button after closing the modal
-              setTimeout(() => {
-                addParticipantButtonRef.current?.focus();
-              }, 0);
-            }}
-            onSubmit={(name) => {
-              onAddParticipant(name);
-              // Close the modal after adding a participant
-              setIsModalOpen(false);
-              // Focus on the Add Participant button after closing the modal
-              setTimeout(() => {
-                addParticipantButtonRef.current?.focus();
-              }, 0);
-            }}
-          />
         </div>
         {loading ? (
           <p>Loading participants...</p>
@@ -196,5 +219,12 @@ export default function TournamentTabs({
         </div>
       </Tabs.Item>
     </Tabs>
+    {/* use external pod generation modal */}
+    <PodGenerationModal
+      show={showPodsModal}
+      participants={participants}
+      onClose={() => setShowPodsModal(false)}
+    />
+  </>
   );
 }
