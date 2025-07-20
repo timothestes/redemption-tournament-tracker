@@ -35,15 +35,28 @@ export default function PodGenerationModal({ show, participants, onClose }: PodG
   const handleGenerate = () => {
     const shuffled = [...participants].sort(() => Math.random() - 0.5);
     const total = shuffled.length;
-    const numPods = Math.ceil(total / podSize);
-    const baseSize = Math.floor(total / numPods);
-    const extras = total % numPods;
-    let index = 0;
+    const S = podSize;
+    const fullPods = Math.floor(total / S);
+    const remainder = total - fullPods * S;
     const podsArr: any[][] = [];
-    for (let i = 0; i < numPods; i++) {
-      const size = i < extras ? baseSize + 1 : baseSize;
-      podsArr.push(shuffled.slice(index, index + size));
-      index += size;
+    // create full pods
+    let index = 0;
+    for (let i = 0; i < fullPods; i++) {
+      podsArr.push(shuffled.slice(index, index + S));
+      index += S;
+    }
+    // handle remainders
+    if (remainder > 0) {
+      const leftovers = shuffled.slice(index);
+      if (fullPods > 1) {
+        // distribute leftovers evenly among full pods
+        leftovers.forEach((player, idx) => {
+          podsArr[idx % podsArr.length].push(player);
+        });
+      } else {
+        // single full pod or none: create separate pod of leftovers
+        podsArr.push(leftovers);
+      }
     }
     setPods(podsArr);
   };
