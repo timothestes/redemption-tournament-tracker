@@ -6,7 +6,7 @@ import { HiArrowSmRight, HiDocumentText, HiMenu } from "react-icons/hi";
 import { IoClose } from "react-icons/io5";
 import { FaTrophy, FaBookOpen } from "react-icons/fa6";
 import { PiPencilLineBold } from "react-icons/pi";
-import { TbCardsFilled } from "react-icons/tb";
+import { TbCardsFilled, TbSearch } from "react-icons/tb";
 import Image from "next/image";
 import Link from "next/link";
 import { useTheme } from "next-themes";
@@ -84,6 +84,15 @@ const SideNav: React.FC = () => {
                 className="hover:bg-gray-100/70 dark:hover:bg-gray-700/70 transition-colors duration-200"
               >
                 Deck Check PDF
+              </Sidebar.Item>
+            </Sidebar.ItemGroup>
+            <Sidebar.ItemGroup className="space-y-1">
+              <Sidebar.Item
+                href="/decklist/card-search"
+                icon={TbSearch}
+                className="hover:bg-gray-100/70 dark:hover:bg-gray-700/70 transition-colors duration-200"
+              >
+                Card Search
               </Sidebar.Item>
             </Sidebar.ItemGroup>
             <Sidebar.ItemGroup className="space-y-1">
