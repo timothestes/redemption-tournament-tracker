@@ -530,7 +530,7 @@ export default function CardSearchClient() {
             {/* Clear search button removed as requested */}
           </div>
           <button
-            className="mb-4 px-4 py-2 rounded bg-blue-200 text-blue-900 hover:bg-blue-700 hover:text-white border border-blue-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent transition font-semibold shadow"
+            className="mb-4 px-4 py-2 rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent transition font-semibold shadow"
             onClick={handleResetFilters}
             style={{ minHeight: 48 }}
           >
@@ -603,7 +603,7 @@ export default function CardSearchClient() {
           return (
             <span key={icon} className={pillClass} onClick={() => setSelectedIconFilters(selectedIconFilters.filter(i => i !== icon))} tabIndex={0} role="button" aria-label={`Remove ${icon} filter`}>
               {icon}
-              <span className="ml-1 text-green-900 dark:text-white">×</span>
+              <span className="ml-1 text-gray-700 dark:text-gray-200">×</span>
             </span>
           );
         })}
@@ -725,7 +725,7 @@ export default function CardSearchClient() {
                           'px-3 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
                           selectedTestaments.includes(t)
                             ? 'bg-yellow-200 text-yellow-900 border-yellow-400 dark:bg-yellow-600 dark:text-white dark:border-transparent'
-                            : 'bg-blue-200 text-blue-900 border-blue-300 hover:bg-blue-700 hover:text-white dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                            : 'bg-gray-200 text-gray-900 border-gray-300 hover:bg-gray-400 hover:text-gray-900 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
                         )}
                         onClick={() => setSelectedTestaments(prev => prev.includes(t) ? prev.filter(x=>x!==t) : [...prev,t])}
                       >
@@ -737,7 +737,7 @@ export default function CardSearchClient() {
                         'px-3 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
                         isGospel
                           ? 'bg-yellow-300 text-yellow-900 border-yellow-500 dark:bg-yellow-700 dark:text-white dark:border-transparent'
-                          : 'bg-blue-200 text-blue-900 border-blue-300 hover:bg-blue-700 hover:text-white dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                          : 'bg-gray-200 text-gray-900 border-gray-300 hover:bg-gray-400 hover:text-gray-900 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
                       )}
                       onClick={() => setIsGospel(v => !v)}
                     >
@@ -799,10 +799,10 @@ export default function CardSearchClient() {
                   <div className="flex flex-wrap gap-2">
                     <button
                       className={clsx(
-                        'px-3 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                        'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
                         noAltArt
-                          ? 'bg-gray-200 text-gray-900 border-gray-300 dark:bg-gray-800 dark:text-white dark:border-transparent'
-                          : 'bg-gray-300 text-gray-900 border-gray-400 hover:bg-gray-500 hover:text-white dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600 dark:hover:text-white dark:border-transparent'
+                          ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
+                          : 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
                       )}
                       onClick={() => setnoAltArt(v => !v)}
                     >
@@ -810,10 +810,10 @@ export default function CardSearchClient() {
                     </button>
                     <button
                       className={clsx(
-                        'px-3 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                        'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
                         noFirstPrint
-                          ? 'bg-gray-200 text-gray-900 border-gray-300 dark:bg-gray-800 dark:text-white dark:border-transparent'
-                          : 'bg-gray-300 text-gray-900 border-gray-400 hover:bg-gray-500 hover:text-white dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600 dark:hover:text-white dark:border-transparent'
+                          ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
+                          : 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
                       )}
                       onClick={() => setnoFirstPrint(v => !v)}
                     >
@@ -821,10 +821,10 @@ export default function CardSearchClient() {
                     </button>
                     <button
                       className={clsx(
-                        'px-3 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                        'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
                         nativityOnly
-                          ? 'bg-gray-200 text-gray-900 border-gray-300 dark:bg-gray-800 dark:text-white dark:border-transparent'
-                          : 'bg-gray-300 text-gray-900 border-gray-400 hover:bg-gray-500 hover:text-white dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600 dark:hover:text-white dark:border-transparent'
+                          ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
+                          : 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
                       )}
                       onClick={() => setNativityOnly(v => !v)}
                     >
@@ -832,10 +832,10 @@ export default function CardSearchClient() {
                     </button>
                     <button
                       className={clsx(
-                        'px-3 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                        'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
                         hasStarOnly
-                          ? 'bg-gray-200 text-gray-900 border-gray-300 dark:bg-gray-800 dark:text-white dark:border-transparent'
-                          : 'bg-gray-300 text-gray-900 border-gray-400 hover:bg-gray-500 hover:text-white dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600 dark:hover:text-white dark:border-transparent'
+                          ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
+                          : 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
                       )}
                       onClick={() => setHasStarOnly(v => !v)}
                     >
@@ -843,10 +843,10 @@ export default function CardSearchClient() {
                     </button>
                     <button
                       className={clsx(
-                        'px-3 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                        'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
                         cloudOnly
-                          ? 'bg-gray-200 text-gray-900 border-gray-300 dark:bg-gray-800 dark:text-white dark:border-transparent'
-                          : 'bg-gray-300 text-gray-900 border-gray-400 hover:bg-gray-500 hover:text-white dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600 dark:hover:text-white dark:border-transparent'
+                          ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
+                          : 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
                       )}
                       onClick={() => setCloudOnly(v => !v)}
                     >

@@ -1,7 +1,7 @@
 import React from "react";
 import { Button } from "flowbite-react";
 
-function Attribute({ label, value }: { label: string; value: string }) {
+function Attribute({ label, value }: { label: string; value: string | boolean }) {
   // Prettify testament display if it's an array
   let displayValue = value;
   if (label === 'Testament') {
@@ -18,7 +18,11 @@ function Attribute({ label, value }: { label: string; value: string }) {
     }
   }
   if (label === 'Is Gospel') {
-    displayValue = value === true ? 'Yes' : value === false ? 'No' : '';
+    if (typeof value === 'boolean') {
+      displayValue = value ? 'Yes' : 'No';
+    } else {
+      displayValue = '';
+    }
   }
   return <p className="text-sm text-gray-900 dark:text-white"><strong>{label}:</strong> {displayValue}</p>;
 }
