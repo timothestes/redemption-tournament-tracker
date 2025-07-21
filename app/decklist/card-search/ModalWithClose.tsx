@@ -20,7 +20,7 @@ function Attribute({ label, value }: { label: string; value: string }) {
   if (label === 'Is Gospel') {
     displayValue = value === true ? 'Yes' : value === false ? 'No' : '';
   }
-  return <p className="text-sm"><strong>{label}:</strong> {displayValue}</p>;
+  return <p className="text-sm text-gray-900 dark:text-white"><strong>{label}:</strong> {displayValue}</p>;
 }
 
 function prettifyFieldName(key: string): string {
@@ -63,7 +63,7 @@ export default function ModalWithClose({ modalCard, setModalCard, CARD_IMAGE_BAS
       onClick={() => setModalCard(null)}
     >
       <div
-        className="bg-white dark:bg-gray-900 rounded shadow-lg max-w-2xl w-full max-h-[90vh] overflow-auto relative"
+        className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white rounded shadow-lg max-w-2xl w-full max-h-[90vh] overflow-auto relative"
         onClick={e => e.stopPropagation()}
       >
         {/* X close button */}
