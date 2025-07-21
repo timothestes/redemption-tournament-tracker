@@ -45,11 +45,11 @@ export default function CardSearchClient() {
     "Good Fortress": (c) => c.type === "Fortress" && c.alignment.includes("Good"),
     "Evil Fortress": (c) => c.type === "Fortress" && c.alignment.includes("Evil"),
     // other icons use existing category filters
-    GE: (c) => c.type === "GE",
+    GE: (c) => c.type.includes("GE"),
     "Cross Icon": (c) => c.type === "Hero",
     "Evil Character": (c) => c.type === "Evil Character",
     Site: (c) => c.type === "Site",
-    EE: (c) => c.type === "EE",
+    EE: (c) => c.type.includes("EE"),
     "Territory-Class": (c) => c.class === "Territory",
     "Warrior-Class": (c) => c.class === "Warrior",
     "Weapon-Class": (c) => c.class === "Weapon",
@@ -174,7 +174,7 @@ export default function CardSearchClient() {
   function toggleIconFilter(value: string) {
     setSelectedIconFilters((prev) => {
       const next = prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value];
-      console.log(`Icon filter toggled: ${value}, selectedIconFilters=`, next);
+      console.log(`Icon filter toggled: ${value}, iconFilterMode=${iconFilterMode}, selectedIconFilters=`, next);
       return next;
     });
   }
