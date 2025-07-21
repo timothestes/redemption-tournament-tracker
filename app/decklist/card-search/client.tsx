@@ -516,10 +516,10 @@ export default function CardSearchClient() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
   const currentTheme = theme === 'system' ? resolvedTheme : theme;
-  const mainBg = mounted && currentTheme === 'light' ? 'bg-white text-gray-900' : 'bg-gray-900 text-white';
+  const mainBg = mounted && currentTheme === 'light' ? 'bg-white text-gray-900' : 'bg-gray-800 text-white';
 
   return (
-    <div className={`${mainBg} min-h-screen`}>
+    <div className={`${mainBg} min-h-screen transition-colors duration-200`}>
       <div className="p-2 border-b flex flex-col items-center bg-white dark:bg-gray-900 sticky top-0 z-30">
         <div className="relative w-full max-w-xl px-2 flex flex-row items-center justify-center gap-1">
           <div className="flex-2 relative mb-4">
@@ -672,7 +672,7 @@ export default function CardSearchClient() {
           </span>
         )}
       </div>
-      <main className="p-2 overflow-auto">
+      <main className="p-2 overflow-auto bg-white dark:bg-gray-800 transition-colors duration-200">
         {/* Responsive grid for filters */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-4 items-start bg-gray-50 dark:bg-gray-900 rounded-xl p-4">
           {/* Legality & Alignment */}
