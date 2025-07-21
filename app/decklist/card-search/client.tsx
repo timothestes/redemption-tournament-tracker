@@ -947,7 +947,7 @@ export default function CardSearchClient() {
           </div>
         </div>
         {/* Card grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-12">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
           {visibleCards.map((c) => (
             <div key={c.dataLine} className="cursor-pointer" onClick={() => setModalCard(c)}>
               <img src={`${CARD_IMAGE_BASE_URL}${sanitizeImgFile(c.imgFile)}.jpg`} alt={c.name} className="w-full h-auto rounded shadow" />
