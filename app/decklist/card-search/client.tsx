@@ -24,6 +24,7 @@ interface Card {
   alignment: string;
   legality: string;
   testament: string;
+  isGospel: boolean;
 }
 
 export default function CardSearchClient() {
@@ -40,6 +41,7 @@ export default function CardSearchClient() {
   // Advanced filters
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [selectedTestaments, setSelectedTestaments] = useState<string[]>([]);
+  const [isGospel, setIsGospel] = useState(false);
   const [noAltArt, setnoAltArt] = useState(true);
   const [noFirstPrint, setnoFirstPrint] = useState(true);
   const [nativityOnly, setNativityOnly] = useState(false);
@@ -116,17 +118,40 @@ export default function CardSearchClient() {
         const dataLines = lines.slice(1).filter((l) => l.trim());
         const parsed = dataLines.map((line) => {
           const cols = line.split("\t");
-          // Determine testament from reference text
+          // Enhanced testament and gospel tagging logic
           const reference = cols[12] || "";
-          const refLower = reference.toLowerCase();
-          let testament = "";
-          if (GOSPEL_BOOKS.some((b) => refLower.startsWith(b))) {
-            testament = "Gospel";
-          } else if (NT_BOOKS.some((b) => refLower.startsWith(b))) {
-            testament = "NT";
-          } else if (OT_BOOKS.some((b) => refLower.startsWith(b))) {
-            testament = "OT";
+          let references: string[] = [];
+          for (let refGroup of reference.split(";")) {
+            refGroup = refGroup.trim();
+            if (refGroup.includes("(") && refGroup.includes(")")) {
+              // Extract main reference
+              const mainRef = refGroup.split("(")[0].trim();
+              if (mainRef) references.push(mainRef);
+              // Extract parenthetical references
+              const parenContent = refGroup.substring(refGroup.indexOf("(") + 1, refGroup.indexOf(")"));
+              const parenRefs = parenContent.split(",").map(pr => pr.trim()).filter(Boolean);
+              references.push(...parenRefs);
+            } else {
+              if (refGroup) references.push(refGroup);
+            }
           }
+          // Lowercase all references for matching
+          const referencesLower = references.map(r => r.toLowerCase());
+          // Tagging strategy: collect all matching testaments
+          const foundTestaments = new Set<string>();
+          for (const ref of referencesLower) {
+            if (NT_BOOKS.some(b => ref.startsWith(b.toLowerCase()))) foundTestaments.add('NT');
+            if (OT_BOOKS.some(b => ref.startsWith(b.toLowerCase()))) foundTestaments.add('OT');
+          }
+          let testament: string | string[] = '';
+          if (foundTestaments.size === 1) {
+            testament = Array.from(foundTestaments)[0];
+          } else if (foundTestaments.size > 1) {
+            testament = Array.from(foundTestaments);
+          }
+          // IsGospel: true if any reference starts with a Gospel book name
+          const gospelBooksLower = GOSPEL_BOOKS.map(b => b.toLowerCase());
+          const isGospel = referencesLower.some(ref => gospelBooksLower.some(b => ref.startsWith(b)));
           // Normalize brigade field
           const rawBrigade = cols[5] || "";
           const alignment = cols[14] || "";
@@ -157,6 +182,7 @@ export default function CardSearchClient() {
             alignment: cols[14] || "",
             legality: cols[15] || "",
             testament,
+            isGospel,
           } as Card;
         });
         setCards(parsed);
@@ -250,20 +276,30 @@ export default function CardSearchClient() {
             return c.brigade.toLowerCase().includes(icon.toLowerCase());
           });
         })
-        // Testament filters
+        // Testament filters (no Gospel)
         .filter((c) => {
           if (selectedTestaments.length === 0) return true;
-          return selectedTestaments.includes(c.testament);
+          // Helper to check if testament contains NT or OT
+          const hasTestament = (testament, test) => {
+            if (Array.isArray(testament)) return testament.includes(test);
+            if (typeof testament === 'string') return testament === test || testament.includes(test);
+            return false;
+          };
+          // AND logic: require all selected testaments to be present
+          const allPresent = selectedTestaments.every(test => hasTestament(c.testament, test) || (test === 'OT' && c.identifier && c.identifier.includes('O.T.')));
+          return allPresent;
         })
+        // IsGospel filter
+        .filter((c) => !isGospel || c.isGospel)
         // Misc filters (hide AB Versions, hide 1st Print K/L Starters)
         .filter((c) => !noAltArt || !c.set.includes("AB"))
         .filter((c) => !noFirstPrint || (
           !c.set.includes("K1P") && !c.set.includes("L1P")
         ))
         .filter((c) => !nativityOnly || isNativityReference(c.reference))
-                   .filter((c) => !cloudOnly || c.class.toLowerCase().includes("cloud"))
+        .filter((c) => !cloudOnly || c.class.toLowerCase().includes("cloud"))
         .filter((c) => !hasStarOnly || c.specialAbility.includes("STAR:") || c.specialAbility.includes("(Star)")),
-    [cards, query, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedTestaments, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly]
+    [cards, query, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly]
   );
 
   // Reset visible count when filters change
@@ -279,13 +315,14 @@ export default function CardSearchClient() {
       alignment: selectedAlignmentFilters,
       icons: selectedIconFilters,
       testaments: selectedTestaments,
+      isGospel,
       altArt: noAltArt,
       firstPrint: noFirstPrint,
       nativity: nativityOnly,
       star: hasStarOnly,
       cloud: cloudOnly,
     });
-  }, [query, legalityMode, selectedAlignmentFilters, selectedIconFilters, selectedTestaments, noAltArt, noFirstPrint, nativityOnly, hasStarOnly]);
+  }, [query, legalityMode, selectedAlignmentFilters, selectedIconFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly]);
 
   const visibleCards = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
 
@@ -407,178 +444,203 @@ export default function CardSearchClient() {
 
   return (
     <div>
-      <div className="p-4 border-b">
-        <input
-          type="text"
-          placeholder="Search cards..."
-          className="w-full mb-4 p-2 border rounded"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-      </div>
-      <main className="p-4 overflow-auto">
-        <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Legality</p>
-        {/* Legality mode toggles */}
-        <div className="flex gap-2 mb-4">
-          {['Rotation','Classic','Banned','Scrolls'].map((mode) => (
+      <div className="p-4 border-b flex justify-center">
+        <div className="relative w-full max-w-xl">
+          <input
+            type="text"
+            placeholder="Search cards..."
+            className="w-full mb-4 p-2 pr-10 border rounded"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            maxLength={64}
+          />
+          {query && (
             <button
-              key={mode}
-              className={clsx(
-                'px-3 py-1 border rounded text-sm',
-                legalityMode === mode
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700'
-              )}
-              onClick={() => setLegalityMode(mode as typeof legalityMode)}
+              type="button"
+              className="absolute right-3 top-2 text-gray-400 hover:text-gray-700 dark:hover:text-white text-lg focus:outline-none"
+              aria-label="Clear search"
+              onClick={() => setQuery("")}
             >
-              {mode}
+              ×
             </button>
-          ))}
-        </div>
-        {/* Alignment filters */}
-        <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Alignment</p>
-        <div className="flex gap-2 mb-4">
-          {['Good','Evil','Neutral'].map((mode) => (
-            <button
-              key={mode}
-              className={clsx(
-                'px-3 py-1 border rounded text-sm',
-                selectedAlignmentFilters.includes(mode)
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700'
-              )}
-              onClick={() => toggleAlignmentFilter(mode)}
-            >
-              {mode}
-            </button>
-          ))}
-        </div>
-        {/* Advanced Filters */}
-        <div className="mb-4">
-          <button
-            className="px-2 py-1 border rounded text-sm mb-2"
-            onClick={() => setAdvancedOpen(!advancedOpen)}
-          >
-            Advanced Filters {advancedOpen ? '▲' : '▼'}
-          </button>
-          {advancedOpen && (
-            <div className="p-2 border rounded space-y-2">
-              <p className="font-semibold">Testament</p>
-              <div className="flex gap-2">
-                {['OT','NT','Gospel'].map((t) => (
-                  <button
-                    key={t}
-                    className={clsx('px-2 py-1 border rounded text-sm', selectedTestaments.includes(t) ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700')}
-                    onClick={() => setSelectedTestaments(prev => prev.includes(t) ? prev.filter(x=>x!==t) : [...prev,t])}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-              <p className="font-semibold pt-2">Misc</p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  className={clsx(
-                    'px-2 py-1 border rounded text-sm',
-                    noAltArt ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700'
-                  )}
-                  onClick={() => setnoAltArt(v => !v)}
-                >
-                  No AB Versions
-                </button>
-                <button
-                  className={clsx(
-                    'px-2 py-1 border rounded text-sm',
-                    noFirstPrint ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700'
-                  )}
-                  onClick={() => setnoFirstPrint(v => !v)}
-                >
-                  No 1st Print K/L Starters
-                </button>
-                <button
-                  className={clsx(
-                    'px-2 py-1 border rounded text-sm',
-                    nativityOnly ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700'
-                  )}
-                  onClick={() => setNativityOnly(v => !v)}
-                >
-                  Nativity
-                </button>
-                <button
-                  className={clsx(
-                    'px-2 py-1 border rounded text-sm',
-                    hasStarOnly ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700'
-                  )}
-                  onClick={() => setHasStarOnly(v => !v)}
-                >
-                  Has Star
-                </button>
-                <button
-                  className={clsx(
-                    'px-2 py-1 border rounded text-sm',
-                    cloudOnly ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700'
-                  )}
-                  onClick={() => setCloudOnly(v => !v)}
-                >
-                  Cloud
-                </button>
-              </div>
-            </div>
           )}
         </div>
-        {/* Quick icon filters */}
-        <div className="mb-4">
-          <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Types</p>
-          <div className="flex flex-wrap gap-2">
-            {typeIcons.map((t) => {
-              const src = `/filter-icons/${encodeURIComponent(t)}.png`;
-              return (
-                <img
-                  key={t}
-                  src={src}
-                  alt={t}
+      </div>
+      <main className="p-4 overflow-auto">
+        {/* Responsive grid for filters */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 items-start">
+          {/* Legality & Alignment */}
+          <div>
+            <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Legality</p>
+            <div className="flex gap-2 mb-4 flex-wrap">
+              {['Rotation','Classic','Banned','Scrolls'].map((mode) => (
+                <button
+                  key={mode}
                   className={clsx(
-                    'h-8 w-auto cursor-pointer',
-                    selectedIconFilters.includes(t) && 'ring-2 ring-blue-500'
+                    'px-3 py-1 border rounded text-sm',
+                    legalityMode === mode
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-100 dark:bg-gray-700'
                   )}
-                  onClick={() => toggleIconFilter(t)}
+                  onClick={() => setLegalityMode(mode as typeof legalityMode)}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+            <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Alignment</p>
+            <div className="flex gap-2 mb-4 flex-wrap">
+              {['Good','Evil','Neutral'].map((mode) => (
+                <button
+                  key={mode}
+                  className={clsx(
+                    'px-3 py-1 border rounded text-sm',
+                    selectedAlignmentFilters.includes(mode)
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-100 dark:bg-gray-700'
+                  )}
+                  onClick={() => toggleAlignmentFilter(mode)}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+            {/* Advanced Filters */}
+            <div className="mb-4">
+              <button
+                className="px-2 py-1 border rounded text-sm mb-2"
+                onClick={() => setAdvancedOpen(!advancedOpen)}
+              >
+                Advanced Filters {advancedOpen ? '▲' : '▼'}
+              </button>
+              {advancedOpen && (
+                <div className="p-2 border rounded space-y-2">
+                  <p className="font-semibold">Testament</p>
+                  <div className="flex gap-2 mb-2">
+                    {['OT','NT'].map((t) => (
+                      <button
+                        key={t}
+                        className={clsx('px-2 py-1 border rounded text-sm', selectedTestaments.includes(t) ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700')}
+                        onClick={() => setSelectedTestaments(prev => prev.includes(t) ? prev.filter(x=>x!==t) : [...prev,t])}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                    <button
+                      className={clsx('px-2 py-1 border rounded text-sm', isGospel ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700')}
+                      onClick={() => setIsGospel(v => !v)}
+                    >
+                      Gospel
+                    </button>
+                  </div>
+                  <p className="font-semibold pt-2">Misc</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      className={clsx(
+                        'px-2 py-1 border rounded text-sm',
+                        noAltArt ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700'
+                      )}
+                      onClick={() => setnoAltArt(v => !v)}
+                    >
+                      No AB Versions
+                    </button>
+                    <button
+                      className={clsx(
+                        'px-2 py-1 border rounded text-sm',
+                        noFirstPrint ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700'
+                      )}
+                      onClick={() => setnoFirstPrint(v => !v)}
+                    >
+                      No 1st Print K/L Starters
+                    </button>
+                    <button
+                      className={clsx(
+                        'px-2 py-1 border rounded text-sm',
+                        nativityOnly ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700'
+                      )}
+                      onClick={() => setNativityOnly(v => !v)}
+                    >
+                      Nativity
+                    </button>
+                    <button
+                      className={clsx(
+                        'px-2 py-1 border rounded text-sm',
+                        hasStarOnly ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700'
+                      )}
+                      onClick={() => setHasStarOnly(v => !v)}
+                    >
+                      Has Star
+                    </button>
+                    <button
+                      className={clsx(
+                        'px-2 py-1 border rounded text-sm',
+                        cloudOnly ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700'
+                      )}
+                      onClick={() => setCloudOnly(v => !v)}
+                    >
+                      Cloud
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          {/* Types */}
+          <div>
+            <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Types</p>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {typeIcons.map((t) => {
+                const src = `/filter-icons/${encodeURIComponent(t)}.png`;
+                return (
+                  <img
+                    key={t}
+                    src={src}
+                    alt={t}
+                    className={clsx(
+                      'h-8 w-auto cursor-pointer',
+                      selectedIconFilters.includes(t) && 'ring-2 ring-blue-500'
+                    )}
+                    onClick={() => toggleIconFilter(t)}
+                  />
+                );
+              })}
+            </div>
+          </div>
+          {/* Brigades */}
+          <div>
+            <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Good Brigades</p>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {goodBrigadeIcons.map((icon) => (
+                <img
+                  key={icon}
+                  src={`/filter-icons/Color=${encodeURIComponent(icon)}.png`}
+                  alt={icon}
+                  className={clsx(
+                    "h-8 w-auto cursor-pointer",
+                    selectedIconFilters.includes(icon) && "ring-2 ring-blue-500"
+                  )}
+                  onClick={() => toggleIconFilter(icon)}
                 />
-              );
-            })}
+              ))}
+            </div>
+            <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Evil Brigades</p>
+            <div className="flex flex-wrap gap-2">
+              {evilBrigadeIcons.map((icon) => (
+                <img
+                  key={icon}
+                  src={`/filter-icons/Color=${encodeURIComponent(icon)}.png`}
+                  alt={icon}
+                  className={clsx(
+                    "h-8 w-auto cursor-pointer",
+                    selectedIconFilters.includes(icon) && "ring-2 ring-blue-500"
+                  )}
+                  onClick={() => toggleIconFilter(icon)}
+                />
+              ))}
+            </div>
           </div>
-          {/* Good Brigades */}
-          <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Good Brigades</p>
-          <div className="flex flex-wrap gap-2 mb-2">
-            {goodBrigadeIcons.map((icon) => (
-              <img
-                key={icon}
-                src={`/filter-icons/Color=${encodeURIComponent(icon)}.png`}
-                alt={icon}
-                className={clsx(
-                  "h-8 w-auto cursor-pointer",
-                  selectedIconFilters.includes(icon) && "ring-2 ring-blue-500"
-                )}
-                onClick={() => toggleIconFilter(icon)}
-              />
-            ))}
-          </div>
-          {/* Evil Brigades */}
-          <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Evil Brigades</p>
-          <div className="flex flex-wrap gap-2">
-            {evilBrigadeIcons.map((icon) => (
-              <img
-                key={icon}
-                src={`/filter-icons/Color=${encodeURIComponent(icon)}.png`}
-                alt={icon}
-                className={clsx(
-                  "h-8 w-auto cursor-pointer",
-                  selectedIconFilters.includes(icon) && "ring-2 ring-blue-500"
-                )}
-                onClick={() => toggleIconFilter(icon)}
-              />
-            ))}
-          </div>  
         </div>
+        {/* Card grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
           {visibleCards.map((c) => (
             <div key={c.dataLine} className="cursor-pointer" onClick={() => setModalCard(c)}>
@@ -625,7 +687,22 @@ export default function CardSearchClient() {
 
 // Helper sub-components
 function Attribute({ label, value }: { label: string; value: string }) {
-  return <p className="text-sm"><strong>{label}:</strong> {value}</p>;
+  // Prettify testament display if it's an array
+  let displayValue = value;
+  if (label === 'Testament') {
+    if (Array.isArray(value)) {
+      displayValue = value.join(' and ');
+    }
+    // If someone encoded as a string like 'NTOT', split and join
+    if (typeof value === 'string' && value.length > 2 && (value.includes('NT') || value.includes('OT'))) {
+      // Try to split into NT and OT
+      const parts = [];
+      if (value.includes('NT')) parts.push('NT');
+      if (value.includes('OT')) parts.push('OT');
+      displayValue = parts.join(' and ');
+    }
+  }
+  return <p className="text-sm"><strong>{label}:</strong> {displayValue}</p>;
 }
 
 function prettifyFieldName(key: string): string {
