@@ -199,7 +199,6 @@ export default function CardSearchClient() {
     "Artifact",
     "Covenant",
     "Curse",
-    "Site",
     "Good Fortress",
     "Evil Fortress",
     "Hero",
@@ -208,6 +207,7 @@ export default function CardSearchClient() {
     "EE",
     "Lost Soul",
     "Territory-Class",
+    "Site",
   ];
   const colorIcons = [
     "Black",
@@ -481,41 +481,43 @@ export default function CardSearchClient() {
   }
 
   return (
-    <div>
-      <div className="p-4 border-b flex justify-center">
-        <div className="relative w-full max-w-xl">
+    <div className="bg-gray-900 min-h-screen text-white">
+      <div className="p-2 border-b flex justify-center bg-white dark:bg-gray-900 sticky top-0 z-30">
+        <div className="relative w-full max-w-xl px-2">
           <input
             type="text"
             placeholder="Search cards..."
-            className="w-full mb-4 p-2 pr-10 border rounded"
+            className="w-full mb-4 p-3 pr-12 border rounded text-base focus:ring-2 focus:ring-blue-400 dark:text-white dark:bg-gray-800"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             maxLength={64}
+            style={{ minHeight: 48 }}
           />
           {query && (
             <button
               type="button"
-              className="absolute right-3 top-2 text-gray-400 hover:text-gray-700 dark:hover:text-white text-lg focus:outline-none"
+              className="absolute right-4 top-3 text-gray-400 hover:text-gray-700 dark:text-white text-xl focus:outline-none"
               aria-label="Clear search"
               onClick={() => setQuery("")}
+              style={{ minWidth: 32, minHeight: 32 }}
             >
               ×
             </button>
           )}
         </div>
       </div>
-      <main className="p-4 overflow-auto">
+      <main className="p-2 overflow-auto">
         {/* Responsive grid for filters */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 items-start">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-4 items-start">
           {/* Legality & Alignment */}
           <div>
             <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Legality</p>
-            <div className="flex gap-2 mb-4 flex-wrap">
+            <div className="flex flex-col sm:flex-row gap-2 mb-4 flex-wrap">
               {['Rotation','Classic','Banned','Scrolls'].map((mode) => (
                 <button
                   key={mode}
                   className={clsx(
-                    'px-3 py-1 border rounded text-sm',
+                    'px-4 py-2 border rounded text-base',
                     legalityMode === mode
                       ? 'bg-blue-500 text-white'
                       : 'bg-gray-100 dark:bg-gray-700'
@@ -527,12 +529,12 @@ export default function CardSearchClient() {
               ))}
             </div>
             <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Alignment</p>
-            <div className="flex gap-2 mb-4 flex-wrap">
+            <div className="flex flex-col sm:flex-row gap-2 mb-4 flex-wrap">
               {['Good','Evil','Neutral'].map((mode) => (
                 <button
                   key={mode}
                   className={clsx(
-                    'px-3 py-1 border rounded text-sm',
+                    'px-4 py-2 border rounded text-base',
                     selectedAlignmentFilters.includes(mode)
                       ? 'bg-blue-500 text-white'
                       : 'bg-gray-100 dark:bg-gray-700'
@@ -546,7 +548,7 @@ export default function CardSearchClient() {
             {/* Advanced Filters */}
             <div className="mb-4">
               <button
-                className="px-2 py-1 border rounded text-sm mb-2"
+                className="px-3 py-2 border rounded text-base mb-2"
                 onClick={() => setAdvancedOpen(!advancedOpen)}
               >
                 Advanced Filters {advancedOpen ? '▲' : '▼'}
@@ -554,18 +556,18 @@ export default function CardSearchClient() {
               {advancedOpen && (
                 <div className="p-2 border rounded space-y-2">
                   <p className="font-semibold">Testament</p>
-                  <div className="flex gap-2 mb-2">
+                  <div className="flex flex-col sm:flex-row gap-2 mb-2">
                     {['OT','NT'].map((t) => (
                       <button
                         key={t}
-                        className={clsx('px-2 py-1 border rounded text-sm', selectedTestaments.includes(t) ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700')}
+                        className={clsx('px-3 py-2 border rounded text-base', selectedTestaments.includes(t) ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700')}
                         onClick={() => setSelectedTestaments(prev => prev.includes(t) ? prev.filter(x=>x!==t) : [...prev,t])}
                       >
                         {t}
                       </button>
                     ))}
                     <button
-                      className={clsx('px-2 py-1 border rounded text-sm', isGospel ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700')}
+                      className={clsx('px-3 py-2 border rounded text-base', isGospel ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700')}
                       onClick={() => setIsGospel(v => !v)}
                     >
                       Gospel
@@ -575,7 +577,7 @@ export default function CardSearchClient() {
                   <div className="flex flex-wrap gap-2">
                     <button
                       className={clsx(
-                        'px-2 py-1 border rounded text-sm',
+                        'px-3 py-2 border rounded text-base',
                         noAltArt ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700'
                       )}
                       onClick={() => setnoAltArt(v => !v)}
@@ -584,7 +586,7 @@ export default function CardSearchClient() {
                     </button>
                     <button
                       className={clsx(
-                        'px-2 py-1 border rounded text-sm',
+                        'px-3 py-2 border rounded text-base',
                         noFirstPrint ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700'
                       )}
                       onClick={() => setnoFirstPrint(v => !v)}
@@ -593,7 +595,7 @@ export default function CardSearchClient() {
                     </button>
                     <button
                       className={clsx(
-                        'px-2 py-1 border rounded text-sm',
+                        'px-3 py-2 border rounded text-base',
                         nativityOnly ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700'
                       )}
                       onClick={() => setNativityOnly(v => !v)}
@@ -602,7 +604,7 @@ export default function CardSearchClient() {
                     </button>
                     <button
                       className={clsx(
-                        'px-2 py-1 border rounded text-sm',
+                        'px-3 py-2 border rounded text-base',
                         hasStarOnly ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700'
                       )}
                       onClick={() => setHasStarOnly(v => !v)}
@@ -611,7 +613,7 @@ export default function CardSearchClient() {
                     </button>
                     <button
                       className={clsx(
-                        'px-2 py-1 border rounded text-sm',
+                        'px-3 py-2 border rounded text-base',
                         cloudOnly ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700'
                       )}
                       onClick={() => setCloudOnly(v => !v)}
@@ -626,7 +628,7 @@ export default function CardSearchClient() {
           {/* Types */}
           <div>
             <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Types</p>
-            <div className="flex flex-wrap gap-2 mb-4">
+            <div className="flex flex-wrap gap-2 mb-4 justify-start">
               {typeIcons.map((t) => {
                 const src = `/filter-icons/${encodeURIComponent(t)}.png`;
                 return (
@@ -635,10 +637,11 @@ export default function CardSearchClient() {
                     src={src}
                     alt={t}
                     className={clsx(
-                      'h-8 w-auto cursor-pointer',
+                      'h-10 w-10 sm:h-8 sm:w-auto cursor-pointer',
                       selectedIconFilters.includes(t) && 'ring-2 ring-blue-500'
                     )}
                     onClick={() => toggleIconFilter(t)}
+                    style={{ minWidth: 40, minHeight: 40 }}
                   />
                 );
               })}
@@ -647,32 +650,34 @@ export default function CardSearchClient() {
           {/* Brigades */}
           <div>
             <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Good Brigades</p>
-            <div className="flex flex-wrap gap-2 mb-2">
+            <div className="flex flex-wrap gap-2 mb-2 justify-start">
               {goodBrigadeIcons.map((icon) => (
                 <img
                   key={icon}
                   src={`/filter-icons/Color=${encodeURIComponent(icon)}.png`}
                   alt={icon}
                   className={clsx(
-                    "h-8 w-auto cursor-pointer",
+                    "h-10 w-10 sm:h-8 sm:w-auto cursor-pointer",
                     selectedIconFilters.includes(icon) && "ring-2 ring-blue-500"
                   )}
                   onClick={() => toggleIconFilter(icon)}
+                  style={{ minWidth: 40, minHeight: 40 }}
                 />
               ))}
             </div>
             <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Evil Brigades</p>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 justify-start">
               {evilBrigadeIcons.map((icon) => (
                 <img
                   key={icon}
                   src={`/filter-icons/Color=${encodeURIComponent(icon)}.png`}
                   alt={icon}
                   className={clsx(
-                    "h-8 w-auto cursor-pointer",
+                    "h-10 w-10 sm:h-8 sm:w-auto cursor-pointer",
                     selectedIconFilters.includes(icon) && "ring-2 ring-blue-500"
                   )}
                   onClick={() => toggleIconFilter(icon)}
+                  style={{ minWidth: 40, minHeight: 40 }}
                 />
               ))}
             </div>
