@@ -369,47 +369,11 @@ export default function CardSearchClient() {
   }, [query, legalityMode, selectedAlignmentFilters, selectedIconFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly]);
 
 
-  function getTypeRank(card) {
-    // Dominant: type includes 'Dominant'
-    if (card.type && card.type.includes("Dominant")) return 0;
-    // Artifact: type === 'Artifact'
-    if (card.type === "Artifact") return 1;
-    // Covenant: type === 'Covenant'
-    if (card.type === "Covenant") return 2;
-    // Curse: type === 'Curse'
-    if (card.type === "Curse") return 3;
-    // Site: type === 'Site'
-    if (card.type === "Site") return 4;
-    // Fortress: type includes 'Fortress'
-    if (card.type && card.type.includes("Fortress")) return 5;
-    // Lost Soul: type includes 'Lost Soul'
-    if (card.type && card.type.includes("Lost Soul")) return 6;
-    // Hero: type includes 'Hero'
-    if (card.type && card.type.includes("Hero")) return 7;
-    // Evil Character: type includes 'Evil Character'
-    if (card.type && card.type.includes("Evil Character")) return 8;
-    // GE: type includes 'GE'
-    if (card.type && card.type.includes("GE")) return 9;
-    // EE: type includes 'EE'
-    if (card.type && card.type.includes("EE")) return 10;
-    // Everything else
-    return 11;
-  }
 
   const visibleCards = useMemo(() => {
     return filtered
       .slice(0, visibleCount)
-      .sort((a, b) => {
-        const rankA = getTypeRank(a);
-        const rankB = getTypeRank(b);
-        if (rankA !== rankB) return rankA - rankB;
-        // Secondary sort: brigade color (alphabetical)
-        const brigadeA = a.brigade ? a.brigade.split("/")[0] : "";
-        const brigadeB = b.brigade ? b.brigade.split("/")[0] : "";
-        if (brigadeA !== brigadeB) return brigadeA.localeCompare(brigadeB);
-        // Tertiary sort: name
-        return a.name.localeCompare(b.name);
-      });
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [filtered, visibleCount]);
 
   // Infinite scroll effect
@@ -557,31 +521,21 @@ export default function CardSearchClient() {
   return (
     <div className={`${mainBg} min-h-screen`}>
       <div className="p-2 border-b flex flex-col items-center bg-white dark:bg-gray-900 sticky top-0 z-30">
-        <div className="relative w-full max-w-xl px-2 flex items-center gap-2">
-          <div className="flex-1 relative mb-4">
+        <div className="relative w-full max-w-xl px-2 flex flex-row items-center justify-center gap-1">
+          <div className="flex-2 relative mb-4">
             <input
               type="text"
               placeholder="Search cards..."
-              className="w-full p-3 pr-10 border rounded text-base focus:ring-2 focus:ring-blue-400 dark:text-white dark:bg-gray-800"
+              className="w-full p-3 pr-10 border rounded text-base focus:ring-2 focus:ring-blue-400 text-gray-900 bg-white dark:text-white dark:bg-gray-800"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               maxLength={64}
               style={{ minHeight: 48, maxWidth: 320 }}
             />
-            {query && (
-              <button
-                type="button"
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-700 dark:text-white text-xl focus:outline-none"
-                aria-label="Clear search"
-                onClick={() => setQuery("")}
-                style={{ minWidth: 32, minHeight: 32 }}
-              >
-                ×
-              </button>
-            )}
+            {/* Clear search button removed as requested */}
           </div>
           <button
-            className="mb-4 px-4 py-2 rounded bg-gray-200 text-gray-900 hover:bg-blue-100 hover:text-blue-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white transition font-semibold shadow"
+            className="mb-4 px-4 py-2 rounded bg-gray-200 text-gray-900 hover:bg-blue-100 hover:text-blue-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent transition font-semibold shadow"
             onClick={handleResetFilters}
             style={{ minHeight: 48 }}
           >
@@ -590,12 +544,18 @@ export default function CardSearchClient() {
         </div>
       </div>
       {/* Active Filters Summary Bar */}
-      <div className="w-full px-4 py-2 flex flex-wrap gap-2 items-center justify-center min-h-[44px] transition-all duration-300 sticky top-[64px] z-30 bg-white bg-opacity-95 dark:bg-gray-900 dark:bg-opacity-95 text-gray-900 dark:text-white">
+      <div className="w-full px-4 py-2 flex flex-wrap gap-2 items-center justify-center min-h-[44px] transition-all duration-300 sticky top-[64px] z-30 bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
         {/* Query */}
         {query && (
-          <span className="bg-blue-200 text-blue-900 dark:bg-blue-800 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1">
+          <span
+            className="bg-blue-200 text-blue-900 dark:bg-blue-800 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer"
+            onClick={() => setQuery("")}
+            tabIndex={0}
+            role="button"
+            aria-label="Remove Search filter"
+          >
             Search: "{query}"
-            <span className="ml-1 text-blue-900 dark:text-white cursor-pointer" onClick={() => setQuery("")}>×</span>
+            <span className="ml-1 text-blue-900 dark:text-white">×</span>
           </span>
         )}
         {/* Legality */}
@@ -607,9 +567,16 @@ export default function CardSearchClient() {
         )}
         {/* Alignment */}
         {selectedAlignmentFilters.map(mode => (
-          <span key={mode} className="bg-purple-200 text-purple-900 dark:bg-purple-700 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setSelectedAlignmentFilters(selectedAlignmentFilters.filter(m => m !== mode))} tabIndex={0} role="button" aria-label={`Remove ${mode} alignment filter`}>
+          <span
+            key={mode}
+            className="bg-blue-100 text-blue-900 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer border border-blue-300 shadow-sm"
+            onClick={() => setSelectedAlignmentFilters(selectedAlignmentFilters.filter(m => m !== mode))}
+            tabIndex={0}
+            role="button"
+            aria-label={`Remove ${mode} alignment filter`}
+          >
             {mode}
-            <span className="ml-1 text-purple-900 dark:text-white">×</span>
+            <span className="ml-1 text-blue-900">×</span>
           </span>
         ))}
         {/* Icon Filters */}
@@ -716,10 +683,10 @@ export default function CardSearchClient() {
                 <button
                   key={mode}
                   className={clsx(
-                    'px-4 py-2 border rounded text-base font-semibold shadow',
+                    'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
                     legalityMode === mode
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-200 text-gray-900 hover:bg-blue-100 hover:text-blue-900 border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white'
+                      ? 'bg-blue-100 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
+                      : 'bg-gray-200 text-gray-900 hover:bg-blue-100 hover:text-blue-900 border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
                   )}
                   onClick={() => setLegalityMode(mode as typeof legalityMode)}
                 >
@@ -733,10 +700,10 @@ export default function CardSearchClient() {
                 <button
                   key={mode}
                   className={clsx(
-                    'px-4 py-2 border rounded text-base font-semibold shadow',
+                    'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
                     selectedAlignmentFilters.includes(mode)
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-200 text-gray-900 hover:bg-blue-100 hover:text-blue-900 border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white'
+                      ? 'bg-blue-100 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
+                      : 'bg-gray-200 text-gray-900 hover:bg-blue-100 hover:text-blue-900 border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
                   )}
                   onClick={() => toggleAlignmentFilter(mode)}
                 >
@@ -747,26 +714,36 @@ export default function CardSearchClient() {
             {/* Advanced Filters */}
             <div className="mb-4">
               <button
-                className="px-3 py-2 border rounded text-base mb-2 bg-gray-200 text-gray-900 hover:bg-blue-100 hover:text-blue-900 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white font-semibold shadow"
+                className="px-3 py-2 border rounded text-base mb-2 bg-gray-200 text-gray-900 hover:bg-blue-100 hover:text-blue-900 dark:bg-gray-800 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white font-semibold shadow"
                 onClick={() => setAdvancedOpen(!advancedOpen)}
               >
                 Advanced Filters {advancedOpen ? '▲' : '▼'}
               </button>
               {advancedOpen && (
                 <div className="p-2 border rounded space-y-2">
-                  <p className="font-semibold">Testament</p>
+                  <p className="font-bold text-lg text-gray-900 dark:text-white rounded px-2 py-1 inline-block shadow-none">Testament</p>
                   <div className="flex flex-col sm:flex-row gap-2 mb-2">
                     {['OT','NT'].map((t) => (
                       <button
                         key={t}
-                        className={clsx('px-3 py-2 border rounded text-base font-semibold shadow', selectedTestaments.includes(t) ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-900 hover:bg-blue-100 hover:text-blue-900 border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white')}
+                        className={clsx(
+                          'px-3 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                          selectedTestaments.includes(t)
+                            ? 'bg-yellow-200 text-yellow-900 border-yellow-400 dark:bg-yellow-600 dark:text-white dark:border-transparent'
+                            : 'bg-gray-100 text-gray-900 border-gray-300 hover:bg-yellow-100 hover:text-yellow-900 dark:bg-gray-700 dark:text-white dark:hover:bg-yellow-700 dark:hover:text-white dark:border-transparent'
+                        )}
                         onClick={() => setSelectedTestaments(prev => prev.includes(t) ? prev.filter(x=>x!==t) : [...prev,t])}
                       >
                         {t}
                       </button>
                     ))}
                     <button
-                      className={clsx('px-3 py-2 border rounded text-base font-semibold shadow', isGospel ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-900 hover:bg-blue-100 hover:text-blue-900 border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white')}
+                      className={clsx(
+                        'px-3 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                        isGospel
+                          ? 'bg-yellow-300 text-yellow-900 border-yellow-500 dark:bg-yellow-700 dark:text-white dark:border-transparent'
+                          : 'bg-gray-100 text-gray-900 border-gray-300 hover:bg-yellow-200 hover:text-yellow-900 dark:bg-gray-700 dark:text-white dark:hover:bg-yellow-800 dark:hover:text-white dark:border-transparent'
+                      )}
                       onClick={() => setIsGospel(v => !v)}
                     >
                       Gospel
@@ -775,11 +752,11 @@ export default function CardSearchClient() {
                   {/* Strength and Toughness Filters - Toughness now under Strength */}
                   <div className="flex flex-col gap-4 mb-2 items-start">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold">Strength</span>
+                      <span className="font-bold text-lg text-gray-900 dark:text-white rounded px-2 py-1 inline-block shadow-none">Strength</span>
                       <select
                         value={strengthOp}
                         onChange={e => setStrengthOp(e.target.value)}
-                        className="border rounded px-2 py-1 bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white"
+                        className="border rounded px-2 py-1 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-gray-400 dark:bg-gray-700 dark:text-white dark:border-gray-600"
                       >
                         <option value="lt">&lt;</option>
                         <option value="lte">&le;</option>
@@ -790,7 +767,7 @@ export default function CardSearchClient() {
                       <select
                         value={strengthFilter === null ? '' : strengthFilter}
                         onChange={e => setStrengthFilter(e.target.value === '' ? null : Number(e.target.value))}
-                        className="border rounded px-2 py-1 bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white"
+                        className="border rounded px-2 py-1 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-gray-400 dark:bg-gray-700 dark:text-white dark:border-gray-600"
                       >
                         <option value="">Any</option>
                         {[...Array(14).keys()].map(n => (
@@ -799,11 +776,11 @@ export default function CardSearchClient() {
                       </select>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold">Toughness</span>
+                      <span className="font-bold text-lg text-gray-900 dark:text-white rounded px-2 py-1 inline-block shadow-none">Toughness</span>
                       <select
                         value={toughnessOp}
                         onChange={e => setToughnessOp(e.target.value)}
-                        className="border rounded px-2 py-1 bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white"
+                        className="border rounded px-2 py-1 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-gray-400 dark:bg-gray-700 dark:text-white dark:border-gray-600"
                       >
                         <option value="lt">&lt;</option>
                         <option value="lte">&le;</option>
@@ -814,7 +791,7 @@ export default function CardSearchClient() {
                       <select
                         value={toughnessFilter === null ? '' : toughnessFilter}
                         onChange={e => setToughnessFilter(e.target.value === '' ? null : Number(e.target.value))}
-                        className="border rounded px-2 py-1 bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white"
+                        className="border rounded px-2 py-1 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-gray-400 dark:bg-gray-700 dark:text-white dark:border-gray-600"
                       >
                         <option value="">Any</option>
                         {[...Array(14).keys()].map(n => (
@@ -823,12 +800,14 @@ export default function CardSearchClient() {
                       </select>
                     </div>
                   </div>
-                  <p className="font-semibold pt-2">Misc</p>
+                  <p className="font-bold text-lg rounded px-2 py-1 inline-block shadow-none mt-2 text-gray-900 dark:text-white">Misc</p>
                   <div className="flex flex-wrap gap-2">
                     <button
                       className={clsx(
-                        'px-3 py-2 border rounded text-base',
-                        noAltArt ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700'
+                        'px-3 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                        noAltArt
+                          ? 'bg-blue-100 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
+                          : 'bg-gray-200 text-gray-900 border-gray-300 hover:bg-blue-100 hover:text-blue-900 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
                       )}
                       onClick={() => setnoAltArt(v => !v)}
                     >
@@ -836,8 +815,10 @@ export default function CardSearchClient() {
                     </button>
                     <button
                       className={clsx(
-                        'px-3 py-2 border rounded text-base',
-                        noFirstPrint ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700'
+                        'px-3 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                        noFirstPrint
+                          ? 'bg-blue-100 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
+                          : 'bg-gray-200 text-gray-900 border-gray-300 hover:bg-blue-100 hover:text-blue-900 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
                       )}
                       onClick={() => setnoFirstPrint(v => !v)}
                     >
@@ -845,8 +826,10 @@ export default function CardSearchClient() {
                     </button>
                     <button
                       className={clsx(
-                        'px-3 py-2 border rounded text-base',
-                        nativityOnly ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700'
+                        'px-3 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                        nativityOnly
+                          ? 'bg-blue-100 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
+                          : 'bg-gray-100 text-gray-900 border-gray-300 hover:bg-blue-100 hover:text-blue-900 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
                       )}
                       onClick={() => setNativityOnly(v => !v)}
                     >
@@ -854,8 +837,10 @@ export default function CardSearchClient() {
                     </button>
                     <button
                       className={clsx(
-                        'px-3 py-2 border rounded text-base',
-                        hasStarOnly ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700'
+                        'px-3 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                        hasStarOnly
+                          ? 'bg-blue-100 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
+                          : 'bg-gray-100 text-gray-900 border-gray-300 hover:bg-blue-100 hover:text-blue-900 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
                       )}
                       onClick={() => setHasStarOnly(v => !v)}
                     >
@@ -863,8 +848,10 @@ export default function CardSearchClient() {
                     </button>
                     <button
                       className={clsx(
-                        'px-3 py-2 border rounded text-base',
-                        cloudOnly ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700'
+                        'px-3 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                        cloudOnly
+                          ? 'bg-blue-100 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
+                          : 'bg-gray-100 text-gray-900 border-gray-300 hover:bg-blue-100 hover:text-blue-900 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
                       )}
                       onClick={() => setCloudOnly(v => !v)}
                     >
@@ -888,7 +875,7 @@ export default function CardSearchClient() {
                     alt={t}
                     className={clsx(
                       'h-10 w-10 sm:h-8 sm:w-auto cursor-pointer',
-                      selectedIconFilters.includes(t) && 'ring-2 ring-blue-500'
+                      selectedIconFilters.includes(t) && 'ring-2 ring-blue-500 dark:ring-blue-300'
                     )}
                     onClick={() => toggleIconFilter(t)}
                     style={{ minWidth: 40, minHeight: 40 }}
@@ -908,7 +895,7 @@ export default function CardSearchClient() {
                   alt={icon}
                   className={clsx(
                     "h-10 w-10 sm:h-8 sm:w-auto cursor-pointer",
-                    selectedIconFilters.includes(icon) && "ring-2 ring-blue-500"
+                    selectedIconFilters.includes(icon) && "ring-2 ring-blue-500 dark:ring-blue-300"
                   )}
                   onClick={() => toggleIconFilter(icon)}
                   style={{ minWidth: 40, minHeight: 40 }}
@@ -924,7 +911,7 @@ export default function CardSearchClient() {
                   alt={icon}
                   className={clsx(
                     "h-10 w-10 sm:h-8 sm:w-auto cursor-pointer",
-                    selectedIconFilters.includes(icon) && "ring-2 ring-blue-500"
+                    selectedIconFilters.includes(icon) && "ring-2 ring-blue-500 dark:ring-blue-300"
                   )}
                   onClick={() => toggleIconFilter(icon)}
                   style={{ minWidth: 40, minHeight: 40 }}
