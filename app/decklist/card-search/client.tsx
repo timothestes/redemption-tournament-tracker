@@ -81,6 +81,8 @@ export default function CardSearchClient() {
   // Define how each icon filter should be applied
   const iconPredicates: Record<string, (c: Card) => boolean> = {
     Artifact: (c) => c.type === "Artifact",
+    Covenant: (c) => c.type === "Covenant",
+    Curse: (c) => c.type === "Curse",
     "Good Dominant": (c) => c.type.includes("Dominant") && c.alignment.includes("Good"),
     "Evil Dominant": (c) => c.type.includes("Dominant") && c.alignment.includes("Evil"),
     "Good Fortress": (c) => c.type.includes("Fortress") && c.alignment.includes("Good"),
@@ -195,6 +197,8 @@ export default function CardSearchClient() {
     "Good Dominant",
     "Evil Dominant",
     "Artifact",
+    "Covenant",
+    "Curse",
     "Site",
     "Good Fortress",
     "Evil Fortress",
@@ -324,7 +328,41 @@ export default function CardSearchClient() {
     });
   }, [query, legalityMode, selectedAlignmentFilters, selectedIconFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly]);
 
-  const visibleCards = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+
+  function getTypeRank(card) {
+    // Dominant: type includes 'Dominant'
+    if (card.type && card.type.includes("Dominant")) return 0;
+    // Artifact: type === 'Artifact'
+    if (card.type === "Artifact") return 1;
+    // Site: type === 'Site'
+    if (card.type === "Site") return 2;
+    // Fortress: type includes 'Fortress'
+    if (card.type && card.type.includes("Fortress")) return 3;
+    // Hero: type includes 'Hero'
+    if (card.type && card.type.includes("Hero")) return 4;
+    // Evil Character: type includes 'Evil Character'
+    if (card.type && card.type.includes("Evil Character")) return 5;
+    // GE: type includes 'GE'
+    if (card.type && card.type.includes("GE")) return 6;
+    // EE: type includes 'EE'
+    if (card.type && card.type.includes("EE")) return 7;
+    // Lost Soul: type includes 'Lost Soul'
+    if (card.type && card.type.includes("Lost Soul")) return 8;
+    // Everything else
+    return 9;
+  }
+
+  const visibleCards = useMemo(() => {
+    return filtered
+      .slice(0, visibleCount)
+      .sort((a, b) => {
+        const rankA = getTypeRank(a);
+        const rankB = getTypeRank(b);
+        if (rankA !== rankB) return rankA - rankB;
+        // If same rank, sort alphabetically by name
+        return a.name.localeCompare(b.name);
+      });
+  }, [filtered, visibleCount]);
 
   // Infinite scroll effect
   useEffect(() => {
