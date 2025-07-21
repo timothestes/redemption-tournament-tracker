@@ -45,11 +45,11 @@ export default function CardSearchClient() {
     "Good Fortress": (c) => c.type === "Fortress" && c.alignment.includes("Good"),
     "Evil Fortress": (c) => c.type === "Fortress" && c.alignment.includes("Evil"),
     // other icons use existing category filters
-    Bible: (c) => c.type === "GE",
+    GE: (c) => c.type === "GE",
     "Cross Icon": (c) => c.type === "Hero",
     "Evil Character": (c) => c.type === "Evil Character",
     Site: (c) => c.type === "Site",
-    Skull: (c) => c.type === "EE",
+    EE: (c) => c.type === "EE",
     "Territory-Class": (c) => c.class === "Territory",
     "Warrior-Class": (c) => c.class === "Warrior",
     "Weapon-Class": (c) => c.class === "Weapon",
@@ -106,8 +106,8 @@ export default function CardSearchClient() {
     "Evil Fortress",
     "Cross Icon",  // Hero icon
     "Evil Character",
-    "Bible",
-    "Skull"
+    "GE",
+    "EE"
   ];
   const colorIcons = ["Black","Blue","Brown","Clay","Crimson","Gold","Gray","Green","Orange","Pale Green","Purple","Silver","White"];
 
