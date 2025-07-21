@@ -16,6 +16,12 @@ export default async function Index() {
             <h2 className="font-medium text-2xl mb-4 text-center text-gray-800 dark:text-white">New Here?</h2>
             <div className="flex flex-col gap-4 items-center">
               <Link 
+                href="/decklist/card-search"
+                className="text-lg hover:underline text-blue-600 dark:text-blue-400 font-medium transition-all duration-200 hover:text-blue-800 dark:hover:text-blue-300"
+              >
+                Search for Redemption cards
+              </Link>
+              <Link 
                 href="/decklist/generate"
                 className="text-lg hover:underline text-blue-600 dark:text-blue-400 font-medium transition-all duration-200 hover:text-blue-800 dark:hover:text-blue-300"
               >
