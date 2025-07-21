@@ -372,7 +372,7 @@ export default function CardSearchClient() {
         .filter((c) => !nativityOnly || isNativityReference(c.reference))
         .filter((c) => !cloudOnly || c.class.toLowerCase().includes("cloud"))
         .filter((c) => !hasStarOnly || c.specialAbility.includes("STAR:") || c.specialAbility.includes("(Star)")),
-    [cards, query, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, strengthFilter, strengthOp, toughnessFilter, toughnessOp, iconFilterMode]
+    [cards, query, searchField, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, strengthFilter, strengthOp, toughnessFilter, toughnessOp, iconFilterMode]
   );
 
   // Reset visible count when filters change or icon filter mode changes
