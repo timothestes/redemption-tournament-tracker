@@ -86,31 +86,6 @@ export default function ModalWithClose({ modalCard, setModalCard, CARD_IMAGE_BAS
               alt={modalCard.name}
               className="w-full max-w-lg h-auto max-h-[500px] object-contain mx-auto rounded shadow-lg"
             />
-            {/* Copy icon */}
-            <button
-              className="absolute top-2 right-2 bg-transparent p-1 rounded hover:bg-gray-200/50"
-              style={{ zIndex: 20 }}
-              title="Copy image to clipboard"
-              onClick={async () => {
-                try {
-                  const imgUrl = `${CARD_IMAGE_BASE_URL}${sanitizeImgFile(modalCard.imgFile)}.jpg`;
-                  const response = await fetch(imgUrl);
-                  const blob = await response.blob();
-                  await navigator.clipboard.write([
-                    new window.ClipboardItem({ [blob.type]: blob })
-                  ]);
-                  alert("Image copied to clipboard!");
-                } catch (err) {
-                  alert("Failed to copy image.");
-                }
-              }}
-            >
-              {/* SVG copy icon, transparent */}
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500 opacity-70 hover:opacity-100">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <rect x="3" y="3" width="13" height="13" rx="2" ry="2"></rect>
-              </svg>
-            </button>
           </div>
           <div className="mt-4 space-y-1 w-full">
             {Object.entries(modalCard)

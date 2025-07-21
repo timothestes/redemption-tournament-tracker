@@ -87,8 +87,8 @@ export default function CardSearchClient() {
     Artifact: (c) => c.type === "Artifact",
     Covenant: (c) => c.type === "Covenant",
     Curse: (c) => c.type === "Curse",
-    "Good Dominant": (c) => c.type.includes("Dominant") && c.alignment.includes("Good"),
-    "Evil Dominant": (c) => c.type.includes("Dominant") && c.alignment.includes("Evil"),
+    "Good Dominant": (c) => c.type.includes("Dominant") && (c.alignment.includes("Good") || c.alignment.includes("Neutral")),
+    "Evil Dominant": (c) => c.type.includes("Dominant") && (c.alignment.includes("Evil") || c.alignment.includes("Neutral")),
     "Good Fortress": (c) => c.type.includes("Fortress") && c.alignment.includes("Good"),
     "Evil Fortress": (c) => c.type.includes("Fortress") && c.alignment.includes("Evil"),
     // other icons use existing category filters
@@ -220,6 +220,7 @@ export default function CardSearchClient() {
     "Lost Soul",
     "Territory-Class",
     "Site",
+    "City",
   ];
   const colorIcons = [
     "Black",
@@ -515,13 +516,13 @@ export default function CardSearchClient() {
   // ...existing code...
   return (
     <div className="bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white min-h-screen transition-colors duration-200">
-      <div className="p-2 flex flex-col items-center sticky top-0 z-30 bg-white text-gray-900 border-b border-gray-200 shadow-sm dark:bg-[#181A20] dark:text-white dark:border-zinc-800 dark:shadow-lg">
+      <div className="p-2 flex flex-col items-center sticky top-0 z-30 bg-white text-gray-900 border-b border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-800 dark:shadow-lg">
         <div className="relative w-full max-w-xl px-2 flex flex-row items-center justify-center gap-1">
           <div className="flex-2 relative mb-4">
             <input
               type="text"
-              placeholder="Search cards..."
-              className="w-full p-3 pr-10 border rounded text-base focus:ring-2 focus:ring-blue-400 text-gray-900 bg-white dark:text-white dark:bg-gray-800"
+              placeholder="Search Redemption Cards..."
+              className="w-full p-3 pr-10 border rounded text-base focus:ring-2 focus:ring-blue-400 text-gray-900 bg-white dark:text-white dark:bg-gray-900"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               maxLength={64}
@@ -530,7 +531,7 @@ export default function CardSearchClient() {
             {/* Clear search button removed as requested */}
           </div>
           <button
-            className="mb-4 px-4 py-2 rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent transition font-semibold shadow"
+            className="mb-4 px-4 py-2 rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-900 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent transition font-semibold shadow"
             onClick={handleResetFilters}
             style={{ minHeight: 48 }}
           >
@@ -539,7 +540,7 @@ export default function CardSearchClient() {
         </div>
       </div>
       {/* Active Filters Summary Bar */}
-      <div className="w-full px-4 py-2 flex flex-wrap gap-2 items-center justify-center min-h-[44px] transition-all duration-300 sticky top-[64px] z-30 bg-white text-gray-900 border-b border-gray-200 shadow-sm dark:bg-[#23262F] dark:text-white dark:border-zinc-800 dark:shadow">
+      <div className="w-full px-4 py-2 flex flex-wrap gap-2 items-center justify-center min-h-[44px] transition-all duration-300 sticky top-[64px] z-30 bg-white text-gray-900 border-b border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-900 dark:shadow">
         {/* Query */}
         {query && (
           <span
@@ -669,7 +670,7 @@ export default function CardSearchClient() {
       </div>
       <main className="p-2 overflow-auto bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200">
         {/* Responsive grid for filters */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-4 items-start bg-white text-gray-900 border border-gray-200 shadow-sm dark:bg-[#23262F] dark:text-white dark:border-zinc-800 dark:shadow p-4 rounded-lg">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-4 items-start bg-white text-gray-900 border border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-900 dark:shadow p-4 rounded-lg">
           {/* Legality & Alignment */}
           <div>
             <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Legality</p>
@@ -709,7 +710,7 @@ export default function CardSearchClient() {
             {/* Advanced Filters */}
             <div className="mb-4">
               <button
-                className="px-3 py-2 border rounded text-base mb-2 bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700 dark:hover:text-white font-semibold shadow"
+                className="px-3 py-2 border rounded text-base mb-2 bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 dark:bg-gray-900 dark:text-white dark:hover:bg-gray-700 dark:hover:text-white font-semibold shadow"
                 onClick={() => setAdvancedOpen(!advancedOpen)}
               >
                 Advanced Filters {advancedOpen ? '▲' : '▼'}
@@ -725,7 +726,7 @@ export default function CardSearchClient() {
                           'px-3 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
                           selectedTestaments.includes(t)
                             ? 'bg-yellow-200 text-yellow-900 border-yellow-400 dark:bg-yellow-600 dark:text-white dark:border-transparent'
-                            : 'bg-gray-200 text-gray-900 border-gray-300 hover:bg-gray-400 hover:text-gray-900 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                            : 'bg-gray-200 text-gray-900 border-gray-300 hover:bg-gray-400 hover:text-gray-900 dark:bg-gray-900 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
                         )}
                         onClick={() => setSelectedTestaments(prev => prev.includes(t) ? prev.filter(x=>x!==t) : [...prev,t])}
                       >
