@@ -584,7 +584,7 @@ export default function CardSearchClient() {
           </span>
         ))}
         {/* Icon Filters */}
-        {selectedIconFilters.map(icon => {
+        {selectedIconFilters.map((icon, idx) => {
           // Brigade color mapping
           const brigadeColors = {
             Black: 'bg-black text-white',
@@ -607,13 +607,19 @@ export default function CardSearchClient() {
             'Good Multi': 'bg-gradient-to-r from-blue-200 via-green-200 to-red-200 text-gray-900 dark:from-blue-700 dark:via-green-700 dark:to-red-700 dark:text-white',
             'Evil Multi': 'bg-gradient-to-r from-gray-200 via-red-200 to-gray-400 text-gray-900 dark:from-black dark:via-crimson dark:to-gray-700 dark:text-white',
           };
-          // If icon is a brigade, use its color, else default
           const pillClass = brigadeColors[icon] ? `${brigadeColors[icon]} px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer` : 'bg-green-200 text-green-900 dark:bg-green-700 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer';
           return (
-            <span key={icon} className={pillClass} onClick={() => setSelectedIconFilters(selectedIconFilters.filter(i => i !== icon))} tabIndex={0} role="button" aria-label={`Remove ${icon} filter`}>
-              {icon}
-              <span className="ml-1 text-gray-700 dark:text-gray-200">×</span>
-            </span>
+            <React.Fragment key={icon}>
+              <span className={pillClass} onClick={() => setSelectedIconFilters(selectedIconFilters.filter(i => i !== icon))} tabIndex={0} role="button" aria-label={`Remove ${icon} filter`}>
+                {icon}
+                <span className="ml-1 text-gray-700 dark:text-gray-200">×</span>
+              </span>
+              {idx < selectedIconFilters.length - 1 && (
+                <span className="mx-1 font-bold text-xs text-gray-500 dark:text-gray-400 select-none">
+                  {iconFilterMode}
+                </span>
+              )}
+            </React.Fragment>
           );
         })}
         {/* Testament */}
