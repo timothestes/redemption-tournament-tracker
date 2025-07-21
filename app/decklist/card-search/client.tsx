@@ -1,8 +1,8 @@
 "use client";
 import React, { useEffect, useState, useMemo } from "react";
-import { useTheme } from "next-themes";
+import ModalWithClose from "./ModalWithClose";
 import { CARD_DATA_URL, CARD_IMAGE_BASE_URL, OT_BOOKS, NT_BOOKS, GOSPEL_BOOKS, GOOD_BRIGADES, EVIL_BRIGADES } from "./constants";
-import { Modal, Button } from "flowbite-react";
+import { Button } from "flowbite-react";
 import clsx from "clsx";
 
 // Card data structure
@@ -652,34 +652,13 @@ export default function CardSearchClient() {
       </main>
       {/* Smaller modal with overlay click to close */}
       {modalCard && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
-          onClick={() => setModalCard(null)}
-        >
-          <div
-            className="bg-white dark:bg-gray-900 rounded shadow-lg max-w-md w-full max-h-[80vh] overflow-auto relative"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="px-4 pt-4 pb-2 border-b font-semibold text-lg text-center truncate">{modalCard.name}</div>
-            <div className="px-4 py-2">
-              <img
-                src={`${CARD_IMAGE_BASE_URL}${sanitizeImgFile(modalCard.imgFile)}.jpg`}
-                alt={modalCard.name}
-                className="w-full h-auto max-h-60 object-contain mx-auto rounded"
-              />
-              <div className="mt-4 space-y-1">
-                {Object.entries(modalCard)
-                  .filter(([key]) => key !== "dataLine" && key !== "imgFile")
-                  .map(([key, value]) => (
-                    <Attribute key={key} label={prettifyFieldName(key)} value={value} />
-                  ))}
-              </div>
-            </div>
-            <div className="px-4 pb-4 flex justify-center">
-              <Button onClick={() => setModalCard(null)}>Close</Button>
-            </div>
-          </div>
-        </div>
+        <ModalWithClose
+          modalCard={modalCard}
+          setModalCard={setModalCard}
+          CARD_IMAGE_BASE_URL={CARD_IMAGE_BASE_URL}
+          sanitizeImgFile={sanitizeImgFile}
+          // prettifyFieldName now handled inside ModalWithClose
+        />
       )}
     </div>
   );
