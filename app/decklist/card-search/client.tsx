@@ -27,6 +27,8 @@ interface Card {
 }
 
 export default function CardSearchClient() {
+  // Collapse state for filter grid
+  const [filterGridCollapsed, setFilterGridCollapsed] = useState(false);
   // Search field dropdown state
   const [searchField, setSearchField] = useState<string>('everything');
 
@@ -549,7 +551,7 @@ export default function CardSearchClient() {
           <div className="flex-2 relative mb-4 flex items-center gap-2">
             <input
               type="text"
-              placeholder="Search Redemption Cards..."
+              placeholder="Search"
               className="w-full p-3 pr-10 border rounded text-base focus:ring-2 focus:ring-blue-400 text-gray-900 bg-white dark:text-white dark:bg-gray-900"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -585,6 +587,28 @@ export default function CardSearchClient() {
       </div>
       {/* Active Filters Summary Bar */}
       <div className="w-full px-4 py-2 flex flex-wrap gap-2 items-center justify-center min-h-[44px] transition-all duration-300 sticky top-[64px] z-30 bg-white text-gray-900 border-b border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-900 dark:shadow">
+        {/* Collapse/Expand Filter Grid Button */}
+        <div className="absolute right-4 top-2">
+          <button
+            aria-label="Toggle filter grid"
+            className={`w-8 h-8 rounded-full flex items-center justify-center border border-gray-400 dark:border-gray-700 shadow transition bg-gray-300 dark:bg-gray-700 ${filterGridCollapsed ? 'ring-2 ring-blue-400' : ''}`}
+            style={{ outline: 'none' }}
+            onClick={() => setFilterGridCollapsed(v => !v)}
+          >
+            {/* Use a chevron icon for clarity */}
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              style={{ transition: 'transform 0.2s', transform: filterGridCollapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}
+            >
+              <circle cx="12" cy="12" r="11" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1" />
+              <path d="M8 10l4 4 4-4" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
         {/* Query */}
         {query && (
           <span
@@ -725,7 +749,8 @@ export default function CardSearchClient() {
       </div>
       <main className="p-2 overflow-auto bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200">
         {/* Responsive grid for filters */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-4 items-start bg-white text-gray-900 border border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-900 dark:shadow p-4 rounded-lg">
+        {!filterGridCollapsed && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-4 items-start bg-white text-gray-900 border border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-900 dark:shadow p-4 rounded-lg">
           {/* Legality & Alignment */}
           <div>
             <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Legality</p>
@@ -987,6 +1012,7 @@ export default function CardSearchClient() {
             </div>
           </div>
         </div>
+        )}
         {/* Card grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
           {visibleCards.map((c) => (
