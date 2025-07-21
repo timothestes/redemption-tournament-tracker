@@ -18,7 +18,7 @@ export const NT_BOOKS = [
   'matthew', 'mark', 'luke', 'john', 'acts', 'romans',
   'corinthians', 'galatians', 'ephesians', 'philippians',
   'colossians', 'thessalonians', 'timothy', 'titus', 'philemon',
-  'hebrews', 'james', 'peter', 'jude', 'revelation'
+  'hebrews', 'james', 'peter', 'jude', 'revelation', 'josephus'
 ];
 
 export const GOSPEL_BOOKS = [

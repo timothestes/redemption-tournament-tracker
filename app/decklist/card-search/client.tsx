@@ -11,6 +11,7 @@ interface Card {
   name: string;
   set: string;
   imgFile: string;
+  officialSet: string;
   type: string;
   brigade: string;
   strength: string;
@@ -143,6 +144,7 @@ export default function CardSearchClient() {
             name: cols[0] || "",
             set: cols[1] || "",
             imgFile: cols[2] || "",
+            officialSet: cols[3] || "",
             type: cols[4] || "",
             brigade,
             strength: cols[6] || "",
@@ -586,25 +588,36 @@ export default function CardSearchClient() {
           ))}
         </div>
       </main>
-      {/* Popup modal that closes on outside click, with responsive image */}
+      {/* Smaller modal with overlay click to close */}
       {modalCard && (
-        <Modal show={!!modalCard} popup onClose={() => setModalCard(null)}>
-          <Modal.Header>{modalCard.name}</Modal.Header>
-          <Modal.Body>
-            <img
-              src={`${CARD_IMAGE_BASE_URL}${sanitizeImgFile(modalCard.imgFile)}.jpg`}
-              alt={modalCard.name}
-              className="w-full h-auto max-h-[90vh] object-contain"
-            />
-            <Attribute label="Type" value={modalCard.type} />
-            <Attribute label="Brigade" value={modalCard.brigade} />
-            <Attribute label="Rarity" value={modalCard.rarity} />
-            <Attribute label="Ability" value={modalCard.specialAbility} />
-          </Modal.Body>
-          <Modal.Footer>
-            <Button onClick={() => setModalCard(null)}>Close</Button>
-          </Modal.Footer>
-        </Modal>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+          onClick={() => setModalCard(null)}
+        >
+          <div
+            className="bg-white dark:bg-gray-900 rounded shadow-lg max-w-md w-full max-h-[80vh] overflow-auto relative"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-4 pt-4 pb-2 border-b font-semibold text-lg text-center truncate">{modalCard.name}</div>
+            <div className="px-4 py-2">
+              <img
+                src={`${CARD_IMAGE_BASE_URL}${sanitizeImgFile(modalCard.imgFile)}.jpg`}
+                alt={modalCard.name}
+                className="w-full h-auto max-h-60 object-contain mx-auto rounded"
+              />
+              <div className="mt-4 space-y-1">
+                {Object.entries(modalCard)
+                  .filter(([key]) => key !== "dataLine" && key !== "imgFile")
+                  .map(([key, value]) => (
+                    <Attribute key={key} label={prettifyFieldName(key)} value={value} />
+                  ))}
+              </div>
+            </div>
+            <div className="px-4 pb-4 flex justify-center">
+              <Button onClick={() => setModalCard(null)}>Close</Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -613,4 +626,25 @@ export default function CardSearchClient() {
 // Helper sub-components
 function Attribute({ label, value }: { label: string; value: string }) {
   return <p className="text-sm"><strong>{label}:</strong> {value}</p>;
+}
+
+function prettifyFieldName(key: string): string {
+  const map: Record<string, string> = {
+    name: "Name",
+    set: "Set",
+    officialSet: "Official Set",
+    type: "Type",
+    brigade: "Brigade",
+    strength: "Strength",
+    toughness: "Toughness",
+    class: "Class",
+    identifier: "Identifier",
+    specialAbility: "Special Ability",
+    rarity: "Rarity",
+    reference: "Reference",
+    alignment: "Alignment",
+    legality: "Legality",
+    testament: "Testament",
+  };
+  return map[key] || key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, s => s.toUpperCase());
 }
