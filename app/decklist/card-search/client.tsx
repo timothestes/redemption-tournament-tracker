@@ -2,7 +2,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import ModalWithClose from "./ModalWithClose";
 import { CARD_DATA_URL, CARD_IMAGE_BASE_URL, OT_BOOKS, NT_BOOKS, GOSPEL_BOOKS, GOOD_BRIGADES, EVIL_BRIGADES } from "./constants";
-import { Button } from "flowbite-react";
 import clsx from "clsx";
 
 // Card data structure
@@ -28,6 +27,11 @@ interface Card {
 }
 
 export default function CardSearchClient() {
+  // Strength and toughness filter state
+  const [strengthFilter, setStrengthFilter] = useState<number | null>(null);
+  const [strengthOp, setStrengthOp] = useState<string>('eq');
+  const [toughnessFilter, setToughnessFilter] = useState<number | null>(null);
+  const [toughnessOp, setToughnessOp] = useState<string>('eq');
   const [cards, setCards] = useState<Card[]>([]);
   const [query, setQuery] = useState("");
   const [selectedIconFilters, setSelectedIconFilters] = useState<string[]>([]);
@@ -139,11 +143,19 @@ export default function CardSearchClient() {
           }
           // Lowercase all references for matching
           const referencesLower = references.map(r => r.toLowerCase());
+          // Helper to normalize book names with numbers (e.g., II Samuel -> Samuel)
+          function normalizeBookName(ref) {
+            // Remove leading roman numerals or numbers (I, II, 1, 2, etc.)
+            return ref.replace(/^(i{1,3}|1|2|3|4|one|two|three|four)\s+/i, '').trim();
+          }
           // Tagging strategy: collect all matching testaments
           const foundTestaments = new Set<string>();
           for (const ref of referencesLower) {
-            if (NT_BOOKS.some(b => ref.startsWith(b.toLowerCase()))) foundTestaments.add('NT');
-            if (OT_BOOKS.some(b => ref.startsWith(b.toLowerCase()))) foundTestaments.add('OT');
+            // Try both original and normalized book name
+            const book = ref.split(' ')[0];
+            const normalizedBook = normalizeBookName(ref).split(' ')[0];
+            if (NT_BOOKS.some(b => book === b.toLowerCase() || normalizedBook === b.toLowerCase())) foundTestaments.add('NT');
+            if (OT_BOOKS.some(b => book === b.toLowerCase() || normalizedBook === b.toLowerCase())) foundTestaments.add('OT');
           }
           let testament: string | string[] = '';
           if (foundTestaments.size === 1) {
@@ -295,6 +307,34 @@ export default function CardSearchClient() {
         })
         // IsGospel filter
         .filter((c) => !isGospel || c.isGospel)
+        // Strength filter
+        .filter((c) => {
+          if (strengthFilter === null) return true;
+          const val = parseInt(c.strength, 10);
+          if (isNaN(val)) return false;
+          switch (strengthOp) {
+            case 'lt': return val < strengthFilter;
+            case 'lte': return val <= strengthFilter;
+            case 'eq': return val === strengthFilter;
+            case 'gt': return val > strengthFilter;
+            case 'gte': return val >= strengthFilter;
+            default: return true;
+          }
+        })
+        // Toughness filter
+        .filter((c) => {
+          if (toughnessFilter === null) return true;
+          const val = parseInt(c.toughness, 10);
+          if (isNaN(val)) return false;
+          switch (toughnessOp) {
+            case 'lt': return val < toughnessFilter;
+            case 'lte': return val <= toughnessFilter;
+            case 'eq': return val === toughnessFilter;
+            case 'gt': return val > toughnessFilter;
+            case 'gte': return val >= toughnessFilter;
+            default: return true;
+          }
+        })
         // Misc filters (hide AB Versions, hide 1st Print K/L Starters)
         .filter((c) => !noAltArt || !c.set.includes("AB"))
         .filter((c) => !noFirstPrint || (
@@ -303,7 +343,7 @@ export default function CardSearchClient() {
         .filter((c) => !nativityOnly || isNativityReference(c.reference))
         .filter((c) => !cloudOnly || c.class.toLowerCase().includes("cloud"))
         .filter((c) => !hasStarOnly || c.specialAbility.includes("STAR:") || c.specialAbility.includes("(Star)")),
-    [cards, query, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly]
+    [cards, query, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, strengthFilter, strengthOp, toughnessFilter, toughnessOp]
   );
 
   // Reset visible count when filters change
@@ -334,22 +374,26 @@ export default function CardSearchClient() {
     if (card.type && card.type.includes("Dominant")) return 0;
     // Artifact: type === 'Artifact'
     if (card.type === "Artifact") return 1;
+    // Covenant: type === 'Covenant'
+    if (card.type === "Covenant") return 2;
+    // Curse: type === 'Curse'
+    if (card.type === "Curse") return 3;
     // Site: type === 'Site'
-    if (card.type === "Site") return 2;
+    if (card.type === "Site") return 4;
     // Fortress: type includes 'Fortress'
-    if (card.type && card.type.includes("Fortress")) return 3;
-    // Hero: type includes 'Hero'
-    if (card.type && card.type.includes("Hero")) return 4;
-    // Evil Character: type includes 'Evil Character'
-    if (card.type && card.type.includes("Evil Character")) return 5;
-    // GE: type includes 'GE'
-    if (card.type && card.type.includes("GE")) return 6;
-    // EE: type includes 'EE'
-    if (card.type && card.type.includes("EE")) return 7;
+    if (card.type && card.type.includes("Fortress")) return 5;
     // Lost Soul: type includes 'Lost Soul'
-    if (card.type && card.type.includes("Lost Soul")) return 8;
+    if (card.type && card.type.includes("Lost Soul")) return 6;
+    // Hero: type includes 'Hero'
+    if (card.type && card.type.includes("Hero")) return 7;
+    // Evil Character: type includes 'Evil Character'
+    if (card.type && card.type.includes("Evil Character")) return 8;
+    // GE: type includes 'GE'
+    if (card.type && card.type.includes("GE")) return 9;
+    // EE: type includes 'EE'
+    if (card.type && card.type.includes("EE")) return 10;
     // Everything else
-    return 9;
+    return 11;
   }
 
   const visibleCards = useMemo(() => {
@@ -359,7 +403,11 @@ export default function CardSearchClient() {
         const rankA = getTypeRank(a);
         const rankB = getTypeRank(b);
         if (rankA !== rankB) return rankA - rankB;
-        // If same rank, sort alphabetically by name
+        // Secondary sort: brigade color (alphabetical)
+        const brigadeA = a.brigade ? a.brigade.split("/")[0] : "";
+        const brigadeB = b.brigade ? b.brigade.split("/")[0] : "";
+        if (brigadeA !== brigadeB) return brigadeA.localeCompare(brigadeB);
+        // Tertiary sort: name
         return a.name.localeCompare(b.name);
       });
   }, [filtered, visibleCount]);
@@ -480,30 +528,58 @@ export default function CardSearchClient() {
     return brigadesList.sort();
   }
 
+  // Reset filters handler
+  function handleResetFilters() {
+    setQuery("");
+    setSelectedIconFilters([]);
+    setLegalityMode('Rotation');
+    setSelectedAlignmentFilters([]);
+    setSelectedTestaments([]);
+    setIsGospel(false);
+    setnoAltArt(true);
+    setnoFirstPrint(true);
+    setNativityOnly(false);
+    setHasStarOnly(false);
+    setCloudOnly(false);
+    setStrengthFilter(null);
+    setStrengthOp('eq');
+    setToughnessFilter(null);
+    setToughnessOp('eq');
+  }
+
   return (
     <div className="bg-gray-900 min-h-screen text-white">
-      <div className="p-2 border-b flex justify-center bg-white dark:bg-gray-900 sticky top-0 z-30">
-        <div className="relative w-full max-w-xl px-2">
-          <input
-            type="text"
-            placeholder="Search cards..."
-            className="w-full mb-4 p-3 pr-12 border rounded text-base focus:ring-2 focus:ring-blue-400 dark:text-white dark:bg-gray-800"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            maxLength={64}
+      <div className="p-2 border-b flex flex-col items-center bg-white dark:bg-gray-900 sticky top-0 z-30">
+        <div className="relative w-full max-w-xl px-2 flex items-center gap-2">
+          <div className="flex-1 relative mb-4">
+            <input
+              type="text"
+              placeholder="Search cards..."
+              className="w-full p-3 pr-10 border rounded text-base focus:ring-2 focus:ring-blue-400 dark:text-white dark:bg-gray-800"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              maxLength={64}
+              style={{ minHeight: 48, maxWidth: 320 }}
+            />
+            {query && (
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-700 dark:text-white text-xl focus:outline-none"
+                aria-label="Clear search"
+                onClick={() => setQuery("")}
+                style={{ minWidth: 32, minHeight: 32 }}
+              >
+                ×
+              </button>
+            )}
+          </div>
+          <button
+            className="mb-4 px-4 py-2 rounded bg-gray-700 text-white hover:bg-blue-500 transition"
+            onClick={handleResetFilters}
             style={{ minHeight: 48 }}
-          />
-          {query && (
-            <button
-              type="button"
-              className="absolute right-4 top-3 text-gray-400 hover:text-gray-700 dark:text-white text-xl focus:outline-none"
-              aria-label="Clear search"
-              onClick={() => setQuery("")}
-              style={{ minWidth: 32, minHeight: 32 }}
-            >
-              ×
-            </button>
-          )}
+          >
+            Reset Filters
+          </button>
         </div>
       </div>
       <main className="p-2 overflow-auto">
@@ -572,6 +648,57 @@ export default function CardSearchClient() {
                     >
                       Gospel
                     </button>
+                  </div>
+                  {/* Strength and Toughness Filters - Toughness now under Strength */}
+                  <div className="flex flex-col gap-4 mb-2 items-start">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">Strength</span>
+                      <select
+                        value={strengthOp}
+                        onChange={e => setStrengthOp(e.target.value)}
+                        className="border rounded px-2 py-1 bg-gray-100 dark:bg-gray-700"
+                      >
+                        <option value="lt">&lt;</option>
+                        <option value="lte">&le;</option>
+                        <option value="eq">=</option>
+                        <option value="gt">&gt;</option>
+                        <option value="gte">&ge;</option>
+                      </select>
+                      <select
+                        value={strengthFilter === null ? '' : strengthFilter}
+                        onChange={e => setStrengthFilter(e.target.value === '' ? null : Number(e.target.value))}
+                        className="border rounded px-2 py-1 bg-gray-100 dark:bg-gray-700"
+                      >
+                        <option value="">Any</option>
+                        {[...Array(14).keys()].map(n => (
+                          <option key={n} value={n}>{n}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">Toughness</span>
+                      <select
+                        value={toughnessOp}
+                        onChange={e => setToughnessOp(e.target.value)}
+                        className="border rounded px-2 py-1 bg-gray-100 dark:bg-gray-700"
+                      >
+                        <option value="lt">&lt;</option>
+                        <option value="lte">&le;</option>
+                        <option value="eq">=</option>
+                        <option value="gt">&gt;</option>
+                        <option value="gte">&ge;</option>
+                      </select>
+                      <select
+                        value={toughnessFilter === null ? '' : toughnessFilter}
+                        onChange={e => setToughnessFilter(e.target.value === '' ? null : Number(e.target.value))}
+                        className="border rounded px-2 py-1 bg-gray-100 dark:bg-gray-700"
+                      >
+                        <option value="">Any</option>
+                        {[...Array(14).keys()].map(n => (
+                          <option key={n} value={n}>{n}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                   <p className="font-semibold pt-2">Misc</p>
                   <div className="flex flex-wrap gap-2">

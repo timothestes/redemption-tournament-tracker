@@ -17,6 +17,9 @@ function Attribute({ label, value }: { label: string; value: string }) {
       displayValue = parts.join(' and ');
     }
   }
+  if (label === 'Is Gospel') {
+    displayValue = value === true ? 'Yes' : value === false ? 'No' : '';
+  }
   return <p className="text-sm"><strong>{label}:</strong> {displayValue}</p>;
 }
 
@@ -37,6 +40,7 @@ function prettifyFieldName(key: string): string {
     alignment: "Alignment",
     legality: "Legality",
     testament: "Testament",
+    isGospel: "Is Gospel",
   };
   return map[key] || key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, s => s.toUpperCase());
 }
@@ -106,7 +110,12 @@ export default function ModalWithClose({ modalCard, setModalCard, CARD_IMAGE_BAS
           </div>
           <div className="mt-4 space-y-1 w-full">
             {Object.entries(modalCard)
-              .filter(([key]) => key !== "dataLine" && key !== "imgFile")
+              .filter(([key, value]) => {
+                // Only render 'Is Gospel' if isGospel is true
+                if (key === 'isGospel') return modalCard.isGospel === true;
+                // Always render other fields except dataLine and imgFile
+                return key !== "dataLine" && key !== "imgFile";
+              })
               .map(([key, value]) => (
                 <Attribute key={key} label={prettifyFieldName(key)} value={value as string} />
               ))}
