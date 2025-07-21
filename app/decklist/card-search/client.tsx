@@ -539,7 +539,7 @@ export default function CardSearchClient() {
             {/* Clear search button removed as requested */}
           </div>
           <button
-            className="mb-4 px-4 py-2 rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-900 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent transition font-semibold shadow"
+            className="mb-4 px-4 py-2 rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent transition font-semibold shadow"
             onClick={handleResetFilters}
             style={{ minHeight: 48 }}
           >
@@ -740,7 +740,7 @@ export default function CardSearchClient() {
                           'px-3 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
                           selectedTestaments.includes(t)
                             ? 'bg-yellow-200 text-yellow-900 border-yellow-400 dark:bg-yellow-600 dark:text-white dark:border-transparent'
-                            : 'bg-gray-200 text-gray-900 border-gray-300 hover:bg-gray-400 hover:text-gray-900 dark:bg-gray-900 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                            : 'bg-gray-200 text-gray-900 border-gray-300 hover:bg-gray-400 hover:text-gray-900 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
                         )}
                         onClick={() => setSelectedTestaments(prev => prev.includes(t) ? prev.filter(x=>x!==t) : [...prev,t])}
                       >
@@ -874,22 +874,6 @@ export default function CardSearchClient() {
           </div>
           {/* Types */}
         <div>
-          {/* Icon filter mode toggle */}
-          <div className="mb-2 flex items-center gap-2">
-            <span className="text-gray-500 dark:text-gray-400 text-sm">Icon Filter Mode:</span>
-            <button
-              className={clsx(
-                'px-2 py-1 border rounded text-sm font-semibold transition',
-                iconFilterMode === 'AND'
-                  ? 'bg-gray-200 text-gray-900 border-gray-300 dark:bg-gray-900 dark:text-white'
-                  : 'bg-blue-200 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white'
-              )}
-              onClick={() => setIconFilterMode(iconFilterMode === 'AND' ? 'OR' : 'AND')}
-              title="Toggle between AND/OR logic for icon filters"
-            >
-              {iconFilterMode === 'AND' ? 'AND' : 'OR'}
-            </button>
-          </div>
           <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Types</p>
           <div className="flex flex-wrap gap-2 mb-4 justify-start">
             {typeIcons.map((t) => {
@@ -908,6 +892,22 @@ export default function CardSearchClient() {
                 />
               );
             })}
+          </div>
+          {/* Icon filter mode toggle moved below types icons */}
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-gray-500 dark:text-gray-400 text-sm">Icon Filter Mode:</span>
+            <button
+              className={clsx(
+                'px-2 py-1 border rounded text-sm font-semibold transition',
+                iconFilterMode === 'AND'
+                  ? 'bg-gray-200 text-gray-900 border-gray-300 dark:bg-gray-900 dark:text-white'
+                  : 'bg-blue-200 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white'
+              )}
+              onClick={() => setIconFilterMode(iconFilterMode === 'AND' ? 'OR' : 'AND')}
+              title="Toggle between AND/OR logic for icon filters"
+            >
+              {iconFilterMode === 'AND' ? 'AND' : 'OR'}
+            </button>
           </div>
         </div>
           {/* Brigades */}
