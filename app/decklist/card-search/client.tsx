@@ -547,8 +547,15 @@ export default function CardSearchClient() {
     setToughnessOp('eq');
   }
 
+  // Theme detection for background color
+  const { theme, resolvedTheme } = require('next-themes').useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  const currentTheme = theme === 'system' ? resolvedTheme : theme;
+  const mainBg = mounted && currentTheme === 'light' ? 'bg-white text-gray-900' : 'bg-gray-900 text-white';
+
   return (
-    <div className="bg-gray-900 min-h-screen text-white">
+    <div className={`${mainBg} min-h-screen`}>
       <div className="p-2 border-b flex flex-col items-center bg-white dark:bg-gray-900 sticky top-0 z-30">
         <div className="relative w-full max-w-xl px-2 flex items-center gap-2">
           <div className="flex-1 relative mb-4">
@@ -581,6 +588,122 @@ export default function CardSearchClient() {
             Reset Filters
           </button>
         </div>
+      </div>
+      {/* Active Filters Summary Bar */}
+      <div className="w-full px-4 py-2 flex flex-wrap gap-2 items-center justify-center min-h-[44px] transition-all duration-300 sticky top-[64px] z-30 bg-gray-900 bg-opacity-95">
+        {/* Query */}
+        {query && (
+          <span className="bg-blue-800 text-white px-3 py-1 rounded-full text-sm flex items-center gap-1">
+            Search: "{query}"
+            <span className="ml-1 text-white cursor-pointer" onClick={() => setQuery("")}>×</span>
+          </span>
+        )}
+        {/* Legality */}
+        {legalityMode !== 'Rotation' && (
+          <span className="bg-blue-700 text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setLegalityMode('Rotation')} tabIndex={0} role="button" aria-label="Remove Legality filter">
+            {legalityMode}
+            <span className="ml-1 text-white">×</span>
+          </span>
+        )}
+        {/* Alignment */}
+        {selectedAlignmentFilters.map(mode => (
+          <span key={mode} className="bg-purple-700 text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setSelectedAlignmentFilters(selectedAlignmentFilters.filter(m => m !== mode))} tabIndex={0} role="button" aria-label={`Remove ${mode} alignment filter`}>
+            {mode}
+            <span className="ml-1 text-white">×</span>
+          </span>
+        ))}
+        {/* Icon Filters */}
+        {selectedIconFilters.map(icon => {
+          // Brigade color mapping
+          const brigadeColors = {
+            Black: 'bg-black',
+            Blue: 'bg-blue-700',
+            Brown: 'bg-yellow-900',
+            Clay: 'bg-orange-200 text-gray-900',
+            Crimson: 'bg-red-900',
+            Gold: 'bg-yellow-400 text-gray-900',
+            'Good Gold': 'bg-yellow-400 text-gray-900',
+            'Evil Gold': 'bg-yellow-700',
+            Gray: 'bg-gray-500',
+            Green: 'bg-green-700',
+            Orange: 'bg-orange-500',
+            'Pale Green': 'bg-green-200 text-gray-900',
+            Purple: 'bg-purple-700',
+            Silver: 'bg-gray-300 text-gray-900',
+            White: 'bg-white text-gray-900',
+            Red: 'bg-red-700',
+            Teal: 'bg-teal-600',
+            'Good Multi': 'bg-gradient-to-r from-blue-700 via-green-700 to-red-700',
+            'Evil Multi': 'bg-gradient-to-r from-black via-crimson to-gray-700',
+          };
+          // If icon is a brigade, use its color, else default
+          const pillClass = brigadeColors[icon] ? `${brigadeColors[icon]} px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer` : 'bg-green-700 text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer';
+          return (
+            <span key={icon} className={pillClass} onClick={() => setSelectedIconFilters(selectedIconFilters.filter(i => i !== icon))} tabIndex={0} role="button" aria-label={`Remove ${icon} filter`}>
+              {icon}
+              <span className="ml-1 text-white">×</span>
+            </span>
+          );
+        })}
+        {/* Testament */}
+        {selectedTestaments.map(t => (
+          <span key={t} className="bg-yellow-700 text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setSelectedTestaments(selectedTestaments.filter(x => x !== t))} tabIndex={0} role="button" aria-label={`Remove ${t} testament filter`}>
+            {t}
+            <span className="ml-1 text-white">×</span>
+          </span>
+        ))}
+        {/* Gospel */}
+        {isGospel && (
+          <span className="bg-yellow-800 text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setIsGospel(false)} tabIndex={0} role="button" aria-label="Remove Gospel filter">
+            Gospel
+            <span className="ml-1 text-white">×</span>
+          </span>
+        )}
+        {/* Strength */}
+        {strengthFilter !== null && (
+          <span className="bg-red-700 text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setStrengthFilter(null)} tabIndex={0} role="button" aria-label="Remove Strength filter">
+            Strength {strengthOp === 'eq' ? '=' : strengthOp === 'lt' ? '<' : strengthOp === 'lte' ? '≤' : strengthOp === 'gt' ? '>' : '≥'} {strengthFilter}
+            <span className="ml-1 text-white">×</span>
+          </span>
+        )}
+        {/* Toughness */}
+        {toughnessFilter !== null && (
+          <span className="bg-red-800 text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setToughnessFilter(null)} tabIndex={0} role="button" aria-label="Remove Toughness filter">
+            Toughness {toughnessOp === 'eq' ? '=' : toughnessOp === 'lt' ? '<' : toughnessOp === 'lte' ? '≤' : toughnessOp === 'gt' ? '>' : '≥'} {toughnessFilter}
+            <span className="ml-1 text-white">×</span>
+          </span>
+        )}
+        {/* Misc */}
+        {noAltArt === false && (
+          <span className="bg-gray-700 text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setnoAltArt(true)} tabIndex={0} role="button" aria-label="Remove AB Versions filter">
+            AB Versions
+            <span className="ml-1 text-white">×</span>
+          </span>
+        )}
+        {noFirstPrint === false && (
+          <span className="bg-gray-700 text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setnoFirstPrint(true)} tabIndex={0} role="button" aria-label="Remove 1st Print K/L Starters filter">
+            1st Print K/L Starters
+            <span className="ml-1 text-white">×</span>
+          </span>
+        )}
+        {nativityOnly && (
+          <span className="bg-pink-700 text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setNativityOnly(false)} tabIndex={0} role="button" aria-label="Remove Nativity filter">
+            Nativity
+            <span className="ml-1 text-white">×</span>
+          </span>
+        )}
+        {hasStarOnly && (
+          <span className="bg-blue-900 text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setHasStarOnly(false)} tabIndex={0} role="button" aria-label="Remove Has Star filter">
+            Has Star
+            <span className="ml-1 text-white">×</span>
+          </span>
+        )}
+        {cloudOnly && (
+          <span className="bg-blue-900 text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setCloudOnly(false)} tabIndex={0} role="button" aria-label="Remove Cloud filter">
+            Cloud
+            <span className="ml-1 text-white">×</span>
+          </span>
+        )}
       </div>
       <main className="p-2 overflow-auto">
         {/* Responsive grid for filters */}
@@ -811,7 +934,7 @@ export default function CardSearchClient() {
           </div>
         </div>
         {/* Card grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-12">
           {visibleCards.map((c) => (
             <div key={c.dataLine} className="cursor-pointer" onClick={() => setModalCard(c)}>
               <img src={`${CARD_IMAGE_BASE_URL}${sanitizeImgFile(c.imgFile)}.jpg`} alt={c.name} className="w-full h-auto rounded shadow" />
