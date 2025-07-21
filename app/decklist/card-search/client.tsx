@@ -27,6 +27,9 @@ interface Card {
 }
 
 export default function CardSearchClient() {
+  // Search field dropdown state
+  const [searchField, setSearchField] = useState<string>('everything');
+
   // Icon filter mode: AND or OR
   const [iconFilterMode, setIconFilterMode] = useState<'AND'|'OR'>('AND');
   // Strength and toughness filter state
@@ -147,7 +150,7 @@ export default function CardSearchClient() {
           const referencesLower = references.map(r => r.toLowerCase());
           // Helper to normalize book names with numbers (e.g., II Samuel -> Samuel)
           function normalizeBookName(ref) {
-            // Remove leading roman numerals or numbers (I, II, 1, 2, etc.)
+            // Remove leading roman numerals or numbers (I, II, 1, 2, 3, 4, one, two, three, four)\s+/i, '')
             return ref.replace(/^(i{1,3}|1|2|3|4|one|two|three|four)\s+/i, '').trim();
           }
           // Tagging strategy: collect all matching testaments
@@ -268,7 +271,24 @@ export default function CardSearchClient() {
   const filtered = useMemo(
     () =>
       cards
-        .filter((c) => Object.values(c).join(" ").toLowerCase().includes(query.toLowerCase()))
+        .filter((c) => {
+          const q = query.toLowerCase();
+          if (!q) return true;
+          switch (searchField) {
+            case 'name':
+              return c.name.toLowerCase().includes(q);
+            case 'specialAbility':
+              return c.specialAbility.toLowerCase().includes(q);
+            case 'setName':
+              return c.officialSet.toLowerCase().includes(q) || c.set.toLowerCase().includes(q);
+            case 'identifier':
+              return c.identifier.toLowerCase().includes(q);
+            case 'reference':
+              return c.reference.toLowerCase().includes(q);
+            default:
+              return Object.values(c).join(" ").toLowerCase().includes(q);
+          }
+        })
         // Legality mode filter
         .filter((c) => {
           if (legalityMode === 'Classic') return true;
@@ -526,7 +546,7 @@ export default function CardSearchClient() {
     <div className="bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white min-h-screen transition-colors duration-200">
       <div className="p-2 flex flex-col items-center sticky top-0 z-30 bg-white text-gray-900 border-b border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-800 dark:shadow-lg">
         <div className="relative w-full max-w-xl px-2 flex flex-row items-center justify-center gap-1">
-          <div className="flex-2 relative mb-4">
+          <div className="flex-2 relative mb-4 flex items-center gap-2">
             <input
               type="text"
               placeholder="Search Redemption Cards..."
@@ -534,9 +554,25 @@ export default function CardSearchClient() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               maxLength={64}
-              style={{ minHeight: 48, maxWidth: 320 }}
+              style={{ minHeight: 48, maxWidth: 220 }}
             />
-            {/* Clear search button removed as requested */}
+            <select
+              value={searchField}
+              onChange={e => {
+                console.log("hello;")
+                setSearchField(e.target.value);
+                setVisibleCount(50);
+              }}
+              className="border rounded px-2 py-2 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:text-white dark:border-gray-600"
+              style={{ minHeight: 48 }}
+            >
+              <option value="everything">Everything</option>
+              <option value="name">Name</option>
+              <option value="specialAbility">Special Ability</option>
+              <option value="setName">Set Name</option>
+              <option value="identifier">Identifier</option>
+              <option value="reference">Reference</option>
+            </select>
           </div>
           <button
             className="mb-4 px-4 py-2 rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent transition font-semibold shadow"
@@ -558,7 +594,12 @@ export default function CardSearchClient() {
             role="button"
             aria-label="Remove Search filter"
           >
-            Search: "{query}"
+            {searchField === 'everything' && `Search: "${query}"`}
+            {searchField === 'name' && `Name contains: "${query}"`}
+            {searchField === 'specialAbility' && `Special Ability contains: "${query}"`}
+            {searchField === 'setName' && `Set Name contains: "${query}"`}
+            {searchField === 'identifier' && `Identifier contains: "${query}"`}
+            {searchField === 'reference' && `Reference contains: "${query}"`}
             <span className="ml-1 text-blue-900 dark:text-white">×</span>
           </span>
         )}
