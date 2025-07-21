@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState, useMemo } from "react";
 import { CARD_DATA_URL, CARD_IMAGE_BASE_URL, OT_BOOKS, NT_BOOKS, GOSPEL_BOOKS } from "./constants";
-import { Modal, Button } from "flowbite-react";
+import { Modal, Button, ToggleSwitch } from "flowbite-react";
 import clsx from "clsx";
 
 // Card data structure
@@ -27,20 +27,46 @@ interface Card {
 export default function CardSearchClient() {
   const [cards, setCards] = useState<Card[]>([]);
   const [query, setQuery] = useState("");
-  const [selectedFilters, setSelectedFilters] = useState({
-    brigade: [] as string[],
-    type: [] as string[],
-    rarity: [] as string[],
-  });
-  const [visibleCount, setVisibleCount] = useState(50);
-  const [modalCard, setModalCard] = useState<Card | null>(null);
+  const [selectedIconFilters, setSelectedIconFilters] = useState<string[]>([]);
+  const [iconFilterMode, setIconFilterMode] = useState<'AND'|'OR'>('AND');
+  // Card legality filter mode: Rotation, Classic (all), Banned
+  const [legalityMode, setLegalityMode] = useState<'Rotation'|'Classic'|'Banned'>('Rotation');
+  const [visibleCount, setVisibleCount] = useState(50); // Number of cards to show
 
+  const [modalCard, setModalCard] = useState<Card | null>(null);
+  // sanitize imgFile to avoid duplicate extensions
+  const sanitizeImgFile = (f: string) => f.replace(/\.jpe?g$/i, "");
+
+  // Define how each icon filter should be applied
+  const iconPredicates: Record<string, (c: Card) => boolean> = {
+    Artifact: (c) => c.type === "Artifact",
+    "Good Dominant": (c) => c.type === "Dominant" && c.alignment.includes("Good"),
+    "Evil Dominant": (c) => c.type === "Dominant" && c.alignment.includes("Evil"),
+    "Good Fortress": (c) => c.type === "Fortress" && c.alignment.includes("Good"),
+    "Evil Fortress": (c) => c.type === "Fortress" && c.alignment.includes("Evil"),
+    // other icons use existing category filters
+    Bible: (c) => c.type === "GE",
+    "Cross Icon": (c) => c.type === "Hero",
+    "Evil Character": (c) => c.type === "Evil Character",
+    Site: (c) => c.type === "Site",
+    Skull: (c) => c.type === "EE",
+    "Territory-Class": (c) => c.class === "Territory",
+    "Warrior-Class": (c) => c.class === "Warrior",
+    "Weapon-Class": (c) => c.class === "Weapon",
+    // Enhancements by alignment
+    "Good Enhancement": (c) => c.type === "Enhancement" && c.alignment.includes("Good"),
+    "Evil Enhancement": (c) => c.type === "Enhancement" && c.alignment.includes("Evil"),
+    "City": (c) => c.type === "City",
+  };
+
+  // Adjust parsing to skip header row
   useEffect(() => {
     fetch(CARD_DATA_URL)
       .then((res) => res.text())
       .then((text) => {
-        const lines = text.split("\n").filter((l) => l.trim());
-        const parsed = lines.map((line) => {
+        const lines = text.split("\n");
+        const dataLines = lines.slice(1).filter((l) => l.trim());
+        const parsed = dataLines.map((line) => {
           const cols = line.split("\t");
           return {
             dataLine: line,
@@ -70,32 +96,92 @@ export default function CardSearchClient() {
   const types = useMemo(() => Array.from(new Set(cards.map((c) => c.type))).filter(Boolean), [cards]);
   const rarities = useMemo(() => Array.from(new Set(cards.map((c) => c.rarity))).filter(Boolean), [cards]);
 
+  // Quick icon filters for type-based icons (reordered) and color-coded brigades
+  const typeIcons = [
+    "Good Dominant",
+    "Evil Dominant",
+    "Artifact",
+    "Site",
+    "Good Fortress",
+    "Evil Fortress",
+    "Cross Icon",  // Hero icon
+    "Evil Character",
+    "Bible",
+    "Skull"
+  ];
+  const colorIcons = ["Black","Blue","Brown","Clay","Crimson","Gold","Gray","Green","Orange","Pale Green","Purple","Silver","White"];
+
   const filtered = useMemo(
     () =>
       cards
         .filter((c) => Object.values(c).join(" ").toLowerCase().includes(query.toLowerCase()))
+        // Legality mode filter
+        .filter((c) => legalityMode === 'Classic' || c.legality === legalityMode)
         .filter((c) => {
-          if (selectedFilters.brigade.length && !selectedFilters.brigade.includes(c.brigade)) return false;
-          if (selectedFilters.type.length && !selectedFilters.type.includes(c.type)) return false;
-          if (selectedFilters.rarity.length && !selectedFilters.rarity.includes(c.rarity)) return false;
-          return true;
+          // include City if Site + Good/Evil Fortress selected
+          const effIcons = [...selectedIconFilters];
+          if (
+            selectedIconFilters.includes("Site") &&
+            (selectedIconFilters.includes("Evil Fortress") || selectedIconFilters.includes("Good Fortress"))
+          ) {
+            effIcons.push("City");
+          }
+          if (effIcons.length === 0) return true;
+          if (iconFilterMode === 'OR') {
+            return effIcons.some((icon) => {
+              const pred = iconPredicates[icon];
+              if (pred) return pred(c);
+              return c.brigade.toLowerCase().includes(icon.toLowerCase());
+            });
+          }
+          // AND mode
+          return effIcons.every((icon) => {
+            const pred = iconPredicates[icon];
+            if (pred) return pred(c);
+            return c.brigade.toLowerCase().includes(icon.toLowerCase());
+          });
         }),
-    [cards, query, selectedFilters]
+    [cards, query, selectedIconFilters, legalityMode, iconFilterMode]
   );
 
-  const visibleCards = filtered.slice(0, visibleCount);
+  // Reset visible count when filters change
+  useEffect(() => {
+    setVisibleCount(50);
+  }, [query, selectedIconFilters, legalityMode, iconFilterMode]);
 
-  function toggleFilter(category: keyof typeof selectedFilters, value: string) {
-    setSelectedFilters((prev) => {
-      const arr = prev[category];
-      const next = arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value];
-      return { ...prev, [category]: next };
+  const visibleCards = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+
+  // Infinite scroll effect
+  useEffect(() => {
+    const handleScroll = () => {
+      // Add a buffer to trigger loading before reaching the absolute bottom
+      if (
+        window.innerHeight + document.documentElement.scrollTop <
+        document.documentElement.offsetHeight - 100
+      ) {
+        return;
+      }
+      if (filtered.length > visibleCount) {
+        setVisibleCount((prevCount) => prevCount + 50); // Load 50 more cards
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [filtered.length, visibleCount]);
+
+  // Toggler for icon filters
+  function toggleIconFilter(value: string) {
+    setSelectedIconFilters((prev) => {
+      const next = prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value];
+      console.log(`Icon filter toggled: ${value}, selectedIconFilters=`, next);
+      return next;
     });
   }
 
   return (
-    <div className="flex">
-      <aside className="w-64 p-4 border-r overflow-auto">
+    <div>
+      <div className="p-4 border-b">
         <input
           type="text"
           placeholder="Search cards..."
@@ -103,30 +189,85 @@ export default function CardSearchClient() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <FilterSection label="Brigade" options={brigades} selected={selectedFilters.brigade} onToggle={(v) => toggleFilter("brigade", v)} />
-        <FilterSection label="Type" options={types} selected={selectedFilters.type} onToggle={(v) => toggleFilter("type", v)} />
-        <FilterSection label="Rarity" options={rarities} selected={selectedFilters.rarity} onToggle={(v) => toggleFilter("rarity", v)} />
-        {visibleCount < filtered.length && (
-          <Button onClick={() => setVisibleCount((vc) => vc + 50)} size="sm" className="w-full">
-            Load More
-          </Button>
-        )}
-      </aside>
-      <main className="flex-1 p-4 overflow-auto">
+      </div>
+      <main className="p-4 overflow-auto">
+        <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Legality</p>
+        {/* Legality mode toggles */}
+        <div className="flex gap-2 mb-4">
+          {['Rotation','Classic','Banned'].map((mode) => (
+            <button
+              key={mode}
+              className={clsx(
+                'px-3 py-1 border rounded text-sm',
+                legalityMode === mode
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700'
+              )}
+              onClick={() => setLegalityMode(mode as typeof legalityMode)}
+            >
+              {mode}
+            </button>
+          ))}
+        </div>
+        {/* Quick icon filters with AND/OR toggle */}
+        <div className="mb-4">
+          <div className="flex items-center justify-end mb-2 space-x-2">
+            <span className="text-sm">AND</span>
+            <ToggleSwitch
+              id="filter-mode"
+              checked={iconFilterMode === 'OR'}
+              onChange={() => setIconFilterMode(iconFilterMode === 'AND' ? 'OR' : 'AND')}
+            />
+            <span className="text-sm">OR</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {typeIcons.map((t) => (
+              <img
+                key={t}
+                src={`/filter-icons/${encodeURIComponent(t)}.png`}
+                alt={t}
+                className={clsx(
+                  "h-8 w-auto cursor-pointer",
+                  selectedIconFilters.includes(t) && "ring-2 ring-blue-500"
+                )}
+                onClick={() => toggleIconFilter(t)}
+              />
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {colorIcons.map((icon) => (
+              <img
+                key={icon}
+                src={`/filter-icons/Color=${encodeURIComponent(icon)}.png`}
+                alt={icon}
+                className={clsx(
+                  "h-8 w-auto cursor-pointer",
+                  selectedIconFilters.includes(icon) && "ring-2 ring-blue-500"
+                )}
+                onClick={() => toggleIconFilter(icon)}
+              />
+            ))}
+          </div>
+        </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
           {visibleCards.map((c) => (
             <div key={c.dataLine} className="cursor-pointer" onClick={() => setModalCard(c)}>
-              <img src={`${CARD_IMAGE_BASE_URL}${c.imgFile}.jpg`} alt={c.name} className="w-full h-auto rounded shadow" />
+              <img src={`${CARD_IMAGE_BASE_URL}${sanitizeImgFile(c.imgFile)}.jpg`} alt={c.name} className="w-full h-auto rounded shadow" />
               <p className="text-sm mt-1 text-center truncate">{c.name}</p>
             </div>
           ))}
         </div>
       </main>
+      {/* Popup modal that closes on outside click, with responsive image */}
       {modalCard && (
-        <Modal show onClose={() => setModalCard(null)}>
+        <Modal show={!!modalCard} popup onClose={() => setModalCard(null)}>
           <Modal.Header>{modalCard.name}</Modal.Header>
           <Modal.Body>
-            <img src={`${CARD_IMAGE_BASE_URL}${modalCard.imgFile}.jpg`} alt={modalCard.name} className="w-full h-auto" />
+            <img
+              src={`${CARD_IMAGE_BASE_URL}${sanitizeImgFile(modalCard.imgFile)}.jpg`}
+              alt={modalCard.name}
+              className="w-full h-auto max-h-[90vh] object-contain"
+            />
             <Attribute label="Type" value={modalCard.type} />
             <Attribute label="Brigade" value={modalCard.brigade} />
             <Attribute label="Rarity" value={modalCard.rarity} />
@@ -142,21 +283,6 @@ export default function CardSearchClient() {
 }
 
 // Helper sub-components
-function FilterSection({ label, options, selected, onToggle }: { label: string; options: string[]; selected: string[]; onToggle: (v: string) => void; }) {
-  return (
-    <div className="mb-4">
-      <h3 className="font-semibold">{label}</h3>
-      <div className="flex flex-wrap gap-2 mt-2">
-        {options.map((opt) => (
-          <button key={opt} className={clsx("px-2 py-1 border rounded text-sm", selected.includes(opt) && "bg-blue-200")} onClick={() => onToggle(opt)}>
-            {opt}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function Attribute({ label, value }: { label: string; value: string }) {
   return <p className="text-sm"><strong>{label}:</strong> {value}</p>;
 }
