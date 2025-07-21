@@ -27,6 +27,8 @@ interface Card {
 }
 
 export default function CardSearchClient() {
+  // Icon filter mode: AND or OR
+  const [iconFilterMode, setIconFilterMode] = useState<'AND'|'OR'>('AND');
   // Strength and toughness filter state
   const [strengthFilter, setStrengthFilter] = useState<number | null>(null);
   const [strengthOp, setStrengthOp] = useState<string>('eq');
@@ -284,16 +286,22 @@ export default function CardSearchClient() {
           });
         })
         .filter((c) => {
-          // icon filters (AND mode)
           if (selectedIconFilters.length === 0) return true;
-          return selectedIconFilters.every((icon) => {
-            const pred = iconPredicates[icon];
-            if (pred) return pred(c);
-            // match any part of the brigade string
-            return c.brigade.toLowerCase().includes(icon.toLowerCase());
-          });
+          if (iconFilterMode === 'AND') {
+            return selectedIconFilters.every((icon) => {
+              const pred = iconPredicates[icon];
+              if (pred) return pred(c);
+              return c.brigade.toLowerCase().includes(icon.toLowerCase());
+            });
+          } else {
+            return selectedIconFilters.some((icon) => {
+              const pred = iconPredicates[icon];
+              if (pred) return pred(c);
+              return c.brigade.toLowerCase().includes(icon.toLowerCase());
+            });
+          }
         })
-        // Testament filters (no Gospel)
+        // Testament filters
         .filter((c) => {
           if (selectedTestaments.length === 0) return true;
           // Helper to check if testament contains NT or OT
@@ -344,13 +352,13 @@ export default function CardSearchClient() {
         .filter((c) => !nativityOnly || isNativityReference(c.reference))
         .filter((c) => !cloudOnly || c.class.toLowerCase().includes("cloud"))
         .filter((c) => !hasStarOnly || c.specialAbility.includes("STAR:") || c.specialAbility.includes("(Star)")),
-    [cards, query, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, strengthFilter, strengthOp, toughnessFilter, toughnessOp]
+    [cards, query, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, strengthFilter, strengthOp, toughnessFilter, toughnessOp, iconFilterMode]
   );
 
-  // Reset visible count when filters change
+  // Reset visible count when filters change or icon filter mode changes
   useEffect(() => {
     setVisibleCount(50);
-  }, [query, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedTestaments, noAltArt, noFirstPrint, nativityOnly, hasStarOnly]);
+  }, [query, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedTestaments, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, iconFilterMode]);
 
   // Central logging of all active filters
   useEffect(() => {
@@ -859,27 +867,43 @@ export default function CardSearchClient() {
             </div>
           </div>
           {/* Types */}
-          <div>
-            <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Types</p>
-            <div className="flex flex-wrap gap-2 mb-4 justify-start">
-              {typeIcons.map((t) => {
-                const src = `/filter-icons/${encodeURIComponent(t)}.png`;
-                return (
-                  <img
-                    key={t}
-                    src={src}
-                    alt={t}
-                    className={clsx(
-                      'h-10 w-10 sm:h-8 sm:w-auto cursor-pointer',
-                      selectedIconFilters.includes(t) && 'ring-2 ring-blue-500 dark:ring-blue-300'
-                    )}
-                    onClick={() => toggleIconFilter(t)}
-                    style={{ minWidth: 40, minHeight: 40 }}
-                  />
-                );
-              })}
-            </div>
+        <div>
+          {/* Icon filter mode toggle */}
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-gray-500 dark:text-gray-400 text-sm">Icon Filter Mode:</span>
+            <button
+              className={clsx(
+                'px-2 py-1 border rounded text-sm font-semibold transition',
+                iconFilterMode === 'AND'
+                  ? 'bg-gray-200 text-gray-900 border-gray-300 dark:bg-gray-900 dark:text-white'
+                  : 'bg-blue-200 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white'
+              )}
+              onClick={() => setIconFilterMode(iconFilterMode === 'AND' ? 'OR' : 'AND')}
+              title="Toggle between AND/OR logic for icon filters"
+            >
+              {iconFilterMode === 'AND' ? 'AND' : 'OR'}
+            </button>
           </div>
+          <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Types</p>
+          <div className="flex flex-wrap gap-2 mb-4 justify-start">
+            {typeIcons.map((t) => {
+              const src = `/filter-icons/${encodeURIComponent(t)}.png`;
+              return (
+                <img
+                  key={t}
+                  src={src}
+                  alt={t}
+                  className={clsx(
+                    'h-10 w-10 sm:h-8 sm:w-auto cursor-pointer',
+                    selectedIconFilters.includes(t) && 'ring-2 ring-blue-500 dark:ring-blue-300'
+                  )}
+                  onClick={() => toggleIconFilter(t)}
+                  style={{ minWidth: 40, minHeight: 40 }}
+                />
+              );
+            })}
+          </div>
+        </div>
           {/* Brigades */}
           <div>
             <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Good Brigades</p>
