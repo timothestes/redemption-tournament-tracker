@@ -1,7 +1,8 @@
 "use client";
 import React, { useEffect, useState, useMemo } from "react";
+import { useTheme } from "next-themes";
 import { CARD_DATA_URL, CARD_IMAGE_BASE_URL, OT_BOOKS, NT_BOOKS, GOSPEL_BOOKS } from "./constants";
-import { Modal, Button, ToggleSwitch } from "flowbite-react";
+import { Modal, Button } from "flowbite-react";
 import clsx from "clsx";
 
 // Card data structure
@@ -28,14 +29,18 @@ export default function CardSearchClient() {
   const [cards, setCards] = useState<Card[]>([]);
   const [query, setQuery] = useState("");
   const [selectedIconFilters, setSelectedIconFilters] = useState<string[]>([]);
-  const [iconFilterMode, setIconFilterMode] = useState<'AND'|'OR'>('AND');
-  // Card legality filter mode: Rotation, Classic (all), Banned
-  const [legalityMode, setLegalityMode] = useState<'Rotation'|'Classic'|'Banned'>('Rotation');
+  // Card legality filter mode: Rotation, Classic (all), Banned, Scrolls (not Rotation or Banned)
+  const [legalityMode, setLegalityMode] = useState<'Rotation'|'Classic'|'Banned'|'Scrolls'>('Rotation');
   const [visibleCount, setVisibleCount] = useState(50); // Number of cards to show
 
   const [modalCard, setModalCard] = useState<Card | null>(null);
+  // Alignment filters: Good, Evil, Neutral (multiple selection)
+  const [selectedAlignmentFilters, setSelectedAlignmentFilters] = useState<string[]>([]);
   // sanitize imgFile to avoid duplicate extensions
   const sanitizeImgFile = (f: string) => f.replace(/\.jpe?g$/i, "");
+  // theme for dark/light Lost Soul icon
+  const { theme, systemTheme } = useTheme();
+  const resolvedTheme = theme === 'system' ? systemTheme : theme;
 
   // Define how each icon filter should be applied
   const iconPredicates: Record<string, (c: Card) => boolean> = {
@@ -46,8 +51,8 @@ export default function CardSearchClient() {
     "Evil Fortress": (c) => c.type === "Fortress" && c.alignment.includes("Evil"),
     // other icons use existing category filters
     GE: (c) => c.type.includes("GE"),
-    "Cross Icon": (c) => c.type === "Hero",
     "Evil Character": (c) => c.type === "Evil Character",
+    Hero: (c) => c.type === "Hero",
     Site: (c) => c.type === "Site",
     EE: (c) => c.type.includes("EE"),
     "Territory-Class": (c) => c.class === "Territory",
@@ -56,6 +61,7 @@ export default function CardSearchClient() {
     // Enhancements by alignment
     "Good Enhancement": (c) => c.type === "Enhancement" && c.alignment.includes("Good"),
     "Evil Enhancement": (c) => c.type === "Enhancement" && c.alignment.includes("Evil"),
+    "Lost Soul": (c) => c.type === "Lost Soul",
     "City": (c) => c.type === "City",
   };
 
@@ -104,50 +110,69 @@ export default function CardSearchClient() {
     "Site",
     "Good Fortress",
     "Evil Fortress",
-    "Cross Icon",  // Hero icon
+    "Hero",
     "Evil Character",
     "GE",
-    "EE"
+    "EE",
+    "Lost Soul"
   ];
-  const colorIcons = ["Black","Blue","Brown","Clay","Crimson","Gold","Gray","Green","Orange","Pale Green","Purple","Silver","White"];
+  const colorIcons = [
+    "Black",
+    "Blue",
+    "Brown",
+    "Clay",
+    "Crimson",
+    "Gold",
+    "Gray",
+    "Green",
+    "Orange",
+    "Pale Green",
+    "Purple",
+    "Silver",
+    "White",
+    "Red",
+    "Teal",
+  ];
+  // Grouped color icons by brigade alignment
+  const goodBrigadeIcons = ["Blue","Clay","Gold","Green","Purple","Silver","White","Red","Teal"];
+  const evilBrigadeIcons = ["Black","Brown","Crimson","Gold","Gray","Orange","Pale Green"];
 
   const filtered = useMemo(
     () =>
       cards
         .filter((c) => Object.values(c).join(" ").toLowerCase().includes(query.toLowerCase()))
         // Legality mode filter
-        .filter((c) => legalityMode === 'Classic' || c.legality === legalityMode)
         .filter((c) => {
-          // include City if Site + Good/Evil Fortress selected
-          const effIcons = [...selectedIconFilters];
-          if (
-            selectedIconFilters.includes("Site") &&
-            (selectedIconFilters.includes("Evil Fortress") || selectedIconFilters.includes("Good Fortress"))
-          ) {
-            effIcons.push("City");
-          }
-          if (effIcons.length === 0) return true;
-          if (iconFilterMode === 'OR') {
-            return effIcons.some((icon) => {
-              const pred = iconPredicates[icon];
-              if (pred) return pred(c);
-              return c.brigade.toLowerCase().includes(icon.toLowerCase());
-            });
-          }
-          // AND mode
-          return effIcons.every((icon) => {
+          if (legalityMode === 'Classic') return true;
+          if (legalityMode === 'Scrolls') return c.legality !== 'Rotation' && c.legality !== 'Banned';
+          return c.legality === legalityMode;
+        })
+        // Alignment filters (OR across selected filters)
+        .filter((c) => {
+          if (selectedAlignmentFilters.length === 0) return true;
+          return selectedAlignmentFilters.some((mode) => {
+            if (mode === 'Neutral') {
+              return !c.alignment.includes('Good') && !c.alignment.includes('Evil');
+            }
+            return c.alignment.includes(mode);
+          });
+        })
+        .filter((c) => {
+          // icon filters (AND mode)
+          if (selectedIconFilters.length === 0) return true;
+          return selectedIconFilters.every((icon) => {
             const pred = iconPredicates[icon];
             if (pred) return pred(c);
             return c.brigade.toLowerCase().includes(icon.toLowerCase());
           });
         }),
-    [cards, query, selectedIconFilters, legalityMode, iconFilterMode]
+    [cards, query, selectedIconFilters, legalityMode, selectedAlignmentFilters]
   );
 
   // Reset visible count when filters change
   useEffect(() => {
     setVisibleCount(50);
-  }, [query, selectedIconFilters, legalityMode, iconFilterMode]);
+  }, [query, selectedIconFilters, legalityMode, selectedAlignmentFilters]);
 
   const visibleCards = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
 
@@ -174,9 +199,15 @@ export default function CardSearchClient() {
   function toggleIconFilter(value: string) {
     setSelectedIconFilters((prev) => {
       const next = prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value];
-      console.log(`Icon filter toggled: ${value}, iconFilterMode=${iconFilterMode}, selectedIconFilters=`, next);
+      console.log(`Icon filter toggled: ${value}, selectedIconFilters=`, next);
       return next;
     });
+  }
+  // Toggler for alignment filters
+  function toggleAlignmentFilter(value: string) {
+    setSelectedAlignmentFilters((prev) =>
+      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
+    );
   }
 
   return (
@@ -194,7 +225,7 @@ export default function CardSearchClient() {
         <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Legality</p>
         {/* Legality mode toggles */}
         <div className="flex gap-2 mb-4">
-          {['Rotation','Classic','Banned'].map((mode) => (
+          {['Rotation','Classic','Banned','Scrolls'].map((mode) => (
             <button
               key={mode}
               className={clsx(
@@ -209,33 +240,54 @@ export default function CardSearchClient() {
             </button>
           ))}
         </div>
+        {/* Alignment filters */}
+        <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Alignment</p>
+        <div className="flex gap-2 mb-4">
+          {['Good','Evil','Neutral'].map((mode) => (
+            <button
+              key={mode}
+              className={clsx(
+                'px-3 py-1 border rounded text-sm',
+                selectedAlignmentFilters.includes(mode)
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700'
+              )}
+              onClick={() => toggleAlignmentFilter(mode)}
+            >
+              {mode}
+            </button>
+          ))}
+        </div>
         {/* Quick icon filters with AND/OR toggle */}
         <div className="mb-4">
-          <div className="flex items-center justify-end mb-2 space-x-2">
-            <span className="text-sm">AND</span>
-            <ToggleSwitch
-              id="filter-mode"
-              checked={iconFilterMode === 'OR'}
-              onChange={() => setIconFilterMode(iconFilterMode === 'AND' ? 'OR' : 'AND')}
-            />
-            <span className="text-sm">OR</span>
-          </div>
+          <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Types</p>
           <div className="flex flex-wrap gap-2">
-            {typeIcons.map((t) => (
-              <img
-                key={t}
-                src={`/filter-icons/${encodeURIComponent(t)}.png`}
-                alt={t}
-                className={clsx(
-                  "h-8 w-auto cursor-pointer",
-                  selectedIconFilters.includes(t) && "ring-2 ring-blue-500"
-                )}
-                onClick={() => toggleIconFilter(t)}
-              />
-            ))}
+            {typeIcons.map((t) => {
+              // use static Lost Soul icon
+              const src =
+                t === 'Lost Soul'
+                  ? '/filter-icons/Lost%20Soul.png'
+                  : t === 'Hero'
+                  ? '/filter-icons/hero.png'
+                  : `/filter-icons/${encodeURIComponent(t)}.png`;
+              return (
+                <img
+                  key={t}
+                  src={src}
+                  alt={t}
+                  className={clsx(
+                    'h-8 w-auto cursor-pointer',
+                    selectedIconFilters.includes(t) && 'ring-2 ring-blue-500'
+                  )}
+                  onClick={() => toggleIconFilter(t)}
+                />
+              );
+            })}
           </div>
-          <div className="flex flex-wrap gap-2 mt-2">
-            {colorIcons.map((icon) => (
+          {/* Good Brigades */}
+          <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Good Brigades</p>
+          <div className="flex flex-wrap gap-2 mb-2">
+            {goodBrigadeIcons.map((icon) => (
               <img
                 key={icon}
                 src={`/filter-icons/Color=${encodeURIComponent(icon)}.png`}
@@ -248,6 +300,22 @@ export default function CardSearchClient() {
               />
             ))}
           </div>
+          {/* Evil Brigades */}
+          <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Evil Brigades</p>
+          <div className="flex flex-wrap gap-2">
+            {evilBrigadeIcons.map((icon) => (
+              <img
+                key={icon}
+                src={`/filter-icons/Color=${encodeURIComponent(icon)}.png`}
+                alt={icon}
+                className={clsx(
+                  "h-8 w-auto cursor-pointer",
+                  selectedIconFilters.includes(icon) && "ring-2 ring-blue-500"
+                )}
+                onClick={() => toggleIconFilter(icon)}
+              />
+            ))}
+          </div>  
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
           {visibleCards.map((c) => (
