@@ -547,12 +547,12 @@ export default function CardSearchClient() {
   return (
     <div className="bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white min-h-screen transition-colors duration-200">
       <div className="p-2 flex flex-col items-center sticky top-0 z-30 bg-white text-gray-900 border-b border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-800 dark:shadow-lg">
-        <div className="relative w-full max-w-xl px-2 flex flex-row items-center justify-center gap-1">
-          <div className="flex-2 relative mb-4 flex items-center gap-2">
+        <div className="relative w-full max-w-xl px-2 flex flex-col sm:flex-row items-center justify-center gap-0">
+          <div className="w-full flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-center sm:gap-2 text-center">
             <input
               type="text"
               placeholder="Search"
-              className="w-full p-3 pr-10 border rounded text-base focus:ring-2 focus:ring-blue-400 text-gray-900 bg-white dark:text-white dark:bg-gray-900"
+              className="w-full sm:w-auto p-3 pr-10 border rounded text-base focus:ring-2 focus:ring-blue-400 text-gray-900 bg-white dark:text-white dark:bg-gray-900"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               maxLength={64}
@@ -561,28 +561,27 @@ export default function CardSearchClient() {
             <select
               value={searchField}
               onChange={e => {
-                console.log("hello;")
                 setSearchField(e.target.value);
                 setVisibleCount(50);
               }}
-              className="border rounded px-4 py-2 w-24 sm:w-auto bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:text-white dark:border-gray-600"
-              style={{ minHeight: 48, maxWidth: 96 }}
+              className="border rounded px-4 py-2 w-full bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:text-white dark:border-gray-600 sm:w-24 text-center"
+              style={{ minHeight: 48 }}
             >
-              <option value="everything">All</option>
-              <option value="name">Name</option>
-              <option value="specialAbility">Special Ability</option>
-              <option value="setName">Set Name</option>
-              <option value="identifier">Identifier</option>
-              <option value="reference">Reference</option>
+              <option value="everything" className="text-center">All</option>
+              <option value="name" className="text-center">Name</option>
+              <option value="specialAbility" className="text-center">Special Ability</option>
+              <option value="setName" className="text-center">Set Name</option>
+              <option value="identifier" className="text-center">Identifier</option>
+              <option value="reference" className="text-center">Reference</option>
             </select>
+            <button
+              className="px-4 py-2 w-full sm:w-auto rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center"
+              onClick={handleResetFilters}
+              style={{ minHeight: 48 }}
+            >
+              Reset Filters
+            </button>
           </div>
-          <button
-            className="mb-4 px-4 py-2 rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent transition font-semibold shadow"
-            onClick={handleResetFilters}
-            style={{ minHeight: 48 }}
-          >
-            Reset Filters
-          </button>
         </div>
       </div>
       {/* Active Filters Summary Bar */}
