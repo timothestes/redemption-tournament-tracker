@@ -24,3 +24,25 @@ export const NT_BOOKS = [
 export const GOSPEL_BOOKS = [
   'matthew', 'mark', 'luke', 'john'
 ];
+
+export const GOOD_BRIGADES = [
+  "Good Gold",
+  "Red",
+  "Silver",
+  "Teal",
+  "White",
+  "Green",
+  "Purple",
+  "Blue",
+  "Clay",
+];
+
+export const EVIL_BRIGADES = [
+  "Brown",
+  "Evil Gold",
+  "Crimson",
+  "Black",
+  "Gray",
+  "Orange",
+  "Pale Green",
+];
