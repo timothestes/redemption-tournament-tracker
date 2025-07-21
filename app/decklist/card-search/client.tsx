@@ -565,10 +565,10 @@ export default function CardSearchClient() {
                 setSearchField(e.target.value);
                 setVisibleCount(50);
               }}
-              className="border rounded px-2 py-2 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:text-white dark:border-gray-600"
-              style={{ minHeight: 48 }}
+              className="border rounded px-4 py-2 w-24 sm:w-auto bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:text-white dark:border-gray-600"
+              style={{ minHeight: 48, maxWidth: 96 }}
             >
-              <option value="everything">Everything</option>
+              <option value="everything">All</option>
               <option value="name">Name</option>
               <option value="specialAbility">Special Ability</option>
               <option value="setName">Set Name</option>
