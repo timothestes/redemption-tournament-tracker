@@ -58,6 +58,8 @@ export default function CardSearchClient() {
   const [nativityOnly, setNativityOnly] = useState(false);
   const [hasStarOnly, setHasStarOnly] = useState(false);
   const [cloudOnly, setCloudOnly] = useState(false);
+  const [angelOnly, setAngelOnly] = useState(false);
+  const [demonOnly, setDemonOnly] = useState(false);
 
   // sanitize imgFile to avoid duplicate extensions
   const sanitizeImgFile = (f: string) => f.replace(/\.jpe?g$/i, "");
@@ -373,14 +375,16 @@ export default function CardSearchClient() {
         ))
         .filter((c) => !nativityOnly || isNativityReference(c.reference))
         .filter((c) => !cloudOnly || c.class.toLowerCase().includes("cloud"))
-        .filter((c) => !hasStarOnly || c.specialAbility.includes("STAR:") || c.specialAbility.includes("(Star)")),
-    [cards, query, searchField, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, strengthFilter, strengthOp, toughnessFilter, toughnessOp, iconFilterMode]
+        .filter((c) => !hasStarOnly || c.specialAbility.toLowerCase().includes("star:") || c.specialAbility.toLowerCase().includes("(star)"))
+        .filter((c) => !angelOnly || (c.type.includes("Hero") && c.brigade.includes("Silver") && !c.identifier.includes("Human") && !c.identifier.includes("Genderless") && c.name !== "Moses in Glory (GoC)" && c.name !== "Noah, the Righteous / Noah (Rest and Comfort) (LoC)"))
+        .filter((c) => !demonOnly || (c.type.includes("Evil Character") && c.brigade.includes("Orange") && c.name !== "Babylon The Harlot (RoJ)" && c.brigade !== "Black/Brown/Crimson/Evil Gold/Gray/Orange/Pale Green" && !c.identifier.includes("Symbolic") && !c.identifier.includes("Animal") && c.name !== "Sabbath Breaker [Gray/Orange]" && c.name !== "The Divining Damsel (Promo)" && c.name !== "The False Prophet (EC)" && c.name !== "The False Prophet (RoJ)" && c.name !== "The False Prophet (RoJ AB)")),
+    [cards, query, searchField, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, strengthFilter, strengthOp, toughnessFilter, toughnessOp, iconFilterMode]
   );
 
   // Reset visible count when filters change or icon filter mode changes
   useEffect(() => {
     setVisibleCount(50);
-  }, [query, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedTestaments, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, iconFilterMode]);
+  }, [query, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedTestaments, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, iconFilterMode]);
 
   // Central logging of all active filters
   useEffect(() => {
@@ -396,8 +400,10 @@ export default function CardSearchClient() {
       nativity: nativityOnly,
       star: hasStarOnly,
       cloud: cloudOnly,
+      angel: angelOnly,
+      demon: demonOnly,
     });
-  }, [query, legalityMode, selectedAlignmentFilters, selectedIconFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly]);
+  }, [query, legalityMode, selectedAlignmentFilters, selectedIconFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly]);
 
 
 
@@ -536,6 +542,8 @@ export default function CardSearchClient() {
     setNativityOnly(false);
     setHasStarOnly(false);
     setCloudOnly(false);
+    setAngelOnly(false);
+    setDemonOnly(false);
     setStrengthFilter(null);
     setStrengthOp('eq');
     setToughnessFilter(null);
@@ -745,6 +753,18 @@ export default function CardSearchClient() {
             <span className="ml-1 text-blue-900 dark:text-white">×</span>
           </span>
         )}
+        {angelOnly && (
+          <span className="bg-gray-100 text-gray-900 dark:bg-gray-300 dark:text-gray-900 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setAngelOnly(false)} tabIndex={0} role="button" aria-label="Remove Angel filter">
+            Angel
+            <span className="ml-1 text-gray-900">×</span>
+          </span>
+        )}
+        {demonOnly && (
+          <span className="bg-orange-200 text-orange-900 dark:bg-orange-500 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setDemonOnly(false)} tabIndex={0} role="button" aria-label="Remove Demon filter">
+            Demon
+            <span className="ml-1 text-orange-900 dark:text-white">×</span>
+          </span>
+        )}
       </div>
       <main className="p-2 overflow-auto bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200">
         {/* Responsive grid for filters */}
@@ -931,6 +951,28 @@ export default function CardSearchClient() {
                       onClick={() => setCloudOnly(v => !v)}
                     >
                       Cloud
+                    </button>
+                    <button
+                      className={clsx(
+                        'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                        angelOnly
+                          ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
+                          : 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                      )}
+                      onClick={() => setAngelOnly(v => !v)}
+                    >
+                      Angel
+                    </button>
+                    <button
+                      className={clsx(
+                        'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                        demonOnly
+                          ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
+                          : 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                      )}
+                      onClick={() => setDemonOnly(v => !v)}
+                    >
+                      Demon
                     </button>
                   </div>
                 </div>
