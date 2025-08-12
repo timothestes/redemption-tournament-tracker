@@ -60,6 +60,7 @@ export default function CardSearchClient() {
   const [cloudOnly, setCloudOnly] = useState(false);
   const [angelOnly, setAngelOnly] = useState(false);
   const [demonOnly, setDemonOnly] = useState(false);
+  const [danielOnly, setDanielOnly] = useState(false);
 
   // sanitize imgFile to avoid duplicate extensions
   const sanitizeImgFile = (f: string) => f.replace(/\.jpe?g$/i, "");
@@ -377,14 +378,15 @@ export default function CardSearchClient() {
         .filter((c) => !cloudOnly || c.class.toLowerCase().includes("cloud"))
         .filter((c) => !hasStarOnly || c.specialAbility.toLowerCase().includes("star:") || c.specialAbility.toLowerCase().includes("(star)"))
         .filter((c) => !angelOnly || (c.type.includes("Hero") && c.brigade.includes("Silver") && !c.identifier.includes("Human") && !c.identifier.includes("Genderless") && c.name !== "Moses in Glory (GoC)" && c.name !== "Noah, the Righteous / Noah (Rest and Comfort) (LoC)" && c.name !== "Daniel (Promo)"))
-        .filter((c) => !demonOnly || (c.type.includes("Evil Character") && (c.brigade.includes("Orange") || c.name.toLowerCase().includes("demon") || c.name.toLowerCase().includes("obsidian minion") || c.name === "Foul Spirit (E)" || c.name === "Lying Spirit" || c.name === "Spirit of Doubt" || c.name === "Unclean Spirit (E)" || c.name === "Wandering Spirit (Ap)") && c.name !== "Babylon The Harlot (RoJ)" && c.brigade !== "Black/Brown/Crimson/Evil Gold/Gray/Orange/Pale Green" && !c.identifier.includes("Symbolic") && !c.identifier.includes("Animal") && c.name !== "Sabbath Breaker [Gray/Orange]" && c.name !== "The Divining Damsel (Promo)" && c.name !== "The False Prophet (EC)" && c.name !== "The False Prophet (RoJ)" && c.name !== "The False Prophet (RoJ AB)" && c.name !== "Damsel with Spirit of Divination (TxP)" && c.name !== "Saul/Paul")),
-    [cards, query, searchField, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, strengthFilter, strengthOp, toughnessFilter, toughnessOp, iconFilterMode]
+        .filter((c) => !demonOnly || (c.type.includes("Evil Character") && (c.brigade.includes("Orange") || c.name.toLowerCase().includes("demon") || c.name.toLowerCase().includes("obsidian minion") || c.name === "Foul Spirit (E)" || c.name === "Lying Spirit" || c.name === "Spirit of Doubt" || c.name === "Unclean Spirit (E)" || c.name === "Wandering Spirit (Ap)") && c.name !== "Babylon The Harlot (RoJ)" && c.brigade !== "Black/Brown/Crimson/Evil Gold/Gray/Orange/Pale Green" && !c.identifier.includes("Symbolic") && !c.identifier.includes("Animal") && c.name !== "Sabbath Breaker [Gray/Orange]" && c.name !== "The Divining Damsel (Promo)" && c.name !== "The False Prophet (EC)" && c.name !== "The False Prophet (RoJ)" && c.name !== "The False Prophet (RoJ AB)" && c.name !== "Damsel with Spirit of Divination (TxP)" && c.name !== "Saul/Paul"))
+        .filter((c) => !danielOnly || c.reference.toLowerCase().includes("daniel")),
+    [cards, query, searchField, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, strengthFilter, strengthOp, toughnessFilter, toughnessOp, iconFilterMode]
   );
 
   // Reset visible count when filters change or icon filter mode changes
   useEffect(() => {
     setVisibleCount(50);
-  }, [query, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedTestaments, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, iconFilterMode]);
+  }, [query, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedTestaments, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, iconFilterMode]);
 
   // Central logging of all active filters
   useEffect(() => {
@@ -402,8 +404,9 @@ export default function CardSearchClient() {
       cloud: cloudOnly,
       angel: angelOnly,
       demon: demonOnly,
+      daniel: danielOnly,
     });
-  }, [query, legalityMode, selectedAlignmentFilters, selectedIconFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly]);
+  }, [query, legalityMode, selectedAlignmentFilters, selectedIconFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly]);
 
 
 
@@ -544,6 +547,7 @@ export default function CardSearchClient() {
     setCloudOnly(false);
     setAngelOnly(false);
     setDemonOnly(false);
+    setDanielOnly(false);
     setStrengthFilter(null);
     setStrengthOp('eq');
     setToughnessFilter(null);
@@ -765,6 +769,12 @@ export default function CardSearchClient() {
             <span className="ml-1 text-orange-900 dark:text-white">×</span>
           </span>
         )}
+        {danielOnly && (
+          <span className="bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setDanielOnly(false)} tabIndex={0} role="button" aria-label="Remove Daniel filter">
+            Daniel
+            <span className="ml-1 text-blue-900 dark:text-white">×</span>
+          </span>
+        )}
       </div>
       <main className="p-2 overflow-auto bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200">
         {/* Responsive grid for filters */}
@@ -973,6 +983,17 @@ export default function CardSearchClient() {
                       onClick={() => setDemonOnly(v => !v)}
                     >
                       Demon
+                    </button>
+                    <button
+                      className={clsx(
+                        'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                        danielOnly
+                          ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
+                          : 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                      )}
+                      onClick={() => setDanielOnly(v => !v)}
+                    >
+                      Daniel
                     </button>
                   </div>
                 </div>
