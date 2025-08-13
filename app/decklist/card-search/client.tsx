@@ -65,6 +65,7 @@ export default function CardSearchClient() {
   const [angelOnly, setAngelOnly] = useState(false);
   const [demonOnly, setDemonOnly] = useState(false);
   const [danielOnly, setDanielOnly] = useState(false);
+  const [postexilicOnly, setPostexilicOnly] = useState(false);
   const [copyLinkNotification, setCopyLinkNotification] = useState(false);
 
   // Function to update URL with current filter state
@@ -96,6 +97,7 @@ export default function CardSearchClient() {
     if (filters.angelOnly) params.set('angel', 'true');
     if (filters.demonOnly) params.set('demon', 'true');
     if (filters.danielOnly) params.set('daniel', 'true');
+    if (filters.postexilicOnly) params.set('postexilic', 'true');
 
     const url = params.toString() ? `?${params.toString()}` : '';
     router.replace(`/decklist/card-search${url}`, { scroll: false });
@@ -133,6 +135,7 @@ export default function CardSearchClient() {
       setAngelOnly(searchParams.get('angel') === 'true');
       setDemonOnly(searchParams.get('demon') === 'true');
       setDanielOnly(searchParams.get('daniel') === 'true');
+      setPostexilicOnly(searchParams.get('postexilic') === 'true');
     }
   }, [searchParams]);
 
@@ -159,6 +162,7 @@ export default function CardSearchClient() {
       angelOnly,
       demonOnly,
       danielOnly,
+      postexilicOnly,
     };
     
     updateURL(filters);
@@ -167,7 +171,7 @@ export default function CardSearchClient() {
     selectedAlignmentFilters, selectedTestaments, isGospel, strengthFilter,
     strengthOp, toughnessFilter, toughnessOp, noAltArt, noFirstPrint,
     nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly,
-    updateURL
+    postexilicOnly, updateURL
   ]);
 
   // sanitize imgFile to avoid duplicate extensions
@@ -487,14 +491,44 @@ export default function CardSearchClient() {
         .filter((c) => !hasStarOnly || c.specialAbility.toLowerCase().includes("star:") || c.specialAbility.toLowerCase().includes("(star)"))
         .filter((c) => !angelOnly || (c.type.includes("Hero") && c.brigade.includes("Silver") && !c.identifier.includes("Human") && !c.identifier.includes("Genderless") && c.name !== "Moses in Glory (GoC)" && c.name !== "Noah, the Righteous / Noah (Rest and Comfort) (LoC)" && c.name !== "Daniel (Promo)"))
         .filter((c) => !demonOnly || (c.type.includes("Evil Character") && (c.brigade.includes("Orange") || c.name.toLowerCase().includes("demon") || c.name.toLowerCase().includes("obsidian minion") || c.name === "Foul Spirit (E)" || c.name === "Lying Spirit" || c.name === "Spirit of Doubt" || c.name === "Unclean Spirit (E)" || c.name === "Wandering Spirit (Ap)") && c.name !== "Babylon The Harlot (RoJ)" && c.brigade !== "Black/Brown/Crimson/Evil Gold/Gray/Orange/Pale Green" && !c.identifier.includes("Symbolic") && !c.identifier.includes("Animal") && c.name !== "Sabbath Breaker [Gray/Orange]" && c.name !== "The Divining Damsel (Promo)" && c.name !== "The False Prophet (EC)" && c.name !== "The False Prophet (RoJ)" && c.name !== "The False Prophet (RoJ AB)" && c.name !== "Damsel with Spirit of Divination (TxP)" && c.name !== "Saul/Paul"))
-        .filter((c) => !danielOnly || c.reference.toLowerCase().includes("daniel")),
-    [cards, query, searchField, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, strengthFilter, strengthOp, toughnessFilter, toughnessOp, iconFilterMode]
+        .filter((c) => !danielOnly || c.reference.toLowerCase().includes("daniel"))
+        .filter((c) => {
+          if (!postexilicOnly) return true;
+          // Check if name contains "postexilic"
+          if (c.identifier.toLowerCase().includes("postexilic")) return true;
+          // Check if it's one of the specific postexilic cards
+          const postexilicCards = [
+            "Nehemiah",
+            "Eliashib the High Priest",
+            "Ezra",
+            "Haggai",
+            "Haggai (PoC)",
+            "Joiada, Son of Eliashib",
+            "Joiakim, Son of Joshua",
+            "Jonathan, son of Joiada",
+            "Joshua the High Priest (PoC)",
+            "Joshua the High Priest",
+            "Malachi (PoC)",
+            "Malachi, the Loved",
+            "Malachi",
+            "Shelemiah the Priest",
+            "Zechariah (Pi)",
+            "Zechariah (Pr)",
+            "Zechariah (RoA)",
+            "Zechariah, the Renewer",
+            "Zerubbabel",
+            "Foolish Shepherd",
+            "Unfaithful Priests"
+          ];
+          return postexilicCards.includes(c.name);
+        }),
+    [cards, query, searchField, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly, strengthFilter, strengthOp, toughnessFilter, toughnessOp, iconFilterMode]
   );
 
   // Reset visible count when filters change or icon filter mode changes
   useEffect(() => {
     setVisibleCount(50);
-  }, [query, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedTestaments, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, iconFilterMode]);
+  }, [query, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedTestaments, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly, iconFilterMode]);
 
   // Central logging of all active filters
   useEffect(() => {
@@ -513,8 +547,9 @@ export default function CardSearchClient() {
       angel: angelOnly,
       demon: demonOnly,
       daniel: danielOnly,
+      postexilic: postexilicOnly,
     });
-  }, [query, legalityMode, selectedAlignmentFilters, selectedIconFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly]);
+  }, [query, legalityMode, selectedAlignmentFilters, selectedIconFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly]);
 
 
 
@@ -658,6 +693,7 @@ export default function CardSearchClient() {
     setAngelOnly(false);
     setDemonOnly(false);
     setDanielOnly(false);
+    setPostexilicOnly(false);
     setStrengthFilter(null);
     setStrengthOp('eq');
     setToughnessFilter(null);
@@ -907,6 +943,12 @@ export default function CardSearchClient() {
             <span className="ml-1 text-blue-900 dark:text-white">×</span>
           </span>
         )}
+        {postexilicOnly && (
+          <span className="bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setPostexilicOnly(false)} tabIndex={0} role="button" aria-label="Remove Postexilic filter">
+            Postexilic
+            <span className="ml-1 text-blue-900 dark:text-white">×</span>
+          </span>
+        )}
       </div>
       <main className="p-2 overflow-auto bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200">
         {/* Responsive grid for filters */}
@@ -1126,6 +1168,17 @@ export default function CardSearchClient() {
                       onClick={() => setDanielOnly(v => !v)}
                     >
                       Daniel
+                    </button>
+                    <button
+                      className={clsx(
+                        'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                        postexilicOnly
+                          ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
+                          : 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                      )}
+                      onClick={() => setPostexilicOnly(v => !v)}
+                    >
+                      Postexilic
                     </button>
                   </div>
                 </div>
