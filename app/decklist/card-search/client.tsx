@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import ModalWithClose from "./ModalWithClose";
 import { CARD_DATA_URL, CARD_IMAGE_BASE_URL, OT_BOOKS, NT_BOOKS, GOSPEL_BOOKS, GOOD_BRIGADES, EVIL_BRIGADES } from "./constants";
 import clsx from "clsx";
@@ -27,6 +28,9 @@ interface Card {
 }
 
 export default function CardSearchClient() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  
   // Collapse state for filter grid
   const [filterGridCollapsed, setFilterGridCollapsed] = useState(false);
   // Search field dropdown state
@@ -61,6 +65,110 @@ export default function CardSearchClient() {
   const [angelOnly, setAngelOnly] = useState(false);
   const [demonOnly, setDemonOnly] = useState(false);
   const [danielOnly, setDanielOnly] = useState(false);
+  const [copyLinkNotification, setCopyLinkNotification] = useState(false);
+
+  // Function to update URL with current filter state
+  const updateURL = React.useCallback((filters: Record<string, any>) => {
+    const params = new URLSearchParams();
+    
+    // Only add non-default values to URL
+    if (filters.query) params.set('q', filters.query);
+    if (filters.searchField !== 'everything') params.set('field', filters.searchField);
+    if (filters.legalityMode !== 'Rotation') params.set('legality', filters.legalityMode);
+    if (filters.iconFilterMode !== 'AND') params.set('iconMode', filters.iconFilterMode);
+    if (filters.selectedIconFilters.length > 0) params.set('icons', filters.selectedIconFilters.join(','));
+    if (filters.selectedAlignmentFilters.length > 0) params.set('alignment', filters.selectedAlignmentFilters.join(','));
+    if (filters.selectedTestaments.length > 0) params.set('testaments', filters.selectedTestaments.join(','));
+    if (filters.isGospel) params.set('gospel', 'true');
+    if (filters.strengthFilter !== null) {
+      params.set('strength', filters.strengthFilter.toString());
+      params.set('strengthOp', filters.strengthOp);
+    }
+    if (filters.toughnessFilter !== null) {
+      params.set('toughness', filters.toughnessFilter.toString());
+      params.set('toughnessOp', filters.toughnessOp);
+    }
+    if (!filters.noAltArt) params.set('showAltArt', 'true');
+    if (!filters.noFirstPrint) params.set('showFirstPrint', 'true');
+    if (filters.nativityOnly) params.set('nativity', 'true');
+    if (filters.hasStarOnly) params.set('hasStar', 'true');
+    if (filters.cloudOnly) params.set('cloud', 'true');
+    if (filters.angelOnly) params.set('angel', 'true');
+    if (filters.demonOnly) params.set('demon', 'true');
+    if (filters.danielOnly) params.set('daniel', 'true');
+
+    const url = params.toString() ? `?${params.toString()}` : '';
+    router.replace(`/decklist/card-search${url}`, { scroll: false });
+  }, [router]);
+
+  // Load state from URL on mount
+  useEffect(() => {
+    if (searchParams) {
+      setQuery(searchParams.get('q') || '');
+      setSearchField(searchParams.get('field') || 'everything');
+      setLegalityMode((searchParams.get('legality') as any) || 'Rotation');
+      setIconFilterMode((searchParams.get('iconMode') as any) || 'AND');
+      setSelectedIconFilters(searchParams.get('icons')?.split(',').filter(Boolean) || []);
+      setSelectedAlignmentFilters(searchParams.get('alignment')?.split(',').filter(Boolean) || []);
+      setSelectedTestaments(searchParams.get('testaments')?.split(',').filter(Boolean) || []);
+      setIsGospel(searchParams.get('gospel') === 'true');
+      
+      const strengthParam = searchParams.get('strength');
+      if (strengthParam) {
+        setStrengthFilter(parseInt(strengthParam, 10));
+        setStrengthOp(searchParams.get('strengthOp') || 'eq');
+      }
+      
+      const toughnessParam = searchParams.get('toughness');
+      if (toughnessParam) {
+        setToughnessFilter(parseInt(toughnessParam, 10));
+        setToughnessOp(searchParams.get('toughnessOp') || 'eq');
+      }
+      
+      setnoAltArt(searchParams.get('showAltArt') !== 'true');
+      setnoFirstPrint(searchParams.get('showFirstPrint') !== 'true');
+      setNativityOnly(searchParams.get('nativity') === 'true');
+      setHasStarOnly(searchParams.get('hasStar') === 'true');
+      setCloudOnly(searchParams.get('cloud') === 'true');
+      setAngelOnly(searchParams.get('angel') === 'true');
+      setDemonOnly(searchParams.get('demon') === 'true');
+      setDanielOnly(searchParams.get('daniel') === 'true');
+    }
+  }, [searchParams]);
+
+  // Update URL whenever filters change
+  useEffect(() => {
+    const filters = {
+      query,
+      searchField,
+      legalityMode,
+      iconFilterMode,
+      selectedIconFilters,
+      selectedAlignmentFilters,
+      selectedTestaments,
+      isGospel,
+      strengthFilter,
+      strengthOp,
+      toughnessFilter,
+      toughnessOp,
+      noAltArt,
+      noFirstPrint,
+      nativityOnly,
+      hasStarOnly,
+      cloudOnly,
+      angelOnly,
+      demonOnly,
+      danielOnly,
+    };
+    
+    updateURL(filters);
+  }, [
+    query, searchField, legalityMode, iconFilterMode, selectedIconFilters,
+    selectedAlignmentFilters, selectedTestaments, isGospel, strengthFilter,
+    strengthOp, toughnessFilter, toughnessOp, noAltArt, noFirstPrint,
+    nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly,
+    updateURL
+  ]);
 
   // sanitize imgFile to avoid duplicate extensions
   const sanitizeImgFile = (f: string) => f.replace(/\.jpe?g$/i, "");
@@ -535,8 +643,10 @@ export default function CardSearchClient() {
   // Reset filters handler
   function handleResetFilters() {
     setQuery("");
+    setSearchField("everything");
     setSelectedIconFilters([]);
     setLegalityMode('Rotation');
+    setIconFilterMode('AND');
     setSelectedAlignmentFilters([]);
     setSelectedTestaments([]);
     setIsGospel(false);
@@ -552,6 +662,20 @@ export default function CardSearchClient() {
     setStrengthOp('eq');
     setToughnessFilter(null);
     setToughnessOp('eq');
+    
+    // Clear URL
+    router.replace('/decklist/card-search', { scroll: false });
+  }
+
+  // Copy current search URL to clipboard
+  function handleCopyLink() {
+    const currentUrl = window.location.href;
+    navigator.clipboard.writeText(currentUrl).then(() => {
+      setCopyLinkNotification(true);
+      setTimeout(() => setCopyLinkNotification(false), 2000); // Hide after 2 seconds
+    }).catch(err => {
+      console.error('Failed to copy link:', err);
+    });
   }
 
 
@@ -592,6 +716,14 @@ export default function CardSearchClient() {
               style={{ minHeight: 48 }}
             >
               Reset Filters
+            </button>
+            <button
+              className="px-4 py-2 w-full sm:w-auto rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center relative"
+              onClick={handleCopyLink}
+              style={{ minHeight: 48 }}
+              title={copyLinkNotification ? 'Link copied!' : 'Copy search link'}
+            >
+              {copyLinkNotification ? '✓' : '🔗'}
             </button>
           </div>
         </div>
