@@ -718,7 +718,7 @@ export default function CardSearchClient() {
               Reset Filters
             </button>
             <button
-              className="px-4 py-2 w-full sm:w-auto rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center relative"
+              className="px-4 py-2 w-full sm:w-auto rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center relative hidden sm:block"
               onClick={handleCopyLink}
               style={{ minHeight: 48 }}
               title={copyLinkNotification ? 'Link copied!' : 'Copy search link'}
