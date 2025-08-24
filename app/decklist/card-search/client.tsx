@@ -48,7 +48,7 @@ export default function CardSearchClient() {
   const [selectedIconFilters, setSelectedIconFilters] = useState<string[]>([]);
   // Card legality filter mode: Rotation, Classic (all), Banned, Scrolls (not Rotation or Banned)
   const [legalityMode, setLegalityMode] = useState<'Rotation'|'Classic'|'Banned'|'Scrolls'>('Rotation');
-  const [visibleCount, setVisibleCount] = useState(50); // Number of cards to show
+  const [visibleCount, setVisibleCount] = useState(0); // Number of cards to show
 
   const [modalCard, setModalCard] = useState<Card | null>(null);
   // Alignment filters: Good, Evil, Neutral (multiple selection)
@@ -525,58 +525,40 @@ export default function CardSearchClient() {
     [cards, query, searchField, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly, strengthFilter, strengthOp, toughnessFilter, toughnessOp, iconFilterMode]
   );
 
-  // Reset visible count when filters change or icon filter mode changes
+  // Effect to show all cards when any filter is applied
   useEffect(() => {
-    setVisibleCount(50);
-  }, [query, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedTestaments, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly, iconFilterMode]);
-
-  // Central logging of all active filters
-  useEffect(() => {
-    console.log('Active filters:', {
-      query,
-      legalityMode,
-      alignment: selectedAlignmentFilters,
-      icons: selectedIconFilters,
-      testaments: selectedTestaments,
-      isGospel,
-      altArt: noAltArt,
-      firstPrint: noFirstPrint,
-      nativity: nativityOnly,
-      star: hasStarOnly,
-      cloud: cloudOnly,
-      angel: angelOnly,
-      demon: demonOnly,
-      daniel: danielOnly,
-      postexilic: postexilicOnly,
-    });
-  }, [query, legalityMode, selectedAlignmentFilters, selectedIconFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly]);
-
-
+    // If any meaningful filters are active, show all filtered cards, otherwise show none
+    // Note: searchField change alone shouldn't trigger showing cards without a query
+    const hasActiveFilters = query || 
+      selectedIconFilters.length > 0 || 
+      selectedAlignmentFilters.length > 0 || 
+      selectedTestaments.length > 0 || 
+      isGospel || 
+      strengthFilter !== null || 
+      toughnessFilter !== null || 
+      !noAltArt || 
+      !noFirstPrint || 
+      nativityOnly || 
+      hasStarOnly || 
+      cloudOnly || 
+      angelOnly || 
+      demonOnly || 
+      danielOnly || 
+      postexilicOnly ||
+      legalityMode !== 'Rotation';
+    
+    if (hasActiveFilters) {
+      setVisibleCount(filtered.length);
+    } else {
+      setVisibleCount(0);
+    }
+  }, [filtered.length, query, legalityMode, selectedIconFilters, selectedAlignmentFilters, selectedTestaments, isGospel, strengthFilter, toughnessFilter, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly]);
 
   const visibleCards = useMemo(() => {
     return filtered
       .slice(0, visibleCount)
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [filtered, visibleCount]);
-
-  // Infinite scroll effect
-  useEffect(() => {
-    const handleScroll = () => {
-      // Add a buffer to trigger loading before reaching the absolute bottom
-      if (
-        window.innerHeight + document.documentElement.scrollTop <
-        document.documentElement.offsetHeight - 100
-      ) {
-        return;
-      }
-      if (filtered.length > visibleCount) {
-        setVisibleCount((prevCount) => prevCount + 50); // Load 50 more cards
-      }
-    };
-
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [filtered.length, visibleCount]);
 
   // Toggler for icon filters
   function toggleIconFilter(value: string) {
@@ -698,6 +680,7 @@ export default function CardSearchClient() {
     setStrengthOp('eq');
     setToughnessFilter(null);
     setToughnessOp('eq');
+    setVisibleCount(0); // Don't show any cards after reset
     
     // Clear URL
     router.replace('/decklist/card-search', { scroll: false });
@@ -734,7 +717,6 @@ export default function CardSearchClient() {
               value={searchField}
               onChange={e => {
                 setSearchField(e.target.value);
-                setVisibleCount(50);
               }}
               className="border rounded px-4 py-2 w-full bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:text-white dark:border-gray-600 sm:w-24 text-center"
               style={{ minHeight: 48 }}
@@ -1261,14 +1243,23 @@ export default function CardSearchClient() {
         </div>
         )}
         {/* Card grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
-          {visibleCards.map((c) => (
-            <div key={c.dataLine} className="cursor-pointer" onClick={() => setModalCard(c)}>
-              <img src={`${CARD_IMAGE_BASE_URL}${sanitizeImgFile(c.imgFile)}.jpg`} alt={c.name} className="w-full h-auto rounded shadow" />
-              <p className="text-sm mt-1 text-center truncate">{c.name}</p>
+        {visibleCards.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
+            {visibleCards.map((c) => (
+              <div key={c.dataLine} className="cursor-pointer" onClick={() => setModalCard(c)}>
+                <img src={`${CARD_IMAGE_BASE_URL}${sanitizeImgFile(c.imgFile)}.jpg`} alt={c.name} className="w-full h-auto rounded shadow" />
+                <p className="text-sm mt-1 text-center truncate">{c.name}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex items-center justify-center mt-16 mb-16">
+            <div className="text-center">
+              <p className="text-xl text-gray-500 dark:text-gray-400 mb-2">Ready to filter cards</p>
+              <p className="text-sm text-gray-400 dark:text-gray-500">Use the search or filters above to find cards</p>
             </div>
-          ))}
-        </div>
+          </div>
+        )}
       </main>
       {/* Smaller modal with overlay click to close */}
       {modalCard && (
