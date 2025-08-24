@@ -53,6 +53,8 @@ export default function CardSearchClient() {
   const [modalCard, setModalCard] = useState<Card | null>(null);
   // Alignment filters: Good, Evil, Neutral (multiple selection)
   const [selectedAlignmentFilters, setSelectedAlignmentFilters] = useState<string[]>([]);
+  // Rarity filters
+  const [selectedRarityFilters, setSelectedRarityFilters] = useState<string[]>([]);
   // Advanced filters
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [selectedTestaments, setSelectedTestaments] = useState<string[]>([]);
@@ -79,6 +81,7 @@ export default function CardSearchClient() {
     if (filters.iconFilterMode !== 'AND') params.set('iconMode', filters.iconFilterMode);
     if (filters.selectedIconFilters.length > 0) params.set('icons', filters.selectedIconFilters.join(','));
     if (filters.selectedAlignmentFilters.length > 0) params.set('alignment', filters.selectedAlignmentFilters.join(','));
+    if (filters.selectedRarityFilters.length > 0) params.set('rarity', filters.selectedRarityFilters.join(','));
     if (filters.selectedTestaments.length > 0) params.set('testaments', filters.selectedTestaments.join(','));
     if (filters.isGospel) params.set('gospel', 'true');
     if (filters.strengthFilter !== null) {
@@ -112,6 +115,7 @@ export default function CardSearchClient() {
       setIconFilterMode((searchParams.get('iconMode') as any) || 'AND');
       setSelectedIconFilters(searchParams.get('icons')?.split(',').filter(Boolean) || []);
       setSelectedAlignmentFilters(searchParams.get('alignment')?.split(',').filter(Boolean) || []);
+      setSelectedRarityFilters(searchParams.get('rarity')?.split(',').filter(Boolean) || []);
       setSelectedTestaments(searchParams.get('testaments')?.split(',').filter(Boolean) || []);
       setIsGospel(searchParams.get('gospel') === 'true');
       
@@ -148,6 +152,7 @@ export default function CardSearchClient() {
       iconFilterMode,
       selectedIconFilters,
       selectedAlignmentFilters,
+      selectedRarityFilters,
       selectedTestaments,
       isGospel,
       strengthFilter,
@@ -168,7 +173,7 @@ export default function CardSearchClient() {
     updateURL(filters);
   }, [
     query, searchField, legalityMode, iconFilterMode, selectedIconFilters,
-    selectedAlignmentFilters, selectedTestaments, isGospel, strengthFilter,
+    selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, strengthFilter,
     strengthOp, toughnessFilter, toughnessOp, noAltArt, noFirstPrint,
     nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly,
     postexilicOnly, updateURL
@@ -176,6 +181,18 @@ export default function CardSearchClient() {
 
   // sanitize imgFile to avoid duplicate extensions
   const sanitizeImgFile = (f: string) => f.replace(/\.jpe?g$/i, "");
+  
+  // Rarity categorization helper
+  const categorizeRarity = (rarity: string, officialSet: string): string => {
+    const r = rarity.toLowerCase();
+    const os = officialSet.toLowerCase();
+    if (r === 'common' || r === 'deck' || r === 'starter' || r === 'fixed') return 'Common';
+    if (r === 'promo' || r === 'seasonal' || r === 'national' || os === 'promo') return 'Promo';
+    if (r === 'uncommon' || r === 'rare' || r === 'legacy rare') return 'Rare';
+    if (r === 'ultra rare' || r === 'ultra-rare') return 'Ultra Rare';
+    return 'Common'; // default fallback
+  };
+  
   // Nativity filter helper
   const isNativityReference = (ref: string): boolean => {
     const r = ref.trim();
@@ -406,6 +423,11 @@ export default function CardSearchClient() {
               return Object.values(c).join(" ").toLowerCase().includes(q);
           }
         })
+        // Filter out specific unwanted cards
+        .filter((c) => {
+          // Exclude Lost Soul Token OT [2024 - Nationals]
+          return c.name !== "Lost Soul Token OT [2024 - Nationals]";
+        })
         // Legality mode filter
         .filter((c) => {
           if (legalityMode === 'Classic') return true;
@@ -421,6 +443,12 @@ export default function CardSearchClient() {
             }
             return c.alignment.includes(mode);
           });
+        })
+        // Rarity filters (OR across selected filters)
+        .filter((c) => {
+          if (selectedRarityFilters.length === 0) return true;
+          const cardRarityCategory = categorizeRarity(c.rarity, c.officialSet);
+          return selectedRarityFilters.includes(cardRarityCategory);
         })
         .filter((c) => {
           if (selectedIconFilters.length === 0) return true;
@@ -522,7 +550,7 @@ export default function CardSearchClient() {
           ];
           return postexilicCards.includes(c.name);
         }),
-    [cards, query, searchField, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly, strengthFilter, strengthOp, toughnessFilter, toughnessOp, iconFilterMode]
+    [cards, query, searchField, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly, strengthFilter, strengthOp, toughnessFilter, toughnessOp, iconFilterMode]
   );
 
   // Effect to show all cards when any filter is applied
@@ -532,6 +560,7 @@ export default function CardSearchClient() {
     const hasActiveFilters = query || 
       selectedIconFilters.length > 0 || 
       selectedAlignmentFilters.length > 0 || 
+      selectedRarityFilters.length > 0 || 
       selectedTestaments.length > 0 || 
       isGospel || 
       strengthFilter !== null || 
@@ -552,7 +581,7 @@ export default function CardSearchClient() {
     } else {
       setVisibleCount(0);
     }
-  }, [filtered.length, query, legalityMode, selectedIconFilters, selectedAlignmentFilters, selectedTestaments, isGospel, strengthFilter, toughnessFilter, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly]);
+  }, [filtered.length, query, legalityMode, selectedIconFilters, selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, strengthFilter, toughnessFilter, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly]);
 
   const visibleCards = useMemo(() => {
     return filtered
@@ -570,6 +599,13 @@ export default function CardSearchClient() {
   // Toggler for alignment filters
   function toggleAlignmentFilter(value: string) {
     setSelectedAlignmentFilters((prev) =>
+      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
+    );
+  }
+  
+  // Toggler for rarity filters
+  function toggleRarityFilter(value: string) {
+    setSelectedRarityFilters((prev) =>
       prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
     );
   }
@@ -665,6 +701,7 @@ export default function CardSearchClient() {
     setLegalityMode('Rotation');
     setIconFilterMode('AND');
     setSelectedAlignmentFilters([]);
+    setSelectedRarityFilters([]);
     setSelectedTestaments([]);
     setIsGospel(false);
     setnoAltArt(true);
@@ -807,6 +844,20 @@ export default function CardSearchClient() {
           >
             {mode}
             <span className="ml-1 text-blue-900">×</span>
+          </span>
+        ))}
+        {/* Rarity */}
+        {selectedRarityFilters.map(rarity => (
+          <span
+            key={rarity}
+            className="bg-purple-200 text-purple-900 dark:bg-purple-600 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer"
+            onClick={() => setSelectedRarityFilters(selectedRarityFilters.filter(r => r !== rarity))}
+            tabIndex={0}
+            role="button"
+            aria-label={`Remove ${rarity} rarity filter`}
+          >
+            {rarity}
+            <span className="ml-1 text-purple-900 dark:text-white">×</span>
           </span>
         ))}
         {/* Icon Filters */}
@@ -969,6 +1020,23 @@ export default function CardSearchClient() {
                   onClick={() => toggleAlignmentFilter(mode)}
                 >
                   {mode}
+                </button>
+              ))}
+            </div>
+            <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Rarity</p>
+            <div className="flex flex-col sm:flex-row gap-2 mb-4 flex-wrap">
+              {['Common','Promo','Rare','Ultra Rare'].map((rarity) => (
+                <button
+                  key={rarity}
+                  className={clsx(
+                    'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                    selectedRarityFilters.includes(rarity)
+                      ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
+                      : 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                  )}
+                  onClick={() => toggleRarityFilter(rarity)}
+                >
+                  {rarity}
                 </button>
               ))}
             </div>
