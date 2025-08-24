@@ -1336,6 +1336,7 @@ export default function CardSearchClient() {
           setModalCard={setModalCard}
           CARD_IMAGE_BASE_URL={CARD_IMAGE_BASE_URL}
           sanitizeImgFile={sanitizeImgFile}
+          visibleCards={visibleCards}
         />
       )}
     </div>

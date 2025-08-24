@@ -1,5 +1,6 @@
 import React from "react";
 import { Button } from "flowbite-react";
+import { openYTGSearchPage } from "./ytgUtils";
 
 function Attribute({ label, value }: { label: string; value: string | boolean }) {
   // Prettify testament display if it's an array
@@ -49,16 +50,31 @@ function prettifyFieldName(key: string): string {
   return map[key] || key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, s => s.toUpperCase());
 }
 
-export default function ModalWithClose({ modalCard, setModalCard, CARD_IMAGE_BASE_URL, sanitizeImgFile }) {
+export default function ModalWithClose({ modalCard, setModalCard, CARD_IMAGE_BASE_URL, sanitizeImgFile, visibleCards }) {
   React.useEffect(() => {
-    function handleEsc(e) {
+    function handleKeyDown(e) {
       if (e.key === "Escape") {
         setModalCard(null);
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        if (!visibleCards || visibleCards.length <= 1) return;
+        
+        const currentIndex = visibleCards.findIndex(card => card.dataLine === modalCard.dataLine);
+        if (currentIndex === -1) return;
+        
+        let nextIndex;
+        if (e.key === "ArrowLeft") {
+          nextIndex = currentIndex === 0 ? visibleCards.length - 1 : currentIndex - 1;
+        } else {
+          nextIndex = currentIndex === visibleCards.length - 1 ? 0 : currentIndex + 1;
+        }
+        
+        setModalCard(visibleCards[nextIndex]);
       }
     }
-    window.addEventListener("keydown", handleEsc);
-    return () => window.removeEventListener("keydown", handleEsc);
-  }, [setModalCard]);
+    
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [setModalCard, modalCard, visibleCards]);
 
   if (!modalCard) return null;
   return (
@@ -67,7 +83,7 @@ export default function ModalWithClose({ modalCard, setModalCard, CARD_IMAGE_BAS
       onClick={() => setModalCard(null)}
     >
       <div
-        className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white rounded shadow-lg max-w-2xl w-full max-h-[90vh] overflow-auto relative"
+        className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white rounded shadow-lg max-w-2xl w-full max-h-[90vh] overflow-hidden relative flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         {/* X close button */}
@@ -82,30 +98,81 @@ export default function ModalWithClose({ modalCard, setModalCard, CARD_IMAGE_BAS
             <line x1="22" y1="10" x2="10" y2="22" stroke="white" strokeWidth="3.5" strokeLinecap="round" />
           </svg>
         </button>
-        <div className="px-4 pt-4 pb-2 border-b font-semibold text-lg text-center truncate">{modalCard.name}</div>
-        <div className="px-4 py-2 flex flex-col items-center relative">
-          <div className="relative w-full flex justify-center">
+        <div className="px-4 pt-4 pb-2 border-b font-semibold text-lg text-center truncate">
+          <div className="truncate">{modalCard.name}</div>
+        </div>
+        <div className="px-4 py-2 flex flex-col items-center relative flex-1 overflow-hidden">
+          <div className="relative w-full flex justify-center mb-4">
             <img
               src={`${CARD_IMAGE_BASE_URL}${sanitizeImgFile(modalCard.imgFile)}.jpg`}
               alt={modalCard.name}
-              className="w-full max-w-lg h-auto max-h-[500px] object-contain mx-auto rounded shadow-lg"
+              className="w-full max-w-md h-auto max-h-[60vh] object-contain mx-auto rounded shadow-lg"
             />
           </div>
-          <div className="mt-4 space-y-1 w-full">
-            {Object.entries(modalCard)
-              .filter(([key, value]) => {
-                // Only render 'Is Gospel' if isGospel is true
-                if (key === 'isGospel') return modalCard.isGospel === true;
-                // Always render other fields except dataLine and imgFile
-                return key !== "dataLine" && key !== "imgFile";
+          <div className="w-full flex-1 overflow-auto px-2">
+            <div className="space-y-1">
+              {Object.entries(modalCard)
+                .filter(([key, value]) => {
+                  // Only render 'Is Gospel' if isGospel is true
+                  if (key === 'isGospel') return modalCard.isGospel === true;
+                  // Always render other fields except dataLine and imgFile
+                  return key !== "dataLine" && key !== "imgFile";
               })
               .map(([key, value]) => (
                 <Attribute key={key} label={prettifyFieldName(key)} value={value as string} />
               ))}
+            </div>
           </div>
         </div>
-        <div className="px-4 pb-4 flex justify-center">
-          <Button onClick={() => setModalCard(null)}>Close</Button>
+        <div className="px-4 pb-4 pt-2 border-t bg-gray-50 dark:bg-gray-800">
+          {visibleCards && visibleCards.length > 1 && (
+            <div className="text-xs text-gray-500 dark:text-gray-400 text-center mb-2">
+              Use ← → arrow keys or buttons above to navigate • {visibleCards.findIndex(card => card.dataLine === modalCard.dataLine) + 1} of {visibleCards.length}
+            </div>
+          )}
+          <div className="flex justify-center gap-2 flex-wrap">
+            {visibleCards && visibleCards.length > 1 && (
+              <button
+                onClick={() => {
+                  const currentIndex = visibleCards.findIndex(card => card.dataLine === modalCard.dataLine);
+                  const prevIndex = currentIndex === 0 ? visibleCards.length - 1 : currentIndex - 1;
+                  setModalCard(visibleCards[prevIndex]);
+                }}
+                className="px-3 py-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors flex items-center"
+                title="Previous card (Left arrow)"
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </button>
+            )}
+            <Button 
+              onClick={() => openYTGSearchPage(modalCard.name)}
+              className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
+              size="sm"
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd"/>
+              </svg>
+              Search YTG
+            </Button>
+            <Button onClick={() => setModalCard(null)} size="sm">Close</Button>
+            {visibleCards && visibleCards.length > 1 && (
+              <button
+                onClick={() => {
+                  const currentIndex = visibleCards.findIndex(card => card.dataLine === modalCard.dataLine);
+                  const nextIndex = currentIndex === visibleCards.length - 1 ? 0 : currentIndex + 1;
+                  setModalCard(visibleCards[nextIndex]);
+                }}
+                className="px-3 py-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors flex items-center"
+                title="Next card (Right arrow)"
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
