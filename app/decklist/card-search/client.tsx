@@ -33,8 +33,8 @@ export default function CardSearchClient() {
   
   // Collapse state for filter grid
   const [filterGridCollapsed, setFilterGridCollapsed] = useState(false);
-  // Search field dropdown state
-  const [searchField, setSearchField] = useState<string>('everything');
+  // Query state - each query has its own text and search field
+  const [queries, setQueries] = useState<{text: string, field: string}[]>([{text: "", field: "everything"}]);
 
   // Icon filter mode: AND or OR
   const [iconFilterMode, setIconFilterMode] = useState<'AND'|'OR'>('AND');
@@ -44,7 +44,6 @@ export default function CardSearchClient() {
   const [toughnessFilter, setToughnessFilter] = useState<number | null>(null);
   const [toughnessOp, setToughnessOp] = useState<string>('eq');
   const [cards, setCards] = useState<Card[]>([]);
-  const [query, setQuery] = useState("");
   const [selectedIconFilters, setSelectedIconFilters] = useState<string[]>([]);
   // Card legality filter mode: Rotation, Classic (all), Banned, Scrolls (not Rotation or Banned)
   const [legalityMode, setLegalityMode] = useState<'Rotation'|'Classic'|'Banned'|'Scrolls'>('Rotation');
@@ -69,14 +68,42 @@ export default function CardSearchClient() {
   const [danielOnly, setDanielOnly] = useState(false);
   const [postexilicOnly, setPostexilicOnly] = useState(false);
   const [copyLinkNotification, setCopyLinkNotification] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Helper functions for managing multiple queries
+  const updateQuery = (index: number, text: string) => {
+    const newQueries = [...queries];
+    newQueries[index] = { ...newQueries[index], text };
+    setQueries(newQueries);
+  };
+
+  const updateQueryField = (index: number, field: string) => {
+    const newQueries = [...queries];
+    newQueries[index] = { ...newQueries[index], field };
+    setQueries(newQueries);
+  };
+
+  const addNewQuery = () => {
+    setQueries([...queries, {text: "", field: "everything"}]);
+  };
+
+  const removeQuery = (index: number) => {
+    if (queries.length > 1) {
+      const newQueries = queries.filter((_, i) => i !== index);
+      setQueries(newQueries);
+    }
+  };
 
   // Function to update URL with current filter state
   const updateURL = React.useCallback((filters: Record<string, any>) => {
     const params = new URLSearchParams();
     
     // Only add non-default values to URL
-    if (filters.query) params.set('q', filters.query);
-    if (filters.searchField !== 'everything') params.set('field', filters.searchField);
+    const activeQueries = filters.queries?.filter(q => q.text.trim()) || [];
+    if (activeQueries.length > 0) {
+      params.set('q', activeQueries[0].text); // For now, only save first query to URL
+      if (activeQueries[0].field !== 'everything') params.set('field', activeQueries[0].field);
+    }
     if (filters.legalityMode !== 'Rotation') params.set('legality', filters.legalityMode);
     if (filters.iconFilterMode !== 'AND') params.set('iconMode', filters.iconFilterMode);
     if (filters.selectedIconFilters.length > 0) params.set('icons', filters.selectedIconFilters.join(','));
@@ -106,11 +133,12 @@ export default function CardSearchClient() {
     router.replace(`/decklist/card-search${url}`, { scroll: false });
   }, [router]);
 
-  // Load state from URL on mount
+  // Load state from URL on mount (only once)
   useEffect(() => {
-    if (searchParams) {
-      setQuery(searchParams.get('q') || '');
-      setSearchField(searchParams.get('field') || 'everything');
+    if (searchParams && !isInitialized) {
+      const urlQuery = searchParams.get('q') || '';
+      const urlField = searchParams.get('field') || 'everything';
+      setQueries(urlQuery ? [{text: urlQuery, field: urlField}] : [{text: "", field: "everything"}]);
       setLegalityMode((searchParams.get('legality') as any) || 'Rotation');
       setIconFilterMode((searchParams.get('iconMode') as any) || 'AND');
       setSelectedIconFilters(searchParams.get('icons')?.split(',').filter(Boolean) || []);
@@ -140,14 +168,15 @@ export default function CardSearchClient() {
       setDemonOnly(searchParams.get('demon') === 'true');
       setDanielOnly(searchParams.get('daniel') === 'true');
       setPostexilicOnly(searchParams.get('postexilic') === 'true');
+      
+      setIsInitialized(true);
     }
-  }, [searchParams]);
+  }, [searchParams, isInitialized]);
 
   // Update URL whenever filters change
   useEffect(() => {
     const filters = {
-      query,
-      searchField,
+      queries,
       legalityMode,
       iconFilterMode,
       selectedIconFilters,
@@ -172,7 +201,7 @@ export default function CardSearchClient() {
     
     updateURL(filters);
   }, [
-    query, searchField, legalityMode, iconFilterMode, selectedIconFilters,
+    queries, legalityMode, iconFilterMode, selectedIconFilters,
     selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, strengthFilter,
     strengthOp, toughnessFilter, toughnessOp, noAltArt, noFirstPrint,
     nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly,
@@ -406,22 +435,28 @@ export default function CardSearchClient() {
     () =>
       cards
         .filter((c) => {
-          const q = query.toLowerCase();
-          if (!q) return true;
-          switch (searchField) {
-            case 'name':
-              return c.name.toLowerCase().includes(q);
-            case 'specialAbility':
-              return c.specialAbility.toLowerCase().includes(q);
-            case 'setName':
-              return c.officialSet.toLowerCase().includes(q) || c.set.toLowerCase().includes(q);
-            case 'identifier':
-              return c.identifier.toLowerCase().includes(q);
-            case 'reference':
-              return c.reference.toLowerCase().includes(q);
-            default:
-              return Object.values(c).join(" ").toLowerCase().includes(q);
-          }
+          // Handle multiple queries - all must match (AND logic)
+          const activeQueries = queries.filter(q => q.text.trim());
+          if (activeQueries.length === 0) return true;
+          
+          return activeQueries.every(queryObj => {
+            const q = queryObj.text.toLowerCase();
+            const searchField = queryObj.field;
+            switch (searchField) {
+              case 'name':
+                return c.name.toLowerCase().includes(q);
+              case 'specialAbility':
+                return c.specialAbility.toLowerCase().includes(q);
+              case 'setName':
+                return c.officialSet.toLowerCase().includes(q) || c.set.toLowerCase().includes(q);
+              case 'identifier':
+                return c.identifier.toLowerCase().includes(q);
+              case 'reference':
+                return c.reference.toLowerCase().includes(q);
+              default:
+                return Object.values(c).join(" ").toLowerCase().includes(q);
+            }
+          });
         })
         // Filter out specific unwanted cards
         .filter((c) => {
@@ -550,14 +585,15 @@ export default function CardSearchClient() {
           ];
           return postexilicCards.includes(c.name);
         }),
-    [cards, query, searchField, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly, strengthFilter, strengthOp, toughnessFilter, toughnessOp, iconFilterMode]
+    [cards, queries, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly, strengthFilter, strengthOp, toughnessFilter, toughnessOp, iconFilterMode]
   );
 
   // Effect to show all cards when any filter is applied
   useEffect(() => {
     // If any meaningful filters are active, show all filtered cards, otherwise show none
     // Note: searchField change alone shouldn't trigger showing cards without a query
-    const hasActiveFilters = query || 
+    const hasActiveQueries = queries.some(q => q.text.trim());
+    const hasActiveFilters = hasActiveQueries || 
       selectedIconFilters.length > 0 || 
       selectedAlignmentFilters.length > 0 || 
       selectedRarityFilters.length > 0 || 
@@ -581,7 +617,7 @@ export default function CardSearchClient() {
     } else {
       setVisibleCount(0);
     }
-  }, [filtered.length, query, legalityMode, selectedIconFilters, selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, strengthFilter, toughnessFilter, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly]);
+  }, [filtered.length, queries, legalityMode, selectedIconFilters, selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, strengthFilter, toughnessFilter, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly]);
 
   const visibleCards = useMemo(() => {
     return filtered
@@ -695,8 +731,7 @@ export default function CardSearchClient() {
 
   // Reset filters handler
   function handleResetFilters() {
-    setQuery("");
-    setSearchField("everything");
+    setQueries([{text: "", field: "everything"}]);
     setSelectedIconFilters([]);
     setLegalityMode('Rotation');
     setIconFilterMode('AND');
@@ -741,30 +776,44 @@ export default function CardSearchClient() {
       <div className="p-2 flex flex-col items-center sticky top-0 z-40 bg-white text-gray-900 border-b border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-800 dark:shadow-lg">
         <div className="relative w-full max-w-xl px-2 flex flex-col sm:flex-row items-center justify-center gap-0">
           <div className="w-full flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-center sm:gap-2 text-center">
-            <input
-              type="text"
-              placeholder="Search"
-              className="w-full sm:w-auto p-3 pr-10 border rounded text-base focus:ring-2 focus:ring-blue-400 text-gray-900 bg-white dark:text-white dark:bg-gray-900"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              maxLength={64}
-              style={{ minHeight: 48, maxWidth: 220 }}
-            />
-            <select
-              value={searchField}
-              onChange={e => {
-                setSearchField(e.target.value);
-              }}
-              className="border rounded px-4 py-2 w-full bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:text-white dark:border-gray-600 sm:w-24 text-center"
-              style={{ minHeight: 48 }}
-            >
-              <option value="everything" className="text-center">All</option>
-              <option value="name" className="text-center">Name</option>
-              <option value="specialAbility" className="text-center">Special Ability</option>
-              <option value="setName" className="text-center">Set Name</option>
-              <option value="identifier" className="text-center">Identifier</option>
-              <option value="reference" className="text-center">Reference</option>
-            </select>
+            <div className="flex flex-col gap-2 w-full sm:w-auto">
+              {queries.map((queryObj, index) => (
+                <div key={index} className="flex items-center gap-1">
+                  <input
+                    type="text"
+                    placeholder={index === 0 ? "Search" : `Search ${index + 1}`}
+                    className="w-full sm:w-auto p-3 pr-10 border rounded text-base focus:ring-2 focus:ring-blue-400 text-gray-900 bg-white dark:text-white dark:bg-gray-900"
+                    value={queryObj.text}
+                    onChange={(e) => updateQuery(index, e.target.value)}
+                    maxLength={64}
+                    style={{ minHeight: 48, maxWidth: 180 }}
+                  />
+                  <select
+                    value={queryObj.field}
+                    onChange={e => updateQueryField(index, e.target.value)}
+                    className="border rounded px-2 py-2 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center text-sm"
+                    style={{ minHeight: 48, maxWidth: 120 }}
+                  >
+                    <option value="everything">All</option>
+                    <option value="name">Name</option>
+                    <option value="specialAbility">Special Ability</option>
+                    <option value="setName">Set Name</option>
+                    <option value="identifier">Identifier</option>
+                    <option value="reference">Reference</option>
+                  </select>
+                  {queries.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeQuery(index)}
+                      className="p-2 text-red-600 hover:text-red-800 hover:bg-red-100 rounded transition-colors"
+                      title="Remove this query"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
             <button
               className="px-4 py-2 w-full sm:w-auto rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center"
               onClick={handleResetFilters}
@@ -773,12 +822,29 @@ export default function CardSearchClient() {
               Reset Filters
             </button>
             <button
-              className="px-4 py-2 w-full sm:w-auto rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center relative hidden sm:block"
-              onClick={handleCopyLink}
+              className={`px-4 py-2 w-full sm:w-auto rounded border transition font-semibold shadow text-center relative hidden sm:block ${
+                queries.filter(q => q.text.trim()).length > 1
+                  ? 'bg-gray-400 text-gray-600 border-gray-500 cursor-not-allowed opacity-50 dark:bg-gray-800 dark:text-gray-500 dark:border-gray-600'
+                  : 'bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+              }`}
+              onClick={queries.filter(q => q.text.trim()).length > 1 ? undefined : handleCopyLink}
               style={{ minHeight: 48 }}
-              title={copyLinkNotification ? 'Link copied!' : 'Copy search link'}
+              title={
+                queries.filter(q => q.text.trim()).length > 1
+                  ? 'Multiple query link sharing sadly not supported'
+                  : copyLinkNotification ? 'Link copied!' : 'Copy search link'
+              }
+              disabled={queries.filter(q => q.text.trim()).length > 1}
             >
               {copyLinkNotification ? '✓' : '🔗'}
+            </button>
+            <button
+              className="px-4 py-2 w-full sm:w-auto rounded bg-green-200 text-green-900 hover:bg-green-400 hover:text-green-900 border border-green-300 dark:bg-green-700 dark:text-white dark:hover:bg-green-600 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center relative hidden sm:block"
+              onClick={addNewQuery}
+              style={{ minHeight: 48 }}
+              title="Add new query"
+            >
+              +
             </button>
           </div>
         </div>
@@ -807,24 +873,28 @@ export default function CardSearchClient() {
             </svg>
           </button>
         </div>
-        {/* Query */}
-        {query && (
-          <span
-            className="bg-blue-200 text-blue-900 dark:bg-blue-800 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer"
-            onClick={() => setQuery("")}
-            tabIndex={0}
-            role="button"
-            aria-label="Remove Search filter"
-          >
-            {searchField === 'everything' && `Search: "${query}"`}
-            {searchField === 'name' && `Name contains: "${query}"`}
-            {searchField === 'specialAbility' && `Special Ability contains: "${query}"`}
-            {searchField === 'setName' && `Set Name contains: "${query}"`}
-            {searchField === 'identifier' && `Identifier contains: "${query}"`}
-            {searchField === 'reference' && `Reference contains: "${query}"`}
-            <span className="ml-1 text-blue-900 dark:text-white">×</span>
-          </span>
-        )}
+        {/* Query Pills */}
+        {queries.map((queryObj, originalIndex) => {
+          if (!queryObj.text.trim()) return null;
+          return (
+            <span
+              key={originalIndex}
+              className="bg-blue-200 text-blue-900 dark:bg-blue-800 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer"
+              onClick={() => updateQuery(originalIndex, "")}
+              tabIndex={0}
+              role="button"
+              aria-label={`Remove Search filter ${originalIndex + 1}`}
+            >
+              {queryObj.field === 'everything' && `Search: "${queryObj.text}"`}
+              {queryObj.field === 'name' && `Name contains: "${queryObj.text}"`}
+              {queryObj.field === 'specialAbility' && `Special Ability contains: "${queryObj.text}"`}
+              {queryObj.field === 'setName' && `Set Name contains: "${queryObj.text}"`}
+              {queryObj.field === 'identifier' && `Identifier contains: "${queryObj.text}"`}
+              {queryObj.field === 'reference' && `Reference contains: "${queryObj.text}"`}
+              <span className="ml-1 text-blue-900 dark:text-white">×</span>
+            </span>
+          );
+        })}
         {/* Legality */}
         {legalityMode !== 'Rotation' && (
           <span className="bg-blue-400 text-blue-900 dark:bg-blue-700 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setLegalityMode('Rotation')} tabIndex={0} role="button" aria-label="Remove Legality filter">
