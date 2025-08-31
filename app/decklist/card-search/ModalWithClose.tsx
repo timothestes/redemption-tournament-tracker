@@ -1,6 +1,7 @@
 import React from "react";
 import { Button } from "flowbite-react";
 import { openYTGSearchPage } from "./ytgUtils";
+import { useCardImageUrl } from "./hooks/useCardImageUrl";
 
 function Attribute({ label, value }: { label: string; value: string | boolean }) {
   // Prettify testament display if it's an array
@@ -50,7 +51,8 @@ function prettifyFieldName(key: string): string {
   return map[key] || key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, s => s.toUpperCase());
 }
 
-export default function ModalWithClose({ modalCard, setModalCard, CARD_IMAGE_BASE_URL, sanitizeImgFile, visibleCards }) {
+export default function ModalWithClose({ modalCard, setModalCard, visibleCards }) {
+  const { getImageUrl } = useCardImageUrl();
   React.useEffect(() => {
     function handleKeyDown(e) {
       if (e.key === "Escape") {
@@ -104,7 +106,7 @@ export default function ModalWithClose({ modalCard, setModalCard, CARD_IMAGE_BAS
         <div className="px-4 py-2 flex flex-col items-center relative flex-1 overflow-hidden">
           <div className="relative w-full flex justify-center mb-4">
             <img
-              src={`${CARD_IMAGE_BASE_URL}${sanitizeImgFile(modalCard.imgFile)}.jpg`}
+              src={getImageUrl(modalCard.imgFile)}
               alt={modalCard.name}
               className="w-full max-w-md h-auto max-h-[60vh] object-contain mx-auto rounded shadow-lg"
             />

@@ -3,16 +3,15 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import ModalWithClose from "./ModalWithClose";
 import FilterGrid from "./components/FilterGrid";
-import { CARD_DATA_URL, CARD_IMAGE_BASE_URL, OT_BOOKS, NT_BOOKS, GOSPEL_BOOKS, GOOD_BRIGADES, EVIL_BRIGADES } from "./constants";
+import CardImage from "./components/CardImage";
+import { CARD_DATA_URL, OT_BOOKS, NT_BOOKS, GOSPEL_BOOKS } from "./constants";
 import { 
   Card, 
-  sanitizeImgFile, 
   categorizeRarity, 
   isNativityReference, 
   iconPredicates, 
   normalizeBrigadeField 
 } from "./utils";
-import clsx from "clsx";
 
 export default function CardSearchClient() {
   const router = useRouter();
@@ -899,7 +898,12 @@ export default function CardSearchClient() {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
             {visibleCards.map((c) => (
               <div key={c.dataLine} className="cursor-pointer" onClick={() => setModalCard(c)}>
-                <img src={`${CARD_IMAGE_BASE_URL}${sanitizeImgFile(c.imgFile)}.jpg`} alt={c.name} className="w-full h-auto rounded shadow" />
+                <CardImage
+                  imgFile={c.imgFile}
+                  alt={c.name}
+                  className="rounded shadow hover:shadow-lg transition-shadow"
+                  sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 16vw"
+                />
                 <p className="text-sm mt-1 text-center truncate">{c.name}</p>
               </div>
             ))}
@@ -918,8 +922,6 @@ export default function CardSearchClient() {
         <ModalWithClose
           modalCard={modalCard}
           setModalCard={setModalCard}
-          CARD_IMAGE_BASE_URL={CARD_IMAGE_BASE_URL}
-          sanitizeImgFile={sanitizeImgFile}
           visibleCards={visibleCards}
         />
       )}
