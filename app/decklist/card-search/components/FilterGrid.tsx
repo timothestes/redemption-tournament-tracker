@@ -16,8 +16,12 @@ interface FilterGridProps {
   setAdvancedOpen: (open: boolean) => void;
   selectedTestaments: string[];
   setSelectedTestaments: (testaments: string[] | ((prev: string[]) => string[])) => void;
+  testamentNots: Record<string, boolean>;
+  setTestamentNots: (nots: Record<string, boolean> | ((prev: Record<string, boolean>) => Record<string, boolean>)) => void;
   isGospel: boolean;
   setIsGospel: (gospel: boolean | ((prev: boolean) => boolean)) => void;
+  gospelNot: boolean;
+  setGospelNot: (not: boolean | ((prev: boolean) => boolean)) => void;
   strengthFilter: number | null;
   setStrengthFilter: (strength: number | null) => void;
   strengthOp: string;
@@ -32,24 +36,40 @@ interface FilterGridProps {
   setnoFirstPrint: (value: boolean | ((prev: boolean) => boolean)) => void;
   nativityOnly: boolean;
   setNativityOnly: (value: boolean | ((prev: boolean) => boolean)) => void;
+  nativityNot: boolean;
+  setNativityNot: (value: boolean | ((prev: boolean) => boolean)) => void;
   hasStarOnly: boolean;
   setHasStarOnly: (value: boolean | ((prev: boolean) => boolean)) => void;
+  hasStarNot: boolean;
+  setHasStarNot: (value: boolean | ((prev: boolean) => boolean)) => void;
   cloudOnly: boolean;
   setCloudOnly: (value: boolean | ((prev: boolean) => boolean)) => void;
+  cloudNot: boolean;
+  setCloudNot: (value: boolean | ((prev: boolean) => boolean)) => void;
   angelOnly: boolean;
   setAngelOnly: (value: boolean | ((prev: boolean) => boolean)) => void;
+  angelNot: boolean;
+  setAngelNot: (value: boolean | ((prev: boolean) => boolean)) => void;
   demonOnly: boolean;
   setDemonOnly: (value: boolean | ((prev: boolean) => boolean)) => void;
+  demonNot: boolean;
+  setDemonNot: (value: boolean | ((prev: boolean) => boolean)) => void;
   danielOnly: boolean;
   setDanielOnly: (value: boolean | ((prev: boolean) => boolean)) => void;
+  danielNot: boolean;
+  setDanielNot: (value: boolean | ((prev: boolean) => boolean)) => void;
   postexilicOnly: boolean;
   setPostexilicOnly: (value: boolean | ((prev: boolean) => boolean)) => void;
+  postexilicNot: boolean;
+  setPostexilicNot: (value: boolean | ((prev: boolean) => boolean)) => void;
   
   // Icon filters
-  selectedIconFilters: string[];
+  selectedIconFilters: Array<{ icon: string; operator: 'AND' | 'OR' | 'AND NOT' }>;
   toggleIconFilter: (value: string) => void;
-  iconFilterMode: 'AND' | 'OR';
-  setIconFilterMode: (mode: 'AND' | 'OR') => void;
+  updateIconFilterOperator: (icon: string, operator: 'AND' | 'OR' | 'AND NOT') => void;
+  iconFilterMode: 'AND' | 'OR' | 'AND NOT';
+  setIconFilterMode: (mode: 'AND' | 'OR' | 'AND NOT') => void;
+  updateAllIconFilterOperators: (operator: 'AND' | 'OR' | 'AND NOT') => void;
 }
 
 export default function FilterGrid({
@@ -63,8 +83,12 @@ export default function FilterGrid({
   setAdvancedOpen,
   selectedTestaments,
   setSelectedTestaments,
+  testamentNots,
+  setTestamentNots,
   isGospel,
   setIsGospel,
+  gospelNot,
+  setGospelNot,
   strengthFilter,
   setStrengthFilter,
   strengthOp,
@@ -79,22 +103,38 @@ export default function FilterGrid({
   setnoFirstPrint,
   nativityOnly,
   setNativityOnly,
+  nativityNot,
+  setNativityNot,
   hasStarOnly,
   setHasStarOnly,
+  hasStarNot,
+  setHasStarNot,
   cloudOnly,
   setCloudOnly,
+  cloudNot,
+  setCloudNot,
   angelOnly,
   setAngelOnly,
+  angelNot,
+  setAngelNot,
   demonOnly,
   setDemonOnly,
+  demonNot,
+  setDemonNot,
   danielOnly,
   setDanielOnly,
+  danielNot,
+  setDanielNot,
   postexilicOnly,
   setPostexilicOnly,
+  postexilicNot,
+  setPostexilicNot,
   selectedIconFilters,
   toggleIconFilter,
+  updateIconFilterOperator,
   iconFilterMode,
   setIconFilterMode,
+  updateAllIconFilterOperators,
 }: FilterGridProps) {
   // Quick icon filters for type-based icons (reordered) and color-coded brigades
   const typeIcons = [
@@ -206,30 +246,70 @@ export default function FilterGrid({
             <div className="p-2 border rounded space-y-2">
               <p className="font-bold text-lg text-gray-900 dark:text-white rounded px-2 py-1 inline-block shadow-none">Testament</p>
               <div className="flex flex-col sm:flex-row gap-2 mb-2">
-                {['OT','NT'].map((t) => (
-                  <button
-                    key={t}
-                    className={clsx(
-                      'px-3 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
-                      selectedTestaments.includes(t)
-                        ? 'bg-yellow-200 text-yellow-900 border-yellow-400 dark:bg-yellow-600 dark:text-white dark:border-transparent'
-                        : 'bg-gray-200 text-gray-900 border-gray-300 hover:bg-gray-400 hover:text-gray-900 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
-                    )}
-                    onClick={() => setSelectedTestaments(prev => prev.includes(t) ? prev.filter(x=>x!==t) : [...prev,t])}
-                  >
-                    {t}
-                  </button>
-                ))}
+                {['OT','NT'].map((t) => {
+                  const isActive = selectedTestaments.includes(t);
+                  const isNot = testamentNots[t] || false;
+                  return (
+                    <button
+                      key={t}
+                      className={clsx(
+                        'px-3 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                        isActive && !isNot && 'bg-yellow-200 text-yellow-900 border-yellow-400 dark:bg-yellow-600 dark:text-white dark:border-transparent',
+                        isActive && isNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
+                        !isActive && 'bg-gray-200 text-gray-900 border-gray-300 hover:bg-gray-400 hover:text-gray-900 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                      )}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        // Cycle through: OFF → ON (include) → NOT (exclude) → OFF
+                        if (!isActive) {
+                          // OFF → ON (include)
+                          setSelectedTestaments(prev => [...prev, t]);
+                          setTestamentNots(prev => ({ ...prev, [t]: false }));
+                        } else if (isActive && !isNot) {
+                          // ON (include) → NOT (exclude)
+                          setTestamentNots(prev => ({ ...prev, [t]: true }));
+                        } else {
+                          // NOT (exclude) → OFF
+                          setSelectedTestaments(prev => prev.filter(x => x !== t));
+                          setTestamentNots(prev => {
+                            const newNots = { ...prev };
+                            delete newNots[t];
+                            return newNots;
+                          });
+                        }
+                      }}
+                      title="Click to cycle: Include → Exclude → Off"
+                    >
+                      {isNot ? 'NOT ' : ''}{t}
+                    </button>
+                  );
+                })}
                 <button
                   className={clsx(
                     'px-3 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
-                    isGospel
-                      ? 'bg-yellow-300 text-yellow-900 border-yellow-500 dark:bg-yellow-700 dark:text-white dark:border-transparent'
-                      : 'bg-gray-200 text-gray-900 border-gray-300 hover:bg-gray-400 hover:text-gray-900 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                    isGospel && !gospelNot && 'bg-yellow-300 text-yellow-900 border-yellow-500 dark:bg-yellow-700 dark:text-white dark:border-transparent',
+                    isGospel && gospelNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
+                    !isGospel && 'bg-gray-200 text-gray-900 border-gray-300 hover:bg-gray-400 hover:text-gray-900 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
                   )}
-                  onClick={() => setIsGospel(v => !v)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    // Cycle through: OFF → ON (include) → NOT (exclude) → OFF
+                    if (!isGospel) {
+                      // OFF → ON (include)
+                      setIsGospel(true);
+                      setGospelNot(false);
+                    } else if (isGospel && !gospelNot) {
+                      // ON (include) → NOT (exclude)
+                      setGospelNot(true);
+                    } else {
+                      // NOT (exclude) → OFF
+                      setIsGospel(false);
+                      setGospelNot(false);
+                    }
+                  }}
+                  title="Click to cycle: Include → Exclude → Off"
                 >
-                  Gospel
+                  {gospelNot ? 'NOT ' : ''}Gospel
                 </button>
               </div>
               {/* Strength and Toughness Filters - Toughness now under Strength */}
@@ -310,79 +390,191 @@ export default function FilterGrid({
                 <button
                   className={clsx(
                     'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
-                    nativityOnly
-                      ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
-                      : 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                    nativityOnly && !nativityNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
+                    nativityOnly && nativityNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
+                    !nativityOnly && 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
                   )}
-                  onClick={() => setNativityOnly(v => !v)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    // Cycle through: OFF → ON (include) → NOT (exclude) → OFF
+                    if (!nativityOnly) {
+                      // OFF → ON (include)
+                      setNativityOnly(true);
+                      setNativityNot(false);
+                    } else if (nativityOnly && !nativityNot) {
+                      // ON (include) → NOT (exclude)
+                      setNativityNot(true);
+                    } else {
+                      // NOT (exclude) → OFF
+                      setNativityOnly(false);
+                      setNativityNot(false);
+                    }
+                  }}
+                  title="Click to cycle: Include → Exclude → Off"
                 >
-                  Nativity
+                  {nativityOnly && nativityNot ? 'NOT ' : ''}Nativity
                 </button>
                 <button
                   className={clsx(
                     'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
-                    hasStarOnly
-                      ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
-                      : 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                    hasStarOnly && !hasStarNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
+                    hasStarOnly && hasStarNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
+                    !hasStarOnly && 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
                   )}
-                  onClick={() => setHasStarOnly(v => !v)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    // Cycle through: OFF → ON (include) → NOT (exclude) → OFF
+                    if (!hasStarOnly) {
+                      // OFF → ON (include)
+                      setHasStarOnly(true);
+                      setHasStarNot(false);
+                    } else if (hasStarOnly && !hasStarNot) {
+                      // ON (include) → NOT (exclude)
+                      setHasStarNot(true);
+                    } else {
+                      // NOT (exclude) → OFF
+                      setHasStarOnly(false);
+                      setHasStarNot(false);
+                    }
+                  }}
+                  title="Click to cycle: Include → Exclude → Off"
                 >
-                  Has Star
+                  {hasStarOnly && hasStarNot ? 'NOT ' : ''}Has Star
                 </button>
                 <button
                   className={clsx(
                     'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
-                    cloudOnly
-                      ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
-                      : 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                    cloudOnly && !cloudNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
+                    cloudOnly && cloudNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
+                    !cloudOnly && 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
                   )}
-                  onClick={() => setCloudOnly(v => !v)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    // Cycle through: OFF → ON (include) → NOT (exclude) → OFF
+                    if (!cloudOnly) {
+                      // OFF → ON (include)
+                      setCloudOnly(true);
+                      setCloudNot(false);
+                    } else if (cloudOnly && !cloudNot) {
+                      // ON (include) → NOT (exclude)
+                      setCloudNot(true);
+                    } else {
+                      // NOT (exclude) → OFF
+                      setCloudOnly(false);
+                      setCloudNot(false);
+                    }
+                  }}
+                  title="Click to cycle: Include → Exclude → Off"
                 >
-                  Cloud
+                  {cloudOnly && cloudNot ? 'NOT ' : ''}Cloud
                 </button>
                 <button
                   className={clsx(
                     'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
-                    angelOnly
-                      ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
-                      : 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                    angelOnly && !angelNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
+                    angelOnly && angelNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
+                    !angelOnly && 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
                   )}
-                  onClick={() => setAngelOnly(v => !v)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    // Cycle through: OFF → ON (include) → NOT (exclude) → OFF
+                    if (!angelOnly) {
+                      // OFF → ON (include)
+                      setAngelOnly(true);
+                      setAngelNot(false);
+                    } else if (angelOnly && !angelNot) {
+                      // ON (include) → NOT (exclude)
+                      setAngelNot(true);
+                    } else {
+                      // NOT (exclude) → OFF
+                      setAngelOnly(false);
+                      setAngelNot(false);
+                    }
+                  }}
+                  title="Click to cycle: Include → Exclude → Off"
                 >
-                  Angel
+                  {angelOnly && angelNot ? 'NOT ' : ''}Angel
                 </button>
                 <button
                   className={clsx(
                     'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
-                    demonOnly
-                      ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
-                      : 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                    demonOnly && !demonNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
+                    demonOnly && demonNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
+                    !demonOnly && 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
                   )}
-                  onClick={() => setDemonOnly(v => !v)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    // Cycle through: OFF → ON (include) → NOT (exclude) → OFF
+                    if (!demonOnly) {
+                      // OFF → ON (include)
+                      setDemonOnly(true);
+                      setDemonNot(false);
+                    } else if (demonOnly && !demonNot) {
+                      // ON (include) → NOT (exclude)
+                      setDemonNot(true);
+                    } else {
+                      // NOT (exclude) → OFF
+                      setDemonOnly(false);
+                      setDemonNot(false);
+                    }
+                  }}
+                  title="Click to cycle: Include → Exclude → Off"
                 >
-                  Demon
+                  {demonOnly && demonNot ? 'NOT ' : ''}Demon
                 </button>
                 <button
                   className={clsx(
                     'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
-                    danielOnly
-                      ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
-                      : 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                    danielOnly && !danielNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
+                    danielOnly && danielNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
+                    !danielOnly && 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
                   )}
-                  onClick={() => setDanielOnly(v => !v)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    // Cycle through: OFF → ON (include) → NOT (exclude) → OFF
+                    if (!danielOnly) {
+                      // OFF → ON (include)
+                      setDanielOnly(true);
+                      setDanielNot(false);
+                    } else if (danielOnly && !danielNot) {
+                      // ON (include) → NOT (exclude)
+                      setDanielNot(true);
+                    } else {
+                      // NOT (exclude) → OFF
+                      setDanielOnly(false);
+                      setDanielNot(false);
+                    }
+                  }}
+                  title="Click to cycle: Include → Exclude → Off"
                 >
-                  Daniel
+                  {danielOnly && danielNot ? 'NOT ' : ''}Daniel
                 </button>
                 <button
                   className={clsx(
                     'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
-                    postexilicOnly
-                      ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
-                      : 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                    postexilicOnly && !postexilicNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
+                    postexilicOnly && postexilicNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
+                    !postexilicOnly && 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
                   )}
-                  onClick={() => setPostexilicOnly(v => !v)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    // Cycle through: OFF → ON (include) → NOT (exclude) → OFF
+                    if (!postexilicOnly) {
+                      // OFF → ON (include)
+                      setPostexilicOnly(true);
+                      setPostexilicNot(false);
+                    } else if (postexilicOnly && !postexilicNot) {
+                      // ON (include) → NOT (exclude)
+                      setPostexilicNot(true);
+                    } else {
+                      // NOT (exclude) → OFF
+                      setPostexilicOnly(false);
+                      setPostexilicNot(false);
+                    }
+                  }}
+                  title="Click to cycle: Include → Exclude → Off"
                 >
-                  Postexilic
+                  {postexilicOnly && postexilicNot ? 'NOT ' : ''}Postexilic
                 </button>
               </div>
             </div>
@@ -402,7 +594,7 @@ export default function FilterGrid({
                 alt={t}
                 className={clsx(
                   'h-10 w-10 sm:h-8 sm:w-auto cursor-pointer',
-                  selectedIconFilters.includes(t) && 'ring-2 ring-blue-500 dark:ring-blue-300'
+                  selectedIconFilters.some(f => f.icon === t) && 'ring-2 ring-blue-500 dark:ring-blue-300'
                 )}
                 onClick={() => toggleIconFilter(t)}
                 style={{ minWidth: 40, minHeight: 40 }}
@@ -412,18 +604,35 @@ export default function FilterGrid({
         </div>
         {/* Icon filter mode toggle moved below types icons */}
         <div className="mb-2 flex items-center gap-2">
-          <span className="text-gray-500 dark:text-gray-400 text-sm">Icon Filter Mode:</span>
+          <span 
+            className="text-gray-500 dark:text-gray-400 text-sm cursor-help" 
+            title="Controls how multiple icon filters combine: Click button to cycle through modes"
+          >
+            Icon Filter Mode:
+          </span>
           <button
             className={clsx(
               'px-2 py-1 border rounded text-sm font-semibold transition',
-              iconFilterMode === 'AND'
-                ? 'bg-gray-200 text-gray-900 border-gray-300 dark:bg-gray-900 dark:text-white'
-                : 'bg-blue-200 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white'
+              'bg-gray-200 text-gray-900 border-gray-300 dark:bg-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-700'
             )}
-            onClick={() => setIconFilterMode(iconFilterMode === 'AND' ? 'OR' : 'AND')}
-            title="Toggle between AND/OR logic for icon filters"
+            onClick={(e) => {
+              e.preventDefault();
+              // Click: cycle through AND → OR → AND NOT → AND
+              let newMode: 'AND' | 'OR' | 'AND NOT';
+              if (iconFilterMode === 'AND') {
+                newMode = 'OR';
+              } else if (iconFilterMode === 'OR') {
+                newMode = 'AND NOT';
+              } else {
+                newMode = 'AND';
+              }
+              setIconFilterMode(newMode);
+              // Update all currently active icon filters to the new mode
+              updateAllIconFilterOperators(newMode);
+            }}
+            title="Click to cycle: AND → OR → AND NOT (applies to all active filters)"
           >
-            {iconFilterMode === 'AND' ? 'AND' : 'OR'}
+            {iconFilterMode}
           </button>
         </div>
       </div>
@@ -438,7 +647,7 @@ export default function FilterGrid({
               alt={icon}
               className={clsx(
                 "h-10 w-10 sm:h-8 sm:w-auto cursor-pointer",
-                selectedIconFilters.includes(icon) && "ring-2 ring-blue-500 dark:ring-blue-300"
+                selectedIconFilters.some(f => f.icon === icon) && "ring-2 ring-blue-500 dark:ring-blue-300"
               )}
               onClick={() => toggleIconFilter(icon)}
               style={{ minWidth: 40, minHeight: 40 }}
@@ -454,7 +663,7 @@ export default function FilterGrid({
               alt={icon}
               className={clsx(
                 "h-10 w-10 sm:h-8 sm:w-auto cursor-pointer",
-                selectedIconFilters.includes(icon) && "ring-2 ring-blue-500 dark:ring-blue-300"
+                selectedIconFilters.some(f => f.icon === icon) && "ring-2 ring-blue-500 dark:ring-blue-300"
               )}
               onClick={() => toggleIconFilter(icon)}
               style={{ minWidth: 40, minHeight: 40 }}

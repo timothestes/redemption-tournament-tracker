@@ -22,15 +22,20 @@ export default function CardSearchClient() {
   // Query state - each query has its own text and search field
   const [queries, setQueries] = useState<{text: string, field: string}[]>([{text: "", field: "everything"}]);
 
-  // Icon filter mode: AND or OR
-  const [iconFilterMode, setIconFilterMode] = useState<'AND'|'OR'>('AND');
+  // Icon filters with individual operators for each filter
+  type IconFilterOperator = 'AND' | 'OR' | 'AND NOT';
+  type IconFilterWithOp = { icon: string; operator: IconFilterOperator };
+  const [selectedIconFilters, setSelectedIconFilters] = useState<IconFilterWithOp[]>([]);
+  
+  // Deprecated - keeping for backwards compatibility with URL params
+  const [iconFilterMode, setIconFilterMode] = useState<IconFilterOperator>('AND');
+  
   // Strength and toughness filter state
   const [strengthFilter, setStrengthFilter] = useState<number | null>(null);
   const [strengthOp, setStrengthOp] = useState<string>('eq');
   const [toughnessFilter, setToughnessFilter] = useState<number | null>(null);
   const [toughnessOp, setToughnessOp] = useState<string>('eq');
   const [cards, setCards] = useState<Card[]>([]);
-  const [selectedIconFilters, setSelectedIconFilters] = useState<string[]>([]);
   // Card legality filter mode: Rotation, Classic (all), Banned, Scrolls (not Rotation or Banned)
   const [legalityMode, setLegalityMode] = useState<'Rotation'|'Classic'|'Banned'|'Scrolls'>('Rotation');
   const [visibleCount, setVisibleCount] = useState(0); // Number of cards to show
@@ -53,6 +58,20 @@ export default function CardSearchClient() {
   const [demonOnly, setDemonOnly] = useState(false);
   const [danielOnly, setDanielOnly] = useState(false);
   const [postexilicOnly, setPostexilicOnly] = useState(false);
+  
+  // Negation states for misc filters (true = NOT/exclude)
+  const [nativityNot, setNativityNot] = useState(false);
+  const [hasStarNot, setHasStarNot] = useState(false);
+  const [cloudNot, setCloudNot] = useState(false);
+  const [angelNot, setAngelNot] = useState(false);
+  const [demonNot, setDemonNot] = useState(false);
+  const [danielNot, setDanielNot] = useState(false);
+  const [postexilicNot, setPostexilicNot] = useState(false);
+  
+  // Testament and Gospel NOT states
+  const [testamentNots, setTestamentNots] = useState<Record<string, boolean>>({});
+  const [gospelNot, setGospelNot] = useState(false);
+  
   const [copyLinkNotification, setCopyLinkNotification] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -92,7 +111,10 @@ export default function CardSearchClient() {
     }
     if (filters.legalityMode !== 'Rotation') params.set('legality', filters.legalityMode);
     if (filters.iconFilterMode !== 'AND') params.set('iconMode', filters.iconFilterMode);
-    if (filters.selectedIconFilters.length > 0) params.set('icons', filters.selectedIconFilters.join(','));
+    if (filters.selectedIconFilters.length > 0) {
+      // Save icon filters with their operators as JSON
+      params.set('icons', JSON.stringify(filters.selectedIconFilters));
+    }
     if (filters.selectedAlignmentFilters.length > 0) params.set('alignment', filters.selectedAlignmentFilters.join(','));
     if (filters.selectedRarityFilters.length > 0) params.set('rarity', filters.selectedRarityFilters.join(','));
     if (filters.selectedTestaments.length > 0) params.set('testaments', filters.selectedTestaments.join(','));
@@ -127,7 +149,26 @@ export default function CardSearchClient() {
       setQueries(urlQuery ? [{text: urlQuery, field: urlField}] : [{text: "", field: "everything"}]);
       setLegalityMode((searchParams.get('legality') as any) || 'Rotation');
       setIconFilterMode((searchParams.get('iconMode') as any) || 'AND');
-      setSelectedIconFilters(searchParams.get('icons')?.split(',').filter(Boolean) || []);
+      
+      // Load icon filters from URL (try JSON first for new format, fall back to CSV for old format)
+      const iconsParam = searchParams.get('icons');
+      if (iconsParam) {
+        try {
+          const parsed = JSON.parse(iconsParam);
+          if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'object') {
+            setSelectedIconFilters(parsed);
+          } else {
+            // Old format: just strings, convert to new format
+            const iconNames = iconsParam.split(',').filter(Boolean);
+            setSelectedIconFilters(iconNames.map(icon => ({ icon, operator: 'AND' })));
+          }
+        } catch {
+          // Old format: CSV of icon names
+          const iconNames = iconsParam.split(',').filter(Boolean);
+          setSelectedIconFilters(iconNames.map(icon => ({ icon, operator: 'AND' })));
+        }
+      }
+      
       setSelectedAlignmentFilters(searchParams.get('alignment')?.split(',').filter(Boolean) || []);
       setSelectedRarityFilters(searchParams.get('rarity')?.split(',').filter(Boolean) || []);
       setSelectedTestaments(searchParams.get('testaments')?.split(',').filter(Boolean) || []);
@@ -360,19 +401,36 @@ export default function CardSearchClient() {
         })
         .filter((c) => {
           if (selectedIconFilters.length === 0) return true;
-          if (iconFilterMode === 'AND') {
-            return selectedIconFilters.every((icon) => {
-              const pred = iconPredicates[icon];
-              if (pred) return pred(c);
-              return c.brigade.toLowerCase().includes(icon.toLowerCase());
-            });
-          } else {
-            return selectedIconFilters.some((icon) => {
-              const pred = iconPredicates[icon];
-              if (pred) return pred(c);
-              return c.brigade.toLowerCase().includes(icon.toLowerCase());
-            });
+          
+          // New logic: evaluate each filter with its operator
+          // Start with the first filter's result
+          let result: boolean;
+          const firstFilter = selectedIconFilters[0];
+          const pred = iconPredicates[firstFilter.icon];
+          const matches = pred ? pred(c) : c.brigade.toLowerCase().includes(firstFilter.icon.toLowerCase());
+          
+          // First filter is always evaluated positively
+          result = matches;
+          
+          // Now apply each subsequent filter with its operator
+          for (let i = 1; i < selectedIconFilters.length; i++) {
+            const filter = selectedIconFilters[i];
+            const filterPred = iconPredicates[filter.icon];
+            const filterMatches = filterPred ? filterPred(c) : c.brigade.toLowerCase().includes(filter.icon.toLowerCase());
+            
+            // Get the operator from the PREVIOUS filter (operator between prev and current)
+            const prevOperator = selectedIconFilters[i - 1].operator;
+            
+            if (prevOperator === 'AND') {
+              result = result && filterMatches;
+            } else if (prevOperator === 'OR') {
+              result = result || filterMatches;
+            } else if (prevOperator === 'AND NOT') {
+              result = result && !filterMatches;
+            }
           }
+          
+          return result;
         })
         // Testament filters
         .filter((c) => {
@@ -383,12 +441,22 @@ export default function CardSearchClient() {
             if (typeof testament === 'string') return testament === test || testament.includes(test);
             return false;
           };
-          // AND logic: require all selected testaments to be present
-          const allPresent = selectedTestaments.every(test => hasTestament(c.testament, test) || (test === 'OT' && c.identifier && c.identifier.includes('O.T.')));
-          return allPresent;
+          // Check each testament with its NOT state
+          return selectedTestaments.every(test => {
+            const cardHasTestament = hasTestament(c.testament, test) || (test === 'OT' && c.identifier && c.identifier.includes('O.T.'));
+            const isNot = testamentNots[test] || false;
+            // If NOT is set, card should NOT have this testament
+            // If NOT is not set, card should have this testament
+            return isNot ? !cardHasTestament : cardHasTestament;
+          });
         })
         // IsGospel filter
-        .filter((c) => !isGospel || c.isGospel)
+        .filter((c) => {
+          if (!isGospel) return true;
+          const cardIsGospel = c.isGospel;
+          // If gospelNot is true, exclude gospel cards; otherwise include only gospel cards
+          return gospelNot ? !cardIsGospel : cardIsGospel;
+        })
         // Strength filter
         .filter((c) => {
           if (strengthFilter === null) return true;
@@ -422,16 +490,43 @@ export default function CardSearchClient() {
         .filter((c) => !noFirstPrint || (
           !c.set.includes("K1P") && !c.set.includes("L1P")
         ))
-        .filter((c) => !nativityOnly || isNativityReference(c.reference))
-        .filter((c) => !cloudOnly || c.class.toLowerCase().includes("cloud"))
-        .filter((c) => !hasStarOnly || c.specialAbility.toLowerCase().includes("star:") || c.specialAbility.toLowerCase().includes("(star)"))
-        .filter((c) => !angelOnly || (c.type.includes("Hero") && c.brigade.includes("Silver") && !c.identifier.includes("Human") && !c.identifier.includes("Genderless") && c.name !== "Moses in Glory (GoC)" && c.name !== "Noah, the Righteous / Noah (Rest and Comfort) (LoC)" && c.name !== "Daniel (Promo)"))
-        .filter((c) => !demonOnly || (c.type.includes("Evil Character") && (c.brigade.includes("Orange") || c.name.toLowerCase().includes("demon") || c.name.toLowerCase().includes("obsidian minion") || c.name === "Foul Spirit (E)" || c.name === "Lying Spirit" || c.name === "Spirit of Doubt" || c.name === "Unclean Spirit (E)" || c.name === "Wandering Spirit (Ap)") && c.name !== "Babylon The Harlot (RoJ)" && c.brigade !== "Black/Brown/Crimson/Evil Gold/Gray/Orange/Pale Green" && !c.identifier.includes("Symbolic") && !c.identifier.includes("Animal") && c.name !== "Sabbath Breaker [Gray/Orange]" && c.name !== "The Divining Damsel (Promo)" && c.name !== "The False Prophet (EC)" && c.name !== "The False Prophet (RoJ)" && c.name !== "The False Prophet (RoJ AB)" && c.name !== "Damsel with Spirit of Divination (TxP)" && c.name !== "Saul/Paul"))
-        .filter((c) => !danielOnly || c.reference.toLowerCase().includes("daniel"))
+        .filter((c) => {
+          if (!nativityOnly) return true;
+          const matches = isNativityReference(c.reference);
+          return nativityNot ? !matches : matches;
+        })
+        .filter((c) => {
+          if (!cloudOnly) return true;
+          const matches = c.class.toLowerCase().includes("cloud");
+          return cloudNot ? !matches : matches;
+        })
+        .filter((c) => {
+          if (!hasStarOnly) return true;
+          const matches = c.specialAbility.toLowerCase().includes("star:") || c.specialAbility.toLowerCase().includes("(star)");
+          return hasStarNot ? !matches : matches;
+        })
+        .filter((c) => {
+          if (!angelOnly) return true;
+          const matches = c.type.includes("Hero") && c.brigade.includes("Silver") && !c.identifier.includes("Human") && !c.identifier.includes("Genderless") && c.name !== "Moses in Glory (GoC)" && c.name !== "Noah, the Righteous / Noah (Rest and Comfort) (LoC)" && c.name !== "Daniel (Promo)";
+          return angelNot ? !matches : matches;
+        })
+        .filter((c) => {
+          if (!demonOnly) return true;
+          const matches = c.type.includes("Evil Character") && (c.brigade.includes("Orange") || c.name.toLowerCase().includes("demon") || c.name.toLowerCase().includes("obsidian minion") || c.name === "Foul Spirit (E)" || c.name === "Lying Spirit" || c.name === "Spirit of Doubt" || c.name === "Unclean Spirit (E)" || c.name === "Wandering Spirit (Ap)") && c.name !== "Babylon The Harlot (RoJ)" && c.brigade !== "Black/Brown/Crimson/Evil Gold/Gray/Orange/Pale Green" && !c.identifier.includes("Symbolic") && !c.identifier.includes("Animal") && c.name !== "Sabbath Breaker [Gray/Orange]" && c.name !== "The Divining Damsel (Promo)" && c.name !== "The False Prophet (EC)" && c.name !== "The False Prophet (RoJ)" && c.name !== "The False Prophet (RoJ AB)" && c.name !== "Damsel with Spirit of Divination (TxP)" && c.name !== "Saul/Paul" && c.name !== "Judas Iscariot / Judas, the Betrayer (GoC)";
+          return demonNot ? !matches : matches;
+        })
+        .filter((c) => {
+          if (!danielOnly) return true;
+          const matches = c.reference.toLowerCase().includes("daniel");
+          return danielNot ? !matches : matches;
+        })
         .filter((c) => {
           if (!postexilicOnly) return true;
           // Check if name contains "postexilic"
-          if (c.identifier.toLowerCase().includes("postexilic")) return true;
+          if (c.identifier.toLowerCase().includes("postexilic")) {
+            const matches = true;
+            return postexilicNot ? !matches : matches;
+          }
           // Check if it's one of the specific postexilic cards
           const postexilicCards = [
             "Nehemiah",
@@ -456,9 +551,10 @@ export default function CardSearchClient() {
             "Foolish Shepherd",
             "Unfaithful Priests"
           ];
-          return postexilicCards.includes(c.name);
+          const matches = postexilicCards.includes(c.name);
+          return postexilicNot ? !matches : matches;
         }),
-    [cards, queries, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly, strengthFilter, strengthOp, toughnessFilter, toughnessOp, iconFilterMode]
+    [cards, queries, selectedIconFilters, legalityMode, selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly, strengthFilter, strengthOp, toughnessFilter, toughnessOp, iconFilterMode, nativityNot, hasStarNot, cloudNot, angelNot, demonNot, danielNot, postexilicNot, testamentNots, gospelNot]
   );
 
   // Effect to show all cards when any filter is applied
@@ -490,7 +586,7 @@ export default function CardSearchClient() {
     } else {
       setVisibleCount(0);
     }
-  }, [filtered.length, queries, legalityMode, selectedIconFilters, selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, strengthFilter, toughnessFilter, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly]);
+  }, [filtered.length, queries, legalityMode, selectedIconFilters, selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, strengthFilter, toughnessFilter, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly, testamentNots, gospelNot]);
 
   const visibleCards = useMemo(() => {
     return filtered
@@ -501,10 +597,31 @@ export default function CardSearchClient() {
   // Toggler for icon filters
   function toggleIconFilter(value: string) {
     setSelectedIconFilters((prev) => {
-      const next = prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value];
-      return next;
+      const exists = prev.find(f => f.icon === value);
+      if (exists) {
+        // Remove the filter
+        return prev.filter((v) => v.icon !== value);
+      } else {
+        // Add the filter with default operator (AND)
+        return [...prev, { icon: value, operator: 'AND' }];
+      }
     });
   }
+  
+  // Update operator for a specific icon filter
+  function updateIconFilterOperator(icon: string, operator: IconFilterOperator) {
+    setSelectedIconFilters((prev) => 
+      prev.map(f => f.icon === icon ? { ...f, operator } : f)
+    );
+  }
+
+  // Update operator for ALL icon filters (used by Icon Filter Mode button)
+  function updateAllIconFilterOperators(operator: IconFilterOperator) {
+    setSelectedIconFilters((prev) => 
+      prev.map(filter => ({ ...filter, operator }))
+    );
+  }
+
   // Toggler for alignment filters
   function toggleAlignmentFilter(value: string) {
     setSelectedAlignmentFilters((prev) =>
@@ -544,6 +661,18 @@ export default function CardSearchClient() {
     setStrengthOp('eq');
     setToughnessFilter(null);
     setToughnessOp('eq');
+    
+    // Reset NOT states
+    setNativityNot(false);
+    setHasStarNot(false);
+    setCloudNot(false);
+    setAngelNot(false);
+    setDemonNot(false);
+    setDanielNot(false);
+    setPostexilicNot(false);
+    setTestamentNots({});
+    setGospelNot(false);
+    
     setVisibleCount(0); // Don't show any cards after reset
     
     // Clear URL
@@ -723,7 +852,7 @@ export default function CardSearchClient() {
           </span>
         ))}
         {/* Icon Filters */}
-        {selectedIconFilters.map((icon, idx) => {
+        {selectedIconFilters.map((filter, idx) => {
           // Brigade color mapping
           const brigadeColors = {
             Black: 'bg-black text-white',
@@ -746,16 +875,47 @@ export default function CardSearchClient() {
             'Good Multi': 'bg-gradient-to-r from-blue-200 via-green-200 to-red-200 text-gray-900 dark:from-blue-700 dark:via-green-700 dark:to-red-700 dark:text-white',
             'Evil Multi': 'bg-gradient-to-r from-gray-200 via-red-200 to-gray-400 text-gray-900 dark:from-black dark:via-crimson dark:to-gray-700 dark:text-white',
           };
-          const pillClass = brigadeColors[icon] ? `${brigadeColors[icon]} px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer` : 'bg-green-200 text-green-900 dark:bg-green-700 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer';
+          const pillClass = brigadeColors[filter.icon] ? `${brigadeColors[filter.icon]} px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer` : 'bg-green-200 text-green-900 dark:bg-green-700 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer';
           return (
-            <React.Fragment key={icon}>
-              <span className={pillClass} onClick={() => setSelectedIconFilters(selectedIconFilters.filter(i => i !== icon))} tabIndex={0} role="button" aria-label={`Remove ${icon} filter`}>
-                {icon}
+            <React.Fragment key={filter.icon}>
+              <span className={pillClass} onClick={() => setSelectedIconFilters(selectedIconFilters.filter(f => f.icon !== filter.icon))} tabIndex={0} role="button" aria-label={`Remove ${filter.icon} filter`}>
+                {filter.icon}
                 <span className="ml-1 text-gray-700 dark:text-gray-200">×</span>
               </span>
               {idx < selectedIconFilters.length - 1 && (
-                <span className="mx-1 font-bold text-xs text-gray-500 dark:text-gray-400 select-none">
-                  {iconFilterMode}
+                <span 
+                  className="mx-1 font-bold text-xs text-gray-500 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors px-2 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    // Left-click: cycle through AND → OR → AND NOT → AND
+                    const currentOp = filter.operator;
+                    if (currentOp === 'AND') {
+                      updateIconFilterOperator(filter.icon, 'OR');
+                    } else if (currentOp === 'OR') {
+                      updateIconFilterOperator(filter.icon, 'AND NOT');
+                    } else if (currentOp === 'AND NOT') {
+                      updateIconFilterOperator(filter.icon, 'AND');
+                    }
+                  }}
+                  title="Click to cycle: AND → OR → AND NOT"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      // Same as left-click
+                      const currentOp = filter.operator;
+                      if (currentOp === 'AND') {
+                        updateIconFilterOperator(filter.icon, 'OR');
+                      } else if (currentOp === 'OR') {
+                        updateIconFilterOperator(filter.icon, 'AND NOT');
+                      } else if (currentOp === 'AND NOT') {
+                        updateIconFilterOperator(filter.icon, 'AND');
+                      }
+                    }
+                  }}
+                >
+                  {filter.operator}
                 </span>
               )}
             </React.Fragment>
@@ -763,15 +923,15 @@ export default function CardSearchClient() {
         })}
         {/* Testament */}
         {selectedTestaments.map(t => (
-          <span key={t} className="bg-yellow-200 text-yellow-900 dark:bg-yellow-700 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setSelectedTestaments(selectedTestaments.filter(x => x !== t))} tabIndex={0} role="button" aria-label={`Remove ${t} testament filter`}>
-            {t}
+          <span key={t} className="bg-yellow-200 text-yellow-900 dark:bg-yellow-700 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setSelectedTestaments(selectedTestaments.filter(x => x !== t)); setTestamentNots(prev => { const newNots = { ...prev }; delete newNots[t]; return newNots; }); }} tabIndex={0} role="button" aria-label={`Remove ${t} testament filter`}>
+            {testamentNots[t] ? 'NOT ' : ''}{t}
             <span className="ml-1 text-yellow-900 dark:text-white">×</span>
           </span>
         ))}
         {/* Gospel */}
         {isGospel && (
-          <span className="bg-yellow-300 text-yellow-900 dark:bg-yellow-800 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setIsGospel(false)} tabIndex={0} role="button" aria-label="Remove Gospel filter">
-            Gospel
+          <span className="bg-yellow-300 text-yellow-900 dark:bg-yellow-800 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setIsGospel(false); setGospelNot(false); }} tabIndex={0} role="button" aria-label="Remove Gospel filter">
+            {gospelNot ? 'NOT ' : ''}Gospel
             <span className="ml-1 text-yellow-900 dark:text-white">×</span>
           </span>
         )}
@@ -803,44 +963,44 @@ export default function CardSearchClient() {
           </span>
         )}
         {nativityOnly && (
-          <span className="bg-pink-200 text-pink-900 dark:bg-pink-700 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setNativityOnly(false)} tabIndex={0} role="button" aria-label="Remove Nativity filter">
-            Nativity
+          <span className="bg-pink-200 text-pink-900 dark:bg-pink-700 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setNativityOnly(false); setNativityNot(false); }} tabIndex={0} role="button" aria-label="Remove Nativity filter">
+            {nativityNot ? 'NOT ' : ''}Nativity
             <span className="ml-1 text-pink-900 dark:text-white">×</span>
           </span>
         )}
         {hasStarOnly && (
-          <span className="bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setHasStarOnly(false)} tabIndex={0} role="button" aria-label="Remove Has Star filter">
-            Has Star
+          <span className="bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setHasStarOnly(false); setHasStarNot(false); }} tabIndex={0} role="button" aria-label="Remove Has Star filter">
+            {hasStarNot ? 'NOT ' : ''}Has Star
             <span className="ml-1 text-blue-900 dark:text-white">×</span>
           </span>
         )}
         {cloudOnly && (
-          <span className="bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setCloudOnly(false)} tabIndex={0} role="button" aria-label="Remove Cloud filter">
-            Cloud
+          <span className="bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setCloudOnly(false); setCloudNot(false); }} tabIndex={0} role="button" aria-label="Remove Cloud filter">
+            {cloudNot ? 'NOT ' : ''}Cloud
             <span className="ml-1 text-blue-900 dark:text-white">×</span>
           </span>
         )}
         {angelOnly && (
-          <span className="bg-gray-100 text-gray-900 dark:bg-gray-300 dark:text-gray-900 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setAngelOnly(false)} tabIndex={0} role="button" aria-label="Remove Angel filter">
-            Angel
+          <span className="bg-gray-100 text-gray-900 dark:bg-gray-300 dark:text-gray-900 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setAngelOnly(false); setAngelNot(false); }} tabIndex={0} role="button" aria-label="Remove Angel filter">
+            {angelNot ? 'NOT ' : ''}Angel
             <span className="ml-1 text-gray-900">×</span>
           </span>
         )}
         {demonOnly && (
-          <span className="bg-orange-200 text-orange-900 dark:bg-orange-500 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setDemonOnly(false)} tabIndex={0} role="button" aria-label="Remove Demon filter">
-            Demon
+          <span className="bg-orange-200 text-orange-900 dark:bg-orange-500 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setDemonOnly(false); setDemonNot(false); }} tabIndex={0} role="button" aria-label="Remove Demon filter">
+            {demonNot ? 'NOT ' : ''}Demon
             <span className="ml-1 text-orange-900 dark:text-white">×</span>
           </span>
         )}
         {danielOnly && (
-          <span className="bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setDanielOnly(false)} tabIndex={0} role="button" aria-label="Remove Daniel filter">
-            Daniel
+          <span className="bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setDanielOnly(false); setDanielNot(false); }} tabIndex={0} role="button" aria-label="Remove Daniel filter">
+            {danielNot ? 'NOT ' : ''}Daniel
             <span className="ml-1 text-blue-900 dark:text-white">×</span>
           </span>
         )}
         {postexilicOnly && (
-          <span className="bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setPostexilicOnly(false)} tabIndex={0} role="button" aria-label="Remove Postexilic filter">
-            Postexilic
+          <span className="bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setPostexilicOnly(false); setPostexilicNot(false); }} tabIndex={0} role="button" aria-label="Remove Postexilic filter">
+            {postexilicNot ? 'NOT ' : ''}Postexilic
             <span className="ml-1 text-blue-900 dark:text-white">×</span>
           </span>
         )}
@@ -859,8 +1019,12 @@ export default function CardSearchClient() {
             setAdvancedOpen={setAdvancedOpen}
             selectedTestaments={selectedTestaments}
             setSelectedTestaments={setSelectedTestaments}
+            testamentNots={testamentNots}
+            setTestamentNots={setTestamentNots}
             isGospel={isGospel}
             setIsGospel={setIsGospel}
+            gospelNot={gospelNot}
+            setGospelNot={setGospelNot}
             strengthFilter={strengthFilter}
             setStrengthFilter={setStrengthFilter}
             strengthOp={strengthOp}
@@ -875,20 +1039,36 @@ export default function CardSearchClient() {
             setnoFirstPrint={setnoFirstPrint}
             nativityOnly={nativityOnly}
             setNativityOnly={setNativityOnly}
+            nativityNot={nativityNot}
+            setNativityNot={setNativityNot}
             hasStarOnly={hasStarOnly}
             setHasStarOnly={setHasStarOnly}
+            hasStarNot={hasStarNot}
+            setHasStarNot={setHasStarNot}
             cloudOnly={cloudOnly}
             setCloudOnly={setCloudOnly}
+            cloudNot={cloudNot}
+            setCloudNot={setCloudNot}
             angelOnly={angelOnly}
             setAngelOnly={setAngelOnly}
+            angelNot={angelNot}
+            setAngelNot={setAngelNot}
             demonOnly={demonOnly}
             setDemonOnly={setDemonOnly}
+            demonNot={demonNot}
+            setDemonNot={setDemonNot}
             danielOnly={danielOnly}
             setDanielOnly={setDanielOnly}
+            danielNot={danielNot}
+            setDanielNot={setDanielNot}
             postexilicOnly={postexilicOnly}
             setPostexilicOnly={setPostexilicOnly}
+            postexilicNot={postexilicNot}
+            setPostexilicNot={setPostexilicNot}
             selectedIconFilters={selectedIconFilters}
             toggleIconFilter={toggleIconFilter}
+            updateIconFilterOperator={updateIconFilterOperator}
+            updateAllIconFilterOperators={updateAllIconFilterOperators}
             iconFilterMode={iconFilterMode}
             setIconFilterMode={setIconFilterMode}
           />
