@@ -153,6 +153,8 @@ export default function FilterGrid({
     "Territory-Class",
     "Site",
     "City",
+    "Warrior-Class",
+    "Weapon-Class",
   ];
 
   // Grouped color icons by brigade alignment
