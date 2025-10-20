@@ -51,12 +51,26 @@ function prettifyFieldName(key: string): string {
   return map[key] || key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, s => s.toUpperCase());
 }
 
-export default function ModalWithClose({ modalCard, setModalCard, visibleCards }) {
+export default function ModalWithClose({ modalCard, setModalCard, visibleCards, onAddCard, onRemoveCard, getCardQuantity }) {
   const { getImageUrl } = useCardImageUrl();
+  const [showMenu, setShowMenu] = React.useState(false);
+  
+  // Close menu when clicking outside
+  React.useEffect(() => {
+    if (!showMenu) return;
+    const handleClick = () => setShowMenu(false);
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [showMenu]);
+  
   React.useEffect(() => {
     function handleKeyDown(e) {
       if (e.key === "Escape") {
-        setModalCard(null);
+        if (showMenu) {
+          setShowMenu(false);
+        } else {
+          setModalCard(null);
+        }
       } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
         if (!visibleCards || visibleCards.length <= 1) return;
         
@@ -147,6 +161,88 @@ export default function ModalWithClose({ modalCard, setModalCard, visibleCards }
                   <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
               </button>
+            )}
+            {onAddCard && onRemoveCard && getCardQuantity && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowMenu(!showMenu)}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded flex items-center gap-2 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  Add to Deck
+                  {getCardQuantity(modalCard.name, modalCard.set, false) > 0 && (
+                    <span className="bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
+                      {getCardQuantity(modalCard.name, modalCard.set, false)}
+                    </span>
+                  )}
+                  <svg className={`w-4 h-4 transition-transform ${showMenu ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+                {showMenu && (
+                  <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-[200px] z-50">
+                    <button
+                      onClick={() => {
+                        onAddCard(modalCard, false);
+                        setShowMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Add to Main Deck
+                    </button>
+                    <button
+                      onClick={() => {
+                        onAddCard(modalCard, true);
+                        setShowMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Add to Reserve
+                    </button>
+                    {(getCardQuantity(modalCard.name, modalCard.set, false) > 0 || getCardQuantity(modalCard.name, modalCard.set, true) > 0) && (
+                      <>
+                        <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+                        {getCardQuantity(modalCard.name, modalCard.set, false) > 0 && (
+                          <button
+                            onClick={() => {
+                              onRemoveCard(modalCard.name, modalCard.set, false);
+                              setShowMenu(false);
+                            }}
+                            className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-red-600 dark:text-red-400"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                            </svg>
+                            Remove from Main Deck
+                          </button>
+                        )}
+                        {getCardQuantity(modalCard.name, modalCard.set, true) > 0 && (
+                          <button
+                            onClick={() => {
+                              onRemoveCard(modalCard.name, modalCard.set, true);
+                              setShowMenu(false);
+                            }}
+                            className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-red-600 dark:text-red-400"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                            </svg>
+                            Remove from Reserve
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
             <Button 
               onClick={() => openYTGSearchPage(modalCard.name)}

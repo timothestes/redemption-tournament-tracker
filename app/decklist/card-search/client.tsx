@@ -84,6 +84,9 @@ export default function CardSearchClient() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [exportNotification, setExportNotification] = useState(false);
 
+  // Deck builder visibility state
+  const [showDeckBuilder, setShowDeckBuilder] = useState(true);
+
   // Deck builder state
   const {
     deck,
@@ -747,7 +750,7 @@ export default function CardSearchClient() {
   return (
     <div className="flex w-full h-screen overflow-hidden bg-gray-100 dark:bg-gray-900">
       {/* Left panel: Card search */}
-      <div className="flex-1 flex flex-col w-full md:w-1/2 xl:w-[61.8%] md:border-r md:border-gray-200 md:dark:border-gray-800 overflow-hidden">
+      <div className={`flex-1 flex flex-col w-full ${showDeckBuilder ? 'md:w-1/2 xl:w-[61.8%] md:border-r md:border-gray-200 md:dark:border-gray-800' : ''} overflow-hidden transition-all duration-300`}>
         <div className="bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200 flex-1 flex flex-col overflow-hidden">
           <div className="p-2 flex flex-col items-center sticky top-0 z-40 bg-white text-gray-900 border-b border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-800 dark:shadow-lg">
         <div className="relative w-full max-w-xl px-2 flex flex-col sm:flex-row items-center justify-center gap-0">
@@ -1191,30 +1194,35 @@ export default function CardSearchClient() {
           modalCard={modalCard}
           setModalCard={setModalCard}
           visibleCards={visibleCards}
+          onAddCard={addCard}
+          onRemoveCard={removeCard}
+          getCardQuantity={getCardQuantity}
         />
       )}
         </div>
       </div>
-      {/* Right panel: Deck builder (hidden on mobile, shown on md and up) */}
-      <div className="hidden md:flex w-full md:w-1/2 xl:w-[38.2%] flex-col overflow-hidden">
-        <DeckBuilderPanel
-          deck={deck}
-          onDeckNameChange={setDeckName}
-          onAddCard={(cardName, cardSet, isReserve) => {
-            // Find the card in the cards array
-            const card = cards.find(c => c.name === cardName && c.set === cardSet);
-            if (card) {
-              addCard(card, isReserve);
-            }
-          }}
-          onRemoveCard={(cardName, cardSet, isReserve) => {
-            removeCard(cardName, cardSet, isReserve);
-          }}
-          onExport={handleExportDeck}
-          onImport={() => setShowImportModal(true)}
-          onClear={clearDeck}
-        />
-      </div>
+      {/* Right panel: Deck builder (hidden on mobile, toggleable on desktop) */}
+      {showDeckBuilder && (
+        <div className="hidden md:flex w-full md:w-1/2 xl:w-[38.2%] flex-col overflow-hidden transition-all duration-300">
+          <DeckBuilderPanel
+            deck={deck}
+            onDeckNameChange={setDeckName}
+            onAddCard={(cardName, cardSet, isReserve) => {
+              // Find the card in the cards array
+              const card = cards.find(c => c.name === cardName && c.set === cardSet);
+              if (card) {
+                addCard(card, isReserve);
+              }
+            }}
+            onRemoveCard={(cardName, cardSet, isReserve) => {
+              removeCard(cardName, cardSet, isReserve);
+            }}
+            onExport={handleExportDeck}
+            onImport={() => setShowImportModal(true)}
+            onClear={clearDeck}
+          />
+        </div>
+      )}
       
       {/* Import modal */}
       {showImportModal && (
@@ -1291,6 +1299,34 @@ export default function CardSearchClient() {
           Deck copied to clipboard!
         </div>
       )}
+      
+      {/* Floating Deck Toggle Button (Desktop only) */}
+      <button
+        onClick={() => setShowDeckBuilder(!showDeckBuilder)}
+        className="hidden md:flex fixed top-20 right-4 z-50 items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 text-gray-700 dark:text-gray-200 font-medium"
+        title={showDeckBuilder ? 'Hide deck builder' : 'Show deck builder'}
+      >
+        {showDeckBuilder ? (
+          <>
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+            </svg>
+            <span className="text-sm">Hide Deck</span>
+          </>
+        ) : (
+          <>
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+            </svg>
+            <span className="text-sm">Show Deck</span>
+            {deck.cards.length > 0 && (
+              <span className="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                {deck.cards.reduce((sum, dc) => sum + dc.quantity, 0)}
+              </span>
+            )}
+          </>
+        )}
+      </button>
     </div>
   );
 }

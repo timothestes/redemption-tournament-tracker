@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Deck } from "../types/deck";
 import DeckCardList from "./DeckCardList";
 
@@ -36,6 +36,15 @@ export default function DeckBuilderPanel({
   const [activeTab, setActiveTab] = useState<TabType>("cards");
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(deck.name);
+  const [showMenu, setShowMenu] = useState(false);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    if (!showMenu) return;
+    const handleClick = () => setShowMenu(false);
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [showMenu]);
 
   // Calculate deck stats
   const mainDeckCards = deck.cards.filter((dc) => !dc.isReserve);
@@ -60,6 +69,46 @@ export default function DeckBuilderPanel({
       setEditedName(deck.name);
       setIsEditingName(false);
     }
+  };
+
+  // Group cards by type
+  const groupCardsByType = (cards: typeof deck.cards) => {
+    const grouped = cards.reduce((acc, deckCard) => {
+      const type = deckCard.card.type || "Unknown";
+      if (!acc[type]) {
+        acc[type] = [];
+      }
+      acc[type].push(deckCard);
+      return acc;
+    }, {} as Record<string, typeof deck.cards>);
+
+    // Sort types alphabetically
+    return Object.keys(grouped)
+      .sort()
+      .map((type) => ({
+        type,
+        cards: grouped[type],
+        count: grouped[type].reduce((sum, dc) => sum + dc.quantity, 0),
+      }));
+  };
+
+  // Prettify card type names
+  const prettifyTypeName = (type: string): string => {
+    const typeMap: Record<string, string> = {
+      'GE': 'Good Enhancement',
+      'EE': 'Evil Enhancement',
+      'EC': 'Evil Character',
+      'HC': 'Hero Character',
+      'GC': 'Good Character',
+      'LS': 'Lost Soul',
+      'Dom': 'Dominant',
+      'Cov': 'Covenant',
+      'Cur': 'Curse',
+      'Art': 'Artifact',
+      'Fort': 'Fortress',
+      'Site': 'Site',
+    };
+    return typeMap[type] || type;
   };
 
   return (
@@ -112,31 +161,63 @@ export default function DeckBuilderPanel({
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="mt-3 flex gap-2">
+        {/* Menu Dropdown */}
+        <div className="mt-3 relative">
           <button
-            onClick={onExport}
-            className="flex-1 px-3 py-2 text-sm font-medium rounded bg-blue-600 hover:bg-blue-700 text-white transition-colors"
-          >
-            Export
-          </button>
-          <button
-            onClick={onImport}
-            className="flex-1 px-3 py-2 text-sm font-medium rounded bg-green-600 hover:bg-green-700 text-white transition-colors"
-          >
-            Import
-          </button>
-          <button
-            onClick={() => {
-              if (confirm("Clear entire deck?")) {
-                onClear();
-              }
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowMenu(!showMenu);
             }}
-            className="px-3 py-2 text-sm font-medium rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition-colors"
-            title="Clear deck"
+            className="w-full px-3 py-2 text-sm font-medium rounded bg-blue-600 hover:bg-blue-700 text-white transition-colors flex items-center justify-center gap-2"
           >
-            Clear
+            Menu
+            <svg className={`w-4 h-4 transition-transform ${showMenu ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
           </button>
+          {showMenu && (
+            <div className="absolute top-full mt-1 left-0 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50">
+              <button
+                onClick={() => {
+                  onExport();
+                  setShowMenu(false);
+                }}
+                className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                Export
+              </button>
+              <button
+                onClick={() => {
+                  onImport();
+                  setShowMenu(false);
+                }}
+                className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Import
+              </button>
+              <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+              <button
+                onClick={() => {
+                  if (confirm("Clear entire deck?")) {
+                    onClear();
+                  }
+                  setShowMenu(false);
+                }}
+                className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-red-600 dark:text-red-400 text-sm"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Clear Deck
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -167,56 +248,74 @@ export default function DeckBuilderPanel({
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">
         {activeTab === "cards" ? (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {/* Main Deck */}
             {mainDeckCards.length > 0 && (
               <div>
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 pb-2 border-b border-gray-200 dark:border-gray-700">
                   Main Deck ({mainDeckCount})
                 </h3>
-                <DeckCardList
-                  cards={mainDeckCards}
-                  onIncrement={(name, set, isReserve) => onAddCard(name, set, isReserve)}
-                  onDecrement={(name, set, isReserve) => onRemoveCard(name, set, isReserve)}
-                  onRemove={(name, set, isReserve) => {
-                    // Remove all copies
-                    const card = deck.cards.find(
-                      (dc) => dc.card.name === name && dc.card.set === set && dc.isReserve === isReserve
-                    );
-                    if (card) {
-                      for (let i = 0; i < card.quantity; i++) {
-                        onRemoveCard(name, set, isReserve);
-                      }
-                    }
-                  }}
-                  filterReserve={false}
-                />
+                <div className="space-y-4">
+                  {groupCardsByType(mainDeckCards).map(({ type, cards, count }) => (
+                    <div key={type}>
+                      <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2 uppercase tracking-wide">
+                        {prettifyTypeName(type)} ({count})
+                      </h4>
+                      <DeckCardList
+                        cards={cards}
+                        onIncrement={(name, set, isReserve) => onAddCard(name, set, isReserve)}
+                        onDecrement={(name, set, isReserve) => onRemoveCard(name, set, isReserve)}
+                        onRemove={(name, set, isReserve) => {
+                          // Remove all copies
+                          const card = deck.cards.find(
+                            (dc) => dc.card.name === name && dc.card.set === set && dc.isReserve === isReserve
+                          );
+                          if (card) {
+                            for (let i = 0; i < card.quantity; i++) {
+                              onRemoveCard(name, set, isReserve);
+                            }
+                          }
+                        }}
+                        filterReserve={false}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
             {/* Reserve */}
             {reserveCards.length > 0 && (
               <div>
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 pb-2 border-b border-gray-200 dark:border-gray-700">
                   Reserve ({reserveCount})
                 </h3>
-                <DeckCardList
-                  cards={reserveCards}
-                  onIncrement={(name, set, isReserve) => onAddCard(name, set, isReserve)}
-                  onDecrement={(name, set, isReserve) => onRemoveCard(name, set, isReserve)}
-                  onRemove={(name, set, isReserve) => {
-                    // Remove all copies
-                    const card = deck.cards.find(
-                      (dc) => dc.card.name === name && dc.card.set === set && dc.isReserve === isReserve
-                    );
-                    if (card) {
-                      for (let i = 0; i < card.quantity; i++) {
-                        onRemoveCard(name, set, isReserve);
-                      }
-                    }
-                  }}
-                  filterReserve={true}
-                />
+                <div className="space-y-4">
+                  {groupCardsByType(reserveCards).map(({ type, cards, count }) => (
+                    <div key={type}>
+                      <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2 uppercase tracking-wide">
+                        {prettifyTypeName(type)} ({count})
+                      </h4>
+                      <DeckCardList
+                        cards={cards}
+                        onIncrement={(name, set, isReserve) => onAddCard(name, set, isReserve)}
+                        onDecrement={(name, set, isReserve) => onRemoveCard(name, set, isReserve)}
+                        onRemove={(name, set, isReserve) => {
+                          // Remove all copies
+                          const card = deck.cards.find(
+                            (dc) => dc.card.name === name && dc.card.set === set && dc.isReserve === isReserve
+                          );
+                          if (card) {
+                            for (let i = 0; i < card.quantity; i++) {
+                              onRemoveCard(name, set, isReserve);
+                            }
+                          }
+                        }}
+                        filterReserve={true}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
