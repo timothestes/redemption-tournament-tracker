@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { Deck } from "../types/deck";
 import DeckCardList from "./DeckCardList";
 
+export type TabType = "main" | "reserve" | "info";
+
 interface DeckBuilderPanelProps {
   /** Current deck state */
   deck: Deck;
@@ -17,9 +19,9 @@ interface DeckBuilderPanelProps {
   onImport: () => void;
   /** Callback to clear deck */
   onClear: () => void;
+  /** Callback when active tab changes */
+  onActiveTabChange?: (tab: TabType) => void;
 }
-
-type TabType = "cards" | "info";
 
 /**
  * Right sidebar panel for deck building
@@ -32,11 +34,18 @@ export default function DeckBuilderPanel({
   onExport,
   onImport,
   onClear,
+  onActiveTabChange,
 }: DeckBuilderPanelProps) {
-  const [activeTab, setActiveTab] = useState<TabType>("cards");
+  const [activeTab, setActiveTab] = useState<TabType>("main");
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(deck.name);
   const [showMenu, setShowMenu] = useState(false);
+
+  // Notify parent when tab changes
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab);
+    onActiveTabChange?.(tab);
+  };
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -139,44 +148,45 @@ export default function DeckBuilderPanel({
           </h2>
         )}
 
-        {/* Card Count */}
-        <div className="mt-2 flex items-center gap-3 text-sm">
-          <div className="flex items-center gap-1">
-            <span className="text-gray-600 dark:text-gray-400">Main:</span>
-            <span className="font-semibold text-gray-900 dark:text-white">{mainDeckCount}</span>
+        {/* Card Count and Menu Button Row */}
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 text-sm">
+            <div className="flex items-center gap-1">
+              <span className="text-gray-600 dark:text-gray-400">Main:</span>
+              <span className="font-semibold text-gray-900 dark:text-white">{mainDeckCount}</span>
+            </div>
+            {reserveCount > 0 && (
+              <>
+                <span className="text-gray-400">•</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-gray-600 dark:text-gray-400">Reserve:</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">{reserveCount}</span>
+                </div>
+              </>
+            )}
+            <span className="text-gray-400">•</span>
+            <div className="flex items-center gap-1">
+              <span className="text-gray-600 dark:text-gray-400">Total:</span>
+              <span className="font-semibold text-gray-900 dark:text-white">{totalCards}</span>
+            </div>
           </div>
-          {reserveCount > 0 && (
-            <>
-              <span className="text-gray-400">•</span>
-              <div className="flex items-center gap-1">
-                <span className="text-gray-600 dark:text-gray-400">Reserve:</span>
-                <span className="font-semibold text-gray-900 dark:text-white">{reserveCount}</span>
-              </div>
-            </>
-          )}
-          <span className="text-gray-400">•</span>
-          <div className="flex items-center gap-1">
-            <span className="text-gray-600 dark:text-gray-400">Total:</span>
-            <span className="font-semibold text-gray-900 dark:text-white">{totalCards}</span>
-          </div>
-        </div>
 
-        {/* Menu Dropdown */}
-        <div className="mt-3 relative">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowMenu(!showMenu);
-            }}
-            className="w-full px-3 py-2 text-sm font-medium rounded bg-blue-600 hover:bg-blue-700 text-white transition-colors flex items-center justify-center gap-2"
-          >
-            Menu
-            <svg className={`w-4 h-4 transition-transform ${showMenu ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
-          </button>
-          {showMenu && (
-            <div className="absolute top-full mt-1 left-0 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50">
+          {/* Menu Dropdown */}
+          <div className="relative">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowMenu(!showMenu);
+              }}
+              className="px-3 py-1.5 text-sm font-medium rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
+            >
+              Menu
+              <svg className={`w-4 h-4 transition-transform ${showMenu ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+            {showMenu && (
+              <div className="absolute top-full mt-1 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50 min-w-[160px]">
               <button
                 onClick={() => {
                   onExport();
@@ -218,24 +228,35 @@ export default function DeckBuilderPanel({
               </button>
             </div>
           )}
+          </div>
         </div>
       </div>
 
       {/* Tabs */}
       <div className="flex-shrink-0 flex border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
         <button
-          onClick={() => setActiveTab("cards")}
-          className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-            activeTab === "cards"
+          onClick={() => handleTabChange("main")}
+          className={`flex-1 px-3 py-3 text-sm font-medium transition-colors ${
+            activeTab === "main"
               ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
           }`}
         >
-          Cards ({deck.cards.length})
+          Main ({mainDeckCount})
         </button>
         <button
-          onClick={() => setActiveTab("info")}
-          className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+          onClick={() => handleTabChange("reserve")}
+          className={`flex-1 px-3 py-3 text-sm font-medium transition-colors ${
+            activeTab === "reserve"
+              ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+              : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+          }`}
+        >
+          Reserve ({reserveCount})
+        </button>
+        <button
+          onClick={() => handleTabChange("info")}
+          className={`flex-1 px-3 py-3 text-sm font-medium transition-colors ${
             activeTab === "info"
               ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
@@ -247,83 +268,78 @@ export default function DeckBuilderPanel({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">
-        {activeTab === "cards" ? (
-          <div className="space-y-6">
-            {/* Main Deck */}
-            {mainDeckCards.length > 0 && (
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 pb-2 border-b border-gray-200 dark:border-gray-700">
-                  Main Deck ({mainDeckCount})
-                </h3>
-                <div className="space-y-4">
-                  {groupCardsByType(mainDeckCards).map(({ type, cards, count }) => (
-                    <div key={type}>
-                      <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2 uppercase tracking-wide">
-                        {prettifyTypeName(type)} ({count})
-                      </h4>
-                      <DeckCardList
-                        cards={cards}
-                        onIncrement={(name, set, isReserve) => onAddCard(name, set, isReserve)}
-                        onDecrement={(name, set, isReserve) => onRemoveCard(name, set, isReserve)}
-                        onRemove={(name, set, isReserve) => {
-                          // Remove all copies
-                          const card = deck.cards.find(
-                            (dc) => dc.card.name === name && dc.card.set === set && dc.isReserve === isReserve
-                          );
-                          if (card) {
-                            for (let i = 0; i < card.quantity; i++) {
-                              onRemoveCard(name, set, isReserve);
-                            }
-                          }
-                        }}
-                        filterReserve={false}
-                      />
-                    </div>
-                  ))}
+        {activeTab === "main" ? (
+          <div className="space-y-4">
+            {mainDeckCards.length > 0 ? (
+              groupCardsByType(mainDeckCards).map(({ type, cards, count }) => (
+                <div key={type}>
+                  <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2 uppercase tracking-wide">
+                    {prettifyTypeName(type)} ({count})
+                  </h4>
+                  <DeckCardList
+                    cards={cards}
+                    onIncrement={(name, set, isReserve) => onAddCard(name, set, isReserve)}
+                    onDecrement={(name, set, isReserve) => onRemoveCard(name, set, isReserve)}
+                    onRemove={(name, set, isReserve) => {
+                      // Remove all copies
+                      const card = deck.cards.find(
+                        (dc) => dc.card.name === name && dc.card.set === set && dc.isReserve === isReserve
+                      );
+                      if (card) {
+                        for (let i = 0; i < card.quantity; i++) {
+                          onRemoveCard(name, set, isReserve);
+                        }
+                      }
+                    }}
+                    filterReserve={false}
+                  />
                 </div>
-              </div>
-            )}
-
-            {/* Reserve */}
-            {reserveCards.length > 0 && (
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 pb-2 border-b border-gray-200 dark:border-gray-700">
-                  Reserve ({reserveCount})
-                </h3>
-                <div className="space-y-4">
-                  {groupCardsByType(reserveCards).map(({ type, cards, count }) => (
-                    <div key={type}>
-                      <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2 uppercase tracking-wide">
-                        {prettifyTypeName(type)} ({count})
-                      </h4>
-                      <DeckCardList
-                        cards={cards}
-                        onIncrement={(name, set, isReserve) => onAddCard(name, set, isReserve)}
-                        onDecrement={(name, set, isReserve) => onRemoveCard(name, set, isReserve)}
-                        onRemove={(name, set, isReserve) => {
-                          // Remove all copies
-                          const card = deck.cards.find(
-                            (dc) => dc.card.name === name && dc.card.set === set && dc.isReserve === isReserve
-                          );
-                          if (card) {
-                            for (let i = 0; i < card.quantity; i++) {
-                              onRemoveCard(name, set, isReserve);
-                            }
-                          }
-                        }}
-                        filterReserve={true}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Empty State */}
-            {deck.cards.length === 0 && (
+              ))
+            ) : (
               <div className="text-center py-12">
                 <p className="text-gray-500 dark:text-gray-400 text-sm">
-                  Click cards from the search results to add them to your deck
+                  No cards in main deck yet
+                </p>
+                <p className="text-gray-400 dark:text-gray-500 text-xs mt-2">
+                  Click cards from search to add them
+                </p>
+              </div>
+            )}
+          </div>
+        ) : activeTab === "reserve" ? (
+          <div className="space-y-4">
+            {reserveCards.length > 0 ? (
+              groupCardsByType(reserveCards).map(({ type, cards, count }) => (
+                <div key={type}>
+                  <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2 uppercase tracking-wide">
+                    {prettifyTypeName(type)} ({count})
+                  </h4>
+                  <DeckCardList
+                    cards={cards}
+                    onIncrement={(name, set, isReserve) => onAddCard(name, set, isReserve)}
+                    onDecrement={(name, set, isReserve) => onRemoveCard(name, set, isReserve)}
+                    onRemove={(name, set, isReserve) => {
+                      // Remove all copies
+                      const card = deck.cards.find(
+                        (dc) => dc.card.name === name && dc.card.set === set && dc.isReserve === isReserve
+                      );
+                      if (card) {
+                        for (let i = 0; i < card.quantity; i++) {
+                          onRemoveCard(name, set, isReserve);
+                        }
+                      }
+                    }}
+                    filterReserve={true}
+                  />
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-gray-500 dark:text-gray-400 text-sm">
+                  No cards in reserve yet
+                </p>
+                <p className="text-gray-400 dark:text-gray-500 text-xs mt-2">
+                  Use "Add to Deck" button on cards and select "Add to Reserve"
                 </p>
               </div>
             )}

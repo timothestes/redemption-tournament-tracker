@@ -13,12 +13,15 @@ function normalizeCardName(name: string): string {
  * Parse a deck text in standard tab-separated format
  * Format: Quantity\tName\tSet\tImageFile\tCollectorInfo
  * Supports "Reserve:" section for reserve cards
+ * Ignores "Tokens:" section (tokens are not imported)
  * 
  * Example:
  * 4	Abraham	PoC	Abraham (PoC).jpg	"Genesis 11:26; [PoC (R)]"
  * 2	Moses	Patriarchs	Moses (Pa).jpg	"Exodus 2:10; [Pa (UR)]"
  * Reserve:
  * 1	Angel of the Lord	Patriarchs	Angel of the Lord (Pa).jpg	"Genesis 16:7; [Pa (R)]"
+ * Tokens:
+ * 1	Aaron's Staff (CoW)
  */
 export function parseDeckText(
   text: string,
@@ -28,12 +31,24 @@ export function parseDeckText(
   const deckCards: DeckCard[] = [];
   const errors: string[] = [];
   let isReserve = false;
+  let isTokens = false; // Track if we're in the Tokens section
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     
     // Skip empty lines
     if (!line) continue;
+    
+    // Check for Tokens section marker - ignore all cards after this
+    if (line.toLowerCase() === "tokens:") {
+      isTokens = true;
+      continue;
+    }
+    
+    // Skip all lines if we're in the Tokens section
+    if (isTokens) {
+      continue;
+    }
     
     // Check for Reserve section marker
     if (line.toLowerCase() === "reserve:") {
@@ -55,8 +70,8 @@ export function parseDeckText(
     
     // Parse quantity
     const quantity = parseInt(quantityStr, 10);
-    if (isNaN(quantity) || quantity < 1 || quantity > 4) {
-      errors.push(`Line ${i + 1}: Invalid quantity "${quantityStr}" (must be 1-4)`);
+    if (isNaN(quantity) || quantity < 1) {
+      errors.push(`Line ${i + 1}: Invalid quantity "${quantityStr}" (must be at least 1)`);
       continue;
     }
     

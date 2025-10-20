@@ -51,7 +51,15 @@ function prettifyFieldName(key: string): string {
   return map[key] || key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, s => s.toUpperCase());
 }
 
-export default function ModalWithClose({ modalCard, setModalCard, visibleCards, onAddCard, onRemoveCard, getCardQuantity }) {
+export default function ModalWithClose({ 
+  modalCard, 
+  setModalCard, 
+  visibleCards, 
+  onAddCard, 
+  onRemoveCard, 
+  getCardQuantity,
+  activeDeckTab = "main" // Default to main if not provided
+}) {
   const { getImageUrl } = useCardImageUrl();
   const [showMenu, setShowMenu] = React.useState(false);
   
@@ -164,23 +172,42 @@ export default function ModalWithClose({ modalCard, setModalCard, visibleCards, 
             )}
             {onAddCard && onRemoveCard && getCardQuantity && (
               <div className="relative">
-                <button
-                  onClick={() => setShowMenu(!showMenu)}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded flex items-center gap-2 transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  Add to Deck
-                  {getCardQuantity(modalCard.name, modalCard.set, false) > 0 && (
-                    <span className="bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
-                      {getCardQuantity(modalCard.name, modalCard.set, false)}
-                    </span>
-                  )}
-                  <svg className={`w-4 h-4 transition-transform ${showMenu ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                </button>
+                <div className="flex gap-0">
+                  {/* Main add button - adds to active tab */}
+                  <button
+                    onClick={() => {
+                      const isReserve = activeDeckTab === "reserve";
+                      onAddCard(modalCard, isReserve);
+                    }}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-l flex items-center gap-2 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    Add to {activeDeckTab === "reserve" ? "Reserve" : activeDeckTab === "main" ? "Main" : "Deck"}
+                    {(() => {
+                      const isReserve = activeDeckTab === "reserve";
+                      const quantity = getCardQuantity(modalCard.name, modalCard.set, isReserve);
+                      return quantity > 0 && (
+                        <span className="bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
+                          {quantity}
+                        </span>
+                      );
+                    })()}
+                  </button>
+                  {/* Dropdown toggle button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowMenu(!showMenu);
+                    }}
+                    className="px-2 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-r border-l border-blue-700 transition-colors"
+                  >
+                    <svg className={`w-4 h-4 transition-transform ${showMenu ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
                 {showMenu && (
                   <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-[200px] z-50">
                     <button

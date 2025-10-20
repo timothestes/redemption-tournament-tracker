@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import ModalWithClose from "./ModalWithClose";
 import FilterGrid from "./components/FilterGrid";
 import CardImage from "./components/CardImage";
-import DeckBuilderPanel from "./components/DeckBuilderPanel";
+import DeckBuilderPanel, { TabType } from "./components/DeckBuilderPanel";
 import { CARD_DATA_URL, OT_BOOKS, NT_BOOKS, GOSPEL_BOOKS } from "./constants";
 import { 
   Card, 
@@ -86,6 +86,9 @@ export default function CardSearchClient() {
 
   // Deck builder visibility state
   const [showDeckBuilder, setShowDeckBuilder] = useState(true);
+
+  // Track active tab in deck builder
+  const [activeDeckTab, setActiveDeckTab] = useState<TabType>("main");
 
   // Deck builder state
   const {
@@ -1140,10 +1143,10 @@ export default function CardSearchClient() {
                 <div 
                   key={c.dataLine} 
                   className="relative cursor-pointer group" 
-                  onClick={() => addCard(c, false)}
+                  onClick={() => addCard(c, activeDeckTab === "reserve")}
                   onContextMenu={(e) => {
                     e.preventDefault();
-                    removeCard(c.name, c.set, false);
+                    removeCard(c.name, c.set, activeDeckTab === "reserve");
                   }}
                   title="Left-click to add, right-click to remove"
                 >
@@ -1197,6 +1200,7 @@ export default function CardSearchClient() {
           onAddCard={addCard}
           onRemoveCard={removeCard}
           getCardQuantity={getCardQuantity}
+          activeDeckTab={activeDeckTab}
         />
       )}
         </div>
@@ -1220,6 +1224,7 @@ export default function CardSearchClient() {
             onExport={handleExportDeck}
             onImport={() => setShowImportModal(true)}
             onClear={clearDeck}
+            onActiveTabChange={setActiveDeckTab}
           />
         </div>
       )}
