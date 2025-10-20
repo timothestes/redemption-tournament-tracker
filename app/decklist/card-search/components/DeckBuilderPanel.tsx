@@ -1,14 +1,26 @@
 import React, { useState, useEffect } from "react";
 import { Deck } from "../types/deck";
+import { SyncStatus } from "../hooks/useDeckState";
 import DeckCardList from "./DeckCardList";
+import { Card } from "../utils";
+import { validateDeck, getValidationSummary } from "../utils/deckValidation";
+import GeneratePDFModal from "./GeneratePDFModal";
 
 export type TabType = "main" | "reserve" | "info";
 
 interface DeckBuilderPanelProps {
   /** Current deck state */
   deck: Deck;
+  /** Cloud sync status */
+  syncStatus?: SyncStatus;
+  /** Whether there are unsaved changes */
+  hasUnsavedChanges?: boolean;
   /** Callback when deck name changes */
   onDeckNameChange: (name: string) => void;
+  /** Callback when deck format changes */
+  onDeckFormatChange?: (format: string) => void;
+  /** Callback to save deck to cloud */
+  onSaveDeck?: () => Promise<{ success: boolean; error?: string }>;
   /** Callback to add a card */
   onAddCard: (cardName: string, cardSet: string, isReserve: boolean) => void;
   /** Callback to remove a card */
@@ -21,6 +33,8 @@ interface DeckBuilderPanelProps {
   onClear: () => void;
   /** Callback when active tab changes */
   onActiveTabChange?: (tab: TabType) => void;
+  /** Callback when user wants to view card details */
+  onViewCard?: (card: Card) => void;
 }
 
 /**
@@ -28,18 +42,41 @@ interface DeckBuilderPanelProps {
  */
 export default function DeckBuilderPanel({
   deck,
+  syncStatus,
+  hasUnsavedChanges = false,
   onDeckNameChange,
+  onDeckFormatChange,
+  onSaveDeck,
   onAddCard,
   onRemoveCard,
   onExport,
   onImport,
   onClear,
   onActiveTabChange,
+  onViewCard,
 }: DeckBuilderPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>("main");
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(deck.name);
   const [showMenu, setShowMenu] = useState(false);
+  const [showGeneratePDFModal, setShowGeneratePDFModal] = useState(false);
+  
+  // Initialize deck type based on deck.format
+  const [deckType, setDeckType] = useState<'T1' | 'T2'>(() => {
+    const format = deck.format?.toLowerCase();
+    return format?.includes('type 2') || format?.includes('multi') ? 'T2' : 'T1';
+  });
+
+  // Calculate validation
+  const validation = validateDeck(deck);
+
+  // Handle deck type toggle
+  const handleDeckTypeToggle = () => {
+    const newType = deckType === 'T1' ? 'T2' : 'T1';
+    setDeckType(newType);
+    const newFormat = newType === 'T2' ? 'Type 2' : 'Type 1';
+    onDeckFormatChange?.(newFormat);
+  };
 
   // Notify parent when tab changes
   const handleTabChange = (tab: TabType) => {
@@ -77,6 +114,25 @@ export default function DeckBuilderPanel({
     } else if (e.key === "Escape") {
       setEditedName(deck.name);
       setIsEditingName(false);
+    }
+  };
+
+  // Handle moving card between main deck and reserve
+  const handleMoveCard = (cardName: string, cardSet: string, fromReserve: boolean, toReserve: boolean) => {
+    // Find the card
+    const deckCard = deck.cards.find(
+      (dc) => dc.card.name === cardName && dc.card.set === cardSet && dc.isReserve === fromReserve
+    );
+    
+    if (deckCard) {
+      // Remove all copies from current location
+      for (let i = 0; i < deckCard.quantity; i++) {
+        onRemoveCard(cardName, cardSet, fromReserve);
+      }
+      // Add all copies to new location
+      for (let i = 0; i < deckCard.quantity; i++) {
+        onAddCard(cardName, cardSet, toReserve);
+      }
     }
   };
 
@@ -143,6 +199,7 @@ export default function DeckBuilderPanel({
               setEditedName(deck.name);
             }}
             title="Click to edit deck name"
+            suppressHydrationWarning
           >
             {deck.name}
           </h2>
@@ -150,7 +207,7 @@ export default function DeckBuilderPanel({
 
         {/* Card Count and Menu Button Row */}
         <div className="mt-2 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 text-sm">
+          <div className="flex items-center gap-3 text-sm" suppressHydrationWarning>
             <div className="flex items-center gap-1">
               <span className="text-gray-600 dark:text-gray-400">Main:</span>
               <span className="font-semibold text-gray-900 dark:text-white">{mainDeckCount}</span>
@@ -169,7 +226,85 @@ export default function DeckBuilderPanel({
               <span className="text-gray-600 dark:text-gray-400">Total:</span>
               <span className="font-semibold text-gray-900 dark:text-white">{totalCards}</span>
             </div>
+            
+            {/* T1/T2 Toggle Switch */}
+            <span className="text-gray-400">•</span>
+            <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-full p-0.5">
+              <button
+                onClick={() => deckType === 'T2' && handleDeckTypeToggle()}
+                className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                  deckType === 'T1'
+                    ? 'bg-blue-600 dark:bg-blue-500 text-white'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                }`}
+              >
+                T1
+              </button>
+              <button
+                onClick={() => deckType === 'T1' && handleDeckTypeToggle()}
+                className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                  deckType === 'T2'
+                    ? 'bg-blue-600 dark:bg-blue-500 text-white'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                }`}
+              >
+                T2
+              </button>
+            </div>
           </div>
+
+          {/* Save Button */}
+          {onSaveDeck && (
+            <button
+              onClick={async () => {
+                const result = await onSaveDeck();
+                if (!result.success && result.error) {
+                  alert(result.error);
+                }
+              }}
+              disabled={syncStatus?.isSaving}
+              className={`px-4 py-1.5 text-sm font-medium rounded transition-colors flex items-center gap-2 ${
+                syncStatus?.isSaving
+                  ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-500 cursor-not-allowed'
+                  : hasUnsavedChanges
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                  : 'bg-green-600 hover:bg-green-700 text-white'
+              }`}
+              title={
+                syncStatus?.isSaving
+                  ? 'Saving...'
+                  : hasUnsavedChanges
+                  ? 'Save changes to cloud'
+                  : syncStatus?.lastSavedAt
+                  ? `Last saved ${new Date(syncStatus.lastSavedAt).toLocaleTimeString()}`
+                  : 'Save to cloud'
+              }
+            >
+              {syncStatus?.isSaving ? (
+                <>
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Saving...
+                </>
+              ) : hasUnsavedChanges ? (
+                <>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                  </svg>
+                  Save
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Saved
+                </>
+              )}
+            </button>
+          )}
 
           {/* Menu Dropdown */}
           <div className="relative">
@@ -210,6 +345,18 @@ export default function DeckBuilderPanel({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
                 Import
+              </button>
+              <button
+                onClick={() => {
+                  setShowGeneratePDFModal(true);
+                  setShowMenu(false);
+                }}
+                className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+                Generate PDF
               </button>
               <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
               <button
@@ -262,7 +409,21 @@ export default function DeckBuilderPanel({
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
           }`}
         >
-          Info
+          <span className="flex items-center justify-center gap-1.5">
+            Info
+            {validation.stats.totalCards > 0 && (
+              <span
+                className={`inline-flex items-center justify-center w-4 h-4 text-xs rounded-full ${
+                  validation.isValid
+                    ? "bg-green-500 text-white"
+                    : "bg-red-500 text-white"
+                }`}
+                title={validation.isValid ? "Valid deck" : `${validation.issues.filter(i => i.type === "error").length} error(s)`}
+              >
+                {validation.isValid ? "✓" : "!"}
+              </span>
+            )}
+          </span>
         </button>
       </div>
 
@@ -271,7 +432,8 @@ export default function DeckBuilderPanel({
         {activeTab === "main" ? (
           <div className="space-y-4">
             {mainDeckCards.length > 0 ? (
-              groupCardsByType(mainDeckCards).map(({ type, cards, count }) => (
+              groupCardsByType(mainDeckCards).map(({ type, cards, count }) => {
+                return (
                 <div key={type}>
                   <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2 uppercase tracking-wide">
                     {prettifyTypeName(type)} ({count})
@@ -292,9 +454,12 @@ export default function DeckBuilderPanel({
                       }
                     }}
                     filterReserve={false}
+                    onViewCard={onViewCard}
+                    onMoveCard={handleMoveCard}
                   />
                 </div>
-              ))
+              );
+              })
             ) : (
               <div className="text-center py-12">
                 <p className="text-gray-500 dark:text-gray-400 text-sm">
@@ -309,7 +474,8 @@ export default function DeckBuilderPanel({
         ) : activeTab === "reserve" ? (
           <div className="space-y-4">
             {reserveCards.length > 0 ? (
-              groupCardsByType(reserveCards).map(({ type, cards, count }) => (
+              groupCardsByType(reserveCards).map(({ type, cards, count }) => {
+                return (
                 <div key={type}>
                   <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2 uppercase tracking-wide">
                     {prettifyTypeName(type)} ({count})
@@ -330,9 +496,12 @@ export default function DeckBuilderPanel({
                       }
                     }}
                     filterReserve={true}
+                    onViewCard={onViewCard}
+                    onMoveCard={handleMoveCard}
                   />
                 </div>
-              ))
+              );
+              })
             ) : (
               <div className="text-center py-12">
                 <p className="text-gray-500 dark:text-gray-400 text-sm">
@@ -347,6 +516,54 @@ export default function DeckBuilderPanel({
         ) : (
           // Info Tab
           <div className="space-y-4 text-sm">
+            {/* Validation Status */}
+            <div>
+              <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                Deck Validation
+              </h3>
+              <div className={`p-3 rounded-lg ${
+                validation.isValid && validation.stats.totalCards > 0
+                  ? "bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800"
+                  : validation.stats.totalCards === 0
+                  ? "bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+                  : "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800"
+              }`}>
+                <div className="font-medium mb-2">
+                  {validation.isValid && validation.stats.totalCards > 0 ? (
+                    <span className="text-green-700 dark:text-green-400">✓ Valid Deck</span>
+                  ) : validation.stats.totalCards === 0 ? (
+                    <span className="text-gray-600 dark:text-gray-400">Empty Deck</span>
+                  ) : (
+                    <span className="text-red-700 dark:text-red-400">
+                      ✗ {validation.issues.filter(i => i.type === "error").length} Error{validation.issues.filter(i => i.type === "error").length !== 1 ? "s" : ""}
+                    </span>
+                  )}
+                </div>
+                
+                {validation.issues.length > 0 && (
+                  <div className="space-y-1">
+                    {validation.issues.map((issue, idx) => (
+                      <div
+                        key={idx}
+                        className={`text-xs flex items-start gap-1 ${
+                          issue.type === "error"
+                            ? "text-red-700 dark:text-red-400"
+                            : issue.type === "warning"
+                            ? "text-yellow-700 dark:text-yellow-400"
+                            : "text-blue-700 dark:text-blue-400"
+                        }`}
+                      >
+                        <span className="mt-0.5">
+                          {issue.type === "error" ? "⚠" : issue.type === "warning" ? "⚠" : "ℹ"}
+                        </span>
+                        <span>{issue.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div>
               <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
                 Deck Statistics
@@ -370,6 +587,24 @@ export default function DeckBuilderPanel({
                     <span className="font-medium">{reserveCount}</span>
                   </div>
                 )}
+                <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                  <div className="flex justify-between">
+                    <span>Lost Souls:</span>
+                    <span className={`font-medium ${
+                      validation.stats.lostSoulCount < validation.stats.requiredLostSouls
+                        ? "text-red-600 dark:text-red-400"
+                        : validation.stats.lostSoulCount > validation.stats.requiredLostSouls
+                        ? "text-red-600 dark:text-red-400"
+                        : "text-green-600 dark:text-green-400"
+                    }`}>
+                      {validation.stats.lostSoulCount}/{validation.stats.requiredLostSouls}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Dominants:</span>
+                    <span className="font-medium">{validation.stats.dominantCount}</span>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -391,6 +626,14 @@ export default function DeckBuilderPanel({
           </div>
         )}
       </div>
+
+      {/* Generate PDF Modal */}
+      {showGeneratePDFModal && (
+        <GeneratePDFModal
+          deck={deck}
+          onClose={() => setShowGeneratePDFModal(false)}
+        />
+      )}
     </div>
   );
 }

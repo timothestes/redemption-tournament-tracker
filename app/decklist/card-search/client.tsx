@@ -20,6 +20,9 @@ export default function CardSearchClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
+  // Get deck ID from URL params if editing existing deck
+  const deckIdFromUrl = searchParams.get("deckId") || undefined;
+  
   // Collapse state for filter grid
   const [filterGridCollapsed, setFilterGridCollapsed] = useState(false);
   // Query state - each query has its own text and search field
@@ -93,16 +96,21 @@ export default function CardSearchClient() {
   // Deck builder state
   const {
     deck,
+    syncStatus,
+    hasUnsavedChanges,
     addCard,
     removeCard,
     updateQuantity,
     setDeckName,
+    setDeckFormat,
     clearDeck,
     newDeck,
     loadDeck,
+    loadDeckFromCloud,
+    saveDeckToCloud,
     getCardQuantity,
     getDeckStats
-  } = useDeckState();
+  } = useDeckState(deckIdFromUrl);
 
   // Helper functions for managing multiple queries
   const updateQuery = (index: number, text: string) => {
@@ -263,6 +271,19 @@ export default function CardSearchClient() {
     nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly,
     postexilicOnly, updateURL
   ]);
+
+  // Warn before leaving with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = ''; // Chrome requires returnValue to be set
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   // sanitize imgFile to avoid duplicate extensions - now imported from utils
 
@@ -1158,14 +1179,14 @@ export default function CardSearchClient() {
                   />
                   {/* Magnifying glass icon - shown on hover, top right */}
                   <button
-                    className="absolute top-1 right-1 bg-gray-900/90 hover:bg-gray-900 text-white rounded-full w-8 h-8 flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                    className="absolute top-1 right-1 bg-gray-900/90 hover:bg-gray-900 text-white rounded-full w-10 h-10 flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-10"
                     onClick={(e) => {
                       e.stopPropagation(); // Prevent card click
                       setModalCard(c);
                     }}
                     title="View card details"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                   </button>
@@ -1210,7 +1231,11 @@ export default function CardSearchClient() {
         <div className="hidden md:flex w-full md:w-1/2 xl:w-[38.2%] flex-col overflow-hidden transition-all duration-300">
           <DeckBuilderPanel
             deck={deck}
+            syncStatus={syncStatus}
+            hasUnsavedChanges={hasUnsavedChanges}
             onDeckNameChange={setDeckName}
+            onDeckFormatChange={setDeckFormat}
+            onSaveDeck={saveDeckToCloud}
             onAddCard={(cardName, cardSet, isReserve) => {
               // Find the card in the cards array
               const card = cards.find(c => c.name === cardName && c.set === cardSet);
@@ -1225,6 +1250,7 @@ export default function CardSearchClient() {
             onImport={() => setShowImportModal(true)}
             onClear={clearDeck}
             onActiveTabChange={setActiveDeckTab}
+            onViewCard={setModalCard}
           />
         </div>
       )}

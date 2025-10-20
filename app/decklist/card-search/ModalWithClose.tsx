@@ -93,12 +93,25 @@ export default function ModalWithClose({
         }
         
         setModalCard(visibleCards[nextIndex]);
+      } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+        // Only handle up/down if we have deck management functions
+        if (!onAddCard || !onRemoveCard) return;
+        
+        if (e.key === "ArrowUp") {
+          // Up arrow adds to the active tab (main or reserve)
+          const isReserve = activeDeckTab === "reserve";
+          onAddCard(modalCard, isReserve);
+        } else {
+          // Down arrow removes from the active tab
+          const isReserve = activeDeckTab === "reserve";
+          onRemoveCard(modalCard.name, modalCard.set, isReserve);
+        }
       }
     }
     
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [setModalCard, modalCard, visibleCards]);
+  }, [setModalCard, modalCard, visibleCards, showMenu, onAddCard, onRemoveCard, activeDeckTab]);
 
   if (!modalCard) return null;
   return (
@@ -151,7 +164,7 @@ export default function ModalWithClose({
         <div className="px-4 pb-4 pt-2 border-t bg-gray-50 dark:bg-gray-800">
           {visibleCards && visibleCards.length > 1 && (
             <div className="text-xs text-gray-500 dark:text-gray-400 text-center mb-2">
-              Use ← → arrow keys or buttons above to navigate • {visibleCards.findIndex(card => card.dataLine === modalCard.dataLine) + 1} of {visibleCards.length}
+              Use ← → to navigate{onAddCard && onRemoveCard && ' • ↑ to add • ↓ to remove'} • {visibleCards.findIndex(card => card.dataLine === modalCard.dataLine) + 1} of {visibleCards.length}
             </div>
           )}
           <div className="flex justify-center gap-2 flex-wrap">

@@ -16,6 +16,8 @@ export interface DeckCard {
  * Represents a complete deck with name, cards, and metadata
  */
 export interface Deck {
+  /** Unique identifier (UUID) for the deck - only set when saved to cloud */
+  id?: string;
   /** User-editable deck name */
   name: string;
   /** Array of cards in the deck (main + reserve) */
@@ -24,6 +26,8 @@ export interface Deck {
   description?: string;
   /** Optional format (e.g., 'Type 1', 'Type 2', 'Classic') */
   format?: string;
+  /** Optional folder ID for organization */
+  folderId?: string | null;
   /** Timestamp when deck was created */
   createdAt: Date;
   /** Timestamp when deck was last modified */
