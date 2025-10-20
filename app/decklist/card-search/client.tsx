@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import ModalWithClose from "./ModalWithClose";
 import FilterGrid from "./components/FilterGrid";
 import CardImage from "./components/CardImage";
+import DeckBuilderPanel from "./components/DeckBuilderPanel";
 import { CARD_DATA_URL, OT_BOOKS, NT_BOOKS, GOSPEL_BOOKS } from "./constants";
 import { 
   Card, 
@@ -12,6 +13,8 @@ import {
   iconPredicates, 
   normalizeBrigadeField 
 } from "./utils";
+import { useDeckState } from "./hooks/useDeckState";
+import { parseDeckText, generateDeckText, downloadDeckAsFile, copyDeckToClipboard } from "./utils/deckImportExport";
 
 export default function CardSearchClient() {
   const router = useRouter();
@@ -74,6 +77,26 @@ export default function CardSearchClient() {
   
   const [copyLinkNotification, setCopyLinkNotification] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+
+  // Import/export state
+  const [importText, setImportText] = useState("");
+  const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [exportNotification, setExportNotification] = useState(false);
+
+  // Deck builder state
+  const {
+    deck,
+    addCard,
+    removeCard,
+    updateQuantity,
+    setDeckName,
+    clearDeck,
+    newDeck,
+    loadDeck,
+    getCardQuantity,
+    getDeckStats
+  } = useDeckState();
 
   // Helper functions for managing multiple queries
   const updateQuery = (index: number, text: string) => {
@@ -690,11 +713,43 @@ export default function CardSearchClient() {
     });
   }
 
+  // Export deck to clipboard or download
+  async function handleExportDeck() {
+    try {
+      await copyDeckToClipboard(deck);
+      setExportNotification(true);
+      setTimeout(() => setExportNotification(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy deck to clipboard:', err);
+      // Fallback to download if clipboard fails
+      downloadDeckAsFile(deck);
+    }
+  }
+
+  // Import deck from text
+  function handleImportDeck(text: string) {
+    const result = parseDeckText(text, cards);
+    
+    if (result.errors.length > 0) {
+      setImportErrors(result.errors);
+    } else {
+      setImportErrors([]);
+    }
+    
+    if (result.deck) {
+      loadDeck(result.deck);
+      setShowImportModal(false);
+      setImportText("");
+    }
+  }
 
   // ...existing code...
   return (
-    <div className="bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white min-h-screen transition-colors duration-200">
-      <div className="p-2 flex flex-col items-center sticky top-0 z-40 bg-white text-gray-900 border-b border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-800 dark:shadow-lg">
+    <div className="flex w-full h-screen overflow-hidden bg-gray-100 dark:bg-gray-900">
+      {/* Left panel: Card search */}
+      <div className="flex-1 flex flex-col w-full md:w-1/2 xl:w-[61.8%] md:border-r md:border-gray-200 md:dark:border-gray-800 overflow-hidden">
+        <div className="bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200 flex-1 flex flex-col overflow-hidden">
+          <div className="p-2 flex flex-col items-center sticky top-0 z-40 bg-white text-gray-900 border-b border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-800 dark:shadow-lg">
         <div className="relative w-full max-w-xl px-2 flex flex-col sm:flex-row items-center justify-center gap-0">
           <div className="w-full flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-center sm:gap-2 text-center">
             <div className="flex flex-col gap-2 w-full sm:w-auto">
@@ -1076,17 +1131,50 @@ export default function CardSearchClient() {
         {/* Card grid */}
         {visibleCards.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
-            {visibleCards.map((c) => (
-              <div key={c.dataLine} className="cursor-pointer" onClick={() => setModalCard(c)}>
-                <CardImage
-                  imgFile={c.imgFile}
-                  alt={c.name}
-                  className="rounded shadow hover:shadow-lg transition-shadow"
-                  sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 16vw"
-                />
-                <p className="text-sm mt-1 text-center truncate">{c.name}</p>
-              </div>
-            ))}
+            {visibleCards.map((c) => {
+              const quantityInDeck = getCardQuantity(c.name, c.set, false);
+              return (
+                <div 
+                  key={c.dataLine} 
+                  className="relative cursor-pointer group" 
+                  onClick={() => addCard(c, false)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    removeCard(c.name, c.set, false);
+                  }}
+                  title="Left-click to add, right-click to remove"
+                >
+                  <CardImage
+                    imgFile={c.imgFile}
+                    alt={c.name}
+                    className="rounded shadow hover:shadow-lg transition-shadow"
+                    sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 16vw"
+                  />
+                  {/* Magnifying glass icon - shown on hover, top right */}
+                  <button
+                    className="absolute top-1 right-1 bg-gray-900/90 hover:bg-gray-900 text-white rounded-full w-8 h-8 flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                    onClick={(e) => {
+                      e.stopPropagation(); // Prevent card click
+                      setModalCard(c);
+                    }}
+                    title="View card details"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </button>
+                  {/* Quantity badge - bottom right, above card name */}
+                  {quantityInDeck > 0 && (
+                    <div className="absolute bottom-8 right-1 bg-red-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg z-10">
+                      {quantityInDeck}
+                    </div>
+                  )}
+                  <p className="text-sm mt-1 text-center truncate">{c.name}</p>
+                  {/* Hover hint for deck builder */}
+                  <div className="hidden md:block absolute inset-0 bg-blue-600/0 group-hover:bg-blue-600/10 transition-colors rounded pointer-events-none" />
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="flex items-center justify-center mt-16 mb-16">
@@ -1104,6 +1192,104 @@ export default function CardSearchClient() {
           setModalCard={setModalCard}
           visibleCards={visibleCards}
         />
+      )}
+        </div>
+      </div>
+      {/* Right panel: Deck builder (hidden on mobile, shown on md and up) */}
+      <div className="hidden md:flex w-full md:w-1/2 xl:w-[38.2%] flex-col overflow-hidden">
+        <DeckBuilderPanel
+          deck={deck}
+          onDeckNameChange={setDeckName}
+          onAddCard={(cardName, cardSet, isReserve) => {
+            // Find the card in the cards array
+            const card = cards.find(c => c.name === cardName && c.set === cardSet);
+            if (card) {
+              addCard(card, isReserve);
+            }
+          }}
+          onRemoveCard={(cardName, cardSet, isReserve) => {
+            removeCard(cardName, cardSet, isReserve);
+          }}
+          onExport={handleExportDeck}
+          onImport={() => setShowImportModal(true)}
+          onClear={clearDeck}
+        />
+      </div>
+      
+      {/* Import modal */}
+      {showImportModal && (
+        <div 
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => {
+            setShowImportModal(false);
+            setImportText("");
+            setImportErrors([]);
+          }}
+        >
+          <div 
+            className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+              Import Deck
+            </h3>
+            <div className="text-sm text-gray-600 dark:text-gray-400 mb-4 space-y-2">
+              <p>
+                <strong>From Lackey CCG:</strong> Click the "Copy" button in your deck editor, then paste here.
+              </p>
+              <p>
+                <strong>Format:</strong> Each line should be: <code className="px-1 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">Quantity[TAB]Card Name</code>
+              </p>
+              <p className="text-xs">
+                Add "Reserve:" on its own line to separate reserve cards.
+              </p>
+            </div>
+            <textarea
+              className="w-full h-64 p-3 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white font-mono text-sm"
+              placeholder={`1\tSon of God "Manger" (Promo)\n1\tThe Second Coming (CoW AB)\n1\tAngel of the Lord (2017 Promo)\n\nReserve:\n1\tGibeonite Trickery (Roots)\n1\tNot Among You`}
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+            />
+            {importErrors.length > 0 && (
+              <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
+                <p className="text-sm font-semibold text-red-800 dark:text-red-300 mb-2">
+                  Import Warnings:
+                </p>
+                <ul className="text-xs text-red-700 dark:text-red-400 list-disc list-inside space-y-1">
+                  {importErrors.map((err, i) => (
+                    <li key={i}>{err}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div className="mt-6 flex gap-3 justify-end">
+              <button
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                onClick={() => {
+                  setShowImportModal(false);
+                  setImportText("");
+                  setImportErrors([]);
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => handleImportDeck(importText)}
+                disabled={!importText.trim()}
+              >
+                Import
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Export notification */}
+      {exportNotification && (
+        <div className="fixed bottom-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in">
+          Deck copied to clipboard!
+        </div>
       )}
     </div>
   );
