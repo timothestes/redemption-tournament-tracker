@@ -1,5 +1,5 @@
 import HeaderServer from "../../components/header-server";
-import SideNav from "../../components/side-nav";
+import TopNav from "../../components/top-nav";
 import { createClient } from "../../utils/supabase/server";
 import { Suspense } from "react";
 
@@ -9,16 +9,16 @@ export default async function DecklistLayout({ children }) {
   const isAuthenticated = !!session;
 
   return (
-    <div className="flex">
-      {isAuthenticated && <SideNav />}
-      <main className="flex-1 min-h-screen flex flex-col">
+    <div className="flex flex-col min-h-screen">
+      {isAuthenticated && <TopNav />}
+      <div className="flex-1 flex flex-col">
         <Suspense fallback={null}>
           <HeaderServer />
         </Suspense>
-        <div className="flex-1 p-4">
+        <main className="flex-1 p-4">
           {children}
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
