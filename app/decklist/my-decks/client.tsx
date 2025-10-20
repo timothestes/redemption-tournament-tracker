@@ -11,11 +11,52 @@ import {
   renameFolderAction,
   deleteFolderAction,
   moveDeckToFolderAction,
+  loadDeckByIdAction,
   DeckData,
   FolderData
 } from "../actions";
 import DeleteDeckModal from "./DeleteDeckModal";
 import FolderModal from "./FolderModal";
+import GeneratePDFModal from "../card-search/components/GeneratePDFModal";
+import { Deck } from "../card-search/types/deck";
+import { Card } from "../card-search/utils";
+
+// Helper function to normalize deck format display
+function formatDeckType(format?: string): string {
+  if (!format) return "T1";
+  const fmt = format.toLowerCase();
+  if (fmt.includes("type 2") || fmt.includes("multi") || fmt === "t2") return "T2";
+  return "T1";
+}
+
+// Helper function to get badge colors based on deck type
+function getDeckTypeBadgeClasses(format?: string): string {
+  const deckType = formatDeckType(format);
+  if (deckType === "T2") {
+    return "px-2 py-0.5 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded text-xs font-semibold";
+  }
+  return "px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded text-xs font-semibold";
+}
+
+// Helper function to format date with time and timezone
+function formatDateTime(dateString: string): string {
+  const date = new Date(dateString);
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const year = String(date.getFullYear()).slice(-2);
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  
+  // Get timezone abbreviation
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const tzAbbr = new Intl.DateTimeFormat('en-US', { 
+    timeZoneName: 'short',
+    timeZone: timezone
+  }).formatToParts(date).find(part => part.type === 'timeZoneName')?.value || '';
+  
+  return `${month}/${day}/${year} ${hours}:${minutes}:${seconds} ${tzAbbr}`;
+}
 
 export default function MyDecksClient() {
   const router = useRouter();
@@ -29,6 +70,7 @@ export default function MyDecksClient() {
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null); // null = "All Decks"
   const [folderModal, setFolderModal] = useState<{ mode: "create" | "rename"; folderId?: string; initialName?: string } | null>(null);
   const [folderToDelete, setFolderToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [pdfDeck, setPdfDeck] = useState<Deck | null>(null); // For PDF generation modal
 
   useEffect(() => {
     loadData();
@@ -110,6 +152,54 @@ export default function MyDecksClient() {
       await loadData();
     } else {
       alert(result.error || "Failed to move deck");
+    }
+  }
+
+  async function handleGeneratePDF(deckId: string) {
+    // Load full deck data including cards
+    const result = await loadDeckByIdAction(deckId);
+    if (result.success && result.deck) {
+      const cloudDeck = result.deck;
+      
+      // Convert to Deck format for PDF modal
+      const deck: Deck = {
+        id: cloudDeck.id,
+        name: cloudDeck.name,
+        description: cloudDeck.description || "",
+        format: cloudDeck.format,
+        folderId: cloudDeck.folder_id,
+        cards: cloudDeck.cards.map((dbCard: any) => ({
+          card: {
+            name: dbCard.card_name,
+            set: dbCard.card_set,
+            imgFile: dbCard.card_img_file,
+            // Minimal card data for PDF generation (just needs name for decklist)
+            dataLine: "",
+            officialSet: "",
+            type: "",
+            brigade: "",
+            strength: "",
+            toughness: "",
+            class: "",
+            identifier: "",
+            specialAbility: "",
+            rarity: "",
+            reference: "",
+            alignment: "",
+            legality: "",
+            testament: "",
+            isGospel: false,
+          } as Card,
+          quantity: dbCard.quantity,
+          isReserve: dbCard.is_reserve,
+        })),
+        createdAt: new Date(cloudDeck.created_at),
+        updatedAt: new Date(cloudDeck.updated_at),
+      };
+      
+      setPdfDeck(deck);
+    } else {
+      alert(result.error || "Failed to load deck");
     }
   }
 
@@ -340,6 +430,7 @@ export default function MyDecksClient() {
                   onDelete={(id, name) => setDeckToDelete({ id, name })}
                   onDuplicate={handleDuplicateDeck}
                   onMove={handleMoveDeck}
+                  onGeneratePDF={handleGeneratePDF}
                 />
               ))}
             </div>
@@ -354,6 +445,7 @@ export default function MyDecksClient() {
                   onDelete={(id, name) => setDeckToDelete({ id, name })}
                   onDuplicate={handleDuplicateDeck}
                   onMove={handleMoveDeck}
+                  onGeneratePDF={handleGeneratePDF}
                 />
               ))}
             </div>
@@ -392,6 +484,14 @@ export default function MyDecksClient() {
           deckName={folderToDelete.name}
           onConfirm={() => handleDeleteFolder(folderToDelete.id)}
           onClose={() => setFolderToDelete(null)}
+        />
+      )}
+
+      {/* Generate PDF Modal */}
+      {pdfDeck && (
+        <GeneratePDFModal
+          deck={pdfDeck}
+          onClose={() => setPdfDeck(null)}
         />
       )}
     </div>
@@ -481,6 +581,7 @@ function DeckCard({
   onDelete,
   onDuplicate,
   onMove,
+  onGeneratePDF,
 }: {
   deck: DeckData;
   folders: FolderData[];
@@ -488,8 +589,9 @@ function DeckCard({
   onDelete: (id: string, name: string) => void;
   onDuplicate: (id: string) => void;
   onMove: (deckId: string, folderId: string | null) => void;
+  onGeneratePDF: (deckId: string) => void;
 }) {
-  const updatedDate = new Date(deck.updated_at!).toLocaleDateString();
+  const updatedDate = formatDateTime(deck.updated_at!);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow">
@@ -503,6 +605,7 @@ function DeckCard({
             onDelete={() => onDelete(deck.id!, deck.name)}
             onDuplicate={() => onDuplicate(deck.id!)}
             onMove={(folderId) => onMove(deck.id!, folderId)}
+            onGeneratePDF={() => onGeneratePDF(deck.id!)}
           />
         </div>
 
@@ -514,14 +617,12 @@ function DeckCard({
 
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-3">
+            <span className={getDeckTypeBadgeClasses(deck.format)}>
+              {formatDeckType(deck.format)}
+            </span>
             <span className="text-gray-600 dark:text-gray-400">
               {deck.card_count || 0} cards
             </span>
-            {deck.format && (
-              <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded text-xs">
-                {deck.format}
-              </span>
-            )}
           </div>
         </div>
 
@@ -535,7 +636,7 @@ function DeckCard({
       <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3">
         <button
           onClick={() => onEdit(deck.id!)}
-          className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium transition-colors"
+          className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 font-medium transition-colors"
         >
           Open Deck
         </button>
@@ -552,6 +653,7 @@ function DeckListItem({
   onDelete,
   onDuplicate,
   onMove,
+  onGeneratePDF,
 }: {
   deck: DeckData;
   folders: FolderData[];
@@ -559,20 +661,19 @@ function DeckListItem({
   onDelete: (id: string, name: string) => void;
   onDuplicate: (id: string) => void;
   onMove: (deckId: string, folderId: string | null) => void;
+  onGeneratePDF: (deckId: string) => void;
 }) {
-  const updatedDate = new Date(deck.updated_at!).toLocaleDateString();
+  const updatedDate = formatDateTime(deck.updated_at!);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
       <div className="flex items-center gap-4 p-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3">
+            <span className={getDeckTypeBadgeClasses(deck.format)}>
+              {formatDeckType(deck.format)}
+            </span>
             <h3 className="font-semibold truncate">{deck.name}</h3>
-            {deck.format && (
-              <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded text-xs">
-                {deck.format}
-              </span>
-            )}
           </div>
           {deck.description && (
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 truncate">
@@ -600,6 +701,7 @@ function DeckListItem({
             onDelete={() => onDelete(deck.id!, deck.name)}
             onDuplicate={() => onDuplicate(deck.id!)}
             onMove={(folderId) => onMove(deck.id!, folderId)}
+            onGeneratePDF={() => onGeneratePDF(deck.id!)}
           />
         </div>
       </div>
@@ -615,6 +717,7 @@ function DropdownMenu({
   onDelete,
   onDuplicate,
   onMove,
+  onGeneratePDF,
 }: {
   folders: FolderData[];
   currentFolderId?: string | null;
@@ -622,6 +725,7 @@ function DropdownMenu({
   onDelete: () => void;
   onDuplicate: () => void;
   onMove: (folderId: string | null) => void;
+  onGeneratePDF: () => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [showMoveMenu, setShowMoveMenu] = useState(false);
@@ -664,6 +768,15 @@ function DropdownMenu({
               className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
             >
               Duplicate
+            </button>
+            <button
+              onClick={() => {
+                onGeneratePDF();
+                setIsOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+            >
+              Generate PDF
             </button>
             
             {/* Move to Folder submenu */}

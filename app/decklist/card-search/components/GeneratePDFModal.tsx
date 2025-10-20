@@ -172,8 +172,8 @@ export default function GeneratePDFModal({ deck, onClose }: GeneratePDFModalProp
                 onChange={(e) => setDeckType(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
               >
-                <option value="type_1">Type 1 (Single Color)</option>
-                <option value="type_2">Type 2 (Multi Color)</option>
+                <option value="type_1">Type 1</option>
+                <option value="type_2">Type 2</option>
               </select>
             </div>
 

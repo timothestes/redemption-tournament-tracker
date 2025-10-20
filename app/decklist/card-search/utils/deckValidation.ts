@@ -275,7 +275,9 @@ export function validateDeck(deck: Deck): DeckValidation {
   
   // Validation: Total Dominants cannot exceed required Lost Souls (based on deck size)
   // This means: 50-56 cards = max 7 Dominants, 57-63 = max 8 Dominants, etc.
-  if (dominantCount > requiredLostSouls) {
+  // Only enforce this rule when deck has reached minimum size threshold
+  const minDeckSizeForValidation = getMinimumDeckSize(deck.format);
+  if (mainDeckSize >= minDeckSizeForValidation && dominantCount > requiredLostSouls) {
     issues.push({
       type: "error",
       category: "dominants",

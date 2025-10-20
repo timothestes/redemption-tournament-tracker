@@ -1249,6 +1249,8 @@ export default function CardSearchClient() {
             onExport={handleExportDeck}
             onImport={() => setShowImportModal(true)}
             onClear={clearDeck}
+            onNewDeck={newDeck}
+            onLoadDeck={loadDeckFromCloud}
             onActiveTabChange={setActiveDeckTab}
             onViewCard={setModalCard}
           />
@@ -1284,10 +1286,12 @@ export default function CardSearchClient() {
               </p>
             </div>
             <textarea
+              id="import-deck-textarea"
               className="w-full h-64 p-3 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white font-mono text-sm"
               placeholder={`1\tSon of God "Manger" (Promo)\n1\tThe Second Coming (CoW AB)\n1\tAngel of the Lord (2017 Promo)\n\nReserve:\n1\tGibeonite Trickery (Roots)\n1\tNot Among You`}
               value={importText}
               onChange={(e) => setImportText(e.target.value)}
+              autoFocus
             />
             {importErrors.length > 0 && (
               <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
