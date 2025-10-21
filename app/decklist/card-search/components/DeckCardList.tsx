@@ -18,6 +18,10 @@ interface DeckCardListProps {
   onViewCard?: (card: Card) => void;
   /** Optional: Callback to move card between main deck and reserve */
   onMoveCard?: (cardName: string, cardSet: string, fromReserve: boolean, toReserve: boolean) => void;
+  /** Optional: Whether to show type icons in card rows (default: true) */
+  showTypeIcons?: boolean;
+  /** Optional: Layout view mode (default: 'list') */
+  viewLayout?: 'grid' | 'list';
 }
 
 /**
@@ -31,9 +35,34 @@ export default function DeckCardList({
   filterReserve,
   onViewCard,
   onMoveCard,
+  showTypeIcons = true,
+  viewLayout = 'list',
 }: DeckCardListProps) {
+  const [openMenuCard, setOpenMenuCard] = React.useState<string | null>(null);
   const [previewCard, setPreviewCard] = React.useState<{ card: Card; x: number; y: number } | null>(null);
   const { getImageUrl } = useCardImageUrl();
+  
+  // Close menu when clicking outside or pressing ESC
+  React.useEffect(() => {
+    const handleClickOutside = () => {
+      if (openMenuCard) {
+        setOpenMenuCard(null);
+      }
+    };
+    
+    const handleEscapeKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && openMenuCard) {
+        setOpenMenuCard(null);
+      }
+    };
+    
+    document.addEventListener('click', handleClickOutside);
+    document.addEventListener('keydown', handleEscapeKey);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('keydown', handleEscapeKey);
+    };
+  }, [openMenuCard]);
   
   // Helper function to calculate preview position avoiding screen edges
   const calculatePreviewPosition = (element: HTMLElement) => {
@@ -86,6 +115,171 @@ export default function DeckCardList({
     );
   }
 
+  // Grid View
+  if (viewLayout === 'grid') {
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
+        {sortedCards.map((deckCard) => {
+          const { card, quantity, isReserve } = deckCard;
+          const cardKey = `${card.name}-${card.set}-${isReserve}`;
+          
+          return (
+            <div
+              key={cardKey}
+              className="relative group rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-200"
+            >
+              {/* Backdrop overlay for this card only */}
+              {openMenuCard === cardKey && (
+                <div 
+                  className="absolute inset-0 bg-black/60 backdrop-blur-sm z-30"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenMenuCard(null);
+                  }}
+                />
+              )}
+
+              {/* Card Image */}
+              <div 
+                className="aspect-[2.5/3.5] bg-gray-200 dark:bg-gray-700 cursor-pointer relative"
+                onClick={() => onViewCard?.(card)}
+              >
+                <img
+                  src={getImageUrl(card.imgFile)}
+                  alt={card.name}
+                  className="w-full h-full object-cover"
+                  crossOrigin="anonymous"
+                  onError={(e) => {
+                    e.currentTarget.src = '/placeholder-card.png';
+                  }}
+                />
+              </div>
+              
+              {/* Dropdown Menu - Vertical stack centered on card */}
+              {openMenuCard === cardKey && (
+                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-1.5 py-6 z-40">
+                  {/* Move to Reserve/Main */}
+                  {onMoveCard && filterReserve !== undefined && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onMoveCard(card.name, card.set, isReserve, !isReserve);
+                        setOpenMenuCard(null);
+                      }}
+                      className="w-10 h-10 hover:scale-110 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 flex items-center justify-center text-gray-700 dark:text-gray-200 transition-all"
+                      title={isReserve ? "Move to main deck" : "Move to reserve"}
+                    >
+                      {isReserve ? (
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                        </svg>
+                      ) : (
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                        </svg>
+                      )}
+                    </button>
+                  )}
+
+                  {/* View Card Details */}
+                  {onViewCard && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewCard(card);
+                        setOpenMenuCard(null);
+                      }}
+                      className="w-10 h-10 hover:scale-110 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 flex items-center justify-center text-gray-700 dark:text-gray-200 transition-all"
+                      title="View card details"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </button>
+                  )}
+
+                  {/* Remove All Copies */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemove(card.name, card.set, isReserve);
+                      setOpenMenuCard(null);
+                    }}
+                    className="w-10 h-10 hover:scale-110 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 flex items-center justify-center text-red-600 dark:text-red-400 transition-all"
+                    title="Remove all copies"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+
+              {/* Controls Overlay - Shows on Hover, Golden Ratio 2x2 Grid */}
+              <div className="absolute inset-x-0 bottom-0 transition-opacity duration-200">
+                {/* Using golden ratio: top section ~61.8%, bottom ~38.2% */}
+                <div className="grid grid-rows-[1.618fr_1fr] grid-cols-2 gap-1.5 p-3 h-32">
+                  {/* Top Left: Decrement */}
+                  <div className="flex items-center justify-center">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDecrement(card.name, card.set, isReserve);
+                      }}
+                      className="w-14 h-14 max-w-full max-h-full flex items-center justify-center rounded-lg bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-3xl border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
+                      aria-label="Decrease quantity"
+                    >
+                      −
+                    </button>
+                  </div>
+                  
+                  {/* Top Right: Increment */}
+                  <div className="flex items-center justify-center">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onIncrement(card.name, card.set, isReserve);
+                      }}
+                      className="w-14 h-14 max-w-full max-h-full flex items-center justify-center rounded-lg bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-3xl border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
+                      aria-label="Increase quantity"
+                    >
+                      +
+                    </button>
+                  </div>
+                  
+                  {/* Bottom Left: Menu Button */}
+                  <div className="flex items-center justify-center">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenMenuCard(openMenuCard === cardKey ? null : cardKey);
+                      }}
+                      className="w-10 h-10 max-w-full max-h-full flex items-center justify-center rounded-lg bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
+                      aria-label="Card options"
+                    >
+                      {/* Horizontal dots icon */}
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
+                      </svg>
+                    </button>
+                  </div>
+                  
+                  {/* Bottom Right: Quantity Display - Always Visible, Compact Style */}
+                  <div className="flex items-center justify-center">
+                    <div className="bg-black/75 backdrop-blur-sm text-white px-2.5 py-1 rounded-md font-bold text-sm shadow-lg">
+                      ×{quantity}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // List View (default)
   return (
     <div className="space-y-1">
       {sortedCards.map((deckCard) => {
@@ -169,236 +363,263 @@ export default function DeckCardList({
             className="flex items-center gap-2 p-2 rounded bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
           >
             {/* Type Icon */}
-            {isNeutralDominant ? (
-              <div 
-                className="flex gap-0.5 flex-shrink-0 cursor-pointer"
-                onMouseEnter={(e) => {
-                  const pos = calculatePreviewPosition(e.currentTarget);
-                  setPreviewCard({
-                    card,
-                    ...pos
-                  });
-                }}
-                onMouseLeave={() => setPreviewCard(null)}
-              >
-                <img 
-                  src="/filter-icons/Good Dominant.png" 
-                  alt="Good Dominant"
-                  className="w-8 h-8 object-contain"
-                />
-                <img 
-                  src="/filter-icons/Evil Dominant.png" 
-                  alt="Evil Dominant"
-                  className="w-8 h-8 object-contain"
-                />
-              </div>
-            ) : isNeutralFortress ? (
-              <div 
-                className="flex gap-0.5 flex-shrink-0 cursor-pointer"
-                onMouseEnter={(e) => {
-                  const pos = calculatePreviewPosition(e.currentTarget);
-                  setPreviewCard({
-                    card,
-                    ...pos
-                  });
-                }}
-                onMouseLeave={() => setPreviewCard(null)}
-              >
-                <img 
-                  src="/filter-icons/Good Fortress.png" 
-                  alt="Good Fortress"
-                  className="w-8 h-8 object-contain"
-                />
-                <img 
-                  src="/filter-icons/Evil Fortress.png" 
-                  alt="Evil Fortress"
-                  className="w-8 h-8 object-contain"
-                />
-              </div>
-            ) : isDualEnhancement ? (
-              <div 
-                className="flex gap-0.5 flex-shrink-0 cursor-pointer"
-                onMouseEnter={(e) => {
-                  const pos = calculatePreviewPosition(e.currentTarget);
-                  setPreviewCard({
-                    card,
-                    ...pos
-                  });
-                }}
-                onMouseLeave={() => setPreviewCard(null)}
-              >
-                <img 
-                  src="/filter-icons/GE.png" 
-                  alt="Good Enhancement"
-                  className="w-8 h-8 object-contain"
-                />
-                <img 
-                  src="/filter-icons/EE.png" 
-                  alt="Evil Enhancement"
-                  className="w-8 h-8 object-contain"
-                />
-              </div>
-            ) : isDualHeroEC ? (
-              <div 
-                className="flex gap-0.5 flex-shrink-0 cursor-pointer"
-                onMouseEnter={(e) => {
-                  const pos = calculatePreviewPosition(e.currentTarget);
-                  setPreviewCard({
-                    card,
-                    ...pos
-                  });
-                }}
-                onMouseLeave={() => setPreviewCard(null)}
-              >
-                <img 
-                  src="/filter-icons/Hero.png" 
-                  alt="Hero"
-                  className="w-8 h-8 object-contain"
-                />
-                <img 
-                  src="/filter-icons/Evil Character.png" 
-                  alt="Evil Character"
-                  className="w-8 h-8 object-contain"
-                />
-              </div>
-            ) : isDualECFortress ? (
-              <div 
-                className="flex gap-0.5 flex-shrink-0 cursor-pointer"
-                onMouseEnter={(e) => {
-                  const pos = calculatePreviewPosition(e.currentTarget);
-                  setPreviewCard({
-                    card,
-                    ...pos
-                  });
-                }}
-                onMouseLeave={() => setPreviewCard(null)}
-              >
-                <img 
-                  src="/filter-icons/Evil Character.png" 
-                  alt="Evil Character"
-                  className="w-8 h-8 object-contain"
-                />
-                <img 
-                  src="/filter-icons/Evil Fortress.png" 
-                  alt="Evil Fortress"
-                  className="w-8 h-8 object-contain"
-                />
-              </div>
-            ) : isDualHeroFortress ? (
-              <div 
-                className="flex gap-0.5 flex-shrink-0 cursor-pointer"
-                onMouseEnter={(e) => {
-                  const pos = calculatePreviewPosition(e.currentTarget);
-                  setPreviewCard({
-                    card,
-                    ...pos
-                  });
-                }}
-                onMouseLeave={() => setPreviewCard(null)}
-              >
-                <img 
-                  src="/filter-icons/Hero.png" 
-                  alt="Hero"
-                  className="w-8 h-8 object-contain"
-                />
-                <img 
-                  src="/filter-icons/Good Fortress.png" 
-                  alt="Good Fortress"
-                  className="w-8 h-8 object-contain"
-                />
-              </div>
-            ) : isDualHeroGE ? (
-              <div 
-                className="flex gap-0.5 flex-shrink-0 cursor-pointer"
-                onMouseEnter={(e) => {
-                  const pos = calculatePreviewPosition(e.currentTarget);
-                  setPreviewCard({
-                    card,
-                    ...pos
-                  });
-                }}
-                onMouseLeave={() => setPreviewCard(null)}
-              >
-                <img 
-                  src="/filter-icons/Hero.png" 
-                  alt="Hero"
-                  className="w-8 h-8 object-contain"
-                />
-                <img 
-                  src="/filter-icons/GE.png" 
-                  alt="Good Enhancement"
-                  className="w-8 h-8 object-contain"
-                />
-              </div>
-            ) : isDualEEEC ? (
-              <div 
-                className="flex gap-0.5 flex-shrink-0 cursor-pointer"
-                onMouseEnter={(e) => {
-                  const pos = calculatePreviewPosition(e.currentTarget);
-                  setPreviewCard({
-                    card,
-                    ...pos
-                  });
-                }}
-                onMouseLeave={() => setPreviewCard(null)}
-              >
-                <img 
-                  src="/filter-icons/EE.png" 
-                  alt="Evil Enhancement"
-                  className="w-8 h-8 object-contain"
-                />
-                <img 
-                  src="/filter-icons/Evil Character.png" 
-                  alt="Evil Character"
-                  className="w-8 h-8 object-contain"
-                />
-              </div>
-            ) : isDualGEEC ? (
-              <div 
-                className="flex gap-0.5 flex-shrink-0 cursor-pointer"
-                onMouseEnter={(e) => {
-                  const pos = calculatePreviewPosition(e.currentTarget);
-                  setPreviewCard({
-                    card,
-                    ...pos
-                  });
-                }}
-                onMouseLeave={() => setPreviewCard(null)}
-              >
-                <img 
-                  src="/filter-icons/GE.png" 
-                  alt="Good Enhancement"
-                  className="w-8 h-8 object-contain"
-                />
-                <img 
-                  src="/filter-icons/Evil Character.png" 
-                  alt="Evil Character"
-                  className="w-8 h-8 object-contain"
-                />
-              </div>
-            ) : iconPath && (
-              <img 
-                src={iconPath} 
-                alt={card.type}
-                className="w-8 h-8 object-contain flex-shrink-0 cursor-pointer"
-                onMouseEnter={(e) => {
-                  const pos = calculatePreviewPosition(e.currentTarget);
-                  setPreviewCard({
-                    card,
-                    ...pos
-                  });
-                }}
-                onMouseLeave={() => setPreviewCard(null)}
-                onError={(e) => {
-                  // Hide icon if image doesn't exist
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
+            {showTypeIcons && (
+              <>
+                {isNeutralDominant ? (
+                  <div 
+                    className="flex gap-0.5 flex-shrink-0 cursor-pointer"
+                    onMouseEnter={(e) => {
+                      const pos = calculatePreviewPosition(e.currentTarget);
+                      setPreviewCard({
+                        card,
+                        ...pos
+                      });
+                    }}
+                    onMouseLeave={() => setPreviewCard(null)}
+                  >
+                    <img 
+                      src="/filter-icons/Good Dominant.png" 
+                      alt="Good Dominant"
+                      className="w-8 h-8 object-contain"
+                    />
+                    <img 
+                      src="/filter-icons/Evil Dominant.png" 
+                      alt="Evil Dominant"
+                      className="w-8 h-8 object-contain"
+                    />
+                  </div>
+                ) : isNeutralFortress ? (
+                  <div 
+                    className="flex gap-0.5 flex-shrink-0 cursor-pointer"
+                    onMouseEnter={(e) => {
+                      const pos = calculatePreviewPosition(e.currentTarget);
+                      setPreviewCard({
+                        card,
+                        ...pos
+                      });
+                    }}
+                    onMouseLeave={() => setPreviewCard(null)}
+                  >
+                    <img 
+                      src="/filter-icons/Good Fortress.png" 
+                      alt="Good Fortress"
+                      className="w-8 h-8 object-contain"
+                    />
+                    <img 
+                      src="/filter-icons/Evil Fortress.png" 
+                      alt="Evil Fortress"
+                      className="w-8 h-8 object-contain"
+                    />
+                  </div>
+                ) : isDualEnhancement ? (
+                  <div 
+                    className="flex gap-0.5 flex-shrink-0 cursor-pointer"
+                    onMouseEnter={(e) => {
+                      const pos = calculatePreviewPosition(e.currentTarget);
+                      setPreviewCard({
+                        card,
+                        ...pos
+                      });
+                    }}
+                    onMouseLeave={() => setPreviewCard(null)}
+                  >
+                    <img 
+                      src="/filter-icons/GE.png" 
+                      alt="Good Enhancement"
+                      className="w-8 h-8 object-contain"
+                    />
+                    <img 
+                      src="/filter-icons/EE.png" 
+                      alt="Evil Enhancement"
+                      className="w-8 h-8 object-contain"
+                    />
+                  </div>
+                ) : isDualHeroEC ? (
+                  <div 
+                    className="flex gap-0.5 flex-shrink-0 cursor-pointer"
+                    onMouseEnter={(e) => {
+                      const pos = calculatePreviewPosition(e.currentTarget);
+                      setPreviewCard({
+                        card,
+                        ...pos
+                      });
+                    }}
+                    onMouseLeave={() => setPreviewCard(null)}
+                  >
+                    <img 
+                      src="/filter-icons/Hero.png" 
+                      alt="Hero"
+                      className="w-8 h-8 object-contain"
+                    />
+                    <img 
+                      src="/filter-icons/Evil Character.png" 
+                      alt="Evil Character"
+                      className="w-8 h-8 object-contain"
+                    />
+                  </div>
+                ) : isDualECFortress ? (
+                  <div 
+                    className="flex gap-0.5 flex-shrink-0 cursor-pointer"
+                    onMouseEnter={(e) => {
+                      const pos = calculatePreviewPosition(e.currentTarget);
+                      setPreviewCard({
+                        card,
+                        ...pos
+                      });
+                    }}
+                    onMouseLeave={() => setPreviewCard(null)}
+                  >
+                    <img 
+                      src="/filter-icons/Evil Character.png" 
+                      alt="Evil Character"
+                      className="w-8 h-8 object-contain"
+                    />
+                    <img 
+                      src="/filter-icons/Evil Fortress.png" 
+                      alt="Evil Fortress"
+                      className="w-8 h-8 object-contain"
+                    />
+                  </div>
+                ) : isDualHeroFortress ? (
+                  <div 
+                    className="flex gap-0.5 flex-shrink-0 cursor-pointer"
+                    onMouseEnter={(e) => {
+                      const pos = calculatePreviewPosition(e.currentTarget);
+                      setPreviewCard({
+                        card,
+                        ...pos
+                      });
+                    }}
+                    onMouseLeave={() => setPreviewCard(null)}
+                  >
+                    <img 
+                      src="/filter-icons/Hero.png" 
+                      alt="Hero"
+                      className="w-8 h-8 object-contain"
+                    />
+                    <img 
+                      src="/filter-icons/Good Fortress.png" 
+                      alt="Good Fortress"
+                      className="w-8 h-8 object-contain"
+                    />
+                  </div>
+                ) : isDualHeroGE ? (
+                  <div 
+                    className="flex gap-0.5 flex-shrink-0 cursor-pointer"
+                    onMouseEnter={(e) => {
+                      const pos = calculatePreviewPosition(e.currentTarget);
+                      setPreviewCard({
+                        card,
+                        ...pos
+                      });
+                    }}
+                    onMouseLeave={() => setPreviewCard(null)}
+                  >
+                    <img 
+                      src="/filter-icons/Hero.png" 
+                      alt="Hero"
+                      className="w-8 h-8 object-contain"
+                    />
+                    <img 
+                      src="/filter-icons/GE.png" 
+                      alt="Good Enhancement"
+                      className="w-8 h-8 object-contain"
+                    />
+                  </div>
+                ) : isDualEEEC ? (
+                  <div 
+                    className="flex gap-0.5 flex-shrink-0 cursor-pointer"
+                    onMouseEnter={(e) => {
+                      const pos = calculatePreviewPosition(e.currentTarget);
+                      setPreviewCard({
+                        card,
+                        ...pos
+                      });
+                    }}
+                    onMouseLeave={() => setPreviewCard(null)}
+                  >
+                    <img 
+                      src="/filter-icons/EE.png" 
+                      alt="Evil Enhancement"
+                      className="w-8 h-8 object-contain"
+                    />
+                    <img 
+                      src="/filter-icons/Evil Character.png" 
+                      alt="Evil Character"
+                      className="w-8 h-8 object-contain"
+                    />
+                  </div>
+                ) : isDualGEEC ? (
+                  <div 
+                    className="flex gap-0.5 flex-shrink-0 cursor-pointer"
+                    onMouseEnter={(e) => {
+                      const pos = calculatePreviewPosition(e.currentTarget);
+                      setPreviewCard({
+                        card,
+                        ...pos
+                      });
+                    }}
+                    onMouseLeave={() => setPreviewCard(null)}
+                  >
+                    <img 
+                      src="/filter-icons/GE.png" 
+                      alt="Good Enhancement"
+                      className="w-8 h-8 object-contain"
+                    />
+                    <img 
+                      src="/filter-icons/Evil Character.png" 
+                      alt="Evil Character"
+                      className="w-8 h-8 object-contain"
+                    />
+                  </div>
+                ) : iconPath && (
+                  <img 
+                    src={iconPath} 
+                    alt={card.type}
+                    className="w-8 h-8 object-contain flex-shrink-0 cursor-pointer"
+                    onMouseEnter={(e) => {
+                      const pos = calculatePreviewPosition(e.currentTarget);
+                      setPreviewCard({
+                        card,
+                        ...pos
+                      });
+                    }}
+                    onMouseLeave={() => setPreviewCard(null)}
+                    onError={(e) => {
+                      // Hide icon if image doesn't exist
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                )}
+              </>
             )}
             
-            {/* Quantity Badge */}
-            <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-bold rounded text-sm">
-              {quantity}
+            {/* Quantity Controls with Badge */}
+            <div className="flex items-center gap-0.5 flex-shrink-0">
+              {/* Decrement Button (always visible) */}
+              <button
+                onClick={() => onDecrement(card.name, card.set, isReserve)}
+                className="w-7 h-7 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 transition-colors font-semibold text-base"
+                aria-label="Decrease quantity"
+                title="Decrease quantity"
+              >
+                −
+              </button>
+
+              {/* Quantity Badge (always visible, not a button) */}
+              <div className="flex-shrink-0 w-9 h-7 flex items-center justify-center text-gray-900 dark:text-white font-bold text-sm">
+                {quantity}
+              </div>
+
+              {/* Increment Button (always visible) */}
+              <button
+                onClick={() => onIncrement(card.name, card.set, isReserve)}
+                className="w-7 h-7 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 transition-colors font-semibold text-base"
+                aria-label="Increase quantity"
+                title="Increase quantity"
+              >
+                +
+              </button>
             </div>
 
             {/* Card Info */}
@@ -418,7 +639,7 @@ export default function DeckCardList({
               </div>
             </div>
 
-            {/* Quantity Controls */}
+            {/* Additional Controls */}
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               {/* View Card Button */}
               {onViewCard && (
@@ -445,31 +666,11 @@ export default function DeckCardList({
                   {isReserve ? "<<" : ">>"}
                 </button>
               )}
-              
-              {/* Decrement Button */}
-              <button
-                onClick={() => onDecrement(card.name, card.set, isReserve)}
-                className="w-6 h-6 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 transition-colors"
-                aria-label="Decrease quantity"
-                title="Decrease quantity"
-              >
-                <span className="text-lg leading-none">−</span>
-              </button>
-
-              {/* Increment Button */}
-              <button
-                onClick={() => onIncrement(card.name, card.set, isReserve)}
-                className="w-6 h-6 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 transition-colors"
-                aria-label="Increase quantity"
-                title="Increase quantity"
-              >
-                <span className="text-lg leading-none">+</span>
-              </button>
 
               {/* Remove Button */}
               <button
                 onClick={() => onRemove(card.name, card.set, isReserve)}
-                className="w-6 h-6 flex items-center justify-center rounded bg-red-500 hover:bg-red-600 text-white transition-colors ml-1"
+                className="w-6 h-6 flex items-center justify-center rounded bg-red-500 hover:bg-red-600 text-white transition-colors"
                 aria-label="Remove card"
                 title="Remove card from deck"
               >

@@ -5,6 +5,7 @@ import DeckCardList from "./DeckCardList";
 import { Card } from "../utils";
 import { validateDeck, getValidationSummary } from "../utils/deckValidation";
 import GeneratePDFModal from "./GeneratePDFModal";
+import GenerateDeckImageModal from "./GenerateDeckImageModal";
 import ClearDeckModal from "./ClearDeckModal";
 import LoadDeckModal from "./LoadDeckModal";
 
@@ -68,13 +69,14 @@ export default function DeckBuilderPanel({
   const [editedName, setEditedName] = useState(deck.name);
   const [showMenu, setShowMenu] = useState(false);
   const [showGeneratePDFModal, setShowGeneratePDFModal] = useState(false);
+  const [showGenerateImageModal, setShowGenerateImageModal] = useState(false);
   const [showClearDeckModal, setShowClearDeckModal] = useState(false);
   const [showLoadDeckModal, setShowLoadDeckModal] = useState(false);
   const [showValidationTooltip, setShowValidationTooltip] = useState(false);
   const [showViewDropdown, setShowViewDropdown] = useState(false);
   
   // View options
-  const [viewLayout, setViewLayout] = useState<'grid' | 'list'>('list');
+  const [viewLayout, setViewLayout] = useState<'grid' | 'list'>('grid');
   const [groupBy, setGroupBy] = useState<'type' | 'alignment'>('type');
   
   // Initialize deck type based on deck.format
@@ -204,7 +206,15 @@ export default function DeckBuilderPanel({
       })
       .map((alignment) => ({
         type: alignment,
-        cards: grouped[alignment],
+        // Sort cards within each alignment by type, then by name
+        cards: grouped[alignment].sort((a, b) => {
+          const typeA = a.card.type || '';
+          const typeB = b.card.type || '';
+          if (typeA !== typeB) {
+            return typeA.localeCompare(typeB);
+          }
+          return a.card.name.localeCompare(b.card.name);
+        }),
         count: grouped[alignment].reduce((sum, dc) => sum + dc.quantity, 0),
       }));
   };
@@ -233,6 +243,73 @@ export default function DeckBuilderPanel({
       'Site': 'Site',
     };
     return typeMap[type] || type;
+  };
+
+  // Get icon path for card type - returns single icon path or null for dual icons
+  const getTypeIcon = (type: string): string | null => {
+    // Only show icons for simple single types
+    // Skip multi-type cards (those with "/" in the type)
+    if (type.includes('/')) {
+      return null;
+    }
+    
+    // Return null for types that need dual icons
+    if (type === 'Dominant' || type === 'Dom') {
+      return null; // Will show both Good and Evil Dominant icons
+    }
+    
+    // Map types to icon paths
+    const iconMap: Record<string, string> = {
+      'Artifact': '/filter-icons/Artifact.png',
+      'Art': '/filter-icons/Artifact.png',
+      'City': '/filter-icons/City.png',
+      'Covenant': '/filter-icons/Covenant.png',
+      'Cov': '/filter-icons/Covenant.png',
+      'Curse': '/filter-icons/Curse.png',
+      'Cur': '/filter-icons/Curse.png',
+      'Evil Character': '/filter-icons/Evil Character.png',
+      'EC': '/filter-icons/Evil Character.png',
+      'Evil Enhancement': '/filter-icons/EE.png',
+      'EE': '/filter-icons/EE.png',
+      'Fortress': '/filter-icons/Good Fortress.png', // Just use Good version
+      'Fort': '/filter-icons/Good Fortress.png',
+      'Good Character': '/filter-icons/Hero.png',
+      'GC': '/filter-icons/Hero.png',
+      'Hero': '/filter-icons/Hero.png',
+      'HC': '/filter-icons/Hero.png',
+      'Good Enhancement': '/filter-icons/GE.png',
+      'GE': '/filter-icons/GE.png',
+      'Lost Soul': '/filter-icons/Lost Soul.png',
+      'LS': '/filter-icons/Lost Soul.png',
+      'Site': '/filter-icons/Site.png',
+    };
+    return iconMap[type] || null;
+  };
+
+  // Check if a type should show dual icons
+  const shouldShowDualIcons = (type: string): boolean => {
+    return type === 'Dominant' || type === 'Dom' || type === 'GE/EE' || type === 'EE/GE';
+  };
+
+  // Get dual icon configuration for a type
+  const getDualIconConfig = (type: string): { icon1: string; alt1: string; icon2: string; alt2: string } | null => {
+    if (type === 'Dominant' || type === 'Dom') {
+      return {
+        icon1: '/filter-icons/Good Dominant.png',
+        alt1: 'Good Dominant',
+        icon2: '/filter-icons/Evil Dominant.png',
+        alt2: 'Evil Dominant'
+      };
+    }
+    if (type === 'GE/EE' || type === 'EE/GE') {
+      return {
+        icon1: '/filter-icons/GE.png',
+        alt1: 'Good Enhancement',
+        icon2: '/filter-icons/EE.png',
+        alt2: 'Evil Enhancement'
+      };
+    }
+    return null;
   };
 
   return (
@@ -435,6 +512,18 @@ export default function DeckBuilderPanel({
                 </svg>
                 Generate PDF
               </button>
+              <button
+                onClick={() => {
+                  setShowGenerateImageModal(true);
+                  setShowMenu(false);
+                }}
+                className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Generate Image
+              </button>
               {onLoadDeck && (
                 <button
                   onClick={() => {
@@ -444,7 +533,7 @@ export default function DeckBuilderPanel({
                   className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                   </svg>
                   Load Deck
                 </button>
@@ -678,16 +767,40 @@ export default function DeckBuilderPanel({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-4" data-deck-grid>
         {activeTab === "main" ? (
           <div className="space-y-4">
             {mainDeckCards.length > 0 ? (
               groupCards(mainDeckCards).map(({ type, cards, count }) => {
+                const typeIcon = groupBy === 'type' ? getTypeIcon(type) : null;
+                const dualIconConfig = groupBy === 'type' ? getDualIconConfig(type) : null;
                 return (
                 <div key={type}>
-                  <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2 uppercase tracking-wide">
-                    {groupBy === 'type' ? prettifyTypeName(type) : type} ({count})
-                  </h4>
+                  <div className="flex items-center gap-2 mb-2">
+                    {dualIconConfig ? (
+                      <div className="flex gap-0.5 flex-shrink-0">
+                        <img 
+                          src={dualIconConfig.icon1} 
+                          alt={dualIconConfig.alt1}
+                          className="w-6 h-6 object-contain"
+                        />
+                        <img 
+                          src={dualIconConfig.icon2} 
+                          alt={dualIconConfig.alt2}
+                          className="w-6 h-6 object-contain"
+                        />
+                      </div>
+                    ) : typeIcon && (
+                      <img 
+                        src={typeIcon} 
+                        alt={type}
+                        className="w-6 h-6 object-contain flex-shrink-0"
+                      />
+                    )}
+                    <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                      {groupBy === 'type' ? prettifyTypeName(type) : type} ({count})
+                    </h4>
+                  </div>
                   <DeckCardList
                     cards={cards}
                     onIncrement={(name, set, isReserve) => onAddCard(name, set, isReserve)}
@@ -706,6 +819,8 @@ export default function DeckBuilderPanel({
                     filterReserve={false}
                     onViewCard={onViewCard}
                     onMoveCard={handleMoveCard}
+                    showTypeIcons={false}
+                    viewLayout={viewLayout}
                   />
                 </div>
               );
@@ -744,11 +859,35 @@ export default function DeckBuilderPanel({
           <div className="space-y-4">
             {reserveCards.length > 0 ? (
               groupCards(reserveCards).map(({ type, cards, count }) => {
+                const typeIcon = groupBy === 'type' ? getTypeIcon(type) : null;
+                const dualIconConfig = groupBy === 'type' ? getDualIconConfig(type) : null;
                 return (
                 <div key={type}>
-                  <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2 uppercase tracking-wide">
-                    {groupBy === 'type' ? prettifyTypeName(type) : type} ({count})
-                  </h4>
+                  <div className="flex items-center gap-2 mb-2">
+                    {dualIconConfig ? (
+                      <div className="flex gap-0.5 flex-shrink-0">
+                        <img 
+                          src={dualIconConfig.icon1} 
+                          alt={dualIconConfig.alt1}
+                          className="w-6 h-6 object-contain"
+                        />
+                        <img 
+                          src={dualIconConfig.icon2} 
+                          alt={dualIconConfig.alt2}
+                          className="w-6 h-6 object-contain"
+                        />
+                      </div>
+                    ) : typeIcon && (
+                      <img 
+                        src={typeIcon} 
+                        alt={type}
+                        className="w-6 h-6 object-contain flex-shrink-0"
+                      />
+                    )}
+                    <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                      {groupBy === 'type' ? prettifyTypeName(type) : type} ({count})
+                    </h4>
+                  </div>
                   <DeckCardList
                     cards={cards}
                     onIncrement={(name, set, isReserve) => onAddCard(name, set, isReserve)}
@@ -767,6 +906,8 @@ export default function DeckBuilderPanel({
                     filterReserve={true}
                     onViewCard={onViewCard}
                     onMoveCard={handleMoveCard}
+                    showTypeIcons={false}
+                    viewLayout={viewLayout}
                   />
                 </div>
               );
@@ -936,6 +1077,14 @@ export default function DeckBuilderPanel({
         <GeneratePDFModal
           deck={deck}
           onClose={() => setShowGeneratePDFModal(false)}
+        />
+      )}
+
+      {/* Generate Image Modal */}
+      {showGenerateImageModal && (
+        <GenerateDeckImageModal
+          deck={deck}
+          onClose={() => setShowGenerateImageModal(false)}
         />
       )}
 
