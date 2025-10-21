@@ -36,7 +36,7 @@ interface DeckBuilderPanelProps {
   /** Callback to load a deck from cloud by ID */
   onLoadDeck?: (deckId: string) => void;
   /** Callback to create a new blank deck */
-  onNewDeck?: (name?: string) => void;
+  onNewDeck?: (name?: string, folderId?: string | null) => void;
   /** Callback when active tab changes */
   onActiveTabChange?: (tab: TabType) => void;
   /** Callback when user wants to view card details */
@@ -70,6 +70,12 @@ export default function DeckBuilderPanel({
   const [showGeneratePDFModal, setShowGeneratePDFModal] = useState(false);
   const [showClearDeckModal, setShowClearDeckModal] = useState(false);
   const [showLoadDeckModal, setShowLoadDeckModal] = useState(false);
+  const [showValidationTooltip, setShowValidationTooltip] = useState(false);
+  const [showViewDropdown, setShowViewDropdown] = useState(false);
+  
+  // View options
+  const [viewLayout, setViewLayout] = useState<'grid' | 'list'>('list');
+  const [groupBy, setGroupBy] = useState<'type' | 'alignment'>('type');
   
   // Initialize deck type based on deck.format
   const [deckType, setDeckType] = useState<'T1' | 'T2'>(() => {
@@ -101,6 +107,14 @@ export default function DeckBuilderPanel({
     document.addEventListener('click', handleClick);
     return () => document.removeEventListener('click', handleClick);
   }, [showMenu]);
+
+  // Close view dropdown when clicking outside
+  useEffect(() => {
+    if (!showViewDropdown) return;
+    const handleClick = () => setShowViewDropdown(false);
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [showViewDropdown]);
 
   // Calculate deck stats
   const mainDeckCards = deck.cards.filter((dc) => !dc.isReserve);
@@ -165,6 +179,41 @@ export default function DeckBuilderPanel({
         cards: grouped[type],
         count: grouped[type].reduce((sum, dc) => sum + dc.quantity, 0),
       }));
+  };
+
+  // Group cards by alignment
+  const groupCardsByAlignment = (cards: typeof deck.cards) => {
+    const grouped = cards.reduce((acc, deckCard) => {
+      const alignment = deckCard.card.alignment || "Neutral";
+      if (!acc[alignment]) {
+        acc[alignment] = [];
+      }
+      acc[alignment].push(deckCard);
+      return acc;
+    }, {} as Record<string, typeof deck.cards>);
+
+    // Sort alignments: Good, Evil, Neutral
+    const alignmentOrder = ['Good', 'Evil', 'Neutral'];
+    return Object.keys(grouped)
+      .sort((a, b) => {
+        const aIndex = alignmentOrder.indexOf(a);
+        const bIndex = alignmentOrder.indexOf(b);
+        if (aIndex === -1) return 1;
+        if (bIndex === -1) return -1;
+        return aIndex - bIndex;
+      })
+      .map((alignment) => ({
+        type: alignment,
+        cards: grouped[alignment],
+        count: grouped[alignment].reduce((sum, dc) => sum + dc.quantity, 0),
+      }));
+  };
+
+  // Group cards based on current groupBy setting
+  const groupCards = (cards: typeof deck.cards) => {
+    return groupBy === 'alignment' 
+      ? groupCardsByAlignment(cards) 
+      : groupCardsByType(cards);
   };
 
   // Prettify card type names
@@ -241,21 +290,27 @@ export default function DeckBuilderPanel({
             <span className="text-gray-400">•</span>
             <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-full p-0.5">
               <button
-                onClick={() => deckType === 'T2' && handleDeckTypeToggle()}
+                onClick={() => {
+                  setDeckType('T1');
+                  onDeckFormatChange?.('Type 1');
+                }}
                 className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
                   deckType === 'T1'
                     ? 'bg-blue-600 dark:bg-blue-500 text-white'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 cursor-pointer'
                 }`}
               >
                 T1
               </button>
               <button
-                onClick={() => deckType === 'T1' && handleDeckTypeToggle()}
+                onClick={() => {
+                  setDeckType('T2');
+                  onDeckFormatChange?.('Type 2');
+                }}
                 className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
                   deckType === 'T2'
                     ? 'bg-blue-600 dark:bg-blue-500 text-white'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 cursor-pointer'
                 }`}
               >
                 T2
@@ -273,21 +328,21 @@ export default function DeckBuilderPanel({
                 }
               }}
               disabled={syncStatus?.isSaving}
-              className={`px-4 py-1.5 text-sm font-medium rounded transition-colors flex items-center gap-2 ${
+              className={`px-4 py-1.5 text-sm font-medium rounded transition-all flex items-center gap-2 ${
                 syncStatus?.isSaving
                   ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-500 cursor-not-allowed'
                   : hasUnsavedChanges
-                  ? 'bg-green-600 hover:bg-green-700 text-white'
-                  : 'bg-green-600 hover:bg-green-700 text-white opacity-75'
+                  ? 'bg-green-600 hover:bg-green-700 text-white shadow-sm'
+                  : 'bg-gray-500 hover:bg-gray-600 text-white'
               }`}
               title={
                 syncStatus?.isSaving
                   ? 'Saving...'
                   : hasUnsavedChanges
-                  ? 'Save changes to cloud'
+                  ? 'You have unsaved changes - Click to save to cloud'
                   : syncStatus?.lastSavedAt
-                  ? `Last saved ${new Date(syncStatus.lastSavedAt).toLocaleTimeString()}`
-                  : 'Save to cloud'
+                  ? `All changes saved - Last saved ${new Date(syncStatus.lastSavedAt).toLocaleTimeString()}`
+                  : 'No changes to save'
               }
             >
               {syncStatus?.isSaving ? (
@@ -303,12 +358,12 @@ export default function DeckBuilderPanel({
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                   </svg>
-                  Save
+                  Save Changes
                 </>
               ) : (
                 <>
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19h6" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                   Saved
                 </>
@@ -319,7 +374,7 @@ export default function DeckBuilderPanel({
           {/* New Deck Button */}
           {onNewDeck && (
             <button
-              onClick={() => onNewDeck()}
+              onClick={() => onNewDeck(undefined, deck.folderId)}
               className="px-3 py-1.5 text-sm font-medium rounded border border-blue-500 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 transition-colors flex items-center gap-2"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -414,7 +469,7 @@ export default function DeckBuilderPanel({
       </div>
 
       {/* Tabs */}
-      <div className="flex-shrink-0 flex border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+      <div className="flex-shrink-0 flex items-center border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
         <button
           onClick={() => handleTabChange("main")}
           className={`flex-1 px-3 py-3 text-sm font-medium transition-colors ${
@@ -437,7 +492,9 @@ export default function DeckBuilderPanel({
         </button>
         <button
           onClick={() => handleTabChange("info")}
-          className={`flex-1 px-3 py-3 text-sm font-medium transition-colors ${
+          onMouseEnter={() => setShowValidationTooltip(true)}
+          onMouseLeave={() => setShowValidationTooltip(false)}
+          className={`relative flex-1 px-3 py-3 text-sm font-medium transition-colors ${
             activeTab === "info"
               ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
@@ -452,13 +509,172 @@ export default function DeckBuilderPanel({
                     ? "bg-green-500 text-white"
                     : "bg-red-500 text-white"
                 }`}
-                title={validation.isValid ? "Valid deck" : `${validation.issues.filter(i => i.type === "error").length} error(s)`}
               >
                 {validation.isValid ? "✓" : "!"}
               </span>
             )}
           </span>
+          
+          {/* Validation Tooltip */}
+          {showValidationTooltip && validation.stats.totalCards > 0 && (
+            <div className={`absolute left-1/2 -translate-x-1/2 top-full mt-2 w-72 p-4 rounded-lg shadow-xl z-50 pointer-events-none ${
+              validation.isValid
+                ? "bg-green-50 dark:bg-green-900/90 border-2 border-green-300 dark:border-green-600"
+                : "bg-red-50 dark:bg-red-900/90 border-2 border-red-300 dark:border-red-600"
+            }`}>
+              {/* Arrow */}
+              <div className={`absolute left-1/2 -translate-x-1/2 bottom-full w-0 h-0 border-l-8 border-r-8 border-b-8 border-l-transparent border-r-transparent ${
+                validation.isValid
+                  ? "border-b-green-300 dark:border-b-green-600"
+                  : "border-b-red-300 dark:border-b-red-600"
+              }`}></div>
+              
+              {/* Content */}
+              <div className={`font-semibold mb-3 text-base ${
+                validation.isValid
+                  ? "text-green-800 dark:text-green-200"
+                  : "text-red-800 dark:text-red-200"
+              }`}>
+                {validation.isValid ? "✓ Valid Deck" : `✗ ${validation.issues.filter(i => i.type === "error").length} Error${validation.issues.filter(i => i.type === "error").length !== 1 ? "s" : ""}`}
+              </div>
+              
+              {validation.issues.length > 0 && (
+                <div className="space-y-2">
+                  {validation.issues.map((issue, idx) => (
+                    <div
+                      key={idx}
+                      className={`text-sm flex items-start gap-2 ${
+                        issue.type === "error"
+                          ? "text-red-700 dark:text-red-300"
+                          : issue.type === "warning"
+                          ? "text-yellow-700 dark:text-yellow-300"
+                          : "text-blue-700 dark:text-blue-300"
+                      }`}
+                    >
+                      <span className="mt-0.5 flex-shrink-0">
+                        {issue.type === "error" ? "⚠" : issue.type === "warning" ? "⚠" : "ℹ"}
+                      </span>
+                      <span className="flex-1">{issue.message}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </button>
+        
+        {/* View Dropdown Button */}
+        <div className="relative ml-auto mr-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowViewDropdown(!showViewDropdown);
+            }}
+            className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-1.5"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+            </svg>
+            View
+            <svg className={`w-3 h-3 transition-transform ${showViewDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          
+          {showViewDropdown && (
+            <div className="absolute top-full mt-1 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl py-2 z-50 min-w-[220px]">
+              {/* Layout Section */}
+              <div className="px-3 py-2">
+                <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+                  Layout
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setViewLayout('grid');
+                    }}
+                    className={`flex-1 p-2 rounded flex flex-col items-center gap-1 transition-colors ${
+                      viewLayout === 'grid'
+                        ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }`}
+                    title="Grid view"
+                  >
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                    </svg>
+                    <span className="text-xs font-medium">Grid</span>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setViewLayout('list');
+                    }}
+                    className={`flex-1 p-2 rounded flex flex-col items-center gap-1 transition-colors ${
+                      viewLayout === 'list'
+                        ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }`}
+                    title="List view"
+                  >
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-xs font-medium">List</span>
+                  </button>
+                </div>
+              </div>
+              
+              <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
+              
+              {/* Group By Section */}
+              <div className="px-3 py-2">
+                <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+                  Group by
+                </div>
+                <div className="space-y-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setGroupBy('type');
+                    }}
+                    className={`w-full px-3 py-2 text-left text-sm rounded transition-colors flex items-center justify-between ${
+                      groupBy === 'type'
+                        ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-medium'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <span>Type</span>
+                    {groupBy === 'type' && (
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setGroupBy('alignment');
+                    }}
+                    className={`w-full px-3 py-2 text-left text-sm rounded transition-colors flex items-center justify-between ${
+                      groupBy === 'alignment'
+                        ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-medium'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <span>Alignment</span>
+                    {groupBy === 'alignment' && (
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Content */}
@@ -466,11 +682,11 @@ export default function DeckBuilderPanel({
         {activeTab === "main" ? (
           <div className="space-y-4">
             {mainDeckCards.length > 0 ? (
-              groupCardsByType(mainDeckCards).map(({ type, cards, count }) => {
+              groupCards(mainDeckCards).map(({ type, cards, count }) => {
                 return (
                 <div key={type}>
                   <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2 uppercase tracking-wide">
-                    {prettifyTypeName(type)} ({count})
+                    {groupBy === 'type' ? prettifyTypeName(type) : type} ({count})
                   </h4>
                   <DeckCardList
                     cards={cards}
@@ -527,11 +743,11 @@ export default function DeckBuilderPanel({
         ) : activeTab === "reserve" ? (
           <div className="space-y-4">
             {reserveCards.length > 0 ? (
-              groupCardsByType(reserveCards).map(({ type, cards, count }) => {
+              groupCards(reserveCards).map(({ type, cards, count }) => {
                 return (
                 <div key={type}>
                   <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2 uppercase tracking-wide">
-                    {prettifyTypeName(type)} ({count})
+                    {groupBy === 'type' ? prettifyTypeName(type) : type} ({count})
                   </h4>
                   <DeckCardList
                     cards={cards}
@@ -656,6 +872,41 @@ export default function DeckBuilderPanel({
                   <div className="flex justify-between">
                     <span>Dominants:</span>
                     <span className="font-medium">{validation.stats.dominantCount}</span>
+                  </div>
+                </div>
+                
+                {/* Card Type Breakdown */}
+                <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                  <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">
+                    Card Types
+                  </div>
+                  <div className="space-y-0.5">
+                    {(() => {
+                      // Calculate card type counts
+                      const typeCounts = deck.cards.reduce((acc, deckCard) => {
+                        const type = deckCard.card.type || "Unknown";
+                        const prettyType = prettifyTypeName(type);
+                        if (!acc[prettyType]) {
+                          acc[prettyType] = 0;
+                        }
+                        acc[prettyType] += deckCard.quantity;
+                        return acc;
+                      }, {} as Record<string, number>);
+                      
+                      // Sort by count (descending) then by name
+                      const sortedTypes = Object.entries(typeCounts)
+                        .sort(([nameA, countA], [nameB, countB]) => {
+                          if (countB !== countA) return countB - countA;
+                          return nameA.localeCompare(nameB);
+                        });
+                      
+                      return sortedTypes.map(([type, count]) => (
+                        <div key={type} className="flex justify-between gap-2 text-sm">
+                          <span className="flex-shrink-0">{type}:</span>
+                          <span className="font-medium ml-auto">{count}</span>
+                        </div>
+                      ));
+                    })()}
                   </div>
                 </div>
               </div>

@@ -285,6 +285,117 @@ export function validateDeck(deck: Deck): DeckValidation {
     });
   }
   
+  // Validation: Type 2 requires equal Good and Evil cards (in both main deck and reserve)
+  const isType2 = deck.format?.toLowerCase().includes("type 2") || deck.format?.toLowerCase().includes("multi");
+  if (isType2) {
+    // Check Main Deck
+    const mainGoodCards = deck.cards
+      .filter((dc) => !dc.isReserve && !isLostSoul(dc.card) && !isDominant(dc.card) && dc.card.alignment?.toLowerCase() === "good")
+      .reduce((sum, dc) => sum + dc.quantity, 0);
+    
+    const mainEvilCards = deck.cards
+      .filter((dc) => !dc.isReserve && !isLostSoul(dc.card) && !isDominant(dc.card) && dc.card.alignment?.toLowerCase() === "evil")
+      .reduce((sum, dc) => sum + dc.quantity, 0);
+    
+    if (mainGoodCards !== mainEvilCards && (mainGoodCards > 0 || mainEvilCards > 0)) {
+      const difference = Math.abs(mainGoodCards - mainEvilCards);
+      const more = mainGoodCards > mainEvilCards ? "Good" : "Evil";
+      
+      issues.push({
+        type: "error",
+        category: "format",
+        message: `Type 2 Main Deck requires equal Good and Evil cards: ${mainGoodCards} Good vs ${mainEvilCards} Evil (${difference} more ${more} card${difference !== 1 ? "s" : ""})`,
+      });
+    }
+    
+    // Check Reserve
+    const reserveGoodCards = deck.cards
+      .filter((dc) => dc.isReserve && !isLostSoul(dc.card) && !isDominant(dc.card) && dc.card.alignment?.toLowerCase() === "good")
+      .reduce((sum, dc) => sum + dc.quantity, 0);
+    
+    const reserveEvilCards = deck.cards
+      .filter((dc) => dc.isReserve && !isLostSoul(dc.card) && !isDominant(dc.card) && dc.card.alignment?.toLowerCase() === "evil")
+      .reduce((sum, dc) => sum + dc.quantity, 0);
+    
+    if (reserveGoodCards !== reserveEvilCards && (reserveGoodCards > 0 || reserveEvilCards > 0)) {
+      const difference = Math.abs(reserveGoodCards - reserveEvilCards);
+      const more = reserveGoodCards > reserveEvilCards ? "Good" : "Evil";
+      
+      issues.push({
+        type: "error",
+        category: "format",
+        message: `Type 2 Reserve requires equal Good and Evil cards: ${reserveGoodCards} Good vs ${reserveEvilCards} Evil (${difference} more ${more} card${difference !== 1 ? "s" : ""})`,
+      });
+    }
+  }
+  
+  // Validation: Type 1 requires unique Lost Souls (no duplicates)
+  // Exception: Lost Souls with no special ability can have multiples
+  const isType1 = !isType2; // Type 1 if not Type 2
+  if (isType1) {
+    // Find Lost Soul duplicates (excluding those with no special ability)
+    const lostSoulCounts = deck.cards
+      .filter((dc) => {
+        if (!isLostSoul(dc.card)) return false;
+        // Allow multiples of Lost Souls with no special ability
+        const hasSpecialAbility = dc.card.specialAbility && dc.card.specialAbility.trim() !== '';
+        return hasSpecialAbility;
+      })
+      .reduce((acc, dc) => {
+        const key = `${dc.card.name}-${dc.card.set}`;
+        if (!acc[key]) {
+          acc[key] = { name: dc.card.name, count: 0 };
+        }
+        acc[key].count += dc.quantity;
+        return acc;
+      }, {} as Record<string, { name: string; count: number }>);
+    
+    const duplicateLostSouls = Object.values(lostSoulCounts).filter(ls => ls.count > 1);
+    
+    if (duplicateLostSouls.length > 0) {
+      duplicateLostSouls.forEach(ls => {
+        issues.push({
+          type: "error",
+          category: "souls",
+          message: `Type 1 requires unique Lost Souls with special abilities: "${ls.name}" appears ${ls.count} times (must be 1)`,
+        });
+      });
+    }
+  }
+  
+  // Validation: Type 2 allows maximum 2 copies of each Lost Soul
+  // Exception: Lost Souls with no special ability can have unlimited copies
+  if (isType2) {
+    // Find Lost Souls with more than 2 copies (excluding those with no special ability)
+    const lostSoulCounts = deck.cards
+      .filter((dc) => {
+        if (!isLostSoul(dc.card)) return false;
+        // Allow unlimited copies of Lost Souls with no special ability
+        const hasSpecialAbility = dc.card.specialAbility && dc.card.specialAbility.trim() !== '';
+        return hasSpecialAbility;
+      })
+      .reduce((acc, dc) => {
+        const key = `${dc.card.name}-${dc.card.set}`;
+        if (!acc[key]) {
+          acc[key] = { name: dc.card.name, count: 0 };
+        }
+        acc[key].count += dc.quantity;
+        return acc;
+      }, {} as Record<string, { name: string; count: number }>);
+    
+    const excessLostSouls = Object.values(lostSoulCounts).filter(ls => ls.count > 2);
+    
+    if (excessLostSouls.length > 0) {
+      excessLostSouls.forEach(ls => {
+        issues.push({
+          type: "error",
+          category: "souls",
+          message: `Type 2 allows maximum 2 copies of each Lost Soul with special abilities: "${ls.name}" appears ${ls.count} times (max 2)`,
+        });
+      });
+    }
+  }
+  
   // Validation: Empty deck warning
   if (totalCards === 0) {
     issues.push({

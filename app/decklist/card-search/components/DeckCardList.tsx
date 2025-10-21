@@ -403,7 +403,17 @@ export default function DeckCardList({
 
             {/* Card Info */}
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
+              <div 
+                className="text-sm font-medium text-gray-900 dark:text-white truncate cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                onMouseEnter={(e) => {
+                  const pos = calculatePreviewPosition(e.currentTarget);
+                  setPreviewCard({
+                    card,
+                    ...pos
+                  });
+                }}
+                onMouseLeave={() => setPreviewCard(null)}
+              >
                 {card.name}
               </div>
             </div>

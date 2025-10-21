@@ -112,7 +112,7 @@ export interface SyncStatus {
 /**
  * Custom hook for managing deck state with localStorage persistence and cloud sync
  */
-export function useDeckState(initialDeckId?: string) {
+export function useDeckState(initialDeckId?: string, initialFolderId?: string | null, isNewDeck?: boolean) {
   const [deck, setDeck] = useState<Deck>(() => loadDeckFromStorage());
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
     isSaving: false,
@@ -132,13 +132,27 @@ export function useDeckState(initialDeckId?: string) {
     }
   }, [deck]);
 
-  // Load deck from cloud on mount if deckId provided
+  // Load deck from cloud on mount if deckId provided, or create new deck with folderId if provided
   useEffect(() => {
     if (initialDeckId && isInitialMount.current) {
+      // Load existing deck from cloud
       loadDeckFromCloud(initialDeckId);
+    } else if (isNewDeck && isInitialMount.current) {
+      // Create a fresh blank deck (with optional folderId)
+      console.log('[useDeckState] Creating new deck with folderId:', initialFolderId);
+      setDeck({
+        name: "Untitled Deck",
+        cards: [],
+        description: "",
+        format: undefined,
+        folderId: initialFolderId || undefined,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      setHasUnsavedChanges(false);
     }
     isInitialMount.current = false;
-  }, [initialDeckId]);
+  }, [initialDeckId, initialFolderId, isNewDeck]);
 
   /**
    * Load deck from cloud by ID
@@ -239,13 +253,18 @@ export function useDeckState(initialDeckId?: string) {
       setSyncStatus({ isSaving: true, lastSavedAt: null, error: null });
 
       // Convert Deck format to database format
-      const cardsData: DeckCardData[] = deck.cards.map((deckCard) => ({
-        card_name: deckCard.card.name,
-        card_set: deckCard.card.set,
-        card_img_file: deckCard.card.imgFile,
-        quantity: deckCard.quantity,
-        is_reserve: deckCard.isReserve,
-      }));
+      // Filter out cards with quantity <= 0 to avoid database constraint violations
+      const cardsData: DeckCardData[] = deck.cards
+        .filter((deckCard) => deckCard.quantity > 0)
+        .map((deckCard) => ({
+          card_name: deckCard.card.name,
+          card_set: deckCard.card.set,
+          card_img_file: deckCard.card.imgFile,
+          quantity: deckCard.quantity,
+          is_reserve: deckCard.isReserve,
+        }));
+
+      console.log('[useDeckState] Saving deck with folderId:', deck.folderId);
 
       const result = await saveDeckAction({
         deckId: deck.id,
@@ -475,12 +494,13 @@ export function useDeckState(initialDeckId?: string) {
   /**
    * Reset deck to empty state with new name
    */
-  const newDeck = useCallback((name: string = "Untitled Deck") => {
+  const newDeck = useCallback((name: string = "Untitled Deck", folderId?: string | null) => {
     setDeck({
       name,
       cards: [],
       description: "",
       format: undefined,
+      folderId: folderId,
       createdAt: new Date(),
       updatedAt: new Date(),
     });

@@ -67,7 +67,7 @@ export default function MyDecksClient() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortBy, setSortBy] = useState<"updated" | "created" | "name">("updated");
   const [deckToDelete, setDeckToDelete] = useState<{ id: string; name: string } | null>(null);
-  const [selectedFolder, setSelectedFolder] = useState<string | null>(null); // null = "All Decks"
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null); // null = "My Decks"
   const [folderModal, setFolderModal] = useState<{ mode: "create" | "rename"; folderId?: string; initialName?: string } | null>(null);
   const [folderToDelete, setFolderToDelete] = useState<{ id: string; name: string } | null>(null);
   const [pdfDeck, setPdfDeck] = useState<Deck | null>(null); // For PDF generation modal
@@ -139,7 +139,7 @@ export default function MyDecksClient() {
     if (result.success) {
       setFolders(folders.filter((f) => f.id !== folderId));
       if (selectedFolder === folderId) {
-        setSelectedFolder(null); // Go back to "All Decks"
+        setSelectedFolder(null); // Go back to "My Decks"
       }
     } else {
       alert(result.error || "Failed to delete folder");
@@ -204,7 +204,12 @@ export default function MyDecksClient() {
   }
 
   function handleNewDeck() {
-    router.push("/decklist/card-search");
+    // If in a folder, pass folderId so the new deck is created in that folder
+    if (selectedFolder) {
+      router.push(`/decklist/card-search?folderId=${selectedFolder}&new=true`);
+    } else {
+      router.push("/decklist/card-search?new=true");
+    }
   }
 
   function handleEditDeck(deckId: string) {
@@ -232,7 +237,7 @@ export default function MyDecksClient() {
   // Get selected folder name
   const selectedFolderName = selectedFolder 
     ? folders.find(f => f.id === selectedFolder)?.name || "Unknown Folder"
-    : "All Decks";
+    : "My Decks";
 
   if (loading) {
     return (
@@ -280,7 +285,7 @@ export default function MyDecksClient() {
               </button>
             </div>
 
-            {/* All Decks (Uncategorized) */}
+            {/* My Decks (Uncategorized) */}
             <div
               onClick={() => setSelectedFolder(null)}
               className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition-colors flex items-center gap-2 cursor-pointer ${
@@ -292,7 +297,7 @@ export default function MyDecksClient() {
               <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
               </svg>
-              <span className="flex-1">All Decks</span>
+              <span className="flex-1">My Decks</span>
               <span className="text-sm text-gray-500">
                 {decks.filter(d => !d.folder_id).length}
               </span>
@@ -803,7 +808,7 @@ function DropdownMenu({
                       !currentFolderId ? "bg-blue-50 dark:bg-blue-900/20" : ""
                     }`}
                   >
-                    📁 All Decks
+                    📁 My Decks
                   </button>
                   {folders.map((folder) => (
                     <button

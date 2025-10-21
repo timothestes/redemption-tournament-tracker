@@ -34,13 +34,13 @@ CREATE INDEX idx_decks_is_public ON decks(is_public);
 CREATE INDEX idx_decks_folder_id ON decks(folder_id);
 
 -- Deck Cards Table
-CREATE TABLE deck_cards (
+CREATE or replace TABLE deck_cards (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   deck_id UUID REFERENCES decks(id) ON DELETE CASCADE,
   card_name TEXT NOT NULL,  -- Full name: 'Son of God "Manger"'
   card_set TEXT,            -- Set code: 'Promo', 'LoC', etc.
   card_img_file TEXT,       -- Image filename for display
-  quantity INTEGER NOT NULL CHECK (quantity > 0 AND quantity <= 4),
+  quantity INTEGER NOT NULL CHECK (quantity > 0),
   is_reserve BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(deck_id, card_name, card_set, is_reserve)

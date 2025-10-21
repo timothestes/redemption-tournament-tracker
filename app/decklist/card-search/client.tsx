@@ -22,6 +22,10 @@ export default function CardSearchClient() {
   
   // Get deck ID from URL params if editing existing deck
   const deckIdFromUrl = searchParams.get("deckId") || undefined;
+  // Get folder ID from URL params if creating a new deck in a folder
+  const folderIdFromUrl = searchParams.get("folderId") || undefined;
+  // Check if this is an explicit "new deck" request
+  const isNewDeck = searchParams.get("new") === "true";
   
   // Collapse state for filter grid
   const [filterGridCollapsed, setFilterGridCollapsed] = useState(false);
@@ -110,7 +114,7 @@ export default function CardSearchClient() {
     saveDeckToCloud,
     getCardQuantity,
     getDeckStats
-  } = useDeckState(deckIdFromUrl);
+  } = useDeckState(deckIdFromUrl, folderIdFromUrl, isNewDeck);
 
   // Helper functions for managing multiple queries
   const updateQuery = (index: number, text: string) => {
