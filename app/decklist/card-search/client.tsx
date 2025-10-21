@@ -1167,42 +1167,71 @@ export default function CardSearchClient() {
               return (
                 <div 
                   key={c.dataLine} 
-                  className="relative cursor-pointer group" 
-                  onClick={() => addCard(c, activeDeckTab === "reserve")}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    removeCard(c.name, c.set, activeDeckTab === "reserve");
-                  }}
-                  title="Left-click to add, right-click to remove"
+                  className="relative cursor-pointer group rounded overflow-hidden shadow hover:shadow-xl transition-all duration-200"
                 >
-                  <CardImage
-                    imgFile={c.imgFile}
-                    alt={c.name}
-                    className="rounded shadow hover:shadow-lg transition-shadow"
-                    sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 16vw"
-                  />
-                  {/* Magnifying glass icon - shown on hover, top right */}
-                  <button
-                    className="absolute top-1 right-1 bg-gray-900/90 hover:bg-gray-900 text-white rounded-full w-10 h-10 flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                    onClick={(e) => {
-                      e.stopPropagation(); // Prevent card click
-                      setModalCard(c);
-                    }}
-                    title="View card details"
+                  {/* Card Image - Click to view modal */}
+                  <div 
+                    className="relative overflow-hidden rounded"
+                    onClick={() => setModalCard(c)}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </button>
-                  {/* Quantity badge - bottom right, above card name */}
-                  {quantityInDeck > 0 && (
-                    <div className="absolute bottom-8 right-1 bg-red-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg z-10">
-                      {quantityInDeck}
+                    <CardImage
+                      imgFile={c.imgFile}
+                      alt={c.name}
+                      className="rounded w-full"
+                      sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 16vw"
+                    />
+                    
+                    {/* Controls Overlay - Shows on Hover */}
+                    <div className="absolute inset-x-0 bottom-0 transition-opacity duration-200">
+                      {/* Using golden ratio: top section ~61.8%, bottom ~38.2% */}
+                      <div className="grid grid-rows-[1.618fr_1fr] grid-cols-2 gap-1.5 p-3 h-32">
+                        {/* Top Left: Decrement */}
+                        <div className="flex items-center justify-center">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeCard(c.name, c.set, activeDeckTab === "reserve");
+                            }}
+                            className="w-14 h-14 max-w-full max-h-full flex items-center justify-center rounded-lg bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-3xl border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
+                            aria-label="Remove card"
+                            title="Remove card from deck"
+                          >
+                            −
+                          </button>
+                        </div>
+                        
+                        {/* Top Right: Increment */}
+                        <div className="flex items-center justify-center">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addCard(c, activeDeckTab === "reserve");
+                            }}
+                            className="w-14 h-14 max-w-full max-h-full flex items-center justify-center rounded-lg bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-3xl border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
+                            aria-label="Add card"
+                            title="Add card to deck"
+                          >
+                            +
+                          </button>
+                        </div>
+                        
+                        {/* Bottom Left: Empty space */}
+                        <div className="flex items-center justify-center">
+                        </div>
+                        
+                        {/* Bottom Right: Quantity Display - Always Visible */}
+                        {quantityInDeck > 0 && (
+                          <div className="flex items-center justify-end pr-1">
+                            <div className="bg-black/75 backdrop-blur-sm text-white px-2.5 py-1 rounded-md font-bold text-sm shadow-lg">
+                              ×{quantityInDeck}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
+                  </div>
+                  
                   <p className="text-sm mt-1 text-center truncate">{c.name}</p>
-                  {/* Hover hint for deck builder */}
-                  <div className="hidden md:block absolute inset-0 bg-blue-600/0 group-hover:bg-blue-600/10 transition-colors rounded pointer-events-none" />
                 </div>
               );
             })}
