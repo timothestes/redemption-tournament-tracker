@@ -18,6 +18,20 @@ const ParticipantFormModal: React.FC<ParticipantFormModalProps> = ({
   const { theme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   
+  // Handle ESC key to close modal
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isOpen, onClose]);
+  
   // Only run on client to avoid hydration mismatch
   useEffect(() => {
     setMounted(true);

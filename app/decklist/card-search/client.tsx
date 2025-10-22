@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import ModalWithClose from "./ModalWithClose";
 import FilterGrid from "./components/FilterGrid";
 import CardImage from "./components/CardImage";
+import DeckBuilderPanel, { TabType } from "./components/DeckBuilderPanel";
 import { CARD_DATA_URL, OT_BOOKS, NT_BOOKS, GOSPEL_BOOKS } from "./constants";
 import { 
   Card, 
@@ -12,10 +13,22 @@ import {
   iconPredicates, 
   normalizeBrigadeField 
 } from "./utils";
+import { useDeckState } from "./hooks/useDeckState";
+import { parseDeckText, generateDeckText, downloadDeckAsFile, copyDeckToClipboard } from "./utils/deckImportExport";
+import { createClient } from "../../../utils/supabase/client";
+import type { User } from "@supabase/supabase-js";
+import { deleteDeckAction } from "../actions";
 
 export default function CardSearchClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  
+  // Get deck ID from URL params if editing existing deck
+  const deckIdFromUrl = searchParams.get("deckId") || undefined;
+  // Get folder ID from URL params if creating a new deck in a folder
+  const folderIdFromUrl = searchParams.get("folderId") || undefined;
+  // Check if this is an explicit "new deck" request
+  const isNewDeck = searchParams.get("new") === "true";
   
   // Collapse state for filter grid
   const [filterGridCollapsed, setFilterGridCollapsed] = useState(false);
@@ -74,6 +87,45 @@ export default function CardSearchClient() {
   
   const [copyLinkNotification, setCopyLinkNotification] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+
+  // Notification state
+  const [notification, setNotification] = useState<{message: string, type: 'success' | 'error' | 'info'} | null>(null);
+
+  // Import/export state
+  const [importText, setImportText] = useState("");
+  const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [exportNotification, setExportNotification] = useState(false);
+
+  // Panel visibility state
+  const [showDeckBuilder, setShowDeckBuilder] = useState(true);
+  const [showSearch, setShowSearch] = useState(true);
+
+  // Track active tab in deck builder
+  const [activeDeckTab, setActiveDeckTab] = useState<TabType>("main");
+
+  // User authentication state
+  const [user, setUser] = useState<User | null>(null);
+  const supabase = createClient();
+
+  // Deck builder state
+  const {
+    deck,
+    syncStatus,
+    hasUnsavedChanges,
+    addCard,
+    removeCard,
+    updateQuantity,
+    setDeckName,
+    setDeckFormat,
+    clearDeck,
+    newDeck,
+    loadDeck,
+    loadDeckFromCloud,
+    saveDeckToCloud,
+    getCardQuantity,
+    getDeckStats
+  } = useDeckState(deckIdFromUrl, folderIdFromUrl, isNewDeck);
 
   // Helper functions for managing multiple queries
   const updateQuery = (index: number, text: string) => {
@@ -140,6 +192,22 @@ export default function CardSearchClient() {
     const url = params.toString() ? `?${params.toString()}` : '';
     router.replace(`/decklist/card-search${url}`, { scroll: false });
   }, [router]);
+
+  // Check user authentication on mount
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      setUser(currentUser);
+    };
+
+    getUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Load state from URL on mount (only once)
   useEffect(() => {
@@ -234,6 +302,52 @@ export default function CardSearchClient() {
     nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly,
     postexilicOnly, updateURL
   ]);
+
+  // Warn before leaving with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = ''; // Chrome requires returnValue to be set
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check for Ctrl (Windows/Linux) or Cmd (Mac)
+      const modKey = e.ctrlKey || e.metaKey;
+      
+      if (!modKey) return;
+
+      // Ctrl+S / Cmd+S to save
+      if (e.key === 's') {
+        e.preventDefault();
+        if (user && !syncStatus?.isSaving) {
+          saveDeckToCloud();
+        }
+      }
+      
+      // Ctrl+E / Cmd+E to export
+      else if (e.key === 'e') {
+        e.preventDefault();
+        handleExportDeck();
+      }
+      
+      // Ctrl+I / Cmd+I to import
+      else if (e.key === 'i') {
+        e.preventDefault();
+        setShowImportModal(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [user, syncStatus?.isSaving, saveDeckToCloud, handleExportDeck]);
 
   // sanitize imgFile to avoid duplicate extensions - now imported from utils
 
@@ -690,11 +804,76 @@ export default function CardSearchClient() {
     });
   }
 
+  // Export deck to clipboard or download
+  async function handleExportDeck() {
+    try {
+      await copyDeckToClipboard(deck);
+      setExportNotification(true);
+      setTimeout(() => setExportNotification(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy deck to clipboard:', err);
+      // Fallback to download if clipboard fails
+      downloadDeckAsFile(deck);
+    }
+  }
+
+  // Import deck from text
+  function handleImportDeck(text: string) {
+    const result = parseDeckText(text, cards);
+    
+    if (result.errors.length > 0) {
+      setImportErrors(result.errors);
+    } else {
+      setImportErrors([]);
+    }
+    
+    if (result.deck) {
+      // Preserve the existing deck name when importing
+      const importedDeck = {
+        ...result.deck,
+        name: deck.name || result.deck.name,
+      };
+      loadDeck(importedDeck);
+      setShowImportModal(false);
+      setImportText("");
+    }
+  }
+
+  // Delete deck
+  async function handleDeleteDeck() {
+    if (!deck.id) {
+      // If deck hasn't been saved yet, just clear it
+      clearDeck();
+      return;
+    }
+
+    if (!user) {
+      setNotification({ message: 'Please sign in to delete decks.', type: 'error' });
+      setTimeout(() => setNotification(null), 3000);
+      return;
+    }
+
+    const result = await deleteDeckAction(deck.id);
+    if (result.success) {
+      setNotification({ message: 'Deck deleted successfully!', type: 'success' });
+      setTimeout(() => {
+        // Navigate to my-decks page after successful deletion
+        router.push('/decklist/my-decks');
+      }, 1000);
+    } else {
+      setNotification({ message: result.error || 'Failed to delete deck', type: 'error' });
+      setTimeout(() => setNotification(null), 3000);
+    }
+  }
 
   // ...existing code...
   return (
-    <div className="bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white min-h-screen transition-colors duration-200">
-      <div className="p-2 flex flex-col items-center sticky top-0 z-40 bg-white text-gray-900 border-b border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-800 dark:shadow-lg">
+    <div className="flex w-full h-screen overflow-hidden bg-gray-100 dark:bg-gray-900">
+      {/* Left panel: Card search */}
+      {showSearch && (
+        <div className={`flex-1 flex flex-col w-full ${showDeckBuilder ? 'md:w-1/2 xl:w-[61.8%]' : ''} overflow-hidden transition-all duration-300`}>
+        <div className="bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200 flex-1 flex flex-col overflow-hidden">
+          <div className="p-2 flex flex-col items-center sticky top-0 z-40 bg-white text-gray-900 border-b border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-800 dark:shadow-lg">
         <div className="relative w-full max-w-xl px-2 flex flex-col sm:flex-row items-center justify-center gap-0">
           <div className="w-full flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-center sm:gap-2 text-center">
             <div className="flex flex-col gap-2 w-full sm:w-auto">
@@ -1076,17 +1255,79 @@ export default function CardSearchClient() {
         {/* Card grid */}
         {visibleCards.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
-            {visibleCards.map((c) => (
-              <div key={c.dataLine} className="cursor-pointer" onClick={() => setModalCard(c)}>
-                <CardImage
-                  imgFile={c.imgFile}
-                  alt={c.name}
-                  className="rounded shadow hover:shadow-lg transition-shadow"
-                  sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 16vw"
-                />
-                <p className="text-sm mt-1 text-center truncate">{c.name}</p>
-              </div>
-            ))}
+            {visibleCards.map((c) => {
+              const quantityInDeck = getCardQuantity(c.name, c.set, false);
+              return (
+                <div 
+                  key={c.dataLine} 
+                  className="relative cursor-pointer group rounded overflow-hidden shadow hover:shadow-xl transition-all duration-200"
+                >
+                  {/* Card Image - Click to view modal */}
+                  <div 
+                    className="relative overflow-hidden rounded"
+                    onClick={() => setModalCard(c)}
+                  >
+                    <CardImage
+                      imgFile={c.imgFile}
+                      alt={c.name}
+                      className="rounded w-full"
+                      sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 16vw"
+                    />
+                    
+                    {/* Controls Overlay - Shows on Hover */}
+                    <div className="absolute inset-x-0 bottom-0 transition-opacity duration-200">
+                      {/* Using golden ratio: top section ~61.8%, bottom ~38.2% */}
+                      <div className="grid grid-rows-[1.618fr_1fr] grid-cols-2 gap-1.5 p-3 h-32">
+                        {/* Top Left: Decrement */}
+                        <div className="flex items-center justify-center">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeCard(c.name, c.set, activeDeckTab === "reserve");
+                            }}
+                            className="w-14 h-14 max-w-full max-h-full flex items-center justify-center rounded-lg bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-3xl border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
+                            aria-label="Remove card"
+                            title="Remove card from deck"
+                          >
+                            −
+                          </button>
+                        </div>
+                        
+                        {/* Top Right: Increment */}
+                        <div className="flex items-center justify-center">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addCard(c, activeDeckTab === "reserve");
+                            }}
+                            className="w-14 h-14 max-w-full max-h-full flex items-center justify-center rounded-lg bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-3xl border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
+                            aria-label="Add card"
+                            title="Add card to deck"
+                          >
+                            +
+                          </button>
+                        </div>
+                        
+                        {/* Bottom Left: Empty space */}
+                        <div className="flex items-center justify-center">
+                        </div>
+                        
+                        {/* Bottom Right: Quantity Display - Always Visible */}
+                        {quantityInDeck > 0 && (
+                          <div className="flex items-center justify-end pr-1">
+                            <div className="bg-black/75 backdrop-blur-sm text-white px-2.5 py-1 rounded-md font-bold text-sm shadow-lg">
+                              ×{quantityInDeck}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <p className="text-sm mt-1 text-center truncate">{c.name}</p>
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="flex items-center justify-center mt-16 mb-16">
@@ -1103,7 +1344,207 @@ export default function CardSearchClient() {
           modalCard={modalCard}
           setModalCard={setModalCard}
           visibleCards={visibleCards}
+          onAddCard={addCard}
+          onRemoveCard={removeCard}
+          getCardQuantity={getCardQuantity}
+          activeDeckTab={activeDeckTab}
         />
+      )}
+        </div>
+        </div>
+      )}
+      
+      {/* Central Divider with Toggle Buttons */}
+      {showSearch && showDeckBuilder && (
+        <div className="hidden md:flex relative w-1 bg-gradient-to-b from-transparent via-gray-300 to-transparent dark:via-gray-700 items-center justify-center">
+          {/* Toggle buttons container - centered vertically */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-3 z-10">
+            {/* Hide Search Button */}
+            <button
+              onClick={() => setShowSearch(false)}
+              className="group relative w-7 h-7 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 hover:border-blue-500 dark:hover:border-blue-400 flex items-center justify-center"
+              title="Hide search panel"
+            >
+              <svg className="w-3 h-3 text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M15 19l-7-7 7-7" />
+              </svg>
+              {/* Tooltip */}
+              <span className="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
+                Hide Search
+              </span>
+            </button>
+            
+            {/* Hide Deck Button */}
+            <button
+              onClick={() => setShowDeckBuilder(false)}
+              className="group relative w-7 h-7 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 hover:border-blue-500 dark:hover:border-blue-400 flex items-center justify-center"
+              title="Hide deck builder"
+            >
+              <svg className="w-3 h-3 text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M9 5l7 7-7 7" />
+              </svg>
+              {/* Tooltip */}
+              <span className="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
+                Hide Deck
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {/* Floating restore buttons (when panels are hidden) */}
+      {!showSearch && (
+        <button
+          onClick={() => setShowSearch(true)}
+          className="hidden md:flex fixed left-0 top-1/2 -translate-y-1/2 z-50 flex-col items-center gap-2 px-2 py-4 bg-gradient-to-r from-blue-600 to-blue-500 dark:from-blue-700 dark:to-blue-600 rounded-r-xl shadow-2xl hover:shadow-blue-500/50 dark:hover:shadow-blue-700/50 transition-all hover:pl-3 text-white font-medium group border-r-4 border-blue-400 dark:border-blue-500"
+          title="Show search panel"
+        >
+          <svg className="w-4 h-4 group-hover:scale-105 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <span className="text-xs font-semibold whitespace-nowrap [writing-mode:vertical-lr] rotate-180 tracking-wider">SEARCH</span>
+        </button>
+      )}
+      
+      {!showDeckBuilder && (
+        <button
+          onClick={() => setShowDeckBuilder(true)}
+          className="hidden md:flex fixed right-0 top-1/2 -translate-y-1/2 z-50 flex-col items-center gap-3 px-4 py-8 bg-gradient-to-l from-purple-600 to-purple-500 dark:from-purple-700 dark:to-purple-600 rounded-l-2xl shadow-2xl hover:shadow-purple-500/50 dark:hover:shadow-purple-700/50 transition-all hover:pr-6 text-white font-medium group border-l-4 border-purple-400 dark:border-purple-500"
+          title="Show deck builder"
+        >
+          <svg className="w-6 h-6 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+          <span className="text-xs font-semibold whitespace-nowrap [writing-mode:vertical-lr] rotate-180 tracking-wider">DECK</span>
+        </button>
+      )}
+      
+      {/* Right panel: Deck builder (hidden on mobile, toggleable on desktop) */}
+      {showDeckBuilder && (
+        <div className={`hidden md:flex w-full flex-col overflow-hidden transition-all duration-300 ${
+          showSearch ? 'md:w-1/2 xl:w-[38.2%]' : ''
+        }`}>
+          <DeckBuilderPanel
+            deck={deck}
+            syncStatus={syncStatus}
+            hasUnsavedChanges={hasUnsavedChanges}
+            isAuthenticated={!!user}
+            isExpanded={!showSearch}
+            onDeckNameChange={setDeckName}
+            onDeckFormatChange={setDeckFormat}
+            onSaveDeck={saveDeckToCloud}
+            onAddCard={(cardName, cardSet, isReserve) => {
+              // Find the card in the cards array
+              const card = cards.find(c => c.name === cardName && c.set === cardSet);
+              if (card) {
+                addCard(card, isReserve);
+              }
+            }}
+            onRemoveCard={(cardName, cardSet, isReserve) => {
+              removeCard(cardName, cardSet, isReserve);
+            }}
+            onExport={handleExportDeck}
+            onImport={() => setShowImportModal(true)}
+            onDelete={handleDeleteDeck}
+            onNewDeck={newDeck}
+            onLoadDeck={loadDeckFromCloud}
+            onActiveTabChange={setActiveDeckTab}
+            onViewCard={setModalCard}
+            onNotify={(message, type) => {
+              setNotification({ message, type });
+              setTimeout(() => setNotification(null), 3000);
+            }}
+          />
+        </div>
+      )}
+      
+      {/* Import modal */}
+      {showImportModal && (
+        <div 
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => {
+            setShowImportModal(false);
+            setImportText("");
+            setImportErrors([]);
+          }}
+        >
+          <div 
+            className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+              Import Deck
+            </h3>
+            <div className="text-sm text-gray-600 dark:text-gray-400 mb-4 space-y-2">
+              <p>
+                <strong>From Lackey CCG:</strong> Click the "Copy" button in your deck editor, then paste here.
+              </p>
+              <p>
+                <strong>Format:</strong> Each line should be: <code className="px-1 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">Quantity[TAB]Card Name</code>
+              </p>
+              <p className="text-xs">
+                Add "Reserve:" on its own line to separate reserve cards.
+              </p>
+            </div>
+            <textarea
+              id="import-deck-textarea"
+              className="w-full h-64 p-3 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white font-mono text-sm"
+              placeholder={`1\tSon of God "Manger" (Promo)\n1\tThe Second Coming (CoW AB)\n1\tAngel of the Lord (2017 Promo)\n\nReserve:\n1\tGibeonite Trickery (Roots)\n1\tNot Among You`}
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              autoFocus
+            />
+            {importErrors.length > 0 && (
+              <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
+                <p className="text-sm font-semibold text-red-800 dark:text-red-300 mb-2">
+                  Import Warnings:
+                </p>
+                <ul className="text-xs text-red-700 dark:text-red-400 list-disc list-inside space-y-1">
+                  {importErrors.map((err, i) => (
+                    <li key={i}>{err}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div className="mt-6 flex gap-3 justify-end">
+              <button
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                onClick={() => {
+                  setShowImportModal(false);
+                  setImportText("");
+                  setImportErrors([]);
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => handleImportDeck(importText)}
+                disabled={!importText.trim()}
+              >
+                Import
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* General notification */}
+      {notification && (
+        <div className={`fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in ${
+          notification.type === 'success' ? 'bg-green-600 text-white' :
+          notification.type === 'error' ? 'bg-red-600 text-white' :
+          'bg-blue-600 text-white'
+        }`}>
+          {notification.message}
+        </div>
+      )}
+      
+      {/* Export notification */}
+      {exportNotification && (
+        <div className="fixed bottom-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in">
+          Deck copied to clipboard!
+        </div>
       )}
     </div>
   );

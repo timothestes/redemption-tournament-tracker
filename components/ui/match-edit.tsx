@@ -27,6 +27,20 @@ export default function MatchEditModal({
   const { theme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   
+  // Handle ESC key to close modal
+  useEffect(() => {
+    if (!open) return;
+    
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [open]);
+  
   useEffect(() => {
     setMounted(true);
   }, []);

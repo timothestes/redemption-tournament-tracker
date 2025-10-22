@@ -12,7 +12,7 @@ export async function GET(
     const imagePath = resolvedParams.path.join('/');
     const imageUrl = `${GITHUB_BASE_URL}${imagePath}`;
     
-    console.log('Fetching image:', imageUrl); // Debug log
+    // console.log('Fetching image:', imageUrl); // Debug log
     
     // Fetch the image from GitHub
     const response = await fetch(imageUrl, {

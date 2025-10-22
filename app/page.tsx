@@ -19,7 +19,7 @@ export default async function Index() {
                 href="/decklist/card-search"
                 className="text-lg hover:underline text-blue-600 dark:text-blue-400 font-medium transition-all duration-200 hover:text-blue-800 dark:hover:text-blue-300"
               >
-                Search for Redemption cards
+                Build a Redemption Deck
               </Link>
               <Link 
                 href="/decklist/generate"

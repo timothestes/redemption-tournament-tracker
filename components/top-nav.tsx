@@ -56,8 +56,9 @@ const TopNav: React.FC = () => {
 
   const navLinks = [
     { href: "/tracker/tournaments", label: "Tournaments", icon: FaTrophy },
+    { href: "/decklist/my-decks", label: "My Decks", icon: TbCardsFilled },
+    { href: "/decklist/card-search", label: "Deck Builder", icon: TbSearch },
     { href: "/decklist/generate", label: "Deck Check PDF", icon: TbCardsFilled },
-    { href: "/decklist/card-search", label: "Card Search", icon: TbSearch },
   ];
 
   const tournamentResources = [
