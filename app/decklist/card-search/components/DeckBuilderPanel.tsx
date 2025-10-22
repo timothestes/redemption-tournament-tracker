@@ -46,6 +46,8 @@ interface DeckBuilderPanelProps {
   onActiveTabChange?: (tab: TabType) => void;
   /** Callback when user wants to view card details */
   onViewCard?: (card: Card) => void;
+  /** Callback to show notifications */
+  onNotify?: (message: string, type: 'success' | 'error' | 'info') => void;
 }
 
 /**
@@ -69,6 +71,7 @@ export default function DeckBuilderPanel({
   onNewDeck,
   onActiveTabChange,
   onViewCard,
+  onNotify,
 }: DeckBuilderPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>("main");
   const [isEditingName, setIsEditingName] = useState(false);
@@ -84,6 +87,7 @@ export default function DeckBuilderPanel({
   // View options
   const [viewLayout, setViewLayout] = useState<'grid' | 'list'>('grid');
   const [groupBy, setGroupBy] = useState<'type' | 'alignment'>('type');
+  const [disableHoverPreview, setDisableHoverPreview] = useState(false);
   
   // Initialize deck type based on deck.format
   const [deckType, setDeckType] = useState<'T1' | 'T2'>(() => {
@@ -421,16 +425,18 @@ export default function DeckBuilderPanel({
           {/* Action Buttons */}
           <div className="flex items-center gap-2 flex-shrink-0">
             {/* Save Button */}
-            {onSaveDeck && (
+            {onSaveDeck && isAuthenticated && (
               <button
                 onClick={async () => {
                   if (!isAuthenticated) {
-                    alert('Please sign in to save your deck to the cloud.');
+                    onNotify?.('Please sign in to save your deck to the cloud.', 'error');
                     return;
                   }
                   const result = await onSaveDeck();
                   if (!result.success && result.error) {
-                    alert(result.error);
+                    onNotify?.(result.error, 'error');
+                  } else if (result.success) {
+                    onNotify?.('Deck saved successfully!', 'success');
                   }
                 }}
                 disabled={syncStatus?.isSaving || !isAuthenticated}
@@ -466,7 +472,7 @@ export default function DeckBuilderPanel({
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                     </svg>
-                    Save Changes
+                    Save (Ctrl+S)
                   </>
                 ) : (
                   <>
@@ -571,19 +577,23 @@ export default function DeckBuilderPanel({
                   Load Deck
                 </button>
               )}
-              <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
-              <button
-                onClick={() => {
-                  setShowDeleteDeckModal(true);
-                  setShowMenu(false);
-                }}
-                className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-red-600 dark:text-red-400 text-sm"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                Delete Deck
-              </button>
+              {isAuthenticated && (
+                <>
+                  <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+                  <button
+                    onClick={() => {
+                      setShowDeleteDeckModal(true);
+                      setShowMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-red-600 dark:text-red-400 text-sm"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Delete Deck
+                  </button>
+                </>
+              )}
             </div>
           )}
           </div>
@@ -658,7 +668,7 @@ export default function DeckBuilderPanel({
                   ? "text-green-800 dark:text-green-200"
                   : "text-red-800 dark:text-red-200"
               }`}>
-                {validation.isValid ? "✓ Valid Deck" : `✗ ${validation.issues.filter(i => i.type === "error").length} Error${validation.issues.filter(i => i.type === "error").length !== 1 ? "s" : ""}`}
+                {validation.isValid ? "✓ Passed Basic Checks" : `✗ ${validation.issues.filter(i => i.type === "error").length} Error${validation.issues.filter(i => i.type === "error").length !== 1 ? "s" : ""}`}
               </div>
               
               {validation.issues.length > 0 && (
@@ -802,6 +812,23 @@ export default function DeckBuilderPanel({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4" data-deck-grid>
+        {/* Enhanced View Coming Soon - Show when expanded */}
+        {isExpanded && (
+          <div className="mb-4 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+              </svg>
+              <div>
+                <p className="text-sm text-purple-800 dark:text-purple-200">
+                  <span className="font-semibold">Enhanced full-deck view coming soon!</span> We're building an improved visualization with better card previews, deck analysis, and export options.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+        
         {activeTab === "main" ? (
           <div className="space-y-4">
             {mainDeckCards.length > 0 ? (
@@ -960,6 +987,27 @@ export default function DeckBuilderPanel({
         ) : (
           // Info Tab
           <div className="space-y-4 text-sm">
+            {/* Disclaimer */}
+            <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+              <div className="flex items-start gap-2">
+                <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+                <p className="text-xs text-blue-800 dark:text-blue-200">
+                  Not all deckbuilding checks are implemented, just the basic ones. Please refer to the{' '}
+                  <a 
+                    href="https://landofredemption.com/wp-content/uploads/2024/10/Deck_Building_Rules_1.2.pdf"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold underline hover:text-blue-600 dark:hover:text-blue-300 transition-colors"
+                  >
+                    official deck building rules
+                  </a>
+                  {' '}to ensure the legality of your deck.
+                </p>
+              </div>
+            </div>
+            
             {/* Validation Status */}
             <div>
               <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
@@ -974,7 +1022,7 @@ export default function DeckBuilderPanel({
               }`}>
                 <div className="font-medium mb-2">
                   {validation.isValid && validation.stats.totalCards > 0 ? (
-                    <span className="text-green-700 dark:text-green-400">✓ Valid Deck</span>
+                    <span className="text-green-700 dark:text-green-400">✓ Passed Basic Checks</span>
                   ) : validation.stats.totalCards === 0 ? (
                     <span className="text-gray-600 dark:text-gray-400">Empty Deck</span>
                   ) : (
@@ -1005,6 +1053,53 @@ export default function DeckBuilderPanel({
                     ))}
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Alignment Breakdown */}
+            <div>
+              <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                Alignment Breakdown
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                {(() => {
+                  // Calculate alignment counts
+                  const alignmentCounts = deck.cards.reduce((acc, deckCard) => {
+                    const alignment = deckCard.card.alignment || "Neutral";
+                    if (!acc[alignment]) {
+                      acc[alignment] = 0;
+                    }
+                    acc[alignment] += deckCard.quantity;
+                    return acc;
+                  }, {} as Record<string, number>);
+                  
+                  // Define order and styling for alignments
+                  const alignmentConfig = [
+                    { name: 'Good', color: 'bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-800 dark:text-blue-200' },
+                    { name: 'Evil', color: 'bg-red-100 dark:bg-red-900/30 border-red-300 dark:border-red-700 text-red-800 dark:text-red-200' },
+                    { name: 'Neutral', color: 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200' },
+                    { name: 'Dual', color: 'bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700 text-purple-800 dark:text-purple-200' },
+                  ];
+                  
+                  return alignmentConfig.map(({ name, color }) => {
+                    const count = alignmentCounts[name] || 0;
+                    if (count === 0 && name === 'Dual') return null; // Hide Dual if 0
+                    
+                    return (
+                      <div
+                        key={name}
+                        className={`p-3 rounded-lg border-2 ${color}`}
+                      >
+                        <div className="text-xs font-semibold uppercase tracking-wide mb-1">
+                          {name}
+                        </div>
+                        <div className="text-2xl font-bold">
+                          {count}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </div>
 

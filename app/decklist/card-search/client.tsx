@@ -88,6 +88,9 @@ export default function CardSearchClient() {
   const [copyLinkNotification, setCopyLinkNotification] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
 
+  // Notification state
+  const [notification, setNotification] = useState<{message: string, type: 'success' | 'error' | 'info'} | null>(null);
+
   // Import/export state
   const [importText, setImportText] = useState("");
   const [importErrors, setImportErrors] = useState<string[]>([]);
@@ -845,16 +848,21 @@ export default function CardSearchClient() {
     }
 
     if (!user) {
-      alert('Please sign in to delete decks.');
+      setNotification({ message: 'Please sign in to delete decks.', type: 'error' });
+      setTimeout(() => setNotification(null), 3000);
       return;
     }
 
     const result = await deleteDeckAction(deck.id);
     if (result.success) {
-      // Navigate to my-decks page after successful deletion
-      router.push('/decklist/my-decks');
+      setNotification({ message: 'Deck deleted successfully!', type: 'success' });
+      setTimeout(() => {
+        // Navigate to my-decks page after successful deletion
+        router.push('/decklist/my-decks');
+      }, 1000);
     } else {
-      alert(result.error || 'Failed to delete deck');
+      setNotification({ message: result.error || 'Failed to delete deck', type: 'error' });
+      setTimeout(() => setNotification(null), 3000);
     }
   }
 
@@ -1413,12 +1421,15 @@ export default function CardSearchClient() {
       
       {/* Right panel: Deck builder (hidden on mobile, toggleable on desktop) */}
       {showDeckBuilder && (
-        <div className="hidden md:flex w-full md:w-1/2 xl:w-[38.2%] flex-col overflow-hidden transition-all duration-300">
+        <div className={`hidden md:flex w-full flex-col overflow-hidden transition-all duration-300 ${
+          showSearch ? 'md:w-1/2 xl:w-[38.2%]' : ''
+        }`}>
           <DeckBuilderPanel
             deck={deck}
             syncStatus={syncStatus}
             hasUnsavedChanges={hasUnsavedChanges}
             isAuthenticated={!!user}
+            isExpanded={!showSearch}
             onDeckNameChange={setDeckName}
             onDeckFormatChange={setDeckFormat}
             onSaveDeck={saveDeckToCloud}
@@ -1439,6 +1450,10 @@ export default function CardSearchClient() {
             onLoadDeck={loadDeckFromCloud}
             onActiveTabChange={setActiveDeckTab}
             onViewCard={setModalCard}
+            onNotify={(message, type) => {
+              setNotification({ message, type });
+              setTimeout(() => setNotification(null), 3000);
+            }}
           />
         </div>
       )}
@@ -1511,6 +1526,17 @@ export default function CardSearchClient() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      
+      {/* General notification */}
+      {notification && (
+        <div className={`fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in ${
+          notification.type === 'success' ? 'bg-green-600 text-white' :
+          notification.type === 'error' ? 'bg-red-600 text-white' :
+          'bg-blue-600 text-white'
+        }`}>
+          {notification.message}
         </div>
       )}
       

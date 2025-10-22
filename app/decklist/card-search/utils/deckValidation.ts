@@ -304,7 +304,7 @@ export function validateDeck(deck: Deck): DeckValidation {
       issues.push({
         type: "error",
         category: "format",
-        message: `Type 2 Main Deck requires equal Good and Evil cards: ${mainGoodCards} Good vs ${mainEvilCards} Evil (${difference} more ${more} card${difference !== 1 ? "s" : ""})`,
+        message: `Main Deck: Need ${difference} more ${more} (${mainGoodCards} Good, ${mainEvilCards} Evil)`,
       });
     }
     
@@ -324,7 +324,7 @@ export function validateDeck(deck: Deck): DeckValidation {
       issues.push({
         type: "error",
         category: "format",
-        message: `Type 2 Reserve requires equal Good and Evil cards: ${reserveGoodCards} Good vs ${reserveEvilCards} Evil (${difference} more ${more} card${difference !== 1 ? "s" : ""})`,
+        message: `Reserve: Need ${difference} more ${more} (${reserveGoodCards} Good, ${reserveEvilCards} Evil)`,
       });
     }
   }
@@ -431,7 +431,7 @@ export function getValidationSummary(validation: DeckValidation): string {
   }
   
   if (validation.isValid) {
-    return "✓ Valid deck";
+    return "✓ Passed Basic Checks";
   }
   
   const errorCount = validation.issues.filter((i) => i.type === "error").length;
