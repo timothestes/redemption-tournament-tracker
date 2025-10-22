@@ -100,14 +100,10 @@ export default function DeckCardList({
     return cards.filter((dc) => dc.isReserve === filterReserve);
   }, [cards, filterReserve]);
 
-  // Sort cards alphabetically by name
-  const sortedCards = React.useMemo(() => {
-    return [...filteredCards].sort((a, b) => 
-      a.card.name.localeCompare(b.card.name)
-    );
-  }, [filteredCards]);
+  // Use filtered cards directly - parent component handles sorting
+  const displayCards = filteredCards;
 
-  if (sortedCards.length === 0) {
+  if (displayCards.length === 0) {
     return (
       <div className="flex items-center justify-center py-8 text-gray-400 dark:text-gray-500 text-sm">
         No cards yet
@@ -119,7 +115,7 @@ export default function DeckCardList({
   if (viewLayout === 'grid') {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
-        {sortedCards.map((deckCard) => {
+        {displayCards.map((deckCard) => {
           const { card, quantity, isReserve } = deckCard;
           const cardKey = `${card.name}-${card.set}-${isReserve}`;
           
@@ -127,6 +123,14 @@ export default function DeckCardList({
             <div
               key={cardKey}
               className="relative group rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-200"
+              onMouseEnter={(e) => {
+                const pos = calculatePreviewPosition(e.currentTarget);
+                setPreviewCard({
+                  card,
+                  ...pos
+                });
+              }}
+              onMouseLeave={() => setPreviewCard(null)}
             >
               {/* Backdrop overlay for this card only */}
               {openMenuCard === cardKey && (
@@ -275,6 +279,25 @@ export default function DeckCardList({
             </div>
           );
         })}
+        
+        {/* Card Preview on Hover */}
+        {previewCard && (
+          <div
+            className="fixed z-50 pointer-events-none"
+            style={{
+              left: `${previewCard.x}px`,
+              top: `${previewCard.y}px`,
+              maxWidth: '300px',
+            }}
+          >
+            <img
+              src={getImageUrl(previewCard.card.imgFile)}
+              alt={previewCard.card.name}
+              className="rounded-lg shadow-2xl border-2 border-gray-300 dark:border-gray-600"
+              style={{ maxHeight: '400px', width: 'auto' }}
+            />
+          </div>
+        )}
       </div>
     );
   }
@@ -282,7 +305,7 @@ export default function DeckCardList({
   // List View (default)
   return (
     <div className="space-y-1">
-      {sortedCards.map((deckCard) => {
+      {displayCards.map((deckCard) => {
         const { card, quantity, isReserve } = deckCard;
         const cardKey = `${card.name}-${card.set}-${isReserve}`;
         

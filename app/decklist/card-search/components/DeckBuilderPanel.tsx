@@ -318,7 +318,7 @@ export default function DeckBuilderPanel({
   return (
     <div className="w-full h-full flex flex-col bg-gray-50 dark:bg-gray-900 overflow-hidden">
       {/* Header */}
-      <div className="flex-shrink-0 p-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex-shrink-0 p-4 border-b border-gray-200 dark:border-gray-700 overflow-visible">
         {/* Deck Name */}
         {isEditingName ? (
           <input
