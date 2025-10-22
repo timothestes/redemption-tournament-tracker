@@ -2,8 +2,9 @@ import React, { useState, useEffect } from "react";
 import { Deck } from "../types/deck";
 import { SyncStatus } from "../hooks/useDeckState";
 import DeckCardList from "./DeckCardList";
+import { Switch } from "@headlessui/react";
 import { Card } from "../utils";
-import { validateDeck, getValidationSummary } from "../utils/deckValidation";
+import { validateDeck } from "../utils/deckValidation";
 import GeneratePDFModal from "./GeneratePDFModal";
 import GenerateDeckImageModal from "./GenerateDeckImageModal";
 import ClearDeckModal from "./ClearDeckModal";
@@ -601,6 +602,7 @@ export default function DeckBuilderPanel({
         </div>
       </div>
 
+      {/* ...existing code... */}
       {/* Tabs */}
       <div className="flex-shrink-0 flex items-center border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
         <button
@@ -760,6 +762,22 @@ export default function DeckBuilderPanel({
               </div>
               
               <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
+
+              {/* Card Hover Preview Toggle */}
+              <div className="px-3 py-2 flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Card Hover Preview</span>
+                <Switch
+                  checked={!disableHoverPreview}
+                  onChange={() => setDisableHoverPreview((v) => !v)}
+                  className={`${!disableHoverPreview ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-700'} relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${!disableHoverPreview ? 'translate-x-5' : 'translate-x-1'}`}
+                  />
+                </Switch>
+              </div>
+              {/* Divider for new section */}
+              <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
               
               {/* Group By Section */}
               <div className="px-3 py-2">
@@ -882,6 +900,7 @@ export default function DeckBuilderPanel({
                     onMoveCard={handleMoveCard}
                     showTypeIcons={false}
                     viewLayout={viewLayout}
+                    disableHoverPreview={disableHoverPreview}
                   />
                 </div>
               );

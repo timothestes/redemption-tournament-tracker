@@ -22,6 +22,8 @@ interface DeckCardListProps {
   showTypeIcons?: boolean;
   /** Optional: Layout view mode (default: 'list') */
   viewLayout?: 'grid' | 'list';
+  /** Optional: Disable card hover preview */
+  disableHoverPreview?: boolean;
 }
 
 /**
@@ -37,6 +39,7 @@ export default function DeckCardList({
   onMoveCard,
   showTypeIcons = true,
   viewLayout = 'list',
+  disableHoverPreview = false,
 }: DeckCardListProps) {
   const [openMenuCard, setOpenMenuCard] = React.useState<string | null>(null);
   const [previewCard, setPreviewCard] = React.useState<{ card: Card; x: number; y: number } | null>(null);
@@ -123,14 +126,14 @@ export default function DeckCardList({
             <div
               key={cardKey}
               className="relative group rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-200"
-              onMouseEnter={(e) => {
+              onMouseEnter={disableHoverPreview ? undefined : (e) => {
                 const pos = calculatePreviewPosition(e.currentTarget);
                 setPreviewCard({
                   card,
                   ...pos
                 });
               }}
-              onMouseLeave={() => setPreviewCard(null)}
+              onMouseLeave={disableHoverPreview ? undefined : () => setPreviewCard(null)}
             >
               {/* Backdrop overlay for this card only */}
               {openMenuCard === cardKey && (
@@ -281,7 +284,7 @@ export default function DeckCardList({
         })}
         
         {/* Card Preview on Hover */}
-        {previewCard && (
+  {(!disableHoverPreview && previewCard) && (
           <div
             className="fixed z-50 pointer-events-none"
             style={{
@@ -391,14 +394,14 @@ export default function DeckCardList({
                 {isNeutralDominant ? (
                   <div 
                     className="flex gap-0.5 flex-shrink-0 cursor-pointer"
-                    onMouseEnter={(e) => {
+                    onMouseEnter={disableHoverPreview ? undefined : (e) => {
                       const pos = calculatePreviewPosition(e.currentTarget);
                       setPreviewCard({
                         card,
                         ...pos
                       });
                     }}
-                    onMouseLeave={() => setPreviewCard(null)}
+                    onMouseLeave={disableHoverPreview ? undefined : () => setPreviewCard(null)}
                   >
                     <img 
                       src="/filter-icons/Good Dominant.png" 
@@ -705,7 +708,7 @@ export default function DeckCardList({
       })}
       
       {/* Card Preview on Hover */}
-      {previewCard && (
+  {(!disableHoverPreview && previewCard) && (
         <div
           className="fixed z-50 pointer-events-none"
           style={{
