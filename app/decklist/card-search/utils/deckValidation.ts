@@ -288,43 +288,43 @@ export function validateDeck(deck: Deck): DeckValidation {
   // Validation: Type 2 requires equal Good and Evil cards (in both main deck and reserve)
   const isType2 = deck.format?.toLowerCase().includes("type 2") || deck.format?.toLowerCase().includes("multi");
   if (isType2) {
-    // Check Main Deck
+    // Check Main Deck - INCLUDE Lost Souls and Dominants in alignment check
     const mainGoodCards = deck.cards
-      .filter((dc) => !dc.isReserve && !isLostSoul(dc.card) && !isDominant(dc.card) && dc.card.alignment?.toLowerCase() === "good")
+      .filter((dc) => !dc.isReserve && dc.card.alignment?.toLowerCase() === "good")
       .reduce((sum, dc) => sum + dc.quantity, 0);
     
     const mainEvilCards = deck.cards
-      .filter((dc) => !dc.isReserve && !isLostSoul(dc.card) && !isDominant(dc.card) && dc.card.alignment?.toLowerCase() === "evil")
+      .filter((dc) => !dc.isReserve && dc.card.alignment?.toLowerCase() === "evil")
       .reduce((sum, dc) => sum + dc.quantity, 0);
     
     if (mainGoodCards !== mainEvilCards && (mainGoodCards > 0 || mainEvilCards > 0)) {
       const difference = Math.abs(mainGoodCards - mainEvilCards);
-      const more = mainGoodCards > mainEvilCards ? "Good" : "Evil";
+      const needMore = mainGoodCards < mainEvilCards ? "Good" : "Evil";
       
       issues.push({
         type: "error",
         category: "format",
-        message: `Main Deck: Need ${difference} more ${more} (${mainGoodCards} Good, ${mainEvilCards} Evil)`,
+        message: `Main Deck: Need ${difference} more ${needMore} (${mainGoodCards} Good, ${mainEvilCards} Evil)`,
       });
     }
     
-    // Check Reserve
+    // Check Reserve - INCLUDE Lost Souls and Dominants in alignment check
     const reserveGoodCards = deck.cards
-      .filter((dc) => dc.isReserve && !isLostSoul(dc.card) && !isDominant(dc.card) && dc.card.alignment?.toLowerCase() === "good")
+      .filter((dc) => dc.isReserve && dc.card.alignment?.toLowerCase() === "good")
       .reduce((sum, dc) => sum + dc.quantity, 0);
     
     const reserveEvilCards = deck.cards
-      .filter((dc) => dc.isReserve && !isLostSoul(dc.card) && !isDominant(dc.card) && dc.card.alignment?.toLowerCase() === "evil")
+      .filter((dc) => dc.isReserve && dc.card.alignment?.toLowerCase() === "evil")
       .reduce((sum, dc) => sum + dc.quantity, 0);
     
     if (reserveGoodCards !== reserveEvilCards && (reserveGoodCards > 0 || reserveEvilCards > 0)) {
       const difference = Math.abs(reserveGoodCards - reserveEvilCards);
-      const more = reserveGoodCards > reserveEvilCards ? "Good" : "Evil";
+      const needMore = reserveGoodCards < reserveEvilCards ? "Good" : "Evil";
       
       issues.push({
         type: "error",
         category: "format",
-        message: `Reserve: Need ${difference} more ${more} (${reserveGoodCards} Good, ${reserveEvilCards} Evil)`,
+        message: `Reserve: Need ${difference} more ${needMore} (${reserveGoodCards} Good, ${reserveEvilCards} Evil)`,
       });
     }
   }
