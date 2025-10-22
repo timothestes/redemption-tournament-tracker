@@ -2,6 +2,8 @@
 
 import { hasEnvVars } from "../utils/supabase/check-env-vars";
 import { EnvVarWarning } from "./env-var-warning";
+import Link from "next/link";
+import { Button } from "./ui/button";
 
 export default function Header() {
   return (
@@ -13,7 +15,15 @@ export default function Header() {
             <img src="/lor.png" className="w-48 hidden dark:block" alt="Land of Redemption Logo" />
           </div>
         </div>
-        {!hasEnvVars && <EnvVarWarning />}
+        <div className="flex items-center gap-3">
+          {!hasEnvVars && <EnvVarWarning />}
+          <Button asChild size="sm" variant="outline">
+            <Link href="/sign-in">Sign in</Link>
+          </Button>
+          <Button asChild size="sm" variant="default">
+            <Link href="/sign-up">Sign up</Link>
+          </Button>
+        </div>
       </div>
     </nav>
   );

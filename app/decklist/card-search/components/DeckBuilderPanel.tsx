@@ -18,6 +18,8 @@ interface DeckBuilderPanelProps {
   syncStatus?: SyncStatus;
   /** Whether there are unsaved changes */
   hasUnsavedChanges?: boolean;
+  /** Whether the user is authenticated */
+  isAuthenticated?: boolean;
   /** Callback when deck name changes */
   onDeckNameChange: (name: string) => void;
   /** Callback when deck format changes */
@@ -32,8 +34,8 @@ interface DeckBuilderPanelProps {
   onExport: () => void;
   /** Callback to import deck - parent handles UI */
   onImport: () => void;
-  /** Callback to clear deck */
-  onClear: () => void;
+  /** Callback to delete deck */
+  onDelete: () => void;
   /** Callback to load a deck from cloud by ID */
   onLoadDeck?: (deckId: string) => void;
   /** Callback to create a new blank deck */
@@ -51,6 +53,7 @@ export default function DeckBuilderPanel({
   deck,
   syncStatus,
   hasUnsavedChanges = false,
+  isAuthenticated = false,
   onDeckNameChange,
   onDeckFormatChange,
   onSaveDeck,
@@ -58,7 +61,7 @@ export default function DeckBuilderPanel({
   onRemoveCard,
   onExport,
   onImport,
-  onClear,
+  onDelete,
   onLoadDeck,
   onNewDeck,
   onActiveTabChange,
@@ -70,7 +73,7 @@ export default function DeckBuilderPanel({
   const [showMenu, setShowMenu] = useState(false);
   const [showGeneratePDFModal, setShowGeneratePDFModal] = useState(false);
   const [showGenerateImageModal, setShowGenerateImageModal] = useState(false);
-  const [showClearDeckModal, setShowClearDeckModal] = useState(false);
+  const [showDeleteDeckModal, setShowDeleteDeckModal] = useState(false);
   const [showLoadDeckModal, setShowLoadDeckModal] = useState(false);
   const [showValidationTooltip, setShowValidationTooltip] = useState(false);
   const [showViewDropdown, setShowViewDropdown] = useState(false);
@@ -395,81 +398,89 @@ export default function DeckBuilderPanel({
             </div>
           </div>
 
-          {/* Save Button */}
-          {onSaveDeck && (
-            <button
-              onClick={async () => {
-                const result = await onSaveDeck();
-                if (!result.success && result.error) {
-                  alert(result.error);
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Save Button */}
+            {onSaveDeck && (
+              <button
+                onClick={async () => {
+                  if (!isAuthenticated) {
+                    alert('Please sign in to save your deck to the cloud.');
+                    return;
+                  }
+                  const result = await onSaveDeck();
+                  if (!result.success && result.error) {
+                    alert(result.error);
+                  }
+                }}
+                disabled={syncStatus?.isSaving || !isAuthenticated}
+                className={`px-4 py-1.5 text-sm font-medium rounded transition-all flex items-center gap-2 min-w-[140px] justify-center ${
+                  syncStatus?.isSaving || !isAuthenticated
+                    ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-500 cursor-not-allowed'
+                    : hasUnsavedChanges
+                    ? 'bg-green-600 hover:bg-green-700 text-white shadow-sm'
+                    : 'bg-gray-500 hover:bg-gray-600 text-white'
+                }`}
+                title={
+                  !isAuthenticated
+                    ? 'Only signed in users may save decks'
+                    : syncStatus?.isSaving
+                    ? 'Saving...'
+                    : hasUnsavedChanges
+                    ? 'You have unsaved changes - Click to save to cloud (Ctrl+S / Cmd+S)'
+                    : syncStatus?.lastSavedAt
+                    ? `All changes saved - Last saved ${new Date(syncStatus.lastSavedAt).toLocaleTimeString()} (Ctrl+S / Cmd+S)`
+                    : 'No changes to save (Ctrl+S / Cmd+S)'
                 }
-              }}
-              disabled={syncStatus?.isSaving}
-              className={`px-4 py-1.5 text-sm font-medium rounded transition-all flex items-center gap-2 ${
-                syncStatus?.isSaving
-                  ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-500 cursor-not-allowed'
-                  : hasUnsavedChanges
-                  ? 'bg-green-600 hover:bg-green-700 text-white shadow-sm'
-                  : 'bg-gray-500 hover:bg-gray-600 text-white'
-              }`}
-              title={
-                syncStatus?.isSaving
-                  ? 'Saving...'
-                  : hasUnsavedChanges
-                  ? 'You have unsaved changes - Click to save to cloud'
-                  : syncStatus?.lastSavedAt
-                  ? `All changes saved - Last saved ${new Date(syncStatus.lastSavedAt).toLocaleTimeString()}`
-                  : 'No changes to save'
-              }
-            >
-              {syncStatus?.isSaving ? (
-                <>
-                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Saving...
-                </>
-              ) : hasUnsavedChanges ? (
-                <>
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                  Save Changes
-                </>
-              ) : (
-                <>
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Saved
-                </>
-              )}
-            </button>
-          )}
+              >
+                {syncStatus?.isSaving ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Saving...
+                  </>
+                ) : hasUnsavedChanges ? (
+                  <>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    Save Changes
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Saved
+                  </>
+                )}
+              </button>
+            )}
 
-          {/* New Deck Button */}
-          {onNewDeck && (
-            <button
-              onClick={() => onNewDeck(undefined, deck.folderId)}
-              className="px-3 py-1.5 text-sm font-medium rounded border border-blue-500 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 transition-colors flex items-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              New Deck
-            </button>
-          )}
+            {/* New Deck Button */}
+            {onNewDeck && (
+              <button
+                onClick={() => onNewDeck(undefined, deck.folderId)}
+                className="px-3 py-1.5 text-sm font-medium rounded border border-blue-500 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 transition-colors flex items-center gap-2 flex-shrink-0"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                New Deck
+              </button>
+            )}
 
-          {/* Menu Dropdown */}
-          <div className="relative">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowMenu(!showMenu);
-              }}
-              className="px-3 py-1.5 text-sm font-medium rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
-            >
+            {/* Menu Dropdown */}
+            <div className="relative">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMenu(!showMenu);
+                }}
+                className="px-3 py-1.5 text-sm font-medium rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
+              >
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
               </svg>
@@ -482,11 +493,12 @@ export default function DeckBuilderPanel({
                   setShowMenu(false);
                 }}
                 className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
+                title="Export deck to clipboard (Ctrl+E / Cmd+E)"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                 </svg>
-                Export
+                Export (Ctrl+E)
               </button>
               <button
                 onClick={() => {
@@ -494,11 +506,12 @@ export default function DeckBuilderPanel({
                   setShowMenu(false);
                 }}
                 className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
+                title="Import deck from clipboard (Ctrl+I / Cmd+I)"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
-                Import
+                Import (Ctrl+ I)
               </button>
               <button
                 onClick={() => {
@@ -524,7 +537,7 @@ export default function DeckBuilderPanel({
                 </svg>
                 Generate Image
               </button>
-              {onLoadDeck && (
+              {onLoadDeck && isAuthenticated && (
                 <button
                   onClick={() => {
                     setShowLoadDeckModal(true);
@@ -541,7 +554,7 @@ export default function DeckBuilderPanel({
               <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
               <button
                 onClick={() => {
-                  setShowClearDeckModal(true);
+                  setShowDeleteDeckModal(true);
                   setShowMenu(false);
                 }}
                 className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-red-600 dark:text-red-400 text-sm"
@@ -549,10 +562,11 @@ export default function DeckBuilderPanel({
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
-                Clear Deck
+                Delete Deck
               </button>
             </div>
           )}
+          </div>
           </div>
         </div>
       </div>
@@ -1088,12 +1102,12 @@ export default function DeckBuilderPanel({
         />
       )}
 
-      {/* Clear Deck Modal */}
-      {showClearDeckModal && (
+      {/* Delete Deck Modal */}
+      {showDeleteDeckModal && (
         <ClearDeckModal
           deckName={deck.name}
-          onConfirm={onClear}
-          onClose={() => setShowClearDeckModal(false)}
+          onConfirm={onDelete}
+          onClose={() => setShowDeleteDeckModal(false)}
         />
       )}
 

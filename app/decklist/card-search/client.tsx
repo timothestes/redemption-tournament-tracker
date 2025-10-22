@@ -15,6 +15,9 @@ import {
 } from "./utils";
 import { useDeckState } from "./hooks/useDeckState";
 import { parseDeckText, generateDeckText, downloadDeckAsFile, copyDeckToClipboard } from "./utils/deckImportExport";
+import { createClient } from "../../../utils/supabase/client";
+import type { User } from "@supabase/supabase-js";
+import { deleteDeckAction } from "../actions";
 
 export default function CardSearchClient() {
   const router = useRouter();
@@ -91,11 +94,16 @@ export default function CardSearchClient() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [exportNotification, setExportNotification] = useState(false);
 
-  // Deck builder visibility state
+  // Panel visibility state
   const [showDeckBuilder, setShowDeckBuilder] = useState(true);
+  const [showSearch, setShowSearch] = useState(true);
 
   // Track active tab in deck builder
   const [activeDeckTab, setActiveDeckTab] = useState<TabType>("main");
+
+  // User authentication state
+  const [user, setUser] = useState<User | null>(null);
+  const supabase = createClient();
 
   // Deck builder state
   const {
@@ -181,6 +189,22 @@ export default function CardSearchClient() {
     const url = params.toString() ? `?${params.toString()}` : '';
     router.replace(`/decklist/card-search${url}`, { scroll: false });
   }, [router]);
+
+  // Check user authentication on mount
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      setUser(currentUser);
+    };
+
+    getUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Load state from URL on mount (only once)
   useEffect(() => {
@@ -288,6 +312,39 @@ export default function CardSearchClient() {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasUnsavedChanges]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check for Ctrl (Windows/Linux) or Cmd (Mac)
+      const modKey = e.ctrlKey || e.metaKey;
+      
+      if (!modKey) return;
+
+      // Ctrl+S / Cmd+S to save
+      if (e.key === 's') {
+        e.preventDefault();
+        if (user && !syncStatus?.isSaving) {
+          saveDeckToCloud();
+        }
+      }
+      
+      // Ctrl+E / Cmd+E to export
+      else if (e.key === 'e') {
+        e.preventDefault();
+        handleExportDeck();
+      }
+      
+      // Ctrl+I / Cmd+I to import
+      else if (e.key === 'i') {
+        e.preventDefault();
+        setShowImportModal(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [user, syncStatus?.isSaving, saveDeckToCloud, handleExportDeck]);
 
   // sanitize imgFile to avoid duplicate extensions - now imported from utils
 
@@ -768,9 +825,36 @@ export default function CardSearchClient() {
     }
     
     if (result.deck) {
-      loadDeck(result.deck);
+      // Preserve the existing deck name when importing
+      const importedDeck = {
+        ...result.deck,
+        name: deck.name || result.deck.name,
+      };
+      loadDeck(importedDeck);
       setShowImportModal(false);
       setImportText("");
+    }
+  }
+
+  // Delete deck
+  async function handleDeleteDeck() {
+    if (!deck.id) {
+      // If deck hasn't been saved yet, just clear it
+      clearDeck();
+      return;
+    }
+
+    if (!user) {
+      alert('Please sign in to delete decks.');
+      return;
+    }
+
+    const result = await deleteDeckAction(deck.id);
+    if (result.success) {
+      // Navigate to my-decks page after successful deletion
+      router.push('/decklist/my-decks');
+    } else {
+      alert(result.error || 'Failed to delete deck');
     }
   }
 
@@ -778,7 +862,8 @@ export default function CardSearchClient() {
   return (
     <div className="flex w-full h-screen overflow-hidden bg-gray-100 dark:bg-gray-900">
       {/* Left panel: Card search */}
-      <div className={`flex-1 flex flex-col w-full ${showDeckBuilder ? 'md:w-1/2 xl:w-[61.8%] md:border-r md:border-gray-200 md:dark:border-gray-800' : ''} overflow-hidden transition-all duration-300`}>
+      {showSearch && (
+        <div className={`flex-1 flex flex-col w-full ${showDeckBuilder ? 'md:w-1/2 xl:w-[61.8%]' : ''} overflow-hidden transition-all duration-300`}>
         <div className="bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200 flex-1 flex flex-col overflow-hidden">
           <div className="p-2 flex flex-col items-center sticky top-0 z-40 bg-white text-gray-900 border-b border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-800 dark:shadow-lg">
         <div className="relative w-full max-w-xl px-2 flex flex-col sm:flex-row items-center justify-center gap-0">
@@ -1258,7 +1343,74 @@ export default function CardSearchClient() {
         />
       )}
         </div>
-      </div>
+        </div>
+      )}
+      
+      {/* Central Divider with Toggle Buttons */}
+      {showSearch && showDeckBuilder && (
+        <div className="hidden md:flex relative w-1 bg-gradient-to-b from-transparent via-gray-300 to-transparent dark:via-gray-700 items-center justify-center">
+          {/* Toggle buttons container - centered vertically */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-3 z-10">
+            {/* Hide Search Button */}
+            <button
+              onClick={() => setShowSearch(false)}
+              className="group relative w-10 h-10 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-110 hover:border-blue-500 dark:hover:border-blue-400 flex items-center justify-center"
+              title="Hide search panel"
+            >
+              <svg className="w-4 h-4 text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+              </svg>
+              {/* Tooltip */}
+              <span className="absolute left-full ml-3 px-3 py-1.5 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
+                Hide Search
+              </span>
+            </button>
+            
+            {/* Hide Deck Button */}
+            <button
+              onClick={() => setShowDeckBuilder(false)}
+              className="group relative w-10 h-10 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-110 hover:border-blue-500 dark:hover:border-blue-400 flex items-center justify-center"
+              title="Hide deck builder"
+            >
+              <svg className="w-4 h-4 text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+              </svg>
+              {/* Tooltip */}
+              <span className="absolute left-full ml-3 px-3 py-1.5 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
+                Hide Deck
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {/* Floating restore buttons (when panels are hidden) */}
+      {!showSearch && (
+        <button
+          onClick={() => setShowSearch(true)}
+          className="hidden md:flex fixed left-0 top-1/2 -translate-y-1/2 z-50 flex-col items-center gap-3 px-4 py-8 bg-gradient-to-r from-blue-600 to-blue-500 dark:from-blue-700 dark:to-blue-600 rounded-r-2xl shadow-2xl hover:shadow-blue-500/50 dark:hover:shadow-blue-700/50 transition-all hover:pl-6 text-white font-medium group border-r-4 border-blue-400 dark:border-blue-500"
+          title="Show search panel"
+        >
+          <svg className="w-6 h-6 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <span className="text-xs font-semibold whitespace-nowrap [writing-mode:vertical-lr] rotate-180 tracking-wider">SEARCH</span>
+        </button>
+      )}
+      
+      {!showDeckBuilder && (
+        <button
+          onClick={() => setShowDeckBuilder(true)}
+          className="hidden md:flex fixed right-0 top-1/2 -translate-y-1/2 z-50 flex-col items-center gap-3 px-4 py-8 bg-gradient-to-l from-purple-600 to-purple-500 dark:from-purple-700 dark:to-purple-600 rounded-l-2xl shadow-2xl hover:shadow-purple-500/50 dark:hover:shadow-purple-700/50 transition-all hover:pr-6 text-white font-medium group border-l-4 border-purple-400 dark:border-purple-500"
+          title="Show deck builder"
+        >
+          <svg className="w-6 h-6 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+          <span className="text-xs font-semibold whitespace-nowrap [writing-mode:vertical-lr] rotate-180 tracking-wider">DECK</span>
+        </button>
+      )}
+      
       {/* Right panel: Deck builder (hidden on mobile, toggleable on desktop) */}
       {showDeckBuilder && (
         <div className="hidden md:flex w-full md:w-1/2 xl:w-[38.2%] flex-col overflow-hidden transition-all duration-300">
@@ -1266,6 +1418,7 @@ export default function CardSearchClient() {
             deck={deck}
             syncStatus={syncStatus}
             hasUnsavedChanges={hasUnsavedChanges}
+            isAuthenticated={!!user}
             onDeckNameChange={setDeckName}
             onDeckFormatChange={setDeckFormat}
             onSaveDeck={saveDeckToCloud}
@@ -1281,7 +1434,7 @@ export default function CardSearchClient() {
             }}
             onExport={handleExportDeck}
             onImport={() => setShowImportModal(true)}
-            onClear={clearDeck}
+            onDelete={handleDeleteDeck}
             onNewDeck={newDeck}
             onLoadDeck={loadDeckFromCloud}
             onActiveTabChange={setActiveDeckTab}
@@ -1367,34 +1520,6 @@ export default function CardSearchClient() {
           Deck copied to clipboard!
         </div>
       )}
-      
-      {/* Floating Deck Toggle Button (Desktop only) */}
-      <button
-        onClick={() => setShowDeckBuilder(!showDeckBuilder)}
-        className="hidden md:flex fixed top-20 right-4 z-50 items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 text-gray-700 dark:text-gray-200 font-medium"
-        title={showDeckBuilder ? 'Hide deck builder' : 'Show deck builder'}
-      >
-        {showDeckBuilder ? (
-          <>
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-            </svg>
-            <span className="text-sm">Hide Deck</span>
-          </>
-        ) : (
-          <>
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-            </svg>
-            <span className="text-sm">Show Deck</span>
-            {deck.cards.length > 0 && (
-              <span className="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                {deck.cards.reduce((sum, dc) => sum + dc.quantity, 0)}
-              </span>
-            )}
-          </>
-        )}
-      </button>
     </div>
   );
 }

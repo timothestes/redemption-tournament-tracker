@@ -10,7 +10,7 @@ export default async function DecklistLayout({ children }) {
 
   return (
     <div className="flex flex-col min-h-screen">
-      {isAuthenticated && <TopNav />}
+      <TopNav />
       <div className="flex-1 flex flex-col">
         <Suspense fallback={null}>
           <HeaderServer />
