@@ -20,6 +20,8 @@ interface DeckBuilderPanelProps {
   hasUnsavedChanges?: boolean;
   /** Whether the user is authenticated */
   isAuthenticated?: boolean;
+  /** Whether the panel is expanded to full width */
+  isExpanded?: boolean;
   /** Callback when deck name changes */
   onDeckNameChange: (name: string) => void;
   /** Callback when deck format changes */
@@ -54,6 +56,7 @@ export default function DeckBuilderPanel({
   syncStatus,
   hasUnsavedChanges = false,
   isAuthenticated = false,
+  isExpanded = false,
   onDeckNameChange,
   onDeckFormatChange,
   onSaveDeck,
@@ -181,7 +184,24 @@ export default function DeckBuilderPanel({
       .sort()
       .map((type) => ({
         type,
-        cards: grouped[type],
+        // Sort cards within each type by alignment, then by name
+        cards: grouped[type].sort((a, b) => {
+          const alignmentA = a.card.alignment || 'Neutral';
+          const alignmentB = b.card.alignment || 'Neutral';
+          
+          // Define alignment order: Good, Evil, Neutral
+          const alignmentOrder = ['Good', 'Evil', 'Neutral'];
+          const aIndex = alignmentOrder.indexOf(alignmentA);
+          const bIndex = alignmentOrder.indexOf(alignmentB);
+          
+          // Sort by alignment first
+          if (aIndex !== bIndex) {
+            return (aIndex === -1 ? 999 : aIndex) - (bIndex === -1 ? 999 : bIndex);
+          }
+          
+          // Then by card name
+          return a.card.name.localeCompare(b.card.name);
+        }),
         count: grouped[type].reduce((sum, dc) => sum + dc.quantity, 0),
       }));
   };
