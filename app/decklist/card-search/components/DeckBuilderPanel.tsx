@@ -1237,10 +1237,13 @@ export default function DeckBuilderPanel({
       )}
 
       {/* Delete Deck Modal */}
-      {showDeleteDeckModal && (
+      {showDeleteDeckModal && onNewDeck && (
         <ClearDeckModal
           deckName={deck.name}
-          onConfirm={onDelete}
+          onConfirm={() => {
+            onNewDeck(undefined, deck.folderId);
+            setShowDeleteDeckModal(false);
+          }}
           onClose={() => setShowDeleteDeckModal(false)}
         />
       )}
