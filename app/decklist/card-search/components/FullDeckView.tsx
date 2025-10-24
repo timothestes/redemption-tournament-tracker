@@ -18,6 +18,7 @@ export default function FullDeckView({ deck, onViewCard }: FullDeckViewProps) {
   
   // View mode state
     const [viewMode, setViewMode] = useState<'normal' | 'stacked'>('stacked');
+    const [groupBy, setGroupBy] = useState<'none' | 'alignment' | 'type'>('none');
   
   // Separate main deck and reserve
   const mainDeckCards = deck.cards.filter((dc) => !dc.isReserve);
@@ -46,6 +47,110 @@ export default function FullDeckView({ deck, onViewCard }: FullDeckViewProps) {
       // Finally by name
       return a.card.name.localeCompare(b.card.name);
     });
+  };
+
+  // Group cards by the selected grouping method
+  const groupCards = (cards: typeof deck.cards) => {
+    if (groupBy === 'none') {
+      return { 'All Cards': sortCards(cards) };
+    }
+
+    const grouped: Record<string, typeof deck.cards> = {};
+    
+    cards.forEach((deckCard) => {
+      let key: string;
+      
+      if (groupBy === 'alignment') {
+        key = deckCard.card.alignment || 'Neutral';
+      } else if (groupBy === 'type') {
+        const typeName = prettifyTypeName(deckCard.card.type || 'Unknown');
+        // Combine certain types together
+        if (typeName === 'Artifact' || typeName === 'Covenant' || typeName === 'Curse') {
+          key = 'Artifact/Covenant/Curse';
+        } else if (typeName === 'Fortress' || typeName === 'Site' || typeName === 'City') {
+          key = 'Fortress/Site';
+        } else {
+          key = typeName;
+        }
+      } else {
+        key = 'All Cards';
+      }
+      
+      if (!grouped[key]) {
+        grouped[key] = [];
+      }
+      grouped[key].push(deckCard);
+    });
+
+    // Sort each group
+    Object.keys(grouped).forEach((key) => {
+      grouped[key] = sortCards(grouped[key]);
+    });
+
+    // Return groups in a specific order
+    if (groupBy === 'alignment') {
+      const orderedGroups: Record<string, typeof deck.cards> = {};
+      ['Good', 'Evil', 'Neutral'].forEach((alignment) => {
+        if (grouped[alignment]) {
+          orderedGroups[alignment] = grouped[alignment];
+        }
+      });
+      // Add any remaining groups
+      Object.keys(grouped).forEach((key) => {
+        if (!orderedGroups[key]) {
+          orderedGroups[key] = grouped[key];
+        }
+      });
+      return orderedGroups;
+    }
+
+    if (groupBy === 'type') {
+      // Sort type groups alphabetically
+      const orderedGroups: Record<string, typeof deck.cards> = {};
+      Object.keys(grouped)
+        .sort((a, b) => a.localeCompare(b))
+        .forEach((key) => {
+          orderedGroups[key] = grouped[key];
+        });
+      return orderedGroups;
+    }
+
+    return grouped;
+  };
+
+  // Split large type groups into multiple columns (max 17 cards per column)
+  const splitTypeGroup = (cards: typeof deck.cards, maxPerColumn = 17) => {
+    const totalCards = cards.reduce((sum, dc) => sum + dc.quantity, 0);
+    if (totalCards <= maxPerColumn) {
+      return [cards];
+    }
+
+    // Calculate how many columns we need and target size per column
+    const numColumns = Math.ceil(totalCards / maxPerColumn);
+    const targetPerColumn = Math.ceil(totalCards / numColumns);
+
+    const columns: Array<typeof deck.cards> = [];
+    let currentColumn: typeof deck.cards = [];
+    let currentCount = 0;
+
+    for (const deckCard of cards) {
+      if (currentCount + deckCard.quantity <= targetPerColumn) {
+        currentColumn.push(deckCard);
+        currentCount += deckCard.quantity;
+      } else {
+        if (currentColumn.length > 0) {
+          columns.push(currentColumn);
+        }
+        currentColumn = [deckCard];
+        currentCount = deckCard.quantity;
+      }
+    }
+
+    if (currentColumn.length > 0) {
+      columns.push(currentColumn);
+    }
+
+    return columns;
   };
 
   // Calculate stats
@@ -77,14 +182,14 @@ export default function FullDeckView({ deck, onViewCard }: FullDeckViewProps) {
   };
 
   // Render a compact card item
-  const renderCompactCard = (deckCard: typeof deck.cards[0], index: number) => {
+  const renderCompactCard = (deckCard: typeof deck.cards[0], index: number, isVerticalStack = false) => {
     const card = deckCard.card;
     const imageUrl = getImageUrl(card.imgFile);
 
     return (
       <div
         className={`group relative w-28 flex-shrink-0 cursor-pointer transition-all hover:z-20 ${
-          viewMode === 'stacked' ? '-mb-24' : ''
+          isVerticalStack ? '-mb-32' : viewMode === 'stacked' ? '-mb-24' : ''
         }`}
         onClick={(e) => {
           e.stopPropagation();
@@ -155,6 +260,25 @@ export default function FullDeckView({ deck, onViewCard }: FullDeckViewProps) {
                   {viewMode === 'normal' ? 'Normal' : 'Stacked'}
                 </span>
               </button>
+
+              {/* Group By Dropdown - Only show in stacked mode */}
+              {viewMode === 'stacked' && (
+                <div className="relative">
+                  <select
+                    value={groupBy}
+                    onChange={(e) => setGroupBy(e.target.value as 'none' | 'alignment' | 'type')}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg transition-colors text-gray-300 text-xs font-medium cursor-pointer appearance-none pr-8"
+                    title="Group cards by"
+                  >
+                    <option value="none">No Grouping</option>
+                    <option value="alignment">Group by Alignment</option>
+                    <option value="type">Group by Type</option>
+                  </select>
+                  <svg className="w-4 h-4 text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              )}
               
               <div className="flex items-center gap-2">
                 <span className="text-gray-400">Format:</span>
@@ -287,39 +411,112 @@ export default function FullDeckView({ deck, onViewCard }: FullDeckViewProps) {
         <div>
           {/* Main Deck */}
           <div>
-            <div className="flex items-center gap-3 mb-2">
-              <h2 className="text-xl font-bold text-blue-400">Main Deck</h2>
-              <span className="text-sm text-gray-500">({mainDeckCount} cards)</span>
-            </div>
-            
-            {mainDeckCards.length > 0 ? (
-              <div className={`flex flex-wrap gap-2 items-start ${viewMode === 'stacked' ? 'mt-8' : ''}`}>
-                {sortCards(mainDeckCards).map((deckCard, index) => (
-                  <React.Fragment key={`${deckCard.card.name}-${deckCard.card.set}`}>
-                    {renderCompactCard(deckCard, index)}
-                  </React.Fragment>
-                ))}
+            {groupBy === 'type' ? (
+              // Type grouping layout with side-by-side headers
+              <div>
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-xl font-bold text-blue-400">Main Deck</h2>
+                    <span className="text-sm text-gray-500">({mainDeckCount} cards)</span>
+                  </div>
+                  {reserveCount > 0 && (
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-xl font-bold text-purple-400">Reserve</h2>
+                      <span className="text-sm text-gray-500">({reserveCount} cards)</span>
+                    </div>
+                  )}
+                </div>
+                
+                {mainDeckCards.length > 0 ? (
+                  <div className="flex gap-4 items-start">
+                    <div className="flex gap-4 items-start flex-wrap flex-1">
+                      {Object.entries(groupCards(mainDeckCards)).map(([groupName, cards]) => {
+                        const columns = splitTypeGroup(cards);
+                        return columns.map((columnCards, colIndex) => (
+                          <div key={`${groupName}-${colIndex}`} className="flex flex-col">
+                            <div className="flex flex-col gap-2 items-center">
+                              {columnCards.map((deckCard, index) => (
+                                <React.Fragment key={`${deckCard.card.name}-${deckCard.card.set}`}>
+                                  {renderCompactCard(deckCard, index, true)}
+                                </React.Fragment>
+                              ))}
+                            </div>
+                          </div>
+                        ));
+                      })}
+                    </div>
+                    
+                    {/* Reserve - Show on right side for type grouping */}
+                    {reserveCount > 0 && (
+                      <div className="flex flex-col ml-8">
+                        <div className="flex flex-col gap-2 items-center">
+                          {sortCards(reserveCards).map((deckCard, index) => (
+                            <React.Fragment key={`${deckCard.card.name}-${deckCard.card.set}-reserve`}>
+                              {renderCompactCard(deckCard, index, true)}
+                            </React.Fragment>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-gray-500">
+                    <p>No cards in main deck</p>
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="text-center py-12 text-gray-500">
-                <p>No cards in main deck</p>
+              // Non-type grouping layout with stacked headers
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <h2 className="text-xl font-bold text-blue-400">Main Deck</h2>
+                  <span className="text-sm text-gray-500">({mainDeckCount} cards)</span>
+                </div>
+                
+                {mainDeckCards.length > 0 ? (
+                  <div>
+                    {Object.entries(groupCards(mainDeckCards)).map(([groupName, cards]) => (
+                      <div key={groupName} className="mb-8">
+                        
+                        <div className={`flex flex-wrap gap-2 items-start ${viewMode === 'stacked' ? 'mt-8' : ''}`}>
+                          {cards.map((deckCard, index) => (
+                            <React.Fragment key={`${deckCard.card.name}-${deckCard.card.set}`}>
+                              {renderCompactCard(deckCard, index, false)}
+                            </React.Fragment>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-gray-500">
+                    <p>No cards in main deck</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
 
-          {/* Reserve - Show below main deck if present */}
-          {reserveCount > 0 && (
-            <div className="mt-20 pt-6 border-t-2 border-purple-500/30">
+          {/* Reserve - Show below main deck if present (or on right side for type grouping) */}
+          {reserveCount > 0 && groupBy !== 'type' && (
+            <div className="mt-20 pt-6">
               <div className="flex items-center gap-3 mb-2">
                 <h2 className="text-xl font-bold text-purple-400">Reserve</h2>
                 <span className="text-sm text-gray-500">({reserveCount} cards)</span>
               </div>
               
-              <div className={`flex flex-wrap gap-2 items-start ${viewMode === 'stacked' ? 'mt-8' : ''}`}>
-                {sortCards(reserveCards).map((deckCard, index) => (
-                  <React.Fragment key={`${deckCard.card.name}-${deckCard.card.set}-reserve`}>
-                    {renderCompactCard(deckCard, index)}
-                  </React.Fragment>
+              <div>
+                {Object.entries(groupCards(reserveCards)).map(([groupName, cards]) => (
+                  <div key={groupName} className="mb-8">
+                    
+                    <div className={`flex flex-wrap gap-2 items-start ${viewMode === 'stacked' ? 'mt-8' : ''}`}>
+                      {cards.map((deckCard, index) => (
+                        <React.Fragment key={`${deckCard.card.name}-${deckCard.card.set}-reserve`}>
+                          {renderCompactCard(deckCard, index, false)}
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
