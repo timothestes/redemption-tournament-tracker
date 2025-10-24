@@ -1464,6 +1464,10 @@ export default function CardSearchClient() {
             onExport={handleExportDeck}
             onImport={() => setShowImportModal(true)}
             onDelete={handleDeleteDeck}
+            onDuplicate={() => {
+              // Duplicate will be handled internally by DeckBuilderPanel
+              // Just need to provide the callback for re-rendering
+            }}
             onNewDeck={newDeck}
             onLoadDeck={loadDeckFromCloud}
             onActiveTabChange={setActiveDeckTab}

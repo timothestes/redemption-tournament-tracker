@@ -9,6 +9,7 @@ import GeneratePDFModal from "./GeneratePDFModal";
 import GenerateDeckImageModal from "./GenerateDeckImageModal";
 import ClearDeckModal from "./ClearDeckModal";
 import LoadDeckModal from "./LoadDeckModal";
+import { duplicateDeckAction } from "../../actions";
 
 export type TabType = "main" | "reserve" | "info";
 
@@ -39,6 +40,8 @@ interface DeckBuilderPanelProps {
   onImport: () => void;
   /** Callback to delete deck */
   onDelete: () => void;
+  /** Callback to duplicate current deck */
+  onDuplicate?: () => void;
   /** Callback to load a deck from cloud by ID */
   onLoadDeck?: (deckId: string) => void;
   /** Callback to create a new blank deck */
@@ -68,6 +71,7 @@ export default function DeckBuilderPanel({
   onExport,
   onImport,
   onDelete,
+  onDuplicate,
   onLoadDeck,
   onNewDeck,
   onActiveTabChange,
@@ -540,6 +544,30 @@ export default function DeckBuilderPanel({
                 </svg>
                 Import (Ctrl+ I)
               </button>
+              {onDuplicate && isAuthenticated && deck.id && (
+                <button
+                  onClick={async () => {
+                    setShowMenu(false);
+                    const result = await duplicateDeckAction(deck.id!);
+                    if (result.success) {
+                      onNotify?.('Deck duplicated successfully!', 'success');
+                      // Optionally reload or navigate to the duplicated deck
+                      if (onLoadDeck && result.deckId) {
+                        onLoadDeck(result.deckId);
+                      }
+                    } else {
+                      onNotify?.(result.error || 'Failed to duplicate deck', 'error');
+                    }
+                  }}
+                  className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
+                  title="Create a copy of this deck"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  Duplicate
+                </button>
+              )}
               <button
                 onClick={() => {
                   setShowGeneratePDFModal(true);
