@@ -148,6 +148,44 @@ export default function FullDeckView({ deck, onViewCard }: FullDeckViewProps) {
     return grouped;
   };
 
+  // Split alignment groups into sub-columns (Dominants and Lost Souls separate)
+  const splitAlignmentGroup = (cards: typeof deck.cards) => {
+    const dominants: typeof deck.cards = [];
+    const lostSouls: typeof deck.cards = [];
+    const regular: typeof deck.cards = [];
+
+    cards.forEach((deckCard) => {
+      const type = deckCard.card.type || '';
+      if (type === 'Dom' || type === 'Dominant') {
+        dominants.push(deckCard);
+      } else if (type === 'LS' || type === 'Lost Soul') {
+        lostSouls.push(deckCard);
+      } else {
+        regular.push(deckCard);
+      }
+    });
+
+    const result: { cards: typeof deck.cards; isDominant?: boolean; isLostSoul?: boolean }[] = [];
+    
+    // Add regular cards (may be split into multiple columns)
+    if (regular.length > 0) {
+      const regularColumns = splitTypeGroup(regular);
+      regularColumns.forEach(col => result.push({ cards: col }));
+    }
+    
+    // Add dominants as separate column
+    if (dominants.length > 0) {
+      result.push({ cards: dominants, isDominant: true });
+    }
+    
+    // Add lost souls as separate column
+    if (lostSouls.length > 0) {
+      result.push({ cards: lostSouls, isLostSoul: true });
+    }
+
+    return result;
+  };
+
   // Split large type groups into multiple columns (max 17 cards per column)
   const splitTypeGroup = (cards: typeof deck.cards, maxPerColumn = 17) => {
     const totalCards = cards.reduce((sum, dc) => sum + dc.quantity, 0);
@@ -191,6 +229,24 @@ export default function FullDeckView({ deck, onViewCard }: FullDeckViewProps) {
   
   // Validation
   const validation = validateDeck(deck);
+
+  // Get color for alignment group headers
+  const getAlignmentColor = (groupName: string): string => {
+    switch (groupName) {
+      case 'Good':
+        return 'text-green-400';
+      case 'Evil':
+        return 'text-red-400';
+      case 'Neutral':
+        return 'text-gray-400';
+      case 'Dominant':
+        return 'text-purple-400';
+      case 'Lost Soul':
+        return 'text-blue-300';
+      default:
+        return 'text-yellow-400';
+    }
+  };
 
   // Prettify card type names
   const prettifyTypeName = (type: string): string => {
@@ -447,8 +503,8 @@ export default function FullDeckView({ deck, onViewCard }: FullDeckViewProps) {
         <div>
           {/* Main Deck */}
           <div>
-            {groupBy === 'type' ? (
-              // Type grouping layout with side-by-side headers
+            {groupBy === 'type' || groupBy === 'alignment' ? (
+              // Type/Alignment grouping layout with side-by-side headers
               <div>
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-3">
@@ -460,11 +516,22 @@ export default function FullDeckView({ deck, onViewCard }: FullDeckViewProps) {
                 {mainDeckCards.length > 0 ? (
                   <div className="flex gap-4 items-start flex-wrap">
                     {Object.entries(groupCards(mainDeckCards)).map(([groupName, cards]) => {
-                      const columns = splitTypeGroup(cards);
-                      return columns.map((columnCards, colIndex) => (
+                      // Use different splitting logic for alignment vs type grouping
+                      const columns = groupBy === 'alignment' 
+                        ? splitAlignmentGroup(cards)
+                        : splitTypeGroup(cards).map(col => ({ cards: col }));
+                      
+                      return columns.map((column, colIndex) => (
                         <div key={`${groupName}-${colIndex}`} className="flex flex-col">
+                          {/* Show group header for alignment grouping (only on first column) */}
+                          {groupBy === 'alignment' && colIndex === 0 && (
+                            <div className="mb-2 flex items-center gap-2">
+                              <h3 className={`text-lg font-semibold ${getAlignmentColor(groupName)}`}>{groupName}</h3>
+                              <span className="text-xs text-gray-500">({cards.reduce((sum, dc) => sum + dc.quantity, 0)})</span>
+                            </div>
+                          )}
                           <div className="flex flex-col gap-2 items-center">
-                            {columnCards.flatMap((deckCard) =>
+                            {column.cards.flatMap((deckCard) =>
                               Array.from({ length: deckCard.quantity }, (_, i) => (
                                 <React.Fragment key={`${deckCard.card.name}-${deckCard.card.set}-${i}`}>
                                   {renderCompactCard(deckCard, i, true, true)}
@@ -533,8 +600,8 @@ export default function FullDeckView({ deck, onViewCard }: FullDeckViewProps) {
             )}
           </div>
 
-          {/* Reserve - Show below main deck if present (or on right side for type grouping) */}
-          {reserveCount > 0 && groupBy !== 'type' && (
+          {/* Reserve - Show below main deck if present (only for 'none' grouping) */}
+          {reserveCount > 0 && groupBy === 'none' && (
             <div className="mt-20 pt-6">
               <div className="flex items-center gap-3 mb-2">
                 <h2 className="text-xl font-bold text-purple-400">Reserve</h2>

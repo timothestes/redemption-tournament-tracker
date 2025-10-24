@@ -326,6 +326,42 @@ export default function CardSearchClient() {
       // Check for Ctrl (Windows/Linux) or Cmd (Mac)
       const modKey = e.ctrlKey || e.metaKey;
       
+      // Arrow key navigation for panel visibility (without modifier keys)
+      if (!modKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        // Only handle arrow keys if not focused on an input element
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+          return;
+        }
+        
+        // Don't handle arrow keys if modal is open
+        if (modalCard) {
+          return;
+        }
+        
+        e.preventDefault();
+        
+        // Left arrow: Show fullscreen (hide search to show only deck builder)
+        if (e.key === 'ArrowLeft') {
+          if (!showDeckBuilder) {
+            setShowDeckBuilder(true);
+          } else if (showSearch) {
+            setShowSearch(false);
+          }
+        }
+        
+        // Right arrow: Close fullscreen (show search, hide deck builder if both are visible)
+        else if (e.key === 'ArrowRight') {
+          if (!showSearch) {
+            setShowSearch(true);
+          } else if (showDeckBuilder) {
+            setShowDeckBuilder(false);
+          }
+        }
+        
+        return;
+      }
+      
       if (!modKey) return;
 
       // Ctrl+S / Cmd+S to save
@@ -351,7 +387,7 @@ export default function CardSearchClient() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [user, syncStatus?.isSaving, saveDeckToCloud, handleExportDeck]);
+  }, [user, syncStatus?.isSaving, saveDeckToCloud, handleExportDeck, showSearch, showDeckBuilder, modalCard]);
 
   // sanitize imgFile to avoid duplicate extensions - now imported from utils
 
@@ -1420,7 +1456,7 @@ export default function CardSearchClient() {
               </svg>
               {/* Tooltip */}
               <span className="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
-                Hide Search
+                Hide Search (right arrow key)
               </span>
             </button>
             
@@ -1435,7 +1471,7 @@ export default function CardSearchClient() {
               </svg>
               {/* Tooltip */}
               <span className="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
-                Hide Deck
+                Hide Deck (left arrow key)
               </span>
             </button>
           </div>
