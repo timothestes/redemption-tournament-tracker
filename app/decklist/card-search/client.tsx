@@ -100,6 +100,7 @@ export default function CardSearchClient() {
   // Panel visibility state
   const [showDeckBuilder, setShowDeckBuilder] = useState(true);
   const [showSearch, setShowSearch] = useState(true);
+  const [showMobileBanner, setShowMobileBanner] = useState(true);
 
   // Track active tab in deck builder
   const [activeDeckTab, setActiveDeckTab] = useState<TabType>("main");
@@ -869,6 +870,23 @@ export default function CardSearchClient() {
   // ...existing code...
   return (
     <div className="flex w-full h-screen overflow-hidden bg-gray-100 dark:bg-gray-900">
+      {/* Mobile notice */}
+      {showMobileBanner && (
+        <div className="md:hidden fixed top-16 left-0 right-0 z-50 bg-blue-100 dark:bg-blue-900 border-b border-blue-300 dark:border-blue-700 px-4 py-3 text-center">
+          <button
+            onClick={() => setShowMobileBanner(false)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-900 dark:text-blue-100 hover:text-blue-700 dark:hover:text-blue-300"
+            aria-label="Close banner"
+          >
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
+          <p className="text-sm text-blue-900 dark:text-blue-100 font-medium">
+            ℹ️ Deckbuilder isn't supported on mobile
+          </p>
+        </div>
+      )}
       {/* Left panel: Card search */}
       {showSearch && (
         <div className={`flex-1 flex flex-col w-full ${showDeckBuilder ? 'md:w-1/2 xl:w-[61.8%]' : ''} overflow-hidden transition-all duration-300`}>
@@ -1285,7 +1303,7 @@ export default function CardSearchClient() {
                               e.stopPropagation();
                               removeCard(c.name, c.set, activeDeckTab === "reserve");
                             }}
-                            className="w-14 h-14 max-w-full max-h-full flex items-center justify-center rounded-lg bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-3xl border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
+                            className="hidden md:flex w-14 h-14 max-w-full max-h-full items-center justify-center rounded-lg bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-3xl border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
                             aria-label="Remove card"
                             title="Remove card from deck"
                           >
@@ -1300,7 +1318,7 @@ export default function CardSearchClient() {
                               e.stopPropagation();
                               addCard(c, activeDeckTab === "reserve");
                             }}
-                            className="w-14 h-14 max-w-full max-h-full flex items-center justify-center rounded-lg bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-3xl border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
+                            className="hidden md:flex w-14 h-14 max-w-full max-h-full items-center justify-center rounded-lg bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-3xl border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
                             aria-label="Add card"
                             title="Add card to deck"
                           >
