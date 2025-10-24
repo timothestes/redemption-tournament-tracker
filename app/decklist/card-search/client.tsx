@@ -104,6 +104,9 @@ export default function CardSearchClient() {
 
   // Track active tab in deck builder
   const [activeDeckTab, setActiveDeckTab] = useState<TabType>("main");
+  
+  // Track which section we're viewing in full deck view (for modal navigation)
+  const [fullDeckViewSection, setFullDeckViewSection] = useState<'main' | 'reserve'>('main');
 
   // User authentication state
   const [user, setUser] = useState<User | null>(null);
@@ -869,6 +872,35 @@ export default function CardSearchClient() {
 
   // ...existing code...
   return (
+    <>
+      {/* Modal - Rendered outside main container to avoid z-index issues */}
+      {modalCard && (
+        <ModalWithClose
+          modalCard={modalCard}
+          setModalCard={setModalCard}
+          visibleCards={!showSearch 
+            ? deck.cards
+                .filter(dc => dc.isReserve === (fullDeckViewSection === 'reserve'))
+                .map(dc => dc.card)
+                .sort((a, b) => {
+                  // Sort by type first
+                  const typeA = a.type || 'Unknown';
+                  const typeB = b.type || 'Unknown';
+                  if (typeA !== typeB) {
+                    return typeA.localeCompare(typeB);
+                  }
+                  // Then by name
+                  return a.name.localeCompare(b.name);
+                })
+            : visibleCards
+          }
+          onAddCard={addCard}
+          onRemoveCard={removeCard}
+          getCardQuantity={getCardQuantity}
+          activeDeckTab={activeDeckTab}
+        />
+      )}
+      
     <div className="flex w-full h-screen overflow-hidden bg-gray-100 dark:bg-gray-900">
       {/* Mobile notice */}
       {showMobileBanner && (
@@ -1471,7 +1503,10 @@ export default function CardSearchClient() {
             onNewDeck={newDeck}
             onLoadDeck={loadDeckFromCloud}
             onActiveTabChange={setActiveDeckTab}
-            onViewCard={setModalCard}
+            onViewCard={(card, isReserve) => {
+              setFullDeckViewSection(isReserve ? 'reserve' : 'main');
+              setModalCard(card);
+            }}
             onNotify={(message, type) => {
               setNotification({ message, type });
               setTimeout(() => setNotification(null), 3000);
@@ -1569,5 +1604,6 @@ export default function CardSearchClient() {
         </div>
       )}
     </div>
+    </>
   );
 }

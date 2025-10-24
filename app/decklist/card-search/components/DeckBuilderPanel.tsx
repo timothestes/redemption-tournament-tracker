@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Deck } from "../types/deck";
 import { SyncStatus } from "../hooks/useDeckState";
 import DeckCardList from "./DeckCardList";
+import FullDeckView from "./FullDeckView";
 import { Switch } from "@headlessui/react";
 import { Card } from "../utils";
 import { validateDeck } from "../utils/deckValidation";
@@ -49,7 +50,7 @@ interface DeckBuilderPanelProps {
   /** Callback when active tab changes */
   onActiveTabChange?: (tab: TabType) => void;
   /** Callback when user wants to view card details */
-  onViewCard?: (card: Card) => void;
+  onViewCard?: (card: Card, isReserve?: boolean) => void;
   /** Callback to show notifications */
   onNotify?: (message: string, type: 'success' | 'error' | 'info') => void;
 }
@@ -631,7 +632,8 @@ export default function DeckBuilderPanel({
       </div>
 
       {/* ...existing code... */}
-      {/* Tabs */}
+      {/* Tabs - Hide when expanded (full screen view) */}
+      {!isExpanded && (
       <div className="flex-shrink-0 flex items-center border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
         <button
           onClick={() => handleTabChange("main")}
@@ -855,26 +857,18 @@ export default function DeckBuilderPanel({
           )}
         </div>
       </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4" data-deck-grid>
-        {/* Enhanced View Coming Soon - Show when expanded */}
-        {isExpanded && (
-          <div className="mb-4 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
-            <div className="flex items-start gap-3">
-              <svg className="w-5 h-5 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-              </svg>
-              <div>
-                <p className="text-sm text-purple-800 dark:text-purple-200">
-                  <span className="font-semibold">Enhanced full-deck view coming soon!</span> We're building an improved visualization with better card previews, deck analysis, and export options.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-        
+        {/* Show Full Deck View when expanded */}
+        {isExpanded ? (
+          <FullDeckView 
+            deck={deck}
+            onViewCard={onViewCard}
+          />
+        ) : (
+          <>
         {activeTab === "main" ? (
           <div className="space-y-4">
             {mainDeckCards.length > 0 ? (
@@ -1245,6 +1239,8 @@ export default function DeckBuilderPanel({
               <div>Updated: {deck.updatedAt.toLocaleString()}</div>
             </div>
           </div>
+        )}
+        </>
         )}
       </div>
 
