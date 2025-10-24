@@ -104,6 +104,9 @@ export default function CardSearchClient() {
 
   // Track active tab in deck builder
   const [activeDeckTab, setActiveDeckTab] = useState<TabType>("main");
+  
+  // Track which section we're viewing in full deck view (for modal navigation)
+  const [fullDeckViewSection, setFullDeckViewSection] = useState<'main' | 'reserve'>('main');
 
   // User authentication state
   const [user, setUser] = useState<User | null>(null);
@@ -323,6 +326,42 @@ export default function CardSearchClient() {
       // Check for Ctrl (Windows/Linux) or Cmd (Mac)
       const modKey = e.ctrlKey || e.metaKey;
       
+      // Arrow key navigation for panel visibility (without modifier keys)
+      if (!modKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        // Only handle arrow keys if not focused on an input element
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+          return;
+        }
+        
+        // Don't handle arrow keys if modal is open
+        if (modalCard) {
+          return;
+        }
+        
+        e.preventDefault();
+        
+        // Left arrow: Show fullscreen (hide search to show only deck builder)
+        if (e.key === 'ArrowLeft') {
+          if (!showDeckBuilder) {
+            setShowDeckBuilder(true);
+          } else if (showSearch) {
+            setShowSearch(false);
+          }
+        }
+        
+        // Right arrow: Close fullscreen (show search, hide deck builder if both are visible)
+        else if (e.key === 'ArrowRight') {
+          if (!showSearch) {
+            setShowSearch(true);
+          } else if (showDeckBuilder) {
+            setShowDeckBuilder(false);
+          }
+        }
+        
+        return;
+      }
+      
       if (!modKey) return;
 
       // Ctrl+S / Cmd+S to save
@@ -348,7 +387,7 @@ export default function CardSearchClient() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [user, syncStatus?.isSaving, saveDeckToCloud, handleExportDeck]);
+  }, [user, syncStatus?.isSaving, saveDeckToCloud, handleExportDeck, showSearch, showDeckBuilder, modalCard]);
 
   // sanitize imgFile to avoid duplicate extensions - now imported from utils
 
@@ -869,6 +908,35 @@ export default function CardSearchClient() {
 
   // ...existing code...
   return (
+    <>
+      {/* Modal - Rendered outside main container to avoid z-index issues */}
+      {modalCard && (
+        <ModalWithClose
+          modalCard={modalCard}
+          setModalCard={setModalCard}
+          visibleCards={!showSearch 
+            ? deck.cards
+                .filter(dc => dc.isReserve === (fullDeckViewSection === 'reserve'))
+                .map(dc => dc.card)
+                .sort((a, b) => {
+                  // Sort by type first
+                  const typeA = a.type || 'Unknown';
+                  const typeB = b.type || 'Unknown';
+                  if (typeA !== typeB) {
+                    return typeA.localeCompare(typeB);
+                  }
+                  // Then by name
+                  return a.name.localeCompare(b.name);
+                })
+            : visibleCards
+          }
+          onAddCard={addCard}
+          onRemoveCard={removeCard}
+          getCardQuantity={getCardQuantity}
+          activeDeckTab={activeDeckTab}
+        />
+      )}
+      
     <div className="flex w-full h-screen overflow-hidden bg-gray-100 dark:bg-gray-900">
       {/* Mobile notice */}
       {showMobileBanner && (
@@ -1388,7 +1456,7 @@ export default function CardSearchClient() {
               </svg>
               {/* Tooltip */}
               <span className="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
-                Hide Search
+                Hide Search (right arrow key)
               </span>
             </button>
             
@@ -1403,7 +1471,7 @@ export default function CardSearchClient() {
               </svg>
               {/* Tooltip */}
               <span className="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
-                Hide Deck
+                Hide Deck (left arrow key)
               </span>
             </button>
           </div>
@@ -1471,7 +1539,10 @@ export default function CardSearchClient() {
             onNewDeck={newDeck}
             onLoadDeck={loadDeckFromCloud}
             onActiveTabChange={setActiveDeckTab}
-            onViewCard={setModalCard}
+            onViewCard={(card, isReserve) => {
+              setFullDeckViewSection(isReserve ? 'reserve' : 'main');
+              setModalCard(card);
+            }}
             onNotify={(message, type) => {
               setNotification({ message, type });
               setTimeout(() => setNotification(null), 3000);
@@ -1569,5 +1640,6 @@ export default function CardSearchClient() {
         </div>
       )}
     </div>
+    </>
   );
 }
