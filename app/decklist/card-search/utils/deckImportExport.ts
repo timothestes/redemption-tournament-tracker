@@ -145,6 +145,7 @@ export function parseDeckText(
  * Generate deck text in standard tab-separated format
  * Format: Quantity\tName
  * Reserve cards are separated with "Reserve:" marker
+ * Card names are normalized to use standard apostrophes
  */
 export function generateDeckText(deck: Deck): string {
   const mainCards = deck.cards.filter((dc) => !dc.isReserve);
@@ -159,8 +160,9 @@ export function generateDeckText(deck: Deck): string {
   // Add main deck cards
   mainCards.sort(sortCards).forEach((dc) => {
     const { card, quantity } = dc;
-    // Format: Quantity\tName
-    lines.push(`${quantity}\t${card.name}`);
+    // Format: Quantity\tName (with normalized apostrophes)
+    const normalizedName = normalizeCardName(card.name);
+    lines.push(`${quantity}\t${normalizedName}`);
   });
   
   // Add reserve section if there are reserve cards
@@ -170,7 +172,8 @@ export function generateDeckText(deck: Deck): string {
     
     reserveCards.sort(sortCards).forEach((dc) => {
       const { card, quantity } = dc;
-      lines.push(`${quantity}\t${card.name}`);
+      const normalizedName = normalizeCardName(card.name);
+      lines.push(`${quantity}\t${normalizedName}`);
     });
   }
   
