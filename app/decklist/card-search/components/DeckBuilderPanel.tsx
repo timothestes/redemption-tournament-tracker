@@ -1010,6 +1010,7 @@ export default function DeckBuilderPanel({
                     onMoveCard={handleMoveCard}
                     showTypeIcons={false}
                     viewLayout={viewLayout}
+                    disableHoverPreview={disableHoverPreview}
                   />
                 </div>
               );
