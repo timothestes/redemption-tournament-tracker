@@ -375,8 +375,8 @@ export default function DeckBuilderPanel({
         )}
 
         {/* Card Count and Menu Button Row */}
-        <div className="mt-2 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 text-sm" suppressHydrationWarning>
+        <div className="mt-2 flex items-center justify-between gap-3 min-w-0">
+          <div className="flex items-center gap-3 text-sm flex-wrap min-w-0" suppressHydrationWarning>
             <div className="flex items-center gap-1">
               <span className="text-gray-600 dark:text-gray-400">Main:</span>
               <span className="font-semibold text-gray-900 dark:text-white">{mainDeckCount}</span>
