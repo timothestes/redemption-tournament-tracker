@@ -12,6 +12,7 @@ import ParticipantTable from "./ParticipantTable";
 import ParticipantFormModal from "./participant-form-modal";
 import { HiPlus } from "react-icons/hi";
 import { GiCardPickup } from "react-icons/gi";
+import { printFinalStandings } from "../../utils/printUtils";
 
 interface TournamentTabsProps {
   participants: any[];
@@ -111,6 +112,15 @@ export default function TournamentTabs({
                   <div className="absolute left-1/2 transform -translate-x-1/2 top-full -mt-1 border-4 border-transparent border-t-gray-900"></div>
                 </div>
               </div>
+            )}
+            {tournamentEnded && (
+              <Button
+                onClick={() => printFinalStandings(participants, tournamentName || "Tournament")}
+                outline
+                gradientDuoTone="purpleToBlue"
+              >
+                Print Final Standings
+              </Button>
             )}
             <div className="relative group">
               <Button
