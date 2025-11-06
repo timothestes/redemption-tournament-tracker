@@ -98,6 +98,10 @@ export default function FullDeckView({ deck, onViewCard }: FullDeckViewProps) {
           key = 'Artifact/Covenant/Curse';
         } else if (typeName === 'Fortress' || typeName === 'Site' || typeName === 'City') {
           key = 'Fortress/Site';
+        } else if (typeName === 'Good Enhancement' || deckCard.card.type === 'Hero/GE') {
+          key = 'Good Enhancement';
+        } else if (typeName === 'Evil Enhancement' || deckCard.card.type === 'Evil Character/EE') {
+          key = 'Evil Enhancement';
         } else {
           key = typeName;
         }
