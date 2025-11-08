@@ -70,6 +70,7 @@ const TopNav: React.FC = () => {
   const hostResources = [
     { href: "https://landofredemption.com/wp-content/uploads/2025/03/Redemption_Host_Guide_2025.pdf", label: "Hosting Guide" },
     { href: "https://landofredemption.com/wp-content/uploads/2025/05/Redemption-Tournament-Host-Application-2025-1.pdf", label: "Hosting Application" },
+    { href: "https://landofredemption.com/wp-content/uploads/2025/11/Redemption-Tournament-Host-Application-2025-08.pdf", label: "Hosting Application" },
     { href: "https://landofredemption.com/wp-content/uploads/2025/03/host_sign_in_sheets.pdf", label: "Sign In Sheet" },
     { href: "https://landofredemption.com/wp-content/uploads/2025/03/Type-1-Deck-Check-Sheet-1.pdf", label: "T1 Deck Check Sheet" },
     { href: "https://landofredemption.com/wp-content/uploads/2025/03/Reserve-List-T1.pdf", label: "T1 Reserve List" },
