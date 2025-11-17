@@ -4,73 +4,73 @@ Place Paragon card images in this directory.
 
 ## File Naming Convention
 
-Each image should be named after the Paragon in lowercase with a `.png` extension:
+Each image should be named with "Paragon " prefix followed by the Paragon name with a `.png` extension:
 
-- `abraham.png`
-- `judah.png`
-- `eve.png`
-- `rachel.png`
-- `reuben.png`
-- `joseph.png`
+- `Paragon Abraham.png`
+- `Paragon Judah.png`
+- `Paragon Eve.png`
+- `Paragon Rachel.png`
+- `Paragon Reuben.png`
+- `Paragon Joseph.png`
 - ... (see full list below)
 
 ## Full List of Paragons (42 total)
 
 ### Blue Brigade
-- abraham.png
-- judah.png
-- eve.png
-- rachel.png
-- reuben.png
-- joseph.png
+- Paragon Abraham.png
+- Paragon Judah.png
+- Paragon Eve.png
+- Paragon Rachel.png
+- Paragon Reuben.png
+- Paragon Joseph.png
 
 ### Clay Brigade
-- titus.png
-- zadok.png
-- phinehas.png
-- aaron.png
-- claudia.png
-- melchizedek.png
+- Paragon Titus.png
+- Paragon Zadok.png
+- Paragon Phinehas.png
+- Paragon Aaron.png
+- Paragon Claudia.png
+- Paragon Melchizedek.png
 
 ### Gold Brigade
-- rahab.png
-- joshua.png
-- caleb.png
-- deborah.png
-- gideon.png
-- jephthah.png
+- Paragon Rahab.png
+- Paragon Joshua.png
+- Paragon Caleb.png
+- Paragon Deborah.png
+- Paragon Gideon.png
+- Paragon Jephthah.png
 
 ### Green Brigade
-- samuel.png
-- jeremiah.png
-- david.png
-- hannah.png
-- malachi.png
-- nathan.png
+- Paragon Samuel.png
+- Paragon Jeremiah.png
+- Paragon David.png
+- Paragon Hannah.png
+- Paragon Malachi.png
+- Paragon Nathan.png
 
 ### Purple Brigade
-- jonathan.png
-- esther.png
-- abigail.png
-- abishai.png
-- peter.png
-- benaiah.png
+- Paragon Jonathan.png
+- Paragon Esther.png
+- Paragon Abigail.png
+- Paragon Abishai.png
+- Paragon Peter.png
+- Paragon Benaiah.png
 
 ### Silver Brigade
-- zechariah.png
-- job.png
-- ezekiel.png
-- jacob.png
-- john.png
-- isaiah.png
+- Paragon Zechariah.png
+- Paragon Job.png
+- Paragon Ezekiel.png
+- Paragon Jacob.png
+- Paragon John.png
+- Paragon Isaiah.png
 
 ### White Brigade
-- boaz.png
-- moses.png
-- chenaniah.png
-- ruth.png
-- daniel.png
-- miriam.png
+- Paragon Boaz.png
+- Paragon Moses.png
+- Paragon Chenaniah.png
+- Paragon Ruth.png
+- Paragon Daniel.png
+- Paragon Miriam.png
 
 ## Image Specifications
 

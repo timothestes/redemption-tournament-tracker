@@ -95,6 +95,7 @@ export default function DeckBuilderPanel({
   const [showValidationTooltip, setShowValidationTooltip] = useState(false);
   const [showViewDropdown, setShowViewDropdown] = useState(false);
   const [showParagonDropdown, setShowParagonDropdown] = useState(false);
+  const [showParagonModal, setShowParagonModal] = useState(false);
   
   // View options
   const [viewLayout, setViewLayout] = useState<'grid' | 'list'>('grid');
@@ -172,6 +173,18 @@ export default function DeckBuilderPanel({
     document.addEventListener('click', handleClick);
     return () => document.removeEventListener('click', handleClick);
   }, [showParagonDropdown]);
+
+  // Close paragon modal with Escape key
+  useEffect(() => {
+    if (!showParagonModal) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowParagonModal(false);
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [showParagonModal]);
 
   // Calculate deck stats
   const mainDeckCards = deck.cards.filter((dc) => !dc.isReserve);
@@ -997,10 +1010,33 @@ export default function DeckBuilderPanel({
         {/* Paragon Requirements (only show for Paragon format with a selected Paragon) */}
         {deckType === 'Paragon' && deck.paragon && validation.paragonStats && (
           <div className="mb-4">
-            <ParagonRequirements
-              paragonName={deck.paragon}
-              stats={validation.paragonStats}
-            />
+            <div className="p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-lg">
+              <div className="flex items-start gap-3">
+                {/* Paragon Card Image - Click to Expand */}
+                <img 
+                  src={`/paragons/Paragon ${deck.paragon}.png`}
+                  alt={deck.paragon}
+                  className="w-24 h-auto rounded shadow-lg flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-purple-400 transition-all"
+                  onClick={() => setShowParagonModal(true)}
+                  onError={(e) => {
+                    // Hide image if it doesn't exist
+                    e.currentTarget.style.display = 'none';
+                  }}
+                  title="Click to view full card"
+                />
+                
+                {/* Paragon Info and Requirements */}
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-purple-900 dark:text-purple-100 mb-2">
+                    {deck.paragon}
+                  </h3>
+                  <ParagonRequirements
+                    paragonName={deck.paragon}
+                    stats={validation.paragonStats}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         )}
         
@@ -1422,6 +1458,40 @@ export default function DeckBuilderPanel({
           onLoadDeck={onLoadDeck}
           onClose={() => setShowLoadDeckModal(false)}
         />
+      )}
+
+      {/* Paragon Card Modal */}
+      {showParagonModal && deck.paragon && (
+        <div 
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowParagonModal(false)}
+        >
+          <div 
+            className="relative max-w-4xl w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close button */}
+            <button
+              onClick={() => setShowParagonModal(false)}
+              className="absolute -top-4 -right-4 w-10 h-10 bg-white dark:bg-gray-800 rounded-full shadow-lg flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors z-10"
+              aria-label="Close"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            
+            {/* Paragon Card Image - Full Size */}
+            <img 
+              src={`/paragons/Paragon ${deck.paragon}.png`}
+              alt={deck.paragon}
+              className="w-full h-auto rounded-lg shadow-2xl"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          </div>
+        </div>
       )}
     </div>
   );
