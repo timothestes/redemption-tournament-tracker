@@ -49,8 +49,8 @@ export default function CardSearchClient() {
   const [toughnessFilter, setToughnessFilter] = useState<number | null>(null);
   const [toughnessOp, setToughnessOp] = useState<string>('eq');
   const [cards, setCards] = useState<Card[]>([]);
-  // Card legality filter mode: Rotation, Classic (all), Banned, Scrolls (not Rotation or Banned)
-  const [legalityMode, setLegalityMode] = useState<'Rotation'|'Classic'|'Banned'|'Scrolls'>('Rotation');
+  // Card legality filter mode: Rotation, Classic (all), Banned, Scrolls (not Rotation or Banned), Paragon
+  const [legalityMode, setLegalityMode] = useState<'Rotation'|'Classic'|'Banned'|'Scrolls'|'Paragon'>('Rotation');
   const [visibleCount, setVisibleCount] = useState(0); // Number of cards to show
 
   const [modalCard, setModalCard] = useState<Card | null>(null);
@@ -122,6 +122,7 @@ export default function CardSearchClient() {
     updateQuantity,
     setDeckName,
     setDeckFormat,
+    setDeckParagon,
     clearDeck,
     newDeck,
     loadDeck,
@@ -535,6 +536,51 @@ export default function CardSearchClient() {
         .filter((c) => {
           if (legalityMode === 'Classic') return true;
           if (legalityMode === 'Scrolls') return c.legality !== 'Rotation' && c.legality !== 'Banned';
+          if (legalityMode === 'Paragon') {
+            // Paragon format: exclude Lost Souls (not allowed in Paragon)
+            if (c.type.toLowerCase().includes('lost soul')) {
+              return false;
+            }
+            // Paragon format: exclude non-legal sets (easier to maintain than include list)
+            const paragonExcludedSets = [
+              '10th Anniversary',
+              '1st Edition',
+              '1st Edition Unlimited',
+              '2nd Edition',
+              '2nd Edition Revised',
+              '3rd Edition',
+              'Angel Wars',
+              'Apostles',
+              'Cloud of Witnesses',
+              'Cloud of Witnesses (Alternate Border)',
+              'Disciples',
+              'Early Church',
+              'Faith of Our Fathers',
+              'Fall of Man',
+              'Fundraiser',
+              'Gospel of Christ',
+              'Gospel of Christ Token',
+              'Kings',
+              'Lineage of Christ',
+              'Main',
+              'Main Unlimited',
+              'Patriarchs',
+              'Persecuted Church',
+              'Priests',
+              'Promo',
+              'Promo Token',
+              'Prophecies of Christ',
+              'Prophecies of Christ Token',
+              'Prophets',
+              'Revelation of John',
+              'Revelation of John (Alternate Border)',
+              'Rock of Ages',
+              'Thesaurus ex Preteritus',
+              'Warriors',
+              'Women'
+            ];
+            return !paragonExcludedSets.includes(c.officialSet);
+          }
           return c.legality === legalityMode;
         })
         // Alignment filters (OR across selected filters)
@@ -796,7 +842,8 @@ export default function CardSearchClient() {
   function handleResetFilters() {
     setQueries([{text: "", field: "everything"}]);
     setSelectedIconFilters([]);
-    setLegalityMode('Rotation');
+    // Keep current legality mode when resetting (don't reset to Rotation)
+    // setLegalityMode('Rotation');
     setIconFilterMode('AND');
     setSelectedAlignmentFilters([]);
     setSelectedRarityFilters([]);
@@ -1518,6 +1565,7 @@ export default function CardSearchClient() {
             isExpanded={!showSearch}
             onDeckNameChange={setDeckName}
             onDeckFormatChange={setDeckFormat}
+            onParagonChange={setDeckParagon}
             onSaveDeck={saveDeckToCloud}
             onAddCard={(cardName, cardSet, isReserve) => {
               // Find the card in the cards array

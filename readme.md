@@ -53,6 +53,34 @@ After building, you can start the production server with:
 npm run start
 ```
 
+## Paragon Format
+
+This project includes support for the Paragon format with 42 playable Paragons.
+
+### Updating Paragon Data
+
+Paragon data is synced from a Google Sheets source. To download the latest data:
+
+```bash
+make update-paragons
+```
+
+Or use the shorter alias:
+
+```bash
+make paragons
+```
+
+This command will:
+1. Download the latest CSV data from Google Sheets
+2. Parse and validate the data
+3. Generate type-safe TypeScript definitions
+4. Output a list of all 42 Paragons
+
+### Paragon Images
+
+Place Paragon card images in `public/paragons/` directory. See `public/paragons/README.md` for details on naming conventions and image specifications.
+
 I'd like you to implement a new feature: the print match slips button.
 
 It should go next to the "print round pairings" button.

@@ -11,6 +11,8 @@ import GenerateDeckImageModal from "./GenerateDeckImageModal";
 import ClearDeckModal from "./ClearDeckModal";
 import LoadDeckModal from "./LoadDeckModal";
 import { duplicateDeckAction } from "../../actions";
+import { getParagonNames, getParagonByName, getParagonImagePath } from "../data/paragons";
+import ParagonRequirements from "./ParagonRequirements";
 
 export type TabType = "main" | "reserve" | "info";
 
@@ -29,6 +31,8 @@ interface DeckBuilderPanelProps {
   onDeckNameChange: (name: string) => void;
   /** Callback when deck format changes */
   onDeckFormatChange?: (format: string) => void;
+  /** Callback when Paragon changes */
+  onParagonChange?: (paragon: string | undefined) => void;
   /** Callback to save deck to cloud */
   onSaveDeck?: () => Promise<{ success: boolean; error?: string }>;
   /** Callback to add a card */
@@ -66,6 +70,7 @@ export default function DeckBuilderPanel({
   isExpanded = false,
   onDeckNameChange,
   onDeckFormatChange,
+  onParagonChange,
   onSaveDeck,
   onAddCard,
   onRemoveCard,
@@ -89,6 +94,7 @@ export default function DeckBuilderPanel({
   const [showLoadDeckModal, setShowLoadDeckModal] = useState(false);
   const [showValidationTooltip, setShowValidationTooltip] = useState(false);
   const [showViewDropdown, setShowViewDropdown] = useState(false);
+  const [showParagonDropdown, setShowParagonDropdown] = useState(false);
   
   // View options
   const [viewLayout, setViewLayout] = useState<'grid' | 'list'>('grid');
@@ -96,19 +102,44 @@ export default function DeckBuilderPanel({
   const [disableHoverPreview, setDisableHoverPreview] = useState(false);
   
   // Initialize deck type based on deck.format
-  const [deckType, setDeckType] = useState<'T1' | 'T2'>(() => {
+  const [deckType, setDeckType] = useState<'T1' | 'T2' | 'Paragon'>(() => {
     const format = deck.format?.toLowerCase();
-    return format?.includes('type 2') || format?.includes('multi') ? 'T2' : 'T1';
+    if (format?.includes('paragon')) return 'Paragon';
+    if (format?.includes('type 2') || format?.includes('multi')) return 'T2';
+    return 'T1';
   });
 
   // Calculate validation
   const validation = validateDeck(deck);
 
-  // Handle deck type toggle
-  const handleDeckTypeToggle = () => {
-    const newType = deckType === 'T1' ? 'T2' : 'T1';
+  // Helper function to get brigade color
+  const getBrigadeColor = (brigade: string): string => {
+    const brigadeColors: Record<string, string> = {
+      'Red': '#DC2626',      // red-600
+      'Blue': '#2563EB',     // blue-600
+      'Green': '#16A34A',    // green-600
+      'Purple': '#9333EA',   // purple-600
+      'Gold': '#F59E0B',     // amber-500
+      'White': '#E5E7EB',    // gray-200
+      'Black': '#1F2937',    // gray-800
+      'Brown': '#92400E',    // amber-800
+      'Teal': '#0D9488',     // teal-600
+      'Crimson': '#BE123C',  // rose-700
+      'Orange': '#EA580C',   // orange-600
+      'Silver': '#9CA3AF',   // gray-400
+      'Clay': '#A16207',     // yellow-700
+      'Gray': '#6B7280',     // gray-500
+    };
+    return brigadeColors[brigade] || '#6B7280'; // default to gray-500
+  };
+
+  // Handle deck type change
+  const handleDeckTypeChange = (newType: 'T1' | 'T2' | 'Paragon') => {
     setDeckType(newType);
-    const newFormat = newType === 'T2' ? 'Type 2' : 'Type 1';
+    let newFormat: string;
+    if (newType === 'T2') newFormat = 'Type 2';
+    else if (newType === 'Paragon') newFormat = 'Paragon';
+    else newFormat = 'Type 1';
     onDeckFormatChange?.(newFormat);
   };
 
@@ -133,6 +164,14 @@ export default function DeckBuilderPanel({
     document.addEventListener('click', handleClick);
     return () => document.removeEventListener('click', handleClick);
   }, [showViewDropdown]);
+
+  // Close paragon dropdown when clicking outside
+  useEffect(() => {
+    if (!showParagonDropdown) return;
+    const handleClick = () => setShowParagonDropdown(false);
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [showParagonDropdown]);
 
   // Calculate deck stats
   const mainDeckCards = deck.cards.filter((dc) => !dc.isReserve);
@@ -396,14 +435,11 @@ export default function DeckBuilderPanel({
               <span className="font-semibold text-gray-900 dark:text-white">{totalCards}</span>
             </div>
             
-            {/* T1/T2 Toggle Switch */}
+            {/* Format Selector (T1/T2/Paragon) */}
             <span className="text-gray-400">•</span>
             <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-full p-0.5">
               <button
-                onClick={() => {
-                  setDeckType('T1');
-                  onDeckFormatChange?.('Type 1');
-                }}
+                onClick={() => handleDeckTypeChange('T1')}
                 className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
                   deckType === 'T1'
                     ? 'bg-blue-600 dark:bg-blue-500 text-white'
@@ -413,10 +449,7 @@ export default function DeckBuilderPanel({
                 T1
               </button>
               <button
-                onClick={() => {
-                  setDeckType('T2');
-                  onDeckFormatChange?.('Type 2');
-                }}
+                onClick={() => handleDeckTypeChange('T2')}
                 className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
                   deckType === 'T2'
                     ? 'bg-blue-600 dark:bg-blue-500 text-white'
@@ -425,7 +458,107 @@ export default function DeckBuilderPanel({
               >
                 T2
               </button>
+              <button
+                onClick={() => handleDeckTypeChange('Paragon')}
+                className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                  deckType === 'Paragon'
+                    ? 'bg-purple-600 dark:bg-purple-500 text-white'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 cursor-pointer'
+                }`}
+              >
+                Paragon
+              </button>
             </div>
+            
+            {/* Paragon Selector (only show for Paragon format) */}
+            {deckType === 'Paragon' && (
+              <div className="relative flex items-center gap-1">
+                <span className="text-gray-600 dark:text-gray-400 text-xs">Paragon:</span>
+                <button
+                    onClick={() => setShowParagonDropdown(!showParagonDropdown)}
+                    className="text-xs px-2 py-0.5 bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-700 rounded text-purple-900 dark:text-purple-100 font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 flex items-center gap-1.5 min-w-[180px] justify-between"
+                  >
+                    {deck.paragon ? (
+                      <span className="flex items-center gap-1.5">
+                        {(() => {
+                          const paragonData = getParagonByName(deck.paragon);
+                          if (paragonData) {
+                            return (
+                              <>
+                                <span className="flex gap-0.5">
+                                  <span
+                                    className="w-3 h-3 rounded-sm border border-gray-300 dark:border-gray-600"
+                                    style={{ backgroundColor: getBrigadeColor(paragonData.goodBrigade) }}
+                                    title={`${paragonData.goodBrigade} (Good)`}
+                                  />
+                                  <span
+                                    className="w-3 h-3 rounded-sm border border-gray-300 dark:border-gray-600"
+                                    style={{ backgroundColor: getBrigadeColor(paragonData.evilBrigade) }}
+                                    title={`${paragonData.evilBrigade} (Evil)`}
+                                  />
+                                </span>
+                                <span>{deck.paragon}</span>
+                              </>
+                            );
+                          }
+                          return <span>{deck.paragon}</span>;
+                        })()}
+                      </span>
+                    ) : (
+                      <span className="text-purple-700 dark:text-purple-300">Choose a Paragon...</span>
+                    )}
+                    <svg className={`w-3 h-3 transition-transform ${showParagonDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  
+                  {/* Custom Dropdown Menu */}
+                  {showParagonDropdown && (
+                    <div className="absolute top-full mt-1 left-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto min-w-[240px]">
+                      <button
+                        onClick={() => {
+                          onParagonChange?.(undefined);
+                          setShowParagonDropdown(false);
+                        }}
+                        className="w-full px-3 py-2 text-left text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      >
+                        Choose a Paragon...
+                      </button>
+                      {getParagonNames().map((name) => {
+                        const paragonData = getParagonByName(name);
+                        return (
+                          <button
+                            key={name}
+                            onClick={() => {
+                              onParagonChange?.(name);
+                              setShowParagonDropdown(false);
+                            }}
+                            className={`w-full px-3 py-2 text-left text-xs hover:bg-purple-50 dark:hover:bg-purple-900/30 transition-colors flex items-center gap-2 ${
+                              deck.paragon === name ? 'bg-purple-100 dark:bg-purple-900/50 text-purple-900 dark:text-purple-100' : 'text-gray-700 dark:text-gray-300'
+                            }`}
+                          >
+                            {paragonData && (
+                              <span className="flex gap-0.5 flex-shrink-0">
+                                <span
+                                  className="w-3 h-3 rounded-sm border border-gray-300 dark:border-gray-600"
+                                  style={{ backgroundColor: getBrigadeColor(paragonData.goodBrigade) }}
+                                  title={`${paragonData.goodBrigade} (Good)`}
+                                />
+                                <span
+                                  className="w-3 h-3 rounded-sm border border-gray-300 dark:border-gray-600"
+                                  style={{ backgroundColor: getBrigadeColor(paragonData.evilBrigade) }}
+                                  title={`${paragonData.evilBrigade} (Evil)`}
+                                />
+                              </span>
+                            )}
+                            <span className="font-medium">{name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+            )}
           </div>
 
           {/* Action Buttons */}
@@ -861,6 +994,16 @@ export default function DeckBuilderPanel({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4" data-deck-grid>
+        {/* Paragon Requirements (only show for Paragon format with a selected Paragon) */}
+        {deckType === 'Paragon' && deck.paragon && validation.paragonStats && (
+          <div className="mb-4">
+            <ParagonRequirements
+              paragonName={deck.paragon}
+              stats={validation.paragonStats}
+            />
+          </div>
+        )}
+        
         {/* Show Full Deck View when expanded */}
         {isExpanded ? (
           <FullDeckView 
