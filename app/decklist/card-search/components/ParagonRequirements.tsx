@@ -15,7 +15,7 @@ export default function ParagonRequirements({ paragonName, stats }: ParagonRequi
 
   const requirements = [
     {
-      label: `${paragon.goodBrigade} Good`,
+      label: paragon.goodBrigade,
       required: paragon.primaryGood,
       current: stats?.primaryGood || 0,
       color: "blue",
@@ -39,7 +39,7 @@ export default function ParagonRequirements({ paragonName, stats }: ParagonRequi
       description: `${paragon.neutral} neutral-aligned cards`,
     },
     {
-      label: `${paragon.evilBrigade} Evil`,
+      label: paragon.evilBrigade,
       required: paragon.primaryEvil,
       current: stats?.primaryEvil || 0,
       color: "red",
@@ -55,7 +55,7 @@ export default function ParagonRequirements({ paragonName, stats }: ParagonRequi
       description: `${paragon.otherEvil} evil-aligned cards from any brigade except ${paragon.evilBrigade}`,
     },
     {
-      label: "Dominants",
+      label: "Doms",
       required: 7,
       current: stats?.dominants || 0,
       color: "purple",

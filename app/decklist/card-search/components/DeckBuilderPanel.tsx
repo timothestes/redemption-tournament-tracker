@@ -1216,26 +1216,78 @@ export default function DeckBuilderPanel({
         ) : (
           // Info Tab
           <div className="space-y-4 text-sm">
-            {/* Disclaimer */}
-            <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-              <div className="flex items-start gap-2">
-                <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                </svg>
-                <p className="text-xs text-blue-800 dark:text-blue-200">
-                  Not all deckbuilding checks are implemented, just the basic ones. Please refer to the{' '}
-                  <a 
-                    href="https://landofredemption.com/wp-content/uploads/2024/10/Deck_Building_Rules_1.2.pdf"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-semibold underline hover:text-blue-600 dark:hover:text-blue-300 transition-colors"
-                  >
-                    official deck building rules
-                  </a>
-                  {' '}to ensure the legality of your deck.
-                </p>
+            {/* Disclaimer - Hide for Paragon format */}
+            {deckType !== 'Paragon' && (
+              <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                <div className="flex items-start gap-2">
+                  <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  <p className="text-xs text-blue-800 dark:text-blue-200">
+                    Not all deckbuilding checks are implemented, just the basic ones. Please refer to the{' '}
+                    <a 
+                      href="https://landofredemption.com/wp-content/uploads/2024/10/Deck_Building_Rules_1.2.pdf"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold underline hover:text-blue-600 dark:hover:text-blue-300 transition-colors"
+                    >
+                      official deck building rules
+                    </a>
+                    {' '}to ensure the legality of your deck.
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Paragon Resources - Only show for Paragon format */}
+            {deckType === 'Paragon' && (
+              <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
+                <div className="flex items-start gap-2 mb-2">
+                  <svg className="w-5 h-5 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  <div className="flex-1">
+                    <h4 className="text-xs font-semibold text-purple-800 dark:text-purple-200 mb-2">
+                      Paragon Format Resources
+                    </h4>
+                    <div className="space-y-1">
+                      <a 
+                        href="https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Paragons-v1.pdf"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block text-xs text-purple-700 dark:text-purple-300 hover:text-purple-600 dark:hover:text-purple-200 underline transition-colors"
+                      >
+                        Paragon Cards PDF
+                      </a>
+                      <a 
+                        href="https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Rules-v1.pdf"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block text-xs text-purple-700 dark:text-purple-300 hover:text-purple-600 dark:hover:text-purple-200 underline transition-colors"
+                      >
+                        Paragon Rules PDF
+                      </a>
+                      <a 
+                        href="https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Lost-Souls-Color-v1.pdf"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block text-xs text-purple-700 dark:text-purple-300 hover:text-purple-600 dark:hover:text-purple-200 underline transition-colors"
+                      >
+                        Lost Souls (Color) PDF
+                      </a>
+                      <a 
+                        href="https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Lost-Souls-BW-v1.pdf"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block text-xs text-purple-700 dark:text-purple-300 hover:text-purple-600 dark:hover:text-purple-200 underline transition-colors"
+                      >
+                        Lost Souls (B&W) PDF
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             
             {/* Validation Status */}
             <div>

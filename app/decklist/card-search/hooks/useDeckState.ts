@@ -574,6 +574,13 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
     };
   }, [deck.cards]);
 
+  /**
+   * Clear the unsaved changes flag (useful when discarding changes)
+   */
+  const clearUnsavedChanges = useCallback(() => {
+    setHasUnsavedChanges(false);
+  }, []);
+
   return {
     deck,
     syncStatus,
@@ -592,6 +599,7 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
     saveDeckToCloud,
     getCardQuantity,
     getDeckStats,
+    clearUnsavedChanges,
   };
 }
 

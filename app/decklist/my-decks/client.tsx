@@ -616,6 +616,17 @@ function DeckCard({
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow">
+      {/* Paragon Image Header */}
+      {formatDeckType(deck.format) === "Paragon" && deck.paragon && (
+        <div className="h-32 overflow-hidden rounded-t-lg">
+          <img
+            src={`/paragons/Paragon ${deck.paragon}.png`}
+            alt={deck.paragon}
+            className="w-full h-full object-cover object-top"
+          />
+        </div>
+      )}
+      
       <div className="p-4">
         <div className="flex items-start justify-between mb-2">
           <h3 className="font-semibold text-lg truncate flex-1">{deck.name}</h3>

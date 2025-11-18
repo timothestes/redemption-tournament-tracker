@@ -97,6 +97,10 @@ export default function CardSearchClient() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [exportNotification, setExportNotification] = useState(false);
 
+  // Unsaved changes modal state
+  const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
+
   // Panel visibility state
   const [showDeckBuilder, setShowDeckBuilder] = useState(true);
   const [showSearch, setShowSearch] = useState(true);
@@ -129,7 +133,8 @@ export default function CardSearchClient() {
     loadDeckFromCloud,
     saveDeckToCloud,
     getCardQuantity,
-    getDeckStats
+    getDeckStats,
+    clearUnsavedChanges,
   } = useDeckState(deckIdFromUrl, folderIdFromUrl, isNewDeck);
 
   // Helper functions for managing multiple queries
@@ -319,6 +324,33 @@ export default function CardSearchClient() {
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // Intercept link clicks for internal navigation with unsaved changes
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (!hasUnsavedChanges) return;
+
+      const target = e.target as HTMLElement;
+      const link = target.closest('a');
+      
+      // Check if it's an internal link (not opening in new tab and not external)
+      if (link && !link.target && link.href && link.href.startsWith(window.location.origin)) {
+        console.log('Intercepting navigation to:', link.href);
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Store the navigation action
+        setPendingNavigation(() => () => {
+          window.location.href = link.href;
+        });
+        setShowUnsavedChangesModal(true);
+        return false;
+      }
+    };
+
+    document.addEventListener('click', handleClick, true);
+    return () => document.removeEventListener('click', handleClick, true);
   }, [hasUnsavedChanges]);
 
   // Keyboard shortcuts
@@ -1674,6 +1706,150 @@ export default function CardSearchClient() {
               >
                 Import
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Unsaved Changes Modal */}
+      {showUnsavedChangesModal && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setShowUnsavedChangesModal(false)}
+        >
+          <div 
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header - Less vibrant, more subtle */}
+            <div className="bg-gradient-to-r from-slate-600 to-slate-700 dark:from-slate-700 dark:to-slate-800 px-6 py-5">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 w-12 h-12 bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center">
+                  <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-white mb-1">Save Your Work?</h3>
+                  <p className="text-sm text-slate-200">Your recent changes haven't been saved yet</p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Content */}
+            <div className="px-6 py-6">
+              <p className="text-gray-600 dark:text-gray-300 mb-5 leading-relaxed">
+                It looks like you've made some changes. Would you like to save them before continuing?
+              </p>
+              
+              {/* Deck info card */}
+              <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/50 dark:to-gray-900/30 rounded-xl p-4 border border-gray-200 dark:border-gray-700 shadow-sm">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 bg-blue-500/10 dark:bg-blue-500/20 rounded-lg flex items-center justify-center">
+                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="font-semibold text-gray-900 dark:text-white text-base">
+                      {deck.name || "Untitled Deck"}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                      <span>{getDeckStats().mainDeckCount + getDeckStats().reserveCount} cards</span>
+                      <span className="text-gray-400 dark:text-gray-600">•</span>
+                      <span>{deck.format || "Type 1"}</span>
+                    </div>
+                  </div>
+                </div>
+                {!user && (
+                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <p className="text-xs text-amber-600 dark:text-amber-400 flex items-start gap-2">
+                      <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>Sign in to save your deck to the cloud</span>
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Actions - Using tournament modal style */}
+            <div className="px-6 py-5 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex flex-col gap-3">
+                {/* Save & Continue - Primary action */}
+                <button
+                  onClick={async () => {
+                    if (user) {
+                      try {
+                        await saveDeckToCloud();
+                        setNotification({ message: 'Deck saved successfully!', type: 'success' });
+                        setTimeout(() => setNotification(null), 3000);
+                        
+                        // Wait a bit for save to complete, then navigate
+                        setTimeout(() => {
+                          if (pendingNavigation) {
+                            pendingNavigation();
+                          }
+                        }, 500);
+                      } catch (error) {
+                        setNotification({ message: 'Failed to save deck', type: 'error' });
+                        setTimeout(() => setNotification(null), 3000);
+                      }
+                    }
+                    setShowUnsavedChangesModal(false);
+                    setPendingNavigation(null);
+                  }}
+                  disabled={!user}
+                  className="w-full px-6 py-3 bg-white dark:bg-gray-800 rounded-lg transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border-2 hover:bg-green-50 dark:hover:bg-green-950/20"
+                  style={{
+                    borderImage: 'linear-gradient(to right, rgb(34 197 94), rgb(59 130 246)) 1',
+                  }}
+                >
+                  <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                  </svg>
+                  <span className="bg-gradient-to-r from-green-600 to-blue-600 dark:from-green-400 dark:to-blue-400 bg-clip-text text-transparent">
+                    Save & Continue
+                  </span>
+                </button>
+
+                {/* Leave without saving - Destructive action */}
+                <button
+                  onClick={() => {
+                    // Clear unsaved changes flag to prevent browser warning
+                    clearUnsavedChanges();
+                    
+                    // Close modal first
+                    setShowUnsavedChangesModal(false);
+                    setPendingNavigation(null);
+                    
+                    // Navigate after a brief delay to ensure state updates
+                    setTimeout(() => {
+                      if (pendingNavigation) {
+                        pendingNavigation();
+                      }
+                    }, 0);
+                  }}
+                  className="w-full px-6 py-3 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg transition-all font-semibold flex items-center justify-center gap-2 border-2 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                  </svg>
+                  Leave without saving
+                </button>
+
+                {/* Cancel - Close modal */}
+                <button
+                  onClick={() => {
+                    setShowUnsavedChangesModal(false);
+                    setPendingNavigation(null);
+                  }}
+                  className="w-full px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         </div>
