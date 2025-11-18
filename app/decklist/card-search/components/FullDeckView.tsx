@@ -206,15 +206,29 @@ export default function FullDeckView({ deck, onViewCard }: FullDeckViewProps) {
     let currentCount = 0;
 
     for (const deckCard of cards) {
-      if (currentCount + deckCard.quantity <= targetPerColumn) {
+      // Check if adding this card would exceed the target
+      if (currentCount + deckCard.quantity > targetPerColumn && currentColumn.length > 0) {
+        // Only start a new column if:
+        // 1. We have cards in the current column, AND
+        // 2. Adding this card would put us over target, AND
+        // 3. The current column is closer to target than it would be with this card added
+        const distanceWithoutCard = Math.abs(currentCount - targetPerColumn);
+        const distanceWithCard = Math.abs(currentCount + deckCard.quantity - targetPerColumn);
+        
+        // If adding the card makes us further from target, start a new column
+        if (distanceWithCard > distanceWithoutCard) {
+          columns.push(currentColumn);
+          currentColumn = [deckCard];
+          currentCount = deckCard.quantity;
+        } else {
+          // Otherwise, add it to current column (better balance)
+          currentColumn.push(deckCard);
+          currentCount += deckCard.quantity;
+        }
+      } else {
+        // Add to current column
         currentColumn.push(deckCard);
         currentCount += deckCard.quantity;
-      } else {
-        if (currentColumn.length > 0) {
-          columns.push(currentColumn);
-        }
-        currentColumn = [deckCard];
-        currentCount = deckCard.quantity;
       }
     }
 
