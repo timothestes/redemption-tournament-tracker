@@ -117,19 +117,19 @@ export default function DeckBuilderPanel({
   const getBrigadeColor = (brigade: string): string => {
     const brigadeColors: Record<string, string> = {
       'Red': '#DC2626',      // red-600
-      'Blue': '#2563EB',     // blue-600
-      'Green': '#16A34A',    // green-600
-      'Purple': '#9333EA',   // purple-600
-      'Gold': '#F59E0B',     // amber-500
-      'White': '#E5E7EB',    // gray-200
-      'Black': '#1F2937',    // gray-800
-      'Brown': '#92400E',    // amber-800
+      'Blue': '#2b57a2',     // custom blue color
+      'Green': '#02b65f',    // custom green color
+      'Purple': '#b75ba9',   // custom purple color
+      'Gold': '#ffda5b',     // custom gold color
+      'White': '#ffffff',    // custom white color
+      'Black': '#020406',    // custom black color
+      'Brown': '#a97b27',    // custom brown color
       'Teal': '#0D9488',     // teal-600
-      'Crimson': '#BE123C',  // rose-700
-      'Orange': '#EA580C',   // orange-600
-      'Silver': '#9CA3AF',   // gray-400
-      'Clay': '#A16207',     // yellow-700
-      'Gray': '#6B7280',     // gray-500
+      'Crimson': '#f34088',  // custom crimson color
+      'Orange': '#fcbb72',   // custom orange color
+      'Silver': '#b5b8b9',   // custom silver color
+      'Clay': '#e2b7b3',     // custom clay color
+      'Gray': '#b3c0ba',     // custom gray color
     };
     return brigadeColors[brigade] || '#6B7280'; // default to gray-500
   };

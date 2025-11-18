@@ -119,7 +119,7 @@ export default function ParagonRequirements({ paragonName, stats }: ParagonRequi
       </div>
       
       <div className="mt-2 text-xs text-purple-700 dark:text-purple-300">
-        <strong>Note:</strong> Lost Souls are not allowed in Paragon format. Maximum 7 Dominants.
+        <strong>Note:</strong> No Lost Souls. 40 Card Main deck. 10 Card Reserve. Maximum 7 Dominants.
       </div>
     </div>
   );

@@ -838,6 +838,15 @@ export default function CardSearchClient() {
 
   // Brigade normalization helpers - now imported from utils
 
+  // Handle deck format change - also update legality mode filter
+  function handleDeckFormatChange(format: string) {
+    setDeckFormat(format);
+    // If format is Paragon, automatically set legality filter to Paragon
+    if (format.toLowerCase().includes('paragon')) {
+      setLegalityMode('Paragon');
+    }
+  }
+
   // Reset filters handler
   function handleResetFilters() {
     setQueries([{text: "", field: "everything"}]);
@@ -1564,7 +1573,7 @@ export default function CardSearchClient() {
             isAuthenticated={!!user}
             isExpanded={!showSearch}
             onDeckNameChange={setDeckName}
-            onDeckFormatChange={setDeckFormat}
+            onDeckFormatChange={handleDeckFormatChange}
             onParagonChange={setDeckParagon}
             onSaveDeck={saveDeckToCloud}
             onAddCard={(cardName, cardSet, isReserve) => {
