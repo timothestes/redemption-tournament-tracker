@@ -11,8 +11,9 @@ import GenerateDeckImageModal from "./GenerateDeckImageModal";
 import ClearDeckModal from "./ClearDeckModal";
 import LoadDeckModal from "./LoadDeckModal";
 import { duplicateDeckAction } from "../../actions";
-import { getParagonNames, getParagonByName, getParagonImagePath } from "../data/paragons";
+import { getParagonNames, getParagonByName } from "../data/paragons";
 import ParagonRequirements from "./ParagonRequirements";
+import { useCardImageUrl } from "../hooks/useCardImageUrl";
 
 export type TabType = "main" | "reserve" | "info";
 
@@ -500,12 +501,12 @@ export default function DeckBuilderPanel({
                               <>
                                 <span className="flex gap-0.5">
                                   <span
-                                    className="w-3 h-3 rounded-sm border border-gray-300 dark:border-gray-600"
+                                    className="w-3 h-3 rounded-sm border border-black"
                                     style={{ backgroundColor: getBrigadeColor(paragonData.goodBrigade) }}
                                     title={`${paragonData.goodBrigade} (Good)`}
                                   />
                                   <span
-                                    className="w-3 h-3 rounded-sm border border-gray-300 dark:border-gray-600"
+                                    className="w-3 h-3 rounded-sm border border-black"
                                     style={{ backgroundColor: getBrigadeColor(paragonData.evilBrigade) }}
                                     title={`${paragonData.evilBrigade} (Evil)`}
                                   />
@@ -553,12 +554,12 @@ export default function DeckBuilderPanel({
                             {paragonData && (
                               <span className="flex gap-0.5 flex-shrink-0">
                                 <span
-                                  className="w-3 h-3 rounded-sm border border-gray-300 dark:border-gray-600"
+                                  className="w-3 h-3 rounded-sm border border-black"
                                   style={{ backgroundColor: getBrigadeColor(paragonData.goodBrigade) }}
                                   title={`${paragonData.goodBrigade} (Good)`}
                                 />
                                 <span
-                                  className="w-3 h-3 rounded-sm border border-gray-300 dark:border-gray-600"
+                                  className="w-3 h-3 rounded-sm border border-black"
                                   style={{ backgroundColor: getBrigadeColor(paragonData.evilBrigade) }}
                                   title={`${paragonData.evilBrigade} (Evil)`}
                                 />
@@ -1500,6 +1501,24 @@ export default function DeckBuilderPanel({
           </div>
         </div>
       )}
+
+      {/* Hidden image preloader for reserve cards */}
+      <div className="hidden" aria-hidden="true">
+        {reserveCards.map((deckCard) => {
+          const imageUrl = (() => {
+            const { getImageUrl } = useCardImageUrl();
+            return getImageUrl(deckCard.card.imgFile || "");
+          })();
+          return imageUrl ? (
+            <img
+              key={`preload-${deckCard.card.name}-${deckCard.card.set}`}
+              src={imageUrl}
+              alt=""
+              loading="eager"
+            />
+          ) : null;
+        })}
+      </div>
     </div>
   );
 }
