@@ -296,7 +296,7 @@ export default function FullDeckView({ deck, onViewCard }: FullDeckViewProps) {
               src={imageUrl}
               alt={card.name}
               className="w-full h-full object-cover"
-              loading="lazy"
+              loading="eager"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gray-700">

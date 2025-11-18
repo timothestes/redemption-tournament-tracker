@@ -9,6 +9,7 @@ interface CardImageProps {
   sizes?: string;
   priority?: boolean;
   onClick?: () => void;
+  eager?: boolean; // Add option to load eagerly (more proactive)
 }
 
 export default function CardImage({ imgFile, alt, className = "", sizes, priority = false, onClick }: CardImageProps) {
@@ -39,6 +40,7 @@ export default function CardImage({ imgFile, alt, className = "", sizes, priorit
           className={`object-contain transition-opacity duration-200 ${isLoading ? 'opacity-0' : 'opacity-100'} ${className}`}
           sizes={sizes}
           priority={priority}
+          loading="eager"
           onLoad={() => setIsLoading(false)}
           onError={() => {
             setIsLoading(false);

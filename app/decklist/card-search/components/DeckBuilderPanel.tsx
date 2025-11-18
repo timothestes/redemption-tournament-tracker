@@ -1010,26 +1010,33 @@ export default function DeckBuilderPanel({
         {/* Paragon Requirements (only show for Paragon format with a selected Paragon) */}
         {deckType === 'Paragon' && deck.paragon && validation.paragonStats && (
           <div className="mb-4">
-            <div className="p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-lg">
-              <div className="flex items-start gap-3">
-                {/* Paragon Card Image - Click to Expand */}
-                <img 
-                  src={`/paragons/Paragon ${deck.paragon}.png`}
-                  alt={deck.paragon}
-                  className="w-24 h-auto rounded shadow-lg flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-purple-400 transition-all"
+            <div className="p-4 bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-2 border-purple-300 dark:border-purple-600 rounded-xl shadow-md">
+              <div className="flex items-start gap-4">
+                {/* Paragon Card Artwork - Click to Expand */}
+                <div 
+                  className="relative group w-32 h-40 rounded-lg shadow-xl flex-shrink-0 cursor-pointer hover:scale-105 hover:shadow-2xl transition-transform overflow-hidden bg-gray-200 dark:bg-gray-700 border-2 border-white dark:border-gray-600"
                   onClick={() => setShowParagonModal(true)}
-                  onError={(e) => {
-                    // Hide image if it doesn't exist
-                    e.currentTarget.style.display = 'none';
-                  }}
                   title="Click to view full card"
-                />
+                >
+                  <img 
+                    src={`/paragons/Paragon ${deck.paragon}.png`}
+                    alt={deck.paragon}
+                    className="w-full h-full object-cover object-[1%_center]"
+                    onError={(e) => {
+                      // Hide container if image doesn't exist
+                      e.currentTarget.parentElement!.style.display = 'none';
+                    }}
+                  />
+                  {/* Click Indicator Icon - Bottom Left */}
+                  <div className="absolute bottom-2 left-2 bg-white/90 dark:bg-purple-600/90 rounded-full p-1.5 shadow-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-purple-600 dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                    </svg>
+                  </div>
+                </div>
                 
-                {/* Paragon Info and Requirements */}
+                {/* Paragon Requirements */}
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-purple-900 dark:text-purple-100 mb-2">
-                    {deck.paragon}
-                  </h3>
                   <ParagonRequirements
                     paragonName={deck.paragon}
                     stats={validation.paragonStats}
