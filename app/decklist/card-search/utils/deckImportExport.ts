@@ -10,6 +10,56 @@ function normalizeCardName(name: string): string {
 }
 
 /**
+ * Mapping of cards that generate tokens to their corresponding token cards
+ * Key: Normalized card name
+ * Value: Token card name
+ */
+const CARD_TO_TOKEN_MAP: Record<string, string> = {
+  "The Heavenly Host (GoC)": "Heavenly Host Token",
+  "Two Possessed (GoC)": "Violent Possessor Token",
+  "The Accumulator (GoC)": "Wicked Spirit Token",
+  "Lost Soul \"Lost Souls\" [Proverbs 2:16-17]": "Lost Soul Token \"Lost Souls\" [Proverbs 2:16-17]",
+  "Lost Soul \"Harvest\" [John 4:35] [2023 - 2nd Place]": "Lost Soul Token \"Harvest\" [John 4:35]",
+  "Lost Soul \"Harvest\" [John 4:35]": "Lost Soul Token \"Harvest\" [John 4:35]",
+  "The Church of Christ (GoC)": "Follower Token",
+  "Stricken": "Stricken Reminder Token",
+  "Majestic Heavens (Promo)": "Lost Soul Token NT (Majestic Heavens)|Lost Soul Token OT (Majestic Heavens)",
+  "The Proselytizers (GoC)": "Proselyte Token",
+};
+
+/**
+ * Get the list of required tokens for a deck
+ * Returns an array of unique token names needed
+ */
+function getRequiredTokens(deck: Deck): string[] {
+  const tokenSet = new Set<string>();
+  
+  deck.cards.forEach((dc) => {
+    const cardName = normalizeCardName(dc.card.name);
+    
+    // Check if this card generates tokens
+    Object.entries(CARD_TO_TOKEN_MAP).forEach(([sourceCard, tokens]) => {
+      const normalizedSourceCard = normalizeCardName(sourceCard);
+      
+      // Check for exact match or if the card name contains the source card pattern
+      // This handles cases where the card database might have slight variations
+      const matches = cardName === normalizedSourceCard || 
+                     cardName.toLowerCase() === normalizedSourceCard.toLowerCase() ||
+                     (normalizedSourceCard.includes("(") && 
+                      cardName.toLowerCase().includes(normalizedSourceCard.toLowerCase()));
+      
+      if (matches) {
+        // Some cards generate multiple tokens (separated by |)
+        const tokenNames = tokens.split("|");
+        tokenNames.forEach(token => tokenSet.add(token));
+      }
+    });
+  });
+  
+  return Array.from(tokenSet).sort();
+}
+
+/**
  * Parse a deck text in standard tab-separated format
  * Format: Quantity\tName\tSet\tImageFile\tCollectorInfo
  * Supports "Reserve:" section for reserve cards
@@ -145,6 +195,7 @@ export function parseDeckText(
  * Generate deck text in standard tab-separated format
  * Format: Quantity\tName
  * Reserve cards are separated with "Reserve:" marker
+ * Tokens are automatically added in a "Tokens:" section based on cards in the deck
  * Card names are normalized to use standard apostrophes
  */
 export function generateDeckText(deck: Deck): string {
@@ -174,6 +225,17 @@ export function generateDeckText(deck: Deck): string {
       const { card, quantity } = dc;
       const normalizedName = normalizeCardName(card.name);
       lines.push(`${quantity}\t${normalizedName}`);
+    });
+  }
+  
+  // Add tokens section if any cards in the deck generate tokens
+  const requiredTokens = getRequiredTokens(deck);
+  if (requiredTokens.length > 0) {
+    lines.push(""); // Empty line before Tokens
+    lines.push("Tokens:");
+    
+    requiredTokens.forEach((tokenName) => {
+      lines.push(`7\t${tokenName}`);
     });
   }
   
