@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import ModalWithClose from "./ModalWithClose";
 import FilterGrid from "./components/FilterGrid";
@@ -32,8 +32,10 @@ export default function CardSearchClient() {
   
   // Collapse state for filter grid
   const [filterGridCollapsed, setFilterGridCollapsed] = useState(false);
-  // Query state - each query has its own text and search field
-  const [queries, setQueries] = useState<{text: string, field: string}[]>([{text: "", field: "everything"}]);
+  // Query state - each query has its own text, search field, and operator
+  type QueryOperator = 'AND' | 'OR' | 'AND NOT' | 'NOT';
+  type QueryWithOp = { text: string; field: string; operator: QueryOperator };
+  const [queries, setQueries] = useState<QueryWithOp[]>([{text: "", field: "everything", operator: "AND"}]);
 
   // Icon filters with individual operators for each filter
   type IconFilterOperator = 'AND' | 'OR' | 'AND NOT';
@@ -137,6 +139,9 @@ export default function CardSearchClient() {
     clearUnsavedChanges,
   } = useDeckState(deckIdFromUrl, folderIdFromUrl, isNewDeck);
 
+  // Refs for input fields to enable auto-focus
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
   // Helper functions for managing multiple queries
   const updateQuery = (index: number, text: string) => {
     const newQueries = [...queries];
@@ -148,10 +153,21 @@ export default function CardSearchClient() {
     const newQueries = [...queries];
     newQueries[index] = { ...newQueries[index], field };
     setQueries(newQueries);
+    
+    // Auto-focus the input field after changing the field dropdown
+    setTimeout(() => {
+      inputRefs.current[index]?.focus();
+    }, 0);
+  };
+
+  const updateQueryOperator = (index: number, operator: QueryOperator) => {
+    const newQueries = [...queries];
+    newQueries[index] = { ...newQueries[index], operator };
+    setQueries(newQueries);
   };
 
   const addNewQuery = () => {
-    setQueries([...queries, {text: "", field: "everything"}]);
+    setQueries([...queries, {text: "", field: "everything", operator: "AND"}]);
   };
 
   const removeQuery = (index: number) => {
@@ -224,7 +240,7 @@ export default function CardSearchClient() {
     if (searchParams && !isInitialized) {
       const urlQuery = searchParams.get('q') || '';
       const urlField = searchParams.get('field') || 'everything';
-      setQueries(urlQuery ? [{text: urlQuery, field: urlField}] : [{text: "", field: "everything"}]);
+      setQueries(urlQuery ? [{text: urlQuery, field: urlField, operator: "AND"}] : [{text: "", field: "everything", operator: "AND"}]);
       setLegalityMode((searchParams.get('legality') as any) || 'Rotation');
       setIconFilterMode((searchParams.get('iconMode') as any) || 'AND');
       
@@ -536,16 +552,23 @@ export default function CardSearchClient() {
     () =>
       cards
         .filter((c) => {
-          // Handle multiple queries - all must match (AND logic)
+          // Handle multiple queries with operators - similar to icon filter logic
           const activeQueries = queries.filter(q => q.text.trim());
           if (activeQueries.length === 0) return true;
           
-          return activeQueries.every(queryObj => {
+          // Start with the first query's result
+          let result: boolean;
+          const firstQuery = activeQueries[0];
+          const firstMatches = (queryObj: QueryWithOp): boolean => {
             const q = queryObj.text.toLowerCase();
             const searchField = queryObj.field;
             switch (searchField) {
               case 'name':
                 return c.name.toLowerCase().includes(q);
+              case 'type':
+                return c.type.toLowerCase().includes(q);
+              case 'brigade':
+                return c.brigade.toLowerCase().includes(q);
               case 'specialAbility':
                 return c.specialAbility.toLowerCase().includes(q);
               case 'setName':
@@ -557,7 +580,33 @@ export default function CardSearchClient() {
               default:
                 return Object.values(c).join(" ").toLowerCase().includes(q);
             }
-          });
+          };
+          
+          // First query - check if it has a NOT operator (unary negation)
+          const firstQueryMatches = firstMatches(firstQuery);
+          result = firstQuery.operator === 'NOT' ? !firstQueryMatches : firstQueryMatches;
+          
+          // Apply each subsequent query with its own operator
+          for (let i = 1; i < activeQueries.length; i++) {
+            const query = activeQueries[i];
+            const matches = firstMatches(query);
+            
+            // Each query's operator defines how IT combines with the previous result
+            const currentOperator = query.operator;
+            
+            if (currentOperator === 'AND') {
+              result = result && matches;
+            } else if (currentOperator === 'OR') {
+              result = result || matches;
+            } else if (currentOperator === 'AND NOT') {
+              result = result && !matches;
+            } else if (currentOperator === 'NOT') {
+              // NOT without AND means AND NOT
+              result = result && !matches;
+            }
+          }
+          
+          return result;
         })
         // Filter out specific unwanted cards
         .filter((c) => {
@@ -881,7 +930,7 @@ export default function CardSearchClient() {
 
   // Reset filters handler
   function handleResetFilters() {
-    setQueries([{text: "", field: "everything"}]);
+    setQueries([{text: "", field: "everything", operator: "AND"}]);
     setSelectedIconFilters([]);
     // Keep current legality mode when resetting (don't reset to Rotation)
     // setLegalityMode('Rotation');
@@ -1053,15 +1102,7 @@ export default function CardSearchClient() {
             <div className="flex flex-col gap-2 w-full sm:w-auto">
               {queries.map((queryObj, index) => (
                 <div key={index} className="flex items-center gap-1">
-                  <input
-                    type="text"
-                    placeholder={index === 0 ? "Search" : `Search ${index + 1}`}
-                    className="w-full sm:w-auto p-3 pr-10 border rounded text-base focus:ring-2 focus:ring-blue-400 text-gray-900 bg-white dark:text-white dark:bg-gray-900"
-                    value={queryObj.text}
-                    onChange={(e) => updateQuery(index, e.target.value)}
-                    maxLength={64}
-                    style={{ minHeight: 48, maxWidth: 180 }}
-                  />
+                  {/* Field dropdown */}
                   <select
                     value={queryObj.field}
                     onChange={e => updateQueryField(index, e.target.value)}
@@ -1070,17 +1111,56 @@ export default function CardSearchClient() {
                   >
                     <option value="everything">All</option>
                     <option value="name">Name</option>
+                    <option value="type">Type</option>
+                    <option value="brigade">Brigade</option>
                     <option value="specialAbility">Special Ability</option>
                     <option value="setName">Set Name</option>
                     <option value="identifier">Identifier</option>
                     <option value="reference">Reference</option>
                   </select>
+                  
+                  {/* Operator dropdown - shown for all queries */}
+                  <select
+                    value={queryObj.operator}
+                    onChange={e => updateQueryOperator(index, e.target.value as QueryOperator)}
+                    className="border rounded px-2 py-2 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center text-sm"
+                    style={{ minHeight: 48, maxWidth: 100 }}
+                    title={index === 0 ? "Negate this query" : "How to combine this query with previous results"}
+                  >
+                    {index === 0 ? (
+                      <>
+                        <option value="AND">--</option>
+                        <option value="NOT">NOT</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="AND">AND</option>
+                        <option value="OR">OR</option>
+                        <option value="AND NOT">NOT</option>
+                      </>
+                    )}
+                  </select>
+                  
+                  {/* Search input */}
+                  <input
+                    ref={el => inputRefs.current[index] = el}
+                    type="text"
+                    placeholder={index === 0 ? "Search" : `Search ${index + 1}`}
+                    className="w-full sm:w-auto p-3 pr-10 border rounded text-base focus:ring-2 focus:ring-blue-400 text-gray-900 bg-white dark:text-white dark:bg-gray-900"
+                    value={queryObj.text}
+                    onChange={(e) => updateQuery(index, e.target.value)}
+                    maxLength={64}
+                    style={{ minHeight: 48, maxWidth: 180 }}
+                  />
+                  
+                  {/* Remove button - only show if more than one query */}
                   {queries.length > 1 && (
                     <button
                       type="button"
                       onClick={() => removeQuery(index)}
-                      className="p-2 text-red-600 hover:text-red-800 hover:bg-red-100 rounded transition-colors"
+                      className="p-2 text-red-600 hover:text-red-800 hover:bg-red-100 rounded transition-colors dark:hover:bg-red-900"
                       title="Remove this query"
+                      style={{ minHeight: 48 }}
                     >
                       ×
                     </button>
@@ -1089,20 +1169,20 @@ export default function CardSearchClient() {
               ))}
             </div>
             <button
-              className="px-4 py-2 w-full sm:w-auto rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center"
+              className="px-4 w-full sm:w-auto rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center text-sm"
               onClick={handleResetFilters}
-              style={{ minHeight: 48 }}
+              style={{ minHeight: 48, height: 48 }}
             >
               Reset Filters
             </button>
             <button
-              className={`px-4 py-2 w-full sm:w-auto rounded border transition font-semibold shadow text-center relative hidden sm:block ${
+              className={`px-4 w-full sm:w-auto rounded border transition font-semibold shadow text-center relative hidden sm:block ${
                 queries.filter(q => q.text.trim()).length > 1
                   ? 'bg-gray-400 text-gray-600 border-gray-500 cursor-not-allowed opacity-50 dark:bg-gray-800 dark:text-gray-500 dark:border-gray-600'
                   : 'bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
               }`}
               onClick={queries.filter(q => q.text.trim()).length > 1 ? undefined : handleCopyLink}
-              style={{ minHeight: 48 }}
+              style={{ minHeight: 48, height: 48 }}
               title={
                 queries.filter(q => q.text.trim()).length > 1
                   ? 'Multiple query link sharing sadly not supported'
@@ -1113,9 +1193,9 @@ export default function CardSearchClient() {
               {copyLinkNotification ? '✓' : '🔗'}
             </button>
             <button
-              className="px-4 py-2 w-full sm:w-auto rounded bg-green-200 text-green-900 hover:bg-green-400 hover:text-green-900 border border-green-300 dark:bg-green-700 dark:text-white dark:hover:bg-green-600 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center relative hidden sm:block"
+              className="px-4 w-full sm:w-auto rounded bg-green-200 text-green-900 hover:bg-green-400 hover:text-green-900 border border-green-300 dark:bg-green-700 dark:text-white dark:hover:bg-green-600 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center relative hidden sm:block"
               onClick={addNewQuery}
-              style={{ minHeight: 48 }}
+              style={{ minHeight: 48, height: 48 }}
               title="Add new query"
             >
               +
@@ -1150,6 +1230,21 @@ export default function CardSearchClient() {
         {/* Query Pills */}
         {queries.map((queryObj, originalIndex) => {
           if (!queryObj.text.trim()) return null;
+          
+          // For first query, show its own operator if it's NOT
+          // For subsequent queries, show the query's own operator (how it combines with previous)
+          let operatorPrefix = '';
+          if (originalIndex === 0 && queryObj.operator === 'NOT') {
+            operatorPrefix = 'NOT ';
+          } else if (originalIndex > 0) {
+            const currentOperator = queryObj.operator;
+            if (currentOperator === 'AND NOT' || currentOperator === 'NOT') {
+              operatorPrefix = 'AND NOT ';
+            } else {
+              operatorPrefix = `${currentOperator} `;
+            }
+          }
+          
           return (
             <span
               key={originalIndex}
@@ -1159,8 +1254,11 @@ export default function CardSearchClient() {
               role="button"
               aria-label={`Remove Search filter ${originalIndex + 1}`}
             >
+              {operatorPrefix && <span className="font-bold mr-1">{operatorPrefix}</span>}
               {queryObj.field === 'everything' && `Search: "${queryObj.text}"`}
               {queryObj.field === 'name' && `Name contains: "${queryObj.text}"`}
+              {queryObj.field === 'type' && `Type contains: "${queryObj.text}"`}
+              {queryObj.field === 'brigade' && `Brigade contains: "${queryObj.text}"`}
               {queryObj.field === 'specialAbility' && `Special Ability contains: "${queryObj.text}"`}
               {queryObj.field === 'setName' && `Set Name contains: "${queryObj.text}"`}
               {queryObj.field === 'identifier' && `Identifier contains: "${queryObj.text}"`}
