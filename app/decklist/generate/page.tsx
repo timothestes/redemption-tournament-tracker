@@ -270,6 +270,7 @@ export default function GenerateDeckList() {
                   >
                     <option value="type_1">Type 1</option>
                     <option value="type_2">Type 2</option>
+                    <option value="paragon">Paragon</option>
                   </select>
                 </div>
                 
@@ -374,6 +375,7 @@ export default function GenerateDeckList() {
                   >
                     <option value="type_1">Type 1</option>
                     <option value="type_2">Type 2</option>
+                    <option value="paragon">Paragon</option>
                   </select>
                 </div>
                 <div>

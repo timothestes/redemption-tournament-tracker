@@ -39,6 +39,7 @@ export default function CardImage({ imgFile, alt, className = "", sizes, priorit
           className={`object-contain transition-opacity duration-200 ${isLoading ? 'opacity-0' : 'opacity-100'} ${className}`}
           sizes={sizes}
           priority={priority}
+          loading="lazy"
           onLoad={() => setIsLoading(false)}
           onError={() => {
             setIsLoading(false);

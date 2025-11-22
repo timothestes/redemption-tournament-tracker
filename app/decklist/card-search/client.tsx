@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import ModalWithClose from "./ModalWithClose";
 import FilterGrid from "./components/FilterGrid";
@@ -32,8 +32,10 @@ export default function CardSearchClient() {
   
   // Collapse state for filter grid
   const [filterGridCollapsed, setFilterGridCollapsed] = useState(false);
-  // Query state - each query has its own text and search field
-  const [queries, setQueries] = useState<{text: string, field: string}[]>([{text: "", field: "everything"}]);
+  // Query state - each query has its own text, search field, and operator
+  type QueryOperator = 'AND' | 'OR' | 'AND NOT' | 'NOT';
+  type QueryWithOp = { text: string; field: string; operator: QueryOperator };
+  const [queries, setQueries] = useState<QueryWithOp[]>([{text: "", field: "everything", operator: "AND"}]);
 
   // Icon filters with individual operators for each filter
   type IconFilterOperator = 'AND' | 'OR' | 'AND NOT';
@@ -49,8 +51,8 @@ export default function CardSearchClient() {
   const [toughnessFilter, setToughnessFilter] = useState<number | null>(null);
   const [toughnessOp, setToughnessOp] = useState<string>('eq');
   const [cards, setCards] = useState<Card[]>([]);
-  // Card legality filter mode: Rotation, Classic (all), Banned, Scrolls (not Rotation or Banned)
-  const [legalityMode, setLegalityMode] = useState<'Rotation'|'Classic'|'Banned'|'Scrolls'>('Rotation');
+  // Card legality filter mode: Rotation, Classic (all), Banned, Scrolls (not Rotation or Banned), Paragon
+  const [legalityMode, setLegalityMode] = useState<'Rotation'|'Classic'|'Banned'|'Scrolls'|'Paragon'>('Rotation');
   const [visibleCount, setVisibleCount] = useState(0); // Number of cards to show
 
   const [modalCard, setModalCard] = useState<Card | null>(null);
@@ -97,6 +99,10 @@ export default function CardSearchClient() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [exportNotification, setExportNotification] = useState(false);
 
+  // Unsaved changes modal state
+  const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
+
   // Panel visibility state
   const [showDeckBuilder, setShowDeckBuilder] = useState(true);
   const [showSearch, setShowSearch] = useState(true);
@@ -122,14 +128,19 @@ export default function CardSearchClient() {
     updateQuantity,
     setDeckName,
     setDeckFormat,
+    setDeckParagon,
     clearDeck,
     newDeck,
     loadDeck,
     loadDeckFromCloud,
     saveDeckToCloud,
     getCardQuantity,
-    getDeckStats
+    getDeckStats,
+    clearUnsavedChanges,
   } = useDeckState(deckIdFromUrl, folderIdFromUrl, isNewDeck);
+
+  // Refs for input fields to enable auto-focus
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Helper functions for managing multiple queries
   const updateQuery = (index: number, text: string) => {
@@ -142,10 +153,21 @@ export default function CardSearchClient() {
     const newQueries = [...queries];
     newQueries[index] = { ...newQueries[index], field };
     setQueries(newQueries);
+    
+    // Auto-focus the input field after changing the field dropdown
+    setTimeout(() => {
+      inputRefs.current[index]?.focus();
+    }, 0);
+  };
+
+  const updateQueryOperator = (index: number, operator: QueryOperator) => {
+    const newQueries = [...queries];
+    newQueries[index] = { ...newQueries[index], operator };
+    setQueries(newQueries);
   };
 
   const addNewQuery = () => {
-    setQueries([...queries, {text: "", field: "everything"}]);
+    setQueries([...queries, {text: "", field: "everything", operator: "AND"}]);
   };
 
   const removeQuery = (index: number) => {
@@ -218,7 +240,7 @@ export default function CardSearchClient() {
     if (searchParams && !isInitialized) {
       const urlQuery = searchParams.get('q') || '';
       const urlField = searchParams.get('field') || 'everything';
-      setQueries(urlQuery ? [{text: urlQuery, field: urlField}] : [{text: "", field: "everything"}]);
+      setQueries(urlQuery ? [{text: urlQuery, field: urlField, operator: "AND"}] : [{text: "", field: "everything", operator: "AND"}]);
       setLegalityMode((searchParams.get('legality') as any) || 'Rotation');
       setIconFilterMode((searchParams.get('iconMode') as any) || 'AND');
       
@@ -318,6 +340,33 @@ export default function CardSearchClient() {
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // Intercept link clicks for internal navigation with unsaved changes
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (!hasUnsavedChanges) return;
+
+      const target = e.target as HTMLElement;
+      const link = target.closest('a');
+      
+      // Check if it's an internal link (not opening in new tab and not external)
+      if (link && !link.target && link.href && link.href.startsWith(window.location.origin)) {
+        console.log('Intercepting navigation to:', link.href);
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Store the navigation action
+        setPendingNavigation(() => () => {
+          window.location.href = link.href;
+        });
+        setShowUnsavedChangesModal(true);
+        return false;
+      }
+    };
+
+    document.addEventListener('click', handleClick, true);
+    return () => document.removeEventListener('click', handleClick, true);
   }, [hasUnsavedChanges]);
 
   // Keyboard shortcuts
@@ -503,16 +552,23 @@ export default function CardSearchClient() {
     () =>
       cards
         .filter((c) => {
-          // Handle multiple queries - all must match (AND logic)
+          // Handle multiple queries with operators - similar to icon filter logic
           const activeQueries = queries.filter(q => q.text.trim());
           if (activeQueries.length === 0) return true;
           
-          return activeQueries.every(queryObj => {
+          // Start with the first query's result
+          let result: boolean;
+          const firstQuery = activeQueries[0];
+          const firstMatches = (queryObj: QueryWithOp): boolean => {
             const q = queryObj.text.toLowerCase();
             const searchField = queryObj.field;
             switch (searchField) {
               case 'name':
                 return c.name.toLowerCase().includes(q);
+              case 'type':
+                return c.type.toLowerCase().includes(q);
+              case 'brigade':
+                return c.brigade.toLowerCase().includes(q);
               case 'specialAbility':
                 return c.specialAbility.toLowerCase().includes(q);
               case 'setName':
@@ -524,7 +580,33 @@ export default function CardSearchClient() {
               default:
                 return Object.values(c).join(" ").toLowerCase().includes(q);
             }
-          });
+          };
+          
+          // First query - check if it has a NOT operator (unary negation)
+          const firstQueryMatches = firstMatches(firstQuery);
+          result = firstQuery.operator === 'NOT' ? !firstQueryMatches : firstQueryMatches;
+          
+          // Apply each subsequent query with its own operator
+          for (let i = 1; i < activeQueries.length; i++) {
+            const query = activeQueries[i];
+            const matches = firstMatches(query);
+            
+            // Each query's operator defines how IT combines with the previous result
+            const currentOperator = query.operator;
+            
+            if (currentOperator === 'AND') {
+              result = result && matches;
+            } else if (currentOperator === 'OR') {
+              result = result || matches;
+            } else if (currentOperator === 'AND NOT') {
+              result = result && !matches;
+            } else if (currentOperator === 'NOT') {
+              // NOT without AND means AND NOT
+              result = result && !matches;
+            }
+          }
+          
+          return result;
         })
         // Filter out specific unwanted cards
         .filter((c) => {
@@ -535,6 +617,51 @@ export default function CardSearchClient() {
         .filter((c) => {
           if (legalityMode === 'Classic') return true;
           if (legalityMode === 'Scrolls') return c.legality !== 'Rotation' && c.legality !== 'Banned';
+          if (legalityMode === 'Paragon') {
+            // Paragon format: exclude Lost Souls (not allowed in Paragon)
+            if (c.type.toLowerCase().includes('lost soul')) {
+              return false;
+            }
+            // Paragon format: exclude non-legal sets (easier to maintain than include list)
+            const paragonExcludedSets = [
+              '10th Anniversary',
+              '1st Edition',
+              '1st Edition Unlimited',
+              '2nd Edition',
+              '2nd Edition Revised',
+              '3rd Edition',
+              'Angel Wars',
+              'Apostles',
+              'Cloud of Witnesses',
+              'Cloud of Witnesses (Alternate Border)',
+              'Disciples',
+              'Early Church',
+              'Faith of Our Fathers',
+              'Fall of Man',
+              'Fundraiser',
+              'Gospel of Christ',
+              'Gospel of Christ Token',
+              'Kings',
+              'Lineage of Christ',
+              'Main',
+              'Main Unlimited',
+              'Patriarchs',
+              'Persecuted Church',
+              'Priests',
+              'Promo',
+              'Promo Token',
+              'Prophecies of Christ',
+              'Prophecies of Christ Token',
+              'Prophets',
+              'Revelation of John',
+              'Revelation of John (Alternate Border)',
+              'Rock of Ages',
+              'Thesaurus ex Preteritus',
+              'Warriors',
+              'Women'
+            ];
+            return !paragonExcludedSets.includes(c.officialSet);
+          }
           return c.legality === legalityMode;
         })
         // Alignment filters (OR across selected filters)
@@ -792,11 +919,21 @@ export default function CardSearchClient() {
 
   // Brigade normalization helpers - now imported from utils
 
+  // Handle deck format change - also update legality mode filter
+  function handleDeckFormatChange(format: string) {
+    setDeckFormat(format);
+    // If format is Paragon, automatically set legality filter to Paragon
+    if (format.toLowerCase().includes('paragon')) {
+      setLegalityMode('Paragon');
+    }
+  }
+
   // Reset filters handler
   function handleResetFilters() {
-    setQueries([{text: "", field: "everything"}]);
+    setQueries([{text: "", field: "everything", operator: "AND"}]);
     setSelectedIconFilters([]);
-    setLegalityMode('Rotation');
+    // Keep current legality mode when resetting (don't reset to Rotation)
+    // setLegalityMode('Rotation');
     setIconFilterMode('AND');
     setSelectedAlignmentFilters([]);
     setSelectedRarityFilters([]);
@@ -965,15 +1102,7 @@ export default function CardSearchClient() {
             <div className="flex flex-col gap-2 w-full sm:w-auto">
               {queries.map((queryObj, index) => (
                 <div key={index} className="flex items-center gap-1">
-                  <input
-                    type="text"
-                    placeholder={index === 0 ? "Search" : `Search ${index + 1}`}
-                    className="w-full sm:w-auto p-3 pr-10 border rounded text-base focus:ring-2 focus:ring-blue-400 text-gray-900 bg-white dark:text-white dark:bg-gray-900"
-                    value={queryObj.text}
-                    onChange={(e) => updateQuery(index, e.target.value)}
-                    maxLength={64}
-                    style={{ minHeight: 48, maxWidth: 180 }}
-                  />
+                  {/* Field dropdown */}
                   <select
                     value={queryObj.field}
                     onChange={e => updateQueryField(index, e.target.value)}
@@ -982,17 +1111,56 @@ export default function CardSearchClient() {
                   >
                     <option value="everything">All</option>
                     <option value="name">Name</option>
+                    <option value="type">Type</option>
+                    <option value="brigade">Brigade</option>
                     <option value="specialAbility">Special Ability</option>
                     <option value="setName">Set Name</option>
                     <option value="identifier">Identifier</option>
                     <option value="reference">Reference</option>
                   </select>
+                  
+                  {/* Operator dropdown - shown for all queries */}
+                  <select
+                    value={queryObj.operator}
+                    onChange={e => updateQueryOperator(index, e.target.value as QueryOperator)}
+                    className="border rounded px-2 py-2 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center text-sm"
+                    style={{ minHeight: 48, maxWidth: 100 }}
+                    title={index === 0 ? "Negate this query" : "How to combine this query with previous results"}
+                  >
+                    {index === 0 ? (
+                      <>
+                        <option value="AND">--</option>
+                        <option value="NOT">NOT</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="AND">AND</option>
+                        <option value="OR">OR</option>
+                        <option value="AND NOT">NOT</option>
+                      </>
+                    )}
+                  </select>
+                  
+                  {/* Search input */}
+                  <input
+                    ref={el => inputRefs.current[index] = el}
+                    type="text"
+                    placeholder={index === 0 ? "Search" : `Search ${index + 1}`}
+                    className="w-full sm:w-auto p-3 pr-10 border rounded text-base focus:ring-2 focus:ring-blue-400 text-gray-900 bg-white dark:text-white dark:bg-gray-900"
+                    value={queryObj.text}
+                    onChange={(e) => updateQuery(index, e.target.value)}
+                    maxLength={64}
+                    style={{ minHeight: 48, maxWidth: 180 }}
+                  />
+                  
+                  {/* Remove button - only show if more than one query */}
                   {queries.length > 1 && (
                     <button
                       type="button"
                       onClick={() => removeQuery(index)}
-                      className="p-2 text-red-600 hover:text-red-800 hover:bg-red-100 rounded transition-colors"
+                      className="p-2 text-red-600 hover:text-red-800 hover:bg-red-100 rounded transition-colors dark:hover:bg-red-900"
                       title="Remove this query"
+                      style={{ minHeight: 48 }}
                     >
                       ×
                     </button>
@@ -1001,20 +1169,20 @@ export default function CardSearchClient() {
               ))}
             </div>
             <button
-              className="px-4 py-2 w-full sm:w-auto rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center"
+              className="px-4 w-full sm:w-auto rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center text-sm"
               onClick={handleResetFilters}
-              style={{ minHeight: 48 }}
+              style={{ minHeight: 48, height: 48 }}
             >
               Reset Filters
             </button>
             <button
-              className={`px-4 py-2 w-full sm:w-auto rounded border transition font-semibold shadow text-center relative hidden sm:block ${
+              className={`px-4 w-full sm:w-auto rounded border transition font-semibold shadow text-center relative hidden sm:block ${
                 queries.filter(q => q.text.trim()).length > 1
                   ? 'bg-gray-400 text-gray-600 border-gray-500 cursor-not-allowed opacity-50 dark:bg-gray-800 dark:text-gray-500 dark:border-gray-600'
                   : 'bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
               }`}
               onClick={queries.filter(q => q.text.trim()).length > 1 ? undefined : handleCopyLink}
-              style={{ minHeight: 48 }}
+              style={{ minHeight: 48, height: 48 }}
               title={
                 queries.filter(q => q.text.trim()).length > 1
                   ? 'Multiple query link sharing sadly not supported'
@@ -1025,9 +1193,9 @@ export default function CardSearchClient() {
               {copyLinkNotification ? '✓' : '🔗'}
             </button>
             <button
-              className="px-4 py-2 w-full sm:w-auto rounded bg-green-200 text-green-900 hover:bg-green-400 hover:text-green-900 border border-green-300 dark:bg-green-700 dark:text-white dark:hover:bg-green-600 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center relative hidden sm:block"
+              className="px-4 w-full sm:w-auto rounded bg-green-200 text-green-900 hover:bg-green-400 hover:text-green-900 border border-green-300 dark:bg-green-700 dark:text-white dark:hover:bg-green-600 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center relative hidden sm:block"
               onClick={addNewQuery}
-              style={{ minHeight: 48 }}
+              style={{ minHeight: 48, height: 48 }}
               title="Add new query"
             >
               +
@@ -1062,6 +1230,21 @@ export default function CardSearchClient() {
         {/* Query Pills */}
         {queries.map((queryObj, originalIndex) => {
           if (!queryObj.text.trim()) return null;
+          
+          // For first query, show its own operator if it's NOT
+          // For subsequent queries, show the query's own operator (how it combines with previous)
+          let operatorPrefix = '';
+          if (originalIndex === 0 && queryObj.operator === 'NOT') {
+            operatorPrefix = 'NOT ';
+          } else if (originalIndex > 0) {
+            const currentOperator = queryObj.operator;
+            if (currentOperator === 'AND NOT' || currentOperator === 'NOT') {
+              operatorPrefix = 'AND NOT ';
+            } else {
+              operatorPrefix = `${currentOperator} `;
+            }
+          }
+          
           return (
             <span
               key={originalIndex}
@@ -1071,8 +1254,11 @@ export default function CardSearchClient() {
               role="button"
               aria-label={`Remove Search filter ${originalIndex + 1}`}
             >
+              {operatorPrefix && <span className="font-bold mr-1">{operatorPrefix}</span>}
               {queryObj.field === 'everything' && `Search: "${queryObj.text}"`}
               {queryObj.field === 'name' && `Name contains: "${queryObj.text}"`}
+              {queryObj.field === 'type' && `Type contains: "${queryObj.text}"`}
+              {queryObj.field === 'brigade' && `Brigade contains: "${queryObj.text}"`}
               {queryObj.field === 'specialAbility' && `Special Ability contains: "${queryObj.text}"`}
               {queryObj.field === 'setName' && `Set Name contains: "${queryObj.text}"`}
               {queryObj.field === 'identifier' && `Identifier contains: "${queryObj.text}"`}
@@ -1517,7 +1703,8 @@ export default function CardSearchClient() {
             isAuthenticated={!!user}
             isExpanded={!showSearch}
             onDeckNameChange={setDeckName}
-            onDeckFormatChange={setDeckFormat}
+            onDeckFormatChange={handleDeckFormatChange}
+            onParagonChange={setDeckParagon}
             onSaveDeck={saveDeckToCloud}
             onAddCard={(cardName, cardSet, isReserve) => {
               // Find the card in the cards array
@@ -1617,6 +1804,149 @@ export default function CardSearchClient() {
               >
                 Import
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Unsaved Changes Modal */}
+      {showUnsavedChangesModal && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setShowUnsavedChangesModal(false)}
+        >
+          <div 
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header - Less vibrant, more subtle */}
+            <div className="bg-gradient-to-r from-slate-600 to-slate-700 dark:from-slate-700 dark:to-slate-800 px-6 py-5">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 w-12 h-12 bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center">
+                  <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-white mb-1">Save Your Work?</h3>
+                  <p className="text-sm text-slate-200">Your recent changes haven't been saved yet</p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Content */}
+            <div className="px-6 py-6">
+              <p className="text-gray-600 dark:text-gray-300 mb-5 leading-relaxed">
+                It looks like you've made some changes. Would you like to save them before continuing?
+              </p>
+              
+              {/* Deck info card */}
+              <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/50 dark:to-gray-900/30 rounded-xl p-4 border border-gray-200 dark:border-gray-700 shadow-sm">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 bg-blue-500/10 dark:bg-blue-500/20 rounded-lg flex items-center justify-center">
+                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="font-semibold text-gray-900 dark:text-white text-base">
+                      {deck.name || "Untitled Deck"}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                      <span>{getDeckStats().mainDeckCount + getDeckStats().reserveCount} cards</span>
+                      <span className="text-gray-400 dark:text-gray-600">•</span>
+                      <span>{deck.format || "Type 1"}</span>
+                    </div>
+                  </div>
+                </div>
+                {!user && (
+                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <p className="text-xs text-amber-600 dark:text-amber-400 flex items-start gap-2">
+                      <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>Sign in to save your deck to the cloud</span>
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Actions - Using tournament modal style */}
+            <div className="px-6 py-5 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={async () => {
+                    if (user) {
+                      try {
+                        await saveDeckToCloud();
+                        setNotification({ message: 'Deck saved successfully!', type: 'success' });
+                        setTimeout(() => setNotification(null), 3000);
+                        
+                        // Wait a bit for save to complete, then navigate
+                        setTimeout(() => {
+                          if (pendingNavigation) {
+                            pendingNavigation();
+                          }
+                        }, 500);
+                      } catch (error) {
+                        setNotification({ message: 'Failed to save deck', type: 'error' });
+                        setTimeout(() => setNotification(null), 3000);
+                      }
+                    }
+                    setShowUnsavedChangesModal(false);
+                    setPendingNavigation(null);
+                  }}
+                  disabled={!user}
+                  className="w-full px-6 py-3 bg-white dark:bg-gray-800 rounded-lg transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border-2 hover:bg-green-50 dark:hover:bg-green-950/20"
+                  style={{
+                    borderImage: 'linear-gradient(to right, rgb(34 197 94), rgb(59 130 246)) 1',
+                  }}
+                >
+                  <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                  </svg>
+                  <span className="text-gray-900 dark:text-white">
+                    Save & Continue
+                  </span>
+                </button>
+
+                {/* Leave without saving - Destructive action */}
+                <button
+                  onClick={() => {
+                    // Clear unsaved changes flag to prevent browser warning
+                    clearUnsavedChanges();
+                    
+                    // Close modal first
+                    setShowUnsavedChangesModal(false);
+                    setPendingNavigation(null);
+                    
+                    // Navigate after a brief delay to ensure state updates
+                    setTimeout(() => {
+                      if (pendingNavigation) {
+                        pendingNavigation();
+                      }
+                    }, 0);
+                  }}
+                  className="w-full px-6 py-3 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg transition-all font-semibold flex items-center justify-center gap-2 border-2 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                  </svg>
+                  Leave without saving
+                </button>
+
+                {/* Cancel - Close modal */}
+                <button
+                  onClick={() => {
+                    setShowUnsavedChangesModal(false);
+                    setPendingNavigation(null);
+                  }}
+                  className="w-full px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         </div>

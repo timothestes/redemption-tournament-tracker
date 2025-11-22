@@ -24,8 +24,10 @@ export interface Deck {
   cards: DeckCard[];
   /** Optional description/notes about the deck */
   description?: string;
-  /** Optional format (e.g., 'Type 1', 'Type 2', 'Classic') */
+  /** Optional format (e.g., 'Type 1', 'Type 2', 'Paragon', 'Classic') */
   format?: string;
+  /** Optional Paragon name (only for Paragon format decks) */
+  paragon?: string;
   /** Optional folder ID for organization */
   folderId?: string | null;
   /** Timestamp when deck was created */

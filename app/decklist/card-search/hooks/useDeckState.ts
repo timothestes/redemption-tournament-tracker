@@ -175,6 +175,7 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
           name: cloudDeck.name,
           description: cloudDeck.description || "",
           format: cloudDeck.format,
+          paragon: cloudDeck.paragon,
           folderId: cloudDeck.folder_id,
           cards: cloudDeck.cards.map((dbCard: any) => {
             // Reconstruct the lookup key
@@ -271,6 +272,7 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
         name: deck.name,
         description: deck.description,
         format: deck.format,
+        paragon: deck.paragon,
         folderId: deck.folderId,
         cards: cardsData,
       });
@@ -481,6 +483,17 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
   }, []);
 
   /**
+   * Set deck's Paragon (for Paragon format)
+   */
+  const setDeckParagon = useCallback((paragon: string | undefined) => {
+    setDeck((prevDeck) => ({
+      ...prevDeck,
+      paragon,
+      updatedAt: new Date(),
+    }));
+  }, []);
+
+  /**
    * Clear all cards from deck
    */
   const clearDeck = useCallback(() => {
@@ -561,6 +574,13 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
     };
   }, [deck.cards]);
 
+  /**
+   * Clear the unsaved changes flag (useful when discarding changes)
+   */
+  const clearUnsavedChanges = useCallback(() => {
+    setHasUnsavedChanges(false);
+  }, []);
+
   return {
     deck,
     syncStatus,
@@ -571,6 +591,7 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
     setDeckName,
     setDeckDescription,
     setDeckFormat,
+    setDeckParagon,
     clearDeck,
     newDeck,
     loadDeck,
@@ -578,6 +599,7 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
     saveDeckToCloud,
     getCardQuantity,
     getDeckStats,
+    clearUnsavedChanges,
   };
 }
 

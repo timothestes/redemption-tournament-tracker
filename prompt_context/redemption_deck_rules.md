@@ -7,10 +7,13 @@
 #### Minimum Deck Sizes by Format
 - **Type 1**: 50-154 cards
 - **Type 2**: 100-252 cards
+- **Paragon**: 40 cards (exact)
 
 ### Lost Soul Requirements
 
 The number of Lost Souls required in a deck is based on the **Main Deck size ONLY** (Reserve cards do NOT count toward this requirement).
+
+**Note**: Paragon format does NOT allow Lost Souls.
 
 #### Lost Soul Chart
 
@@ -40,6 +43,7 @@ We will not be enforcing card quality limits at this time.
 
 - **Reserve size (T1)**: Up to 10 cards maximum
 - **Reserve size (T2)**: Up to 15 cards maximum
+- **Reserve size (Paragon)**: Up to 10 cards maximum
 - Dominants and lost souls cannot be in the reserve
 
 ### Validation Formula

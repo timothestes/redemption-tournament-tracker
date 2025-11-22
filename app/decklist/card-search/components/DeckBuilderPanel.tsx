@@ -11,6 +11,9 @@ import GenerateDeckImageModal from "./GenerateDeckImageModal";
 import ClearDeckModal from "./ClearDeckModal";
 import LoadDeckModal from "./LoadDeckModal";
 import { duplicateDeckAction } from "../../actions";
+import { getParagonNames, getParagonByName } from "../data/paragons";
+import ParagonRequirements from "./ParagonRequirements";
+import { useCardImageUrl } from "../hooks/useCardImageUrl";
 
 export type TabType = "main" | "reserve" | "info";
 
@@ -29,6 +32,8 @@ interface DeckBuilderPanelProps {
   onDeckNameChange: (name: string) => void;
   /** Callback when deck format changes */
   onDeckFormatChange?: (format: string) => void;
+  /** Callback when Paragon changes */
+  onParagonChange?: (paragon: string | undefined) => void;
   /** Callback to save deck to cloud */
   onSaveDeck?: () => Promise<{ success: boolean; error?: string }>;
   /** Callback to add a card */
@@ -66,6 +71,7 @@ export default function DeckBuilderPanel({
   isExpanded = false,
   onDeckNameChange,
   onDeckFormatChange,
+  onParagonChange,
   onSaveDeck,
   onAddCard,
   onRemoveCard,
@@ -89,6 +95,8 @@ export default function DeckBuilderPanel({
   const [showLoadDeckModal, setShowLoadDeckModal] = useState(false);
   const [showValidationTooltip, setShowValidationTooltip] = useState(false);
   const [showViewDropdown, setShowViewDropdown] = useState(false);
+  const [showParagonDropdown, setShowParagonDropdown] = useState(false);
+  const [showParagonModal, setShowParagonModal] = useState(false);
   
   // View options
   const [viewLayout, setViewLayout] = useState<'grid' | 'list'>('grid');
@@ -96,19 +104,44 @@ export default function DeckBuilderPanel({
   const [disableHoverPreview, setDisableHoverPreview] = useState(false);
   
   // Initialize deck type based on deck.format
-  const [deckType, setDeckType] = useState<'T1' | 'T2'>(() => {
+  const [deckType, setDeckType] = useState<'T1' | 'T2' | 'Paragon'>(() => {
     const format = deck.format?.toLowerCase();
-    return format?.includes('type 2') || format?.includes('multi') ? 'T2' : 'T1';
+    if (format?.includes('paragon')) return 'Paragon';
+    if (format?.includes('type 2') || format?.includes('multi')) return 'T2';
+    return 'T1';
   });
 
   // Calculate validation
   const validation = validateDeck(deck);
 
-  // Handle deck type toggle
-  const handleDeckTypeToggle = () => {
-    const newType = deckType === 'T1' ? 'T2' : 'T1';
+  // Helper function to get brigade color
+  const getBrigadeColor = (brigade: string): string => {
+    const brigadeColors: Record<string, string> = {
+      'Red': '#DC2626',      // red-600
+      'Blue': '#2b57a2',     // custom blue color
+      'Green': '#02b65f',    // custom green color
+      'Purple': '#b75ba9',   // custom purple color
+      'Gold': '#ffda5b',     // custom gold color
+      'White': '#ffffff',    // custom white color
+      'Black': '#020406',    // custom black color
+      'Brown': '#a97b27',    // custom brown color
+      'Teal': '#0D9488',     // teal-600
+      'Crimson': '#f34088',  // custom crimson color
+      'Orange': '#fcbb72',   // custom orange color
+      'Silver': '#b5b8b9',   // custom silver color
+      'Clay': '#e2b7b3',     // custom clay color
+      'Gray': '#b3c0ba',     // custom gray color
+    };
+    return brigadeColors[brigade] || '#6B7280'; // default to gray-500
+  };
+
+  // Handle deck type change
+  const handleDeckTypeChange = (newType: 'T1' | 'T2' | 'Paragon') => {
     setDeckType(newType);
-    const newFormat = newType === 'T2' ? 'Type 2' : 'Type 1';
+    let newFormat: string;
+    if (newType === 'T2') newFormat = 'Type 2';
+    else if (newType === 'Paragon') newFormat = 'Paragon';
+    else newFormat = 'Type 1';
     onDeckFormatChange?.(newFormat);
   };
 
@@ -133,6 +166,26 @@ export default function DeckBuilderPanel({
     document.addEventListener('click', handleClick);
     return () => document.removeEventListener('click', handleClick);
   }, [showViewDropdown]);
+
+  // Close paragon dropdown when clicking outside
+  useEffect(() => {
+    if (!showParagonDropdown) return;
+    const handleClick = () => setShowParagonDropdown(false);
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [showParagonDropdown]);
+
+  // Close paragon modal with Escape key
+  useEffect(() => {
+    if (!showParagonModal) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowParagonModal(false);
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [showParagonModal]);
 
   // Calculate deck stats
   const mainDeckCards = deck.cards.filter((dc) => !dc.isReserve);
@@ -396,14 +449,11 @@ export default function DeckBuilderPanel({
               <span className="font-semibold text-gray-900 dark:text-white">{totalCards}</span>
             </div>
             
-            {/* T1/T2 Toggle Switch */}
+            {/* Format Selector (T1/T2/Paragon) */}
             <span className="text-gray-400">•</span>
             <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-full p-0.5">
               <button
-                onClick={() => {
-                  setDeckType('T1');
-                  onDeckFormatChange?.('Type 1');
-                }}
+                onClick={() => handleDeckTypeChange('T1')}
                 className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
                   deckType === 'T1'
                     ? 'bg-blue-600 dark:bg-blue-500 text-white'
@@ -413,10 +463,7 @@ export default function DeckBuilderPanel({
                 T1
               </button>
               <button
-                onClick={() => {
-                  setDeckType('T2');
-                  onDeckFormatChange?.('Type 2');
-                }}
+                onClick={() => handleDeckTypeChange('T2')}
                 className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
                   deckType === 'T2'
                     ? 'bg-blue-600 dark:bg-blue-500 text-white'
@@ -425,7 +472,107 @@ export default function DeckBuilderPanel({
               >
                 T2
               </button>
+              <button
+                onClick={() => handleDeckTypeChange('Paragon')}
+                className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                  deckType === 'Paragon'
+                    ? 'bg-purple-600 dark:bg-purple-500 text-white'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 cursor-pointer'
+                }`}
+              >
+                Paragon
+              </button>
             </div>
+            
+            {/* Paragon Selector (only show for Paragon format) */}
+            {deckType === 'Paragon' && (
+              <div className="relative flex items-center gap-1">
+                <span className="text-gray-600 dark:text-gray-400 text-xs">Paragon:</span>
+                <button
+                    onClick={() => setShowParagonDropdown(!showParagonDropdown)}
+                    className="text-xs px-2 py-0.5 bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-700 rounded text-purple-900 dark:text-purple-100 font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 flex items-center gap-1.5 min-w-[180px] justify-between"
+                  >
+                    {deck.paragon ? (
+                      <span className="flex items-center gap-1.5">
+                        {(() => {
+                          const paragonData = getParagonByName(deck.paragon);
+                          if (paragonData) {
+                            return (
+                              <>
+                                <span className="flex gap-0.5">
+                                  <span
+                                    className="w-3 h-3 rounded-sm border border-black"
+                                    style={{ backgroundColor: getBrigadeColor(paragonData.goodBrigade) }}
+                                    title={`${paragonData.goodBrigade} (Good)`}
+                                  />
+                                  <span
+                                    className="w-3 h-3 rounded-sm border border-black"
+                                    style={{ backgroundColor: getBrigadeColor(paragonData.evilBrigade) }}
+                                    title={`${paragonData.evilBrigade} (Evil)`}
+                                  />
+                                </span>
+                                <span>{deck.paragon}</span>
+                              </>
+                            );
+                          }
+                          return <span>{deck.paragon}</span>;
+                        })()}
+                      </span>
+                    ) : (
+                      <span className="text-purple-700 dark:text-purple-300">Choose a Paragon...</span>
+                    )}
+                    <svg className={`w-3 h-3 transition-transform ${showParagonDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  
+                  {/* Custom Dropdown Menu */}
+                  {showParagonDropdown && (
+                    <div className="absolute top-full mt-1 left-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto min-w-[240px]">
+                      <button
+                        onClick={() => {
+                          onParagonChange?.(undefined);
+                          setShowParagonDropdown(false);
+                        }}
+                        className="w-full px-3 py-2 text-left text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      >
+                        Choose a Paragon...
+                      </button>
+                      {getParagonNames().map((name) => {
+                        const paragonData = getParagonByName(name);
+                        return (
+                          <button
+                            key={name}
+                            onClick={() => {
+                              onParagonChange?.(name);
+                              setShowParagonDropdown(false);
+                            }}
+                            className={`w-full px-3 py-2 text-left text-xs hover:bg-purple-50 dark:hover:bg-purple-900/30 transition-colors flex items-center gap-2 ${
+                              deck.paragon === name ? 'bg-purple-100 dark:bg-purple-900/50 text-purple-900 dark:text-purple-100' : 'text-gray-700 dark:text-gray-300'
+                            }`}
+                          >
+                            {paragonData && (
+                              <span className="flex gap-0.5 flex-shrink-0">
+                                <span
+                                  className="w-3 h-3 rounded-sm border border-black"
+                                  style={{ backgroundColor: getBrigadeColor(paragonData.goodBrigade) }}
+                                  title={`${paragonData.goodBrigade} (Good)`}
+                                />
+                                <span
+                                  className="w-3 h-3 rounded-sm border border-black"
+                                  style={{ backgroundColor: getBrigadeColor(paragonData.evilBrigade) }}
+                                  title={`${paragonData.evilBrigade} (Evil)`}
+                                />
+                              </span>
+                            )}
+                            <span className="font-medium">{name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+            )}
           </div>
 
           {/* Action Buttons */}
@@ -861,6 +1008,46 @@ export default function DeckBuilderPanel({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4" data-deck-grid>
+        {/* Paragon Requirements (only show for Paragon format with a selected Paragon) */}
+        {deckType === 'Paragon' && deck.paragon && validation.paragonStats && (
+          <div className="mb-4">
+            <div className="p-4 bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-2 border-purple-300 dark:border-purple-600 rounded-xl shadow-md">
+              <div className="flex items-start gap-4">
+                {/* Paragon Card Artwork - Click to Expand */}
+                <div 
+                  className="relative group w-32 h-40 rounded-lg shadow-xl flex-shrink-0 cursor-pointer hover:scale-105 hover:shadow-2xl transition-transform overflow-hidden bg-gray-200 dark:bg-gray-700 border-2 border-white dark:border-gray-600"
+                  onClick={() => setShowParagonModal(true)}
+                  title="Click to view full card"
+                >
+                  <img 
+                    src={`/paragons/Paragon ${deck.paragon}.png`}
+                    alt={deck.paragon}
+                    className="w-full h-full object-cover object-[1%_center]"
+                    onError={(e) => {
+                      // Hide container if image doesn't exist
+                      e.currentTarget.parentElement!.style.display = 'none';
+                    }}
+                  />
+                  {/* Click Indicator Icon - Bottom Left */}
+                  <div className="absolute bottom-2 left-2 bg-white/90 dark:bg-purple-600/90 rounded-full p-1.5 shadow-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-purple-600 dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                    </svg>
+                  </div>
+                </div>
+                
+                {/* Paragon Requirements */}
+                <div className="flex-1 min-w-0">
+                  <ParagonRequirements
+                    paragonName={deck.paragon}
+                    stats={validation.paragonStats}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* Show Full Deck View when expanded */}
         {isExpanded ? (
           <FullDeckView 
@@ -1029,26 +1216,78 @@ export default function DeckBuilderPanel({
         ) : (
           // Info Tab
           <div className="space-y-4 text-sm">
-            {/* Disclaimer */}
-            <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-              <div className="flex items-start gap-2">
-                <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                </svg>
-                <p className="text-xs text-blue-800 dark:text-blue-200">
-                  Not all deckbuilding checks are implemented, just the basic ones. Please refer to the{' '}
-                  <a 
-                    href="https://landofredemption.com/wp-content/uploads/2024/10/Deck_Building_Rules_1.2.pdf"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-semibold underline hover:text-blue-600 dark:hover:text-blue-300 transition-colors"
-                  >
-                    official deck building rules
-                  </a>
-                  {' '}to ensure the legality of your deck.
-                </p>
+            {/* Disclaimer - Hide for Paragon format */}
+            {deckType !== 'Paragon' && (
+              <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                <div className="flex items-start gap-2">
+                  <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  <p className="text-xs text-blue-800 dark:text-blue-200">
+                    Not all deckbuilding checks are implemented, just the basic ones. Please refer to the{' '}
+                    <a 
+                      href="https://landofredemption.com/wp-content/uploads/2024/10/Deck_Building_Rules_1.2.pdf"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold underline hover:text-blue-600 dark:hover:text-blue-300 transition-colors"
+                    >
+                      official deck building rules
+                    </a>
+                    {' '}to ensure the legality of your deck.
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Paragon Resources - Only show for Paragon format */}
+            {deckType === 'Paragon' && (
+              <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
+                <div className="flex items-start gap-2 mb-2">
+                  <svg className="w-5 h-5 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  <div className="flex-1">
+                    <h4 className="text-xs font-semibold text-purple-800 dark:text-purple-200 mb-2">
+                      Paragon Format Resources
+                    </h4>
+                    <div className="space-y-1">
+                      <a 
+                        href="https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Paragons-v1.pdf"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block text-xs text-purple-700 dark:text-purple-300 hover:text-purple-600 dark:hover:text-purple-200 underline transition-colors"
+                      >
+                        Paragon Cards PDF
+                      </a>
+                      <a 
+                        href="https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Rules-v1.pdf"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block text-xs text-purple-700 dark:text-purple-300 hover:text-purple-600 dark:hover:text-purple-200 underline transition-colors"
+                      >
+                        Paragon Rules PDF
+                      </a>
+                      <a 
+                        href="https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Lost-Souls-Color-v1.pdf"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block text-xs text-purple-700 dark:text-purple-300 hover:text-purple-600 dark:hover:text-purple-200 underline transition-colors"
+                      >
+                        Lost Souls (Color) PDF
+                      </a>
+                      <a 
+                        href="https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Lost-Souls-BW-v1.pdf"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block text-xs text-purple-700 dark:text-purple-300 hover:text-purple-600 dark:hover:text-purple-200 underline transition-colors"
+                      >
+                        Lost Souls (B&W) PDF
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             
             {/* Validation Status */}
             <div>
@@ -1280,6 +1519,58 @@ export default function DeckBuilderPanel({
           onClose={() => setShowLoadDeckModal(false)}
         />
       )}
+
+      {/* Paragon Card Modal */}
+      {showParagonModal && deck.paragon && (
+        <div 
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowParagonModal(false)}
+        >
+          <div 
+            className="relative max-w-4xl w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close button */}
+            <button
+              onClick={() => setShowParagonModal(false)}
+              className="absolute -top-4 -right-4 w-10 h-10 bg-white dark:bg-gray-800 rounded-full shadow-lg flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors z-10"
+              aria-label="Close"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            
+            {/* Paragon Card Image - Full Size */}
+            <img 
+              src={`/paragons/Paragon ${deck.paragon}.png`}
+              alt={deck.paragon}
+              className="w-full h-auto rounded-lg shadow-2xl"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Hidden image preloader for reserve cards */}
+      <div className="hidden" aria-hidden="true">
+        {reserveCards.map((deckCard) => {
+          const imageUrl = (() => {
+            const { getImageUrl } = useCardImageUrl();
+            return getImageUrl(deckCard.card.imgFile || "");
+          })();
+          return imageUrl ? (
+            <img
+              key={`preload-${deckCard.card.name}-${deckCard.card.set}`}
+              src={imageUrl}
+              alt=""
+              loading="eager"
+            />
+          ) : null;
+        })}
+      </div>
     </div>
   );
 }
