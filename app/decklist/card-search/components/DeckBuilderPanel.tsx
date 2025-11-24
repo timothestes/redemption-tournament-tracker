@@ -111,6 +111,20 @@ export default function DeckBuilderPanel({
     return 'T1';
   });
 
+  // Sync deckType with deck.format when deck changes (e.g., when loading a deck)
+  useEffect(() => {
+    const format = deck.format?.toLowerCase();
+    let newType: 'T1' | 'T2' | 'Paragon';
+    if (format?.includes('paragon')) {
+      newType = 'Paragon';
+    } else if (format?.includes('type 2') || format?.includes('multi')) {
+      newType = 'T2';
+    } else {
+      newType = 'T1';
+    }
+    setDeckType(newType);
+  }, [deck.format]);
+
   // Calculate validation
   const validation = validateDeck(deck);
 
@@ -666,6 +680,20 @@ export default function DeckBuilderPanel({
             </button>
             {showMenu && (
               <div className="absolute top-full mt-1 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50 min-w-[160px]">
+              {/* Import/Export Section */}
+              <button
+                onClick={() => {
+                  onImport();
+                  setShowMenu(false);
+                }}
+                className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
+                title="Import deck from clipboard (Ctrl+I / Cmd+I)"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Import (Ctrl+I)
+              </button>
               <button
                 onClick={() => {
                   onExport();
@@ -679,19 +707,10 @@ export default function DeckBuilderPanel({
                 </svg>
                 Export (Ctrl+E)
               </button>
-              <button
-                onClick={() => {
-                  onImport();
-                  setShowMenu(false);
-                }}
-                className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
-                title="Import deck from clipboard (Ctrl+I / Cmd+I)"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                Import (Ctrl+ I)
-              </button>
+              
+              <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+              
+              {/* Duplicate/Load Section */}
               {onDuplicate && isAuthenticated && deck.id && (
                 <button
                   onClick={async () => {
@@ -716,6 +735,25 @@ export default function DeckBuilderPanel({
                   Duplicate
                 </button>
               )}
+              {onLoadDeck && isAuthenticated && (
+                <button
+                  onClick={() => {
+                    setShowLoadDeckModal(true);
+                    setShowMenu(false);
+                  }}
+                  className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
+                  title="Load a saved deck from the cloud"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                  </svg>
+                  Load Deck
+                </button>
+              )}
+              
+              <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+              
+              {/* Generate Section */}
               <button
                 onClick={() => {
                   setShowGeneratePDFModal(true);
@@ -740,20 +778,7 @@ export default function DeckBuilderPanel({
                 </svg>
                 Generate Image
               </button>
-              {onLoadDeck && isAuthenticated && (
-                <button
-                  onClick={() => {
-                    setShowLoadDeckModal(true);
-                    setShowMenu(false);
-                  }}
-                  className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                  </svg>
-                  Load Deck
-                </button>
-              )}
+              
               {isAuthenticated && (
                 <>
                   <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
