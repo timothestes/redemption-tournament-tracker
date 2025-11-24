@@ -67,6 +67,13 @@ const TopNav: React.FC = () => {
     { href: "https://landofredemption.com/wp-content/uploads/2024/10/Deck_Building_Rules_1.2.pdf", label: "Deck Building Rules", icon: TbCardsFilled },
   ];
 
+  const paragonResources = [
+    { href: "https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Paragons-v1.pdf", label: "Paragon Cards" },
+    { href: "https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Rules-v1.pdf", label: "Paragon Rules" },
+    { href: "https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Lost-Souls-Color-v1.pdf", label: "Lost Souls (Color)" },
+    { href: "https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Lost-Souls-BW-v1.pdf", label: "Lost Souls (B&W)" },
+  ];
+
   const hostResources = [
     { href: "https://landofredemption.com/wp-content/uploads/2025/03/Redemption_Host_Guide_2025.pdf", label: "Hosting Guide" },
     { href: "https://landofredemption.com/wp-content/uploads/2025/05/Redemption-Tournament-Host-Application-2025-1.pdf", label: "Hosting Application" },
@@ -164,6 +171,22 @@ const TopNav: React.FC = () => {
                         </a>
                       );
                     })}
+
+                    {/* Paragon Resources */}
+                    <div className="px-4 py-2 mt-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-t border-gray-200 dark:border-gray-700">
+                      Paragon Resources
+                    </div>
+                    {paragonResources.map((resource) => (
+                      <a
+                        key={resource.href}
+                        href={resource.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        {resource.label}
+                      </a>
+                    ))}
 
                     {/* Host Resources */}
                     <div className="px-4 py-2 mt-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-t border-gray-200 dark:border-gray-700">
@@ -301,6 +324,21 @@ const TopNav: React.FC = () => {
                       </a>
                     );
                   })}
+
+                  <div className="px-3 py-1 mt-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-t border-gray-200 dark:border-gray-700 pt-2">
+                    Paragon Resources
+                  </div>
+                  {paragonResources.map((resource) => (
+                    <a
+                      key={resource.href}
+                      href={resource.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block px-3 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                    >
+                      {resource.label}
+                    </a>
+                  ))}
 
                   <div className="px-3 py-1 mt-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-t border-gray-200 dark:border-gray-700 pt-2">
                     Host Resources

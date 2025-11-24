@@ -1,10 +1,20 @@
 import { Deck, DeckCard } from "../types/deck";
 import { Card } from "../utils";
+import { getParagonByName, ParagonData } from "../data/paragons";
 
 export interface ValidationIssue {
   type: "error" | "warning" | "info";
   message: string;
-  category: "size" | "souls" | "quantity" | "reserve" | "dominants" | "format";
+  category: "size" | "souls" | "quantity" | "reserve" | "dominants" | "format" | "paragon";
+}
+
+export interface ParagonBrigadeStats {
+  primaryGood: number;
+  otherGood: number;
+  neutral: number;
+  primaryEvil: number;
+  otherEvil: number;
+  dominants: number;
 }
 
 export interface DeckValidation {
@@ -18,6 +28,7 @@ export interface DeckValidation {
     requiredLostSouls: number;
     dominantCount: number;
   };
+  paragonStats?: ParagonBrigadeStats;
 }
 
 /**
@@ -26,15 +37,18 @@ export interface DeckValidation {
  * 1. Deck Size:
  *    - Type 1: 50-154 cards
  *    - Type 2: 100-252 cards
+ *    - Paragon: 40 cards (exact)
  * 
  * 2. Lost Soul Requirements: Based on Main Deck size ONLY (not including Reserve)
  *    - Every 7 cards in Main Deck requires 1 more Lost Soul
  *    - 50-56 cards = 7 Lost Souls, 57-63 = 8, etc.
  *    - EXCEPTION: "Hopper" Lost Souls (II Chronicles 28:13 variants) do NOT count
+ *    - Paragon: NO Lost Souls allowed
  * 
  * 3. Reserve Limits:
  *    - Type 1: Maximum 10 cards
  *    - Type 2: Maximum 15 cards
+ *    - Paragon: Maximum 10 cards
  *    - Dominants and Lost Souls CANNOT be in Reserve
  * 
  * 4. Dominant Limits:
@@ -122,6 +136,7 @@ function isDominant(card: Card): boolean {
  */
 function getMinimumDeckSize(format?: string): number {
   const fmt = format?.toLowerCase();
+  if (fmt?.includes("paragon")) return 40;
   if (fmt?.includes("type 2") || fmt?.includes("multi")) return 100;
   if (fmt?.includes("type 1") || fmt?.includes("single")) return 50;
   if (fmt?.includes("draft") || fmt?.includes("sealed")) return 40;
@@ -133,6 +148,7 @@ function getMinimumDeckSize(format?: string): number {
  */
 function getMaximumDeckSize(format?: string): number {
   const fmt = format?.toLowerCase();
+  if (fmt?.includes("paragon")) return 40;
   if (fmt?.includes("type 2") || fmt?.includes("multi")) return 252;
   if (fmt?.includes("type 1") || fmt?.includes("single")) return 154;
   return 154; // Default to Type 1 maximum
@@ -144,7 +160,150 @@ function getMaximumDeckSize(format?: string): number {
 function getMaximumReserveSize(format?: string): number {
   const fmt = format?.toLowerCase();
   if (fmt?.includes("type 2") || fmt?.includes("multi")) return 15;
+  if (fmt?.includes("paragon")) return 10;
   return 10; // Type 1 and default
+}
+
+/**
+ * Check if a card's brigade matches the given brigade (case-insensitive, handles multi-brigade)
+ */
+function cardHasBrigade(card: Card, brigade: string): boolean {
+  const cardBrigade = card.brigade?.toLowerCase() || "";
+  const targetBrigade = brigade.toLowerCase();
+  
+  // Handle multi-brigade cards (e.g., "Blue/Gold")
+  return cardBrigade.split(/[/,]/).map(b => b.trim()).includes(targetBrigade);
+}
+
+/**
+ * Get card alignment: "good", "evil", or "neutral"
+ */
+function getCardAlignment(card: Card): "good" | "evil" | "neutral" {
+  const alignment = card.alignment?.toLowerCase() || "";
+  if (alignment.includes("good") || alignment.includes("hero")) return "good";
+  if (alignment.includes("evil")) return "evil";
+  return "neutral";
+}
+
+/**
+ * Calculate Paragon brigade distribution for deck
+ */
+function calculateParagonStats(
+  deck: Deck,
+  paragonData: ParagonData
+): ParagonBrigadeStats {
+  const stats: ParagonBrigadeStats = {
+    primaryGood: 0,
+    otherGood: 0,
+    neutral: 0,
+    primaryEvil: 0,
+    otherEvil: 0,
+    dominants: 0,
+  };
+
+  // Count all cards (main deck + reserve)
+  deck.cards.forEach((dc) => {
+    const alignment = getCardAlignment(dc.card);
+    const hasPrimaryGood = cardHasBrigade(dc.card, paragonData.goodBrigade);
+    const hasPrimaryEvil = cardHasBrigade(dc.card, paragonData.evilBrigade);
+    
+    // Track dominants separately for max limit (but still count them in brigade requirements)
+    if (isDominant(dc.card)) {
+      stats.dominants += dc.quantity;
+      // Don't return - continue to count them in brigade requirements below
+    }
+    
+    // Skip Lost Souls from brigade counts
+    if (isLostSoul(dc.card)) {
+      return;
+    }
+
+    if (alignment === "good") {
+      if (hasPrimaryGood) {
+        stats.primaryGood += dc.quantity;
+      } else {
+        stats.otherGood += dc.quantity;
+      }
+    } else if (alignment === "evil") {
+      if (hasPrimaryEvil) {
+        stats.primaryEvil += dc.quantity;
+      } else {
+        stats.otherEvil += dc.quantity;
+      }
+    } else {
+      // Neutral
+      stats.neutral += dc.quantity;
+    }
+  });
+
+  return stats;
+}
+
+/**
+ * Validate Paragon deck requirements
+ */
+function validateParagonDeck(
+  deck: Deck,
+  paragonData: ParagonData,
+  issues: ValidationIssue[]
+): ParagonBrigadeStats {
+  const stats = calculateParagonStats(deck, paragonData);
+
+  // Validate primary good brigade
+  if (stats.primaryGood !== paragonData.primaryGood) {
+    issues.push({
+      type: "error",
+      category: "paragon",
+      message: `${paragonData.name} requires exactly ${paragonData.primaryGood} ${paragonData.goodBrigade} good cards (currently: ${stats.primaryGood})`,
+    });
+  }
+
+  // Validate other good brigades
+  if (stats.otherGood !== paragonData.otherGood) {
+    issues.push({
+      type: "error",
+      category: "paragon",
+      message: `${paragonData.name} requires exactly ${paragonData.otherGood} other good cards (currently: ${stats.otherGood})`,
+    });
+  }
+
+  // Validate neutral cards
+  if (stats.neutral !== paragonData.neutral) {
+    issues.push({
+      type: "error",
+      category: "paragon",
+      message: `${paragonData.name} requires exactly ${paragonData.neutral} neutral cards (currently: ${stats.neutral})`,
+    });
+  }
+
+  // Validate primary evil brigade
+  if (stats.primaryEvil !== paragonData.primaryEvil) {
+    issues.push({
+      type: "error",
+      category: "paragon",
+      message: `${paragonData.name} requires exactly ${paragonData.primaryEvil} ${paragonData.evilBrigade} evil cards (currently: ${stats.primaryEvil})`,
+    });
+  }
+
+  // Validate other evil brigades
+  if (stats.otherEvil !== paragonData.otherEvil) {
+    issues.push({
+      type: "error",
+      category: "paragon",
+      message: `${paragonData.name} requires exactly ${paragonData.otherEvil} other evil cards (currently: ${stats.otherEvil})`,
+    });
+  }
+
+  // Validate dominants (max 7 in Paragon format)
+  if (stats.dominants > 7) {
+    issues.push({
+      type: "error",
+      category: "paragon",
+      message: `Paragon format allows maximum 7 Dominants (currently: ${stats.dominants})`,
+    });
+  }
+
+  return stats;
 }
 
 /**
@@ -164,6 +323,10 @@ export function validateDeck(deck: Deck): DeckValidation {
   // Count Lost Souls (only in Main Deck for requirement calculation)
   // Exclude "Hopper" Lost Souls from the count as they don't count toward the requirement
   const mainDeckLostSouls = mainDeckCards
+    .filter((dc) => isLostSoul(dc.card) && !isHopperLostSoul(dc.card))
+    .reduce((sum, dc) => sum + dc.quantity, 0);
+  
+  const reserveLostSoulsCount = reserveCards
     .filter((dc) => isLostSoul(dc.card) && !isHopperLostSoul(dc.card))
     .reduce((sum, dc) => sum + dc.quantity, 0);
   
@@ -200,7 +363,19 @@ export function validateDeck(deck: Deck): DeckValidation {
   }
   
   // Validation: Lost Soul requirement (based on Main Deck size only)
-  if (mainDeckSize >= minDeckSize) {
+  const isParagon = deck.format?.toLowerCase().includes("paragon");
+  
+  if (isParagon) {
+    // Paragon format: No Lost Souls allowed
+    if (mainDeckLostSouls > 0 || reserveLostSoulsCount > 0) {
+      issues.push({
+        type: "error",
+        category: "souls",
+        message: `Paragon format does not allow Lost Souls: found ${mainDeckLostSouls + reserveLostSoulsCount} Lost Soul(s)`,
+      });
+    }
+  } else if (mainDeckSize >= minDeckSize) {
+    // Standard formats: Lost Soul requirements
     if (mainDeckLostSouls < requiredLostSouls) {
       issues.push({
         type: "error",
@@ -276,8 +451,9 @@ export function validateDeck(deck: Deck): DeckValidation {
   // Validation: Total Dominants cannot exceed required Lost Souls (based on deck size)
   // This means: 50-56 cards = max 7 Dominants, 57-63 = max 8 Dominants, etc.
   // Only enforce this rule when deck has reached minimum size threshold
+  // SKIP for Paragon format (has separate max 7 dominants rule)
   const minDeckSizeForValidation = getMinimumDeckSize(deck.format);
-  if (mainDeckSize >= minDeckSizeForValidation && dominantCount > requiredLostSouls) {
+  if (!isParagon && mainDeckSize >= minDeckSizeForValidation && dominantCount > requiredLostSouls) {
     issues.push({
       type: "error",
       category: "dominants",
@@ -405,6 +581,29 @@ export function validateDeck(deck: Deck): DeckValidation {
     });
   }
   
+  // Paragon format validation
+  let paragonStats: ParagonBrigadeStats | undefined;
+  const isParagonFormat = deck.format?.toLowerCase().includes("paragon");
+  
+  if (isParagonFormat && deck.paragon) {
+    const paragonData = getParagonByName(deck.paragon);
+    if (paragonData) {
+      paragonStats = validateParagonDeck(deck, paragonData, issues);
+    } else {
+      issues.push({
+        type: "error",
+        category: "paragon",
+        message: `Unknown Paragon: "${deck.paragon}"`,
+      });
+    }
+  } else if (isParagonFormat && !deck.paragon) {
+    issues.push({
+      type: "warning",
+      category: "paragon",
+      message: "No Paragon selected for Paragon format deck",
+    });
+  }
+  
   // Determine if deck is valid (no errors, only warnings/info allowed)
   const isValid = !issues.some((issue) => issue.type === "error");
   
@@ -419,6 +618,7 @@ export function validateDeck(deck: Deck): DeckValidation {
       requiredLostSouls,
       dominantCount,
     },
+    paragonStats,
   };
 }
 

@@ -11,7 +11,9 @@ interface GenerateDeckImageModalProps {
 
 export default function GenerateDeckImageModal({ deck, onClose }: GenerateDeckImageModalProps) {
   // Derive deck type from deck format
-  const deckType = deck.format?.toLowerCase().includes('type 2') || deck.format?.toLowerCase().includes('multi') 
+  const deckType = deck.format?.toLowerCase().includes('paragon')
+    ? 'paragon'
+    : deck.format?.toLowerCase().includes('type 2') || deck.format?.toLowerCase().includes('multi') 
     ? 'type_2' 
     : 'type_1';
   

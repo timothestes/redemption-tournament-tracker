@@ -4,8 +4,8 @@ import clsx from "clsx";
 
 interface FilterGridProps {
   // Legality & Alignment
-  legalityMode: 'Rotation' | 'Classic' | 'Banned' | 'Scrolls';
-  setLegalityMode: (mode: 'Rotation' | 'Classic' | 'Banned' | 'Scrolls') => void;
+  legalityMode: 'Rotation' | 'Classic' | 'Banned' | 'Scrolls' | 'Paragon';
+  setLegalityMode: (mode: 'Rotation' | 'Classic' | 'Banned' | 'Scrolls' | 'Paragon') => void;
   selectedAlignmentFilters: string[];
   toggleAlignmentFilter: (value: string) => void;
   selectedRarityFilters: string[];
@@ -187,7 +187,7 @@ export default function FilterGrid({
       <div>
         <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Legality</p>
         <div className="flex flex-col sm:flex-row gap-2 mb-4 flex-wrap">
-          {['Rotation','Classic','Banned','Scrolls'].map((mode) => (
+          {['Rotation','Classic','Banned','Scrolls','Paragon'].map((mode) => (
             <button
               key={mode}
               className={clsx(

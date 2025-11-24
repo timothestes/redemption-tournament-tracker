@@ -25,6 +25,7 @@ import { Card } from "../card-search/utils";
 function formatDeckType(format?: string): string {
   if (!format) return "T1";
   const fmt = format.toLowerCase();
+  if (fmt.includes("paragon")) return "Paragon";
   if (fmt.includes("type 2") || fmt.includes("multi") || fmt === "t2") return "T2";
   return "T1";
 }
@@ -34,6 +35,9 @@ function getDeckTypeBadgeClasses(format?: string): string {
   const deckType = formatDeckType(format);
   if (deckType === "T2") {
     return "px-2 py-0.5 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded text-xs font-semibold";
+  }
+  if (deckType === "Paragon") {
+    return "px-2 py-0.5 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 rounded text-xs font-semibold";
   }
   return "px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded text-xs font-semibold";
 }
@@ -612,6 +616,17 @@ function DeckCard({
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow">
+      {/* Paragon Image Header */}
+      {formatDeckType(deck.format) === "Paragon" && deck.paragon && (
+        <div className="h-32 overflow-hidden rounded-t-lg">
+          <img
+            src={`/paragons/Paragon ${deck.paragon}.png`}
+            alt={deck.paragon}
+            className="w-full h-full object-cover object-top"
+          />
+        </div>
+      )}
+      
       <div className="p-4">
         <div className="flex items-start justify-between mb-2">
           <h3 className="font-semibold text-lg truncate flex-1">{deck.name}</h3>

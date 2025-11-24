@@ -10,6 +10,7 @@ export interface DeckData {
   name: string;
   description?: string;
   format?: string;
+  paragon?: string;
   folder_id?: string | null;
   is_public?: boolean;
   card_count?: number;
@@ -32,6 +33,7 @@ export interface SaveDeckParams {
   name: string;
   description?: string;
   format?: string;
+  paragon?: string;
   folderId?: string | null;
   cards: DeckCardData[];
 }
@@ -56,7 +58,7 @@ export async function saveDeckAction(params: SaveDeckParams) {
       };
     }
 
-    const { deckId, name, description, format, folderId, cards } = params;
+    const { deckId, name, description, format, paragon, folderId, cards } = params;
 
     // Calculate card count (main deck only, excluding reserve)
     const cardCount = cards
@@ -71,6 +73,7 @@ export async function saveDeckAction(params: SaveDeckParams) {
           name,
           description: description || null,
           format: format || null,
+          paragon: paragon || null,
           folder_id: folderId || null,
           card_count: cardCount,
           updated_at: new Date().toISOString(),
@@ -143,6 +146,7 @@ export async function saveDeckAction(params: SaveDeckParams) {
           name,
           description: description || null,
           format: format || null,
+          paragon: paragon || null,
           folder_id: folderId || null,
           card_count: cardCount,
         })
