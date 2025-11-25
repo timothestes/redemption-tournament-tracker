@@ -1371,7 +1371,11 @@ export default function DeckBuilderPanel({
                 {(() => {
                   // Calculate alignment counts
                   const alignmentCounts = deck.cards.reduce((acc, deckCard) => {
-                    const alignment = deckCard.card.alignment || "Neutral";
+                    let alignment = deckCard.card.alignment || "Neutral";
+                    // Treat "Good/Evil" cards as Neutral
+                    if (alignment.includes("Good/Evil")) {
+                      alignment = "Neutral";
+                    }
                     if (!acc[alignment]) {
                       acc[alignment] = 0;
                     }

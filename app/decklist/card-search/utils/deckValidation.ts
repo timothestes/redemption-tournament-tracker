@@ -179,9 +179,11 @@ function cardHasBrigade(card: Card, brigade: string): boolean {
  * Get card alignment: "good", "evil", or "neutral"
  */
 function getCardAlignment(card: Card): "good" | "evil" | "neutral" {
-  const alignment = card.alignment?.toLowerCase() || "";
-  if (alignment.includes("good") || alignment.includes("hero")) return "good";
-  if (alignment.includes("evil")) return "evil";
+  const alignment = card.alignment || "";
+  // Cards with "Good/Evil" alignment are considered neutral for Paragon
+  if (alignment.includes("Good/Evil")) return "neutral";
+  if (alignment.includes("Good")) return "good";
+  if (alignment.includes("Evil")) return "evil";
   return "neutral";
 }
 

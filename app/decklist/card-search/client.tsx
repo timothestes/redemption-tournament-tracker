@@ -669,8 +669,12 @@ export default function CardSearchClient() {
           if (selectedAlignmentFilters.length === 0) return true;
           return selectedAlignmentFilters.some((mode) => {
             if (mode === 'Neutral') {
-              return !c.alignment.includes('Good') && !c.alignment.includes('Evil');
+              // Neutral includes cards with "Good/Evil" alignment or cards with no Good/Evil alignment
+              return c.alignment.includes('Good/Evil') || (!c.alignment.includes('Good') && !c.alignment.includes('Evil'));
             }
+            // For Good or Evil filters, exclude cards with "Good/Evil" alignment (they're neutral)
+            // Only match cards that are purely Good or purely Evil
+            if (c.alignment.includes('Good/Evil')) return false;
             return c.alignment.includes(mode);
           });
         })
