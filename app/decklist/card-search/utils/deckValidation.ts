@@ -172,7 +172,19 @@ function cardHasBrigade(card: Card, brigade: string): boolean {
   const targetBrigade = brigade.toLowerCase();
   
   // Handle multi-brigade cards (e.g., "Blue/Gold")
-  return cardBrigade.split(/[/,]/).map(b => b.trim()).includes(targetBrigade);
+  const brigades = cardBrigade.split(/[/,]/).map(b => b.trim());
+  
+  // Check for exact match first
+  if (brigades.includes(targetBrigade)) {
+    return true;
+  }
+  
+  // Handle "Good Gold" vs "Gold" and "Evil Gold" vs "Gold" matching
+  if (targetBrigade === "gold") {
+    return brigades.includes("good gold") || brigades.includes("evil gold");
+  }
+  
+  return false;
 }
 
 /**
