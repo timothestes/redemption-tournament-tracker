@@ -134,6 +134,7 @@ export default function DeckBuilderPanel({
       'Red': '#DC2626',      // red-600
       'Blue': '#2b57a2',     // custom blue color
       'Green': '#02b65f',    // custom green color
+      'Pale Green': '#bfdb9e', // pale green color
       'Purple': '#b75ba9',   // custom purple color
       'Gold': '#ffda5b',     // custom gold color
       'White': '#ffffff',    // custom white color
