@@ -239,12 +239,12 @@ export default function RegistrationPage() {
               {/* Contact Section */}
               <div className="bg-muted p-4 rounded-lg border border-border">
                 <p className="text-sm text-muted-foreground">
-                  Questions? Contact us at{" "}
+                  Questions? Contact Brian at{" "}
                   <a
-                    href="mailto:info@landofredemption.com"
+                    href="mailto:Brianjones121191@gmail.com"
                     className="font-semibold text-foreground hover:text-green-600 dark:hover:text-green-400 underline decoration-2 underline-offset-2"
                   >
-                    info@landofredemption.com
+                    Brianjones121191@gmail.com
                   </a>
                 </p>
               </div>
@@ -635,6 +635,27 @@ export default function RegistrationPage() {
                     </p>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Payment Information */}
+            <div className="space-y-4">
+              <h2 className="text-xl font-semibold">
+                Payment Information
+              </h2>
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 text-blue-900 dark:text-blue-100 rounded-lg border border-blue-200 dark:border-blue-800">
+                <p className="font-medium mb-2">💳 Payment at Venue</p>
+                <p className="text-sm">
+                  Payment is to be received at the venue (no pre-payment options). Accepted payment methods:
+                </p>
+                <ul className="text-sm mt-2 ml-4 space-y-1">
+                  <li>• Cash</li>
+                  <li>• Brian's Venmo</li>
+                  <li>• Brian's PayPal</li>
+                </ul>
+                <p className="text-sm mt-2 text-muted-foreground">
+                  Venmo and PayPal details will be provided closer to the event.
+                </p>
               </div>
             </div>
 

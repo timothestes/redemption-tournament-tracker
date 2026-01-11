@@ -270,7 +270,7 @@ export function getRegistrationConfirmationEmail(
             
             <div class="contact-box">
               <p>Questions or need to update your registration?</p>
-              <a href="mailto:info@landofredemption.com">info@landofredemption.com</a>
+              <a href="mailto:Brianjones121191@gmail.com">Brianjones121191@gmail.com</a>
             </div>
             
             <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
