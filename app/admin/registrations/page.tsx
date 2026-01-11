@@ -92,11 +92,11 @@ export default function AdminRegistrationsPage() {
   }, []);
 
   const loadRegistrations = async () => {
-    setLoading(true);
+    // Don't set loading = true to avoid clearing the table visually
+    // Just silently fetch in background
     const { registrations: data } = await getRegistrations();
     setRegistrations(data);
-    setFilteredRegistrations(data);
-    setLoading(false);
+    // Don't need to set setFilteredRegistrations here - the useEffect will handle filtering
   };
 
   // Apply filters whenever filters or registrations change
