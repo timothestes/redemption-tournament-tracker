@@ -4,12 +4,11 @@ import { useState, useEffect } from "react";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { Label } from "../../../components/ui/label";
-import { Checkbox } from "../../../components/ui/checkbox";
 import TopNav from "../../../components/top-nav";
 import { createClient } from "../../../utils/supabase/client";
 import { getRegistrations, deleteRegistration, sendBulkEmail, updateRegistration, createTournamentFromRegistrations } from "./actions";
 import { useRouter } from "next/navigation";
-import { ADMIN_WHITELIST } from "../config";
+import { useIsAdmin } from "../../../hooks/useIsAdmin";
 import { NATIONALS_CONFIG } from "../../config/nationals";
 
 interface Registration {
@@ -35,7 +34,6 @@ export default function AdminRegistrationsPage() {
   const [filteredRegistrations, setFilteredRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -67,18 +65,19 @@ export default function AdminRegistrationsPage() {
   const router = useRouter();
   const supabase = createClient();
 
+  const { isAdmin, loading: adminLoading } = useIsAdmin();
+
   useEffect(() => {
     const checkAccess = async () => {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       setUser(currentUser);
 
-      // Check if user is admin
-      if (!currentUser || !ADMIN_WHITELIST.includes(currentUser.email || "")) {
+      // Check if user is admin (wait for admin loading to complete)
+      if (!adminLoading && (!currentUser || !isAdmin)) {
         router.push("/");
         return;
       }
 
-      setIsAdmin(true);
       await loadRegistrations();
     };
 
@@ -89,7 +88,7 @@ export default function AdminRegistrationsPage() {
     if (dismissed === 'true') {
       setShowEmailLimitsInfo(false);
     }
-  }, []);
+  }, [adminLoading, isAdmin]);
 
   const loadRegistrations = async () => {
     // Only show loading spinner on initial load

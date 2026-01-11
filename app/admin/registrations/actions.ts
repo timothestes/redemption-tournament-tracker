@@ -3,13 +3,14 @@
 import { createClient } from "../../../utils/supabase/server";
 import { sendEmail } from "../../../utils/email";
 import { redirect } from "next/navigation";
-import { ADMIN_WHITELIST } from "../config";
+import { isRegistrationAdmin, requireRegistrationAdmin } from "../../../utils/adminUtils";
 
 export async function checkAdminAccess() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+  const isAdmin = await isRegistrationAdmin();
 
-  if (!user || !ADMIN_WHITELIST.includes(user.email || "")) {
+  if (!user || !isAdmin) {
     return { isAdmin: false, user: null };
   }
 

@@ -14,7 +14,7 @@ import { Button } from "./ui/button";
 import { ThemeSwitcher } from "./theme-switcher";
 import { createClient } from "../utils/supabase/client";
 import { signOutAction } from "../app/actions";
-import { ADMIN_WHITELIST } from "../app/admin/config";
+import { useIsAdmin } from "../hooks/useIsAdmin";
 import { NATIONALS_CONFIG } from "../app/config/nationals";
 
 const TopNav: React.FC = () => {
@@ -24,7 +24,7 @@ const TopNav: React.FC = () => {
   const [mounted, setMounted] = useState(false);
   const [logoSrc, setLogoSrc] = useState('/lor.png');
   const [user, setUser] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { isAdmin } = useIsAdmin();
   const pathname = usePathname();
   const supabase = createClient();
 
@@ -44,14 +44,12 @@ const TopNav: React.FC = () => {
     const getUser = async () => {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       setUser(currentUser);
-      setIsAdmin(currentUser ? ADMIN_WHITELIST.includes(currentUser.email || "") : false);
     };
 
     getUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
-      setIsAdmin(session?.user ? ADMIN_WHITELIST.includes(session.user.email || "") : false);
     });
 
     return () => subscription.unsubscribe();

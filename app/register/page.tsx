@@ -9,28 +9,28 @@ import { submitRegistration } from "./actions";
 import TopNav from "../../components/top-nav";
 import { createClient } from "../../utils/supabase/client";
 import { NATIONALS_CONFIG } from "../config/nationals";
-import { ADMIN_WHITELIST } from "../admin/config";
+import { useIsAdmin } from "../../hooks/useIsAdmin";
 
 export default function RegistrationPage() {
   const [user, setUser] = useState(null);
   const supabase = createClient();
+  const { isAdmin, loading: adminLoading } = useIsAdmin();
 
   useEffect(() => {
     const getUser = async () => {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       setUser(currentUser);
       
-      // Check if registration is admin-only
-      if (NATIONALS_CONFIG.adminOnly) {
-        const isAdmin = currentUser ? ADMIN_WHITELIST.includes(currentUser.email || "") : false;
-        if (!isAdmin) {
+      // Check if registration is admin-only (wait for admin loading to complete)
+      if (NATIONALS_CONFIG.adminOnly && !adminLoading) {
+        if (!currentUser || !isAdmin) {
           window.location.href = "/";
           return;
         }
       }
     };
     getUser();
-  }, []);
+  }, [adminLoading, isAdmin]);
 
   const [formData, setFormData] = useState({
     firstName: "",
