@@ -15,6 +15,11 @@ interface NationalsConfig {
   datesShort: string;
   adminOnly: boolean;
   emailSubject: string;
+  eventDates: {
+    thursday: string;
+    friday: string;
+    saturday: string;
+  };
   events: {
     thursday: EventOption[];
     friday: EventOption[];
@@ -38,6 +43,13 @@ export const NATIONALS_CONFIG: NationalsConfig = {
   
   // Email subject line
   emailSubject: "Registration Confirmed - Nationals 2026",
+  
+  // Event dates
+  eventDates: {
+    thursday: "July 23",
+    friday: "July 24",
+    saturday: "July 25",
+  },
   
   // Event configurations by day
   events: {

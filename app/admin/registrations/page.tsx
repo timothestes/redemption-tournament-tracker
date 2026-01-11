@@ -743,10 +743,20 @@ export default function AdminRegistrationsPage() {
                   <thead className="bg-muted">
                     <tr>
                       <th className="px-4 py-3 text-left">
-                        <Checkbox
-                          checked={selectedIds.size === filteredRegistrations.length && filteredRegistrations.length > 0}
-                          onCheckedChange={toggleSelectAll}
-                        />
+                        <button
+                          onClick={toggleSelectAll}
+                          className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
+                            selectedIds.size === filteredRegistrations.length && filteredRegistrations.length > 0
+                              ? 'bg-green-500 border-green-600 hover:bg-green-600'
+                              : 'border-gray-300 hover:border-green-400 hover:bg-green-50 dark:border-gray-600 dark:hover:border-green-400 dark:hover:bg-green-950/20'
+                          }`}
+                        >
+                          {selectedIds.size === filteredRegistrations.length && filteredRegistrations.length > 0 && (
+                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </button>
                       </th>
                       <th className="px-4 py-3 text-left text-sm font-semibold">Name</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold">Photo</th>
@@ -765,12 +775,22 @@ export default function AdminRegistrationsPage() {
                     {filteredRegistrations.map((reg) => (
                       <tr key={reg.id} className="hover:bg-muted/50">
                         <td className="px-4 py-3">
-                          <Checkbox
-                            checked={selectedIds.has(reg.id)}
-                            onCheckedChange={() => toggleSelection(reg.id)}
-                          />
+                          <button
+                            onClick={() => toggleSelection(reg.id)}
+                            className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
+                              selectedIds.has(reg.id)
+                                ? 'bg-green-500 border-green-600 hover:bg-green-600'
+                                : 'border-gray-300 hover:border-green-400 hover:bg-green-50 dark:border-gray-600 dark:hover:border-green-400 dark:hover:bg-green-950/20'
+                            }`}
+                          >
+                            {selectedIds.has(reg.id) && (
+                              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </button>
                         </td>
-                        <td className="px-4 py-3 text-sm">
+                        <td className="px-4 py-3 text-sm max-w-[150px] truncate" title={`${reg.first_name} ${reg.last_name}`}>
                           {reg.first_name} {reg.last_name}
                         </td>
                         <td className="px-4 py-3">
@@ -808,8 +828,8 @@ export default function AdminRegistrationsPage() {
                             </button>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-sm">{reg.email}</td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground">
+                        <td className="px-4 py-3 text-sm max-w-[180px] truncate" title={reg.email}>{reg.email}</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground max-w-[140px] truncate" title={reg.discord_username || ""}>
                           {reg.discord_username || "-"}
                         </td>
                         <td className="px-4 py-3 text-sm">
@@ -846,17 +866,30 @@ export default function AdminRegistrationsPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <Checkbox
-                            checked={reg.paid || false}
-                            onCheckedChange={async (checked) => {
-                              const result = await updateRegistration(reg.id, { paid: checked === true });
-                              if (result.success) {
-                                await loadRegistrations();
-                              } else {
-                                alert(`Error updating paid status: ${result.error}`);
-                              }
+                          <button
+                            onClick={() => {
+                              const newPaidStatus = !reg.paid;
+                              (async () => {
+                                const result = await updateRegistration(reg.id, { paid: newPaidStatus });
+                                if (result.success) {
+                                  await loadRegistrations();
+                                } else {
+                                  alert(`Error updating paid status: ${result.error}`);
+                                }
+                              })();
                             }}
-                          />
+                            className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all mx-auto ${
+                              reg.paid
+                                ? 'bg-green-500 border-green-600 hover:bg-green-600'
+                                : 'border-gray-300 hover:border-green-400 hover:bg-green-50 dark:border-gray-600 dark:hover:border-green-400 dark:hover:bg-green-950/20'
+                            }`}
+                          >
+                            {reg.paid && (
+                              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </button>
                         </td>
                         <td className="px-4 py-3 text-sm text-muted-foreground">
                           {formatDate(reg.created_at)}
@@ -1012,7 +1045,16 @@ export default function AdminRegistrationsPage() {
 
         {/* Edit Modal */}
         {showEditModal && editingRegistration && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div 
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setShowEditModal(false);
+                setEditingRegistration(null);
+              }
+            }}
+            tabIndex={0}
+          >
             <div className="bg-card border rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-auto">
               <div className="p-6">
                 <h2 className="text-2xl font-bold mb-4">
@@ -1115,56 +1157,81 @@ export default function AdminRegistrationsPage() {
                   <div className="space-y-3 pt-4 border-t">
                     <h3 className="font-semibold">Additional Options</h3>
                     
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="edit-fantasy"
-                        checked={editingRegistration.fantasy_draft_opt_in}
-                        onCheckedChange={(checked) => setEditingRegistration({...editingRegistration, fantasy_draft_opt_in: checked as boolean})}
-                      />
+                    <div className="flex items-center space-x-3">
+                      <button
+                        onClick={() => setEditingRegistration({...editingRegistration, fantasy_draft_opt_in: !editingRegistration.fantasy_draft_opt_in})}
+                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.fantasy_draft_opt_in ? 'bg-green-500 border-green-600' : 'border-gray-300 dark:border-gray-600'}`}
+                      >
+                        {editingRegistration.fantasy_draft_opt_in && (
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
                       <Label htmlFor="edit-fantasy" className="font-normal cursor-pointer">
                         Fantasy Draft Opt-in
                       </Label>
                     </div>
 
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="edit-firstNats"
-                        checked={editingRegistration.first_nationals}
-                        onCheckedChange={(checked) => setEditingRegistration({...editingRegistration, first_nationals: checked as boolean})}
-                      />
+                    <div className="flex items-center space-x-3">
+                      <button
+                        onClick={() => setEditingRegistration({...editingRegistration, first_nationals: !editingRegistration.first_nationals})}
+                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.first_nationals ? 'bg-green-500 border-green-600' : 'border-gray-300 dark:border-gray-600'}`}
+                      >
+                        {editingRegistration.first_nationals && (
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
                       <Label htmlFor="edit-firstNats" className="font-normal cursor-pointer">
                         First Nationals
                       </Label>
                     </div>
 
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="edit-airport"
-                        checked={editingRegistration.needs_airport_transportation}
-                        onCheckedChange={(checked) => setEditingRegistration({...editingRegistration, needs_airport_transportation: checked as boolean})}
-                      />
+                    <div className="flex items-center space-x-3">
+                      <button
+                        onClick={() => setEditingRegistration({...editingRegistration, needs_airport_transportation: !editingRegistration.needs_airport_transportation})}
+                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.needs_airport_transportation ? 'bg-green-500 border-green-600' : 'border-gray-300 dark:border-gray-600'}`}
+                      >
+                        {editingRegistration.needs_airport_transportation && (
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
                       <Label htmlFor="edit-airport" className="font-normal cursor-pointer">
                         Needs Airport Transportation
                       </Label>
                     </div>
 
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="edit-hotel"
-                        checked={editingRegistration.needs_hotel_transportation}
-                        onCheckedChange={(checked) => setEditingRegistration({...editingRegistration, needs_hotel_transportation: checked as boolean})}
-                      />
+                    <div className="flex items-center space-x-3">
+                      <button
+                        onClick={() => setEditingRegistration({...editingRegistration, needs_hotel_transportation: !editingRegistration.needs_hotel_transportation})}
+                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.needs_hotel_transportation ? 'bg-green-500 border-green-600' : 'border-gray-300 dark:border-gray-600'}`}
+                      >
+                        {editingRegistration.needs_hotel_transportation && (
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
                       <Label htmlFor="edit-hotel" className="font-normal cursor-pointer">
                         Needs Hotel Transportation
                       </Label>
                     </div>
 
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="edit-paid"
-                        checked={editingRegistration.paid}
-                        onCheckedChange={(checked) => setEditingRegistration({...editingRegistration, paid: checked as boolean})}
-                      />
+                    <div className="flex items-center space-x-3">
+                      <button
+                        onClick={() => setEditingRegistration({...editingRegistration, paid: !editingRegistration.paid})}
+                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.paid ? 'bg-green-500 border-green-600' : 'border-gray-300 dark:border-gray-600'}`}
+                      >
+                        {editingRegistration.paid && (
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
                       <Label htmlFor="edit-paid" className="font-normal cursor-pointer">
                         Paid
                       </Label>

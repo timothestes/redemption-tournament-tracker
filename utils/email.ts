@@ -245,17 +245,17 @@ export function getRegistrationConfirmationEmail(
             <h3 class="section-title">📅 Your Event Schedule</h3>
             
             <div class="event-box">
-              <strong>Thursday, July 23rd</strong>
+              <strong>Thursday, ${NATIONALS_CONFIG.eventDates.thursday}</strong>
               <span>${formatEvent(thursdayEvent)}</span>
             </div>
             
             <div class="event-box">
-              <strong>Friday, July 24th</strong>
+              <strong>Friday, ${NATIONALS_CONFIG.eventDates.friday}</strong>
               <span>${formatEvent(fridayEvent)}</span>
             </div>
             
             <div class="event-box">
-              <strong>Saturday, July 25th</strong>
+              <strong>Saturday, ${NATIONALS_CONFIG.eventDates.saturday}</strong>
               <span>${formatEvent(saturdayEvent)}</span>
             </div>
             

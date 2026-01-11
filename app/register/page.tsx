@@ -279,8 +279,8 @@ export default function RegistrationPage() {
               </div>
             </div>
           ) : (
-          <div className="bg-card border border-border rounded-lg shadow-sm p-8">
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="bg-card border border-border rounded-lg shadow-sm p-8">
+              <form onSubmit={handleSubmit} className="space-y-6">
             {/* Personal Information */}
             <div className="space-y-4">
               <h2 className="text-xl font-semibold">
@@ -391,101 +391,134 @@ export default function RegistrationPage() {
                 Event Selection
               </h2>
 
-              {/* Thursday - July 23rd */}
+              {/* Thursday */}
               <div className="space-y-3 p-4 bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600">
                 <h3 className="font-semibold">
-                  Thursday <span className="text-red-500">*</span>
+                  Thursday <span className="text-red-500">*</span> <span className="text-sm text-muted-foreground font-normal">({NATIONALS_CONFIG.eventDates.thursday})</span>
                 </h3>
                 <div className="space-y-2">
                   {NATIONALS_CONFIG.events.thursday.map((event) => (
-                    <label key={event.value} className="flex items-start space-x-3 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="thursdayEvent"
-                        value={event.value}
-                        checked={formData.thursdayEvent === event.value}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            thursdayEvent: e.target.value,
-                          })
-                        }
-                        className="w-4 h-4 mt-1"
-                      />
-                      <span>
+                    <button
+                      key={event.value}
+                      type="button"
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          thursdayEvent: event.value,
+                        })
+                      }
+                      className={`w-full flex items-start space-x-3 p-3 transition-all ${
+                        formData.thursdayEvent === event.value
+                          ? 'text-blue-600 dark:text-blue-400'
+                          : 'hover:text-blue-500 dark:hover:text-blue-400'
+                      }`}
+                    >
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                        formData.thursdayEvent === event.value
+                          ? 'bg-blue-500 border-blue-600'
+                          : 'border-gray-400 dark:border-gray-500'
+                      }`}>
+                        {formData.thursdayEvent === event.value && (
+                          <div className="w-2 h-2 bg-white rounded-full"></div>
+                        )}
+                      </div>
+                      <span className="text-left">
                         {event.label}{event.price ? ` - ${event.price}` : ''}
                         {event.description && (
-                          <span className="text-sm text-muted-foreground">
-                            {' '}({event.description})
+                          <span className="text-sm text-muted-foreground block">
+                            {event.description}
                           </span>
                         )}
                       </span>
-                    </label>
+                    </button>
                   ))}
                 </div>
               </div>
 
-              {/* Friday - July 24th */}
+              {/* Friday */}
               <div className="space-y-3 p-4 bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600">
                 <h3 className="font-semibold">
-                  Friday <span className="text-red-500">*</span>
+                  Friday <span className="text-red-500">*</span> <span className="text-sm text-muted-foreground font-normal">({NATIONALS_CONFIG.eventDates.friday})</span>
                 </h3>
                 <div className="space-y-2">
                   {NATIONALS_CONFIG.events.friday.map((event) => (
-                    <label key={event.value} className="flex items-start space-x-3 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="fridayEvent"
-                        value={event.value}
-                        checked={formData.fridayEvent === event.value}
-                        onChange={(e) =>
-                          setFormData({ ...formData, fridayEvent: e.target.value })
-                        }
-                        className="w-4 h-4 mt-1"
-                      />
-                      <span>
+                    <button
+                      key={event.value}
+                      type="button"
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          fridayEvent: event.value,
+                        })
+                      }
+                      className={`w-full flex items-start space-x-3 p-3 transition-all ${
+                        formData.fridayEvent === event.value
+                          ? 'text-blue-600 dark:text-blue-400'
+                          : 'hover:text-blue-500 dark:hover:text-blue-400'
+                      }`}
+                    >
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                        formData.fridayEvent === event.value
+                          ? 'bg-blue-500 border-blue-600'
+                          : 'border-gray-400 dark:border-gray-500'
+                      }`}>
+                        {formData.fridayEvent === event.value && (
+                          <div className="w-2 h-2 bg-white rounded-full"></div>
+                        )}
+                      </div>
+                      <span className="text-left">
                         {event.label}{event.price ? ` - ${event.price}` : ''}
                         {event.description && (
-                          <span className="text-sm text-muted-foreground">
-                            {' '}({event.description})
+                          <span className="text-sm text-muted-foreground block">
+                            {event.description}
                           </span>
                         )}
                       </span>
-                    </label>
+                    </button>
                   ))}
                 </div>
               </div>
 
-              {/* Saturday - July 25th */}
+              {/* Saturday */}
               <div className="space-y-3 p-4 bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600">
                 <h3 className="font-semibold">
-                  Saturday <span className="text-red-500">*</span>
+                  Saturday <span className="text-red-500">*</span> <span className="text-sm text-muted-foreground font-normal">({NATIONALS_CONFIG.eventDates.saturday})</span>
                 </h3>
                 <div className="space-y-2">
                   {NATIONALS_CONFIG.events.saturday.map((event) => (
-                    <label key={event.value} className="flex items-start space-x-3 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="saturdayEvent"
-                        value={event.value}
-                        checked={formData.saturdayEvent === event.value}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            saturdayEvent: e.target.value,
-                          })
-                        }
-                        className="w-4 h-4 mt-1"
-                      />
-                      <span>
+                    <button
+                      key={event.value}
+                      type="button"
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          saturdayEvent: event.value,
+                        })
+                      }
+                      className={`w-full flex items-start space-x-3 p-3 transition-all ${
+                        formData.saturdayEvent === event.value
+                          ? 'text-blue-600 dark:text-blue-400'
+                          : 'hover:text-blue-500 dark:hover:text-blue-400'
+                      }`}
+                    >
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                        formData.saturdayEvent === event.value
+                          ? 'bg-blue-500 border-blue-600'
+                          : 'border-gray-400 dark:border-gray-500'
+                      }`}>
+                        {formData.saturdayEvent === event.value && (
+                          <div className="w-2 h-2 bg-white rounded-full"></div>
+                        )}
+                      </div>
+                      <span className="text-left">
                         {event.label}{event.price ? ` - ${event.price}` : ''}
                         {event.description && (
-                          <span className="text-sm text-muted-foreground">
-                            {' '}({event.description})
+                          <span className="text-sm text-muted-foreground block">
+                            {event.description}
                           </span>
                         )}
                       </span>
-                    </label>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -499,17 +532,17 @@ export default function RegistrationPage() {
 
               <div className="space-y-4">
                 <div className="flex items-start space-x-3">
-                  <Checkbox
-                    id="fantasyDraft"
-                    checked={formData.fantasyDraftOptIn}
-                    onCheckedChange={(checked) =>
-                      setFormData({
-                        ...formData,
-                        fantasyDraftOptIn: checked as boolean,
-                      })
-                    }
-                  />
-                  <div className="space-y-1">
+                  <button
+                    onClick={() => setFormData({...formData, fantasyDraftOptIn: !formData.fantasyDraftOptIn})}
+                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 ${formData.fantasyDraftOptIn ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
+                  >
+                    {formData.fantasyDraftOptIn && (
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+                  <div className="space-y-1" onClick={() => setFormData({...formData, fantasyDraftOptIn: !formData.fantasyDraftOptIn})}>
                     <Label
                       htmlFor="fantasyDraft"
                       className="font-normal cursor-pointer"
@@ -525,36 +558,37 @@ export default function RegistrationPage() {
                 </div>
 
                 <div className="flex items-center space-x-3">
-                  <Checkbox
-                    id="firstNationals"
-                    checked={formData.firstNationals}
-                    onCheckedChange={(checked) =>
-                      setFormData({
-                        ...formData,
-                        firstNationals: checked as boolean,
-                      })
-                    }
-                  />
+                  <button
+                    onClick={() => setFormData({...formData, firstNationals: !formData.firstNationals})}
+                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${formData.firstNationals ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
+                  >
+                    {formData.firstNationals && (
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
                   <Label
                     htmlFor="firstNationals"
                     className="font-normal cursor-pointer"
+                    onClick={() => setFormData({...formData, firstNationals: !formData.firstNationals})}
                   >
                     Is this your first National tournament?
                   </Label>
                 </div>
 
                 <div className="flex items-start space-x-3">
-                  <Checkbox
-                    id="airportTransportation"
-                    checked={formData.needsAirportTransportation}
-                    onCheckedChange={(checked) =>
-                      setFormData({
-                        ...formData,
-                        needsAirportTransportation: checked as boolean,
-                      })
-                    }
-                  />
-                  <div className="space-y-1">
+                  <button
+                    onClick={() => setFormData({...formData, needsAirportTransportation: !formData.needsAirportTransportation})}
+                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 ${formData.needsAirportTransportation ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
+                  >
+                    {formData.needsAirportTransportation && (
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+                  <div className="space-y-1" onClick={() => setFormData({...formData, needsAirportTransportation: !formData.needsAirportTransportation})}>
                     <Label
                       htmlFor="airportTransportation"
                       className="font-normal cursor-pointer"
@@ -565,6 +599,7 @@ export default function RegistrationPage() {
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-blue-600 dark:text-blue-400 hover:underline"
+                        onClick={(e) => e.stopPropagation()}
                       >
                         Bluegrass International Airport
                       </a>
@@ -577,17 +612,17 @@ export default function RegistrationPage() {
                 </div>
 
                 <div className="flex items-start space-x-3">
-                  <Checkbox
-                    id="hotelTransportation"
-                    checked={formData.needsHotelTransportation}
-                    onCheckedChange={(checked) =>
-                      setFormData({
-                        ...formData,
-                        needsHotelTransportation: checked as boolean,
-                      })
-                    }
-                  />
-                  <div className="space-y-1">
+                  <button
+                    onClick={() => setFormData({...formData, needsHotelTransportation: !formData.needsHotelTransportation})}
+                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 ${formData.needsHotelTransportation ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
+                  >
+                    {formData.needsHotelTransportation && (
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+                  <div className="space-y-1" onClick={() => setFormData({...formData, needsHotelTransportation: !formData.needsHotelTransportation})}>
                     <Label
                       htmlFor="hotelTransportation"
                       className="font-normal cursor-pointer"
@@ -617,22 +652,22 @@ export default function RegistrationPage() {
             )}
 
             {/* Submit Button */}
-            <div className="pt-4 flex justify-center">
-              <Button
-                type="submit"
-                disabled={isSubmitting || isUploadingPhoto}
-                variant="outline"
-                className="border-2 border-green-500 text-green-600 hover:bg-green-50 hover:border-green-600 dark:border-green-400 dark:text-green-400 dark:hover:bg-green-950"
-                size="lg"
-              >
-                {isUploadingPhoto ? "Uploading picture..." : isSubmitting ? "Submitting..." : "Submit Registration"}
-              </Button>
-            </div>
-          </form>
+              <div className="pt-4 flex justify-center">
+                <Button
+                  type="submit"
+                  disabled={isSubmitting || isUploadingPhoto}
+                  variant="outline"
+                  className="border-2 border-blue-500 text-blue-600 hover:bg-blue-50 hover:border-blue-600 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-950"
+                  size="lg"
+                >
+                  {isUploadingPhoto ? "Uploading picture..." : isSubmitting ? "Submitting..." : "Submit Registration"}
+                </Button>
+              </div>
+            </form>
           </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
     </div>
   );
 }
