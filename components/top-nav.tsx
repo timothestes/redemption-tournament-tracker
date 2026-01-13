@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { HiMenu, HiDocumentText, HiArrowSmRight } from "react-icons/hi";
+import { HiMenu, HiDocumentText, HiArrowSmRight, HiUserAdd, HiShieldCheck } from "react-icons/hi";
 import { IoClose } from "react-icons/io5";
 import { FaTrophy, FaBookOpen } from "react-icons/fa6";
 import { PiPencilLineBold } from "react-icons/pi";
@@ -14,6 +14,8 @@ import { Button } from "./ui/button";
 import { ThemeSwitcher } from "./theme-switcher";
 import { createClient } from "../utils/supabase/client";
 import { signOutAction } from "../app/actions";
+import { useIsAdmin } from "../hooks/useIsAdmin";
+import { NATIONALS_CONFIG } from "../app/config/nationals";
 
 const TopNav: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -22,6 +24,7 @@ const TopNav: React.FC = () => {
   const [mounted, setMounted] = useState(false);
   const [logoSrc, setLogoSrc] = useState('/lor.png');
   const [user, setUser] = useState(null);
+  const { isAdmin } = useIsAdmin();
   const pathname = usePathname();
   const supabase = createClient();
 
@@ -55,10 +58,15 @@ const TopNav: React.FC = () => {
   const isActive = (path: string) => pathname?.startsWith(path);
 
   const navLinks = [
+    { href: "/register", label: NATIONALS_CONFIG.adminOnly ? `${NATIONALS_CONFIG.displayName} (Admin Only)` : `${NATIONALS_CONFIG.displayName}`, icon: HiUserAdd, highlight: true },
     { href: "/tracker/tournaments", label: "Tournaments", icon: FaTrophy },
     { href: "/decklist/my-decks", label: "My Decks", icon: TbCardsFilled },
     { href: "/decklist/card-search", label: "Deck Builder", icon: TbSearch },
     { href: "/decklist/generate", label: "Deck Check PDF", icon: TbCardsFilled },
+  ];
+
+  const adminLinks = [
+    { href: "/admin/registrations", label: "Admin", icon: HiShieldCheck },
   ];
 
   const tournamentResources = [
@@ -108,14 +116,58 @@ const TopNav: React.FC = () => {
 
           {/* Desktop Navigation - Center */}
           <div className="hidden md:flex md:items-center md:space-x-1 flex-1 justify-center">
-            {navLinks.map((link) => {
+            {navLinks.slice(0, 1).map((link) => {
               const Icon = link.icon;
+              const isHighlight = link.highlight;
               return (
                 <Link
                   key={link.href}
                   href={link.href}
                   className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
+                    ${isHighlight
+                      ? 'border-2 border-green-500 text-green-600 hover:bg-green-50 dark:border-green-400 dark:text-green-400 dark:hover:bg-green-950'
+                      : isActive(link.href)
+                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {link.label}
+                </Link>
+              );
+            })}
+
+            {/* Admin Links - Only for admins (right after Nationals) */}
+            {isAdmin && adminLinks.map((link) => {
+              const Icon = link.icon;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors
                     ${isActive(link.href)
+                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {link.label}
+                </Link>
+              );
+            })}
+
+            {/* Rest of nav links */}
+            {navLinks.slice(1).map((link) => {
+              const Icon = link.icon;
+              const isHighlight = link.highlight;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
+                    ${isHighlight
+                      ? 'border-2 border-green-500 text-green-600 hover:bg-green-50 dark:border-green-400 dark:text-green-400 dark:hover:bg-green-950'
+                      : isActive(link.href)
                       ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
                       : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
                     }`}
@@ -265,7 +317,31 @@ const TopNav: React.FC = () => {
       {isMobileMenuOpen && (
         <div className="md:hidden border-t border-gray-200 dark:border-gray-700">
           <div className="px-2 pt-2 pb-3 space-y-1">
-            {navLinks.map((link) => {
+            {/* Nationals link */}
+            {navLinks.slice(0, 1).map((link) => {
+              const Icon = link.icon;
+              const isHighlight = link.highlight;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-md text-base font-medium transition-colors
+                    ${isHighlight
+                      ? 'border-2 border-green-500 text-green-600 hover:bg-green-50 dark:border-green-400 dark:text-green-400 dark:hover:bg-green-950'
+                      : isActive(link.href)
+                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  {link.label}
+                </Link>
+              );
+            })}
+
+            {/* Admin Links - Only for admins (right after Nationals) */}
+            {isAdmin && adminLinks.map((link) => {
               const Icon = link.icon;
               return (
                 <Link
@@ -274,6 +350,29 @@ const TopNav: React.FC = () => {
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={`flex items-center gap-3 px-3 py-2 rounded-md text-base font-medium transition-colors
                     ${isActive(link.href)
+                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  {link.label}
+                </Link>
+              );
+            })}
+
+            {/* Rest of nav links */}
+            {navLinks.slice(1).map((link) => {
+              const Icon = link.icon;
+              const isHighlight = link.highlight;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-md text-base font-medium transition-colors
+                    ${isHighlight
+                      ? 'border-2 border-green-500 text-green-600 hover:bg-green-50 dark:border-green-400 dark:text-green-400 dark:hover:bg-green-950'
+                      : isActive(link.href)
                       ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
                       : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
                     }`}
