@@ -39,7 +39,7 @@ export const NATIONALS_CONFIG: NationalsConfig = {
   datesShort: "July 23-25",
   
   // Access control - set to true to make registration admin-only
-  adminOnly: false,
+  adminOnly: true,
   
   // Email subject line
   emailSubject: "Registration Confirmed - Nationals 2026",
