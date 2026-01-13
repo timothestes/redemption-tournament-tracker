@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import { useRouter } from "next/navigation";
 import clsx from "clsx";
 
 interface FilterGridProps {
@@ -136,6 +137,7 @@ export default function FilterGrid({
   setIconFilterMode,
   updateAllIconFilterOperators,
 }: FilterGridProps) {
+  const router = useRouter();
   // Quick icon filters for type-based icons (reordered) and color-coded brigades
   const typeIcons = [
     "Good Dominant",
@@ -635,6 +637,19 @@ export default function FilterGrid({
             title="Click to cycle: AND → OR → AND NOT (applies to all active filters)"
           >
             {iconFilterMode}
+          </button>
+          <button
+            className={clsx(
+              'px-2 py-1 border rounded text-sm transition opacity-70 hover:opacity-100',
+              'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700'
+            )}
+            onClick={(e) => {
+              e.preventDefault();
+              router.push('/decklist/card-search/random');
+            }}
+            title="I'm feeling lucky"
+          >
+            🎲
           </button>
         </div>
       </div>
