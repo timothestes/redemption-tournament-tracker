@@ -113,7 +113,8 @@ export interface SyncStatus {
  * Custom hook for managing deck state with localStorage persistence and cloud sync
  */
 export function useDeckState(initialDeckId?: string, initialFolderId?: string | null, isNewDeck?: boolean) {
-  const [deck, setDeck] = useState<Deck>(() => loadDeckFromStorage());
+  // Initialize with default deck to avoid hydration mismatch
+  const [deck, setDeck] = useState<Deck>(getDefaultDeck);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
     isSaving: false,
     lastSavedAt: null,
@@ -121,6 +122,19 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
   });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const isInitialMount = useRef(true);
+  const hasLoadedFromStorage = useRef(false);
+
+  // Load from localStorage on client mount (after hydration)
+  useEffect(() => {
+    if (!hasLoadedFromStorage.current && !initialDeckId && !isNewDeck) {
+      const storedDeck = loadDeckFromStorage();
+      // Only update if there's actually a deck in storage (not just the default)
+      if (storedDeck.cards.length > 0 || storedDeck.name !== "Untitled Deck" || storedDeck.id) {
+        setDeck(storedDeck);
+      }
+      hasLoadedFromStorage.current = true;
+    }
+  }, [initialDeckId, isNewDeck]);
 
   // Persist deck to localStorage whenever it changes
   useEffect(() => {
@@ -249,7 +263,7 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
   /**
    * Save current deck to cloud
    */
-  const saveDeckToCloud = useCallback(async () => {
+  const saveDeckToCloud = useCallback(async (overrideName?: string) => {
     try {
       setSyncStatus({ isSaving: true, lastSavedAt: null, error: null });
 
@@ -269,7 +283,7 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
 
       const result = await saveDeckAction({
         deckId: deck.id,
-        name: deck.name,
+        name: overrideName || deck.name,
         description: deck.description,
         format: deck.format,
         paragon: deck.paragon,
@@ -607,6 +621,11 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
  * Load deck from localStorage
  */
 function loadDeckFromStorage(): Deck {
+  // Check if we're in the browser (not SSR)
+  if (typeof window === 'undefined') {
+    return getDefaultDeck();
+  }
+  
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -622,7 +641,13 @@ function loadDeckFromStorage(): Deck {
     console.error("Error loading deck from storage:", error);
   }
 
-  // Return default empty deck
+  return getDefaultDeck();
+}
+
+/**
+ * Get default empty deck
+ */
+function getDefaultDeck(): Deck {
   return {
     name: "Untitled Deck",
     cards: [],
@@ -637,6 +662,11 @@ function loadDeckFromStorage(): Deck {
  * Save deck to localStorage
  */
 function saveDeckToStorage(deck: Deck): void {
+  // Check if we're in the browser (not SSR)
+  if (typeof window === 'undefined') {
+    return;
+  }
+  
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(deck));
   } catch (error) {

@@ -344,7 +344,7 @@ export default function MyDecksClient() {
             </div>
             <button
               onClick={handleNewDeck}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors"
+              className="px-6 py-3 border-2 border-blue-500 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg font-medium transition-colors"
             >
               + New Deck
             </button>

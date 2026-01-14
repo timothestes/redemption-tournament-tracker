@@ -19,6 +19,79 @@ import { createClient } from "../../../utils/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { deleteDeckAction } from "../actions";
 
+// Helper component for rename form in new deck modal
+function NewDeckRenameForm({ 
+  onSubmit, 
+  onSkip, 
+  onDiscard, 
+  onCancel 
+}: { 
+  onSubmit: (name: string) => void; 
+  onSkip: () => void; 
+  onDiscard: () => void; 
+  onCancel: () => void; 
+}) {
+  const [deckName, setDeckName] = useState("Untitled Deck");
+
+  return (
+    <>
+      <p className="text-gray-600 dark:text-gray-300 mb-4 leading-relaxed">
+        Your deck is still named <strong>"Untitled Deck"</strong>. Would you like to give it a name before saving?
+      </p>
+      
+      <div className="mb-5">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Deck Name
+        </label>
+        <input
+          type="text"
+          value={deckName}
+          onChange={(e) => setDeckName(e.target.value)}
+          placeholder="Enter deck name..."
+          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              onSubmit(deckName.trim() || "Untitled Deck");
+            }
+          }}
+          autoFocus
+        />
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <button
+          onClick={() => onSubmit(deckName.trim() || "Untitled Deck")}
+          className="w-full px-6 py-3 bg-white dark:bg-gray-800 rounded-lg transition-all font-semibold flex items-center justify-center gap-2 border-2 hover:bg-green-50 dark:hover:bg-green-950/20"
+          style={{
+            borderImage: 'linear-gradient(to right, rgb(34 197 94), rgb(59 130 246)) 1',
+          }}
+        >
+          <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+          </svg>
+          <span className="text-gray-900 dark:text-white">
+            Save & Create New Deck
+          </span>
+        </button>
+
+        <button
+          onClick={onDiscard}
+          className="w-full px-6 py-3 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg transition-all font-semibold flex items-center justify-center gap-2 border-2 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+        >
+          Discard & Create New Deck
+        </button>
+
+        <button
+          onClick={onCancel}
+          className="w-full px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+        >
+          Cancel
+        </button>
+      </div>
+    </>
+  );
+}
+
 export default function CardSearchClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -102,6 +175,10 @@ export default function CardSearchClient() {
   // Unsaved changes modal state
   const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
+  
+  // New deck confirmation modal state
+  const [showNewDeckModal, setShowNewDeckModal] = useState(false);
+  const [pendingNewDeckFolderId, setPendingNewDeckFolderId] = useState<string | null | undefined>(undefined);
 
   // Panel visibility state
   const [showDeckBuilder, setShowDeckBuilder] = useState(true);
@@ -329,45 +406,9 @@ export default function CardSearchClient() {
     postexilicOnly, updateURL
   ]);
 
-  // Warn before leaving with unsaved changes
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges) {
-        e.preventDefault();
-        e.returnValue = ''; // Chrome requires returnValue to be set
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [hasUnsavedChanges]);
-
-  // Intercept link clicks for internal navigation with unsaved changes
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (!hasUnsavedChanges) return;
-
-      const target = e.target as HTMLElement;
-      const link = target.closest('a');
-      
-      // Check if it's an internal link (not opening in new tab and not external)
-      if (link && !link.target && link.href && link.href.startsWith(window.location.origin)) {
-        console.log('Intercepting navigation to:', link.href);
-        e.preventDefault();
-        e.stopPropagation();
-        
-        // Store the navigation action
-        setPendingNavigation(() => () => {
-          window.location.href = link.href;
-        });
-        setShowUnsavedChangesModal(true);
-        return false;
-      }
-    };
-
-    document.addEventListener('click', handleClick, true);
-    return () => document.removeEventListener('click', handleClick, true);
-  }, [hasUnsavedChanges]);
+  // Note: We don't warn on page unload because the deck is always saved to localStorage
+  // automatically. "Unsaved changes" only refers to cloud sync, not local storage.
+  // Users can safely close the tab or navigate away - their deck is preserved locally.
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -1018,6 +1059,48 @@ export default function CardSearchClient() {
       setShowImportModal(false);
       setImportText("");
     }
+  }
+
+  // Handle new deck with confirmation
+  function handleNewDeck(name?: string, folderId?: string | null) {
+    const stats = getDeckStats();
+    const hasCards = stats.mainDeckCount + stats.reserveCount > 0;
+    
+    // If deck has cards, show confirmation modal
+    if (hasCards) {
+      setPendingNewDeckFolderId(folderId);
+      setShowNewDeckModal(true);
+      return;
+    }
+    
+    // No cards, just create new deck
+    newDeck(name, folderId);
+  }
+  
+  // Proceed with new deck creation after confirmation
+  async function proceedWithNewDeck(shouldSave: boolean, newName?: string) {
+    if (shouldSave && user) {
+      try {
+        // Update name if provided, and pass it directly to save
+        if (newName && newName !== deck.name) {
+          setDeckName(newName);
+          // Pass the new name directly to saveDeckToCloud to avoid closure issues
+          await saveDeckToCloud(newName);
+        } else {
+          await saveDeckToCloud();
+        }
+        setNotification({ message: 'Deck saved successfully!', type: 'success' });
+        setTimeout(() => setNotification(null), 3000);
+      } catch (error) {
+        setNotification({ message: 'Failed to save deck', type: 'error' });
+        setTimeout(() => setNotification(null), 3000);
+      }
+    }
+    
+    // Create new deck
+    newDeck("Untitled Deck", pendingNewDeckFolderId);
+    setShowNewDeckModal(false);
+    setPendingNewDeckFolderId(undefined);
   }
 
   // Delete deck
@@ -1727,7 +1810,7 @@ export default function CardSearchClient() {
               // Duplicate will be handled internally by DeckBuilderPanel
               // Just need to provide the callback for re-rendering
             }}
-            onNewDeck={newDeck}
+            onNewDeck={handleNewDeck}
             onLoadDeck={loadDeckFromCloud}
             onActiveTabChange={setActiveDeckTab}
             onViewCard={(card, isReserve) => {
@@ -1832,8 +1915,8 @@ export default function CardSearchClient() {
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-xl font-bold text-white mb-1">Save Your Work?</h3>
-                  <p className="text-sm text-slate-200">Your recent changes haven't been saved yet</p>
+                  <h3 className="text-xl font-bold text-white mb-1">Save to Cloud?</h3>
+                  <p className="text-sm text-slate-200">Your deck is saved locally on this device</p>
                 </div>
               </div>
             </div>
@@ -1841,7 +1924,7 @@ export default function CardSearchClient() {
             {/* Content */}
             <div className="px-6 py-6">
               <p className="text-gray-600 dark:text-gray-300 mb-5 leading-relaxed">
-                It looks like you've made some changes. Would you like to save them before continuing?
+                Your deck is saved locally. {user ? 'Would you like to save it to the cloud before continuing?' : 'Sign in to save it to the cloud and access it from any device.'}
               </p>
               
               {/* Deck info card */}
@@ -1952,6 +2035,158 @@ export default function CardSearchClient() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      
+      {/* New Deck Confirmation Modal */}
+      {showNewDeckModal && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={() => setShowNewDeckModal(false)}
+        >
+          <div 
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-amber-600 to-orange-600 dark:from-amber-700 dark:to-orange-800 px-6 py-5">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 w-12 h-12 bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center">
+                  <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-white mb-1">Create New Deck?</h3>
+                  {!user && <p className="text-sm text-amber-50">Your current deck will be discarded</p>}
+                </div>
+              </div>
+            </div>
+            
+            {/* Content */}
+            <div className="px-6 py-6">
+              {!user ? (
+                <>
+                  <div className="mb-5 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <svg className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <div>
+                        <p className="text-sm font-semibold text-red-900 dark:text-red-100 mb-1">
+                          You are not signed in
+                        </p>
+                        <p className="text-sm text-red-700 dark:text-red-300">
+                          Creating a new deck will discard your current deck. Your deck is saved locally on this device only. 
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mb-5 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <p className="text-sm text-blue-700 dark:text-blue-300 flex items-start gap-2">
+                      <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>💡 Users that are signed in can save multiple decks to the cloud</span>
+                    </p>
+                  </div>
+                </>
+              ) : hasUnsavedChanges && deck.name === "Untitled Deck" ? (
+                <NewDeckRenameForm
+                  onSubmit={(newName) => proceedWithNewDeck(true, newName)}
+                  onSkip={() => proceedWithNewDeck(true)}
+                  onDiscard={() => proceedWithNewDeck(false)}
+                  onCancel={() => setShowNewDeckModal(false)}
+                />
+              ) : hasUnsavedChanges ? (
+                <>
+                  <p className="text-gray-600 dark:text-gray-300 mb-5 leading-relaxed">
+                    You have unsaved changes to <strong>{deck.name}</strong>. Would you like to save it before creating a new deck?
+                  </p>
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/50 dark:to-gray-900/30 rounded-xl p-4 border border-gray-200 dark:border-gray-700 shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-blue-500/10 dark:bg-blue-500/20 rounded-lg flex items-center justify-center">
+                        <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                        </svg>
+                      </div>
+                      <div>
+                        <div className="font-semibold text-gray-900 dark:text-white text-base">
+                          {deck.name}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                          <span>{getDeckStats().mainDeckCount + getDeckStats().reserveCount} cards</span>
+                          <span className="text-gray-400 dark:text-gray-600">•</span>
+                          <span>{deck.format || "Type 1"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="text-gray-600 dark:text-gray-300 mb-5 leading-relaxed">
+                  Are you sure you want to create a new deck? Your current deck will be replaced.
+                </p>
+              )}
+            </div>
+            
+            {/* Actions */}
+            {(!user || !hasUnsavedChanges || deck.name !== "Untitled Deck") && (
+              <div className="px-6 py-5 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex flex-col gap-3">
+                  {user && hasUnsavedChanges && (
+                    <button
+                      onClick={() => proceedWithNewDeck(true)}
+                      className="w-full px-6 py-3 bg-white dark:bg-gray-800 rounded-lg transition-all font-semibold flex items-center justify-center gap-2 border-2 hover:bg-green-50 dark:hover:bg-green-950/20"
+                      style={{
+                        borderImage: 'linear-gradient(to right, rgb(34 197 94), rgb(59 130 246)) 1',
+                      }}
+                    >
+                      <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                      </svg>
+                      <span className="text-gray-900 dark:text-white">
+                        Save & Create New Deck
+                      </span>
+                    </button>
+                  )}
+
+                  {!user && (
+                    <button
+                      onClick={() => {
+                        // Close modal and navigate to sign in
+                        setShowNewDeckModal(false);
+                        router.push('/sign-in');
+                      }}
+                      className="w-full px-6 py-3 border-2 border-blue-500 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg transition-all font-semibold flex items-center justify-center gap-2"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                      </svg>
+                      Sign In to Save Decks
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => proceedWithNewDeck(false)}
+                    className="w-full px-6 py-3 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg transition-all font-semibold flex items-center justify-center gap-2 border-2 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Discard Changes & Create New Deck
+                  </button>
+
+                  <button
+                    onClick={() => setShowNewDeckModal(false)}
+                    className="w-full px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
