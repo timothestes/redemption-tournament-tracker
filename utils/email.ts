@@ -62,6 +62,28 @@ export function getRegistrationConfirmationEmail(
       .join(" ");
   };
 
+  // Function to get event price
+  const getEventPrice = (eventValue: string, day: 'thursday' | 'friday' | 'saturday'): number => {
+    const event = NATIONALS_CONFIG.events[day].find(e => e.value === eventValue);
+    if (!event || !event.price) return 0;
+    // Extract number from price string like "$35"
+    return parseFloat(event.price.replace('$', ''));
+  };
+
+  // Calculate total payment
+  const thursdayPrice = getEventPrice(thursdayEvent, 'thursday');
+  const fridayPrice = getEventPrice(fridayEvent, 'friday');
+  const saturdayPrice = getEventPrice(saturdayEvent, 'saturday');
+  const totalPayment = thursdayPrice + fridayPrice + saturdayPrice;
+
+  // Format event with price
+  const formatEventWithPrice = (eventValue: string, day: 'thursday' | 'friday' | 'saturday') => {
+    const event = NATIONALS_CONFIG.events[day].find(e => e.value === eventValue);
+    if (!event || event.value === 'none') return 'None';
+    const eventName = formatEvent(eventValue);
+    return event.price ? `${eventName} - ${event.price}` : eventName;
+  };
+
   return `
     <!DOCTYPE html>
     <html>
@@ -158,6 +180,63 @@ export function getRegistrationConfirmationEmail(
             font-size: 16px;
             font-weight: 500;
           }
+          .payment-box {
+            background: #f0f9ff;
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            padding: 24px;
+            margin: 30px 0;
+          }
+          .payment-box h3 {
+            margin: 0 0 16px 0;
+            color: #1e40af;
+            font-size: 20px;
+            font-weight: 700;
+            text-align: center;
+          }
+          .payment-breakdown {
+            background: white;
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 16px;
+          }
+          .payment-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e5e7eb;
+          }
+          .payment-item:last-child {
+            border-bottom: none;
+          }
+          .payment-item-label {
+            color: #4b5563;
+            font-size: 14px;
+          }
+          .payment-item-price {
+            color: #1f2937;
+            font-weight: 600;
+            font-size: 14px;
+          }
+          .payment-total {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            background: white;
+            border-radius: 6px;
+            border: 2px solid #3b82f6;
+          }
+          .payment-total-label {
+            color: #1e40af;
+            font-size: 18px;
+            font-weight: 700;
+          }
+          .payment-total-amount {
+            color: #1e40af;
+            font-size: 24px;
+            font-weight: 700;
+          }
           .info-box {
             background: #ecfdf5;
             border: 1px solid #a7f3d0;
@@ -246,18 +325,45 @@ export function getRegistrationConfirmationEmail(
             
             <div class="event-box">
               <strong>Thursday, ${NATIONALS_CONFIG.eventDates.thursday}</strong>
-              <span>${formatEvent(thursdayEvent)}</span>
+              <span>${formatEventWithPrice(thursdayEvent, 'thursday')}</span>
             </div>
             
             <div class="event-box">
               <strong>Friday, ${NATIONALS_CONFIG.eventDates.friday}</strong>
-              <span>${formatEvent(fridayEvent)}</span>
+              <span>${formatEventWithPrice(fridayEvent, 'friday')}</span>
             </div>
             
             <div class="event-box">
               <strong>Saturday, ${NATIONALS_CONFIG.eventDates.saturday}</strong>
-              <span>${formatEvent(saturdayEvent)}</span>
+              <span>${formatEventWithPrice(saturdayEvent, 'saturday')}</span>
             </div>
+            
+            ${totalPayment > 0 ? `
+            <div class="payment-box">
+              <h3>💵 Payment Summary</h3>
+              <div class="payment-breakdown">
+                ${thursdayPrice > 0 ? `
+                <div class="payment-item">
+                  <span class="payment-item-label">Thursday: ${formatEvent(thursdayEvent)} $${thursdayPrice.toFixed(2)}</span>
+                </div>
+                ` : ''}
+                ${fridayPrice > 0 ? `
+                <div class="payment-item">
+                  <span class="payment-item-label">Friday: ${formatEvent(fridayEvent)} $${fridayPrice.toFixed(2)}</span>
+                </div>
+                ` : ''}
+                ${saturdayPrice > 0 ? `
+                <div class="payment-item">
+                  <span class="payment-item-label">Saturday: ${formatEvent(saturdayEvent)} $${saturdayPrice.toFixed(2)}</span>
+                </div>
+                ` : ''}
+              </div>
+              <div class="payment-total">
+                <span class="payment-total-label">Total Due Upon Arrival: </span>
+                <span class="payment-total-amount">$${totalPayment.toFixed(2)}</span>
+              </div>
+            </div>
+            ` : ''}
             
             <div class="info-box">
               <h4>📍 What's Next?</h4>

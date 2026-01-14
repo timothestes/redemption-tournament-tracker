@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
-import { Checkbox } from "../../components/ui/checkbox";
 import { submitRegistration } from "./actions";
 import TopNav from "../../components/top-nav";
 import { createClient } from "../../utils/supabase/client";
@@ -55,6 +54,42 @@ export default function RegistrationPage() {
     message: string;
   }>({ type: null, message: "" });
   const [showThankYou, setShowThankYou] = useState(false);
+
+  // Reset form when navigating back to registration from header
+  useEffect(() => {
+    const handleNavigate = () => {
+      if (showThankYou) {
+        setShowThankYou(false);
+        setFormData({
+          firstName: "",
+          lastName: "",
+          email: "",
+          discordUsername: "",
+          thursdayEvent: "",
+          fridayEvent: "",
+          saturdayEvent: "",
+          fantasyDraftOptIn: false,
+          firstNationals: false,
+          needsAirportTransportation: false,
+          needsHotelTransportation: false,
+        });
+        setPhotoFile(null);
+        setPhotoPreview(null);
+      }
+    };
+
+    // Listen for clicks on the page (specifically for header navigation)
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const link = target.closest('a[href="/register"]');
+      if (link && showThankYou) {
+        handleNavigate();
+      }
+    };
+
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [showThankYou]);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

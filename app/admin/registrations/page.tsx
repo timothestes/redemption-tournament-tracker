@@ -34,7 +34,8 @@ export default function AdminRegistrationsPage() {
   const [filteredRegistrations, setFilteredRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingRegistration, setDeletingRegistration] = useState<{id: string, name: string} | null>(null);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showTournamentModal, setShowTournamentModal] = useState(false);
@@ -163,16 +164,19 @@ export default function AdminRegistrationsPage() {
     paidFilter,
   ]);
 
-  const handleDelete = async (id: string) => {
-    if (deleteConfirm !== id) {
-      setDeleteConfirm(id);
-      return;
-    }
+  const handleDelete = (id: string, name: string) => {
+    setDeletingRegistration({ id, name });
+    setShowDeleteModal(true);
+  };
 
-    const result = await deleteRegistration(id);
+  const confirmDelete = async () => {
+    if (!deletingRegistration) return;
+
+    const result = await deleteRegistration(deletingRegistration.id);
     if (result.success) {
       await loadRegistrations();
-      setDeleteConfirm(null);
+      setShowDeleteModal(false);
+      setDeletingRegistration(null);
     } else {
       alert(`Error deleting registration: ${result.error}`);
     }
@@ -316,6 +320,19 @@ export default function AdminRegistrationsPage() {
       .split("_")
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ");
+  };
+
+  // Calculate total amount owed based on events
+  const calculateTotalOwed = (thursdayEvent: string, fridayEvent: string, saturdayEvent: string): number => {
+    const getEventPrice = (eventValue: string, day: 'thursday' | 'friday' | 'saturday'): number => {
+      const event = NATIONALS_CONFIG.events[day].find(e => e.value === eventValue);
+      if (!event || !event.price) return 0;
+      return parseFloat(event.price.replace('$', ''));
+    };
+
+    return getEventPrice(thursdayEvent, 'thursday') + 
+           getEventPrice(fridayEvent, 'friday') + 
+           getEventPrice(saturdayEvent, 'saturday');
   };
 
   // Photo management functions
@@ -766,6 +783,7 @@ export default function AdminRegistrationsPage() {
                       <th className="px-4 py-3 text-left text-sm font-semibold">Saturday</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold">Options</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold">Paid</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Total Owed</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold">Registered</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold">Actions</th>
                     </tr>
@@ -890,6 +908,15 @@ export default function AdminRegistrationsPage() {
                             )}
                           </button>
                         </td>
+                        <td className="px-4 py-3 text-sm">
+                          <span className={`font-semibold ${
+                            calculateTotalOwed(reg.thursday_event, reg.friday_event, reg.saturday_event) > 0
+                              ? 'text-blue-600 dark:text-blue-400'
+                              : 'text-muted-foreground'
+                          }`}>
+                            ${calculateTotalOwed(reg.thursday_event, reg.friday_event, reg.saturday_event).toFixed(2)}
+                          </span>
+                        </td>
                         <td className="px-4 py-3 text-sm text-muted-foreground">
                           {formatDate(reg.created_at)}
                         </td>
@@ -905,9 +932,9 @@ export default function AdminRegistrationsPage() {
                             <Button
                               variant="destructive"
                               size="sm"
-                              onClick={() => handleDelete(reg.id)}
+                              onClick={() => handleDelete(reg.id, `${reg.first_name} ${reg.last_name}`)}
                             >
-                              {deleteConfirm === reg.id ? "Confirm?" : "Delete"}
+                              Delete
                             </Button>
                           </div>
                         </td>
@@ -1329,6 +1356,58 @@ export default function AdminRegistrationsPage() {
                       setEditingRegistration(null);
                     }}
                     variant="outline"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteModal && deletingRegistration && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-card border rounded-lg shadow-lg max-w-md w-full">
+              <div className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-100 dark:bg-red-950 flex items-center justify-center">
+                    <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-foreground">
+                      Delete Registration
+                    </h2>
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <p className="text-muted-foreground">
+                    Are you sure you want to delete the registration for{" "}
+                    <span className="font-semibold text-foreground">{deletingRegistration.name}</span>?
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    This action cannot be undone.
+                  </p>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    onClick={confirmDelete}
+                    variant="destructive"
+                    className="flex-1"
+                  >
+                    Delete
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setShowDeleteModal(false);
+                      setDeletingRegistration(null);
+                    }}
+                    variant="outline"
+                    className="flex-1"
                   >
                     Cancel
                   </Button>

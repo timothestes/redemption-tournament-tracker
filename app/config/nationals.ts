@@ -62,7 +62,7 @@ export const NATIONALS_CONFIG: NationalsConfig = {
       {
         value: "type2_2player",
         label: "Type 2 2-Player",
-        price: "TBD"
+        price: "$10"
       },
       {
         value: "none",
@@ -74,12 +74,12 @@ export const NATIONALS_CONFIG: NationalsConfig = {
       {
         value: "type1_2player",
         label: "Type 1 2-Player",
-        price: "TBD"
+        price: "$10"
       },
       {
         value: "typeA_2player",
         label: "Type A 2-Player",
-        price: "TBD",
+        price: "$10",
         description: "for players under 13 years old"
       },
       {
@@ -92,7 +92,7 @@ export const NATIONALS_CONFIG: NationalsConfig = {
       {
         value: "teams",
         label: "Teams",
-        price: "TBD"
+        price: "$10"
       },
       {
         value: "sealed_deck",
