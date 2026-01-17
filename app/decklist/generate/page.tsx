@@ -18,6 +18,7 @@ export default function GenerateDeckList() {
   const [nCardColumns, setNCardColumns] = useState(10);
   const [activeTab, setActiveTab] = useState<'pdf' | 'screenshot'>('pdf');
   const [mCount, setMCount] = useState(false);
+  const [aodCount, setAodCount] = useState(false);
   const successRef = useRef<HTMLDivElement>(null);
   const screenshotSuccessRef = useRef<HTMLDivElement>(null);
 
@@ -115,6 +116,7 @@ export default function GenerateDeckList() {
           event,
           show_alignment: showAlignment,
           m_count: mCount,
+          aod_count: aodCount,
         }),
       });
 
@@ -157,6 +159,7 @@ export default function GenerateDeckList() {
           decklist_type: deckType,
           n_card_columns: nCardColumns,
           m_count: mCount,
+          aod_count: aodCount,
         }),
       });
 
@@ -299,6 +302,19 @@ export default function GenerateDeckList() {
                      <ToggleSwitch label="M Count" checked={mCount} onChange={setMCount} />
                    </div>
                  </div>
+                <div title="The AoD count (Ancient of Day Count) represents average number of daniel cards in the top 9 cards of a randomly shuffled deck">
+                  <label className="block text-sm font-medium mb-2 flex items-center">
+                    AoD Count
+                    <span className="ml-1 text-gray-400 hover:text-gray-600" title="The AoD count (Ancient of Day Count) represents average number of daniel cards in the top 9 cards of a randomly shuffled deck">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 11-0 20 10 10 0 010-20z" />
+                      </svg>
+                    </span>
+                  </label>
+                   <div className="flex items-center p-3 border rounded-lg bg-gray-50 dark:bg-gray-700">
+                     <ToggleSwitch label="AoD Count" checked={aodCount} onChange={setAodCount} />
+                   </div>
+                 </div>
               </div>
 
               {/* Decklist Input */}
@@ -405,6 +421,19 @@ export default function GenerateDeckList() {
                   </label>
                    <div className="flex items-center p-3 border rounded-lg bg-gray-50 dark:bg-gray-700">
                      <ToggleSwitch label="Matthew Count" checked={mCount} onChange={setMCount} />
+                   </div>
+                 </div>
+                <div title="The AoD count (Ancient of Day Count) represents average number of daniel cards in the top 9 cards of a randomly shuffled deck">
+                  <label className="block text-sm font-medium mb-2 flex items-center">
+                    AoD Count
+                    <span className="ml-1 text-gray-400 hover:text-gray-600" title="The AoD count (Ancient of Day Count) represents average number of daniel cards in the top 9 cards of a randomly shuffled deck">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 11-0 20 10 10 0 010-20z" />
+                      </svg>
+                    </span>
+                  </label>
+                   <div className="flex items-center p-3 border rounded-lg bg-gray-50 dark:bg-gray-700">
+                     <ToggleSwitch label="AoD Count" checked={aodCount} onChange={setAodCount} />
                    </div>
                  </div>
               </div>

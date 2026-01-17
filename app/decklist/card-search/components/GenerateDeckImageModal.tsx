@@ -23,6 +23,7 @@ export default function GenerateDeckImageModal({ deck, onClose }: GenerateDeckIm
   // Default to 15 columns for 100+ card decks, 10 otherwise
   const [nCardColumns, setNCardColumns] = useState(totalCards >= 100 ? 15 : 10);
   const [mCount, setMCount] = useState(false);
+  const [aodCount, setAodCount] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<{ url: string; message: string } | null>(null);
@@ -57,6 +58,7 @@ export default function GenerateDeckImageModal({ deck, onClose }: GenerateDeckIm
           decklist_type: deckType,
           n_card_columns: nCardColumns,
           m_count: mCount,
+          aod_count: aodCount,
         }),
       });
 
@@ -175,6 +177,40 @@ export default function GenerateDeckImageModal({ deck, onClose }: GenerateDeckIm
                     <span
                       className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-lg transition-transform duration-200 ${
                         mCount ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <div className="h-px bg-gray-200 dark:bg-gray-700"></div>
+
+                {/* AoD Count Toggle */}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="w-5 h-5 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                      </svg>
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-sm font-semibold text-gray-900 dark:text-white block">
+                        AoD Count
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 leading-tight">
+                        Avg. cards hit by Ancient of Days
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAodCount(!aodCount)}
+                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 flex-shrink-0 ${
+                      aodCount ? 'bg-gradient-to-r from-amber-600 to-orange-600' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-lg transition-transform duration-200 ${
+                        aodCount ? 'translate-x-6' : 'translate-x-1'
                       }`}
                     />
                   </button>

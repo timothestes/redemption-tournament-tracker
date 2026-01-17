@@ -2159,7 +2159,7 @@ export default function CardSearchClient() {
                         setShowNewDeckModal(false);
                         router.push('/sign-in');
                       }}
-                      className="w-full px-6 py-3 border-2 border-blue-500 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg transition-all font-semibold flex items-center justify-center gap-2"
+                      className="w-full px-6 py-3 bg-blue-600 dark:bg-blue-700 text-white rounded-lg transition-all font-semibold flex items-center justify-center gap-2 hover:bg-blue-700 dark:hover:bg-blue-600 border-2 border-blue-600 dark:border-blue-700"
                     >
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
