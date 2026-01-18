@@ -66,6 +66,22 @@ export default function DeckCardList({
       document.removeEventListener('keydown', handleEscapeKey);
     };
   }, [openMenuCard]);
+
+  // Clear preview card if the card being previewed is removed from the deck
+  React.useEffect(() => {
+    if (!previewCard) return;
+    
+    // Check if the previewed card still exists in the cards array
+    const cardStillExists = cards.some(
+      dc => dc.card.name === previewCard.card.name && 
+            dc.card.set === previewCard.card.set
+    );
+    
+    // If the card was removed, clear the preview
+    if (!cardStillExists) {
+      setPreviewCard(null);
+    }
+  }, [cards, previewCard]);
   
   // Helper function to calculate preview position avoiding screen edges
   const calculatePreviewPosition = (element: HTMLElement) => {
