@@ -1697,18 +1697,6 @@ export default function CardSearchClient() {
           </div>
         )}
       </main>
-      {/* Smaller modal with overlay click to close */}
-      {modalCard && (
-        <ModalWithClose
-          modalCard={modalCard}
-          setModalCard={setModalCard}
-          visibleCards={visibleCards}
-          onAddCard={addCard}
-          onRemoveCard={removeCard}
-          getCardQuantity={getCardQuantity}
-          activeDeckTab={activeDeckTab}
-        />
-      )}
         </div>
         </div>
       )}
