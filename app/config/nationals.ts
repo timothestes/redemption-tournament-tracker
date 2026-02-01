@@ -8,6 +8,11 @@ interface EventOption {
   description?: string;
 }
 
+interface OvernightStayNight {
+  value: string;
+  label: string;
+}
+
 interface NationalsConfig {
   year: number;
   displayName: string;
@@ -25,6 +30,7 @@ interface NationalsConfig {
     friday: EventOption[];
     saturday: EventOption[];
   };
+  overnightStayNights: OvernightStayNight[];
 }
 
 export const NATIONALS_CONFIG: NationalsConfig = {
@@ -39,7 +45,7 @@ export const NATIONALS_CONFIG: NationalsConfig = {
   datesShort: "July 23-25",
   
   // Access control - set to true to make registration admin-only
-  adminOnly: true,
+  adminOnly: false,
   
   // Email subject line
   emailSubject: "Registration Confirmed - Nationals 2026",
@@ -50,6 +56,14 @@ export const NATIONALS_CONFIG: NationalsConfig = {
     friday: "July 24",
     saturday: "July 25",
   },
+
+  // Overnight stay options
+  overnightStayNights: [
+    { value: "wednesday", label: "Wednesday Night (July 22)" },
+    { value: "thursday", label: "Thursday Night (July 23)" },
+    { value: "friday", label: "Friday Night (July 24)" },
+    { value: "saturday", label: "Saturday Night (July 25)" },
+  ],
   
   // Event configurations by day
   events: {

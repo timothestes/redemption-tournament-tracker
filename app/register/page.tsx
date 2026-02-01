@@ -43,6 +43,8 @@ export default function RegistrationPage() {
     firstNationals: false,
     needsAirportTransportation: false,
     needsHotelTransportation: false,
+    stayingOvernight: false,
+    overnightStayNights: [] as string[],
   });
 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -72,6 +74,8 @@ export default function RegistrationPage() {
           firstNationals: false,
           needsAirportTransportation: false,
           needsHotelTransportation: false,
+          stayingOvernight: false,
+          overnightStayNights: [],
         });
         setPhotoFile(null);
         setPhotoPreview(null);
@@ -301,6 +305,8 @@ export default function RegistrationPage() {
                       firstNationals: false,
                       needsAirportTransportation: false,
                       needsHotelTransportation: false,
+                      stayingOvernight: false,
+                      overnightStayNights: [],
                     });
                     setPhotoFile(null);
                     setPhotoPreview(null);
@@ -384,7 +390,7 @@ export default function RegistrationPage() {
                       discordUsername: e.target.value,
                     })
                   }
-                  placeholder="username#1234"
+                  placeholder="(optional)"
                   className="w-full"
                 />
               </div>
@@ -568,6 +574,7 @@ export default function RegistrationPage() {
               <div className="space-y-4">
                 <div className="flex items-start space-x-3">
                   <button
+                    type="button"
                     onClick={() => setFormData({...formData, fantasyDraftOptIn: !formData.fantasyDraftOptIn})}
                     className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 ${formData.fantasyDraftOptIn ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
                   >
@@ -594,6 +601,7 @@ export default function RegistrationPage() {
 
                 <div className="flex items-center space-x-3">
                   <button
+                    type="button"
                     onClick={() => setFormData({...formData, firstNationals: !formData.firstNationals})}
                     className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${formData.firstNationals ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
                   >
@@ -614,6 +622,7 @@ export default function RegistrationPage() {
 
                 <div className="flex items-start space-x-3">
                   <button
+                    type="button"
                     onClick={() => setFormData({...formData, needsAirportTransportation: !formData.needsAirportTransportation})}
                     className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 ${formData.needsAirportTransportation ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
                   >
@@ -641,13 +650,14 @@ export default function RegistrationPage() {
                       ?
                     </Label>
                     <p className="text-sm text-muted-foreground">
-                      Shuttle times TBD
+                      Shuttle times are TBD but will be sent via email when determined
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-start space-x-3">
                   <button
+                    type="button"
                     onClick={() => setFormData({...formData, needsHotelTransportation: !formData.needsHotelTransportation})}
                     className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 ${formData.needsHotelTransportation ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
                   >
@@ -666,10 +676,97 @@ export default function RegistrationPage() {
                       and the venue?
                     </Label>
                     <p className="text-sm text-muted-foreground">
-                      Shuttle times TBD
+                      Shuttle times are TBD but will be sent via email when determined
                     </p>
                   </div>
                 </div>
+
+                {/* Overnight Stay Section */}
+                <div className="flex items-start space-x-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newStayingOvernight = !formData.stayingOvernight;
+                      setFormData({
+                        ...formData, 
+                        stayingOvernight: newStayingOvernight,
+                        overnightStayNights: newStayingOvernight ? formData.overnightStayNights : []
+                      });
+                    }}
+                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 ${formData.stayingOvernight ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
+                  >
+                    {formData.stayingOvernight && (
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+                  <div 
+                    className="space-y-1 cursor-pointer" 
+                    onClick={() => {
+                      const newStayingOvernight = !formData.stayingOvernight;
+                      setFormData({
+                        ...formData, 
+                        stayingOvernight: newStayingOvernight,
+                        overnightStayNights: newStayingOvernight ? formData.overnightStayNights : []
+                      });
+                    }}
+                  >
+                    <Label
+                      htmlFor="stayingOvernight"
+                      className="font-normal cursor-pointer"
+                    >
+                      Do you plan to stay overnight at the venue?
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Help us plan for overnight accommodations
+                    </p>
+                  </div>
+                </div>
+
+                {/* Overnight Stay Nights Selection */}
+                {formData.stayingOvernight && (
+                  <div className="ml-9 mt-3 space-y-2 p-4 bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-200 dark:border-gray-600">
+                    <p className="text-sm font-medium text-muted-foreground mb-3">
+                      Which nights do you plan to stay?
+                    </p>
+                    {NATIONALS_CONFIG.overnightStayNights.map((night) => (
+                      <div key={night.value} className="flex items-center space-x-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nights = formData.overnightStayNights.includes(night.value)
+                              ? formData.overnightStayNights.filter(n => n !== night.value)
+                              : [...formData.overnightStayNights, night.value];
+                            setFormData({...formData, overnightStayNights: nights});
+                          }}
+                          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${
+                            formData.overnightStayNights.includes(night.value) 
+                              ? 'bg-blue-500 border-blue-600' 
+                              : 'border-gray-300 dark:border-gray-500'
+                          }`}
+                        >
+                          {formData.overnightStayNights.includes(night.value) && (
+                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </button>
+                        <Label
+                          className="font-normal cursor-pointer text-sm"
+                          onClick={() => {
+                            const nights = formData.overnightStayNights.includes(night.value)
+                              ? formData.overnightStayNights.filter(n => n !== night.value)
+                              : [...formData.overnightStayNights, night.value];
+                            setFormData({...formData, overnightStayNights: nights});
+                          }}
+                        >
+                          {night.label}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 

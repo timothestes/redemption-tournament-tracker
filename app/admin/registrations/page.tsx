@@ -24,6 +24,8 @@ interface Registration {
   first_nationals: boolean;
   needs_airport_transportation: boolean;
   needs_hotel_transportation: boolean;
+  staying_overnight: boolean;
+  overnight_stay_nights: string[] | null;
   photo_url: string | null;
   paid: boolean;
   created_at: string;
@@ -60,6 +62,7 @@ export default function AdminRegistrationsPage() {
   const [fantasyDraftFilter, setFantasyDraftFilter] = useState("all");
   const [airportTransportFilter, setAirportTransportFilter] = useState("all");
   const [hotelTransportFilter, setHotelTransportFilter] = useState("all");
+  const [overnightStayFilter, setOvernightStayFilter] = useState("all");
   const [photoFilter, setPhotoFilter] = useState("all");
   const [paidFilter, setPaidFilter] = useState("all");
   
@@ -142,6 +145,9 @@ export default function AdminRegistrationsPage() {
     if (hotelTransportFilter !== "all") {
       filtered = filtered.filter((reg) => reg.needs_hotel_transportation === (hotelTransportFilter === "yes"));
     }
+    if (overnightStayFilter !== "all") {
+      filtered = filtered.filter((reg) => reg.staying_overnight === (overnightStayFilter === "yes"));
+    }
     if (photoFilter !== "all") {
       filtered = filtered.filter((reg) => photoFilter === "yes" ? reg.photo_url !== null : reg.photo_url === null);
     }
@@ -160,6 +166,7 @@ export default function AdminRegistrationsPage() {
     fantasyDraftFilter,
     airportTransportFilter,
     hotelTransportFilter,
+    overnightStayFilter,
     photoFilter,
     paidFilter,
   ]);
@@ -202,6 +209,8 @@ export default function AdminRegistrationsPage() {
       first_nationals: editingRegistration.first_nationals,
       needs_airport_transportation: editingRegistration.needs_airport_transportation,
       needs_hotel_transportation: editingRegistration.needs_hotel_transportation,
+      staying_overnight: editingRegistration.staying_overnight,
+      overnight_stay_nights: editingRegistration.overnight_stay_nights || [],
       paid: editingRegistration.paid,
     });
 
@@ -245,6 +254,8 @@ export default function AdminRegistrationsPage() {
     setFantasyDraftFilter("all");
     setAirportTransportFilter("all");
     setHotelTransportFilter("all");
+    setOvernightStayFilter("all");
+    setPhotoFilter("all");
     setPaidFilter("all");
   };
 
@@ -655,7 +666,7 @@ export default function AdminRegistrationsPage() {
             </div>
 
             {/* Additional Filters */}
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
               <div>
                 <Label htmlFor="firstNats">First Nationals?</Label>
                 <select
@@ -704,6 +715,20 @@ export default function AdminRegistrationsPage() {
                   id="hotel"
                   value={hotelTransportFilter}
                   onChange={(e) => setHotelTransportFilter(e.target.value)}
+                  className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                >
+                  <option value="all">All</option>
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                </select>
+              </div>
+
+              <div>
+                <Label htmlFor="overnight">Staying Overnight?</Label>
+                <select
+                  id="overnight"
+                  value={overnightStayFilter}
+                  onChange={(e) => setOvernightStayFilter(e.target.value)}
                   className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
                 >
                   <option value="all">All</option>
@@ -880,17 +905,29 @@ export default function AdminRegistrationsPage() {
                                 Hotel
                               </span>
                             )}
+                            {reg.staying_overnight && (
+                              <span className="text-orange-600 dark:text-orange-400" title={reg.overnight_stay_nights?.join(', ') || 'No nights selected'}>
+                                🌙 Overnight{reg.overnight_stay_nights && reg.overnight_stay_nights.length > 0 ? ` (${reg.overnight_stay_nights.length})` : ''}
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="px-4 py-3 text-center">
                           <button
                             onClick={() => {
                               const newPaidStatus = !reg.paid;
+                              // Optimistic update - immediately update local state
+                              setRegistrations(prev => prev.map(r => 
+                                r.id === reg.id ? { ...r, paid: newPaidStatus } : r
+                              ));
+                              // Then sync with server in background
                               (async () => {
                                 const result = await updateRegistration(reg.id, { paid: newPaidStatus });
-                                if (result.success) {
-                                  await loadRegistrations();
-                                } else {
+                                if (!result.success) {
+                                  // Revert on error
+                                  setRegistrations(prev => prev.map(r => 
+                                    r.id === reg.id ? { ...r, paid: !newPaidStatus } : r
+                                  ));
                                   alert(`Error updating paid status: ${result.error}`);
                                 }
                               })();
@@ -1194,7 +1231,7 @@ export default function AdminRegistrationsPage() {
                           </svg>
                         )}
                       </button>
-                      <Label htmlFor="edit-fantasy" className="font-normal cursor-pointer">
+                      <Label htmlFor="edit-fantasy" className="font-normal cursor-pointer" onClick={() => setEditingRegistration({...editingRegistration, fantasy_draft_opt_in: !editingRegistration.fantasy_draft_opt_in})}>
                         Fantasy Draft Opt-in
                       </Label>
                     </div>
@@ -1210,7 +1247,7 @@ export default function AdminRegistrationsPage() {
                           </svg>
                         )}
                       </button>
-                      <Label htmlFor="edit-firstNats" className="font-normal cursor-pointer">
+                      <Label htmlFor="edit-firstNats" className="font-normal cursor-pointer" onClick={() => setEditingRegistration({...editingRegistration, first_nationals: !editingRegistration.first_nationals})}>
                         First Nationals
                       </Label>
                     </div>
@@ -1226,7 +1263,7 @@ export default function AdminRegistrationsPage() {
                           </svg>
                         )}
                       </button>
-                      <Label htmlFor="edit-airport" className="font-normal cursor-pointer">
+                      <Label htmlFor="edit-airport" className="font-normal cursor-pointer" onClick={() => setEditingRegistration({...editingRegistration, needs_airport_transportation: !editingRegistration.needs_airport_transportation})}>
                         Needs Airport Transportation
                       </Label>
                     </div>
@@ -1242,10 +1279,82 @@ export default function AdminRegistrationsPage() {
                           </svg>
                         )}
                       </button>
-                      <Label htmlFor="edit-hotel" className="font-normal cursor-pointer">
+                      <Label htmlFor="edit-hotel" className="font-normal cursor-pointer" onClick={() => setEditingRegistration({...editingRegistration, needs_hotel_transportation: !editingRegistration.needs_hotel_transportation})}>
                         Needs Hotel Transportation
                       </Label>
                     </div>
+
+                    <div className="flex items-center space-x-3">
+                      <button
+                        onClick={() => {
+                          const newStayingOvernight = !editingRegistration.staying_overnight;
+                          setEditingRegistration({
+                            ...editingRegistration, 
+                            staying_overnight: newStayingOvernight,
+                            overnight_stay_nights: newStayingOvernight ? editingRegistration.overnight_stay_nights : []
+                          });
+                        }}
+                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.staying_overnight ? 'bg-green-500 border-green-600' : 'border-gray-300 dark:border-gray-600'}`}
+                      >
+                        {editingRegistration.staying_overnight && (
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
+                      <Label htmlFor="edit-overnight" className="font-normal cursor-pointer" onClick={() => {
+                          const newStayingOvernight = !editingRegistration.staying_overnight;
+                          setEditingRegistration({
+                            ...editingRegistration, 
+                            staying_overnight: newStayingOvernight,
+                            overnight_stay_nights: newStayingOvernight ? editingRegistration.overnight_stay_nights : []
+                          });
+                        }}>
+                        Staying Overnight at Venue
+                      </Label>
+                    </div>
+
+                    {/* Overnight Stay Nights Selection */}
+                    {editingRegistration.staying_overnight && (
+                      <div className="ml-9 space-y-2 p-3 bg-muted rounded-lg">
+                        <p className="text-sm font-medium text-muted-foreground mb-2">
+                          Which nights?
+                        </p>
+                        {NATIONALS_CONFIG.overnightStayNights.map((night) => (
+                          <div key={night.value} className="flex items-center space-x-3">
+                            <button
+                              onClick={() => {
+                                const currentNights = editingRegistration.overnight_stay_nights || [];
+                                const nights = currentNights.includes(night.value)
+                                  ? currentNights.filter(n => n !== night.value)
+                                  : [...currentNights, night.value];
+                                setEditingRegistration({...editingRegistration, overnight_stay_nights: nights});
+                              }}
+                              className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${
+                                (editingRegistration.overnight_stay_nights || []).includes(night.value) 
+                                  ? 'bg-blue-500 border-blue-600' 
+                                  : 'border-gray-300 dark:border-gray-500'
+                              }`}
+                            >
+                              {(editingRegistration.overnight_stay_nights || []).includes(night.value) && (
+                                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </button>
+                            <Label className="font-normal cursor-pointer text-sm" onClick={() => {
+                                const currentNights = editingRegistration.overnight_stay_nights || [];
+                                const nights = currentNights.includes(night.value)
+                                  ? currentNights.filter(n => n !== night.value)
+                                  : [...currentNights, night.value];
+                                setEditingRegistration({...editingRegistration, overnight_stay_nights: nights});
+                              }}>
+                              {night.label}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
                     <div className="flex items-center space-x-3">
                       <button
@@ -1258,7 +1367,7 @@ export default function AdminRegistrationsPage() {
                           </svg>
                         )}
                       </button>
-                      <Label htmlFor="edit-paid" className="font-normal cursor-pointer">
+                      <Label htmlFor="edit-paid" className="font-normal cursor-pointer" onClick={() => setEditingRegistration({...editingRegistration, paid: !editingRegistration.paid})}>
                         Paid
                       </Label>
                     </div>

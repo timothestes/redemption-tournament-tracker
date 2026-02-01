@@ -91,6 +91,8 @@ export async function updateRegistration(id: string, data: {
   first_nationals?: boolean;
   needs_airport_transportation?: boolean;
   needs_hotel_transportation?: boolean;
+  staying_overnight?: boolean;
+  overnight_stay_nights?: string[];
   photo_url?: string | null;
   paid?: boolean;
 }) {
@@ -115,6 +117,8 @@ export async function updateRegistration(id: string, data: {
   if (data.first_nationals !== undefined) updateData.first_nationals = data.first_nationals;
   if (data.needs_airport_transportation !== undefined) updateData.needs_airport_transportation = data.needs_airport_transportation;
   if (data.needs_hotel_transportation !== undefined) updateData.needs_hotel_transportation = data.needs_hotel_transportation;
+  if (data.staying_overnight !== undefined) updateData.staying_overnight = data.staying_overnight;
+  if (data.overnight_stay_nights !== undefined) updateData.overnight_stay_nights = data.overnight_stay_nights;
   if (data.photo_url !== undefined) updateData.photo_url = data.photo_url;
   if (data.paid !== undefined) updateData.paid = data.paid;
   
