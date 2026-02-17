@@ -16,6 +16,7 @@ help:
 	@echo "Setup & Development:"
 	@echo "  make install         - Install dependencies"
 	@echo "  make dev            - Run development server"
+	@echo "  make dev-windows    - Run dev server (Windows: auto-adds Node.js to PATH)"
 	@echo "  make build          - Build for production"
 	@echo "  make start          - Start production server"
 	@echo ""
@@ -38,6 +39,11 @@ run:
 	
 dev:
 	npm run dev
+
+# Windows: Add Node.js to PATH and run dev server (with SSL bypass for corporate proxies)
+# Copy-paste this into PowerShell: $env:Path += ';C:\Program Files\nodejs\'; $env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npm run dev
+dev-windows:
+	@powershell -Command "$$env:Path += ';C:\\Program Files\\nodejs\\'; $$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npm run dev"
 
 # Build the project
 build:
@@ -70,4 +76,4 @@ update-paragons:
 # Check Paragon data (download and generate)
 paragons: update-paragons
 
-.PHONY: all install run dev build start setup clean fresh update-paragons paragons
+.PHONY: all install run dev dev-windows build start setup clean fresh update-paragons paragons
