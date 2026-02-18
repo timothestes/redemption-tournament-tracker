@@ -86,3 +86,5 @@ yarn-error.log*
 next-env.d.ts
 .aider*
 tmp/*
+.claude
+claude.md
