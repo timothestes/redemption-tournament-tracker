@@ -283,7 +283,6 @@ const TopNav: React.FC = () => {
                   {user.email}
                 </span>
                 <form
-                  // @ts-expect-error - Server Actions are not properly typed
                   action={signOutAction}
                 >
                   <Button type="submit" variant="outline" size="sm">
@@ -483,7 +482,6 @@ const TopNav: React.FC = () => {
                     {user.email}
                   </div>
                   <form
-                    // @ts-expect-error - Server Actions are not properly typed
                     action={signOutAction}
                     className="px-3"
                   >

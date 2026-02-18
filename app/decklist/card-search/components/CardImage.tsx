@@ -46,7 +46,7 @@ export default function CardImage({ imgFile, alt, className = "", sizes, priorit
             setHasError(true);
           }}
           onClick={onClick}
-          unoptimized={src.startsWith('/api/')} // Don't double-optimize proxy images
+          unoptimized={src.startsWith('/api/')}
         />
       )}
     </div>

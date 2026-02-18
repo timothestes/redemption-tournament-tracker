@@ -1,5 +1,7 @@
 "use client";
 import React, { useEffect, useState, useMemo, useRef } from "react";
+
+const BATCH_SIZE = 60;
 import { useRouter, useSearchParams } from "next/navigation";
 import ModalWithClose from "./ModalWithClose";
 import FilterGrid from "./components/FilterGrid";
@@ -218,6 +220,7 @@ export default function CardSearchClient() {
 
   // Refs for input fields to enable auto-focus
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   // Helper functions for managing multiple queries
   const updateQuery = (index: number, text: string) => {
@@ -908,17 +911,34 @@ export default function CardSearchClient() {
       legalityMode !== 'Rotation';
     
     if (hasActiveFilters) {
-      setVisibleCount(filtered.length);
+      setVisibleCount(BATCH_SIZE);
     } else {
       setVisibleCount(0);
     }
   }, [filtered.length, queries, legalityMode, selectedIconFilters, selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, strengthFilter, toughnessFilter, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly, testamentNots, gospelNot]);
 
   const visibleCards = useMemo(() => {
-    return filtered
-      .slice(0, visibleCount)
-      .sort((a, b) => a.name.localeCompare(b.name));
+    return [...filtered]
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .slice(0, visibleCount);
   }, [filtered, visibleCount]);
+
+  // Infinite scroll: load more cards when sentinel comes into view
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || visibleCount >= filtered.length) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount((prev) => Math.min(prev + BATCH_SIZE, filtered.length));
+        }
+      },
+      { rootMargin: '200px' }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [visibleCount, filtered.length]);
 
   // Toggler for icon filters
   function toggleIconFilter(value: string) {
@@ -1230,7 +1250,7 @@ export default function CardSearchClient() {
                   
                   {/* Search input */}
                   <input
-                    ref={el => inputRefs.current[index] = el}
+                    ref={el => { inputRefs.current[index] = el; }}
                     type="text"
                     placeholder={index === 0 ? "Search" : `Search ${index + 1}`}
                     className="w-full sm:w-auto p-3 pr-10 border rounded text-base focus:ring-2 focus:ring-blue-400 text-gray-900 bg-white dark:text-white dark:bg-gray-900"
@@ -1307,7 +1327,7 @@ export default function CardSearchClient() {
               viewBox="0 0 24 24"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
-              style={{ transition: 'transform 0.2s', transform: filterGridCollapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}
+              style={{ transitionProperty: 'transform', transitionDuration: '0.2s', transitionTimingFunction: 'ease', transform: filterGridCollapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}
             >
               <circle cx="12" cy="12" r="11" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1" />
               <path d="M8 10l4 4 4-4" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -1613,6 +1633,7 @@ export default function CardSearchClient() {
         )}
         {/* Card grid */}
         {visibleCards.length > 0 ? (
+          <>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
             {visibleCards.map((c) => {
               const quantityInDeck = getCardQuantity(c.name, c.set, false);
@@ -1688,6 +1709,15 @@ export default function CardSearchClient() {
               );
             })}
           </div>
+          <div className="py-3 text-center text-sm text-gray-500 dark:text-gray-400">
+            Showing {Math.min(visibleCount, filtered.length)} of {filtered.length} cards
+          </div>
+          {visibleCount < filtered.length && (
+            <div ref={sentinelRef} className="h-8 flex items-center justify-center mt-2">
+              <div className="text-sm text-gray-400 dark:text-gray-500">Loading more...</div>
+            </div>
+          )}
+          </>
         ) : (
           <div className="flex items-center justify-center mt-16 mb-16">
             <div className="text-center">

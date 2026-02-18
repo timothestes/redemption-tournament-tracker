@@ -53,9 +53,12 @@ const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
         {/* Custom gradient with minimal opacity for light mode */}
         <div style={{
             position: 'absolute',
-            inset: 0,
-            background: isLightTheme 
-              ? 'linear-gradient(to top, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.03) 35%, transparent 65%)' 
+            top: '0px',
+            right: '0px',
+            bottom: '0px',
+            left: '0px',
+            backgroundImage: isLightTheme
+              ? 'linear-gradient(to top, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.03) 35%, transparent 65%)'
               : 'linear-gradient(to top, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.15) 40%, transparent 80%)',
             pointerEvents: 'none',
           }}></div>
