@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState, useMemo, useRef } from "react";
 
-const BATCH_SIZE = 50;
+const BATCH_SIZE = 60;
 import { useRouter, useSearchParams } from "next/navigation";
 import ModalWithClose from "./ModalWithClose";
 import FilterGrid from "./components/FilterGrid";
@@ -1250,7 +1250,7 @@ export default function CardSearchClient() {
                   
                   {/* Search input */}
                   <input
-                    ref={el => inputRefs.current[index] = el}
+                    ref={el => { inputRefs.current[index] = el; }}
                     type="text"
                     placeholder={index === 0 ? "Search" : `Search ${index + 1}`}
                     className="w-full sm:w-auto p-3 pr-10 border rounded text-base focus:ring-2 focus:ring-blue-400 text-gray-900 bg-white dark:text-white dark:bg-gray-900"
@@ -1327,7 +1327,7 @@ export default function CardSearchClient() {
               viewBox="0 0 24 24"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
-              style={{ transition: 'transform 0.2s', transform: filterGridCollapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}
+              style={{ transitionProperty: 'transform', transitionDuration: '0.2s', transitionTimingFunction: 'ease', transform: filterGridCollapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}
             >
               <circle cx="12" cy="12" r="11" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1" />
               <path d="M8 10l4 4 4-4" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -1714,7 +1714,7 @@ export default function CardSearchClient() {
           </div>
           {visibleCount < filtered.length && (
             <div ref={sentinelRef} className="h-8 flex items-center justify-center mt-2">
-              <div className="text-sm text-gray-400 dark:text-gray-500">Loading more…</div>
+              <div className="text-sm text-gray-400 dark:text-gray-500">Loading more...</div>
             </div>
           )}
           </>
