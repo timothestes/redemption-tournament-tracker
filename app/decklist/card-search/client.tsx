@@ -1328,9 +1328,10 @@ export default function CardSearchClient() {
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
               style={{ transitionProperty: 'transform', transitionDuration: '0.2s', transitionTimingFunction: 'ease', transform: filterGridCollapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}
+              suppressHydrationWarning
             >
-              <circle cx="12" cy="12" r="11" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1" />
-              <path d="M8 10l4 4 4-4" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="12" cy="12" r="11" className="fill-gray-200 stroke-gray-400 dark:fill-gray-700 dark:stroke-gray-600" strokeWidth="1" />
+              <path d="M8 10l4 4 4-4" className="stroke-gray-700 dark:stroke-gray-400" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
         </div>
