@@ -208,6 +208,7 @@ export default function CardSearchClient() {
     setDeckName,
     setDeckFormat,
     setDeckParagon,
+    setDeckPublic,
     clearDeck,
     newDeck,
     loadDeck,
@@ -258,9 +259,17 @@ export default function CardSearchClient() {
   };
 
   // Function to update URL with current filter state
+  // Two modes: deck editing (deckId in URL, no filter params) vs browse (filter params in URL)
   const updateURL = React.useCallback((filters: Record<string, any>) => {
+    // Mode 1: Deck editing - keep only deckId in the URL, filters are ephemeral
+    if (deck.id) {
+      router.replace(`/decklist/card-search?deckId=${deck.id}`, { scroll: false });
+      return;
+    }
+
+    // Mode 2: Browse/search mode - write filter state to URL
     const params = new URLSearchParams();
-    
+
     // Only add non-default values to URL
     const activeQueries = filters.queries?.filter(q => q.text.trim()) || [];
     if (activeQueries.length > 0) {
@@ -297,7 +306,7 @@ export default function CardSearchClient() {
 
     const url = params.toString() ? `?${params.toString()}` : '';
     router.replace(`/decklist/card-search${url}`, { scroll: false });
-  }, [router]);
+  }, [router, deck.id]);
 
   // Check user authentication on mount
   useEffect(() => {
@@ -316,8 +325,14 @@ export default function CardSearchClient() {
   }, []);
 
   // Load state from URL on mount (only once)
+  // Skip filter loading when in deck editing mode (deckId present)
   useEffect(() => {
     if (searchParams && !isInitialized) {
+      // In deck editing mode, don't load filters from URL — they're ephemeral
+      if (searchParams.get('deckId')) {
+        setIsInitialized(true);
+        return;
+      }
       const urlQuery = searchParams.get('q') || '';
       const urlField = searchParams.get('field') || 'everything';
       setQueries(urlQuery ? [{text: urlQuery, field: urlField, operator: "AND"}] : [{text: "", field: "everything", operator: "AND"}]);
@@ -1811,6 +1826,7 @@ export default function CardSearchClient() {
             onDeckNameChange={setDeckName}
             onDeckFormatChange={handleDeckFormatChange}
             onParagonChange={setDeckParagon}
+            onDeckPublicChange={setDeckPublic}
             onSaveDeck={saveDeckToCloud}
             onAddCard={(cardName, cardSet, isReserve) => {
               // Find the card in the cards array

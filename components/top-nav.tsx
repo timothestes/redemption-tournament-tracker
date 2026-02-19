@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { HiMenu, HiDocumentText, HiArrowSmRight, HiUserAdd, HiShieldCheck } from "react-icons/hi";
+import { HiMenu, HiDocumentText, HiArrowSmRight, HiUserAdd, HiShieldCheck, HiGlobeAlt } from "react-icons/hi";
 import { IoClose } from "react-icons/io5";
 import { FaTrophy, FaBookOpen } from "react-icons/fa6";
 import { PiPencilLineBold } from "react-icons/pi";
@@ -20,6 +20,7 @@ import { NATIONALS_CONFIG } from "../app/config/nationals";
 const TopNav: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isResourcesOpen, setIsResourcesOpen] = useState(false);
+  const [isDecksOpen, setIsDecksOpen] = useState(false);
   const { theme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [logoSrc, setLogoSrc] = useState('/lor.png');
@@ -34,6 +35,12 @@ const TopNav: React.FC = () => {
 
   const toggleResources = () => {
     setIsResourcesOpen(!isResourcesOpen);
+    setIsDecksOpen(false);
+  };
+
+  const toggleDecks = () => {
+    setIsDecksOpen(!isDecksOpen);
+    setIsResourcesOpen(false);
   };
 
   useEffect(() => {
@@ -55,13 +62,35 @@ const TopNav: React.FC = () => {
     return () => subscription.unsubscribe();
   }, [theme, resolvedTheme]);
 
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setIsDecksOpen(false);
+      setIsResourcesOpen(false);
+    };
+    if (isDecksOpen || isResourcesOpen) {
+      // Use a slight delay so the toggle click doesn't immediately re-close
+      const timer = setTimeout(() => {
+        document.addEventListener('click', handleClickOutside, { once: true });
+      }, 0);
+      return () => {
+        clearTimeout(timer);
+        document.removeEventListener('click', handleClickOutside);
+      };
+    }
+  }, [isDecksOpen, isResourcesOpen]);
+
   const isActive = (path: string) => pathname?.startsWith(path);
 
   const navLinks = [
     { href: "/register", label: NATIONALS_CONFIG.adminOnly ? `${NATIONALS_CONFIG.displayName} (Admin Only)` : `${NATIONALS_CONFIG.displayName}`, icon: HiUserAdd, highlight: true },
     { href: "/tracker/tournaments", label: "Tournaments", icon: FaTrophy },
+  ];
+
+  const deckLinks = [
+    { href: "/decklist/community", label: "Community Decks", icon: HiGlobeAlt, isNew: true },
     { href: "/decklist/my-decks", label: "My Decks", icon: TbCardsFilled },
-    { href: "/decklist/card-search", label: "Deck Builder", icon: TbSearch },
+    { href: "/decklist/card-search?new=true", label: "Deck Builder", icon: TbSearch },
     { href: "/decklist/generate", label: "Deck Check PDF", icon: TbCardsFilled },
   ];
 
@@ -177,6 +206,55 @@ const TopNav: React.FC = () => {
                 </Link>
               );
             })}
+
+            {/* Decks Dropdown */}
+            <div className="relative">
+              <button
+                onClick={toggleDecks}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
+                  ${isDecksOpen || isActive('/decklist')
+                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+              >
+                <TbCardsFilled className="w-4 h-4" />
+                Decks
+                <svg
+                  className={`w-4 h-4 transition-transform ${isDecksOpen ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {isDecksOpen && (
+                <div className="absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5">
+                  <div className="py-2">
+                    {deckLinks.map((link) => {
+                      const Icon = link.icon;
+                      return (
+                        <Link
+                          key={link.href}
+                          href={link.href}
+                          onClick={() => setIsDecksOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        >
+                          <Icon className="w-4 h-4" />
+                          {link.label}
+                          {link.isNew && (
+                            <span className="ml-auto px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] font-bold rounded uppercase">
+                              New
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Resources Dropdown */}
             <div className="relative">
@@ -381,6 +459,51 @@ const TopNav: React.FC = () => {
                 </Link>
               );
             })}
+
+            {/* Mobile Decks Section */}
+            <div className="pt-2">
+              <button
+                onClick={toggleDecks}
+                className="flex items-center justify-between w-full px-3 py-2 rounded-md text-base font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+              >
+                <div className="flex items-center gap-3">
+                  <TbCardsFilled className="w-5 h-5" />
+                  Decks
+                </div>
+                <svg
+                  className={`w-4 h-4 transition-transform ${isDecksOpen ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {isDecksOpen && (
+                <div className="mt-2 ml-8 space-y-1">
+                  {deckLinks.map((link) => {
+                    const Icon = link.icon;
+                    return (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                      >
+                        <Icon className="w-4 h-4" />
+                        {link.label}
+                        {link.isNew && (
+                          <span className="ml-auto px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] font-bold rounded uppercase">
+                            New
+                          </span>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
             {/* Mobile Resources Section */}
             <div className="pt-2">

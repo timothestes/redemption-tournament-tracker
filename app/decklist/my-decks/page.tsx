@@ -1,7 +1,7 @@
 import { Metadata } from "next";
-import { redirect } from "next/navigation";
 import MyDecksClient from "./client";
 import { createClient } from "../../../utils/supabase/server";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "My Decks",
@@ -13,7 +13,44 @@ export default async function MyDecksPage() {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/sign-in");
+    return (
+      <div className="w-full max-w-2xl mx-auto px-4 py-16 text-center">
+        <svg
+          className="mx-auto h-20 w-20 text-gray-400 mb-6"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
+            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+          />
+        </svg>
+        <h1 className="text-3xl font-bold mb-3">My Decks</h1>
+        <p className="text-gray-600 dark:text-gray-400 text-lg mb-6">
+          Sign in to save, manage, and share your Redemption decks.
+        </p>
+        <div className="flex items-center justify-center gap-3">
+          <Link
+            href="/sign-in"
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+          >
+            Sign in
+          </Link>
+          <Link
+            href="/sign-up"
+            className="px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          >
+            Create an account
+          </Link>
+        </div>
+        <p className="mt-8 text-sm text-gray-500 dark:text-gray-500">
+          You can still <Link href="/decklist/card-search?new=true" className="text-blue-600 dark:text-blue-400 underline">build a deck</Link> without an account — signing in lets you save it to the cloud.
+        </p>
+      </div>
+    );
   }
 
   return <MyDecksClient />;

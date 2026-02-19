@@ -30,6 +30,8 @@ export interface Deck {
   paragon?: string;
   /** Optional folder ID for organization */
   folderId?: string | null;
+  /** Whether this deck is publicly visible */
+  isPublic?: boolean;
   /** Timestamp when deck was created */
   createdAt: Date;
   /** Timestamp when deck was last modified */

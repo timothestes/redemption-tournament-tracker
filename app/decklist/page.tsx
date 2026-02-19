@@ -1,16 +1,13 @@
-import { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { createClient } from "../../utils/supabase/server";
 
-export const metadata: Metadata = {
-  title: "Decklist",
-  description: "Decklist generation and management",
-};
+export default async function DecklistPage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
-export default function DecklistLayout() {
-  return (
-    <div className="flex-1 w-full flex flex-col gap-20 items-center">
-      <div className="w-full">
-        <h1 className="text-3xl font-bold mb-8">Decklist</h1>
-      </div>
-    </div>
-  );
+  if (user) {
+    redirect("/decklist/my-decks");
+  } else {
+    redirect("/decklist/card-search");
+  }
 }

@@ -191,6 +191,7 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
           format: cloudDeck.format,
           paragon: cloudDeck.paragon,
           folderId: cloudDeck.folder_id,
+          isPublic: cloudDeck.is_public ?? false,
           cards: cloudDeck.cards.map((dbCard: any) => {
             // Reconstruct the lookup key
             const key = `${dbCard.card_name}|${dbCard.card_set}|${sanitizeImgFile(dbCard.card_img_file)}`;
@@ -281,6 +282,15 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
 
       console.log('[useDeckState] Saving deck with folderId:', deck.folderId);
 
+      // Auto-compute preview cards: 1st Hero, 1st Evil Character
+      const mainCards = deck.cards.filter(dc => !dc.isReserve && dc.quantity > 0);
+      const heroTypes = ['Hero', 'HC', 'Hero Character'];
+      const evilTypes = ['Evil Character', 'EC'];
+      const firstHero = mainCards.find(dc => heroTypes.includes(dc.card.type));
+      const firstEvil = mainCards.find(dc => evilTypes.includes(dc.card.type));
+      const previewCard1 = firstHero?.card.imgFile || mainCards[0]?.card.imgFile || null;
+      const previewCard2 = firstEvil?.card.imgFile || (mainCards.length > 1 ? mainCards[1]?.card.imgFile : null) || null;
+
       const result = await saveDeckAction({
         deckId: deck.id,
         name: overrideName || deck.name,
@@ -289,6 +299,8 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
         paragon: deck.paragon,
         folderId: deck.folderId,
         cards: cardsData,
+        previewCard1,
+        previewCard2,
       });
 
       if (result.success) {
@@ -508,6 +520,16 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
   }, []);
 
   /**
+   * Update deck public visibility (local state only — actual toggle calls server action separately)
+   */
+  const setDeckPublic = useCallback((isPublic: boolean) => {
+    setDeck((prevDeck) => ({
+      ...prevDeck,
+      isPublic,
+    }));
+  }, []);
+
+  /**
    * Clear all cards from deck
    */
   const clearDeck = useCallback(() => {
@@ -606,6 +628,7 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
     setDeckDescription,
     setDeckFormat,
     setDeckParagon,
+    setDeckPublic,
     clearDeck,
     newDeck,
     loadDeck,

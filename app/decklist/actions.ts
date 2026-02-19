@@ -36,6 +36,8 @@ export interface SaveDeckParams {
   paragon?: string;
   folderId?: string | null;
   cards: DeckCardData[];
+  previewCard1?: string | null; // card_img_file for preview
+  previewCard2?: string | null;
 }
 
 /**
@@ -58,7 +60,7 @@ export async function saveDeckAction(params: SaveDeckParams) {
       };
     }
 
-    const { deckId, name, description, format, paragon, folderId, cards } = params;
+    const { deckId, name, description, format, paragon, folderId, cards, previewCard1, previewCard2 } = params;
 
     // Calculate card count (main deck only, excluding reserve)
     const cardCount = cards
@@ -76,6 +78,8 @@ export async function saveDeckAction(params: SaveDeckParams) {
           paragon: paragon || null,
           folder_id: folderId || null,
           card_count: cardCount,
+          preview_card_1: previewCard1 ?? null,
+          preview_card_2: previewCard2 ?? null,
           updated_at: new Date().toISOString(),
         })
         .eq("id", deckId)
@@ -149,6 +153,8 @@ export async function saveDeckAction(params: SaveDeckParams) {
           paragon: paragon || null,
           folder_id: folderId || null,
           card_count: cardCount,
+          preview_card_1: previewCard1 ?? null,
+          preview_card_2: previewCard2 ?? null,
         })
         .select()
         .single();
@@ -725,6 +731,228 @@ export async function deleteFolderAction(folderId: string) {
 /**
  * Move a deck to a folder (or remove from folder)
  */
+/**
+ * Toggle a deck's public/private status
+ */
+export async function toggleDeckPublicAction(deckId: string, isPublic: boolean) {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return {
+        success: false,
+        error: "You must be logged in to change deck visibility",
+      };
+    }
+
+    const { error } = await supabase
+      .from("decks")
+      .update({ is_public: isPublic })
+      .eq("id", deckId)
+      .eq("user_id", user.id);
+
+    if (error) {
+      console.error("Error toggling deck public:", error);
+      return {
+        success: false,
+        error: "Failed to update deck visibility",
+      };
+    }
+
+    revalidatePath("/decklist/my-decks");
+    revalidatePath(`/decklist/${deckId}`);
+
+    return {
+      success: true,
+      message: isPublic ? "Deck is now public" : "Deck is now private",
+    };
+  } catch (error) {
+    console.error("Error in toggleDeckPublicAction:", error);
+    return {
+      success: false,
+      error: "An unexpected error occurred",
+    };
+  }
+}
+
+/**
+ * Load a public deck by ID (no auth required for public decks)
+ */
+export async function loadPublicDeckAction(deckId: string) {
+  try {
+    const supabase = await createClient();
+
+    // Check if current user is authenticated (optional)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    // Load deck
+    const { data: deck, error: deckError } = await supabase
+      .from("decks")
+      .select("*")
+      .eq("id", deckId)
+      .single();
+
+    if (deckError || !deck) {
+      return {
+        success: false,
+        error: "Deck not found",
+        deck: null,
+      };
+    }
+
+    const isOwner = user?.id === deck.user_id;
+
+    // If not public and not owner, deny access
+    if (!deck.is_public && !isOwner) {
+      return {
+        success: false,
+        error: "This deck is private",
+        deck: null,
+      };
+    }
+
+    // Load deck cards
+    const { data: cards, error: cardsError } = await supabase
+      .from("deck_cards")
+      .select("*")
+      .eq("deck_id", deckId)
+      .order("card_name");
+
+    if (cardsError) {
+      console.error("Error loading deck cards:", cardsError);
+      return {
+        success: false,
+        error: "Failed to load deck cards",
+        deck: null,
+      };
+    }
+
+    // Increment view count (fire-and-forget, only for non-owners)
+    if (!isOwner) {
+      supabase
+        .from("decks")
+        .update({ view_count: (deck.view_count || 0) + 1 })
+        .eq("id", deckId)
+        .then(() => {});
+    }
+
+    return {
+      success: true,
+      deck: {
+        ...deck,
+        cards: cards || [],
+      },
+      isOwner,
+    };
+  } catch (error) {
+    console.error("Error in loadPublicDeckAction:", error);
+    return {
+      success: false,
+      error: "An unexpected error occurred",
+      deck: null,
+    };
+  }
+}
+
+/**
+ * Copy a public deck to the current user's library
+ */
+export async function copyPublicDeckAction(sourceDeckId: string) {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return {
+        success: false,
+        error: "You must be logged in to copy a deck",
+      };
+    }
+
+    // Load the source deck
+    const { data: sourceDeck, error: deckError } = await supabase
+      .from("decks")
+      .select("*")
+      .eq("id", sourceDeckId)
+      .single();
+
+    if (deckError || !sourceDeck) {
+      return {
+        success: false,
+        error: "Source deck not found",
+      };
+    }
+
+    // Must be public or owned by caller
+    if (!sourceDeck.is_public && sourceDeck.user_id !== user.id) {
+      return {
+        success: false,
+        error: "You don't have permission to copy this deck",
+      };
+    }
+
+    // Load source deck cards
+    const { data: sourceCards, error: cardsError } = await supabase
+      .from("deck_cards")
+      .select("*")
+      .eq("deck_id", sourceDeckId);
+
+    if (cardsError) {
+      return {
+        success: false,
+        error: "Failed to load source deck cards",
+      };
+    }
+
+    // Create the copy
+    const saveResult = await saveDeckAction({
+      name: `${sourceDeck.name} (Copy)`,
+      description: sourceDeck.description,
+      format: sourceDeck.format,
+      paragon: sourceDeck.paragon,
+      cards: (sourceCards || []).map((card: any) => ({
+        card_name: card.card_name,
+        card_set: card.card_set,
+        card_img_file: card.card_img_file,
+        quantity: card.quantity,
+        is_reserve: card.is_reserve,
+      })),
+    });
+
+    if (!saveResult.success) {
+      return {
+        success: false,
+        error: saveResult.error || "Failed to copy deck",
+      };
+    }
+
+    revalidatePath("/decklist/my-decks");
+
+    return {
+      success: true,
+      deckId: saveResult.deckId,
+      message: "Deck copied to your library",
+    };
+  } catch (error) {
+    console.error("Error in copyPublicDeckAction:", error);
+    return {
+      success: false,
+      error: "An unexpected error occurred",
+    };
+  }
+}
+
 export async function moveDeckToFolderAction(deckId: string, folderId: string | null) {
   try {
     const supabase = await createClient();
@@ -767,5 +995,71 @@ export async function moveDeckToFolderAction(deckId: string, folderId: string | 
       success: false,
       error: "An unexpected error occurred",
     };
+  }
+}
+
+/**
+ * Load public decks for the community browse page
+ */
+export interface LoadPublicDecksParams {
+  page?: number;
+  pageSize?: number;
+  sort?: "newest" | "most_viewed" | "name";
+  format?: string;
+  search?: string;
+}
+
+export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) {
+  try {
+    const supabase = await createClient();
+    const {
+      page = 1,
+      pageSize = 24,
+      sort = "newest",
+      format,
+      search,
+    } = params;
+
+    const offset = (page - 1) * pageSize;
+
+    let query = supabase
+      .from("decks")
+      .select("id, name, description, format, paragon, card_count, view_count, preview_card_1, preview_card_2, created_at, updated_at, deck_cards(card_img_file)", { count: "exact" })
+      .eq("is_public", true);
+
+    if (format) {
+      query = query.eq("format", format);
+    }
+
+    if (search && search.trim()) {
+      query = query.ilike("name", `%${search.trim()}%`);
+    }
+
+    switch (sort) {
+      case "most_viewed":
+        query = query.order("view_count", { ascending: false, nullsFirst: false });
+        break;
+      case "name":
+        query = query.order("name", { ascending: true });
+        break;
+      case "newest":
+      default:
+        query = query.order("updated_at", { ascending: false });
+        break;
+    }
+
+    query = query.range(offset, offset + pageSize - 1);
+
+    const { data: decks, error, count } = await query;
+
+    if (error) {
+      console.error("Error loading public decks:", error);
+      return { success: false, error: "Failed to load community decks", decks: [], totalCount: 0 };
+    }
+
+    return { success: true, decks: decks || [], totalCount: count || 0 };
+  } catch (error) {
+    console.error("Error in loadPublicDecksAction:", error);
+    return { success: false, error: "An unexpected error occurred", decks: [], totalCount: 0 };
   }
 }
