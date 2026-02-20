@@ -52,8 +52,15 @@ export const signInAction = async (formData: FormData) => {
   if (error) {
     const searchParams = new URLSearchParams();
     searchParams.append('email', email);
-    searchParams.append('error', error.message);
-    return encodedRedirect("error", `/sign-in?${searchParams.toString()}`, error.message);
+    
+    // Map Supabase error to user-friendly message
+    let friendlyMessage = error.message;
+    if (error.message === 'Invalid login credentials') {
+      friendlyMessage = 'Incorrect email or password. Please try again.';
+    }
+    
+    searchParams.append('error', friendlyMessage);
+    return encodedRedirect("error", `/sign-in?${searchParams.toString()}`, friendlyMessage);
   }
 
   return redirect("/tracker/tournaments");
