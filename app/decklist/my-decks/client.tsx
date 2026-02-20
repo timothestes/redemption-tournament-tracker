@@ -18,6 +18,7 @@ import {
 } from "../actions";
 import DeleteDeckModal from "./DeleteDeckModal";
 import FolderModal from "./FolderModal";
+import UsernameModal from "./UsernameModal";
 import GeneratePDFModal from "../card-search/components/GeneratePDFModal";
 import { Deck } from "../card-search/types/deck";
 import { Card } from "../card-search/utils";
@@ -76,6 +77,7 @@ export default function MyDecksClient() {
   const [folderModal, setFolderModal] = useState<{ mode: "create" | "rename"; folderId?: string; initialName?: string } | null>(null);
   const [folderToDelete, setFolderToDelete] = useState<{ id: string; name: string } | null>(null);
   const [pdfDeck, setPdfDeck] = useState<Deck | null>(null); // For PDF generation modal
+  const [usernameModalDeckId, setUsernameModalDeckId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -166,8 +168,25 @@ export default function MyDecksClient() {
       setDecks(decks.map(d =>
         d.id === deckId ? { ...d, is_public: !currentlyPublic } : d
       ));
+    } else if ((result as any).needsUsername) {
+      setUsernameModalDeckId(deckId);
     } else {
       alert(result.error || "Failed to update deck visibility");
+    }
+  }
+
+  async function handleUsernameSet(_username: string) {
+    const deckId = usernameModalDeckId;
+    setUsernameModalDeckId(null);
+    if (deckId) {
+      const result = await toggleDeckPublicAction(deckId, true);
+      if (result.success) {
+        setDecks(prev => prev.map(d =>
+          d.id === deckId ? { ...d, is_public: true } : d
+        ));
+      } else {
+        alert(result.error || "Failed to update deck visibility");
+      }
     }
   }
 
@@ -530,6 +549,14 @@ export default function MyDecksClient() {
           onClose={() => setPdfDeck(null)}
         />
       )}
+
+      {/* Username Modal */}
+      {usernameModalDeckId && (
+        <UsernameModal
+          onSuccess={handleUsernameSet}
+          onClose={() => setUsernameModalDeckId(null)}
+        />
+      )}
     </div>
   );
 }
@@ -610,6 +637,14 @@ function FolderItem({
 }
 
 // Deck Card Component (Grid View)
+function getCardImageUrl(cardName: string | null | undefined): string | null {
+  if (!cardName) return null;
+  const blobBase = process.env.NEXT_PUBLIC_BLOB_BASE_URL;
+  if (!blobBase) return null;
+  const sanitized = cardName.replace(/\//g, "_");
+  return `${blobBase}/card-images/${sanitized}.jpg`;
+}
+
 function DeckCard({
   deck,
   folders,
@@ -637,8 +672,8 @@ function DeckCard({
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow">
-      {/* Paragon Image Header */}
-      {formatDeckType(deck.format) === "Paragon" && deck.paragon && (
+      {/* Image Header */}
+      {formatDeckType(deck.format) === "Paragon" && deck.paragon ? (
         <div className="h-32 overflow-hidden rounded-t-lg">
           <img
             src={`/paragons/Paragon ${deck.paragon}.png`}
@@ -646,7 +681,12 @@ function DeckCard({
             className="w-full h-full object-cover object-top"
           />
         </div>
-      )}
+      ) : (getCardImageUrl(deck.preview_card_1) || getCardImageUrl(deck.preview_card_2)) ? (
+        <div className="h-32 overflow-hidden rounded-t-lg bg-gray-100 dark:bg-gray-900 flex items-center justify-center gap-1 px-2 py-2">
+          {getCardImageUrl(deck.preview_card_1) && <img src={getCardImageUrl(deck.preview_card_1)!} alt="" className="h-full object-contain rounded" />}
+          {getCardImageUrl(deck.preview_card_2) && <img src={getCardImageUrl(deck.preview_card_2)!} alt="" className="h-full object-contain rounded" />}
+        </div>
+      ) : null}
 
       <div className="p-4">
         <div className="flex items-start justify-between mb-2">

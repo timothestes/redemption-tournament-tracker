@@ -11,11 +11,12 @@ import GenerateDeckImageModal from "./GenerateDeckImageModal";
 import ClearDeckModal from "./ClearDeckModal";
 import LoadDeckModal from "./LoadDeckModal";
 import { duplicateDeckAction, toggleDeckPublicAction } from "../../actions";
+import UsernameModal from "../../my-decks/UsernameModal";
 import { getParagonNames, getParagonByName } from "../data/paragons";
 import ParagonRequirements from "./ParagonRequirements";
 import { useCardImageUrl } from "../hooks/useCardImageUrl";
 
-export type TabType = "main" | "reserve" | "info";
+export type TabType = "main" | "reserve" | "info" | "cover";
 
 interface DeckBuilderPanelProps {
   /** Current deck state */
@@ -104,6 +105,7 @@ export default function DeckBuilderPanel({
   const [showParagonDropdown, setShowParagonDropdown] = useState(false);
   const [showParagonModal, setShowParagonModal] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [showUsernameModal, setShowUsernameModal] = useState(false);
   
   const { getImageUrl } = useCardImageUrl();
 
@@ -787,6 +789,8 @@ export default function DeckBuilderPanel({
                       if (result.success) {
                         onDeckPublicChange?.(newPublicState);
                         onNotify?.(newPublicState ? 'Deck is now public' : 'Deck is now private', 'success');
+                      } else if ((result as any).needsUsername) {
+                        setShowUsernameModal(true);
                       } else {
                         onNotify?.(result.error || 'Failed to change visibility', 'error');
                       }
@@ -991,7 +995,19 @@ export default function DeckBuilderPanel({
             </div>
           )}
         </button>
-        
+
+        {/* Cover Tab */}
+        <button
+          onClick={() => handleTabChange("cover")}
+          className={`flex-1 px-3 py-3 text-sm font-medium transition-colors ${
+            activeTab === "cover"
+              ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+              : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+          }`}
+        >
+          Cover
+        </button>
+
         {/* View Dropdown Button */}
         <div className="relative ml-auto mr-2">
           <button
@@ -1330,98 +1346,98 @@ export default function DeckBuilderPanel({
               </div>
             )}
           </div>
+        ) : activeTab === "cover" ? (
+          // Cover Tab
+          <div className="space-y-4 text-sm">
+            <div>
+              <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">Cover Cards</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                Choose the two cards shown as the thumbnail on the community page.
+              </p>
+              <div className="flex gap-3 mb-3">
+                {([1, 2] as const).map((slot) => {
+                  const imgFile = slot === 1 ? deck.previewCard1 : deck.previewCard2;
+                  const imgUrl = imgFile ? getImageUrl(imgFile) : null;
+                  return (
+                    <div key={slot} className="flex flex-col items-center gap-1.5 flex-1">
+                      <button
+                        onClick={() => setCoverPickerSlot(coverPickerSlot === slot ? null : slot)}
+                        className={`relative w-full aspect-[2.5/3.5] rounded-lg overflow-hidden border-2 transition-all ${
+                          coverPickerSlot === slot
+                            ? 'border-blue-500 ring-2 ring-blue-300 dark:ring-blue-700'
+                            : 'border-gray-300 dark:border-gray-600 hover:border-blue-400'
+                        } bg-gray-100 dark:bg-gray-800`}
+                        title={`Pick cover card ${slot}`}
+                      >
+                        {imgUrl ? (
+                          <img src={imgUrl} alt={`Cover ${slot}`} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
+                            <svg className="w-6 h-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+                            </svg>
+                            <span className="text-xs">Card {slot}</span>
+                          </div>
+                        )}
+                      </button>
+                      {imgFile && (
+                        <button
+                          onClick={() => setCoverPickerSlot(slot)}
+                          className="text-xs text-blue-500 hover:text-blue-700 dark:hover:text-blue-400"
+                        >
+                          Replace
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Card picker grid */}
+              {coverPickerSlot !== null && (() => {
+                const mainCards = deck.cards.filter(dc => !dc.isReserve && dc.quantity > 0);
+                return (
+                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                    <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                      <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                        Select card for slot {coverPickerSlot}
+                      </span>
+                      <button onClick={() => setCoverPickerSlot(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                    <div className="p-2 max-h-48 overflow-y-auto grid grid-cols-4 gap-1.5">
+                      {mainCards.map((dc) => (
+                        <button
+                          key={`${dc.card.name}|${dc.card.set}`}
+                          onClick={() => {
+                            const imgFile = dc.card.imgFile;
+                            const c1 = coverPickerSlot === 1 ? imgFile : (deck.previewCard1 ?? null);
+                            const c2 = coverPickerSlot === 2 ? imgFile : (deck.previewCard2 ?? null);
+                            onPreviewCardsChange?.(c1, c2);
+                            setCoverPickerSlot(null);
+                          }}
+                          className="relative aspect-[2.5/3.5] rounded overflow-hidden border border-gray-200 dark:border-gray-600 hover:border-blue-500 hover:scale-105 transition-all"
+                          title={dc.card.name}
+                        >
+                          <img
+                            src={getImageUrl(dc.card.imgFile)}
+                            alt={dc.card.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
         ) : (
           // Info Tab
           <div className="space-y-4 text-sm">
-            {/* Cover Cards — for community deck thumbnail */}
-            {deck.isPublic && (
-              <div>
-                <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">Cover Cards</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                  Choose the two cards shown as the thumbnail on the community page.
-                </p>
-                <div className="flex gap-3 mb-3">
-                  {([1, 2] as const).map((slot) => {
-                    const imgFile = slot === 1 ? deck.previewCard1 : deck.previewCard2;
-                    const imgUrl = imgFile ? getImageUrl(imgFile) : null;
-                    return (
-                      <div key={slot} className="flex flex-col items-center gap-1.5 flex-1">
-                        <button
-                          onClick={() => setCoverPickerSlot(coverPickerSlot === slot ? null : slot)}
-                          className={`relative w-full aspect-[2.5/3.5] rounded-lg overflow-hidden border-2 transition-all ${
-                            coverPickerSlot === slot
-                              ? 'border-blue-500 ring-2 ring-blue-300 dark:ring-blue-700'
-                              : 'border-gray-300 dark:border-gray-600 hover:border-blue-400'
-                          } bg-gray-100 dark:bg-gray-800`}
-                          title={`Pick cover card ${slot}`}
-                        >
-                          {imgUrl ? (
-                            <img src={imgUrl} alt={`Cover ${slot}`} className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
-                              <svg className="w-6 h-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
-                              </svg>
-                              <span className="text-xs">Card {slot}</span>
-                            </div>
-                          )}
-                        </button>
-                        {imgFile && (
-                          <button
-                            onClick={() => setCoverPickerSlot(slot)}
-                            className="text-xs text-blue-500 hover:text-blue-700 dark:hover:text-blue-400"
-                          >
-                            Replace
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Card picker grid */}
-                {coverPickerSlot !== null && (() => {
-                  const mainCards = deck.cards.filter(dc => !dc.isReserve && dc.quantity > 0);
-                  return (
-                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                      <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                        <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                          Select card for slot {coverPickerSlot}
-                        </span>
-                        <button onClick={() => setCoverPickerSlot(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
-                      <div className="p-2 max-h-48 overflow-y-auto grid grid-cols-4 gap-1.5">
-                        {mainCards.map((dc) => (
-                          <button
-                            key={`${dc.card.name}|${dc.card.set}`}
-                            onClick={() => {
-                              const imgFile = dc.card.imgFile;
-                              const c1 = coverPickerSlot === 1 ? imgFile : (deck.previewCard1 ?? null);
-                              const c2 = coverPickerSlot === 2 ? imgFile : (deck.previewCard2 ?? null);
-                              onPreviewCardsChange?.(c1, c2);
-                              setCoverPickerSlot(null);
-                            }}
-                            className="relative aspect-[2.5/3.5] rounded overflow-hidden border border-gray-200 dark:border-gray-600 hover:border-blue-500 hover:scale-105 transition-all"
-                            title={dc.card.name}
-                          >
-                            <img
-                              src={getImageUrl(dc.card.imgFile)}
-                              alt={dc.card.name}
-                              className="w-full h-full object-cover"
-                            />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-            )}
-
             {/* Disclaimer - Hide for Paragon format */}
             {deckType !== 'Paragon' && (
               <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
@@ -1762,6 +1778,25 @@ export default function DeckBuilderPanel({
             />
           </div>
         </div>
+      )}
+
+      {/* Username Modal */}
+      {showUsernameModal && (
+        <UsernameModal
+          onSuccess={async () => {
+            setShowUsernameModal(false);
+            if (deck.id) {
+              const result = await toggleDeckPublicAction(deck.id, true);
+              if (result.success) {
+                onDeckPublicChange?.(true);
+                onNotify?.('Deck is now public', 'success');
+              } else {
+                onNotify?.(result.error || 'Failed to change visibility', 'error');
+              }
+            }
+          }}
+          onClose={() => setShowUsernameModal(false)}
+        />
       )}
 
       {/* Hidden image preloader for reserve cards */}

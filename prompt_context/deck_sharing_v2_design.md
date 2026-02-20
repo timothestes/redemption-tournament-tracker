@@ -7,11 +7,11 @@
 | `is_public` column on `decks` table | ✅ exists |
 | RLS policies for public deck reads | ✅ configured |
 | `view_count` column on `decks` | ✅ exists |
-| Toggle UI to make deck public | ❌ not built |
-| Public deck viewing page | ❌ not built |
-| Share link button | ❌ not built |
-| "Copy to My Library" | ❌ not built |
-| Community browse page | ❌ not built |
+| Toggle UI to make deck public | ✅ exists |
+| Public deck viewing page | ✅ exists |
+| Share link button |✅ exists |
+| "Copy to My Library" | ✅ exists |
+| Community browse page | ✅ exists |
 
 No migrations needed. The infrastructure is there.
 

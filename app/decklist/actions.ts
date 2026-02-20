@@ -14,6 +14,8 @@ export interface DeckData {
   folder_id?: string | null;
   is_public?: boolean;
   card_count?: number;
+  preview_card_1?: string | null;
+  preview_card_2?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -750,6 +752,19 @@ export async function toggleDeckPublicAction(deckId: string, isPublic: boolean) 
       };
     }
 
+    // If making public, check that user has a username set
+    if (isPublic) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("username")
+        .eq("id", user.id)
+        .single();
+
+      if (!profile?.username) {
+        return { success: false, needsUsername: true };
+      }
+    }
+
     const { error } = await supabase
       .from("decks")
       .update({ is_public: isPublic })
@@ -834,6 +849,13 @@ export async function loadPublicDeckAction(deckId: string) {
       };
     }
 
+    // Fetch username for the deck creator
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("username")
+      .eq("id", deck.user_id)
+      .single();
+
     // Increment view count (fire-and-forget, only for non-owners)
     if (!isOwner) {
       supabase
@@ -847,6 +869,7 @@ export async function loadPublicDeckAction(deckId: string) {
       success: true,
       deck: {
         ...deck,
+        username: profile?.username || null,
         cards: cards || [],
       },
       isOwner,
@@ -1007,6 +1030,7 @@ export interface LoadPublicDecksParams {
   sort?: "newest" | "most_viewed" | "name";
   format?: string;
   search?: string;
+  username?: string;
 }
 
 export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) {
@@ -1018,6 +1042,7 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
       sort = "newest",
       format,
       search,
+      username,
     } = params;
 
     const offset = (page - 1) * pageSize;
@@ -1031,8 +1056,36 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
       query = query.eq("format", format);
     }
 
+    // Filter by exact username (e.g. clicking a username link)
+    if (username && username.trim()) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("username", username.trim())
+        .single();
+      if (profile) {
+        query = query.eq("user_id", profile.id);
+      } else {
+        // No user with that username — return empty
+        return { success: true, decks: [], totalCount: 0 };
+      }
+    }
+
+    // Search by deck name or username
     if (search && search.trim()) {
-      query = query.ilike("name", `%${search.trim()}%`);
+      const term = search.trim();
+      // Find user IDs matching the search term
+      const { data: matchingProfiles } = await supabase
+        .from("profiles")
+        .select("id")
+        .ilike("username", `%${term}%`);
+      const matchingUserIds = (matchingProfiles || []).map((p: any) => p.id);
+
+      if (matchingUserIds.length > 0) {
+        query = query.or(`name.ilike.%${term}%,user_id.in.(${matchingUserIds.join(",")})`);
+      } else {
+        query = query.ilike("name", `%${term}%`);
+      }
     }
 
     switch (sort) {
@@ -1057,7 +1110,22 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
       return { success: false, error: "Failed to load community decks", decks: [], totalCount: 0 };
     }
 
-    return { success: true, decks: decks || [], totalCount: count || 0 };
+    // Fetch usernames for all deck creators
+    const userIds = [...new Set((decks || []).map((d: any) => d.user_id).filter(Boolean))];
+    let usernameMap = new Map<string, string>();
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, username")
+        .in("id", userIds);
+      usernameMap = new Map((profiles || []).map((p: any) => [p.id, p.username]));
+    }
+    const decksWithUsername = (decks || []).map((d: any) => ({
+      ...d,
+      username: usernameMap.get(d.user_id) || null,
+    }));
+
+    return { success: true, decks: decksWithUsername, totalCount: count || 0 };
   } catch (error) {
     console.error("Error in loadPublicDecksAction:", error);
     return { success: false, error: "An unexpected error occurred", decks: [], totalCount: 0 };
@@ -1114,6 +1182,115 @@ export async function updateDeckPreviewCardsAction(
     return { success: true };
   } catch (error) {
     console.error("Error in updateDeckPreviewCardsAction:", error);
+    return { success: false, error: "An unexpected error occurred" };
+  }
+}
+
+/**
+ * Set username for the current user
+ */
+export async function setUsernameAction(username: string) {
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { success: false, error: "Not authenticated" };
+    }
+
+    const trimmed = username.trim();
+
+    if (trimmed.length < 3 || trimmed.length > 24) {
+      return { success: false, error: "Username must be between 3 and 24 characters" };
+    }
+
+    if (!/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
+      return { success: false, error: "Username can only contain letters, numbers, underscores, and hyphens" };
+    }
+
+    // Check uniqueness for a friendlier error message
+    const { data: existing } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("username", trimmed)
+      .neq("id", user.id)
+      .single();
+
+    if (existing) {
+      return { success: false, error: "This username is already taken" };
+    }
+
+    // Upsert the profile (handles case where profile row might not exist)
+    const { error } = await supabase
+      .from("profiles")
+      .upsert({ id: user.id, username: trimmed, updated_at: new Date().toISOString() });
+
+    if (error) {
+      if (error.code === "23505") {
+        return { success: false, error: "This username is already taken" };
+      }
+      console.error("Error setting username:", error);
+      return { success: false, error: "Failed to set username" };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error in setUsernameAction:", error);
+    return { success: false, error: "An unexpected error occurred" };
+  }
+}
+
+/**
+ * Check if a username is available
+ */
+export async function checkUsernameAvailableAction(username: string) {
+  try {
+    const supabase = await createClient();
+    const trimmed = username.trim();
+
+    if (trimmed.length < 3) {
+      return { available: false };
+    }
+
+    const { data } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("username", trimmed)
+      .single();
+
+    return { available: !data };
+  } catch {
+    return { available: false };
+  }
+}
+
+/**
+ * Update a deck's description
+ */
+export async function updateDeckDescriptionAction(deckId: string, description: string) {
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { success: false, error: "Not authenticated" };
+    }
+
+    const { error } = await supabase
+      .from("decks")
+      .update({ description: description || null })
+      .eq("id", deckId)
+      .eq("user_id", user.id);
+
+    if (error) {
+      console.error("Error updating description:", error);
+      return { success: false, error: "Failed to update description" };
+    }
+
+    revalidatePath(`/decklist/${deckId}`);
+    return { success: true };
+  } catch (error) {
+    console.error("Error in updateDeckDescriptionAction:", error);
     return { success: false, error: "An unexpected error occurred" };
   }
 }

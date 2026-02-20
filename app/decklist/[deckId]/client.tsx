@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Image from "next/image";
-import { copyPublicDeckAction, updateDeckPreviewCardsAction, renameDeckAction, DeckCardData } from "../actions";
+import { copyPublicDeckAction, updateDeckPreviewCardsAction, renameDeckAction, updateDeckDescriptionAction, DeckCardData } from "../actions";
+import ReactMarkdown from "react-markdown";
 import { CARD_DATA_URL } from "../card-search/constants";
 import { Card } from "../card-search/utils";
 import ModalWithClose from "../card-search/ModalWithClose";
@@ -19,6 +21,7 @@ interface PublicDeckData {
   view_count?: number;
   preview_card_1?: string | null;
   preview_card_2?: string | null;
+  username?: string | null;
   created_at: string;
   updated_at: string;
   cards: DeckCardData[];
@@ -136,6 +139,22 @@ export default function PublicDeckClient({ deck, isOwner }: Props) {
     setDeckName(trimmed);
     const result = await renameDeckAction(deck.id, trimmed);
     if (!result.success) setDeckName(deckName); // revert on failure
+  }
+
+  // Description editing (owner only)
+  const [description, setDescription] = useState(deck.description || "");
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [descriptionInput, setDescriptionInput] = useState(deck.description || "");
+  const [savingDescription, setSavingDescription] = useState(false);
+
+  async function handleDescriptionSubmit() {
+    setEditingDescription(false);
+    if (descriptionInput === description) return;
+    setSavingDescription(true);
+    setDescription(descriptionInput);
+    const result = await updateDeckDescriptionAction(deck.id, descriptionInput);
+    setSavingDescription(false);
+    if (!result.success) setDescription(description); // revert on failure
   }
 
   // Cover card editor (owner only)
@@ -330,9 +349,29 @@ export default function PublicDeckClient({ deck, isOwner }: Props) {
                   Paragon: <strong>{deck.paragon}</strong>
                 </span>
               )}
+              {deck.username && (
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  by{" "}
+                  <Link
+                    href={`/decklist/community?username=${encodeURIComponent(deck.username)}`}
+                    className="font-medium text-gray-600 dark:text-gray-400 underline hover:text-gray-900 dark:hover:text-gray-200"
+                  >
+                    {deck.username}
+                  </Link>
+                </span>
+              )}
               <span className="text-sm text-gray-500 dark:text-gray-400">
                 {mainDeckCount} cards{reserveCount > 0 && ` + ${reserveCount} reserve`}
               </span>
+              <span className="text-sm text-gray-400 dark:text-gray-500">
+                Created {new Date(deck.created_at).toLocaleDateString()}
+              </span>
+              <span className="text-sm text-gray-400 dark:text-gray-500">
+                Updated {new Date(deck.updated_at).toLocaleDateString()}
+              </span>
+              {(deck.view_count ?? 0) > 0 && (
+                <span className="text-sm text-gray-400 dark:text-gray-500">{deck.view_count} views</span>
+              )}
             </div>
           </div>
 
@@ -426,9 +465,56 @@ export default function PublicDeckClient({ deck, isOwner }: Props) {
         )}
 
         {/* Description */}
-        {deck.description && (
-          <p className="mt-4 text-gray-700 dark:text-gray-300">{deck.description}</p>
-        )}
+        <div className="mt-4">
+          {isOwner && editingDescription ? (
+            <div>
+              <textarea
+                autoFocus
+                value={descriptionInput}
+                onChange={(e) => setDescriptionInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") { setDescriptionInput(description); setEditingDescription(false); }
+                }}
+                rows={6}
+                placeholder="Write a description for your deck... (Markdown supported)"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+              />
+              <div className="flex items-center gap-2 mt-2">
+                <button
+                  onClick={handleDescriptionSubmit}
+                  className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => { setDescriptionInput(description); setEditingDescription(false); }}
+                  className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto">Markdown supported</span>
+              </div>
+            </div>
+          ) : description ? (
+            <div
+              className={`rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3 ${isOwner ? "cursor-pointer hover:border-blue-300 dark:hover:border-blue-600 transition-colors" : ""}`}
+              onClick={isOwner ? () => { setDescriptionInput(description); setEditingDescription(true); } : undefined}
+              title={isOwner ? "Click to edit description" : undefined}
+            >
+              <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Description</h3>
+              <div className="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300">
+                <ReactMarkdown>{description}</ReactMarkdown>
+              </div>
+            </div>
+          ) : isOwner ? (
+            <button
+              onClick={() => setEditingDescription(true)}
+              className="w-full rounded-lg border border-dashed border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-gray-400 dark:text-gray-500 hover:border-blue-400 hover:text-blue-500 dark:hover:border-blue-500 dark:hover:text-blue-400 transition-colors text-left"
+            >
+              + Add a description...
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {/* Cover card editor modal — owner only */}
@@ -742,16 +828,6 @@ export default function PublicDeckClient({ deck, isOwner }: Props) {
       )}
       </>}
 
-      {/* Metadata footer */}
-      <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400">
-        <div className="flex items-center gap-4 flex-wrap">
-          <span>Created {new Date(deck.created_at).toLocaleDateString()}</span>
-          <span>Updated {new Date(deck.updated_at).toLocaleDateString()}</span>
-          {(deck.view_count ?? 0) > 0 && (
-            <span>{deck.view_count} views</span>
-          )}
-        </div>
-      </div>
     </div>
   );
 }

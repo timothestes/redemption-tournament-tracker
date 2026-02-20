@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { loadPublicDecksAction, copyPublicDeckAction, LoadPublicDecksParams } from "../actions";
 
 interface PublicDeck {
@@ -16,6 +16,7 @@ interface PublicDeck {
   preview_card_1?: string | null;
   preview_card_2?: string | null;
   user_id?: string;
+  username?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -62,14 +63,19 @@ interface Props {
 }
 
 export default function CommunityClient({ initialDecks, initialCount, currentUserId }: Props) {
-  const [decks, setDecks] = useState<PublicDeck[]>(initialDecks);
-  const [loading, setLoading] = useState(false);
-  const [totalCount, setTotalCount] = useState(initialCount);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialUsername = searchParams.get("username") || "";
+
+  const [decks, setDecks] = useState<PublicDeck[]>(initialUsername ? [] : initialDecks);
+  const [loading, setLoading] = useState(!!initialUsername);
+  const [totalCount, setTotalCount] = useState(initialUsername ? 0 : initialCount);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<"newest" | "most_viewed" | "name">("newest");
   const [format, setFormat] = useState<string>("");
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const [usernameFilter, setUsernameFilter] = useState(initialUsername);
 
   const loadDecks = useCallback(async () => {
     setLoading(true);
@@ -79,6 +85,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
       sort,
       format: format || undefined,
       search: search || undefined,
+      username: usernameFilter || undefined,
     };
     const result = await loadPublicDecksAction(params);
     if (result.success) {
@@ -86,7 +93,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
       setTotalCount(result.totalCount);
     }
     setLoading(false);
-  }, [page, sort, format, search]);
+  }, [page, sort, format, search, usernameFilter]);
 
   useEffect(() => {
     loadDecks();
@@ -114,6 +121,12 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
     setPage(1);
   }
 
+  function handleClearUsername() {
+    setUsernameFilter("");
+    setPage(1);
+    router.replace("/decklist/community");
+  }
+
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   return (
@@ -135,7 +148,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            placeholder="Search by deck name..."
+            placeholder="Search by deck name or username..."
             className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm"
           />
           <button
@@ -177,6 +190,21 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
           <option value="name">Name A-Z</option>
         </select>
       </div>
+
+      {/* Username filter banner */}
+      {usernameFilter && (
+        <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm">
+          <span className="text-blue-800 dark:text-blue-200">
+            Showing decks by <strong>{usernameFilter}</strong>
+          </span>
+          <button
+            onClick={handleClearUsername}
+            className="ml-auto text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 font-medium"
+          >
+            Show all decks
+          </button>
+        </div>
+      )}
 
       {/* Results count */}
       {!loading && (
@@ -299,7 +327,23 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
         )}
 
         <div className="p-4">
-          <h3 className="font-semibold text-lg truncate mb-2">{deck.name}</h3>
+          <h3 className="font-semibold text-lg truncate mb-1">{deck.name}</h3>
+          {deck.username && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+              by{" "}
+              <span
+                role="link"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  router.push(`/decklist/community?username=${encodeURIComponent(deck.username!)}`);
+                }}
+                className="text-gray-600 dark:text-gray-400 underline hover:text-gray-900 dark:hover:text-gray-200 cursor-pointer"
+              >
+                {deck.username}
+              </span>
+            </p>
+          )}
 
           {deck.description && (
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">{deck.description}</p>
