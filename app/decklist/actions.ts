@@ -1024,7 +1024,7 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
 
     let query = supabase
       .from("decks")
-      .select("id, name, description, format, paragon, card_count, view_count, preview_card_1, preview_card_2, created_at, updated_at, deck_cards(card_img_file)", { count: "exact" })
+      .select("id, name, description, format, paragon, card_count, view_count, preview_card_1, preview_card_2, user_id, created_at, updated_at", { count: "exact" })
       .eq("is_public", true);
 
     if (format) {
@@ -1061,5 +1061,59 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
   } catch (error) {
     console.error("Error in loadPublicDecksAction:", error);
     return { success: false, error: "An unexpected error occurred", decks: [], totalCount: 0 };
+  }
+}
+
+export async function renameDeckAction(deckId: string, name: string) {
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return { success: false, error: "Not authenticated" };
+
+    const trimmed = name.trim();
+    if (!trimmed) return { success: false, error: "Name cannot be empty" };
+
+    const { error } = await supabase
+      .from("decks")
+      .update({ name: trimmed, updated_at: new Date().toISOString() })
+      .eq("id", deckId)
+      .eq("user_id", user.id);
+
+    if (error) return { success: false, error: "Failed to rename deck" };
+
+    revalidatePath(`/decklist/${deckId}`);
+    revalidatePath("/decklist/community");
+    revalidatePath("/decklist/my-decks");
+    return { success: true };
+  } catch (error) {
+    console.error("Error in renameDeckAction:", error);
+    return { success: false, error: "An unexpected error occurred" };
+  }
+}
+
+export async function updateDeckPreviewCardsAction(
+  deckId: string,
+  previewCard1: string | null,
+  previewCard2: string | null
+) {
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return { success: false, error: "Not authenticated" };
+
+    const { error } = await supabase
+      .from("decks")
+      .update({ preview_card_1: previewCard1, preview_card_2: previewCard2 })
+      .eq("id", deckId)
+      .eq("user_id", user.id);
+
+    if (error) return { success: false, error: "Failed to update cover cards" };
+
+    revalidatePath(`/decklist/${deckId}`);
+    revalidatePath("/decklist/community");
+    return { success: true };
+  } catch (error) {
+    console.error("Error in updateDeckPreviewCardsAction:", error);
+    return { success: false, error: "An unexpected error occurred" };
   }
 }

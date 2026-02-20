@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { copyPublicDeckAction, DeckCardData } from "../actions";
+import { copyPublicDeckAction, updateDeckPreviewCardsAction, renameDeckAction, DeckCardData } from "../actions";
 import { CARD_DATA_URL } from "../card-search/constants";
 import { Card } from "../card-search/utils";
 import ModalWithClose from "../card-search/ModalWithClose";
@@ -17,6 +17,8 @@ interface PublicDeckData {
   is_public?: boolean;
   card_count?: number;
   view_count?: number;
+  preview_card_1?: string | null;
+  preview_card_2?: string | null;
   created_at: string;
   updated_at: string;
   cards: DeckCardData[];
@@ -121,6 +123,37 @@ export default function PublicDeckClient({ deck, isOwner }: Props) {
   const [modalCard, setModalCard] = useState<Card | null>(null);
   const [viewMode, setViewMode] = useState<"normal" | "stacked">("stacked");
   const [groupBy, setGroupBy] = useState<"type" | "alignment" | "none">("type");
+
+  // Inline name editing (owner only)
+  const [deckName, setDeckName] = useState(deck.name);
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState(deck.name);
+
+  async function handleNameSubmit() {
+    const trimmed = nameInput.trim();
+    setEditingName(false);
+    if (!trimmed || trimmed === deckName) { setNameInput(deckName); return; }
+    setDeckName(trimmed);
+    const result = await renameDeckAction(deck.id, trimmed);
+    if (!result.success) setDeckName(deckName); // revert on failure
+  }
+
+  // Cover card editor (owner only)
+  const [previewCard1, setPreviewCard1] = useState<string | null>(deck.preview_card_1 ?? null);
+  const [previewCard2, setPreviewCard2] = useState<string | null>(deck.preview_card_2 ?? null);
+  const [coverEditorOpen, setCoverEditorOpen] = useState(false);
+  const [coverPickerSlot, setCoverPickerSlot] = useState<1 | 2 | null>(null);
+  const [coverSaving, setCoverSaving] = useState(false);
+  const [coverSaved, setCoverSaved] = useState(false);
+
+  useEffect(() => {
+    if (!coverEditorOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { setCoverEditorOpen(false); setCoverPickerSlot(null); }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [coverEditorOpen]);
 
   // Fetch card database to get full card info
   useEffect(() => {
@@ -252,11 +285,42 @@ export default function PublicDeckClient({ deck, isOwner }: Props) {
         />
       )}
 
+      {/* Breadcrumb */}
+      <nav className="mb-6 flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
+        <a href="/decklist/community" className="hover:text-gray-800 dark:hover:text-gray-200 transition-colors">
+          Community Decks
+        </a>
+        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+        <span className="text-gray-800 dark:text-gray-200 truncate">{deckName}</span>
+      </nav>
+
       {/* Header */}
       <div className="mb-8">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-3xl font-bold mb-3">{deck.name}</h1>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            {isOwner && editingName ? (
+              <input
+                autoFocus
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                onBlur={handleNameSubmit}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleNameSubmit();
+                  if (e.key === "Escape") { setNameInput(deckName); setEditingName(false); }
+                }}
+                className="text-3xl font-bold bg-transparent border-b-2 border-blue-500 outline-none w-full min-w-0 mb-3"
+              />
+            ) : (
+              <h1
+                className={`text-3xl font-bold mb-3 ${isOwner ? "cursor-pointer hover:text-blue-500 dark:hover:text-blue-400 transition-colors" : ""}`}
+                onClick={isOwner ? () => { setNameInput(deckName); setEditingName(true); } : undefined}
+                title={isOwner ? "Click to rename" : undefined}
+              >
+                {deckName}
+              </h1>
+            )}
             <div className="flex items-center gap-3 flex-wrap">
               <span className={getDeckTypeBadgeClasses(deck.format)}>
                 {formatDeckType(deck.format)}
@@ -318,15 +382,27 @@ export default function PublicDeckClient({ deck, isOwner }: Props) {
             )}
 
             {isOwner && (
-              <button
-                onClick={handleOpenInBuilder}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-                Edit in Builder
-              </button>
+              <>
+                <button
+                  onClick={() => { setCoverEditorOpen(true); setCoverPickerSlot(1); }}
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2"
+                  title="Edit cover cards"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Cover
+                </button>
+                <button
+                  onClick={handleOpenInBuilder}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  Edit in Builder
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -354,6 +430,126 @@ export default function PublicDeckClient({ deck, isOwner }: Props) {
           <p className="mt-4 text-gray-700 dark:text-gray-300">{deck.description}</p>
         )}
       </div>
+
+      {/* Cover card editor modal — owner only */}
+      {isOwner && coverEditorOpen && (() => {
+        const mainCards = deck.cards.filter(c => !c.is_reserve);
+        const close = () => { setCoverEditorOpen(false); setCoverPickerSlot(null); };
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={close}>
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+                <div>
+                  <h2 className="text-lg font-semibold">Cover Cards</h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">These two cards appear as the thumbnail on the Community Decks page.</p>
+                </div>
+                <button onClick={close} className="ml-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 flex-shrink-0">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="px-6 py-5 flex-shrink-0">
+                {/* Two card slots */}
+                <div className="flex gap-6 justify-center mb-2">
+                  {([1, 2] as const).map((slot) => {
+                    const imgFile = slot === 1 ? previewCard1 : previewCard2;
+                    const imgUrl = imgFile ? getImageUrl(imgFile) : null;
+                    const isActive = coverPickerSlot === slot;
+                    return (
+                      <div key={slot} className="flex flex-col items-center gap-2">
+                        <button
+                          onClick={() => setCoverPickerSlot(slot)}
+                          className={`relative rounded-xl overflow-hidden border-2 transition-all ${
+                            isActive
+                              ? "border-blue-500 ring-4 ring-blue-200 dark:ring-blue-800 scale-105"
+                              : "border-gray-300 dark:border-gray-600 hover:border-blue-400 hover:scale-102"
+                          } bg-gray-100 dark:bg-gray-800`}
+                          style={{ width: 130, aspectRatio: "2.5/3.5" }}
+                          title={`Set cover card ${slot}`}
+                        >
+                          {imgUrl ? (
+                            <img src={imgUrl} alt={`Cover ${slot}`} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
+                              <svg className="w-8 h-8 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+                              </svg>
+                              <span className="text-sm">Empty</span>
+                            </div>
+                          )}
+                          {isActive && (
+                            <div className="absolute inset-0 bg-blue-500/10 flex items-end justify-center pb-2">
+                              <span className="bg-blue-600 text-white text-xs font-semibold px-2 py-0.5 rounded-full">Selecting</span>
+                            </div>
+                          )}
+                        </button>
+                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Card {slot}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Instruction */}
+                <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+                  {coverPickerSlot
+                    ? `Click a card below to set it as cover card ${coverPickerSlot}`
+                    : "Click a slot above to start"}
+                </p>
+              </div>
+
+              {/* Card grid — scrollable */}
+              <div className="flex-1 overflow-y-auto px-6 pb-4 min-h-0">
+                <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
+                  {mainCards.map((card) => (
+                    <button
+                      key={`${card.card_name}|${card.card_set}`}
+                      onClick={async () => {
+                        if (!coverPickerSlot) return;
+                        const imgFile = card.card_img_file || "";
+                        const c1 = coverPickerSlot === 1 ? imgFile : previewCard1;
+                        const c2 = coverPickerSlot === 2 ? imgFile : previewCard2;
+                        if (coverPickerSlot === 1) setPreviewCard1(imgFile);
+                        else setPreviewCard2(imgFile);
+                        // Advance to next slot if slot 1 was just filled and slot 2 is empty
+                        const nextSlot = coverPickerSlot === 1 && !previewCard2 ? 2 : null;
+                        setCoverPickerSlot(nextSlot);
+                        setCoverSaving(true);
+                        const result = await updateDeckPreviewCardsAction(deck.id, c1, c2);
+                        setCoverSaving(false);
+                        if (result.success) {
+                          setCoverSaved(true);
+                          setTimeout(() => setCoverSaved(false), 2000);
+                        }
+                      }}
+                      disabled={!coverPickerSlot}
+                      className={`relative rounded-lg overflow-hidden border transition-all ${
+                        coverPickerSlot
+                          ? "border-gray-200 dark:border-gray-600 hover:border-blue-500 hover:scale-105 cursor-pointer"
+                          : "border-gray-200 dark:border-gray-700 opacity-50 cursor-default"
+                      }`}
+                      style={{ aspectRatio: "2.5/3.5" }}
+                      title={card.card_name}
+                    >
+                      <img src={getImageUrl(card.card_img_file || "")} alt={card.card_name} className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Footer status */}
+              <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex-shrink-0 h-12 flex items-center justify-center">
+                {coverSaving && <p className="text-sm text-gray-500 dark:text-gray-400">Saving…</p>}
+                {coverSaved && <p className="text-sm text-green-600 dark:text-green-400 font-medium">Saved!</p>}
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Paragon image */}
       {deck.paragon && formatDeckType(deck.format) === "Paragon" && (
@@ -677,7 +873,7 @@ function CardTile({ card, onClick, compact }: { card: EnrichedCard | DeckCardDat
 
         {/* Quantity badge */}
         {card.quantity > 1 && (
-          <div className={`absolute bottom-0.5 right-0.5 bg-black/75 backdrop-blur-sm text-white rounded font-bold shadow-lg ${compact ? "px-1.5 py-0.5 text-[10px]" : "px-2.5 py-1 text-sm rounded-md"}`}>
+          <div className={`absolute top-0.5 right-0.5 bg-black/75 backdrop-blur-sm text-white rounded font-bold shadow-lg ${compact ? "px-1.5 py-0.5 text-[10px]" : "px-2.5 py-1 text-sm rounded-md"}`}>
             ×{card.quantity}
           </div>
         )}

@@ -209,6 +209,7 @@ export default function CardSearchClient() {
     setDeckFormat,
     setDeckParagon,
     setDeckPublic,
+    setPreviewCards,
     clearDeck,
     newDeck,
     loadDeck,
@@ -1210,7 +1211,7 @@ export default function CardSearchClient() {
             </svg>
           </button>
           <p className="text-sm text-blue-900 dark:text-blue-100 font-medium">
-            ℹ️ Deckbuilder isn't supported on mobile
+            ℹ️ Deckbuilder isn't supported on mobile (yet)
           </p>
         </div>
       )}
@@ -1856,6 +1857,7 @@ export default function CardSearchClient() {
               setNotification({ message, type });
               setTimeout(() => setNotification(null), 3000);
             }}
+            onPreviewCardsChange={setPreviewCards}
           />
         </div>
       )}

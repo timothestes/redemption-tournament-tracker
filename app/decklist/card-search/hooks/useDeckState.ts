@@ -192,6 +192,8 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
           paragon: cloudDeck.paragon,
           folderId: cloudDeck.folder_id,
           isPublic: cloudDeck.is_public ?? false,
+          previewCard1: cloudDeck.preview_card_1 ?? null,
+          previewCard2: cloudDeck.preview_card_2 ?? null,
           cards: cloudDeck.cards.map((dbCard: any) => {
             // Reconstruct the lookup key
             const key = `${dbCard.card_name}|${dbCard.card_set}|${sanitizeImgFile(dbCard.card_img_file)}`;
@@ -282,14 +284,18 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
 
       console.log('[useDeckState] Saving deck with folderId:', deck.folderId);
 
-      // Auto-compute preview cards: 1st Hero, 1st Evil Character
-      const mainCards = deck.cards.filter(dc => !dc.isReserve && dc.quantity > 0);
-      const heroTypes = ['Hero', 'HC', 'Hero Character'];
-      const evilTypes = ['Evil Character', 'EC'];
-      const firstHero = mainCards.find(dc => heroTypes.includes(dc.card.type));
-      const firstEvil = mainCards.find(dc => evilTypes.includes(dc.card.type));
-      const previewCard1 = firstHero?.card.imgFile || mainCards[0]?.card.imgFile || null;
-      const previewCard2 = firstEvil?.card.imgFile || (mainCards.length > 1 ? mainCards[1]?.card.imgFile : null) || null;
+      // Use user-selected preview cards if set, otherwise auto-compute
+      let previewCard1 = deck.previewCard1 ?? null;
+      let previewCard2 = deck.previewCard2 ?? null;
+      if (!previewCard1 || !previewCard2) {
+        const mainCards = deck.cards.filter(dc => !dc.isReserve && dc.quantity > 0);
+        const heroTypes = ['Hero', 'HC', 'Hero Character'];
+        const evilTypes = ['Evil Character', 'EC'];
+        const firstHero = mainCards.find(dc => heroTypes.includes(dc.card.type));
+        const firstEvil = mainCards.find(dc => evilTypes.includes(dc.card.type));
+        previewCard1 = previewCard1 ?? firstHero?.card.imgFile ?? mainCards[0]?.card.imgFile ?? null;
+        previewCard2 = previewCard2 ?? firstEvil?.card.imgFile ?? (mainCards.length > 1 ? mainCards[1]?.card.imgFile : null) ?? null;
+      }
 
       const result = await saveDeckAction({
         deckId: deck.id,
@@ -530,6 +536,19 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
   }, []);
 
   /**
+   * Set user-chosen preview/cover card img files
+   */
+  const setPreviewCards = useCallback((card1: string | null, card2: string | null) => {
+    setDeck((prevDeck) => ({
+      ...prevDeck,
+      previewCard1: card1,
+      previewCard2: card2,
+      updatedAt: new Date(),
+    }));
+    setHasUnsavedChanges(true);
+  }, []);
+
+  /**
    * Clear all cards from deck
    */
   const clearDeck = useCallback(() => {
@@ -629,6 +648,7 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
     setDeckFormat,
     setDeckParagon,
     setDeckPublic,
+    setPreviewCards,
     clearDeck,
     newDeck,
     loadDeck,

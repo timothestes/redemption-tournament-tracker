@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { loadPublicDecksAction, LoadPublicDecksParams } from "../actions";
+import { useRouter } from "next/navigation";
+import { loadPublicDecksAction, copyPublicDeckAction, LoadPublicDecksParams } from "../actions";
 
 interface PublicDeck {
   id: string;
@@ -14,9 +15,9 @@ interface PublicDeck {
   view_count?: number;
   preview_card_1?: string | null;
   preview_card_2?: string | null;
+  user_id?: string;
   created_at: string;
   updated_at: string;
-  deck_cards?: { card_img_file: string }[];
 }
 
 function formatDeckType(format?: string): string {
@@ -54,10 +55,16 @@ function timeAgo(dateString: string): string {
 
 const PAGE_SIZE = 24;
 
-export default function CommunityClient() {
-  const [decks, setDecks] = useState<PublicDeck[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [totalCount, setTotalCount] = useState(0);
+interface Props {
+  initialDecks: PublicDeck[];
+  initialCount: number;
+  currentUserId?: string;
+}
+
+export default function CommunityClient({ initialDecks, initialCount, currentUserId }: Props) {
+  const [decks, setDecks] = useState<PublicDeck[]>(initialDecks);
+  const [loading, setLoading] = useState(false);
+  const [totalCount, setTotalCount] = useState(initialCount);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<"newest" | "most_viewed" | "name">("newest");
   const [format, setFormat] = useState<string>("");
@@ -205,7 +212,7 @@ export default function CommunityClient() {
           {/* Deck grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {decks.map((deck) => (
-              <DeckCard key={deck.id} deck={deck} />
+              <DeckCard key={deck.id} deck={deck} currentUserId={currentUserId} />
             ))}
           </div>
 
@@ -246,72 +253,110 @@ function getCardImageUrl(imgFile: string | null | undefined): string | null {
 }
 
 function getPreviewImages(deck: PublicDeck): [string | null, string | null] {
-  // Prefer stored preview cards, fall back to first deck_cards
-  const img1 = getCardImageUrl(deck.preview_card_1) || getCardImageUrl(deck.deck_cards?.[0]?.card_img_file);
-  const img2 = getCardImageUrl(deck.preview_card_2) || getCardImageUrl(deck.deck_cards?.[1]?.card_img_file);
-  return [img1, img2];
+  return [getCardImageUrl(deck.preview_card_1), getCardImageUrl(deck.preview_card_2)];
 }
 
-function DeckCard({ deck }: { deck: PublicDeck }) {
+function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: string }) {
+  const router = useRouter();
   const [img1, img2] = getPreviewImages(deck);
   const hasPreview = img1 || img2;
+  const isOwner = !!currentUserId && deck.user_id === currentUserId;
+  const [copying, setCopying] = useState(false);
+
+  async function handleCopyAndEdit(e: React.MouseEvent) {
+    e.preventDefault();
+    setCopying(true);
+    const result = await copyPublicDeckAction(deck.id);
+    if (result.success && (result as any).deckId) {
+      router.push(`/decklist/card-search?deckId=${(result as any).deckId}`);
+    } else {
+      // Not logged in or error — send to sign-in
+      router.push("/sign-in");
+    }
+    setCopying(false);
+  }
 
   return (
-    <Link
-      href={`/decklist/${deck.id}`}
-      className="block bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow overflow-hidden"
-    >
-      {/* Card preview — 2 cards side by side */}
-      {formatDeckType(deck.format) === "Paragon" && deck.paragon ? (
-        <div className="h-36 overflow-hidden">
-          <img
-            src={`/paragons/Paragon ${deck.paragon}.png`}
-            alt={deck.paragon}
-            className="w-full h-full object-cover object-top"
-          />
-        </div>
-      ) : hasPreview ? (
-        <div className="h-36 overflow-hidden bg-gray-100 dark:bg-gray-900 flex items-center justify-center gap-1 px-2 py-2">
-          {img1 && (
-            <img src={img1} alt="" className="h-full object-contain rounded" />
-          )}
-          {img2 && (
-            <img src={img2} alt="" className="h-full object-contain rounded" />
-          )}
-        </div>
-      ) : (
-        <div className="h-36 bg-gray-100 dark:bg-gray-900 flex items-center justify-center">
-          <svg className="w-12 h-12 text-gray-300 dark:text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-          </svg>
-        </div>
-      )}
-
-      <div className="p-4">
-        <h3 className="font-semibold text-lg truncate mb-2">{deck.name}</h3>
-
-        {deck.description && (
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
-            {deck.description}
-          </p>
+    <div className="flex flex-col bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow overflow-hidden">
+      {/* Clickable preview area */}
+      <Link href={`/decklist/${deck.id}`} className="flex-1 block">
+        {/* Card preview */}
+        {formatDeckType(deck.format) === "Paragon" && deck.paragon ? (
+          <div className="h-36 overflow-hidden">
+            <img src={`/paragons/Paragon ${deck.paragon}.png`} alt={deck.paragon} className="w-full h-full object-cover object-top" />
+          </div>
+        ) : hasPreview ? (
+          <div className="h-36 overflow-hidden bg-gray-100 dark:bg-gray-900 flex items-center justify-center gap-1 px-2 py-2">
+            {img1 && <img src={img1} alt="" className="h-full object-contain rounded" />}
+            {img2 && <img src={img2} alt="" className="h-full object-contain rounded" />}
+          </div>
+        ) : (
+          <div className="h-36 bg-gray-100 dark:bg-gray-900 flex items-center justify-center">
+            <svg className="w-12 h-12 text-gray-300 dark:text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+          </div>
         )}
 
-        <div className="flex items-center gap-3 text-sm mb-3">
-          <span className={getDeckTypeBadgeClasses(deck.format)}>
-            {formatDeckType(deck.format)}
-          </span>
-          <span className="text-gray-600 dark:text-gray-400">
-            {deck.card_count || 0} cards
-          </span>
-        </div>
+        <div className="p-4">
+          <h3 className="font-semibold text-lg truncate mb-2">{deck.name}</h3>
 
-        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-500">
-          <span>Updated {timeAgo(deck.updated_at)}</span>
-          {(deck.view_count ?? 0) > 0 && (
-            <span>{deck.view_count} views</span>
+          {deck.description && (
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">{deck.description}</p>
           )}
+
+          <div className="flex items-center gap-3 text-sm mb-3">
+            <span className={getDeckTypeBadgeClasses(deck.format)}>{formatDeckType(deck.format)}</span>
+            <span className="text-gray-600 dark:text-gray-400">{deck.card_count || 0} cards</span>
+          </div>
+
+          <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-500">
+            <span>Updated {timeAgo(deck.updated_at)}</span>
+            {(deck.view_count ?? 0) > 0 && <span>{deck.view_count} views</span>}
+          </div>
         </div>
+      </Link>
+
+      {/* Action buttons */}
+      <div className="flex gap-2 px-4 pb-4">
+        <Link
+          href={`/decklist/${deck.id}`}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+          View
+        </Link>
+
+        {isOwner ? (
+          <Link
+            href={`/decklist/card-search?deckId=${deck.id}`}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Edit
+          </Link>
+        ) : (
+          <button
+            onClick={handleCopyAndEdit}
+            disabled={copying}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium disabled:opacity-60"
+          >
+            {copying ? (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+              </svg>
+            )}
+            {copying ? "Copying…" : "Copy & Edit"}
+          </button>
+        )}
       </div>
-    </Link>
+    </div>
   );
 }
