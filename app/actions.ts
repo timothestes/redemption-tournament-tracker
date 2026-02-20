@@ -63,7 +63,7 @@ export const signInAction = async (formData: FormData) => {
     return redirect(`/sign-in?${searchParams.toString()}`);
   }
 
-  return redirect("/tracker/tournaments");
+  return redirect("/decklist/community");
 };
 
 export const forgotPasswordAction = async (formData: FormData) => {
