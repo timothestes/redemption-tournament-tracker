@@ -182,6 +182,18 @@ export default function CardSearchClient() {
   const [showNewDeckModal, setShowNewDeckModal] = useState(false);
   const [pendingNewDeckFolderId, setPendingNewDeckFolderId] = useState<string | null | undefined>(undefined);
 
+  // ESC key handler for new deck modal
+  useEffect(() => {
+    function handleEscKey(e: KeyboardEvent) {
+      if (e.key === 'Escape' && showNewDeckModal) {
+        setShowNewDeckModal(false);
+      }
+    }
+    
+    document.addEventListener('keydown', handleEscKey);
+    return () => document.removeEventListener('keydown', handleEscKey);
+  }, [showNewDeckModal]);
+
   // Panel visibility state
   const [showDeckBuilder, setShowDeckBuilder] = useState(true);
   const [showSearch, setShowSearch] = useState(true);
@@ -202,12 +214,16 @@ export default function CardSearchClient() {
     deck,
     syncStatus,
     hasUnsavedChanges,
+    isInitializing,
     addCard,
     removeCard,
     updateQuantity,
     setDeckName,
+    setDeckDescription,
     setDeckFormat,
     setDeckParagon,
+    setDeckPublic,
+    setPreviewCards,
     clearDeck,
     newDeck,
     loadDeck,
@@ -258,9 +274,17 @@ export default function CardSearchClient() {
   };
 
   // Function to update URL with current filter state
+  // Two modes: deck editing (deckId in URL, no filter params) vs browse (filter params in URL)
   const updateURL = React.useCallback((filters: Record<string, any>) => {
+    // Mode 1: Deck editing - keep only deckId in the URL, filters are ephemeral
+    if (deck.id) {
+      router.replace(`/decklist/card-search?deckId=${deck.id}`, { scroll: false });
+      return;
+    }
+
+    // Mode 2: Browse/search mode - write filter state to URL
     const params = new URLSearchParams();
-    
+
     // Only add non-default values to URL
     const activeQueries = filters.queries?.filter(q => q.text.trim()) || [];
     if (activeQueries.length > 0) {
@@ -297,7 +321,7 @@ export default function CardSearchClient() {
 
     const url = params.toString() ? `?${params.toString()}` : '';
     router.replace(`/decklist/card-search${url}`, { scroll: false });
-  }, [router]);
+  }, [router, deck.id]);
 
   // Check user authentication on mount
   useEffect(() => {
@@ -316,8 +340,14 @@ export default function CardSearchClient() {
   }, []);
 
   // Load state from URL on mount (only once)
+  // Skip filter loading when in deck editing mode (deckId present)
   useEffect(() => {
     if (searchParams && !isInitialized) {
+      // In deck editing mode, don't load filters from URL — they're ephemeral
+      if (searchParams.get('deckId')) {
+        setIsInitialized(true);
+        return;
+      }
       const urlQuery = searchParams.get('q') || '';
       const urlField = searchParams.get('field') || 'everything';
       setQueries(urlQuery ? [{text: urlQuery, field: urlField, operator: "AND"}] : [{text: "", field: "everything", operator: "AND"}]);
@@ -1082,18 +1112,19 @@ export default function CardSearchClient() {
   }
 
   // Handle new deck with confirmation
-  function handleNewDeck(name?: string, folderId?: string | null) {
+  function handleNewDeck(name?: string, folderId?: string | null, skipConfirmation?: boolean) {
     const stats = getDeckStats();
     const hasCards = stats.mainDeckCount + stats.reserveCount > 0;
     
-    // If deck has cards, show confirmation modal
-    if (hasCards) {
+    // If deck has cards and not skipping confirmation, show confirmation modal
+    if (hasCards && !skipConfirmation) {
       setPendingNewDeckFolderId(folderId);
       setShowNewDeckModal(true);
       return;
     }
     
-    // No cards, just create new deck
+    // No cards or skipping confirmation, just create new deck
+    clearUnsavedChanges();
     newDeck(name, folderId);
   }
   
@@ -1128,6 +1159,7 @@ export default function CardSearchClient() {
     if (!deck.id) {
       // If deck hasn't been saved yet, just clear it
       clearDeck();
+      clearUnsavedChanges();
       return;
     }
 
@@ -1139,11 +1171,12 @@ export default function CardSearchClient() {
 
     const result = await deleteDeckAction(deck.id);
     if (result.success) {
+      clearUnsavedChanges();
+      clearDeck();
+      // Clear the deckId from URL
+      router.replace('/decklist/card-search?new=true', { scroll: false });
       setNotification({ message: 'Deck deleted successfully!', type: 'success' });
-      setTimeout(() => {
-        // Navigate to my-decks page after successful deletion
-        router.push('/decklist/my-decks');
-      }, 1000);
+      setTimeout(() => setNotification(null), 3000);
     } else {
       setNotification({ message: result.error || 'Failed to delete deck', type: 'error' });
       setTimeout(() => setNotification(null), 3000);
@@ -1184,7 +1217,7 @@ export default function CardSearchClient() {
     <div className="flex w-full h-screen overflow-hidden bg-gray-100 dark:bg-gray-900">
       {/* Mobile notice */}
       {showMobileBanner && (
-        <div className="md:hidden fixed top-16 left-0 right-0 z-50 bg-blue-100 dark:bg-blue-900 border-b border-blue-300 dark:border-blue-700 px-4 py-3 text-center">
+        <div className="md:hidden fixed top-16 left-0 right-0 z-50 bg-blue-100 dark:bg-blue-900 border-b border-blue-300 dark:border-green-800 px-4 py-3 text-center">
           <button
             onClick={() => setShowMobileBanner(false)}
             className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-900 dark:text-blue-100 hover:text-blue-700 dark:hover:text-blue-300"
@@ -1195,7 +1228,7 @@ export default function CardSearchClient() {
             </svg>
           </button>
           <p className="text-sm text-blue-900 dark:text-blue-100 font-medium">
-            ℹ️ Deckbuilder isn't supported on mobile
+            ℹ️ Deckbuilder isn't supported on mobile (yet)
           </p>
         </div>
       )}
@@ -1276,7 +1309,7 @@ export default function CardSearchClient() {
               ))}
             </div>
             <button
-              className="px-4 w-full sm:w-auto rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center text-sm"
+              className="px-4 w-full sm:w-auto rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center text-sm"
               onClick={handleResetFilters}
               style={{ minHeight: 48, height: 48 }}
             >
@@ -1286,7 +1319,7 @@ export default function CardSearchClient() {
               className={`px-4 w-full sm:w-auto rounded border transition font-semibold shadow text-center relative hidden sm:block ${
                 queries.filter(q => q.text.trim()).length > 1
                   ? 'bg-gray-400 text-gray-600 border-gray-500 cursor-not-allowed opacity-50 dark:bg-gray-800 dark:text-gray-500 dark:border-gray-600'
-                  : 'bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                  : 'bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
               }`}
               onClick={queries.filter(q => q.text.trim()).length > 1 ? undefined : handleCopyLink}
               style={{ minHeight: 48, height: 48 }}
@@ -1328,9 +1361,10 @@ export default function CardSearchClient() {
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
               style={{ transitionProperty: 'transform', transitionDuration: '0.2s', transitionTimingFunction: 'ease', transform: filterGridCollapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}
+              suppressHydrationWarning
             >
-              <circle cx="12" cy="12" r="11" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1" />
-              <path d="M8 10l4 4 4-4" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="12" cy="12" r="11" className="fill-gray-200 stroke-gray-400 dark:fill-gray-700 dark:stroke-gray-600" strokeWidth="1" />
+              <path d="M8 10l4 4 4-4" className="stroke-gray-700 dark:stroke-gray-400" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
         </div>
@@ -1376,7 +1410,7 @@ export default function CardSearchClient() {
         })}
         {/* Legality */}
         {legalityMode !== 'Rotation' && (
-          <span className="bg-blue-400 text-blue-900 dark:bg-blue-700 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setLegalityMode('Rotation')} tabIndex={0} role="button" aria-label="Remove Legality filter">
+          <span className="bg-blue-400 text-blue-900 dark:bg-green-800 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setLegalityMode('Rotation')} tabIndex={0} role="button" aria-label="Remove Legality filter">
             {legalityMode}
             <span className="ml-1 text-blue-900 dark:text-white">×</span>
           </span>
@@ -1414,7 +1448,7 @@ export default function CardSearchClient() {
           // Brigade color mapping
           const brigadeColors = {
             Black: 'bg-black text-white',
-            Blue: 'bg-blue-200 text-blue-900 dark:bg-blue-700 dark:text-white',
+            Blue: 'bg-blue-200 text-blue-900 dark:bg-green-800 dark:text-white',
             Brown: 'bg-yellow-900 text-white',
             Clay: 'bg-orange-100 text-orange-900 dark:bg-orange-200 dark:text-gray-900',
             Crimson: 'bg-red-200 text-red-900 dark:bg-red-900 dark:text-white',
@@ -1739,7 +1773,7 @@ export default function CardSearchClient() {
             {/* Hide Search Button */}
             <button
               onClick={() => setShowSearch(false)}
-              className="group relative w-7 h-7 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 hover:border-blue-500 dark:hover:border-blue-400 flex items-center justify-center"
+              className="group relative w-7 h-7 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 hover:border-blue-500 dark:hover:border-green-600 flex items-center justify-center"
               title="Hide search panel"
             >
               <svg className="w-3 h-3 text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1754,7 +1788,7 @@ export default function CardSearchClient() {
             {/* Hide Deck Button */}
             <button
               onClick={() => setShowDeckBuilder(false)}
-              className="group relative w-7 h-7 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 hover:border-blue-500 dark:hover:border-blue-400 flex items-center justify-center"
+              className="group relative w-7 h-7 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 hover:border-blue-500 dark:hover:border-green-600 flex items-center justify-center"
               title="Hide deck builder"
             >
               <svg className="w-3 h-3 text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1773,7 +1807,7 @@ export default function CardSearchClient() {
       {!showSearch && (
         <button
           onClick={() => setShowSearch(true)}
-          className="hidden md:flex fixed left-0 top-1/2 -translate-y-1/2 z-50 flex-col items-center gap-2 px-2 py-4 bg-gradient-to-r from-blue-600 to-blue-500 dark:from-blue-700 dark:to-blue-600 rounded-r-xl shadow-2xl hover:shadow-blue-500/50 dark:hover:shadow-blue-700/50 transition-all hover:pl-3 text-white font-medium group border-r-4 border-blue-400 dark:border-blue-500"
+          className="hidden md:flex fixed left-0 top-1/2 -translate-y-1/2 z-50 flex-col items-center gap-2 px-2 py-4 bg-gradient-to-r from-blue-600 to-blue-500 dark:from-blue-700 dark:to-blue-600 rounded-r-xl shadow-2xl hover:shadow-blue-500/50 dark:hover:shadow-blue-700/50 transition-all hover:pl-3 text-white font-medium group border-r-4 border-green-600 dark:border-blue-500"
           title="Show search panel"
         >
           <svg className="w-4 h-4 group-hover:scale-105 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1801,6 +1835,11 @@ export default function CardSearchClient() {
         <div className={`hidden md:flex w-full flex-col overflow-hidden transition-all duration-300 ${
           showSearch ? 'md:w-1/2 xl:w-[38.2%]' : ''
         }`}>
+          {isInitializing ? (
+            <div className="flex-1 flex items-center justify-center bg-white dark:bg-gray-800">
+              <div className="text-gray-400 dark:text-gray-500 text-sm">Loading deck...</div>
+            </div>
+          ) : (
           <DeckBuilderPanel
             deck={deck}
             syncStatus={syncStatus}
@@ -1810,6 +1849,7 @@ export default function CardSearchClient() {
             onDeckNameChange={setDeckName}
             onDeckFormatChange={handleDeckFormatChange}
             onParagonChange={setDeckParagon}
+            onDeckPublicChange={setDeckPublic}
             onSaveDeck={saveDeckToCloud}
             onAddCard={(cardName, cardSet, isReserve) => {
               // Find the card in the cards array
@@ -1839,7 +1879,10 @@ export default function CardSearchClient() {
               setNotification({ message, type });
               setTimeout(() => setNotification(null), 3000);
             }}
+            onPreviewCardsChange={setPreviewCards}
+            onDescriptionChange={setDeckDescription}
           />
+          )}
         </div>
       )}
       
@@ -1903,7 +1946,7 @@ export default function CardSearchClient() {
                 Cancel
               </button>
               <button
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-green-700 text-white rounded hover:bg-green-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => handleImportDeck(importText)}
                 disabled={!importText.trim()}
               >
@@ -1948,7 +1991,7 @@ export default function CardSearchClient() {
               {/* Deck info card */}
               <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/50 dark:to-gray-900/30 rounded-xl p-4 border border-gray-200 dark:border-gray-700 shadow-sm">
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 bg-blue-500/10 dark:bg-blue-500/20 rounded-lg flex items-center justify-center">
+                  <div className="w-10 h-10 bg-green-600/10 dark:bg-green-600/20 rounded-lg flex items-center justify-center">
                     <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                     </svg>
@@ -2124,7 +2167,7 @@ export default function CardSearchClient() {
                   </p>
                   <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/50 dark:to-gray-900/30 rounded-xl p-4 border border-gray-200 dark:border-gray-700 shadow-sm">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-500/10 dark:bg-blue-500/20 rounded-lg flex items-center justify-center">
+                      <div className="w-10 h-10 bg-green-600/10 dark:bg-green-600/20 rounded-lg flex items-center justify-center">
                         <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                         </svg>
@@ -2135,7 +2178,7 @@ export default function CardSearchClient() {
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
                           <span>{getDeckStats().mainDeckCount + getDeckStats().reserveCount} cards</span>
-                          <span className="text-gray-400 dark:text-gray-600">•</span>
+                          <span className="text-gray-400 dark:text-gray-600"></span>
                           <span>{deck.format || "Type 1"}</span>
                         </div>
                       </div>
@@ -2177,7 +2220,7 @@ export default function CardSearchClient() {
                         setShowNewDeckModal(false);
                         router.push('/sign-in');
                       }}
-                      className="w-full px-6 py-3 bg-blue-600 dark:bg-blue-700 text-white rounded-lg transition-all font-semibold flex items-center justify-center gap-2 hover:bg-blue-700 dark:hover:bg-blue-600 border-2 border-blue-600 dark:border-blue-700"
+                      className="w-full px-6 py-3 bg-green-700 dark:bg-green-800 text-white rounded-lg transition-all font-semibold flex items-center justify-center gap-2 hover:bg-green-800 dark:hover:bg-green-700 border-2 border-green-700 dark:border-green-800"
                     >
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
@@ -2214,7 +2257,7 @@ export default function CardSearchClient() {
         <div className={`fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in ${
           notification.type === 'success' ? 'bg-green-600 text-white' :
           notification.type === 'error' ? 'bg-red-600 text-white' :
-          'bg-blue-600 text-white'
+          'bg-green-700 text-white'
         }`}>
           {notification.message}
         </div>

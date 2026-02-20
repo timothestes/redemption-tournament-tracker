@@ -10,12 +10,14 @@ import GeneratePDFModal from "./GeneratePDFModal";
 import GenerateDeckImageModal from "./GenerateDeckImageModal";
 import ClearDeckModal from "./ClearDeckModal";
 import LoadDeckModal from "./LoadDeckModal";
-import { duplicateDeckAction } from "../../actions";
+import { duplicateDeckAction, toggleDeckPublicAction } from "../../actions";
+import UsernameModal from "../../my-decks/UsernameModal";
 import { getParagonNames, getParagonByName } from "../data/paragons";
 import ParagonRequirements from "./ParagonRequirements";
 import { useCardImageUrl } from "../hooks/useCardImageUrl";
+import ReactMarkdown from "react-markdown";
 
-export type TabType = "main" | "reserve" | "info";
+export type TabType = "main" | "reserve" | "info" | "cover";
 
 interface DeckBuilderPanelProps {
   /** Current deck state */
@@ -34,6 +36,8 @@ interface DeckBuilderPanelProps {
   onDeckFormatChange?: (format: string) => void;
   /** Callback when Paragon changes */
   onParagonChange?: (paragon: string | undefined) => void;
+  /** Callback when deck public status changes */
+  onDeckPublicChange?: (isPublic: boolean) => void;
   /** Callback to save deck to cloud */
   onSaveDeck?: () => Promise<{ success: boolean; error?: string }>;
   /** Callback to add a card */
@@ -51,13 +55,17 @@ interface DeckBuilderPanelProps {
   /** Callback to load a deck from cloud by ID */
   onLoadDeck?: (deckId: string) => void;
   /** Callback to create a new blank deck */
-  onNewDeck?: (name?: string, folderId?: string | null) => void;
+  onNewDeck?: (name?: string, folderId?: string | null, skipConfirmation?: boolean) => void;
   /** Callback when active tab changes */
   onActiveTabChange?: (tab: TabType) => void;
   /** Callback when user wants to view card details */
   onViewCard?: (card: Card, isReserve?: boolean) => void;
   /** Callback to show notifications */
   onNotify?: (message: string, type: 'success' | 'error' | 'info') => void;
+  /** Callback when user changes cover card selections */
+  onPreviewCardsChange?: (card1: string | null, card2: string | null) => void;
+  /** Callback when user changes deck description */
+  onDescriptionChange?: (description: string) => void;
 }
 
 /**
@@ -72,6 +80,7 @@ export default function DeckBuilderPanel({
   onDeckNameChange,
   onDeckFormatChange,
   onParagonChange,
+  onDeckPublicChange,
   onSaveDeck,
   onAddCard,
   onRemoveCard,
@@ -84,6 +93,8 @@ export default function DeckBuilderPanel({
   onActiveTabChange,
   onViewCard,
   onNotify,
+  onPreviewCardsChange,
+  onDescriptionChange,
 }: DeckBuilderPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>("main");
   const [isEditingName, setIsEditingName] = useState(false);
@@ -97,7 +108,17 @@ export default function DeckBuilderPanel({
   const [showViewDropdown, setShowViewDropdown] = useState(false);
   const [showParagonDropdown, setShowParagonDropdown] = useState(false);
   const [showParagonModal, setShowParagonModal] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [showUsernameModal, setShowUsernameModal] = useState(false);
   
+  const { getImageUrl } = useCardImageUrl();
+
+  // Cover card picker: which slot is open (1, 2, or null)
+  const [coverPickerSlot, setCoverPickerSlot] = useState<1 | 2 | null>(null);
+  
+  // Description preview mode
+  const [descriptionPreview, setDescriptionPreview] = useState(false);
+
   // View options
   const [viewLayout, setViewLayout] = useState<'grid' | 'list'>('grid');
   const [groupBy, setGroupBy] = useState<'type' | 'alignment'>('type');
@@ -429,17 +450,28 @@ export default function DeckBuilderPanel({
             autoFocus
           />
         ) : (
-          <h2
-            className="text-xl font-semibold text-gray-900 dark:text-white cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-            onClick={() => {
-              setIsEditingName(true);
-              setEditedName(deck.name);
-            }}
-            title="Click to edit deck name"
-            suppressHydrationWarning
-          >
-            {deck.name}
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2
+              className="text-xl font-semibold text-gray-900 dark:text-white cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate"
+              onClick={() => {
+                setIsEditingName(true);
+                setEditedName(deck.name);
+              }}
+              title="Click to edit deck name"
+              suppressHydrationWarning
+            >
+              {deck.name}
+            </h2>
+            {deck.id && (
+              <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${
+                deck.isPublic
+                  ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300"
+                  : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+              }`}>
+                {deck.isPublic ? "Public" : "Private"}
+              </span>
+            )}
+          </div>
         )}
 
         {/* Card Count and Menu Button Row */}
@@ -451,21 +483,19 @@ export default function DeckBuilderPanel({
             </div>
             {reserveCount > 0 && (
               <>
-                <span className="text-gray-400">•</span>
                 <div className="flex items-center gap-1">
                   <span className="text-gray-600 dark:text-gray-400">Reserve:</span>
                   <span className="font-semibold text-gray-900 dark:text-white">{reserveCount}</span>
                 </div>
               </>
             )}
-            <span className="text-gray-400">•</span>
             <div className="flex items-center gap-1">
               <span className="text-gray-600 dark:text-gray-400">Total:</span>
               <span className="font-semibold text-gray-900 dark:text-white">{totalCards}</span>
             </div>
             
             {/* Format Selector (T1/T2/Paragon) */}
-            <span className="text-gray-400">•</span>
+            <span className="text-gray-400"></span>
             <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-full p-0.5">
               <button
                 onClick={() => handleDeckTypeChange('T1')}
@@ -481,7 +511,7 @@ export default function DeckBuilderPanel({
                 onClick={() => handleDeckTypeChange('T2')}
                 className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
                   deckType === 'T2'
-                    ? 'bg-blue-600 dark:bg-blue-500 text-white'
+                    ? 'bg-purple-600 dark:bg-purple-500 text-white'
                     : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 cursor-pointer'
                 }`}
               >
@@ -752,8 +782,78 @@ export default function DeckBuilderPanel({
                 </button>
               )}
               
+              {/* Sharing Section */}
+              {isAuthenticated && deck.id && (
+                <>
+                  <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+                  <button
+                    onClick={async () => {
+                      setShowMenu(false);
+                      const newPublicState = !deck.isPublic;
+                      const result = await toggleDeckPublicAction(deck.id!, newPublicState);
+                      if (result.success) {
+                        onDeckPublicChange?.(newPublicState);
+                        onNotify?.(newPublicState ? 'Deck is now public' : 'Deck is now private', 'success');
+                      } else if ((result as any).needsUsername) {
+                        setShowUsernameModal(true);
+                      } else {
+                        onNotify?.(result.error || 'Failed to change visibility', 'error');
+                      }
+                    }}
+                    className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
+                  >
+                    {deck.isPublic ? (
+                      <>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        Make Private
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Make Public
+                      </>
+                    )}
+                  </button>
+                  {deck.isPublic && (
+                    <>
+                      <button
+                        onClick={() => {
+                          const url = `${window.location.origin}/decklist/${deck.id}`;
+                          navigator.clipboard.writeText(url);
+                          setLinkCopied(true);
+                          setTimeout(() => setLinkCopied(false), 2000);
+                        }}
+                        className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                        </svg>
+                        {linkCopied ? 'Link Copied!' : 'Copy Share Link'}
+                      </button>
+                      <a
+                        href={`/decklist/${deck.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => setShowMenu(false)}
+                        className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        View Public Page
+                      </a>
+                    </>
+                  )}
+                </>
+              )}
+
               <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
-              
+
               {/* Generate Section */}
               <button
                 onClick={() => {
@@ -812,7 +912,7 @@ export default function DeckBuilderPanel({
           onClick={() => handleTabChange("main")}
           className={`flex-1 px-3 py-3 text-sm font-medium transition-colors ${
             activeTab === "main"
-              ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+              ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
           }`}
         >
@@ -822,7 +922,7 @@ export default function DeckBuilderPanel({
           onClick={() => handleTabChange("reserve")}
           className={`flex-1 px-3 py-3 text-sm font-medium transition-colors ${
             activeTab === "reserve"
-              ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+              ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
           }`}
         >
@@ -834,12 +934,12 @@ export default function DeckBuilderPanel({
           onMouseLeave={() => setShowValidationTooltip(false)}
           className={`relative flex-1 px-3 py-3 text-sm font-medium transition-colors ${
             activeTab === "info"
-              ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+              ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
           }`}
         >
           <span className="flex items-center justify-center gap-1.5">
-            Info
+            Stats
             {validation.stats.totalCards > 0 && (
               <span
                 className={`inline-flex items-center justify-center w-4 h-4 text-xs rounded-full ${
@@ -900,7 +1000,19 @@ export default function DeckBuilderPanel({
             </div>
           )}
         </button>
-        
+
+        {/* Details Tab (Cover Cards + Description) */}
+        <button
+          onClick={() => handleTabChange("cover")}
+          className={`flex-1 px-3 py-3 text-sm font-medium transition-colors ${
+            activeTab === "cover"
+              ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
+              : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+          }`}
+        >
+          Details
+        </button>
+
         {/* View Dropdown Button */}
         <div className="relative ml-auto mr-2">
           <button
@@ -972,7 +1084,7 @@ export default function DeckBuilderPanel({
                 <Switch
                   checked={!disableHoverPreview}
                   onChange={() => setDisableHoverPreview((v) => !v)}
-                  className={`${!disableHoverPreview ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-700'} relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none`}
+                  className={`${!disableHoverPreview ? 'bg-green-700' : 'bg-gray-300 dark:bg-gray-700'} relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none`}
                 >
                   <span
                     className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${!disableHoverPreview ? 'translate-x-5' : 'translate-x-1'}`}
@@ -1239,8 +1351,145 @@ export default function DeckBuilderPanel({
               </div>
             )}
           </div>
+        ) : activeTab === "cover" ? (
+          // Details Tab (Cover Cards + Description)
+          <div className="space-y-4 text-sm">
+            <div>
+              <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">Cover Cards</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                Choose the two cards shown as the thumbnail on the community page.
+              </p>
+              <div className="flex gap-3 mb-3">
+                {([1, 2] as const).map((slot) => {
+                  const imgFile = slot === 1 ? deck.previewCard1 : deck.previewCard2;
+                  const imgUrl = imgFile ? getImageUrl(imgFile) : null;
+                  return (
+                    <div key={slot} className="flex flex-col items-center gap-1.5 flex-1">
+                      <button
+                        onClick={() => setCoverPickerSlot(coverPickerSlot === slot ? null : slot)}
+                        className={`relative w-full aspect-[2.5/3.5] rounded-lg overflow-hidden border-2 transition-all ${
+                          coverPickerSlot === slot
+                            ? 'border-blue-500 ring-2 ring-blue-300 dark:ring-blue-700'
+                            : 'border-gray-300 dark:border-gray-600 hover:border-green-600'
+                        } bg-gray-100 dark:bg-gray-800`}
+                        title={`Pick cover card ${slot}`}
+                      >
+                        {imgUrl ? (
+                          <img src={imgUrl} alt={`Cover ${slot}`} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
+                            <svg className="w-6 h-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+                            </svg>
+                            <span className="text-xs">Card {slot}</span>
+                          </div>
+                        )}
+                      </button>
+                      {imgFile && (
+                        <button
+                          onClick={() => setCoverPickerSlot(slot)}
+                          className="text-xs text-blue-500 hover:text-blue-700 dark:hover:text-blue-400"
+                        >
+                          Replace
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Card picker grid */}
+              {coverPickerSlot !== null && (() => {
+                const mainCards = deck.cards.filter(dc => !dc.isReserve && dc.quantity > 0);
+                return (
+                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                    <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                      <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                        Select card for slot {coverPickerSlot}
+                      </span>
+                      <button onClick={() => setCoverPickerSlot(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                    <div className="p-2 max-h-48 overflow-y-auto grid grid-cols-4 gap-1.5">
+                      {mainCards.map((dc) => (
+                        <button
+                          key={`${dc.card.name}|${dc.card.set}`}
+                          onClick={() => {
+                            const imgFile = dc.card.imgFile;
+                            const c1 = coverPickerSlot === 1 ? imgFile : (deck.previewCard1 ?? null);
+                            const c2 = coverPickerSlot === 2 ? imgFile : (deck.previewCard2 ?? null);
+                            onPreviewCardsChange?.(c1, c2);
+                            setCoverPickerSlot(null);
+                          }}
+                          className="relative aspect-[2.5/3.5] rounded overflow-hidden border border-gray-200 dark:border-gray-600 hover:border-blue-500 hover:scale-105 transition-all"
+                          title={dc.card.name}
+                        >
+                          <img
+                            src={getImageUrl(dc.card.imgFile)}
+                            alt={dc.card.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Description Section */}
+            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-semibold text-gray-700 dark:text-gray-300">Description</h3>
+                <div className="flex rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600">
+                  <button
+                    onClick={() => setDescriptionPreview(false)}
+                    className={`px-3 py-1 text-xs font-medium transition-colors ${
+                      !descriptionPreview
+                        ? 'bg-green-600 text-white'
+                        : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => setDescriptionPreview(true)}
+                    className={`px-3 py-1 text-xs font-medium transition-colors border-l border-gray-300 dark:border-gray-600 ${
+                      descriptionPreview
+                        ? 'bg-green-600 text-white'
+                        : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    Preview
+                  </button>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                Add notes or strategy for your deck (supports Markdown).
+              </p>
+              {descriptionPreview ? (
+                <div className="w-full min-h-[8rem] p-3 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white overflow-auto prose prose-sm dark:prose-invert max-w-none">
+                  {deck.description ? (
+                    <ReactMarkdown>{deck.description}</ReactMarkdown>
+                  ) : (
+                    <p className="text-gray-400 dark:text-gray-500 italic">No description yet</p>
+                  )}
+                </div>
+              ) : (
+                <textarea
+                  value={deck.description || ""}
+                  onChange={(e) => onDescriptionChange?.(e.target.value)}
+                  placeholder="Deck strategy, card choices, matchup notes..."
+                  className="w-full h-32 p-3 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              )}
+            </div>
+          </div>
         ) : (
-          // Info Tab
+          // Stats Tab
           <div className="space-y-4 text-sm">
             {/* Disclaimer - Hide for Paragon format */}
             {deckType !== 'Paragon' && (
@@ -1386,7 +1635,7 @@ export default function DeckBuilderPanel({
                   
                   // Define order and styling for alignments
                   const alignmentConfig = [
-                    { name: 'Good', color: 'bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-800 dark:text-blue-200' },
+                    { name: 'Good', color: 'bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-green-800 text-blue-800 dark:text-blue-200' },
                     { name: 'Evil', color: 'bg-red-100 dark:bg-red-900/30 border-red-300 dark:border-red-700 text-red-800 dark:text-red-200' },
                     { name: 'Neutral', color: 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200' },
                     { name: 'Dual', color: 'bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700 text-purple-800 dark:text-purple-200' },
@@ -1531,11 +1780,11 @@ export default function DeckBuilderPanel({
       )}
 
       {/* Delete Deck Modal */}
-      {showDeleteDeckModal && onNewDeck && (
+      {showDeleteDeckModal && (
         <ClearDeckModal
           deckName={deck.name}
           onConfirm={() => {
-            onNewDeck(undefined, deck.folderId);
+            onDelete();
             setShowDeleteDeckModal(false);
           }}
           onClose={() => setShowDeleteDeckModal(false)}
@@ -1584,13 +1833,29 @@ export default function DeckBuilderPanel({
         </div>
       )}
 
+      {/* Username Modal */}
+      {showUsernameModal && (
+        <UsernameModal
+          onSuccess={async () => {
+            setShowUsernameModal(false);
+            if (deck.id) {
+              const result = await toggleDeckPublicAction(deck.id, true);
+              if (result.success) {
+                onDeckPublicChange?.(true);
+                onNotify?.('Deck is now public', 'success');
+              } else {
+                onNotify?.(result.error || 'Failed to change visibility', 'error');
+              }
+            }
+          }}
+          onClose={() => setShowUsernameModal(false)}
+        />
+      )}
+
       {/* Hidden image preloader for reserve cards */}
       <div className="hidden" aria-hidden="true">
         {reserveCards.map((deckCard) => {
-          const imageUrl = (() => {
-            const { getImageUrl } = useCardImageUrl();
-            return getImageUrl(deckCard.card.imgFile || "");
-          })();
+          const imageUrl = getImageUrl(deckCard.card.imgFile || "");
           return imageUrl ? (
             <img
               key={`preload-${deckCard.card.name}-${deckCard.card.set}`}

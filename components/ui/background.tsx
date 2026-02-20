@@ -20,7 +20,7 @@ const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   return (
     <div className="min-h-screen w-full relative">
       {/* Different background styling based on theme */}
-      <div className="absolute inset-0 overflow-hidden">
+      <div className="fixed inset-0 overflow-hidden">
         {/* Base background color - pure white for maximum light mode contrast */}
         <div className="absolute inset-0 bg-white dark:bg-gray-900"></div>
         
@@ -58,8 +58,8 @@ const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
             bottom: '0px',
             left: '0px',
             backgroundImage: isLightTheme
-              ? 'linear-gradient(to top, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.03) 35%, transparent 65%)'
-              : 'linear-gradient(to top, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.15) 40%, transparent 80%)',
+              ? 'linear-gradient(to top, rgba(0, 0, 0, 0.08) 0%, rgba(0, 0, 0, 0.03) 35%, transparent 65%)'
+              : 'linear-gradient(to top, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.15) 40%, transparent 80%)',
             pointerEvents: 'none',
           }}></div>
       </div>

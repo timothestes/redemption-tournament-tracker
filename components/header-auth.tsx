@@ -16,7 +16,6 @@ export default async function AuthButton() {
       <div className="flex items-center gap-4">
         <div className="max-w-12:block hidden">Hey, {user.email}!</div>
         <form
-          // @ts-ignore
           action={signOutAction}
         >
           <Button type="submit" variant={"outline"}>

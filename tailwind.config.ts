@@ -78,6 +78,7 @@ const config = {
   },
   plugins: [
     require("tailwindcss-animate"),
+    require("@tailwindcss/typography"),
     flowbite.plugin(),
   ],
 } satisfies Config;

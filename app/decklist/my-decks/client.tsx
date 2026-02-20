@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { 
-  loadUserDecksAction, 
-  deleteDeckAction, 
+import {
+  loadUserDecksAction,
+  deleteDeckAction,
   duplicateDeckAction,
   loadUserFoldersAction,
   createFolderAction,
@@ -12,11 +12,13 @@ import {
   deleteFolderAction,
   moveDeckToFolderAction,
   loadDeckByIdAction,
+  toggleDeckPublicAction,
   DeckData,
   FolderData
 } from "../actions";
 import DeleteDeckModal from "./DeleteDeckModal";
 import FolderModal from "./FolderModal";
+import UsernameModal from "./UsernameModal";
 import GeneratePDFModal from "../card-search/components/GeneratePDFModal";
 import { Deck } from "../card-search/types/deck";
 import { Card } from "../card-search/utils";
@@ -34,10 +36,10 @@ function formatDeckType(format?: string): string {
 function getDeckTypeBadgeClasses(format?: string): string {
   const deckType = formatDeckType(format);
   if (deckType === "T2") {
-    return "px-2 py-0.5 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded text-xs font-semibold";
+    return "px-2 py-0.5 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 rounded text-xs font-semibold";
   }
   if (deckType === "Paragon") {
-    return "px-2 py-0.5 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 rounded text-xs font-semibold";
+    return "px-2 py-0.5 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 rounded text-xs font-semibold";
   }
   return "px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded text-xs font-semibold";
 }
@@ -75,6 +77,7 @@ export default function MyDecksClient() {
   const [folderModal, setFolderModal] = useState<{ mode: "create" | "rename"; folderId?: string; initialName?: string } | null>(null);
   const [folderToDelete, setFolderToDelete] = useState<{ id: string; name: string } | null>(null);
   const [pdfDeck, setPdfDeck] = useState<Deck | null>(null); // For PDF generation modal
+  const [usernameModalDeckId, setUsernameModalDeckId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -157,6 +160,43 @@ export default function MyDecksClient() {
     } else {
       alert(result.error || "Failed to move deck");
     }
+  }
+
+  async function handleTogglePublic(deckId: string, currentlyPublic: boolean) {
+    const result = await toggleDeckPublicAction(deckId, !currentlyPublic);
+    if (result.success) {
+      setDecks(decks.map(d =>
+        d.id === deckId ? { ...d, is_public: !currentlyPublic } : d
+      ));
+    } else if ((result as any).needsUsername) {
+      setUsernameModalDeckId(deckId);
+    } else {
+      alert(result.error || "Failed to update deck visibility");
+    }
+  }
+
+  async function handleUsernameSet(_username: string) {
+    const deckId = usernameModalDeckId;
+    setUsernameModalDeckId(null);
+    if (deckId) {
+      const result = await toggleDeckPublicAction(deckId, true);
+      if (result.success) {
+        setDecks(prev => prev.map(d =>
+          d.id === deckId ? { ...d, is_public: true } : d
+        ));
+      } else {
+        alert(result.error || "Failed to update deck visibility");
+      }
+    }
+  }
+
+  function handleCopyLink(deckId: string) {
+    const url = `${window.location.origin}/decklist/${deckId}`;
+    navigator.clipboard.writeText(url);
+  }
+
+  function handleViewPublic(deckId: string) {
+    router.push(`/decklist/${deckId}`);
   }
 
   async function handleGeneratePDF(deckId: string) {
@@ -261,7 +301,7 @@ export default function MyDecksClient() {
           <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
           <button
             onClick={loadData}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            className="px-4 py-2 bg-green-700 text-white rounded-md hover:bg-green-800"
           >
             Try Again
           </button>
@@ -350,18 +390,6 @@ export default function MyDecksClient() {
             </button>
           </div>
 
-          {/* Info Banner */}
-          <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg flex items-start gap-3">
-            <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-            </svg>
-            <div>
-              <p className="text-sm text-blue-800 dark:text-blue-200">
-                <span className="font-semibold">Coming Soon:</span> Public deck sharing and community decklists are on the way!
-              </p>
-            </div>
-          </div>
-
           {/* Controls */}
           <div className="flex items-center justify-between mb-6 gap-4">
             <div className="flex items-center gap-2">
@@ -435,7 +463,7 @@ export default function MyDecksClient() {
               </p>
               <button
                 onClick={handleNewDeck}
-                className="mt-6 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors"
+                className="mt-6 px-6 py-3 bg-green-700 text-white rounded-lg hover:bg-green-800 font-medium transition-colors"
               >
                 Create A Deck
               </button>
@@ -452,6 +480,9 @@ export default function MyDecksClient() {
                   onDuplicate={handleDuplicateDeck}
                   onMove={handleMoveDeck}
                   onGeneratePDF={handleGeneratePDF}
+                  onTogglePublic={handleTogglePublic}
+                  onCopyLink={handleCopyLink}
+                  onViewPublic={handleViewPublic}
                 />
               ))}
             </div>
@@ -467,6 +498,9 @@ export default function MyDecksClient() {
                   onDuplicate={handleDuplicateDeck}
                   onMove={handleMoveDeck}
                   onGeneratePDF={handleGeneratePDF}
+                  onTogglePublic={handleTogglePublic}
+                  onCopyLink={handleCopyLink}
+                  onViewPublic={handleViewPublic}
                 />
               ))}
             </div>
@@ -513,6 +547,14 @@ export default function MyDecksClient() {
         <GeneratePDFModal
           deck={pdfDeck}
           onClose={() => setPdfDeck(null)}
+        />
+      )}
+
+      {/* Username Modal */}
+      {usernameModalDeckId && (
+        <UsernameModal
+          onSuccess={handleUsernameSet}
+          onClose={() => setUsernameModalDeckId(null)}
         />
       )}
     </div>
@@ -595,6 +637,14 @@ function FolderItem({
 }
 
 // Deck Card Component (Grid View)
+function getCardImageUrl(cardName: string | null | undefined): string | null {
+  if (!cardName) return null;
+  const blobBase = process.env.NEXT_PUBLIC_BLOB_BASE_URL;
+  if (!blobBase) return null;
+  const sanitized = cardName.replace(/\//g, "_");
+  return `${blobBase}/card-images/${sanitized}.jpg`;
+}
+
 function DeckCard({
   deck,
   folders,
@@ -603,6 +653,9 @@ function DeckCard({
   onDuplicate,
   onMove,
   onGeneratePDF,
+  onTogglePublic,
+  onCopyLink,
+  onViewPublic,
 }: {
   deck: DeckData;
   folders: FolderData[];
@@ -611,13 +664,16 @@ function DeckCard({
   onDuplicate: (id: string) => void;
   onMove: (deckId: string, folderId: string | null) => void;
   onGeneratePDF: (deckId: string) => void;
+  onTogglePublic: (deckId: string, currentlyPublic: boolean) => void;
+  onCopyLink: (deckId: string) => void;
+  onViewPublic: (deckId: string) => void;
 }) {
   const updatedDate = formatDateTime(deck.updated_at!);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow">
-      {/* Paragon Image Header */}
-      {formatDeckType(deck.format) === "Paragon" && deck.paragon && (
+      {/* Image Header */}
+      {formatDeckType(deck.format) === "Paragon" && deck.paragon ? (
         <div className="h-32 overflow-hidden rounded-t-lg">
           <img
             src={`/paragons/Paragon ${deck.paragon}.png`}
@@ -625,27 +681,39 @@ function DeckCard({
             className="w-full h-full object-cover object-top"
           />
         </div>
-      )}
-      
+      ) : (getCardImageUrl(deck.preview_card_1) || getCardImageUrl(deck.preview_card_2)) ? (
+        <div className="h-32 overflow-hidden rounded-t-lg bg-gray-100 dark:bg-gray-900 flex items-center justify-center gap-1 px-2 py-2">
+          {getCardImageUrl(deck.preview_card_1) && <img src={getCardImageUrl(deck.preview_card_1)!} alt="" className="h-full object-contain rounded" />}
+          {getCardImageUrl(deck.preview_card_2) && <img src={getCardImageUrl(deck.preview_card_2)!} alt="" className="h-full object-contain rounded" />}
+        </div>
+      ) : null}
+
       <div className="p-4">
         <div className="flex items-start justify-between mb-2">
-          <h3 className="font-semibold text-lg truncate flex-1">{deck.name}</h3>
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <h3 className="font-semibold text-lg truncate">{deck.name}</h3>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
+              deck.is_public
+                ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300"
+                : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+            }`}>
+              {deck.is_public ? "Public" : "Private"}
+            </span>
+          </div>
           <DropdownMenu
             folders={folders}
             currentFolderId={deck.folder_id}
+            isPublic={!!deck.is_public}
             onEdit={() => onEdit(deck.id!)}
             onDelete={() => onDelete(deck.id!, deck.name)}
             onDuplicate={() => onDuplicate(deck.id!)}
             onMove={(folderId) => onMove(deck.id!, folderId)}
             onGeneratePDF={() => onGeneratePDF(deck.id!)}
+            onTogglePublic={() => onTogglePublic(deck.id!, !!deck.is_public)}
+            onCopyLink={() => onCopyLink(deck.id!)}
+            onViewPublic={() => onViewPublic(deck.id!)}
           />
         </div>
-
-        {deck.description && (
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
-            {deck.description}
-          </p>
-        )}
 
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-3">
@@ -686,6 +754,9 @@ function DeckListItem({
   onDuplicate,
   onMove,
   onGeneratePDF,
+  onTogglePublic,
+  onCopyLink,
+  onViewPublic,
 }: {
   deck: DeckData;
   folders: FolderData[];
@@ -694,6 +765,9 @@ function DeckListItem({
   onDuplicate: (id: string) => void;
   onMove: (deckId: string, folderId: string | null) => void;
   onGeneratePDF: (deckId: string) => void;
+  onTogglePublic: (deckId: string, currentlyPublic: boolean) => void;
+  onCopyLink: (deckId: string) => void;
+  onViewPublic: (deckId: string) => void;
 }) {
   const updatedDate = formatDateTime(deck.updated_at!);
 
@@ -706,12 +780,14 @@ function DeckListItem({
               {formatDeckType(deck.format)}
             </span>
             <h3 className="font-semibold truncate">{deck.name}</h3>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
+              deck.is_public
+                ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300"
+                : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+            }`}>
+              {deck.is_public ? "Public" : "Private"}
+            </span>
           </div>
-          {deck.description && (
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 truncate">
-              {deck.description}
-            </p>
-          )}
         </div>
 
         <div className="flex items-center gap-6 text-sm text-gray-600 dark:text-gray-400">
@@ -722,18 +798,22 @@ function DeckListItem({
         <div className="flex items-center gap-2">
           <button
             onClick={() => onEdit(deck.id!)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium transition-colors"
+            className="px-4 py-2 bg-green-700 text-white rounded-md hover:bg-green-800 font-medium transition-colors"
           >
             Edit
           </button>
           <DropdownMenu
             folders={folders}
             currentFolderId={deck.folder_id}
+            isPublic={!!deck.is_public}
             onEdit={() => onEdit(deck.id!)}
             onDelete={() => onDelete(deck.id!, deck.name)}
             onDuplicate={() => onDuplicate(deck.id!)}
             onMove={(folderId) => onMove(deck.id!, folderId)}
             onGeneratePDF={() => onGeneratePDF(deck.id!)}
+            onTogglePublic={() => onTogglePublic(deck.id!, !!deck.is_public)}
+            onCopyLink={() => onCopyLink(deck.id!)}
+            onViewPublic={() => onViewPublic(deck.id!)}
           />
         </div>
       </div>
@@ -745,22 +825,31 @@ function DeckListItem({
 function DropdownMenu({
   folders,
   currentFolderId,
+  isPublic,
   onEdit,
   onDelete,
   onDuplicate,
   onMove,
   onGeneratePDF,
+  onTogglePublic,
+  onCopyLink,
+  onViewPublic,
 }: {
   folders: FolderData[];
   currentFolderId?: string | null;
+  isPublic: boolean;
   onEdit: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
   onMove: (folderId: string | null) => void;
   onGeneratePDF: () => void;
+  onTogglePublic: () => void;
+  onCopyLink: () => void;
+  onViewPublic: () => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [showMoveMenu, setShowMoveMenu] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   return (
     <div className="relative">
@@ -782,7 +871,7 @@ function DropdownMenu({
               setShowMoveMenu(false);
             }}
           />
-          <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 z-20">
+          <div className="absolute right-0 mt-2 w-52 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 z-20">
             <button
               onClick={() => {
                 onEdit();
@@ -810,8 +899,65 @@ function DropdownMenu({
             >
               Generate PDF
             </button>
-            
+
+            {/* Sharing section */}
+            <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+            <button
+              onClick={() => {
+                onTogglePublic();
+                setIsOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+            >
+              {isPublic ? (
+                <>
+                  <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  Make Private
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Make Public
+                </>
+              )}
+            </button>
+            {isPublic && (
+              <>
+                <button
+                  onClick={() => {
+                    onCopyLink();
+                    setLinkCopied(true);
+                    setTimeout(() => setLinkCopied(false), 2000);
+                  }}
+                  className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                  </svg>
+                  {linkCopied ? "Link Copied!" : "Copy Share Link"}
+                </button>
+                <button
+                  onClick={() => {
+                    onViewPublic();
+                    setIsOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  View Public Page
+                </button>
+              </>
+            )}
+
             {/* Move to Folder submenu */}
+            <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
             <div className="relative">
               <button
                 onClick={() => setShowMoveMenu(!showMoveMenu)}
@@ -822,7 +968,7 @@ function DropdownMenu({
                   <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
                 </svg>
               </button>
-              
+
               {showMoveMenu && (
                 <div className="absolute left-full top-0 ml-1 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 max-h-60 overflow-y-auto">
                   <button
@@ -835,7 +981,7 @@ function DropdownMenu({
                       !currentFolderId ? "bg-blue-50 dark:bg-blue-900/20" : ""
                     }`}
                   >
-                    📁 My Decks
+                    My Decks
                   </button>
                   {folders.map((folder) => (
                     <button
@@ -849,7 +995,7 @@ function DropdownMenu({
                         currentFolderId === folder.id ? "bg-blue-50 dark:bg-blue-900/20" : ""
                       }`}
                     >
-                      📁 {folder.name}
+                      {folder.name}
                     </button>
                   ))}
                   {folders.length === 0 && (
@@ -860,7 +1006,7 @@ function DropdownMenu({
                 </div>
               )}
             </div>
-            
+
             <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
             <button
               onClick={() => {

@@ -14,6 +14,8 @@ export interface DeckData {
   folder_id?: string | null;
   is_public?: boolean;
   card_count?: number;
+  preview_card_1?: string | null;
+  preview_card_2?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -36,6 +38,8 @@ export interface SaveDeckParams {
   paragon?: string;
   folderId?: string | null;
   cards: DeckCardData[];
+  previewCard1?: string | null; // card_img_file for preview
+  previewCard2?: string | null;
 }
 
 /**
@@ -58,7 +62,7 @@ export async function saveDeckAction(params: SaveDeckParams) {
       };
     }
 
-    const { deckId, name, description, format, paragon, folderId, cards } = params;
+    const { deckId, name, description, format, paragon, folderId, cards, previewCard1, previewCard2 } = params;
 
     // Calculate card count (main deck only, excluding reserve)
     const cardCount = cards
@@ -76,6 +80,8 @@ export async function saveDeckAction(params: SaveDeckParams) {
           paragon: paragon || null,
           folder_id: folderId || null,
           card_count: cardCount,
+          preview_card_1: previewCard1 ?? null,
+          preview_card_2: previewCard2 ?? null,
           updated_at: new Date().toISOString(),
         })
         .eq("id", deckId)
@@ -149,6 +155,8 @@ export async function saveDeckAction(params: SaveDeckParams) {
           paragon: paragon || null,
           folder_id: folderId || null,
           card_count: cardCount,
+          preview_card_1: previewCard1 ?? null,
+          preview_card_2: previewCard2 ?? null,
         })
         .select()
         .single();
@@ -339,6 +347,7 @@ export async function loadDeckByIdAction(deckId: string) {
         ...deck,
         cards: cards || [],
       },
+      isOwner: deck.user_id === user.id,
     };
   } catch (error) {
     console.error("Error in loadDeckByIdAction:", error);
@@ -725,6 +734,249 @@ export async function deleteFolderAction(folderId: string) {
 /**
  * Move a deck to a folder (or remove from folder)
  */
+/**
+ * Toggle a deck's public/private status
+ */
+export async function toggleDeckPublicAction(deckId: string, isPublic: boolean) {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return {
+        success: false,
+        error: "You must be logged in to change deck visibility",
+      };
+    }
+
+    // If making public, check that user has a username set
+    if (isPublic) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("username")
+        .eq("id", user.id)
+        .single();
+
+      if (!profile?.username) {
+        return { success: false, needsUsername: true };
+      }
+    }
+
+    const { error } = await supabase
+      .from("decks")
+      .update({ is_public: isPublic })
+      .eq("id", deckId)
+      .eq("user_id", user.id);
+
+    if (error) {
+      console.error("Error toggling deck public:", error);
+      return {
+        success: false,
+        error: "Failed to update deck visibility",
+      };
+    }
+
+    revalidatePath("/decklist/my-decks");
+    revalidatePath(`/decklist/${deckId}`);
+
+    return {
+      success: true,
+      message: isPublic ? "Deck is now public" : "Deck is now private",
+    };
+  } catch (error) {
+    console.error("Error in toggleDeckPublicAction:", error);
+    return {
+      success: false,
+      error: "An unexpected error occurred",
+    };
+  }
+}
+
+/**
+ * Load a public deck by ID (no auth required for public decks)
+ */
+export async function loadPublicDeckAction(deckId: string) {
+  try {
+    const supabase = await createClient();
+
+    // Check if current user is authenticated (optional)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    // Load deck
+    const { data: deck, error: deckError } = await supabase
+      .from("decks")
+      .select("*")
+      .eq("id", deckId)
+      .single();
+
+    if (deckError || !deck) {
+      return {
+        success: false,
+        error: "Deck not found",
+        deck: null,
+      };
+    }
+
+    const isOwner = user?.id === deck.user_id;
+
+    // If not public and not owner, deny access
+    if (!deck.is_public && !isOwner) {
+      return {
+        success: false,
+        error: "This deck is private",
+        deck: null,
+      };
+    }
+
+    // Load deck cards
+    const { data: cards, error: cardsError } = await supabase
+      .from("deck_cards")
+      .select("*")
+      .eq("deck_id", deckId)
+      .order("card_name");
+
+    if (cardsError) {
+      console.error("Error loading deck cards:", cardsError);
+      return {
+        success: false,
+        error: "Failed to load deck cards",
+        deck: null,
+      };
+    }
+
+    // Fetch username for the deck creator
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("username")
+      .eq("id", deck.user_id)
+      .single();
+
+    // Increment view count (fire-and-forget, only for non-owners)
+    if (!isOwner) {
+      supabase
+        .from("decks")
+        .update({ view_count: (deck.view_count || 0) + 1 })
+        .eq("id", deckId)
+        .then(() => {});
+    }
+
+    return {
+      success: true,
+      deck: {
+        ...deck,
+        username: profile?.username || null,
+        cards: cards || [],
+      },
+      isOwner,
+    };
+  } catch (error) {
+    console.error("Error in loadPublicDeckAction:", error);
+    return {
+      success: false,
+      error: "An unexpected error occurred",
+      deck: null,
+    };
+  }
+}
+
+/**
+ * Copy a public deck to the current user's library
+ */
+export async function copyPublicDeckAction(sourceDeckId: string) {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return {
+        success: false,
+        error: "You must be logged in to copy a deck",
+      };
+    }
+
+    // Load the source deck
+    const { data: sourceDeck, error: deckError } = await supabase
+      .from("decks")
+      .select("*")
+      .eq("id", sourceDeckId)
+      .single();
+
+    if (deckError || !sourceDeck) {
+      return {
+        success: false,
+        error: "Source deck not found",
+      };
+    }
+
+    // Must be public or owned by caller
+    if (!sourceDeck.is_public && sourceDeck.user_id !== user.id) {
+      return {
+        success: false,
+        error: "You don't have permission to copy this deck",
+      };
+    }
+
+    // Load source deck cards
+    const { data: sourceCards, error: cardsError } = await supabase
+      .from("deck_cards")
+      .select("*")
+      .eq("deck_id", sourceDeckId);
+
+    if (cardsError) {
+      return {
+        success: false,
+        error: "Failed to load source deck cards",
+      };
+    }
+
+    // Create the copy
+    const saveResult = await saveDeckAction({
+      name: `${sourceDeck.name} (Copy)`,
+      description: sourceDeck.description,
+      format: sourceDeck.format,
+      paragon: sourceDeck.paragon,
+      cards: (sourceCards || []).map((card: any) => ({
+        card_name: card.card_name,
+        card_set: card.card_set,
+        card_img_file: card.card_img_file,
+        quantity: card.quantity,
+        is_reserve: card.is_reserve,
+      })),
+    });
+
+    if (!saveResult.success) {
+      return {
+        success: false,
+        error: saveResult.error || "Failed to copy deck",
+      };
+    }
+
+    revalidatePath("/decklist/my-decks");
+
+    return {
+      success: true,
+      deckId: saveResult.deckId,
+      message: "Deck copied to your library",
+    };
+  } catch (error) {
+    console.error("Error in copyPublicDeckAction:", error);
+    return {
+      success: false,
+      error: "An unexpected error occurred",
+    };
+  }
+}
+
 export async function moveDeckToFolderAction(deckId: string, folderId: string | null) {
   try {
     const supabase = await createClient();
@@ -767,5 +1019,279 @@ export async function moveDeckToFolderAction(deckId: string, folderId: string | 
       success: false,
       error: "An unexpected error occurred",
     };
+  }
+}
+
+/**
+ * Load public decks for the community browse page
+ */
+export interface LoadPublicDecksParams {
+  page?: number;
+  pageSize?: number;
+  sort?: "newest" | "most_viewed" | "name";
+  format?: string;
+  search?: string;
+  username?: string;
+}
+
+export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) {
+  try {
+    const supabase = await createClient();
+    const {
+      page = 1,
+      pageSize = 24,
+      sort = "newest",
+      format,
+      search,
+      username,
+    } = params;
+
+    const offset = (page - 1) * pageSize;
+
+    let query = supabase
+      .from("decks")
+      .select("id, name, description, format, paragon, card_count, view_count, preview_card_1, preview_card_2, user_id, created_at, updated_at", { count: "exact" })
+      .eq("is_public", true);
+
+    if (format) {
+      query = query.eq("format", format);
+    }
+
+    // Filter by exact username (e.g. clicking a username link)
+    if (username && username.trim()) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("username", username.trim())
+        .single();
+      if (profile) {
+        query = query.eq("user_id", profile.id);
+      } else {
+        // No user with that username — return empty
+        return { success: true, decks: [], totalCount: 0 };
+      }
+    }
+
+    // Search by deck name or username
+    if (search && search.trim()) {
+      const term = search.trim();
+      // Find user IDs matching the search term
+      const { data: matchingProfiles } = await supabase
+        .from("profiles")
+        .select("id")
+        .ilike("username", `%${term}%`);
+      const matchingUserIds = (matchingProfiles || []).map((p: any) => p.id);
+
+      if (matchingUserIds.length > 0) {
+        query = query.or(`name.ilike.%${term}%,user_id.in.(${matchingUserIds.join(",")})`);
+      } else {
+        query = query.ilike("name", `%${term}%`);
+      }
+    }
+
+    switch (sort) {
+      case "most_viewed":
+        query = query.order("view_count", { ascending: false, nullsFirst: false });
+        break;
+      case "name":
+        query = query.order("name", { ascending: true });
+        break;
+      case "newest":
+      default:
+        query = query.order("updated_at", { ascending: false });
+        break;
+    }
+
+    query = query.range(offset, offset + pageSize - 1);
+
+    const { data: decks, error, count } = await query;
+
+    if (error) {
+      console.error("Error loading public decks:", error);
+      return { success: false, error: "Failed to load community decks", decks: [], totalCount: 0 };
+    }
+
+    // Fetch usernames for all deck creators
+    const userIds = [...new Set((decks || []).map((d: any) => d.user_id).filter(Boolean))];
+    let usernameMap = new Map<string, string>();
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, username")
+        .in("id", userIds);
+      usernameMap = new Map((profiles || []).map((p: any) => [p.id, p.username]));
+    }
+    const decksWithUsername = (decks || []).map((d: any) => ({
+      ...d,
+      username: usernameMap.get(d.user_id) || null,
+    }));
+
+    return { success: true, decks: decksWithUsername, totalCount: count || 0 };
+  } catch (error) {
+    console.error("Error in loadPublicDecksAction:", error);
+    return { success: false, error: "An unexpected error occurred", decks: [], totalCount: 0 };
+  }
+}
+
+export async function renameDeckAction(deckId: string, name: string) {
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return { success: false, error: "Not authenticated" };
+
+    const trimmed = name.trim();
+    if (!trimmed) return { success: false, error: "Name cannot be empty" };
+
+    const { error } = await supabase
+      .from("decks")
+      .update({ name: trimmed, updated_at: new Date().toISOString() })
+      .eq("id", deckId)
+      .eq("user_id", user.id);
+
+    if (error) return { success: false, error: "Failed to rename deck" };
+
+    revalidatePath(`/decklist/${deckId}`);
+    revalidatePath("/decklist/community");
+    revalidatePath("/decklist/my-decks");
+    return { success: true };
+  } catch (error) {
+    console.error("Error in renameDeckAction:", error);
+    return { success: false, error: "An unexpected error occurred" };
+  }
+}
+
+export async function updateDeckPreviewCardsAction(
+  deckId: string,
+  previewCard1: string | null,
+  previewCard2: string | null
+) {
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return { success: false, error: "Not authenticated" };
+
+    const { error } = await supabase
+      .from("decks")
+      .update({ preview_card_1: previewCard1, preview_card_2: previewCard2 })
+      .eq("id", deckId)
+      .eq("user_id", user.id);
+
+    if (error) return { success: false, error: "Failed to update cover cards" };
+
+    revalidatePath(`/decklist/${deckId}`);
+    revalidatePath("/decklist/community");
+    return { success: true };
+  } catch (error) {
+    console.error("Error in updateDeckPreviewCardsAction:", error);
+    return { success: false, error: "An unexpected error occurred" };
+  }
+}
+
+/**
+ * Set username for the current user
+ */
+export async function setUsernameAction(username: string) {
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { success: false, error: "Not authenticated" };
+    }
+
+    const trimmed = username.trim();
+
+    if (trimmed.length < 3 || trimmed.length > 24) {
+      return { success: false, error: "Username must be between 3 and 24 characters" };
+    }
+
+    if (!/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
+      return { success: false, error: "Username can only contain letters, numbers, underscores, and hyphens" };
+    }
+
+    // Check uniqueness for a friendlier error message
+    const { data: existing } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("username", trimmed)
+      .neq("id", user.id)
+      .single();
+
+    if (existing) {
+      return { success: false, error: "This username is already taken" };
+    }
+
+    // Upsert the profile (handles case where profile row might not exist)
+    const { error } = await supabase
+      .from("profiles")
+      .upsert({ id: user.id, username: trimmed, updated_at: new Date().toISOString() });
+
+    if (error) {
+      if (error.code === "23505") {
+        return { success: false, error: "This username is already taken" };
+      }
+      console.error("Error setting username:", error);
+      return { success: false, error: "Failed to set username" };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error in setUsernameAction:", error);
+    return { success: false, error: "An unexpected error occurred" };
+  }
+}
+
+/**
+ * Check if a username is available
+ */
+export async function checkUsernameAvailableAction(username: string) {
+  try {
+    const supabase = await createClient();
+    const trimmed = username.trim();
+
+    if (trimmed.length < 3) {
+      return { available: false };
+    }
+
+    const { data } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("username", trimmed)
+      .single();
+
+    return { available: !data };
+  } catch {
+    return { available: false };
+  }
+}
+
+/**
+ * Update a deck's description
+ */
+export async function updateDeckDescriptionAction(deckId: string, description: string) {
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { success: false, error: "Not authenticated" };
+    }
+
+    const { error } = await supabase
+      .from("decks")
+      .update({ description: description || null })
+      .eq("id", deckId)
+      .eq("user_id", user.id);
+
+    if (error) {
+      console.error("Error updating description:", error);
+      return { success: false, error: "Failed to update description" };
+    }
+
+    revalidatePath(`/decklist/${deckId}`);
+    return { success: true };
+  } catch (error) {
+    console.error("Error in updateDeckDescriptionAction:", error);
+    return { success: false, error: "An unexpected error occurred" };
   }
 }

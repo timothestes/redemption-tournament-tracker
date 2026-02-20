@@ -687,7 +687,7 @@ export default function DeckCardList({
               {onViewCard && (
                 <button
                   onClick={() => onViewCard(card)}
-                  className="w-6 h-6 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-600 hover:bg-blue-500 dark:hover:bg-blue-600 text-gray-700 dark:text-gray-200 hover:text-white transition-colors"
+                  className="w-6 h-6 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-600 hover:bg-green-600 dark:hover:bg-green-700 text-gray-700 dark:text-gray-200 hover:text-white transition-colors"
                   aria-label="View card details"
                   title="View card details"
                 >

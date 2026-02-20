@@ -30,6 +30,11 @@ export interface Deck {
   paragon?: string;
   /** Optional folder ID for organization */
   folderId?: string | null;
+  /** Whether this deck is publicly visible */
+  isPublic?: boolean;
+  /** User-selected cover card img files for community listing thumbnails */
+  previewCard1?: string | null;
+  previewCard2?: string | null;
   /** Timestamp when deck was created */
   createdAt: Date;
   /** Timestamp when deck was last modified */

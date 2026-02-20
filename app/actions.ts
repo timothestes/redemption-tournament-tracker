@@ -52,11 +52,18 @@ export const signInAction = async (formData: FormData) => {
   if (error) {
     const searchParams = new URLSearchParams();
     searchParams.append('email', email);
-    searchParams.append('error', error.message);
-    return encodedRedirect("error", `/sign-in?${searchParams.toString()}`, error.message);
+    
+    // Map Supabase error to user-friendly message
+    let friendlyMessage = error.message;
+    if (error.message === 'Invalid login credentials') {
+      friendlyMessage = 'Incorrect email or password. Please try again.';
+    }
+    
+    searchParams.append('error', friendlyMessage);
+    return redirect(`/sign-in?${searchParams.toString()}`);
   }
 
-  return redirect("/tracker/tournaments");
+  return redirect("/decklist/community");
 };
 
 export const forgotPasswordAction = async (formData: FormData) => {
@@ -130,7 +137,7 @@ export const resetPasswordAction = async (formData: FormData) => {
   encodedRedirect("success", "/tracker/reset-password", "Password updated");
 };
 
-export const signOutAction = async () => {
+export const signOutAction = async (_formData: FormData) => {
   const supabase = await createClient();
   await supabase.auth.signOut();
   return redirect("/sign-in");
