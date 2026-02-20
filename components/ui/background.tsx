@@ -20,7 +20,7 @@ const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   return (
     <div className="min-h-screen w-full relative">
       {/* Different background styling based on theme */}
-      <div className="absolute inset-0 overflow-hidden">
+      <div className="fixed inset-0 overflow-hidden">
         {/* Base background color - pure white for maximum light mode contrast */}
         <div className="absolute inset-0 bg-white dark:bg-gray-900"></div>
         
