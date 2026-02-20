@@ -60,7 +60,7 @@ export const signInAction = async (formData: FormData) => {
     }
     
     searchParams.append('error', friendlyMessage);
-    return encodedRedirect("error", `/sign-in?${searchParams.toString()}`, friendlyMessage);
+    return redirect(`/sign-in?${searchParams.toString()}`);
   }
 
   return redirect("/tracker/tournaments");
