@@ -1054,7 +1054,12 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
       .eq("is_public", true);
 
     if (format) {
-      query = query.eq("format", format);
+      if (format === "Type 1") {
+        // Decks with null format default to T1 in the UI, so include them here
+        query = query.or("format.is.null,format.eq.Type 1");
+      } else {
+        query = query.eq("format", format);
+      }
     }
 
     // Filter by exact username (e.g. clicking a username link)
