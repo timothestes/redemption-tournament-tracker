@@ -15,6 +15,7 @@ import UsernameModal from "../../my-decks/UsernameModal";
 import { getParagonNames, getParagonByName } from "../data/paragons";
 import ParagonRequirements from "./ParagonRequirements";
 import { useCardImageUrl } from "../hooks/useCardImageUrl";
+import ReactMarkdown from "react-markdown";
 
 export type TabType = "main" | "reserve" | "info" | "cover";
 
@@ -54,7 +55,7 @@ interface DeckBuilderPanelProps {
   /** Callback to load a deck from cloud by ID */
   onLoadDeck?: (deckId: string) => void;
   /** Callback to create a new blank deck */
-  onNewDeck?: (name?: string, folderId?: string | null) => void;
+  onNewDeck?: (name?: string, folderId?: string | null, skipConfirmation?: boolean) => void;
   /** Callback when active tab changes */
   onActiveTabChange?: (tab: TabType) => void;
   /** Callback when user wants to view card details */
@@ -63,6 +64,8 @@ interface DeckBuilderPanelProps {
   onNotify?: (message: string, type: 'success' | 'error' | 'info') => void;
   /** Callback when user changes cover card selections */
   onPreviewCardsChange?: (card1: string | null, card2: string | null) => void;
+  /** Callback when user changes deck description */
+  onDescriptionChange?: (description: string) => void;
 }
 
 /**
@@ -91,6 +94,7 @@ export default function DeckBuilderPanel({
   onViewCard,
   onNotify,
   onPreviewCardsChange,
+  onDescriptionChange,
 }: DeckBuilderPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>("main");
   const [isEditingName, setIsEditingName] = useState(false);
@@ -111,6 +115,9 @@ export default function DeckBuilderPanel({
 
   // Cover card picker: which slot is open (1, 2, or null)
   const [coverPickerSlot, setCoverPickerSlot] = useState<1 | 2 | null>(null);
+  
+  // Description preview mode
+  const [descriptionPreview, setDescriptionPreview] = useState(false);
 
   // View options
   const [viewLayout, setViewLayout] = useState<'grid' | 'list'>('grid');
@@ -476,21 +483,19 @@ export default function DeckBuilderPanel({
             </div>
             {reserveCount > 0 && (
               <>
-                <span className="text-gray-400">•</span>
                 <div className="flex items-center gap-1">
                   <span className="text-gray-600 dark:text-gray-400">Reserve:</span>
                   <span className="font-semibold text-gray-900 dark:text-white">{reserveCount}</span>
                 </div>
               </>
             )}
-            <span className="text-gray-400">•</span>
             <div className="flex items-center gap-1">
               <span className="text-gray-600 dark:text-gray-400">Total:</span>
               <span className="font-semibold text-gray-900 dark:text-white">{totalCards}</span>
             </div>
             
             {/* Format Selector (T1/T2/Paragon) */}
-            <span className="text-gray-400">•</span>
+            <span className="text-gray-400"></span>
             <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-full p-0.5">
               <button
                 onClick={() => handleDeckTypeChange('T1')}
@@ -506,7 +511,7 @@ export default function DeckBuilderPanel({
                 onClick={() => handleDeckTypeChange('T2')}
                 className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
                   deckType === 'T2'
-                    ? 'bg-blue-600 dark:bg-blue-500 text-white'
+                    ? 'bg-purple-600 dark:bg-purple-500 text-white'
                     : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 cursor-pointer'
                 }`}
               >
@@ -907,7 +912,7 @@ export default function DeckBuilderPanel({
           onClick={() => handleTabChange("main")}
           className={`flex-1 px-3 py-3 text-sm font-medium transition-colors ${
             activeTab === "main"
-              ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+              ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
           }`}
         >
@@ -917,7 +922,7 @@ export default function DeckBuilderPanel({
           onClick={() => handleTabChange("reserve")}
           className={`flex-1 px-3 py-3 text-sm font-medium transition-colors ${
             activeTab === "reserve"
-              ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+              ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
           }`}
         >
@@ -929,12 +934,12 @@ export default function DeckBuilderPanel({
           onMouseLeave={() => setShowValidationTooltip(false)}
           className={`relative flex-1 px-3 py-3 text-sm font-medium transition-colors ${
             activeTab === "info"
-              ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+              ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
           }`}
         >
           <span className="flex items-center justify-center gap-1.5">
-            Info
+            Stats
             {validation.stats.totalCards > 0 && (
               <span
                 className={`inline-flex items-center justify-center w-4 h-4 text-xs rounded-full ${
@@ -996,16 +1001,16 @@ export default function DeckBuilderPanel({
           )}
         </button>
 
-        {/* Cover Tab */}
+        {/* Details Tab (Cover Cards + Description) */}
         <button
           onClick={() => handleTabChange("cover")}
           className={`flex-1 px-3 py-3 text-sm font-medium transition-colors ${
             activeTab === "cover"
-              ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+              ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
           }`}
         >
-          Cover
+          Details
         </button>
 
         {/* View Dropdown Button */}
@@ -1079,7 +1084,7 @@ export default function DeckBuilderPanel({
                 <Switch
                   checked={!disableHoverPreview}
                   onChange={() => setDisableHoverPreview((v) => !v)}
-                  className={`${!disableHoverPreview ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-700'} relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none`}
+                  className={`${!disableHoverPreview ? 'bg-green-700' : 'bg-gray-300 dark:bg-gray-700'} relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none`}
                 >
                   <span
                     className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${!disableHoverPreview ? 'translate-x-5' : 'translate-x-1'}`}
@@ -1347,7 +1352,7 @@ export default function DeckBuilderPanel({
             )}
           </div>
         ) : activeTab === "cover" ? (
-          // Cover Tab
+          // Details Tab (Cover Cards + Description)
           <div className="space-y-4 text-sm">
             <div>
               <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">Cover Cards</h3>
@@ -1365,7 +1370,7 @@ export default function DeckBuilderPanel({
                         className={`relative w-full aspect-[2.5/3.5] rounded-lg overflow-hidden border-2 transition-all ${
                           coverPickerSlot === slot
                             ? 'border-blue-500 ring-2 ring-blue-300 dark:ring-blue-700'
-                            : 'border-gray-300 dark:border-gray-600 hover:border-blue-400'
+                            : 'border-gray-300 dark:border-gray-600 hover:border-green-600'
                         } bg-gray-100 dark:bg-gray-800`}
                         title={`Pick cover card ${slot}`}
                       >
@@ -1434,9 +1439,57 @@ export default function DeckBuilderPanel({
                 );
               })()}
             </div>
+
+            {/* Description Section */}
+            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-semibold text-gray-700 dark:text-gray-300">Description</h3>
+                <div className="flex rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600">
+                  <button
+                    onClick={() => setDescriptionPreview(false)}
+                    className={`px-3 py-1 text-xs font-medium transition-colors ${
+                      !descriptionPreview
+                        ? 'bg-green-600 text-white'
+                        : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => setDescriptionPreview(true)}
+                    className={`px-3 py-1 text-xs font-medium transition-colors border-l border-gray-300 dark:border-gray-600 ${
+                      descriptionPreview
+                        ? 'bg-green-600 text-white'
+                        : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    Preview
+                  </button>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                Add notes or strategy for your deck (supports Markdown).
+              </p>
+              {descriptionPreview ? (
+                <div className="w-full min-h-[8rem] p-3 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white overflow-auto prose prose-sm dark:prose-invert max-w-none">
+                  {deck.description ? (
+                    <ReactMarkdown>{deck.description}</ReactMarkdown>
+                  ) : (
+                    <p className="text-gray-400 dark:text-gray-500 italic">No description yet</p>
+                  )}
+                </div>
+              ) : (
+                <textarea
+                  value={deck.description || ""}
+                  onChange={(e) => onDescriptionChange?.(e.target.value)}
+                  placeholder="Deck strategy, card choices, matchup notes..."
+                  className="w-full h-32 p-3 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              )}
+            </div>
           </div>
         ) : (
-          // Info Tab
+          // Stats Tab
           <div className="space-y-4 text-sm">
             {/* Disclaimer - Hide for Paragon format */}
             {deckType !== 'Paragon' && (
@@ -1582,7 +1635,7 @@ export default function DeckBuilderPanel({
                   
                   // Define order and styling for alignments
                   const alignmentConfig = [
-                    { name: 'Good', color: 'bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-800 dark:text-blue-200' },
+                    { name: 'Good', color: 'bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-green-800 text-blue-800 dark:text-blue-200' },
                     { name: 'Evil', color: 'bg-red-100 dark:bg-red-900/30 border-red-300 dark:border-red-700 text-red-800 dark:text-red-200' },
                     { name: 'Neutral', color: 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200' },
                     { name: 'Dual', color: 'bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700 text-purple-800 dark:text-purple-200' },
@@ -1727,11 +1780,11 @@ export default function DeckBuilderPanel({
       )}
 
       {/* Delete Deck Modal */}
-      {showDeleteDeckModal && onNewDeck && (
+      {showDeleteDeckModal && (
         <ClearDeckModal
           deckName={deck.name}
           onConfirm={() => {
-            onNewDeck(undefined, deck.folderId);
+            onDelete();
             setShowDeleteDeckModal(false);
           }}
           onClose={() => setShowDeleteDeckModal(false)}

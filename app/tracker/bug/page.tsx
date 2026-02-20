@@ -28,7 +28,7 @@ export default function BugPage() {
         <div className="flex flex-row flex-wrap gap-6 items-start mt-4">
           <a
             href="https://discord.com/invite/jREJdTysPp"
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg shadow-lg hover:bg-blue-700"
+            className="px-6 py-3 bg-green-700 text-white rounded-lg shadow-lg hover:bg-green-800"
             target="_blank"
             rel="noopener noreferrer"
           >

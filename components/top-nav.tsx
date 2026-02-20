@@ -84,12 +84,12 @@ const TopNav: React.FC = () => {
 
   const navLinks = [
     { href: "/register", label: NATIONALS_CONFIG.adminOnly ? `${NATIONALS_CONFIG.displayName} (Admin Only)` : `${NATIONALS_CONFIG.displayName}`, icon: HiUserAdd, highlight: true },
-    { href: "/tracker/tournaments", label: "Tournaments", icon: FaTrophy },
+    { href: "/tracker/tournaments", label: "Tournaments", icon: FaTrophy, authRequired: true },
   ];
 
   const deckLinks = [
     { href: "/decklist/community", label: "Community Decks", icon: HiGlobeAlt, isNew: true },
-    { href: "/decklist/my-decks", label: "My Decks", icon: TbCardsFilled },
+    { href: "/decklist/my-decks", label: "My Decks", icon: TbCardsFilled, authRequired: true },
     { href: "/decklist/card-search?new=true", label: "Deck Builder", icon: TbSearch },
     { href: "/decklist/generate", label: "Deck Check PDF", icon: TbCardsFilled },
   ];
@@ -128,7 +128,7 @@ const TopNav: React.FC = () => {
       <div className="max-w-full mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/tracker/tournaments" className="flex-shrink-0">
+          <Link href="/decklist/community" className="flex-shrink-0">
             <div className="cursor-pointer">
               {mounted && (
                 <Image
@@ -186,7 +186,7 @@ const TopNav: React.FC = () => {
             })}
 
             {/* Rest of nav links */}
-            {navLinks.slice(1).map((link) => {
+            {navLinks.slice(1).filter(link => !link.authRequired || user).map((link) => {
               const Icon = link.icon;
               const isHighlight = link.highlight;
               return (
@@ -232,7 +232,7 @@ const TopNav: React.FC = () => {
               {isDecksOpen && (
                 <div className="absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5">
                   <div className="py-2">
-                    {deckLinks.map((link) => {
+                    {deckLinks.filter(link => !link.authRequired || user).map((link) => {
                       const Icon = link.icon;
                       return (
                         <Link
@@ -438,7 +438,7 @@ const TopNav: React.FC = () => {
             })}
 
             {/* Rest of nav links */}
-            {navLinks.slice(1).map((link) => {
+            {navLinks.slice(1).filter(link => !link.authRequired || user).map((link) => {
               const Icon = link.icon;
               const isHighlight = link.highlight;
               return (
@@ -482,7 +482,7 @@ const TopNav: React.FC = () => {
 
               {isDecksOpen && (
                 <div className="mt-2 ml-8 space-y-1">
-                  {deckLinks.map((link) => {
+                  {deckLinks.filter(link => !link.authRequired || user).map((link) => {
                     const Icon = link.icon;
                     return (
                       <Link

@@ -121,19 +121,41 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
     error: null,
   });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   const isInitialMount = useRef(true);
   const hasLoadedFromStorage = useRef(false);
+  
+  // Track the initial params to avoid re-running on hydration changes
+  const initialParamsRef = useRef<{ deckId?: string; isNew?: boolean; initialized: boolean }>({ initialized: false });
 
   // Load from localStorage on client mount (after hydration)
+  // Use a small delay to ensure searchParams has hydrated
   useEffect(() => {
-    if (!hasLoadedFromStorage.current && !initialDeckId && !isNewDeck) {
-      const storedDeck = loadDeckFromStorage();
-      // Only update if there's actually a deck in storage (not just the default)
-      if (storedDeck.cards.length > 0 || storedDeck.name !== "Untitled Deck" || storedDeck.id) {
-        setDeck(storedDeck);
+    // Skip if already processed or if still on first render before hydration settles
+    if (hasLoadedFromStorage.current) return;
+    
+    // Wait a tick for searchParams to hydrate properly
+    const timer = setTimeout(() => {
+      if (hasLoadedFromStorage.current) return;
+      
+      // Mark the initial params we're working with
+      if (!initialParamsRef.current.initialized) {
+        initialParamsRef.current = { deckId: initialDeckId, isNew: isNewDeck, initialized: true };
+      }
+      
+      // Only load from storage if no deckId and not creating new deck
+      if (!initialDeckId && !isNewDeck) {
+        const storedDeck = loadDeckFromStorage();
+        // Only update if there's actually a deck in storage (not just the default)
+        if (storedDeck.cards.length > 0 || storedDeck.name !== "Untitled Deck" || storedDeck.id) {
+          setDeck(storedDeck);
+        }
       }
       hasLoadedFromStorage.current = true;
-    }
+      setIsInitializing(false);
+    }, 0);
+    
+    return () => clearTimeout(timer);
   }, [initialDeckId, isNewDeck]);
 
   // Persist deck to localStorage whenever it changes
@@ -164,6 +186,7 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
         updatedAt: new Date(),
       });
       setHasUnsavedChanges(false);
+      setIsInitializing(false);
     }
     isInitialMount.current = false;
   }, [initialDeckId, initialFolderId, isNewDeck]);
@@ -179,14 +202,16 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
       
       if (result.success && result.deck) {
         const cloudDeck = result.deck;
+        const isOwner = result.isOwner ?? false;
         
         // Fetch full card database to reconstruct complete card data
         const cardDatabase = await fetchCardDatabase();
         
         // Convert database format to Deck format with full card data
+        // If not the owner, clear the ID so saving creates a new copy instead of trying to update
         const loadedDeck: Deck = {
-          id: cloudDeck.id,
-          name: cloudDeck.name,
+          id: isOwner ? cloudDeck.id : undefined,
+          name: isOwner ? cloudDeck.name : `Copy of ${cloudDeck.name}`,
           description: cloudDeck.description || "",
           format: cloudDeck.format,
           paragon: cloudDeck.paragon,
@@ -241,12 +266,14 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
         
         setDeck(loadedDeck);
         setHasUnsavedChanges(false);
+        setIsInitializing(false);
         setSyncStatus({
           isSaving: false,
           lastSavedAt: new Date(cloudDeck.updated_at),
           error: null,
         });
       } else {
+        setIsInitializing(false);
         setSyncStatus({
           isSaving: false,
           lastSavedAt: null,
@@ -255,6 +282,7 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
       }
     } catch (error) {
       console.error("Error loading deck from cloud:", error);
+      setIsInitializing(false);
       setSyncStatus({
         isSaving: false,
         lastSavedAt: null,
@@ -549,14 +577,22 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
   }, []);
 
   /**
-   * Clear all cards from deck
+   * Clear all cards from deck and reset to new blank deck
    */
   const clearDeck = useCallback(() => {
-    setDeck((prevDeck) => ({
-      ...prevDeck,
+    setDeck({
+      id: undefined,
+      name: "Untitled Deck",
       cards: [],
+      description: "",
+      format: undefined,
+      folderId: undefined,
+      isPublic: false,
+      previewCard1: null,
+      previewCard2: null,
+      createdAt: new Date(),
       updatedAt: new Date(),
-    }));
+    });
   }, []);
 
   /**
@@ -640,6 +676,7 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
     deck,
     syncStatus,
     hasUnsavedChanges,
+    isInitializing,
     addCard,
     removeCard,
     updateQuantity,

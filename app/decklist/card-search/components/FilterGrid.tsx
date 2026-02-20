@@ -196,7 +196,7 @@ export default function FilterGrid({
                 'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
                 legalityMode === mode
                   ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
-                  : 'bg-gray-200 text-gray-900 hover:bg-blue-400 hover:text-blue-900 border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                  : 'bg-gray-200 text-gray-900 hover:bg-blue-400 hover:text-blue-900 border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
               )}
               onClick={() => setLegalityMode(mode as typeof legalityMode)}
             >
@@ -213,7 +213,7 @@ export default function FilterGrid({
                 'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
                 selectedAlignmentFilters.includes(mode)
                   ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
-                  : 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                  : 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
               )}
               onClick={() => toggleAlignmentFilter(mode)}
             >
@@ -230,7 +230,7 @@ export default function FilterGrid({
                 'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
                 selectedRarityFilters.includes(rarity)
                   ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
-                  : 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                  : 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
               )}
               onClick={() => toggleRarityFilter(rarity)}
             >
@@ -260,7 +260,7 @@ export default function FilterGrid({
                         'px-3 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
                         isActive && !isNot && 'bg-yellow-200 text-yellow-900 border-yellow-400 dark:bg-yellow-600 dark:text-white dark:border-transparent',
                         isActive && isNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
-                        !isActive && 'bg-gray-200 text-gray-900 border-gray-300 hover:bg-gray-400 hover:text-gray-900 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                        !isActive && 'bg-gray-200 text-gray-900 border-gray-300 hover:bg-gray-400 hover:text-gray-900 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
                       )}
                       onClick={(e) => {
                         e.preventDefault();
@@ -293,7 +293,7 @@ export default function FilterGrid({
                     'px-3 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
                     isGospel && !gospelNot && 'bg-yellow-300 text-yellow-900 border-yellow-500 dark:bg-yellow-700 dark:text-white dark:border-transparent',
                     isGospel && gospelNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
-                    !isGospel && 'bg-gray-200 text-gray-900 border-gray-300 hover:bg-gray-400 hover:text-gray-900 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                    !isGospel && 'bg-gray-200 text-gray-900 border-gray-300 hover:bg-gray-400 hover:text-gray-900 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
                   )}
                   onClick={(e) => {
                     e.preventDefault();
@@ -374,7 +374,7 @@ export default function FilterGrid({
                     'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
                     noAltArt
                       ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
-                      : 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                      : 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
                   )}
                   onClick={() => setnoAltArt(v => !v)}
                 >
@@ -385,7 +385,7 @@ export default function FilterGrid({
                     'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
                     noFirstPrint
                       ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
-                      : 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                      : 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
                   )}
                   onClick={() => setnoFirstPrint(v => !v)}
                 >
@@ -396,7 +396,7 @@ export default function FilterGrid({
                     'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
                     nativityOnly && !nativityNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
                     nativityOnly && nativityNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
-                    !nativityOnly && 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                    !nativityOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
                   )}
                   onClick={(e) => {
                     e.preventDefault();
@@ -423,7 +423,7 @@ export default function FilterGrid({
                     'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
                     hasStarOnly && !hasStarNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
                     hasStarOnly && hasStarNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
-                    !hasStarOnly && 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                    !hasStarOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
                   )}
                   onClick={(e) => {
                     e.preventDefault();
@@ -450,7 +450,7 @@ export default function FilterGrid({
                     'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
                     cloudOnly && !cloudNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
                     cloudOnly && cloudNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
-                    !cloudOnly && 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                    !cloudOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
                   )}
                   onClick={(e) => {
                     e.preventDefault();
@@ -477,7 +477,7 @@ export default function FilterGrid({
                     'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
                     angelOnly && !angelNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
                     angelOnly && angelNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
-                    !angelOnly && 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                    !angelOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
                   )}
                   onClick={(e) => {
                     e.preventDefault();
@@ -504,7 +504,7 @@ export default function FilterGrid({
                     'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
                     demonOnly && !demonNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
                     demonOnly && demonNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
-                    !demonOnly && 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                    !demonOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
                   )}
                   onClick={(e) => {
                     e.preventDefault();
@@ -531,7 +531,7 @@ export default function FilterGrid({
                     'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
                     danielOnly && !danielNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
                     danielOnly && danielNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
-                    !danielOnly && 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                    !danielOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
                   )}
                   onClick={(e) => {
                     e.preventDefault();
@@ -558,7 +558,7 @@ export default function FilterGrid({
                     'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
                     postexilicOnly && !postexilicNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
                     postexilicOnly && postexilicNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
-                    !postexilicOnly && 'bg-gray-200 text-gray-900 hover:bg-blue-700 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-blue-700 dark:hover:text-white dark:border-transparent'
+                    !postexilicOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
                   )}
                   onClick={(e) => {
                     e.preventDefault();

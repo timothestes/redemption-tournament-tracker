@@ -32,10 +32,10 @@ function formatDeckType(format?: string): string {
 function getDeckTypeBadgeClasses(format?: string): string {
   const deckType = formatDeckType(format);
   if (deckType === "T2") {
-    return "px-2 py-0.5 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded text-xs font-semibold";
+    return "px-2 py-0.5 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 rounded text-xs font-semibold";
   }
   if (deckType === "Paragon") {
-    return "px-2 py-0.5 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 rounded text-xs font-semibold";
+    return "px-2 py-0.5 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 rounded text-xs font-semibold";
   }
   return "px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded text-xs font-semibold";
 }
@@ -153,7 +153,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
           />
           <button
             onClick={handleSearch}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+            className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-medium hover:bg-green-800 transition-colors"
           >
             Search
           </button>
@@ -343,10 +343,6 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
                 {deck.username}
               </span>
             </p>
-          )}
-
-          {deck.description && (
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">{deck.description}</p>
           )}
 
           <div className="flex items-center gap-3 text-sm mb-3">

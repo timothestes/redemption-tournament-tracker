@@ -35,7 +35,7 @@ export default async function MyDecksPage() {
         <div className="flex items-center justify-center gap-3">
           <Link
             href="/sign-in"
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+            className="px-6 py-3 bg-green-700 text-white rounded-lg font-medium hover:bg-green-800 transition-colors"
           >
             Sign in
           </Link>

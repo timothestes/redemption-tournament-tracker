@@ -347,6 +347,7 @@ export async function loadDeckByIdAction(deckId: string) {
         ...deck,
         cards: cards || [],
       },
+      isOwner: deck.user_id === user.id,
     };
   } catch (error) {
     console.error("Error in loadDeckByIdAction:", error);
