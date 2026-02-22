@@ -30,6 +30,7 @@ interface PublicDeckData {
 interface Props {
   deck: PublicDeckData;
   isOwner: boolean;
+  isLoggedIn: boolean;
 }
 
 // Enriched card with full Card data from the card database
@@ -117,7 +118,7 @@ function sanitizeImgFile(imgFile: string): string {
   return (imgFile || "").replace(/\.jpe?g$/i, "");
 }
 
-export default function PublicDeckClient({ deck, isOwner }: Props) {
+export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   const router = useRouter();
   const [linkCopied, setLinkCopied] = useState(false);
   const [copying, setCopying] = useState(false);
@@ -398,7 +399,7 @@ export default function PublicDeckClient({ deck, isOwner }: Props) {
               )}
             </button>
 
-            {!isOwner && (
+            {!isOwner && isLoggedIn && (
               <button
                 onClick={handleCopyToLibrary}
                 disabled={copying}

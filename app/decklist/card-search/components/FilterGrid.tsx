@@ -184,16 +184,16 @@ export default function FilterGrid({
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-4 items-start bg-white text-gray-900 border border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-900 dark:shadow p-4 rounded-lg">
-      {/* Legality & Alignment */}
-      <div>
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 mb-4 items-start bg-white text-gray-900 border border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-900 dark:shadow p-3 md:p-4 rounded-lg">
+      {/* Legality & Alignment — spans full width on mobile so Types/Brigades get their own column */}
+      <div className="col-span-2 md:col-span-1">
         <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Legality</p>
-        <div className="flex flex-col sm:flex-row gap-2 mb-4 flex-wrap">
+        <div className="flex flex-wrap gap-1.5 mb-3">
           {['Rotation','Classic','Banned','Scrolls','Paragon'].map((mode) => (
             <button
               key={mode}
               className={clsx(
-                'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
                 legalityMode === mode
                   ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
                   : 'bg-gray-200 text-gray-900 hover:bg-blue-400 hover:text-blue-900 border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
@@ -205,12 +205,12 @@ export default function FilterGrid({
           ))}
         </div>
         <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Alignment</p>
-        <div className="flex flex-col sm:flex-row gap-2 mb-4 flex-wrap">
+        <div className="flex flex-wrap gap-1.5 mb-3">
           {['Good','Evil','Neutral'].map((mode) => (
             <button
               key={mode}
               className={clsx(
-                'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
                 selectedAlignmentFilters.includes(mode)
                   ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
                   : 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
@@ -222,12 +222,12 @@ export default function FilterGrid({
           ))}
         </div>
         <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Rarity</p>
-        <div className="flex flex-col sm:flex-row gap-2 mb-4 flex-wrap">
+        <div className="flex flex-wrap gap-1.5 mb-3">
           {['Common','Promo','Rare','Ultra Rare'].map((rarity) => (
             <button
               key={rarity}
               className={clsx(
-                'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
                 selectedRarityFilters.includes(rarity)
                   ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
                   : 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
@@ -241,15 +241,15 @@ export default function FilterGrid({
         {/* Advanced Filters */}
         <div className="mb-4">
           <button
-            className="px-3 py-2 border rounded text-base mb-2 bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 dark:bg-gray-900 dark:text-white dark:hover:bg-gray-700 dark:hover:text-white font-semibold shadow"
+            className="px-2.5 py-1 md:px-3 md:py-2 border rounded text-sm md:text-base mb-2 bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 dark:bg-gray-900 dark:text-white dark:hover:bg-gray-700 dark:hover:text-white font-semibold shadow"
             onClick={() => setAdvancedOpen(!advancedOpen)}
           >
             Advanced Filters {advancedOpen ? '▲' : '▼'}
           </button>
           {advancedOpen && (
             <div className="p-2 border rounded space-y-2">
-              <p className="font-bold text-lg text-gray-900 dark:text-white rounded px-2 py-1 inline-block shadow-none">Testament</p>
-              <div className="flex flex-col sm:flex-row gap-2 mb-2">
+              <p className="font-bold text-base md:text-lg text-gray-900 dark:text-white rounded px-2 py-1 inline-block shadow-none">Testament</p>
+              <div className="flex flex-wrap gap-1.5 mb-2">
                 {['OT','NT'].map((t) => {
                   const isActive = selectedTestaments.includes(t);
                   const isNot = testamentNots[t] || false;
@@ -257,7 +257,7 @@ export default function FilterGrid({
                     <button
                       key={t}
                       className={clsx(
-                        'px-3 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                        'px-2.5 py-1 md:px-3 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
                         isActive && !isNot && 'bg-yellow-200 text-yellow-900 border-yellow-400 dark:bg-yellow-600 dark:text-white dark:border-transparent',
                         isActive && isNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
                         !isActive && 'bg-gray-200 text-gray-900 border-gray-300 hover:bg-gray-400 hover:text-gray-900 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
@@ -290,7 +290,7 @@ export default function FilterGrid({
                 })}
                 <button
                   className={clsx(
-                    'px-3 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                    'px-2.5 py-1 md:px-3 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
                     isGospel && !gospelNot && 'bg-yellow-300 text-yellow-900 border-yellow-500 dark:bg-yellow-700 dark:text-white dark:border-transparent',
                     isGospel && gospelNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
                     !isGospel && 'bg-gray-200 text-gray-900 border-gray-300 hover:bg-gray-400 hover:text-gray-900 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
@@ -371,7 +371,7 @@ export default function FilterGrid({
               <div className="flex flex-wrap gap-2">
                 <button
                   className={clsx(
-                    'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                    'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
                     noAltArt
                       ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
                       : 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
@@ -382,7 +382,7 @@ export default function FilterGrid({
                 </button>
                 <button
                   className={clsx(
-                    'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                    'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
                     noFirstPrint
                       ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
                       : 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
@@ -393,7 +393,7 @@ export default function FilterGrid({
                 </button>
                 <button
                   className={clsx(
-                    'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                    'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
                     nativityOnly && !nativityNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
                     nativityOnly && nativityNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
                     !nativityOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
@@ -420,7 +420,7 @@ export default function FilterGrid({
                 </button>
                 <button
                   className={clsx(
-                    'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                    'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
                     hasStarOnly && !hasStarNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
                     hasStarOnly && hasStarNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
                     !hasStarOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
@@ -447,7 +447,7 @@ export default function FilterGrid({
                 </button>
                 <button
                   className={clsx(
-                    'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                    'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
                     cloudOnly && !cloudNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
                     cloudOnly && cloudNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
                     !cloudOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
@@ -474,7 +474,7 @@ export default function FilterGrid({
                 </button>
                 <button
                   className={clsx(
-                    'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                    'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
                     angelOnly && !angelNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
                     angelOnly && angelNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
                     !angelOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
@@ -501,7 +501,7 @@ export default function FilterGrid({
                 </button>
                 <button
                   className={clsx(
-                    'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                    'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
                     demonOnly && !demonNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
                     demonOnly && demonNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
                     !demonOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
@@ -528,7 +528,7 @@ export default function FilterGrid({
                 </button>
                 <button
                   className={clsx(
-                    'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                    'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
                     danielOnly && !danielNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
                     danielOnly && danielNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
                     !danielOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
@@ -555,7 +555,7 @@ export default function FilterGrid({
                 </button>
                 <button
                   className={clsx(
-                    'px-4 py-2 border rounded text-base font-semibold shadow transition-colors duration-150',
+                    'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
                     postexilicOnly && !postexilicNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
                     postexilicOnly && postexilicNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
                     !postexilicOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
@@ -597,11 +597,11 @@ export default function FilterGrid({
                 src={src}
                 alt={t}
                 className={clsx(
-                  'h-10 w-10 sm:h-8 sm:w-auto cursor-pointer',
+                  'h-8 w-8 md:h-10 md:w-auto cursor-pointer',
                   selectedIconFilters.some(f => f.icon === t) && 'ring-2 ring-blue-500 dark:ring-blue-300'
                 )}
                 onClick={() => toggleIconFilter(t)}
-                style={{ minWidth: 40, minHeight: 40 }}
+                style={{ minWidth: 32, minHeight: 32 }}
               />
             );
           })}
@@ -667,7 +667,7 @@ export default function FilterGrid({
                 selectedIconFilters.some(f => f.icon === icon) && "ring-2 ring-blue-500 dark:ring-blue-300"
               )}
               onClick={() => toggleIconFilter(icon)}
-              style={{ minWidth: 40, minHeight: 40 }}
+              style={{ minWidth: 32, minHeight: 32 }}
             />
           ))}
         </div>
@@ -683,7 +683,7 @@ export default function FilterGrid({
                 selectedIconFilters.some(f => f.icon === icon) && "ring-2 ring-blue-500 dark:ring-blue-300"
               )}
               onClick={() => toggleIconFilter(icon)}
-              style={{ minWidth: 40, minHeight: 40 }}
+              style={{ minWidth: 32, minHeight: 32 }}
             />
           ))}
         </div>

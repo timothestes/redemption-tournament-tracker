@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { loadPublicDeckAction } from "../actions";
+import { createClient } from "../../../utils/supabase/server";
 import PublicDeckClient from "./client";
 
 interface PageProps {
@@ -61,7 +62,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function PublicDeckPage({ params }: PageProps) {
   const { deckId } = await params;
-  const result = await loadPublicDeckAction(deckId);
+  const [result, { data: { user } }] = await Promise.all([
+    loadPublicDeckAction(deckId),
+    createClient().then((sb) => sb.auth.getUser()),
+  ]);
 
   if (!result.success || !result.deck) {
     if (result.error === "This deck is private") {
@@ -84,6 +88,7 @@ export default async function PublicDeckPage({ params }: PageProps) {
     <PublicDeckClient
       deck={result.deck}
       isOwner={result.isOwner ?? false}
+      isLoggedIn={!!user}
     />
   );
 }

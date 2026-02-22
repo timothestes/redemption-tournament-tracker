@@ -25,6 +25,7 @@ const TopNav: React.FC = () => {
   const [mounted, setMounted] = useState(false);
   const [logoSrc, setLogoSrc] = useState('/lor.png');
   const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const { isAdmin } = useIsAdmin();
   const pathname = usePathname();
   const supabase = createClient();
@@ -51,6 +52,7 @@ const TopNav: React.FC = () => {
     const getUser = async () => {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       setUser(currentUser);
+      setAuthLoading(false);
     };
 
     getUser();
@@ -129,17 +131,15 @@ const TopNav: React.FC = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/decklist/community" className="flex-shrink-0">
-            <div className="cursor-pointer">
-              {mounted && (
-                <Image
-                  src={logoSrc}
-                  alt="Home Icon"
-                  width={120}
-                  height={32}
-                  style={{ width: "auto", height: "auto", maxHeight: "32px" }}
-                  priority
-                />
-              )}
+            <div className="cursor-pointer" style={{ width: 120, height: 32 }}>
+              <Image
+                src={logoSrc}
+                alt="Home Icon"
+                width={120}
+                height={32}
+                style={{ width: "auto", height: "auto", maxHeight: "32px", opacity: mounted ? 1 : 0 }}
+                priority
+              />
             </div>
           </Link>
 
@@ -186,7 +186,7 @@ const TopNav: React.FC = () => {
             })}
 
             {/* Rest of nav links */}
-            {navLinks.slice(1).filter(link => !link.authRequired || user).map((link) => {
+            {navLinks.slice(1).map((link) => {
               const Icon = link.icon;
               const isHighlight = link.highlight;
               return (
@@ -232,7 +232,7 @@ const TopNav: React.FC = () => {
               {isDecksOpen && (
                 <div className="absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5">
                   <div className="py-2">
-                    {deckLinks.filter(link => !link.authRequired || user).map((link) => {
+                    {deckLinks.map((link) => {
                       const Icon = link.icon;
                       return (
                         <Link
@@ -355,14 +355,18 @@ const TopNav: React.FC = () => {
           {/* Auth Section - Right Side */}
           <div className="hidden md:flex md:items-center md:gap-3">
             <ThemeSwitcher />
-            {user ? (
+            {authLoading ? (
+              // Invisible placeholder matching the logged-out button sizes so layout doesn't shift
+              <div className="flex items-center gap-3 invisible" aria-hidden>
+                <Button size="sm" variant="outline">Sign in</Button>
+                <Button size="sm" variant="default">Sign up</Button>
+              </div>
+            ) : user ? (
               <>
                 <span className="text-sm text-gray-600 dark:text-gray-300">
                   {user.email}
                 </span>
-                <form
-                  action={signOutAction}
-                >
+                <form action={signOutAction}>
                   <Button type="submit" variant="outline" size="sm">
                     Sign out
                   </Button>
@@ -392,7 +396,7 @@ const TopNav: React.FC = () => {
 
       {/* Mobile Navigation */}
       {isMobileMenuOpen && (
-        <div className="md:hidden border-t border-gray-200 dark:border-gray-700">
+        <div className="md:hidden border-t border-gray-200 dark:border-gray-700 max-h-[calc(100dvh-4rem)] overflow-y-auto">
           <div className="px-2 pt-2 pb-3 space-y-1">
             {/* Nationals link */}
             {navLinks.slice(0, 1).map((link) => {
@@ -438,7 +442,7 @@ const TopNav: React.FC = () => {
             })}
 
             {/* Rest of nav links */}
-            {navLinks.slice(1).filter(link => !link.authRequired || user).map((link) => {
+            {navLinks.slice(1).map((link) => {
               const Icon = link.icon;
               const isHighlight = link.highlight;
               return (
@@ -482,7 +486,7 @@ const TopNav: React.FC = () => {
 
               {isDecksOpen && (
                 <div className="mt-2 ml-8 space-y-1">
-                  {deckLinks.filter(link => !link.authRequired || user).map((link) => {
+                  {deckLinks.map((link) => {
                     const Icon = link.icon;
                     return (
                       <Link

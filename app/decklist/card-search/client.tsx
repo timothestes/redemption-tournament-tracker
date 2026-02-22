@@ -105,8 +105,11 @@ export default function CardSearchClient() {
   // Check if this is an explicit "new deck" request
   const isNewDeck = searchParams.get("new") === "true";
   
-  // Collapse state for filter grid
+  // Collapse state for filter grid — collapsed by default on mobile
   const [filterGridCollapsed, setFilterGridCollapsed] = useState(false);
+  useEffect(() => {
+    if (window.innerWidth < 768) setFilterGridCollapsed(true);
+  }, []);
   // Query state - each query has its own text, search field, and operator
   type QueryOperator = 'AND' | 'OR' | 'AND NOT' | 'NOT';
   type QueryWithOp = { text: string; field: string; operator: QueryOperator };
@@ -197,7 +200,18 @@ export default function CardSearchClient() {
   // Panel visibility state
   const [showDeckBuilder, setShowDeckBuilder] = useState(true);
   const [showSearch, setShowSearch] = useState(true);
-  const [showMobileBanner, setShowMobileBanner] = useState(true);
+  const [showMobileBanner, setShowMobileBanner] = useState(false);
+
+  useEffect(() => {
+    if (!localStorage.getItem('mobile-banner-dismissed')) {
+      setShowMobileBanner(true);
+      const timer = setTimeout(() => {
+        setShowMobileBanner(false);
+        localStorage.setItem('mobile-banner-dismissed', '1');
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   // Track active tab in deck builder
   const [activeDeckTab, setActiveDeckTab] = useState<TabType>("main");
@@ -1217,9 +1231,9 @@ export default function CardSearchClient() {
     <div className="flex w-full h-screen overflow-hidden bg-gray-100 dark:bg-gray-900">
       {/* Mobile notice */}
       {showMobileBanner && (
-        <div className="md:hidden fixed top-16 left-0 right-0 z-50 bg-blue-100 dark:bg-blue-900 border-b border-blue-300 dark:border-green-800 px-4 py-3 text-center">
+        <div className="md:hidden fixed top-16 left-0 right-0 z-50 bg-blue-100 dark:bg-blue-900 border-b border-blue-300 dark:border-blue-700 px-4 py-3 text-center">
           <button
-            onClick={() => setShowMobileBanner(false)}
+            onClick={() => { setShowMobileBanner(false); localStorage.setItem('mobile-banner-dismissed', '1'); }}
             className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-900 dark:text-blue-100 hover:text-blue-700 dark:hover:text-blue-300"
             aria-label="Close banner"
           >
@@ -1237,7 +1251,7 @@ export default function CardSearchClient() {
         <div className={`flex-1 flex flex-col w-full ${showDeckBuilder ? 'md:w-1/2 xl:w-[61.8%]' : ''} overflow-hidden transition-all duration-300`}>
         <div className="bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200 flex-1 flex flex-col overflow-hidden">
           <div className="p-2 flex flex-col items-center sticky top-0 z-40 bg-white text-gray-900 border-b border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-800 dark:shadow-lg">
-        <div className="relative w-full max-w-xl px-2 flex flex-col sm:flex-row items-center justify-center gap-0">
+        <div className="relative w-full max-w-xl px-2 flex flex-col sm:flex-row sm:flex-wrap items-center justify-center gap-2">
           <div className="w-full flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-center sm:gap-2 text-center">
             <div className="flex flex-col gap-2 w-full sm:w-auto">
               {queries.map((queryObj, index) => (
@@ -1333,7 +1347,7 @@ export default function CardSearchClient() {
               {copyLinkNotification ? '✓' : '🔗'}
             </button>
             <button
-              className="px-4 w-full sm:w-auto rounded bg-green-200 text-green-900 hover:bg-green-400 hover:text-green-900 border border-green-300 dark:bg-green-700 dark:text-white dark:hover:bg-green-600 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center relative hidden sm:block"
+              className="px-4 w-full sm:w-auto rounded bg-green-200 text-green-900 hover:bg-green-400 hover:text-green-900 border border-green-300 dark:bg-green-700 dark:text-white dark:hover:bg-green-600 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center relative"
               onClick={addNewQuery}
               style={{ minHeight: 48, height: 48 }}
               title="Add new query"
@@ -1346,7 +1360,10 @@ export default function CardSearchClient() {
       {/* Active Filters Summary Bar */}
       <div className="w-full px-4 py-2 flex flex-wrap gap-2 items-center justify-center min-h-[44px] transition-all duration-300 sticky top-[120px] sm:top-[64px] z-30 bg-white text-gray-900 border-b border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-900 dark:shadow">
         {/* Collapse/Expand Filter Grid Button */}
-        <div className="absolute right-4 top-2">
+        <div className="absolute right-4 top-2 flex flex-row items-center gap-1.5">
+          <span className="md:hidden text-xs text-gray-500 dark:text-gray-400 font-medium">
+            Filters
+          </span>
           <button
             aria-label="Toggle filter grid"
             className={`w-8 h-8 rounded-full flex items-center justify-center border border-gray-400 dark:border-gray-700 shadow transition bg-gray-300 dark:bg-gray-700 ${filterGridCollapsed ? 'ring-2 ring-blue-400' : ''}`}
