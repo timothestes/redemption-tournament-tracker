@@ -766,9 +766,37 @@ export async function toggleDeckPublicAction(deckId: string, isPublic: boolean) 
       }
     }
 
+    // Build the update payload
+    const updatePayload: Record<string, unknown> = { is_public: isPublic };
+
+    // When making public, auto-set default preview cards if none are set
+    if (isPublic) {
+      const { data: existingDeck } = await supabase
+        .from("decks")
+        .select("preview_card_1, preview_card_2")
+        .eq("id", deckId)
+        .eq("user_id", user.id)
+        .single();
+
+      if (!existingDeck?.preview_card_1 && !existingDeck?.preview_card_2) {
+        const { data: deckCards } = await supabase
+          .from("deck_cards")
+          .select("card_img_file")
+          .eq("deck_id", deckId)
+          .eq("is_reserve", false)
+          .not("card_img_file", "is", null)
+          .limit(2);
+
+        if (deckCards && deckCards.length > 0) {
+          updatePayload.preview_card_1 = deckCards[0].card_img_file ?? null;
+          updatePayload.preview_card_2 = deckCards[1]?.card_img_file ?? null;
+        }
+      }
+    }
+
     const { error } = await supabase
       .from("decks")
-      .update({ is_public: isPublic })
+      .update(updatePayload)
       .eq("id", deckId)
       .eq("user_id", user.id);
 
