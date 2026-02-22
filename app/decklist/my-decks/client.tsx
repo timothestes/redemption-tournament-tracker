@@ -674,7 +674,7 @@ function DeckCard({
     <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow">
       {/* Image Header */}
       {formatDeckType(deck.format) === "Paragon" && deck.paragon ? (
-        <div className="h-32 overflow-hidden rounded-t-lg">
+        <div className="h-32 overflow-hidden rounded-t-lg cursor-pointer" onClick={() => onEdit(deck.id!)}>
           <img
             src={`/paragons/Paragon ${deck.paragon}.png`}
             alt={deck.paragon}
@@ -682,7 +682,7 @@ function DeckCard({
           />
         </div>
       ) : (getCardImageUrl(deck.preview_card_1) || getCardImageUrl(deck.preview_card_2)) ? (
-        <div className="h-32 overflow-hidden rounded-t-lg bg-gray-100 dark:bg-gray-900 flex items-center justify-center gap-1 px-2 py-2">
+        <div className="h-32 overflow-hidden rounded-t-lg bg-gray-100 dark:bg-gray-900 flex items-center justify-center gap-1 px-2 py-2 cursor-pointer" onClick={() => onEdit(deck.id!)}>
           {getCardImageUrl(deck.preview_card_1) && <img src={getCardImageUrl(deck.preview_card_1)!} alt="" className="h-full object-contain rounded" />}
           {getCardImageUrl(deck.preview_card_2) && <img src={getCardImageUrl(deck.preview_card_2)!} alt="" className="h-full object-contain rounded" />}
         </div>
