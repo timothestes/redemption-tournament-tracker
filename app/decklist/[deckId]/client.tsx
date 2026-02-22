@@ -788,7 +788,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                 onKeyDown={(e) => {
                   if (e.key === "Escape") { setDescriptionInput(description); setEditingDescription(false); }
                 }}
-                rows={6}
+                rows={26}
                 placeholder="Write a description for your deck... (Markdown supported)"
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
               />
@@ -810,7 +810,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
             </div>
           ) : description ? (
             <div
-              className={`rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3 ${isOwner ? "cursor-pointer hover:border-blue-300 dark:hover:border-green-700 transition-colors" : ""}`}
+              className={`rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3 ${isOwner ? "cursor-pointer hover:border-blue-300 dark:hover:border-blue-500 transition-colors" : ""}`}
               onClick={isOwner ? () => { setDescriptionInput(description); setEditingDescription(true); } : undefined}
               title={isOwner ? "Click to edit description" : undefined}
             >
@@ -822,7 +822,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
           ) : isOwner ? (
             <button
               onClick={() => setEditingDescription(true)}
-              className="w-full rounded-lg border border-dashed border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-gray-400 dark:text-gray-500 hover:border-green-600 hover:text-blue-500 dark:hover:border-blue-500 dark:hover:text-blue-400 transition-colors text-left"
+              className="w-full rounded-lg border border-dashed border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-gray-400 dark:text-gray-500 hover:border-blue-400 hover:text-blue-500 dark:hover:border-blue-500 dark:hover:text-blue-400 transition-colors text-left"
             >
               + Add a description...
             </button>
