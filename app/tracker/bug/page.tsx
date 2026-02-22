@@ -14,7 +14,7 @@ export default function BugPage() {
           >
             Redemption Discord
           </a>{" "}
-          or file an issue on the tournament tracker's GitHub{" "}
+          or file an issue on the RedemptionCCG App's GitHub{" "}
           <a
             href="https://github.com/timothestes/redemption-tournament-tracker/issues"
             className="text-blue-600 underline font-medium hover:text-blue-800"

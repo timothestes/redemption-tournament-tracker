@@ -58,7 +58,7 @@ export const printFinalStandings = (
         </style>
       </head>
       <body>
-        <img src="/lor-lightmode.png" alt="Tournament Logo" class="logo" />
+        <img src="/lightmode_redemptionccgapp.webp" alt="RedemptionCCG App Logo" class="logo" />
         <h1>${pageTitle}</h1>
         <button onclick="window.print();return false;" style="padding:10px 20px; margin:10px 0; background:#4a90e2; color:white; border:none; border-radius:4px; cursor:pointer;">Print</button>
   `;
@@ -179,7 +179,7 @@ export const printTournamentPairings = (
         </style>
       </head>
       <body>
-        <img src="/lor-lightmode.png" alt="Tournament Logo" class="logo" />
+        <img src="/lightmode_redemptionccgapp.webp" alt="RedemptionCCG App Logo" class="logo" />
         <h1>${pageTitle}</h1>
         <button onclick="window.print();return false;" style="padding:10px 20px; margin:10px 0; background:#4a90e2; color:white; border:none; border-radius:4px; cursor:pointer;">Print</button>
   `;

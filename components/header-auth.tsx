@@ -50,7 +50,7 @@ export async function AuthLogo() {
     </div>
   ) : (
     <div className="flex items-center">
-      <img src="/lor.png" className="w-48" alt="Land of Redemption Logo" />
+      <img src="/darkmode_redemptionccgapp.webp" className="w-48" alt="RedemptionCCG App Logo" />
     </div>
   );
 }

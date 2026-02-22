@@ -23,7 +23,7 @@ const TopNav: React.FC = () => {
   const [isDecksOpen, setIsDecksOpen] = useState(false);
   const { theme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  const [logoSrc, setLogoSrc] = useState('/lor.png');
+  const [logoSrc, setLogoSrc] = useState('/darkmode_redemptionccgapp.webp');
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const { isAdmin } = useIsAdmin();
@@ -47,7 +47,7 @@ const TopNav: React.FC = () => {
   useEffect(() => {
     setMounted(true);
     const currentTheme = theme === 'system' ? resolvedTheme : theme;
-    setLogoSrc(currentTheme === 'light' ? '/lor-lightmode.png' : '/lor.png');
+    setLogoSrc(currentTheme === 'light' ? '/lightmode_redemptionccgapp.webp' : '/darkmode_redemptionccgapp.webp');
 
     const getUser = async () => {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
@@ -134,7 +134,7 @@ const TopNav: React.FC = () => {
             <div className="cursor-pointer" style={{ width: 120, height: 32 }}>
               <Image
                 src={logoSrc}
-                alt="Home Icon"
+                alt="RedemptionCCG App Logo"
                 width={120}
                 height={32}
                 style={{ width: "auto", height: "auto", maxHeight: "32px", opacity: mounted ? 1 : 0 }}

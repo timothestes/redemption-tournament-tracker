@@ -25,7 +25,7 @@ export default function TournamentsPage() {
   useEffect(() => {
     fetchTournaments();
     // Reset document title when viewing tournaments list
-    document.title = "Land of Redemption Tournament Tracker";
+    document.title = "RedemptionCCG App";
   }, []);
 
   const handleAddTournament = async (name: string) => {

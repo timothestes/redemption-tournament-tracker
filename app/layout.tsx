@@ -9,8 +9,8 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "Land of Redemption Tournament Tracker",
-  description: "A new way to host Redemption Tournaments",
+  title: "RedemptionCCG App",
+  description: "The best way to experience Redemption online",
 };
 
 export default function RootLayout({
