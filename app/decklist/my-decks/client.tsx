@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   loadUserDecksAction,
@@ -13,8 +13,10 @@ import {
   moveDeckToFolderAction,
   loadDeckByIdAction,
   toggleDeckPublicAction,
+  loadGlobalTagsAction,
   DeckData,
-  FolderData
+  FolderData,
+  GlobalTag,
 } from "../actions";
 import DeleteDeckModal from "./DeleteDeckModal";
 import FolderModal from "./FolderModal";
@@ -42,6 +44,13 @@ function getDeckTypeBadgeClasses(format?: string): string {
     return "px-2 py-0.5 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 rounded text-xs font-semibold";
   }
   return "px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded text-xs font-semibold";
+}
+
+function getContrastColor(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.55 ? "#1f2937" : "#ffffff";
 }
 
 // Helper function to format date with time and timezone
@@ -78,6 +87,37 @@ export default function MyDecksClient() {
   const [folderToDelete, setFolderToDelete] = useState<{ id: string; name: string } | null>(null);
   const [pdfDeck, setPdfDeck] = useState<Deck | null>(null); // For PDF generation modal
   const [usernameModalDeckId, setUsernameModalDeckId] = useState<string | null>(null);
+
+  // Tag filter state
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [globalTags, setGlobalTags] = useState<GlobalTag[]>([]);
+  const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
+  const [tagFilterInput, setTagFilterInput] = useState("");
+  const tagDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!tagDropdownOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (tagDropdownRef.current && !tagDropdownRef.current.contains(e.target as Node)) {
+        setTagDropdownOpen(false);
+        setTagFilterInput("");
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [tagDropdownOpen]);
+
+  useEffect(() => {
+    loadGlobalTagsAction().then((res) => {
+      if (res.success) setGlobalTags(res.tags);
+    });
+  }, []);
+
+  function toggleTagFilter(tagId: string) {
+    setSelectedTagIds((prev) =>
+      prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]
+    );
+  }
 
   useEffect(() => {
     loadData();
@@ -261,9 +301,14 @@ export default function MyDecksClient() {
   }
 
   // Filter decks based on selected folder
-  const filteredDecks = selectedFolder === null 
-    ? decks.filter(d => !d.folder_id) // Show uncategorized decks
+  const folderDecks = selectedFolder === null
+    ? decks.filter(d => !d.folder_id)
     : decks.filter(d => d.folder_id === selectedFolder);
+
+  // Apply tag filter (client-side)
+  const filteredDecks = selectedTagIds.length === 0
+    ? folderDecks
+    : folderDecks.filter(d => d.tags && d.tags.some(t => selectedTagIds.includes(t.id)));
 
   // Sort decks
   const sortedDecks = [...filteredDecks].sort((a, b) => {
@@ -380,6 +425,7 @@ export default function MyDecksClient() {
               <h1 className="text-3xl font-bold mb-2">{selectedFolderName}</h1>
               <p className="text-gray-600 dark:text-gray-400">
                 {filteredDecks.length} {filteredDecks.length === 1 ? "deck" : "decks"}
+                {selectedTagIds.length > 0 && ` · ${selectedTagIds.length} tag${selectedTagIds.length > 1 ? "s" : ""} selected`}
               </p>
             </div>
             <button
@@ -391,7 +437,7 @@ export default function MyDecksClient() {
           </div>
 
           {/* Controls */}
-          <div className="flex items-center justify-between mb-6 gap-4">
+          <div className="flex items-center justify-between mb-3 gap-4">
             <div className="flex items-center gap-2">
               <label className="text-sm text-gray-600 dark:text-gray-400">Sort by:</label>
               <select
@@ -403,6 +449,86 @@ export default function MyDecksClient() {
                 <option value="created">Date Created</option>
                 <option value="name">Name</option>
               </select>
+
+              {/* Tags dropdown */}
+              {globalTags.length > 0 && (
+                <div className="relative" ref={tagDropdownRef}>
+                  <button
+                    onClick={() => { setTagDropdownOpen((o) => !o); setTagFilterInput(""); }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm transition-colors ${
+                      selectedTagIds.length > 0
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                        : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a2 2 0 012-2z" />
+                    </svg>
+                    Tags
+                    {selectedTagIds.length > 0 && (
+                      <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-blue-600 text-white">
+                        {selectedTagIds.length}
+                      </span>
+                    )}
+                    <svg className={`w-3.5 h-3.5 transition-transform ${tagDropdownOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {tagDropdownOpen && (
+                    <div className="absolute z-50 top-full mt-1.5 left-0 w-64 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl">
+                      <div className="px-3 pt-3 pb-2 border-b border-gray-100 dark:border-gray-800">
+                        <input
+                          autoFocus
+                          type="text"
+                          placeholder="Filter tags…"
+                          value={tagFilterInput}
+                          onChange={(e) => setTagFilterInput(e.target.value)}
+                          className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div className="max-h-64 overflow-y-auto">
+                        {globalTags.filter((t) => t.name.toLowerCase().includes(tagFilterInput.toLowerCase())).length === 0 ? (
+                          <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-4">No matches</p>
+                        ) : (
+                          globalTags
+                            .filter((t) => t.name.toLowerCase().includes(tagFilterInput.toLowerCase()))
+                            .map((tag) => {
+                              const active = selectedTagIds.includes(tag.id);
+                              return (
+                                <button
+                                  key={tag.id}
+                                  onClick={() => toggleTagFilter(tag.id)}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                                >
+                                  <span className="w-4 flex-shrink-0 flex items-center justify-center">
+                                    {active && (
+                                      <svg className="w-3.5 h-3.5 text-gray-700 dark:text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                      </svg>
+                                    )}
+                                  </span>
+                                  <span className="w-3 h-3 rounded-full flex-shrink-0 border border-black/10" style={{ backgroundColor: tag.color }} />
+                                  <span className="text-sm text-gray-800 dark:text-gray-200">{tag.name}</span>
+                                </button>
+                              );
+                            })
+                        )}
+                      </div>
+                      {selectedTagIds.length > 0 && (
+                        <div className="border-t border-gray-100 dark:border-gray-800">
+                          <button
+                            onClick={() => setSelectedTagIds([])}
+                            className="w-full px-3 py-2 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                          >
+                            Clear all tags
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2">
@@ -439,6 +565,30 @@ export default function MyDecksClient() {
             </div>
           </div>
 
+          {/* Active tag pills banner */}
+          {selectedTagIds.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              <span className="text-xs text-gray-500 dark:text-gray-400">Filtered by:</span>
+              {selectedTagIds.map((id) => {
+                const tag = globalTags.find((t) => t.id === id);
+                if (!tag) return null;
+                return (
+                  <button
+                    key={id}
+                    onClick={() => toggleTagFilter(id)}
+                    className="flex items-center gap-1 pl-2.5 pr-1.5 py-0.5 rounded-full text-xs font-medium"
+                    style={{ backgroundColor: tag.color, color: getContrastColor(tag.color) }}
+                  >
+                    {tag.name}
+                    <svg className="w-3 h-3 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {/* Decks Display */}
           {filteredDecks.length === 0 ? (
             <div className="text-center py-16">
@@ -456,10 +606,12 @@ export default function MyDecksClient() {
                 />
               </svg>
               <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-gray-100">
-                No decks in {selectedFolderName.toLowerCase()}
+                {selectedTagIds.length > 0 ? "No decks match the selected tags" : `No decks in ${selectedFolderName.toLowerCase()}`}
               </h3>
               <p className="mt-2 text-gray-600 dark:text-gray-400">
-                {selectedFolder ? "Create a new deck or move existing decks to this folder." : "Get started by creating your first deck!"}
+                {selectedTagIds.length > 0
+                  ? "Try removing some tag filters."
+                  : selectedFolder ? "Create a new deck or move existing decks to this folder." : "Get started by creating your first deck!"}
               </p>
               <button
                 onClick={handleNewDeck}
@@ -726,6 +878,20 @@ function DeckCard({
           </div>
         </div>
 
+        {deck.tags && deck.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {deck.tags.slice(0, 6).map((tag) => (
+              <span
+                key={tag.id}
+                className="px-2 py-0.5 rounded-full text-xs font-medium"
+                style={{ backgroundColor: tag.color, color: getContrastColor(tag.color) }}
+              >
+                {tag.name}
+              </span>
+            ))}
+          </div>
+        )}
+
         <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
           <p className="text-xs text-gray-500 dark:text-gray-500">
             Updated {updatedDate}
@@ -788,6 +954,19 @@ function DeckListItem({
               {deck.is_public ? "Public" : "Private"}
             </span>
           </div>
+          {deck.tags && deck.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {deck.tags.slice(0, 6).map((tag) => (
+                <span
+                  key={tag.id}
+                  className="px-2 py-0.5 rounded-full text-xs font-medium"
+                  style={{ backgroundColor: tag.color, color: getContrastColor(tag.color) }}
+                >
+                  {tag.name}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-6 text-sm text-gray-600 dark:text-gray-400">

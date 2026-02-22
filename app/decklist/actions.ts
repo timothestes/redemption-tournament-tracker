@@ -18,6 +18,7 @@ export interface DeckData {
   preview_card_2?: string | null;
   created_at?: string;
   updated_at?: string;
+  tags?: GlobalTag[];
 }
 
 export interface DeckCardData {
@@ -254,15 +255,31 @@ export async function loadUserDecksAction() {
     }
 
     // Calculate main deck count for each deck from the actual cards
+    const deckIds = (decks || []).map((d: any) => d.id).filter(Boolean);
+    let tagsMap = new Map<string, GlobalTag[]>();
+    if (deckIds.length > 0) {
+      const { data: tagRows } = await supabase
+        .from("deck_tags")
+        .select("deck_id, global_tags(id, name, color)")
+        .in("deck_id", deckIds);
+      for (const row of tagRows || []) {
+        if (!row.global_tags) continue;
+        const existing = tagsMap.get(row.deck_id) || [];
+        existing.push(row.global_tags as unknown as GlobalTag);
+        tagsMap.set(row.deck_id, existing);
+      }
+    }
+
     const decksWithCounts = (decks || []).map((deck: any) => {
       const mainDeckCount = (deck.deck_cards || [])
         .filter((card: any) => !card.is_reserve)
         .reduce((sum: number, card: any) => sum + card.quantity, 0);
-      
+
       return {
         ...deck,
         card_count: mainDeckCount,
-        deck_cards: undefined, // Remove cards array from response (not needed in list view)
+        deck_cards: undefined,
+        tags: tagsMap.get(deck.id) || [],
       };
     });
 
@@ -885,6 +902,16 @@ export async function loadPublicDeckAction(deckId: string) {
       .eq("id", deck.user_id)
       .single();
 
+    // Fetch tags for this deck
+    const { data: deckTagRows } = await supabase
+      .from("deck_tags")
+      .select("tag_id, global_tags(id, name, color)")
+      .eq("deck_id", deckId);
+
+    const tags = (deckTagRows || [])
+      .map((row: any) => row.global_tags)
+      .filter(Boolean);
+
     // Increment view count (fire-and-forget, only for non-owners)
     if (!isOwner) {
       supabase
@@ -900,6 +927,7 @@ export async function loadPublicDeckAction(deckId: string) {
         ...deck,
         username: profile?.username || null,
         cards: cards || [],
+        tags,
       },
       isOwner,
     };
@@ -1060,6 +1088,7 @@ export interface LoadPublicDecksParams {
   format?: string;
   search?: string;
   username?: string;
+  tagIds?: string[];
 }
 
 export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) {
@@ -1072,14 +1101,33 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
       format,
       search,
       username,
+      tagIds,
     } = params;
 
     const offset = (page - 1) * pageSize;
+
+    // If tag filtering is requested, resolve the matching deck IDs first
+    let tagFilteredDeckIds: string[] | null = null;
+    if (tagIds && tagIds.length > 0) {
+      const { data: tagRows } = await supabase
+        .from("deck_tags")
+        .select("deck_id")
+        .in("tag_id", tagIds);
+      // OR logic: any deck that has at least one of the selected tags
+      tagFilteredDeckIds = [...new Set((tagRows || []).map((r: any) => r.deck_id))];
+      if (tagFilteredDeckIds.length === 0) {
+        return { success: true, decks: [], totalCount: 0 };
+      }
+    }
 
     let query = supabase
       .from("decks")
       .select("id, name, description, format, paragon, card_count, view_count, preview_card_1, preview_card_2, user_id, created_at, updated_at", { count: "exact" })
       .eq("is_public", true);
+
+    if (tagFilteredDeckIds) {
+      query = query.in("id", tagFilteredDeckIds);
+    }
 
     if (format) {
       if (format === "Type 1") {
@@ -1154,9 +1202,26 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
         .in("id", userIds);
       usernameMap = new Map((profiles || []).map((p: any) => [p.id, p.username]));
     }
+    // Batch-fetch tags for all returned decks
+    const deckIds = (decks || []).map((d: any) => d.id).filter(Boolean);
+    let tagsMap = new Map<string, GlobalTag[]>();
+    if (deckIds.length > 0) {
+      const { data: tagRows } = await supabase
+        .from("deck_tags")
+        .select("deck_id, global_tags(id, name, color)")
+        .in("deck_id", deckIds);
+      for (const row of (tagRows || []) as any[]) {
+        if (!row.global_tags) continue;
+        const existing = tagsMap.get(row.deck_id) || [];
+        existing.push(row.global_tags as unknown as GlobalTag);
+        tagsMap.set(row.deck_id, existing);
+      }
+    }
+
     const decksWithUsername = (decks || []).map((d: any) => ({
       ...d,
       username: usernameMap.get(d.user_id) || null,
+      tags: tagsMap.get(d.id) || [],
     }));
 
     return { success: true, decks: decksWithUsername, totalCount: count || 0 };
@@ -1270,6 +1335,70 @@ export async function setUsernameAction(username: string) {
     return { success: true };
   } catch (error) {
     console.error("Error in setUsernameAction:", error);
+    return { success: false, error: "An unexpected error occurred" };
+  }
+}
+
+// ─── Tag types ────────────────────────────────────────────────────────────────
+
+export interface GlobalTag {
+  id: string;
+  name: string;
+  color: string;
+}
+
+/**
+ * Load the full predefined tag list (public, no auth required)
+ */
+export async function loadGlobalTagsAction(): Promise<{ success: boolean; tags: GlobalTag[]; error?: string }> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("global_tags")
+      .select("id, name, color")
+      .order("name");
+    if (error) return { success: false, tags: [], error: "Failed to load tags" };
+    return { success: true, tags: data || [] };
+  } catch {
+    return { success: false, tags: [], error: "An unexpected error occurred" };
+  }
+}
+
+/**
+ * Replace all tags on a deck (owner only)
+ */
+export async function updateDeckTagsAction(deckId: string, tagIds: string[]) {
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return { success: false, error: "Not authenticated" };
+
+    // Verify ownership
+    const { data: deck } = await supabase
+      .from("decks")
+      .select("user_id")
+      .eq("id", deckId)
+      .single();
+    if (!deck || deck.user_id !== user.id) return { success: false, error: "Not authorized" };
+
+    // Delete existing tags then insert new set
+    const { error: delError } = await supabase
+      .from("deck_tags")
+      .delete()
+      .eq("deck_id", deckId);
+    if (delError) return { success: false, error: "Failed to update tags" };
+
+    if (tagIds.length > 0) {
+      const { error: insError } = await supabase
+        .from("deck_tags")
+        .insert(tagIds.map((tag_id) => ({ deck_id: deckId, tag_id })));
+      if (insError) return { success: false, error: "Failed to save tags" };
+    }
+
+    revalidatePath(`/decklist/${deckId}`);
+    revalidatePath("/decklist/community");
+    return { success: true };
+  } catch {
     return { success: false, error: "An unexpected error occurred" };
   }
 }

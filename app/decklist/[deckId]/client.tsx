@@ -1,10 +1,13 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { copyPublicDeckAction, updateDeckPreviewCardsAction, renameDeckAction, updateDeckDescriptionAction, DeckCardData } from "../actions";
+import { copyPublicDeckAction, updateDeckPreviewCardsAction, renameDeckAction, updateDeckDescriptionAction, updateDeckTagsAction, loadGlobalTagsAction, GlobalTag, DeckCardData } from "../actions";
+import { createGlobalTagAction } from "../../admin/tags/actions";
+import { HexColorPicker } from "react-colorful";
+import { useIsAdmin } from "../../../hooks/useIsAdmin";
 import ReactMarkdown from "react-markdown";
 import { CARD_DATA_URL } from "../card-search/constants";
 import { Card } from "../card-search/utils";
@@ -25,6 +28,15 @@ interface PublicDeckData {
   created_at: string;
   updated_at: string;
   cards: DeckCardData[];
+  tags?: GlobalTag[];
+}
+
+function getContrastColor(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.55 ? "#1f2937" : "#ffffff";
 }
 
 interface Props {
@@ -120,6 +132,7 @@ function sanitizeImgFile(imgFile: string): string {
 
 export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   const router = useRouter();
+  const { isAdmin } = useIsAdmin();
   const [linkCopied, setLinkCopied] = useState(false);
   const [copying, setCopying] = useState(false);
   const [copyResult, setCopyResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -156,6 +169,82 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
     const result = await updateDeckDescriptionAction(deck.id, descriptionInput);
     setSavingDescription(false);
     if (!result.success) setDescription(description); // revert on failure
+  }
+
+  // Tags
+  const [deckTags, setDeckTags] = useState<GlobalTag[]>(deck.tags || []);
+  const [allGlobalTags, setAllGlobalTags] = useState<GlobalTag[]>([]);
+  const [tagPickerOpen, setTagPickerOpen] = useState(false);
+  const [tagFilter, setTagFilter] = useState("");
+  const [savingTags, setSavingTags] = useState(false);
+  const tagPickerRef = useRef<HTMLDivElement>(null);
+
+  // Load global tag list for the picker (owner only)
+  useEffect(() => {
+    if (!isOwner) return;
+    loadGlobalTagsAction().then((res) => {
+      if (res.success) setAllGlobalTags(res.tags);
+    });
+  }, [isOwner]);
+
+  // Close picker on outside click
+  useEffect(() => {
+    if (!tagPickerOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (tagPickerRef.current && !tagPickerRef.current.contains(e.target as Node)) {
+        setTagPickerOpen(false);
+        setTagFilter("");
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [tagPickerOpen]);
+
+  const toggleTag = useCallback(async (tag: GlobalTag) => {
+    const isSelected = deckTags.some((t) => t.id === tag.id);
+    const next = isSelected
+      ? deckTags.filter((t) => t.id !== tag.id)
+      : [...deckTags, tag];
+    setDeckTags(next);
+    setSavingTags(true);
+    await updateDeckTagsAction(deck.id, next.map((t) => t.id));
+    setSavingTags(false);
+  }, [deckTags, deck.id]);
+
+  const filteredGlobalTags = allGlobalTags.filter((t) =>
+    t.name.toLowerCase().includes(tagFilter.toLowerCase())
+  );
+
+  // Inline create tag form (admin only, inside the picker)
+  const [createMode, setCreateMode] = useState(false);
+  const [createName, setCreateName] = useState("");
+  const [createColor, setCreateColor] = useState("#6366f1");
+  const [createColorOpen, setCreateColorOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  async function handleCreateTag(e: React.FormEvent) {
+    e.preventDefault();
+    if (!createName.trim()) return;
+    setCreateError(null);
+    setCreating(true);
+    const res = await createGlobalTagAction(createName.trim(), createColor);
+    setCreating(false);
+    if (!res.success) {
+      setCreateError(res.error || "Failed to create tag");
+      return;
+    }
+    const newTag = res.tag as GlobalTag;
+    // Add to global list and immediately apply to deck
+    setAllGlobalTags((prev) => [...prev, newTag].sort((a, b) => a.name.localeCompare(b.name)));
+    const next = [...deckTags, newTag];
+    setDeckTags(next);
+    setSavingTags(true);
+    await updateDeckTagsAction(deck.id, next.map((t) => t.id));
+    setSavingTags(false);
+    setCreateMode(false);
+    setCreateName("");
+    setCreateColor("#6366f1");
+    setCreateError(null);
   }
 
   // Cover card editor (owner only)
@@ -374,6 +463,196 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                 <span className="text-sm text-gray-400 dark:text-gray-500">{deck.view_count} views</span>
               )}
             </div>
+
+            {/* Tags row */}
+            {(deckTags.length > 0 || isOwner) && (
+              <div className="flex items-center gap-2 flex-wrap mt-2">
+                {deckTags.map((tag) =>
+                  isOwner ? (
+                    <button
+                      key={tag.id}
+                      onClick={() => toggleTag(tag)}
+                      className="group flex items-center gap-1 pl-2.5 pr-1.5 py-0.5 rounded-full text-xs font-medium transition-opacity"
+                      style={{ backgroundColor: tag.color, color: getContrastColor(tag.color) }}
+                      title={`Remove "${tag.name}"`}
+                    >
+                      {tag.name}
+                      <svg
+                        className="w-3 h-3 opacity-50 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  ) : (
+                    <span
+                      key={tag.id}
+                      className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+                      style={{ backgroundColor: tag.color, color: getContrastColor(tag.color) }}
+                    >
+                      {tag.name}
+                    </span>
+                  )
+                )}
+
+                {/* Owner tag picker trigger */}
+                {isOwner && (
+                  <div className="relative" ref={tagPickerRef}>
+                    <button
+                      onClick={() => { setTagPickerOpen((o) => !o); setTagFilter(""); }}
+                      className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-dashed border-gray-400 dark:border-gray-500 text-xs text-gray-500 dark:text-gray-400 hover:border-gray-600 dark:hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      {deckTags.length === 0 ? "Add tags" : "Edit"}
+                      {savingTags && <span className="ml-1 opacity-60">·</span>}
+                    </button>
+
+                    {tagPickerOpen && (
+                      <div className="absolute z-50 top-full mt-1.5 left-0 w-72 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl">
+
+                        {createMode ? (
+                          /* ── Inline create form ── */
+                          <form onSubmit={handleCreateTag} className="p-3 flex flex-col gap-3">
+                            {/* Name + swatch row */}
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setCreateColorOpen((o) => !o)}
+                                className="w-7 h-7 rounded-md border-2 border-gray-300 dark:border-gray-600 shadow-sm flex-shrink-0 hover:scale-110 transition-transform"
+                                style={{ backgroundColor: createColor }}
+                                title={createColorOpen ? "Close color picker" : "Pick color"}
+                              />
+                              <input
+                                autoFocus
+                                type="text"
+                                placeholder="Tag name"
+                                value={createName}
+                                onChange={(e) => setCreateName(e.target.value)}
+                                maxLength={50}
+                                className="flex-1 px-2.5 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                            </div>
+
+                            {/* Color picker — inline, expands the dropdown downward */}
+                            {createColorOpen && (
+                              <div className="flex flex-col items-center gap-1.5">
+                                <HexColorPicker color={createColor} onChange={setCreateColor} style={{ width: "100%" }} />
+                                <span className="font-mono text-xs text-gray-400 dark:text-gray-500">{createColor}</span>
+                              </div>
+                            )}
+
+                            {/* Preview pill */}
+                            {createName.trim() && (
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs text-gray-400 dark:text-gray-500">Preview:</span>
+                                <span
+                                  className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+                                  style={{ backgroundColor: createColor, color: getContrastColor(createColor) }}
+                                >
+                                  {createName}
+                                </span>
+                              </div>
+                            )}
+
+                            {createError && (
+                              <p className="text-xs text-red-500 dark:text-red-400">{createError}</p>
+                            )}
+
+                            <div className="flex gap-2">
+                              <button
+                                type="submit"
+                                disabled={creating || !createName.trim()}
+                                className="flex-1 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                              >
+                                {creating ? "Creating…" : "Create tag"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => { setCreateMode(false); setCreateError(null); setCreateName(""); setCreateColorOpen(false); }}
+                                className="flex-1 py-1.5 border border-gray-300 dark:border-gray-600 text-sm rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </form>
+                        ) : (
+                          <>
+                            {/* Filter input */}
+                            <div className="px-3 pt-3 pb-2 border-b border-gray-100 dark:border-gray-800">
+                              <input
+                                autoFocus
+                                type="text"
+                                placeholder="Filter tags…"
+                                value={tagFilter}
+                                onChange={(e) => setTagFilter(e.target.value)}
+                                className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                            </div>
+
+                            {/* Tag list */}
+                            <div className="max-h-56 overflow-y-auto">
+                              {filteredGlobalTags.length === 0 ? (
+                                <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-4">
+                                  {allGlobalTags.length === 0 ? "No tags available yet" : "No matches"}
+                                </p>
+                              ) : (
+                                filteredGlobalTags.map((tag) => {
+                                  const selected = deckTags.some((t) => t.id === tag.id);
+                                  return (
+                                    <button
+                                      key={tag.id}
+                                      onClick={() => toggleTag(tag)}
+                                      className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                                    >
+                                      <span className="w-4 flex-shrink-0 flex items-center justify-center">
+                                        {selected && (
+                                          <svg className="w-3.5 h-3.5 text-gray-700 dark:text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                          </svg>
+                                        )}
+                                      </span>
+                                      <span
+                                        className="w-3 h-3 rounded-full flex-shrink-0 border border-black/10"
+                                        style={{ backgroundColor: tag.color }}
+                                      />
+                                      <span className="text-sm text-gray-800 dark:text-gray-200">{tag.name}</span>
+                                    </button>
+                                  );
+                                })
+                              )}
+                            </div>
+
+                            {/* Admin: create new tag footer */}
+                            {isAdmin && (
+                              <div className="border-t border-gray-100 dark:border-gray-800">
+                                <button
+                                  onClick={() => {
+                                    setCreateName(tagFilter);
+                                    setCreateColor("#6366f1");
+                                    setCreateError(null);
+                                    setCreateMode(true);
+                                  }}
+                                  className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                                >
+                                  <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                  </svg>
+                                  Create{tagFilter.trim() ? ` "${tagFilter.trim()}"` : " new tag"}
+                                </button>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Actions */}

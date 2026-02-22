@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { loadPublicDecksAction, copyPublicDeckAction, LoadPublicDecksParams } from "../actions";
+import { loadPublicDecksAction, loadGlobalTagsAction, copyPublicDeckAction, LoadPublicDecksParams } from "../actions";
+
+interface DeckTag { id: string; name: string; color: string; }
 
 interface PublicDeck {
   id: string;
@@ -19,6 +21,14 @@ interface PublicDeck {
   username?: string | null;
   created_at: string;
   updated_at: string;
+  tags?: DeckTag[];
+}
+
+function getContrastColor(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.55 ? "#1f2937" : "#ffffff";
 }
 
 function formatDeckType(format?: string): string {
@@ -76,6 +86,37 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [usernameFilter, setUsernameFilter] = useState(initialUsername);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [globalTags, setGlobalTags] = useState<DeckTag[]>([]);
+  const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
+  const [tagFilterInput, setTagFilterInput] = useState("");
+  const tagDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!tagDropdownOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (tagDropdownRef.current && !tagDropdownRef.current.contains(e.target as Node)) {
+        setTagDropdownOpen(false);
+        setTagFilterInput("");
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [tagDropdownOpen]);
+
+  // Load global tags for the filter row
+  useEffect(() => {
+    loadGlobalTagsAction().then((res) => {
+      if (res.success) setGlobalTags(res.tags);
+    });
+  }, []);
+
+  function toggleTagFilter(tagId: string) {
+    setSelectedTagIds((prev) =>
+      prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]
+    );
+    setPage(1);
+  }
 
   const loadDecks = useCallback(async () => {
     setLoading(true);
@@ -86,6 +127,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
       format: format || undefined,
       search: search || undefined,
       username: usernameFilter || undefined,
+      tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
     };
     const result = await loadPublicDecksAction(params);
     if (result.success) {
@@ -93,7 +135,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
       setTotalCount(result.totalCount);
     }
     setLoading(false);
-  }, [page, sort, format, search, usernameFilter]);
+  }, [page, sort, format, search, usernameFilter, selectedTagIds]);
 
   useEffect(() => {
     loadDecks();
@@ -189,7 +231,116 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
           <option value="most_viewed">Most Viewed</option>
           <option value="name">Name A-Z</option>
         </select>
+
+        {/* Tags dropdown */}
+        {globalTags.length > 0 && (
+          <div className="relative" ref={tagDropdownRef}>
+            <button
+              onClick={() => { setTagDropdownOpen((o) => !o); setTagFilterInput(""); }}
+              className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm transition-colors ${
+                selectedTagIds.length > 0
+                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                  : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a2 2 0 012-2z" />
+              </svg>
+              Tags
+              {selectedTagIds.length > 0 && (
+                <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-blue-600 text-white">
+                  {selectedTagIds.length}
+                </span>
+              )}
+              <svg className={`w-3.5 h-3.5 transition-transform ${tagDropdownOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {tagDropdownOpen && (
+              <div className="absolute z-50 top-full mt-1.5 right-0 w-64 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl">
+                {/* Filter input */}
+                <div className="px-3 pt-3 pb-2 border-b border-gray-100 dark:border-gray-800">
+                  <input
+                    autoFocus
+                    type="text"
+                    placeholder="Filter tags…"
+                    value={tagFilterInput}
+                    onChange={(e) => setTagFilterInput(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Tag list */}
+                <div className="max-h-64 overflow-y-auto">
+                  {globalTags.filter((t) => t.name.toLowerCase().includes(tagFilterInput.toLowerCase())).length === 0 ? (
+                    <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-4">No matches</p>
+                  ) : (
+                    globalTags
+                      .filter((t) => t.name.toLowerCase().includes(tagFilterInput.toLowerCase()))
+                      .map((tag) => {
+                        const active = selectedTagIds.includes(tag.id);
+                        return (
+                          <button
+                            key={tag.id}
+                            onClick={() => toggleTagFilter(tag.id)}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                          >
+                            <span className="w-4 flex-shrink-0 flex items-center justify-center">
+                              {active && (
+                                <svg className="w-3.5 h-3.5 text-gray-700 dark:text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </span>
+                            <span className="w-3 h-3 rounded-full flex-shrink-0 border border-black/10" style={{ backgroundColor: tag.color }} />
+                            <span className="text-sm text-gray-800 dark:text-gray-200">{tag.name}</span>
+                          </button>
+                        );
+                      })
+                  )}
+                </div>
+
+                {/* Footer: clear all */}
+                {selectedTagIds.length > 0 && (
+                  <div className="border-t border-gray-100 dark:border-gray-800">
+                    <button
+                      onClick={() => { setSelectedTagIds([]); setPage(1); }}
+                      className="w-full px-3 py-2 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                    >
+                      Clear all tags
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Active tag pills banner */}
+      {selectedTagIds.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <span className="text-xs text-gray-500 dark:text-gray-400">Filtered by:</span>
+          {selectedTagIds.map((id) => {
+            const tag = globalTags.find((t) => t.id === id);
+            if (!tag) return null;
+            return (
+              <button
+                key={id}
+                onClick={() => toggleTagFilter(id)}
+                className="flex items-center gap-1 pl-2.5 pr-1.5 py-0.5 rounded-full text-xs font-medium"
+                style={{ backgroundColor: tag.color, color: getContrastColor(tag.color) }}
+              >
+                {tag.name}
+                <svg className="w-3 h-3 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Username filter banner */}
       {usernameFilter && (
@@ -212,6 +363,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
           {totalCount} {totalCount === 1 ? "deck" : "decks"} found
           {search && ` for "${search}"`}
           {format && ` in ${format}`}
+          {selectedTagIds.length > 0 && ` · ${selectedTagIds.length} tag${selectedTagIds.length > 1 ? "s" : ""} selected`}
         </p>
       )}
 
@@ -349,6 +501,20 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
             <span className={getDeckTypeBadgeClasses(deck.format)}>{formatDeckType(deck.format)}</span>
             <span className="text-gray-600 dark:text-gray-400">{deck.card_count || 0} cards</span>
           </div>
+
+          {deck.tags && deck.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-3">
+              {deck.tags.slice(0, 6).map((tag) => (
+                <span
+                  key={tag.id}
+                  className="px-2 py-0.5 rounded-full text-xs font-medium"
+                  style={{ backgroundColor: tag.color, color: getContrastColor(tag.color) }}
+                >
+                  {tag.name}
+                </span>
+              ))}
+            </div>
+          )}
 
           <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-500">
             <span>Updated {timeAgo(deck.updated_at)}</span>

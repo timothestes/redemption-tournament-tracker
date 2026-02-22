@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Deck } from "../types/deck";
 import { SyncStatus } from "../hooks/useDeckState";
 import DeckCardList from "./DeckCardList";
@@ -10,12 +10,22 @@ import GeneratePDFModal from "./GeneratePDFModal";
 import GenerateDeckImageModal from "./GenerateDeckImageModal";
 import ClearDeckModal from "./ClearDeckModal";
 import LoadDeckModal from "./LoadDeckModal";
-import { duplicateDeckAction, toggleDeckPublicAction } from "../../actions";
+import { duplicateDeckAction, toggleDeckPublicAction, loadGlobalTagsAction, updateDeckTagsAction, GlobalTag } from "../../actions";
+import { createGlobalTagAction } from "../../../admin/tags/actions";
+import { HexColorPicker } from "react-colorful";
+import { useIsAdmin } from "../../../../hooks/useIsAdmin";
 import UsernameModal from "../../my-decks/UsernameModal";
 import { getParagonNames, getParagonByName } from "../data/paragons";
 import ParagonRequirements from "./ParagonRequirements";
 import { useCardImageUrl } from "../hooks/useCardImageUrl";
 import ReactMarkdown from "react-markdown";
+
+function getTagContrastColor(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.55 ? "#1f2937" : "#ffffff";
+}
 
 export type TabType = "main" | "reserve" | "info" | "cover";
 
@@ -115,9 +125,103 @@ export default function DeckBuilderPanel({
 
   // Cover card picker: which slot is open (1, 2, or null)
   const [coverPickerSlot, setCoverPickerSlot] = useState<1 | 2 | null>(null);
-  
+
   // Description preview mode
   const [descriptionPreview, setDescriptionPreview] = useState(false);
+
+  // Tags
+  const { isAdmin } = useIsAdmin();
+  const [deckTags, setDeckTags] = useState<GlobalTag[]>([]);
+  const [allGlobalTags, setAllGlobalTags] = useState<GlobalTag[]>([]);
+  const [tagPickerOpen, setTagPickerOpen] = useState(false);
+  const [tagFilter, setTagFilter] = useState("");
+  const [savingTags, setSavingTags] = useState(false);
+  const tagPickerRef = useRef<HTMLDivElement>(null);
+  const [createMode, setCreateMode] = useState(false);
+  const [createName, setCreateName] = useState("");
+  const [createColor, setCreateColor] = useState("#6366f1");
+  const [createColorOpen, setCreateColorOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  // Load global tags list when authenticated
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    loadGlobalTagsAction().then((res) => {
+      if (res.success) setAllGlobalTags(res.tags);
+    });
+  }, [isAuthenticated]);
+
+  // Load this deck's current tags when the deck ID changes
+  useEffect(() => {
+    if (!deck.id || !isAuthenticated) { setDeckTags([]); return; }
+    // Tags were already joined in loadPublicDeckAction/loadDeckByIdAction,
+    // but in the builder we load them separately since we get the deck differently.
+    import("../../actions").then(({ loadGlobalTagsAction: _ }) => {});
+    // Fetch deck tags directly
+    import("../../../../utils/supabase/client").then(({ createClient }) => {
+      const supabase = createClient();
+      supabase
+        .from("deck_tags")
+        .select("tag_id, global_tags(id, name, color)")
+        .eq("deck_id", deck.id!)
+        .then(({ data }) => {
+          const tags = (data || []).map((r: any) => r.global_tags).filter(Boolean);
+          setDeckTags(tags);
+        });
+    });
+  }, [deck.id, isAuthenticated]);
+
+  // Close tag picker on outside click
+  useEffect(() => {
+    if (!tagPickerOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (tagPickerRef.current && !tagPickerRef.current.contains(e.target as Node)) {
+        setTagPickerOpen(false);
+        setTagFilter("");
+        setCreateMode(false);
+        setCreateError(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [tagPickerOpen]);
+
+  const toggleTag = useCallback(async (tag: GlobalTag) => {
+    if (!deck.id) return;
+    const isSelected = deckTags.some((t) => t.id === tag.id);
+    const next = isSelected ? deckTags.filter((t) => t.id !== tag.id) : [...deckTags, tag];
+    setDeckTags(next);
+    setSavingTags(true);
+    await updateDeckTagsAction(deck.id, next.map((t) => t.id));
+    setSavingTags(false);
+  }, [deckTags, deck.id]);
+
+  const filteredGlobalTags = allGlobalTags.filter((t) =>
+    t.name.toLowerCase().includes(tagFilter.toLowerCase())
+  );
+
+  async function handleCreateTagInBuilder(e: React.FormEvent) {
+    e.preventDefault();
+    if (!createName.trim() || !deck.id) return;
+    setCreateError(null);
+    setCreating(true);
+    const res = await createGlobalTagAction(createName.trim(), createColor);
+    setCreating(false);
+    if (!res.success) { setCreateError(res.error || "Failed to create tag"); return; }
+    const newTag = res.tag as GlobalTag;
+    setAllGlobalTags((prev) => [...prev, newTag].sort((a, b) => a.name.localeCompare(b.name)));
+    const next = [...deckTags, newTag];
+    setDeckTags(next);
+    setSavingTags(true);
+    await updateDeckTagsAction(deck.id, next.map((t) => t.id));
+    setSavingTags(false);
+    setCreateMode(false);
+    setCreateName("");
+    setCreateColor("#6366f1");
+    setCreateColorOpen(false);
+    setCreateError(null);
+  }
 
   // View options
   const [viewLayout, setViewLayout] = useState<'grid' | 'list'>('grid');
@@ -1439,6 +1543,155 @@ export default function DeckBuilderPanel({
                 );
               })()}
             </div>
+
+            {/* Tags Section */}
+            {isAuthenticated && (
+              <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">Tags</h3>
+
+                {!deck.id ? (
+                  <p className="text-xs text-gray-400 dark:text-gray-500 italic">Save your deck first to add tags.</p>
+                ) : (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Current tag pills */}
+                    {deckTags.map((tag) => (
+                      <button
+                        key={tag.id}
+                        onClick={() => toggleTag(tag)}
+                        className="group flex items-center gap-1 pl-2.5 pr-1.5 py-0.5 rounded-full text-xs font-medium transition-opacity"
+                        style={{ backgroundColor: tag.color, color: getTagContrastColor(tag.color) }}
+                        title={`Remove "${tag.name}"`}
+                      >
+                        {tag.name}
+                        <svg
+                          className="w-3 h-3 opacity-50 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    ))}
+
+                    {/* Picker trigger */}
+                    <div className="relative" ref={tagPickerRef}>
+                      <button
+                        onClick={() => { setTagPickerOpen((o) => !o); setTagFilter(""); setCreateMode(false); }}
+                        className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-dashed border-gray-400 dark:border-gray-500 text-xs text-gray-500 dark:text-gray-400 hover:border-gray-600 dark:hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                      >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        {deckTags.length === 0 ? "Add tags" : "Edit"}
+                        {savingTags && <span className="ml-1 opacity-60">·</span>}
+                      </button>
+
+                      {tagPickerOpen && (
+                        <div className="absolute z-50 top-full mt-1.5 left-0 w-64 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl">
+                          {createMode ? (
+                            <form onSubmit={handleCreateTagInBuilder} className="p-3 flex flex-col gap-3">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setCreateColorOpen((o) => !o)}
+                                  className="w-7 h-7 rounded-md border-2 border-gray-300 dark:border-gray-600 shadow-sm flex-shrink-0 hover:scale-110 transition-transform"
+                                  style={{ backgroundColor: createColor }}
+                                />
+                                <input
+                                  autoFocus
+                                  type="text"
+                                  placeholder="Tag name"
+                                  value={createName}
+                                  onChange={(e) => setCreateName(e.target.value)}
+                                  maxLength={50}
+                                  className="flex-1 px-2.5 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                              </div>
+                              {createColorOpen && (
+                                <div className="flex flex-col items-center gap-1.5">
+                                  <HexColorPicker color={createColor} onChange={setCreateColor} style={{ width: "100%" }} />
+                                  <span className="font-mono text-xs text-gray-400">{createColor}</span>
+                                </div>
+                              )}
+                              {createName.trim() && (
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs text-gray-400">Preview:</span>
+                                  <span className="px-2.5 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: createColor, color: getTagContrastColor(createColor) }}>{createName}</span>
+                                </div>
+                              )}
+                              {createError && <p className="text-xs text-red-500">{createError}</p>}
+                              <div className="flex gap-2">
+                                <button type="submit" disabled={creating || !createName.trim()} className="flex-1 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                                  {creating ? "Creating…" : "Create tag"}
+                                </button>
+                                <button type="button" onClick={() => { setCreateMode(false); setCreateError(null); setCreateName(""); setCreateColorOpen(false); }} className="flex-1 py-1.5 border border-gray-300 dark:border-gray-600 text-sm rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">
+                                  Cancel
+                                </button>
+                              </div>
+                            </form>
+                          ) : (
+                            <>
+                              <div className="px-3 pt-3 pb-2 border-b border-gray-100 dark:border-gray-800">
+                                <input
+                                  autoFocus
+                                  type="text"
+                                  placeholder="Filter tags…"
+                                  value={tagFilter}
+                                  onChange={(e) => setTagFilter(e.target.value)}
+                                  className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                              </div>
+                              <div className="max-h-52 overflow-y-auto">
+                                {filteredGlobalTags.length === 0 ? (
+                                  <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-4">
+                                    {allGlobalTags.length === 0 ? "No tags available yet" : "No matches"}
+                                  </p>
+                                ) : (
+                                  filteredGlobalTags.map((tag) => {
+                                    const selected = deckTags.some((t) => t.id === tag.id);
+                                    return (
+                                      <button
+                                        key={tag.id}
+                                        onClick={() => toggleTag(tag)}
+                                        className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                                      >
+                                        <span className="w-4 flex-shrink-0 flex items-center justify-center">
+                                          {selected && (
+                                            <svg className="w-3.5 h-3.5 text-gray-700 dark:text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                          )}
+                                        </span>
+                                        <span className="w-3 h-3 rounded-full flex-shrink-0 border border-black/10" style={{ backgroundColor: tag.color }} />
+                                        <span className="text-sm text-gray-800 dark:text-gray-200">{tag.name}</span>
+                                      </button>
+                                    );
+                                  })
+                                )}
+                              </div>
+                              {isAdmin && (
+                                <div className="border-t border-gray-100 dark:border-gray-800">
+                                  <button
+                                    onClick={() => { setCreateName(tagFilter); setCreateColor("#6366f1"); setCreateError(null); setCreateMode(true); }}
+                                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                                  >
+                                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    Create{tagFilter.trim() ? ` "${tagFilter.trim()}"` : " new tag"}
+                                  </button>
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Description Section */}
             <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
