@@ -1,24 +1,126 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Deck } from "../types/deck";
 import { Card } from "../utils";
 import { useCardImageUrl } from "../hooks/useCardImageUrl";
 import { validateDeck } from "../utils/deckValidation";
+import { loadGlobalTagsAction, updateDeckTagsAction, GlobalTag } from "../../actions";
+import { createGlobalTagAction } from "../../../admin/tags/actions";
+import { HexColorPicker } from "react-colorful";
+import { useIsAdmin } from "../../../../hooks/useIsAdmin";
+
+function getTagContrastColor(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.55 ? "#1f2937" : "#ffffff";
+}
 
 interface FullDeckViewProps {
   deck: Deck;
   onViewCard?: (card: Card, isReserve?: boolean) => void;
+  isAuthenticated?: boolean;
 }
 
 /**
  * Full-screen optimized deck view with compact card display
  * Shows entire deck at a glance with minimal scrolling
  */
-export default function FullDeckView({ deck, onViewCard }: FullDeckViewProps) {
+export default function FullDeckView({ deck, onViewCard, isAuthenticated = false }: FullDeckViewProps) {
   const { getImageUrl } = useCardImageUrl();
-  
+  const { isAdmin } = useIsAdmin();
+
   // View mode state
     const [viewMode, setViewMode] = useState<'normal' | 'stacked'>('stacked');
     const [groupBy, setGroupBy] = useState<'none' | 'alignment' | 'type'>('type');
+
+  // Tags state
+  const [deckTags, setDeckTags] = useState<GlobalTag[]>([]);
+  const [allGlobalTags, setAllGlobalTags] = useState<GlobalTag[]>([]);
+  const [tagPickerOpen, setTagPickerOpen] = useState(false);
+  const [tagFilter, setTagFilter] = useState("");
+  const [savingTags, setSavingTags] = useState(false);
+  const tagPickerRef = useRef<HTMLDivElement>(null);
+  const [createMode, setCreateMode] = useState(false);
+  const [createName, setCreateName] = useState("");
+  const [createColor, setCreateColor] = useState("#6366f1");
+  const [createColorOpen, setCreateColorOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  // Load global tags list when authenticated
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    loadGlobalTagsAction().then((res) => {
+      if (res.success) setAllGlobalTags(res.tags);
+    });
+  }, [isAuthenticated]);
+
+  // Load this deck's current tags when the deck ID changes
+  useEffect(() => {
+    if (!deck.id || !isAuthenticated) { setDeckTags([]); return; }
+    import("../../../../utils/supabase/client").then(({ createClient }) => {
+      const supabase = createClient();
+      supabase
+        .from("deck_tags")
+        .select("tag_id, global_tags(id, name, color)")
+        .eq("deck_id", deck.id!)
+        .then(({ data }) => {
+          const tags = (data || []).map((r: any) => r.global_tags).filter(Boolean);
+          setDeckTags(tags);
+        });
+    });
+  }, [deck.id, isAuthenticated]);
+
+  // Close tag picker on outside click
+  useEffect(() => {
+    if (!tagPickerOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (tagPickerRef.current && !tagPickerRef.current.contains(e.target as Node)) {
+        setTagPickerOpen(false);
+        setTagFilter("");
+        setCreateMode(false);
+        setCreateError(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [tagPickerOpen]);
+
+  const toggleTag = useCallback(async (tag: GlobalTag) => {
+    if (!deck.id) return;
+    const isSelected = deckTags.some((t) => t.id === tag.id);
+    const next = isSelected ? deckTags.filter((t) => t.id !== tag.id) : [...deckTags, tag];
+    setDeckTags(next);
+    setSavingTags(true);
+    await updateDeckTagsAction(deck.id, next.map((t) => t.id));
+    setSavingTags(false);
+  }, [deckTags, deck.id]);
+
+  const filteredGlobalTags = allGlobalTags.filter((t) =>
+    t.name.toLowerCase().includes(tagFilter.toLowerCase())
+  );
+
+  async function handleCreateTag(e: React.FormEvent) {
+    e.preventDefault();
+    if (!createName.trim() || !deck.id) return;
+    setCreateError(null);
+    setCreating(true);
+    const res = await createGlobalTagAction(createName.trim(), createColor);
+    setCreating(false);
+    if (!res.success) { setCreateError(res.error || "Failed to create tag"); return; }
+    const newTag = res.tag as GlobalTag;
+    setAllGlobalTags((prev) => [...prev, newTag].sort((a, b) => a.name.localeCompare(b.name)));
+    const next = [...deckTags, newTag];
+    setDeckTags(next);
+    setSavingTags(true);
+    await updateDeckTagsAction(deck.id, next.map((t) => t.id));
+    setSavingTags(false);
+    setCreateMode(false);
+    setCreateName("");
+    setCreateColor("#6366f1");
+    setCreateColorOpen(false);
+    setCreateError(null);
+  }
   
   // Separate main deck and reserve
   const mainDeckCards = deck.cards.filter((dc) => !dc.isReserve);
@@ -304,7 +406,7 @@ export default function FullDeckView({ deck, onViewCard }: FullDeckViewProps) {
         }}
       >
         {/* Card image - compact */}
-        <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-gray-800 border border-gray-700 hover:border-blue-500 transition-all cursor-pointer hover:scale-105 hover:z-10 shadow-md hover:shadow-xl">
+        <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-blue-500 transition-all cursor-pointer hover:scale-105 hover:z-10 shadow-md hover:shadow-xl">
           {imageUrl ? (
             <img
               src={imageUrl}
@@ -340,12 +442,12 @@ export default function FullDeckView({ deck, onViewCard }: FullDeckViewProps) {
   };
 
   return (
-    <div className="h-full w-full bg-gray-900 text-white overflow-y-auto">
+    <div className="h-full w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-white overflow-y-auto">
       {/* Header with stats */}
-      <div className="sticky top-0 z-20 bg-gradient-to-b from-gray-900 via-gray-900 to-gray-900/95 border-b border-gray-700 shadow-lg">
+      <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-lg">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between mb-3">
-            <h1 className="text-2xl font-bold text-white">{deck.name}</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{deck.name}</h1>
             <div className="flex items-center gap-4 text-sm">
               {/* View Mode Toggle */}
               <button
@@ -356,17 +458,17 @@ export default function FullDeckView({ deck, onViewCard }: FullDeckViewProps) {
                     setGroupBy('none');
                   }
                 }}
-                className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg transition-colors"
+                className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors"
                 title={viewMode === 'normal' ? 'Switch to stacked view' : 'Switch to normal view'}
               >
-                <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   {viewMode === 'normal' ? (
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                   ) : (
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
                   )}
                 </svg>
-                <span className="text-gray-300 text-xs font-medium">
+                <span className="text-gray-600 dark:text-gray-300 text-xs font-medium">
                   {viewMode === 'normal' ? 'Normal' : 'Stacked'}
                 </span>
               </button>
@@ -377,21 +479,21 @@ export default function FullDeckView({ deck, onViewCard }: FullDeckViewProps) {
                   <select
                     value={groupBy}
                     onChange={(e) => setGroupBy(e.target.value as 'none' | 'alignment' | 'type')}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg transition-colors text-gray-300 text-xs font-medium cursor-pointer appearance-none pr-8"
+                    className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors text-gray-700 dark:text-gray-300 text-xs font-medium cursor-pointer appearance-none pr-8"
                     title="Group cards by"
                   >
                     <option value="none">No Grouping</option>
                     <option value="alignment">Group by Alignment</option>
                     <option value="type">Group by Type</option>
                   </select>
-                  <svg className="w-4 h-4 text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-4 h-4 text-gray-500 dark:text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </div>
               )}
               
               <div className="flex items-center gap-2">
-                <span className="text-gray-400">Format:</span>
+                <span className="text-gray-500 dark:text-gray-400">Format:</span>
                 <span className="font-semibold text-blue-400">{deck.format || 'Type 1'}</span>
               </div>
             </div>
@@ -402,10 +504,10 @@ export default function FullDeckView({ deck, onViewCard }: FullDeckViewProps) {
             {/* Validation Status */}
             <div className={`relative group flex items-center gap-2 px-3 py-1.5 border rounded-lg cursor-help ${
               validation.isValid && validation.stats.totalCards > 0
-                ? 'bg-green-900/30 border-green-700/50'
+                ? 'bg-green-50 dark:bg-green-900/30 border-green-300 dark:border-green-700/50'
                 : validation.stats.totalCards === 0
-                ? 'bg-gray-800/30 border-gray-700/50'
-                : 'bg-red-900/30 border-red-700/50'
+                ? 'bg-gray-100 dark:bg-gray-800/30 border-gray-300 dark:border-gray-700/50'
+                : 'bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-700/50'
             }`}>
               {validation.isValid && validation.stats.totalCards > 0 ? (
                 <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -483,35 +585,183 @@ export default function FullDeckView({ deck, onViewCard }: FullDeckViewProps) {
               )}
             </div>
             
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-900/30 border border-green-800/50 rounded-lg">
-              <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-green-800/50 rounded-lg">
+              <svg className="w-4 h-4 text-blue-500 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
               </svg>
-              <span className="text-gray-400">Total:</span>
-              <span className="font-bold text-white">{totalCards}</span>
+              <span className="text-gray-500 dark:text-gray-400">Total:</span>
+              <span className="font-bold text-gray-900 dark:text-white">{totalCards}</span>
             </div>
             
             <div className="flex items-center gap-2">
-              <span className="text-gray-400">Main Deck:</span>
-              <span className="font-semibold text-white">{mainDeckCount}</span>
+              <span className="text-gray-500 dark:text-gray-400">Main Deck:</span>
+              <span className="font-semibold text-gray-900 dark:text-white">{mainDeckCount}</span>
             </div>
-            
+
             {reserveCount > 0 && (
               <>
-                <div className="w-px h-4 bg-gray-600"></div>
+                <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
                 <div className="flex items-center gap-2">
-                  <span className="text-gray-400">Reserve:</span>
-                  <span className="font-semibold text-white">{reserveCount}</span>
+                  <span className="text-gray-500 dark:text-gray-400">Reserve:</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">{reserveCount}</span>
                 </div>
               </>
             )}
-            
-            <div className="w-px h-4 bg-gray-600"></div>
+
+            <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
             <div className="flex items-center gap-2">
-              <span className="text-gray-400">Unique Cards:</span>
-              <span className="font-semibold text-white">{uniqueCards}</span>
+              <span className="text-gray-500 dark:text-gray-400">Unique Cards:</span>
+              <span className="font-semibold text-gray-900 dark:text-white">{uniqueCards}</span>
             </div>
           </div>
+
+          {/* Tags row */}
+          {(deckTags.length > 0 || (isAuthenticated && deck.id)) && (
+            <div className="flex items-center gap-2 flex-wrap mt-3 pt-3 border-t border-gray-200 dark:border-gray-700/50 min-h-[1.75rem]">
+              {/* Current tag pills */}
+              {deckTags.map((tag) => (
+                isAuthenticated ? (
+                  <button
+                    key={tag.id}
+                    onClick={() => toggleTag(tag)}
+                    className="group flex items-center gap-1 pl-2.5 pr-1.5 py-0.5 rounded-full text-xs font-medium transition-opacity"
+                    style={{ backgroundColor: tag.color, color: getTagContrastColor(tag.color) }}
+                    title={`Remove "${tag.name}"`}
+                  >
+                    {tag.name}
+                    <svg className="w-3 h-3 opacity-50 group-hover:opacity-100 transition-opacity flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                ) : (
+                  <span
+                    key={tag.id}
+                    className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+                    style={{ backgroundColor: tag.color, color: getTagContrastColor(tag.color) }}
+                  >
+                    {tag.name}
+                  </span>
+                )
+              ))}
+
+              {/* Picker trigger */}
+              {isAuthenticated && deck.id && (
+                <div className="relative" ref={tagPickerRef}>
+                  <button
+                    onClick={() => { setTagPickerOpen((o) => !o); setTagFilter(""); setCreateMode(false); }}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-dashed border-gray-400 dark:border-gray-500 text-xs text-gray-500 dark:text-gray-400 hover:border-gray-600 dark:hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    {deckTags.length === 0 ? "Add tags" : "Edit"}
+                    {savingTags && <span className="ml-1 opacity-60">·</span>}
+                  </button>
+
+                  {tagPickerOpen && (
+                    <div className="absolute z-50 top-full mt-1.5 left-0 w-64 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl">
+                      {createMode ? (
+                        <form onSubmit={handleCreateTag} className="p-3 flex flex-col gap-3">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setCreateColorOpen((o) => !o)}
+                              className="w-7 h-7 rounded-md border-2 border-gray-300 dark:border-gray-600 shadow-sm flex-shrink-0 hover:scale-110 transition-transform"
+                              style={{ backgroundColor: createColor }}
+                            />
+                            <input
+                              autoFocus
+                              type="text"
+                              placeholder="Tag name"
+                              value={createName}
+                              onChange={(e) => setCreateName(e.target.value)}
+                              maxLength={50}
+                              className="flex-1 px-2.5 py-1.5 text-sm rounded-lg border border-gray-600 bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                          {createColorOpen && (
+                            <div className="flex flex-col items-center gap-1.5">
+                              <HexColorPicker color={createColor} onChange={setCreateColor} style={{ width: "100%" }} />
+                              <span className="font-mono text-xs text-gray-400">{createColor}</span>
+                            </div>
+                          )}
+                          {createName.trim() && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs text-gray-400">Preview:</span>
+                              <span className="px-2.5 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: createColor, color: getTagContrastColor(createColor) }}>{createName}</span>
+                            </div>
+                          )}
+                          {createError && <p className="text-xs text-red-400">{createError}</p>}
+                          <div className="flex gap-2">
+                            <button type="submit" disabled={creating || !createName.trim()} className="flex-1 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                              {creating ? "Creating…" : "Create tag"}
+                            </button>
+                            <button type="button" onClick={() => { setCreateMode(false); setCreateError(null); setCreateName(""); setCreateColorOpen(false); }} className="flex-1 py-1.5 border border-gray-600 text-gray-300 text-sm rounded-lg hover:bg-gray-800">
+                              Cancel
+                            </button>
+                          </div>
+                        </form>
+                      ) : (
+                        <>
+                          <div className="px-3 pt-3 pb-2 border-b border-gray-800">
+                            <input
+                              autoFocus
+                              type="text"
+                              placeholder="Filter tags…"
+                              value={tagFilter}
+                              onChange={(e) => setTagFilter(e.target.value)}
+                              className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-gray-600 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                          <div className="max-h-52 overflow-y-auto">
+                            {filteredGlobalTags.length === 0 ? (
+                              <p className="text-xs text-gray-500 text-center py-4">
+                                {allGlobalTags.length === 0 ? "No tags available yet" : "No matches"}
+                              </p>
+                            ) : (
+                              filteredGlobalTags.map((tag) => {
+                                const selected = deckTags.some((t) => t.id === tag.id);
+                                return (
+                                  <button
+                                    key={tag.id}
+                                    onClick={() => toggleTag(tag)}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-800 transition-colors text-left"
+                                  >
+                                    <span className="w-4 flex-shrink-0 flex items-center justify-center">
+                                      {selected && (
+                                        <svg className="w-3.5 h-3.5 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                      )}
+                                    </span>
+                                    <span className="w-3 h-3 rounded-full flex-shrink-0 border border-black/10" style={{ backgroundColor: tag.color }} />
+                                    <span className="text-sm text-gray-200">{tag.name}</span>
+                                  </button>
+                                );
+                              })
+                            )}
+                          </div>
+                          {isAdmin && (
+                            <div className="border-t border-gray-800">
+                              <button
+                                onClick={() => { setCreateName(tagFilter); setCreateColor("#6366f1"); setCreateError(null); setCreateMode(true); }}
+                                className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-gray-400 hover:bg-gray-800 transition-colors"
+                              >
+                                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                </svg>
+                                Create{tagFilter.trim() ? ` "${tagFilter.trim()}"` : " new tag"}
+                              </button>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

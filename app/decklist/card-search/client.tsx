@@ -202,6 +202,56 @@ export default function CardSearchClient() {
   const [showSearch, setShowSearch] = useState(true);
   const [showMobileBanner, setShowMobileBanner] = useState(false);
 
+  // Deck panel resize state
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isResizingRef = useRef(false);
+  const resizeStartXRef = useRef(0);
+  const resizeStartWidthRef = useRef(0);
+  const currentDeckPanelWidthRef = useRef(38.2);
+  const [deckPanelWidth, setDeckPanelWidth] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('deck-panel-width');
+      return saved ? parseFloat(saved) : 38.2;
+    }
+    return 38.2;
+  });
+  // Keep ref in sync so mouseup handler can read latest value
+  currentDeckPanelWidthRef.current = deckPanelWidth;
+
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizingRef.current = true;
+    resizeStartXRef.current = e.clientX;
+    resizeStartWidthRef.current = deckPanelWidth;
+    document.body.style.cursor = 'ew-resize';
+    document.body.style.userSelect = 'none';
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizingRef.current || !containerRef.current) return;
+      const containerWidth = containerRef.current.offsetWidth;
+      const deltaX = e.clientX - resizeStartXRef.current;
+      const deltaPercent = (deltaX / containerWidth) * 100;
+      const newWidth = Math.max(20, Math.min(70, resizeStartWidthRef.current - deltaPercent));
+      setDeckPanelWidth(newWidth);
+    };
+    const handleMouseUp = () => {
+      if (isResizingRef.current) {
+        isResizingRef.current = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        localStorage.setItem('deck-panel-width', String(currentDeckPanelWidthRef.current));
+      }
+    };
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
   useEffect(() => {
     if (!localStorage.getItem('mobile-banner-dismissed')) {
       setShowMobileBanner(true);
@@ -1228,7 +1278,7 @@ export default function CardSearchClient() {
         />
       )}
       
-    <div className="flex w-full h-screen overflow-hidden bg-gray-100 dark:bg-gray-900">
+    <div ref={containerRef} className="flex w-full h-screen overflow-hidden bg-gray-100 dark:bg-gray-900">
       {/* Mobile notice */}
       {showMobileBanner && (
         <div className="md:hidden fixed top-16 left-0 right-0 z-50 bg-blue-100 dark:bg-blue-900 border-b border-blue-300 dark:border-blue-700 px-4 py-3 text-center">
@@ -1248,7 +1298,7 @@ export default function CardSearchClient() {
       )}
       {/* Left panel: Card search */}
       {showSearch && (
-        <div className={`flex-1 flex flex-col w-full ${showDeckBuilder ? 'md:w-1/2 xl:w-[61.8%]' : ''} overflow-hidden transition-all duration-300`}>
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <div className="bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200 flex-1 flex flex-col overflow-hidden">
           <div className="p-2 flex flex-col items-center sticky top-0 z-40 bg-white text-gray-900 border-b border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-800 dark:shadow-lg">
         <div className="relative w-full max-w-xl px-2 flex flex-col sm:flex-row sm:flex-wrap items-center justify-center gap-2">
@@ -1784,7 +1834,12 @@ export default function CardSearchClient() {
       
       {/* Central Divider with Toggle Buttons */}
       {showSearch && showDeckBuilder && (
-        <div className="hidden md:flex relative w-1 bg-gradient-to-b from-transparent via-gray-300 to-transparent dark:via-gray-700 items-center justify-center">
+        <div
+          className="hidden md:flex relative bg-gradient-to-b from-transparent via-gray-300 to-transparent dark:via-gray-700 hover:via-blue-400 dark:hover:via-blue-500 items-center justify-center cursor-ew-resize select-none transition-colors flex-shrink-0"
+          style={{ width: '6px' }}
+          onMouseDown={handleResizeStart}
+          title="Drag to resize panels"
+        >
           {/* Toggle buttons container - centered vertically */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-3 z-10">
             {/* Hide Search Button */}
@@ -1849,9 +1904,10 @@ export default function CardSearchClient() {
       
       {/* Right panel: Deck builder (hidden on mobile, toggleable on desktop) */}
       {showDeckBuilder && (
-        <div className={`hidden md:flex w-full flex-col overflow-hidden transition-all duration-300 ${
-          showSearch ? 'md:w-1/2 xl:w-[38.2%]' : ''
-        }`}>
+        <div
+          className="hidden md:flex flex-col overflow-hidden flex-shrink-0"
+          style={{ width: showSearch ? `${deckPanelWidth}%` : '100%' }}
+        >
           {isInitializing ? (
             <div className="flex-1 flex items-center justify-center bg-white dark:bg-gray-800">
               <div className="text-gray-400 dark:text-gray-500 text-sm">Loading deck...</div>

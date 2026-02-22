@@ -357,9 +357,57 @@ export default function MyDecksClient() {
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 py-8">
+
+      {/* Mobile folder strip (hidden on lg+) */}
+      <div className="lg:hidden mb-4">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+          <button
+            onClick={() => setSelectedFolder(null)}
+            className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              selectedFolder === null
+                ? "bg-blue-600 text-white"
+                : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+            }`}
+          >
+            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+            My Decks
+            <span className={`text-xs ${selectedFolder === null ? "opacity-75" : "text-gray-400 dark:text-gray-500"}`}>
+              {decks.filter(d => !d.folder_id).length}
+            </span>
+          </button>
+          {folders.map((folder) => (
+            <button
+              key={folder.id}
+              onClick={() => setSelectedFolder(folder.id!)}
+              className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                selectedFolder === folder.id
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+              }`}
+            >
+              <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+              {folder.name}
+              <span className={`text-xs ${selectedFolder === folder.id ? "opacity-75" : "text-gray-400 dark:text-gray-500"}`}>
+                {decks.filter(d => d.folder_id === folder.id).length}
+              </span>
+            </button>
+          ))}
+          <button
+            onClick={() => setFolderModal({ mode: "create" })}
+            className="flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border border-dashed border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          >
+            + Folder
+          </button>
+        </div>
+      </div>
+
       <div className="flex gap-6">
-        {/* Left Sidebar - Folders */}
-        <div className="w-64 flex-shrink-0">
+        {/* Left Sidebar - Folders (hidden on mobile) */}
+        <div className="hidden lg:block w-64 flex-shrink-0">
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">Folders</h2>

@@ -182,9 +182,9 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
       </div>
 
       {/* Controls */}
-      <div className="flex flex-wrap items-center gap-4 mb-6">
-        {/* Search */}
-        <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-md">
+      <div className="flex flex-col gap-3 mb-6">
+        {/* Row 1: Search */}
+        <div className="flex items-center gap-2">
           <input
             type="text"
             value={searchInput}
@@ -195,70 +195,72 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
           />
           <button
             onClick={handleSearch}
-            className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-medium hover:bg-green-800 transition-colors"
+            className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-medium hover:bg-green-800 transition-colors flex-shrink-0"
           >
             Search
           </button>
           {search && (
             <button
               onClick={handleClearSearch}
-              className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+              className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white flex-shrink-0"
             >
               Clear
             </button>
           )}
         </div>
 
-        {/* Format filter */}
-        <select
-          value={format}
-          onChange={(e) => handleFormatChange(e.target.value)}
-          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm"
-        >
-          <option value="">All Formats</option>
-          <option value="Type 1">Type 1</option>
-          <option value="Type 2">Type 2</option>
-          <option value="Paragon">Paragon</option>
-        </select>
+        {/* Row 2: Format / Sort / Tags */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Format filter */}
+          <select
+            value={format}
+            onChange={(e) => handleFormatChange(e.target.value)}
+            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm"
+          >
+            <option value="">All Formats</option>
+            <option value="Type 1">Type 1</option>
+            <option value="Type 2">Type 2</option>
+            <option value="Paragon">Paragon</option>
+          </select>
 
-        {/* Sort */}
-        <select
-          value={sort}
-          onChange={(e) => handleSortChange(e.target.value as typeof sort)}
-          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm"
-        >
-          <option value="newest">Newest</option>
-          <option value="most_viewed">Most Viewed</option>
-          <option value="name">Name A-Z</option>
-        </select>
+          {/* Sort */}
+          <select
+            value={sort}
+            onChange={(e) => handleSortChange(e.target.value as typeof sort)}
+            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm"
+          >
+            <option value="newest">Newest</option>
+            <option value="most_viewed">Most Viewed</option>
+            <option value="name">Name A-Z</option>
+          </select>
 
-        {/* Tags dropdown */}
-        {globalTags.length > 0 && (
-          <div className="relative" ref={tagDropdownRef}>
-            <button
-              onClick={() => { setTagDropdownOpen((o) => !o); setTagFilterInput(""); }}
-              className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm transition-colors ${
-                selectedTagIds.length > 0
-                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
-                  : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-              }`}
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a2 2 0 012-2z" />
-              </svg>
-              Tags
-              {selectedTagIds.length > 0 && (
-                <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-blue-600 text-white">
-                  {selectedTagIds.length}
-                </span>
-              )}
-              <svg className={`w-3.5 h-3.5 transition-transform ${tagDropdownOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
+          {/* Tags dropdown */}
+          {globalTags.length > 0 && (
+            <div className="relative" ref={tagDropdownRef}>
+              <button
+                onClick={() => { setTagDropdownOpen((o) => !o); setTagFilterInput(""); }}
+                className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm transition-colors ${
+                  selectedTagIds.length > 0
+                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                    : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                }`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a2 2 0 012-2z" />
+                </svg>
+                Tags
+                {selectedTagIds.length > 0 && (
+                  <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-blue-600 text-white">
+                    {selectedTagIds.length}
+                  </span>
+                )}
+                <svg className={`w-3.5 h-3.5 transition-transform ${tagDropdownOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
 
-            {tagDropdownOpen && (
-              <div className="absolute z-50 top-full mt-1.5 right-0 w-64 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl">
+              {tagDropdownOpen && (
+                <div className="absolute z-50 top-full mt-1.5 left-0 w-64 max-w-[calc(100vw-2rem)] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl">
                 {/* Filter input */}
                 <div className="px-3 pt-3 pb-2 border-b border-gray-100 dark:border-gray-800">
                   <input
@@ -316,7 +318,8 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
             )}
           </div>
         )}
-      </div>
+        </div>{/* end Row 2 */}
+      </div>{/* end Controls */}
 
       {/* Active tag pills banner */}
       {selectedTagIds.length > 0 && (

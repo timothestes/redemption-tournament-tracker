@@ -1292,9 +1292,10 @@ export default function DeckBuilderPanel({
         
         {/* Show Full Deck View when expanded */}
         {isExpanded ? (
-          <FullDeckView 
+          <FullDeckView
             deck={deck}
             onViewCard={onViewCard}
+            isAuthenticated={isAuthenticated}
           />
         ) : (
           <>
