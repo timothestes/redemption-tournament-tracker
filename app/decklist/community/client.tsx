@@ -104,6 +104,13 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
     return () => document.removeEventListener("mousedown", handleClick);
   }, [tagDropdownOpen]);
 
+  // Sync usernameFilter state with URL param on client-side navigation
+  useEffect(() => {
+    const urlUsername = searchParams.get("username") || "";
+    setUsernameFilter(urlUsername);
+    setPage(1);
+  }, [searchParams]);
+
   // Load global tags for the filter row
   useEffect(() => {
     loadGlobalTagsAction().then((res) => {
