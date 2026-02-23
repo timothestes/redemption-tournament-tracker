@@ -29,13 +29,9 @@ export function useIsAdmin() {
         } else {
           setIsAdmin(data || false);
           if (data) {
-            // Fetch permissions from admin_users table
-            const { data: adminData } = await supabase
-              .from('admin_users')
-              .select('permissions')
-              .eq('user_id', user.id)
-              .single();
-            setPermissions(adminData?.permissions || []);
+            // Use SECURITY DEFINER RPC to bypass RLS on admin_users table
+            const { data: permsData } = await supabase.rpc('get_my_admin_permissions');
+            setPermissions(permsData || []);
           } else {
             setPermissions([]);
           }

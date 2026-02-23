@@ -37,6 +37,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
   // Tags state
   const [deckTags, setDeckTags] = useState<GlobalTag[]>([]);
   const [allGlobalTags, setAllGlobalTags] = useState<GlobalTag[]>([]);
+  const [tagsLoading, setTagsLoading] = useState(false);
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
   const [tagFilter, setTagFilter] = useState("");
   const [savingTags, setSavingTags] = useState(false);
@@ -48,13 +49,25 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
+  const loadAllTags = useCallback(async () => {
+    setTagsLoading(true);
+    const res = await loadGlobalTagsAction();
+    if (res.success) setAllGlobalTags(res.tags);
+    setTagsLoading(false);
+  }, []);
+
   // Load global tags list when authenticated
   useEffect(() => {
     if (!isAuthenticated) return;
-    loadGlobalTagsAction().then((res) => {
-      if (res.success) setAllGlobalTags(res.tags);
-    });
-  }, [isAuthenticated]);
+    loadAllTags();
+  }, [isAuthenticated, loadAllTags]);
+
+  // Retry loading tags when the picker opens and the list is empty (handles race/failure)
+  useEffect(() => {
+    if (tagPickerOpen && isAuthenticated && allGlobalTags.length === 0 && !tagsLoading) {
+      loadAllTags();
+    }
+  }, [tagPickerOpen, isAuthenticated, allGlobalTags.length, tagsLoading, loadAllTags]);
 
   // Load this deck's current tags when the deck ID changes
   useEffect(() => {
@@ -715,7 +728,14 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                             />
                           </div>
                           <div className="max-h-52 overflow-y-auto">
-                            {filteredGlobalTags.length === 0 ? (
+                            {tagsLoading ? (
+                              <div className="flex justify-center py-4">
+                                <svg className="animate-spin w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                                </svg>
+                              </div>
+                            ) : filteredGlobalTags.length === 0 ? (
                               <p className="text-xs text-gray-500 text-center py-4">
                                 {allGlobalTags.length === 0 ? "No tags available yet" : "No matches"}
                               </p>
