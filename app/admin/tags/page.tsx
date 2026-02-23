@@ -95,7 +95,8 @@ function ColorPickerPopover({
 }
 
 export default function AdminTagsPage() {
-  const { isAdmin, loading: adminLoading } = useIsAdmin();
+  const { isAdmin, permissions, loading: adminLoading } = useIsAdmin();
+  const canManageTags = isAdmin && permissions.includes('manage_tags');
   const router = useRouter();
 
   const [tags, setTags] = useState<GlobalTag[]>([]);
@@ -118,13 +119,13 @@ export default function AdminTagsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!adminLoading && !isAdmin) {
+    if (!adminLoading && !canManageTags) {
       router.replace("/");
     }
-  }, [isAdmin, adminLoading, router]);
+  }, [canManageTags, adminLoading, router]);
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!canManageTags) return;
     loadGlobalTagsAdminAction().then((res) => {
       if (res.success) setTags(res.tags as GlobalTag[]);
       setLoading(false);
@@ -187,7 +188,7 @@ export default function AdminTagsPage() {
     );
   }
 
-  if (!isAdmin) return null;
+  if (!canManageTags) return null;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">

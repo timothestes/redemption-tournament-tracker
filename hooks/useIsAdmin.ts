@@ -3,6 +3,7 @@ import { createClient } from "../utils/supabase/client";
 
 export function useIsAdmin() {
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [permissions, setPermissions] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const supabase = createClient();
 
@@ -14,6 +15,7 @@ export function useIsAdmin() {
         
         if (authError || !user) {
           setIsAdmin(false);
+          setPermissions([]);
           setLoading(false);
           return;
         }
@@ -23,11 +25,24 @@ export function useIsAdmin() {
 
         if (error) {
           setIsAdmin(false);
+          setPermissions([]);
         } else {
           setIsAdmin(data || false);
+          if (data) {
+            // Fetch permissions from admin_users table
+            const { data: adminData } = await supabase
+              .from('admin_users')
+              .select('permissions')
+              .eq('user_id', user.id)
+              .single();
+            setPermissions(adminData?.permissions || []);
+          } else {
+            setPermissions([]);
+          }
         }
       } catch (error) {
         setIsAdmin(false);
+        setPermissions([]);
       } finally {
         setLoading(false);
       }
@@ -45,5 +60,5 @@ export function useIsAdmin() {
     };
   }, [supabase]);
 
-  return { isAdmin, loading };
+  return { isAdmin, permissions, loading };
 }

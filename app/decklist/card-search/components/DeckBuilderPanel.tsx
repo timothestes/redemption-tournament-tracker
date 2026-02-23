@@ -130,7 +130,8 @@ export default function DeckBuilderPanel({
   const [descriptionPreview, setDescriptionPreview] = useState(false);
 
   // Tags
-  const { isAdmin } = useIsAdmin();
+  const { isAdmin, permissions } = useIsAdmin();
+  const canManageTags = isAdmin && permissions.includes('manage_tags');
   const [deckTags, setDeckTags] = useState<GlobalTag[]>([]);
   const [allGlobalTags, setAllGlobalTags] = useState<GlobalTag[]>([]);
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
@@ -1671,7 +1672,7 @@ export default function DeckBuilderPanel({
                                   })
                                 )}
                               </div>
-                              {isAdmin && (
+                              {canManageTags && (
                                 <div className="border-t border-gray-100 dark:border-gray-800">
                                   <button
                                     onClick={() => { setCreateName(tagFilter); setCreateColor("#6366f1"); setCreateError(null); setCreateMode(true); }}

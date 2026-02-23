@@ -27,7 +27,8 @@ interface FullDeckViewProps {
  */
 export default function FullDeckView({ deck, onViewCard, isAuthenticated = false }: FullDeckViewProps) {
   const { getImageUrl } = useCardImageUrl();
-  const { isAdmin } = useIsAdmin();
+  const { isAdmin, permissions } = useIsAdmin();
+  const canManageTags = isAdmin && permissions.includes('manage_tags');
 
   // View mode state
     const [viewMode, setViewMode] = useState<'normal' | 'stacked'>('stacked');
@@ -741,7 +742,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                               })
                             )}
                           </div>
-                          {isAdmin && (
+                          {canManageTags && (
                             <div className="border-t border-gray-800">
                               <button
                                 onClick={() => { setCreateName(tagFilter); setCreateColor("#6366f1"); setCreateError(null); setCreateMode(true); }}

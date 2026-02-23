@@ -132,7 +132,8 @@ function sanitizeImgFile(imgFile: string): string {
 
 export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   const router = useRouter();
-  const { isAdmin } = useIsAdmin();
+  const { isAdmin, permissions } = useIsAdmin();
+  const canManageTags = isAdmin && permissions.includes('manage_tags');
   const [linkCopied, setLinkCopied] = useState(false);
   const [copying, setCopying] = useState(false);
   const [copyResult, setCopyResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -627,7 +628,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                             </div>
 
                             {/* Admin: create new tag footer */}
-                            {isAdmin && (
+                            {canManageTags && (
                               <div className="border-t border-gray-100 dark:border-gray-800">
                                 <button
                                   onClick={() => {
