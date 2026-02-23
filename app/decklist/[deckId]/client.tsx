@@ -161,6 +161,15 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   const [editingDescription, setEditingDescription] = useState(false);
   const [descriptionInput, setDescriptionInput] = useState(deck.description || "");
   const [savingDescription, setSavingDescription] = useState(false);
+  const descriptionTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-resize description textarea to fit content
+  useEffect(() => {
+    const el = descriptionTextareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [descriptionInput, editingDescription]);
 
   async function handleDescriptionSubmit() {
     setEditingDescription(false);
@@ -365,8 +374,8 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
     setCopyResult(null);
     const result = await copyPublicDeckAction(deck.id);
     setCopying(false);
-    if (result.success) {
-      setCopyResult({ success: true, message: "Deck copied to your library!" });
+    if (result.success && result.deckId) {
+      router.push(`/decklist/card-search?deckId=${result.deckId}`);
     } else {
       setCopyResult({
         success: false,
@@ -695,7 +704,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
                     </svg>
-                    Copy to My Library
+                    Copy &amp; Edit
                   </>
                 )}
               </button>
@@ -1062,15 +1071,16 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
           {isOwner && editingDescription ? (
             <div>
               <textarea
+                ref={descriptionTextareaRef}
                 autoFocus
                 value={descriptionInput}
                 onChange={(e) => setDescriptionInput(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Escape") { setDescriptionInput(description); setEditingDescription(false); }
                 }}
-                rows={26}
+                rows={3}
                 placeholder="Write a description for your deck... (Markdown supported)"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none overflow-hidden"
               />
               <div className="flex items-center gap-2 mt-2">
                 <button

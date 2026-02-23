@@ -1,46 +1,48 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createClient } from "../utils/supabase/client";
 
+interface AdminState {
+  isAdmin: boolean;
+  permissions: string[];
+  loading: boolean;
+}
+
 export function useIsAdmin() {
-  const [isAdmin, setIsAdmin] = useState<boolean>(false);
-  const [permissions, setPermissions] = useState<string[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const supabase = createClient();
+  const [state, setState] = useState<AdminState>({
+    isAdmin: false,
+    permissions: [],
+    loading: true,
+  });
+  const supabase = useRef(createClient()).current;
 
   useEffect(() => {
     const checkAdminStatus = async () => {
       try {
-        // Get current user
         const { data: { user }, error: authError } = await supabase.auth.getUser();
-        
+
         if (authError || !user) {
-          setIsAdmin(false);
-          setPermissions([]);
-          setLoading(false);
+          setState({ isAdmin: false, permissions: [], loading: false });
           return;
         }
 
-        // Check admin status using table-based function
-        const { data, error } = await supabase.rpc('check_admin_role');
+        const { data: isAdminData, error: adminError } = await supabase.rpc('check_admin_role');
 
-        if (error) {
-          setIsAdmin(false);
-          setPermissions([]);
-        } else {
-          setIsAdmin(data || false);
-          if (data) {
-            // Use SECURITY DEFINER RPC to bypass RLS on admin_users table
-            const { data: permsData } = await supabase.rpc('get_my_admin_permissions');
-            setPermissions(permsData || []);
-          } else {
-            setPermissions([]);
-          }
+        if (adminError || !isAdminData) {
+          setState({ isAdmin: false, permissions: [], loading: false });
+          return;
         }
-      } catch (error) {
-        setIsAdmin(false);
-        setPermissions([]);
-      } finally {
-        setLoading(false);
+
+        // Fetch permissions via SECURITY DEFINER RPC to bypass RLS
+        const { data: permsData, error: permsError } = await supabase.rpc('get_my_admin_permissions');
+
+        // Batch all updates in a single setState to avoid intermediate renders
+        setState({
+          isAdmin: true,
+          permissions: permsError ? [] : (permsData || []),
+          loading: false,
+        });
+      } catch {
+        setState({ isAdmin: false, permissions: [], loading: false });
       }
     };
 
@@ -56,5 +58,9 @@ export function useIsAdmin() {
     };
   }, [supabase]);
 
-  return { isAdmin, permissions, loading };
+  return {
+    isAdmin: state.isAdmin,
+    permissions: state.permissions,
+    loading: state.loading,
+  };
 }
