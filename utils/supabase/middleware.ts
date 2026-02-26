@@ -39,8 +39,12 @@ export const updateSession = async (request: NextRequest) => {
     // https://supabase.com/docs/guides/auth/server-side/nextjs
     const user = await supabase.auth.getUser();
 
-    // tracker routes
-    if (request.nextUrl.pathname.startsWith("/tracker") && user.error) {
+    // tracker routes — reset-password is exempt so recovery tokens can be processed client-side
+    if (
+      request.nextUrl.pathname.startsWith("/tracker") &&
+      !request.nextUrl.pathname.startsWith("/tracker/reset-password") &&
+      user.error
+    ) {
       return NextResponse.redirect(new URL("/sign-in", request.url));
     }
 
