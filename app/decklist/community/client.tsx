@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { loadPublicDecksAction, loadGlobalTagsAction, copyPublicDeckAction, LoadPublicDecksParams } from "../actions";
+import { loadPublicDecksAction, loadGlobalTagsAction, copyPublicDeckAction, loadPublicDeckAction, LoadPublicDecksParams } from "../actions";
 
 interface DeckTag { id: string; name: string; color: string; }
 
@@ -452,6 +452,34 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
   const hasPreview = img1 || img2;
   const isOwner = !!currentUserId && deck.user_id === currentUserId;
   const [copying, setCopying] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  async function handleDownload(e: React.MouseEvent) {
+    e.preventDefault();
+    setDownloading(true);
+    const result = await loadPublicDeckAction(deck.id);
+    setDownloading(false);
+    if (!result.success || !result.deck) return;
+    const cards = (result.deck as any).cards as { card_name: string; quantity: number; is_reserve: boolean }[];
+    const main = cards.filter((c) => !c.is_reserve).sort((a, b) => a.card_name.localeCompare(b.card_name));
+    const reserve = cards.filter((c) => c.is_reserve).sort((a, b) => a.card_name.localeCompare(b.card_name));
+    const lines: string[] = [];
+    main.forEach((c) => lines.push(`${c.quantity}\t${c.card_name}`));
+    if (reserve.length > 0) {
+      lines.push("");
+      lines.push("Reserve:");
+      reserve.forEach((c) => lines.push(`${c.quantity}\t${c.card_name}`));
+    }
+    const blob = new Blob([lines.join("\n")], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${deck.name.replace(/\s+/g, "_")}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
 
   async function handleCopyAndEdit(e: React.MouseEvent) {
     e.preventDefault();
@@ -560,18 +588,33 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
           <button
             onClick={handleCopyAndEdit}
             disabled={copying}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium disabled:opacity-60"
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium disabled:opacity-60 whitespace-nowrap"
           >
             {copying ? (
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
             ) : (
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+              <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
             )}
-            {copying ? "Copying…" : "Copy & Edit"}
+            {copying ? "Copying…" : "Edit Copy"}
           </button>
         ))}
+
+        <button
+          onClick={handleDownload}
+          disabled={downloading}
+          title="Download .txt"
+          className="flex items-center justify-center px-3 self-stretch border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 flex-shrink-0"
+        >
+          {downloading ? (
+            <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+          )}
+        </button>
       </div>
     </div>
   );

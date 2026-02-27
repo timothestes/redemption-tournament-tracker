@@ -287,6 +287,30 @@ export default function MyDecksClient() {
     }
   }
 
+  async function handleDownload(deckId: string) {
+    const result = await loadDeckByIdAction(deckId);
+    if (!result.success || !result.deck) return;
+    const cards = result.deck.cards as { card_name: string; quantity: number; is_reserve: boolean }[];
+    const main = cards.filter((c) => !c.is_reserve).sort((a, b) => a.card_name.localeCompare(b.card_name));
+    const reserve = cards.filter((c) => c.is_reserve).sort((a, b) => a.card_name.localeCompare(b.card_name));
+    const lines: string[] = [];
+    main.forEach((c) => lines.push(`${c.quantity}\t${c.card_name}`));
+    if (reserve.length > 0) {
+      lines.push("");
+      lines.push("Reserve:");
+      reserve.forEach((c) => lines.push(`${c.quantity}\t${c.card_name}`));
+    }
+    const blob = new Blob([lines.join("\n")], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${result.deck.name.replace(/\s+/g, "_")}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
   function handleNewDeck() {
     // If in a folder, pass folderId so the new deck is created in that folder
     if (selectedFolder) {
@@ -680,6 +704,7 @@ export default function MyDecksClient() {
                   onDuplicate={handleDuplicateDeck}
                   onMove={handleMoveDeck}
                   onGeneratePDF={handleGeneratePDF}
+                  onDownload={handleDownload}
                   onTogglePublic={handleTogglePublic}
                   onCopyLink={handleCopyLink}
                   onViewPublic={handleViewPublic}
@@ -698,6 +723,7 @@ export default function MyDecksClient() {
                   onDuplicate={handleDuplicateDeck}
                   onMove={handleMoveDeck}
                   onGeneratePDF={handleGeneratePDF}
+                  onDownload={handleDownload}
                   onTogglePublic={handleTogglePublic}
                   onCopyLink={handleCopyLink}
                   onViewPublic={handleViewPublic}
@@ -853,6 +879,7 @@ function DeckCard({
   onDuplicate,
   onMove,
   onGeneratePDF,
+  onDownload,
   onTogglePublic,
   onCopyLink,
   onViewPublic,
@@ -864,6 +891,7 @@ function DeckCard({
   onDuplicate: (id: string) => void;
   onMove: (deckId: string, folderId: string | null) => void;
   onGeneratePDF: (deckId: string) => void;
+  onDownload: (deckId: string) => void;
   onTogglePublic: (deckId: string, currentlyPublic: boolean) => void;
   onCopyLink: (deckId: string) => void;
   onViewPublic: (deckId: string) => void;
@@ -909,6 +937,7 @@ function DeckCard({
             onDuplicate={() => onDuplicate(deck.id!)}
             onMove={(folderId) => onMove(deck.id!, folderId)}
             onGeneratePDF={() => onGeneratePDF(deck.id!)}
+            onDownload={() => onDownload(deck.id!)}
             onTogglePublic={() => onTogglePublic(deck.id!, !!deck.is_public)}
             onCopyLink={() => onCopyLink(deck.id!)}
             onViewPublic={() => onViewPublic(deck.id!)}
@@ -968,6 +997,7 @@ function DeckListItem({
   onDuplicate,
   onMove,
   onGeneratePDF,
+  onDownload,
   onTogglePublic,
   onCopyLink,
   onViewPublic,
@@ -979,6 +1009,7 @@ function DeckListItem({
   onDuplicate: (id: string) => void;
   onMove: (deckId: string, folderId: string | null) => void;
   onGeneratePDF: (deckId: string) => void;
+  onDownload: (deckId: string) => void;
   onTogglePublic: (deckId: string, currentlyPublic: boolean) => void;
   onCopyLink: (deckId: string) => void;
   onViewPublic: (deckId: string) => void;
@@ -1038,6 +1069,7 @@ function DeckListItem({
             onDuplicate={() => onDuplicate(deck.id!)}
             onMove={(folderId) => onMove(deck.id!, folderId)}
             onGeneratePDF={() => onGeneratePDF(deck.id!)}
+            onDownload={() => onDownload(deck.id!)}
             onTogglePublic={() => onTogglePublic(deck.id!, !!deck.is_public)}
             onCopyLink={() => onCopyLink(deck.id!)}
             onViewPublic={() => onViewPublic(deck.id!)}
@@ -1058,6 +1090,7 @@ function DropdownMenu({
   onDuplicate,
   onMove,
   onGeneratePDF,
+  onDownload,
   onTogglePublic,
   onCopyLink,
   onViewPublic,
@@ -1070,6 +1103,7 @@ function DropdownMenu({
   onDuplicate: () => void;
   onMove: (folderId: string | null) => void;
   onGeneratePDF: () => void;
+  onDownload: () => void;
   onTogglePublic: () => void;
   onCopyLink: () => void;
   onViewPublic: () => void;
@@ -1104,8 +1138,11 @@ function DropdownMenu({
                 onEdit();
                 setIsOpen(false);
               }}
-              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 first:rounded-t-md"
+              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 first:rounded-t-md flex items-center gap-2"
             >
+              <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
               Edit
             </button>
             <button
@@ -1113,8 +1150,11 @@ function DropdownMenu({
                 onDuplicate();
                 setIsOpen(false);
               }}
-              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
             >
+              <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
               Duplicate
             </button>
             <button
@@ -1122,9 +1162,24 @@ function DropdownMenu({
                 onGeneratePDF();
                 setIsOpen(false);
               }}
-              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
             >
+              <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
               Generate PDF
+            </button>
+            <button
+              onClick={() => {
+                onDownload();
+                setIsOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+            >
+              <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Download .txt
             </button>
 
             {/* Sharing section */}
@@ -1188,9 +1243,12 @@ function DropdownMenu({
             <div className="relative">
               <button
                 onClick={() => setShowMoveMenu(!showMoveMenu)}
-                className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between"
+                className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
               >
-                Move to...
+                <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                </svg>
+                <span className="flex-1">Move to...</span>
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
                 </svg>
@@ -1240,8 +1298,11 @@ function DropdownMenu({
                 onDelete();
                 setIsOpen(false);
               }}
-              className="w-full text-left px-4 py-2 hover:bg-red-100 dark:hover:bg-red-900 text-red-600 dark:text-red-400 last:rounded-b-md"
+              className="w-full text-left px-4 py-2 hover:bg-red-100 dark:hover:bg-red-900 text-red-600 dark:text-red-400 last:rounded-b-md flex items-center gap-2"
             >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
               Delete
             </button>
           </div>

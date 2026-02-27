@@ -1001,6 +1001,8 @@ export async function copyPublicDeckAction(sourceDeckId: string) {
       description: sourceDeck.description,
       format: sourceDeck.format,
       paragon: sourceDeck.paragon,
+      previewCard1: sourceDeck.preview_card_1 ?? null,
+      previewCard2: sourceDeck.preview_card_2 ?? null,
       cards: (sourceCards || []).map((card: any) => ({
         card_name: card.card_name,
         card_set: card.card_set,
