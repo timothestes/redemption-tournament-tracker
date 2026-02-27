@@ -1315,8 +1315,8 @@ export default function CardSearchClient() {
                   <select
                     value={queryObj.field}
                     onChange={e => updateQueryField(index, e.target.value)}
-                    className="border rounded px-2 py-2 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center text-sm"
-                    style={{ minHeight: 48, maxWidth: 120 }}
+                    className="border rounded px-2 py-1.5 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center text-sm"
+                    style={{ minHeight: 44, maxWidth: 120 }}
                   >
                     <option value="everything">All</option>
                     <option value="name">Name</option>
@@ -1332,8 +1332,8 @@ export default function CardSearchClient() {
                   <select
                     value={queryObj.operator}
                     onChange={e => updateQueryOperator(index, e.target.value as QueryOperator)}
-                    className="border rounded px-2 py-2 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center text-sm"
-                    style={{ minHeight: 48, maxWidth: 100 }}
+                    className="border rounded px-2 py-1.5 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center text-sm"
+                    style={{ minHeight: 44, maxWidth: 100 }}
                     title={index === 0 ? "Negate this query" : "How to combine this query with previous results"}
                   >
                     {index === 0 ? (
@@ -1355,11 +1355,11 @@ export default function CardSearchClient() {
                     ref={el => { inputRefs.current[index] = el; }}
                     type="text"
                     placeholder={index === 0 ? "Search" : `Search ${index + 1}`}
-                    className="w-full sm:w-auto p-3 pr-10 border rounded text-base focus:ring-2 focus:ring-blue-400 text-gray-900 bg-white dark:text-white dark:bg-gray-900"
+                    className="flex-1 sm:w-auto p-2 sm:p-3 pr-8 sm:pr-10 border rounded text-sm sm:text-base focus:ring-2 focus:ring-blue-400 text-gray-900 bg-white dark:text-white dark:bg-gray-900"
                     value={queryObj.text}
                     onChange={(e) => updateQuery(index, e.target.value)}
                     maxLength={64}
-                    style={{ minHeight: 48, maxWidth: 180 }}
+                    style={{ minHeight: 44, maxWidth: 180 }}
                   />
                   
                   {/* Remove button - only show if more than one query */}
@@ -1369,7 +1369,7 @@ export default function CardSearchClient() {
                       onClick={() => removeQuery(index)}
                       className="p-2 text-red-600 hover:text-red-800 hover:bg-red-100 rounded transition-colors dark:hover:bg-red-900"
                       title="Remove this query"
-                      style={{ minHeight: 48 }}
+                      style={{ minHeight: 44 }}
                     >
                       ×
                     </button>
@@ -1377,21 +1377,23 @@ export default function CardSearchClient() {
                 </div>
               ))}
             </div>
+            <div className="flex flex-row gap-2 w-full sm:w-auto">
             <button
-              className="px-4 w-full sm:w-auto rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center text-sm"
+              className="px-3 sm:px-4 flex-1 sm:flex-none sm:w-auto rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center text-sm"
               onClick={handleResetFilters}
-              style={{ minHeight: 48, height: 48 }}
+              style={{ minHeight: 44, height: 44 }}
             >
-              Reset Filters
+              <span className="hidden sm:inline">Reset Filters</span>
+              <span className="sm:hidden">↺ Reset</span>
             </button>
             <button
-              className={`px-4 w-full sm:w-auto rounded border transition font-semibold shadow text-center relative hidden sm:block ${
+              className={`px-4 sm:w-auto rounded border transition font-semibold shadow text-center relative hidden sm:block ${
                 queries.filter(q => q.text.trim()).length > 1
                   ? 'bg-gray-400 text-gray-600 border-gray-500 cursor-not-allowed opacity-50 dark:bg-gray-800 dark:text-gray-500 dark:border-gray-600'
                   : 'bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
               }`}
               onClick={queries.filter(q => q.text.trim()).length > 1 ? undefined : handleCopyLink}
-              style={{ minHeight: 48, height: 48 }}
+              style={{ minHeight: 44, height: 44 }}
               title={
                 queries.filter(q => q.text.trim()).length > 1
                   ? 'Multiple query link sharing sadly not supported'
@@ -1402,44 +1404,21 @@ export default function CardSearchClient() {
               {copyLinkNotification ? '✓' : '🔗'}
             </button>
             <button
-              className="px-4 w-full sm:w-auto rounded bg-green-200 text-green-900 hover:bg-green-400 hover:text-green-900 border border-green-300 dark:bg-green-700 dark:text-white dark:hover:bg-green-600 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center relative"
+              className="px-4 flex-1 sm:flex-none sm:w-auto rounded bg-green-200 text-green-900 hover:bg-green-400 hover:text-green-900 border border-green-300 dark:bg-green-700 dark:text-white dark:hover:bg-green-600 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center relative"
               onClick={addNewQuery}
-              style={{ minHeight: 48, height: 48 }}
+              style={{ minHeight: 44, height: 44 }}
               title="Add new query"
             >
               +
             </button>
+            </div>
           </div>
         </div>
       </div>
       {/* Active Filters Summary Bar */}
-      <div className="w-full px-4 py-2 flex flex-wrap gap-2 items-center justify-center min-h-[44px] transition-all duration-300 sticky top-[120px] sm:top-[64px] z-30 bg-white text-gray-900 border-b border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-900 dark:shadow">
-        {/* Collapse/Expand Filter Grid Button */}
-        <div className="absolute right-4 top-2 flex flex-row items-center gap-1.5">
-          <span className="md:hidden text-xs text-gray-500 dark:text-gray-400 font-medium">
-            Filters
-          </span>
-          <button
-            aria-label="Toggle filter grid"
-            className={`w-8 h-8 rounded-full flex items-center justify-center border border-gray-400 dark:border-gray-700 shadow transition bg-gray-300 dark:bg-gray-700 ${filterGridCollapsed ? 'ring-2 ring-blue-400' : ''}`}
-            style={{ outline: 'none' }}
-            onClick={() => setFilterGridCollapsed(v => !v)}
-          >
-            {/* Use a chevron icon for clarity */}
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              style={{ transitionProperty: 'transform', transitionDuration: '0.2s', transitionTimingFunction: 'ease', transform: filterGridCollapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}
-              suppressHydrationWarning
-            >
-              <circle cx="12" cy="12" r="11" className="fill-gray-200 stroke-gray-400 dark:fill-gray-700 dark:stroke-gray-600" strokeWidth="1" />
-              <path d="M8 10l4 4 4-4" className="stroke-gray-700 dark:stroke-gray-400" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-        </div>
+      <div className="w-full min-h-[44px] transition-all duration-300 sticky top-[120px] sm:top-[64px] z-30 bg-white text-gray-900 border-b border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-900 dark:shadow flex items-center">
+        {/* Scrollable pills area */}
+        <div className="flex-1 overflow-x-auto flex flex-nowrap sm:flex-wrap gap-2 items-center sm:justify-center px-2 sm:px-4 py-2 sm:overflow-visible">
         {/* Query Pills */}
         {queries.map((queryObj, originalIndex) => {
           if (!queryObj.text.trim()) return null;
@@ -1668,6 +1647,32 @@ export default function CardSearchClient() {
             <span className="ml-1 text-blue-900 dark:text-white">×</span>
           </span>
         )}
+        </div>
+        {/* Collapse/Expand Filter Grid Button — outside scroll area so it never overlaps pills */}
+        <div className="flex-shrink-0 pr-3 flex flex-row items-center gap-1.5">
+          <span className="md:hidden text-xs text-gray-500 dark:text-gray-400 font-medium">
+            Filters
+          </span>
+          <button
+            aria-label="Toggle filter grid"
+            className={`w-8 h-8 rounded-full flex items-center justify-center border border-gray-400 dark:border-gray-700 shadow transition bg-gray-300 dark:bg-gray-700 ${filterGridCollapsed ? 'ring-2 ring-blue-400' : ''}`}
+            style={{ outline: 'none' }}
+            onClick={() => setFilterGridCollapsed(v => !v)}
+          >
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              style={{ transitionProperty: 'transform', transitionDuration: '0.2s', transitionTimingFunction: 'ease', transform: filterGridCollapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}
+              suppressHydrationWarning
+            >
+              <circle cx="12" cy="12" r="11" className="fill-gray-200 stroke-gray-400 dark:fill-gray-700 dark:stroke-gray-600" strokeWidth="1" />
+              <path d="M8 10l4 4 4-4" className="stroke-gray-700 dark:stroke-gray-400" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
       </div>
       <main className="p-2 overflow-auto bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200">
         {/* Responsive grid for filters */}
@@ -1740,7 +1745,7 @@ export default function CardSearchClient() {
         {/* Card grid */}
         {visibleCards.length > 0 ? (
           <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-4 mt-2 sm:mt-4">
             {visibleCards.map((c) => {
               const quantityInDeck = getCardQuantity(c.name, c.set, false);
               return (
@@ -1763,7 +1768,7 @@ export default function CardSearchClient() {
                     {/* Controls Overlay - Shows on Hover */}
                     <div className="absolute inset-x-0 bottom-0 transition-opacity duration-200">
                       {/* Using golden ratio: top section ~61.8%, bottom ~38.2% */}
-                      <div className="grid grid-rows-[1.618fr_1fr] grid-cols-2 gap-1.5 p-3 h-32">
+                      <div className="grid grid-rows-[1.618fr_1fr] grid-cols-2 gap-1 p-2 h-20 md:gap-1.5 md:p-3 md:h-32">
                         {/* Top Left: Decrement */}
                         <div className="flex items-center justify-center">
                           <button
@@ -1771,14 +1776,14 @@ export default function CardSearchClient() {
                               e.stopPropagation();
                               removeCard(c.name, c.set, activeDeckTab === "reserve");
                             }}
-                            className="hidden md:flex w-14 h-14 max-w-full max-h-full items-center justify-center rounded-lg bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-3xl border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
+                            className="flex w-10 h-10 md:w-14 md:h-14 max-w-full max-h-full items-center justify-center rounded-lg bg-black/50 md:bg-black/30 md:hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-2xl md:text-3xl border border-white/20 md:opacity-0 md:group-hover:opacity-100 md:pointer-events-none md:group-hover:pointer-events-auto"
                             aria-label="Remove card"
                             title="Remove card from deck"
                           >
                             −
                           </button>
                         </div>
-                        
+
                         {/* Top Right: Increment */}
                         <div className="flex items-center justify-center">
                           <button
@@ -1786,7 +1791,7 @@ export default function CardSearchClient() {
                               e.stopPropagation();
                               addCard(c, activeDeckTab === "reserve");
                             }}
-                            className="hidden md:flex w-14 h-14 max-w-full max-h-full items-center justify-center rounded-lg bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-3xl border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
+                            className="flex w-10 h-10 md:w-14 md:h-14 max-w-full max-h-full items-center justify-center rounded-lg bg-black/50 md:bg-black/30 md:hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-2xl md:text-3xl border border-white/20 md:opacity-0 md:group-hover:opacity-100 md:pointer-events-none md:group-hover:pointer-events-auto"
                             aria-label="Add card"
                             title="Add card to deck"
                           >
@@ -1810,7 +1815,7 @@ export default function CardSearchClient() {
                     </div>
                   </div>
                   
-                  <p className="text-sm mt-1 text-center truncate">{c.name}</p>
+                  <p className="text-xs sm:text-sm mt-1 text-center truncate hidden sm:block">{c.name}</p>
                 </div>
               );
             })}
