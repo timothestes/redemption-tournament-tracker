@@ -1140,7 +1140,7 @@ export default function CardSearchClient() {
     });
   }
 
-  // Export deck to clipboard or download
+  // Export deck to clipboard (with file download fallback)
   async function handleExportDeck() {
     try {
       await copyDeckToClipboard(deck);
@@ -1151,6 +1151,11 @@ export default function CardSearchClient() {
       // Fallback to download if clipboard fails
       downloadDeckAsFile(deck);
     }
+  }
+
+  // Download deck as .txt file
+  function handleDownloadDeck() {
+    downloadDeckAsFile(deck);
   }
 
   // Import deck from text
@@ -1935,6 +1940,7 @@ export default function CardSearchClient() {
               removeCard(cardName, cardSet, isReserve);
             }}
             onExport={handleExportDeck}
+            onDownload={handleDownloadDeck}
             onImport={() => setShowImportModal(true)}
             onDelete={handleDeleteDeck}
             onDuplicate={() => {

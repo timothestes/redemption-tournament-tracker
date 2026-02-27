@@ -54,8 +54,10 @@ interface DeckBuilderPanelProps {
   onAddCard: (cardName: string, cardSet: string, isReserve: boolean) => void;
   /** Callback to remove a card */
   onRemoveCard: (cardName: string, cardSet: string, isReserve: boolean) => void;
-  /** Callback to export deck */
+  /** Callback to export deck (copy to clipboard) */
   onExport: () => void;
+  /** Callback to download deck as .txt file */
+  onDownload?: () => void;
   /** Callback to import deck - parent handles UI */
   onImport: () => void;
   /** Callback to delete deck */
@@ -95,6 +97,7 @@ export default function DeckBuilderPanel({
   onAddCard,
   onRemoveCard,
   onExport,
+  onDownload,
   onImport,
   onDelete,
   onDuplicate,
@@ -849,13 +852,28 @@ export default function DeckBuilderPanel({
                   setShowMenu(false);
                 }}
                 className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
-                title="Export deck to clipboard (Ctrl+E / Cmd+E)"
+                title="Copy deck to clipboard (Ctrl+E / Cmd+E)"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
                 </svg>
-                Export (Ctrl+E)
+                Copy to Clipboard
               </button>
+              {onDownload && (
+                <button
+                  onClick={() => {
+                    onDownload();
+                    setShowMenu(false);
+                  }}
+                  className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
+                  title="Download deck as .txt file"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download .txt
+                </button>
+              )}
               
               <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
               

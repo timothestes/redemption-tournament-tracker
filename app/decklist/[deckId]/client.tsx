@@ -390,6 +390,28 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
     router.push(`/decklist/card-search?deckId=${deck.id}`);
   }
 
+  function handleDownloadTxt() {
+    const mainCards = deck.cards.filter((c) => !c.is_reserve).slice().sort((a, b) => a.card_name.localeCompare(b.card_name));
+    const reserveCards = deck.cards.filter((c) => c.is_reserve).slice().sort((a, b) => a.card_name.localeCompare(b.card_name));
+    const lines: string[] = [];
+    mainCards.forEach((c) => lines.push(`${c.quantity}\t${c.card_name}`));
+    if (reserveCards.length > 0) {
+      lines.push("");
+      lines.push("Reserve:");
+      reserveCards.forEach((c) => lines.push(`${c.quantity}\t${c.card_name}`));
+    }
+    const text = lines.join("\n");
+    const blob = new Blob([text], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${deck.name.replace(/\s+/g, "_")}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className={`w-full mx-auto py-8 ${viewMode === "stacked" ? "max-w-full px-2" : "max-w-7xl px-4"}`}>
       {/* Card detail modal — no add/remove buttons */}
@@ -686,6 +708,17 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                   Share
                 </>
               )}
+            </button>
+
+            <button
+              onClick={handleDownloadTxt}
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2"
+              title="Download deck as .txt file"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Download .txt
             </button>
 
             {!isOwner && isLoggedIn && (
