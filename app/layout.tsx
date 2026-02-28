@@ -1,7 +1,10 @@
 import { GeistSans } from "geist/font/sans";
+import { Cinzel } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import Background from "../components/ui/background"; // Using the improved background
 import "./globals.css";
+
+const cinzel = Cinzel({ subsets: ["latin"], variable: "--font-cinzel" });
 
 const defaultUrl = process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`
@@ -19,7 +22,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={GeistSans.className} suppressHydrationWarning>
+    <html lang="en" className={`${GeistSans.className} ${cinzel.variable}`} suppressHydrationWarning>
       <body className="bg-background text-foreground">
         <ThemeProvider
           attribute="class"

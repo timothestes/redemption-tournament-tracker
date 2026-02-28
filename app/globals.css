@@ -72,3 +72,10 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Goldfish mode — ultrawide background bias */
+@media (min-aspect-ratio: 2/1) {
+  .cave-bg {
+    background-position: center 82% !important;
+  }
+}
