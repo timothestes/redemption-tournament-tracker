@@ -316,7 +316,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
 
   useKeyboardShortcuts();
 
-  const isParagon = state.format === 'Paragon';
+  const isParagon = false; // TODO: re-enable paragon zone later
   const zoneLayout = useMemo(() => calculateZoneLayout(width, height, isParagon), [width, height, isParagon]);
   const { cardWidth, cardHeight } = useMemo(() => getCardDimensions(width), [width]);
 
