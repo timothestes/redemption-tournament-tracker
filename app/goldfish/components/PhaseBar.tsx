@@ -35,13 +35,16 @@ export function PhaseBar() {
   const handlePhaseClick = (phase: GamePhase) => {
     if (phase === currentPhase) return;
 
-    // Advance to next phase
-    const currentIdx = PHASE_ORDER.indexOf(currentPhase as any);
-    const targetIdx = PHASE_ORDER.indexOf(phase);
+    const fromIdx = PHASE_ORDER.indexOf(currentPhase as any);
+    const toIdx = PHASE_ORDER.indexOf(phase);
 
-    if (targetIdx > currentIdx) {
-      for (let i = currentIdx; i < targetIdx; i++) {
+    if (toIdx > fromIdx) {
+      for (let i = fromIdx; i < toIdx; i++) {
         advancePhase();
+      }
+    } else {
+      for (let i = fromIdx; i > toIdx; i--) {
+        regressPhase();
       }
     }
   };

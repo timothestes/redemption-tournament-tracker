@@ -464,12 +464,18 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
           handleDeckDrop(card.instanceId, rect.left + centerX, rect.top + centerY);
         }
       } else if (targetZone && (targetZone !== card.zone || targetZone === 'territory')) {
-        // Hide the dragged node immediately so it doesn't linger at the drop position
-        // while React processes the state update and re-renders the card in its new zone
-        const parentGroup = node.parent;
-        if (parentGroup && targetZone !== 'territory') {
-          parentGroup.visible(false);
-          parentGroup.getLayer()?.batchDraw();
+        // Hide the dragged card group immediately so it doesn't linger at the drop position
+        // while React processes the state update and re-renders the card in its new zone.
+        // Walk up from e.target to find the draggable Group (the card-level container).
+        if (targetZone !== 'territory') {
+          let cardGroup: Konva.Node | null = node;
+          while (cardGroup && !cardGroup.draggable()) {
+            cardGroup = cardGroup.parent;
+          }
+          if (cardGroup) {
+            cardGroup.visible(false);
+            cardGroup.getLayer()?.batchDraw();
+          }
         }
         if (isGroupDrag) {
           moveCardsBatch(cardIds, targetZone);
@@ -839,8 +845,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                   y={rect.y + 6}
                   text={(useShortenedLabels && SHORT_ZONE_LABELS[zoneId] ? SHORT_ZONE_LABELS[zoneId] : rect.label).toUpperCase()}
                   fontSize={SIDEBAR_ZONES_WITH_BADGE.includes(zoneId) && useShortenedLabels ? 11 : 14}
-                  fontStyle="bold"
-                  fontFamily="var(--font-cinzel), Georgia, serif"
+                  fontFamily="Cinzel, Georgia, serif"
                   fill="#e8d5a3"
                   letterSpacing={SIDEBAR_ZONES_WITH_BADGE.includes(zoneId) && useShortenedLabels ? 1 : 2}
                   width={rect.width - 8 - 38}
@@ -881,8 +886,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
             y={zoneLayout.hand.y + 4}
             text="HAND"
             fontSize={14}
-            fontStyle="bold"
-            fontFamily="var(--font-cinzel), Georgia, serif"
+            fontFamily="Cinzel, Georgia, serif"
             fill="#e8d5a3"
             letterSpacing={2}
           />
@@ -906,7 +910,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
               width={zoneLayout.hand.width}
               text="Hand is empty"
               fontSize={14}
-              fontFamily="var(--font-cinzel), Georgia, serif"
+              fontFamily="Cinzel, Georgia, serif"
               fill="#6b4e27"
               opacity={0.5}
               align="center"
