@@ -98,7 +98,7 @@ const GameCardNode = memo(function GameCardNode({
   cardHeight: number;
   image: HTMLImageElement | undefined;
   isSelected?: boolean;
-  onDragStart: () => void;
+  onDragStart: (card: GameCard) => void;
   onDragMove: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onDragEnd: (card: GameCard, e: Konva.KonvaEventObject<DragEvent>) => void;
   onContextMenu: (card: GameCard, e: Konva.KonvaEventObject<PointerEvent>) => void;
@@ -115,7 +115,7 @@ const GameCardNode = memo(function GameCardNode({
       y={y}
       rotation={rotation}
       draggable
-      onDragStart={onDragStart}
+      onDragStart={() => onDragStart(card)}
       onDragMove={onDragMove}
       onDragEnd={(e) => onDragEnd(card, e)}
       onContextMenu={(e) => onContextMenu(card, e)}
@@ -207,6 +207,24 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
   const { state, dispatch, drawCard, drawMultiple, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleDeck, meekCard, unmeekCard } = useGame();
   const stageRef = useRef<Konva.Stage>(null);
 
+  // Prevent browser-native drag on the canvas container.
+  // Without this, the browser can hijack card drags (especially multi-select)
+  // and show a ghosted overlay of the page instead of the Konva drag behavior.
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const container = stage.container();
+    const preventDrag = (e: Event) => e.preventDefault();
+    container.addEventListener('dragstart', preventDrag);
+    container.addEventListener('dragover', preventDrag);
+    container.style.userSelect = 'none';
+    container.style.webkitUserSelect = 'none';
+    return () => {
+      container.removeEventListener('dragstart', preventDrag);
+      container.removeEventListener('dragover', preventDrag);
+    };
+  }, []);
+
   // Use ref for image cache to avoid re-renders on every image load.
   // A version counter triggers a single re-render when images finish loading.
   const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
@@ -236,6 +254,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
   } | null>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isDraggingRef = useRef(false);
+  const dragSourceZoneRef = useRef<ZoneId | null>(null);
   const [browseZone, setBrowseZone] = useState<ZoneId | null>(null);
 
   // Keep hover preview in sync with game state (e.g. when meekifying a hovered card)
@@ -259,6 +278,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
   const [multiCardContextMenu, setMultiCardContextMenu] = useState<{ x: number; y: number } | null>(null);
   const multiCardMenuTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [batchDeckDropIds, setBatchDeckDropIds] = useState<string[] | null>(null);
+  const [cardRenderKey, setCardRenderKey] = useState(0);
 
   // Selection state
   const {
@@ -404,9 +424,10 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
   });
 
   // Clear hover state and mark dragging on drag start
-  const handleCardDragStart = useCallback(() => {
+  const handleCardDragStart = useCallback((card: GameCard) => {
     isDraggingRef.current = true;
     isCanvasDragging.current = true;
+    dragSourceZoneRef.current = card.zone;
     if (hoverTimerRef.current) {
       clearTimeout(hoverTimerRef.current);
       hoverTimerRef.current = null;
@@ -435,6 +456,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
       isDraggingRef.current = false;
       isCanvasDragging.current = false;
       canvasDragZoneRef.current = null;
+      dragSourceZoneRef.current = null;
       setCanvasDragZone(null);
       const node = e.target;
       const dropX = node.x();
@@ -455,6 +477,15 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
       const cardIds = isGroupDrag ? Array.from(selectedIds) : [card.instanceId];
 
       if (targetZone === 'deck' && card.zone !== 'deck') {
+        // Hide the card so it doesn't awkwardly sit at the deck position while the popup is open
+        let cardGroup: Konva.Node | null = node;
+        while (cardGroup && !cardGroup.draggable()) {
+          cardGroup = cardGroup.parent;
+        }
+        if (cardGroup) {
+          cardGroup.visible(false);
+          cardGroup.getLayer()?.batchDraw();
+        }
         const stage = stageRef.current;
         if (stage) {
           const rect = stage.container().getBoundingClientRect();
@@ -463,11 +494,13 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
           }
           handleDeckDrop(card.instanceId, rect.left + centerX, rect.top + centerY);
         }
-      } else if (targetZone && (targetZone !== card.zone || targetZone === 'territory')) {
+      } else if (targetZone && (targetZone !== card.zone || targetZone === 'territory' || targetZone === 'land-of-bondage')) {
         // Hide the dragged card group immediately so it doesn't linger at the drop position
         // while React processes the state update and re-renders the card in its new zone.
         // Walk up from e.target to find the draggable Group (the card-level container).
-        if (targetZone !== 'territory') {
+        // Skip hiding for free-form zones where repositioning within the same zone is allowed.
+        const freeFormZones: ZoneId[] = ['territory', 'land-of-bondage'];
+        if (!freeFormZones.includes(targetZone)) {
           let cardGroup: Konva.Node | null = node;
           while (cardGroup && !cardGroup.draggable()) {
             cardGroup = cardGroup.parent;
@@ -480,8 +513,8 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
         if (isGroupDrag) {
           moveCardsBatch(cardIds, targetZone);
           clearSelection();
-        } else if (targetZone === 'territory' && card.zone === 'territory') {
-          moveCard(card.instanceId, 'territory', undefined, dropX, dropY);
+        } else if (freeFormZones.includes(targetZone) && card.zone === targetZone) {
+          moveCard(card.instanceId, targetZone, undefined, dropX, dropY);
         } else {
           moveCard(card.instanceId, targetZone, undefined, dropX, dropY);
         }
@@ -665,13 +698,13 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
       });
     }
 
-    // Land of bondage
+    // Land of bondage (free-form)
     const lobZone = zoneLayout['land-of-bondage'];
     if (lobZone) {
-      const positions = calculateCardPositionsInZone(lobZone, state.zones['land-of-bondage'].length, cardWidth, cardHeight);
       state.zones['land-of-bondage'].forEach((card, i) => {
-        const pos = positions[i];
-        if (pos) bounds.push({ instanceId: card.instanceId, x: pos.x, y: pos.y, width: cardWidth, height: cardHeight, rotation: 0 });
+        const x = card.posX ?? (lobZone.x + 8 + (i % 8) * (cardWidth + 4));
+        const y = card.posY ?? (lobZone.y + 20 + Math.floor(i / 8) * (cardHeight * 0.35));
+        bounds.push({ instanceId: card.instanceId, x, y, width: cardWidth, height: cardHeight, rotation: 0 });
       });
     }
 
@@ -709,11 +742,17 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
     (e: Konva.KonvaEventObject<MouseEvent>) => {
       // Only left-click
       if (e.evt.button !== 0) return;
-      // Only start selection drag on empty canvas space (not cards)
-      // Cards are draggable Groups that capture their own events.
-      // Zone backgrounds are non-draggable Rects, Text labels, or the Stage itself.
+      // Only start selection drag on empty canvas space (not cards).
+      // Walk up the node tree to detect any draggable ancestor (card Group),
+      // since the click target may be a nested child (e.g. KonvaImage inside
+      // a non-draggable meek-rotation Group inside the draggable card Group).
       const target = e.target;
-      const isCard = target.parent?.draggable?.();
+      let ancestor: Konva.Node | null = target.parent;
+      let isCard = false;
+      while (ancestor && ancestor !== stageRef.current) {
+        if (ancestor.draggable?.()) { isCard = true; break; }
+        ancestor = ancestor.parent;
+      }
       if (isCard) return;
 
       // Cancel any pending multi-card menu from a previous drag
@@ -727,9 +766,8 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
       const stage = stageRef.current;
       if (!stage) return;
       const pos = stage.getPointerPosition();
-      if (pos) {
-        startSelectionDrag(pos.x, pos.y, e.evt.shiftKey);
-      }
+      if (!pos) return;
+      startSelectionDrag(pos.x, pos.y, e.evt.shiftKey);
     },
     [selectedIds.size, clearSelection, startSelectionDrag]
   );
@@ -737,6 +775,13 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
   const handleStageMouseMove = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
       if (!isSelectingRef.current) return;
+      // If a card drag started (handleCardDragStart fired), cancel the selection
+      // so the dotted rect doesn't flash alongside the card drag.
+      if (isDraggingRef.current) {
+        isSelectingRef.current = false;
+        onRectChangeRef.current?.(null);
+        return;
+      }
       const stage = stageRef.current;
       if (!stage) return;
       const pos = stage.getPointerPosition();
@@ -919,7 +964,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
         </Layer>
 
         {/* Card layer — non-hand zones */}
-        <Layer>
+        <Layer key={`cards-${cardRenderKey}`}>
           {nonHandZones.map(zoneId => {
             const cards = state.zones[zoneId];
             if (!cards || cards.length === 0) return null;
@@ -1121,6 +1166,40 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
               );
             }
 
+            // Land of Bondage: free-form placement using stored positions
+            if (zoneId === 'land-of-bondage') {
+              const zone = zoneLayout[zoneId];
+              return (
+                <Group key={zoneId}>
+                  {cards.map((card, i) => {
+                    const x = card.posX ?? (zone.x + 8 + (i % 8) * (cardWidth + 4));
+                    const y = card.posY ?? (zone.y + 20 + Math.floor(i / 8) * (cardHeight * 0.35));
+                    return (
+                      <GameCardNode
+                        key={card.instanceId}
+                        card={card}
+                        x={x}
+                        y={y}
+                        rotation={0}
+                        cardWidth={cardWidth}
+                        cardHeight={cardHeight}
+                        image={getImage(card.cardImgFile)}
+                        isSelected={selectedIds.has(card.instanceId)}
+                        onDragStart={handleCardDragStart}
+                        onDragMove={handleCardDragMove}
+                        onDragEnd={handleCardDragEnd}
+                        onContextMenu={handleCardContextMenu}
+                        onClick={handleCardClick}
+                        onDblClick={handleCardDblClick}
+                        onMouseEnter={handleCardMouseEnter}
+                        onMouseLeave={handleCardMouseLeave}
+                      />
+                    );
+                  })}
+                </Group>
+              );
+            }
+
             // For other zones, lay cards out in a grid
             const positions = calculateCardPositionsInZone(
               zoneLayout[zoneId],
@@ -1163,7 +1242,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
         </Layer>
 
         {/* Hand layer — separate for z-ordering */}
-        <Layer>
+        <Layer key={`hand-${cardRenderKey}`}>
           {state.zones.hand.map((card, i) => {
             const pos = handPositions[i];
             if (!pos) return null;
@@ -1515,6 +1594,8 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
       {(modalDrag.isDragging || canvasDragZone !== null) && (
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 450 }}>
           {(Object.entries(zoneLayout) as [ZoneId, ZoneRect][]).map(([zoneId, rect]) => {
+            // Don't show highlight for the zone the card is being dragged from
+            if (!modalDrag.isDragging && dragSourceZoneRef.current === zoneId) return null;
             const activeHoveredZone = modalDrag.isDragging ? modalHoveredZone : canvasDragZone;
             const isHovered = activeHoveredZone === zoneId;
             return (
@@ -1526,19 +1607,18 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                   top: rect.y,
                   width: rect.width,
                   height: rect.height,
-                  border: isHovered ? '2px solid #c4955a' : '1px solid rgba(196,149,90,0.4)',
-                  background: isHovered ? 'rgba(196,149,90,0.25)' : 'rgba(196,149,90,0.08)',
+                  border: isHovered ? '1px solid rgba(196,149,90,0.6)' : '1px solid rgba(196,149,90,0.15)',
+                  background: isHovered ? 'rgba(196,149,90,0.12)' : 'transparent',
                   borderRadius: 4,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  transition: 'all 0.1s ease',
+                  transition: 'all 0.15s ease',
                 }}
               >
                 <span style={{
-                  color: isHovered ? '#e8d5a3' : 'rgba(232,213,163,0.5)',
-                  fontSize: 14,
-                  fontWeight: 'bold',
+                  color: isHovered ? 'rgba(232,213,163,0.7)' : 'rgba(232,213,163,0.3)',
+                  fontSize: 12,
                   fontFamily: 'var(--font-cinzel), Georgia, serif',
                   textTransform: 'uppercase',
                   letterSpacing: 2,
@@ -1604,7 +1684,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
             setBatchDeckDropIds(null);
             if (batchDeckDropIds) clearSelection();
           }}
-          onCancel={() => { setDeckDropPopup(null); setBatchDeckDropIds(null); }}
+          onCancel={() => { setDeckDropPopup(null); setBatchDeckDropIds(null); setCardRenderKey(k => k + 1); }}
         />
       )}
 

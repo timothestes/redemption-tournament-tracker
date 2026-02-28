@@ -1170,4 +1170,3 @@ webpack: (config) => {
 - add sounds
 - add music
 - add options to disable sounds/music, etc.
-- unify the play buttons

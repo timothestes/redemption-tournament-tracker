@@ -91,8 +91,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (toZone !== 'deck') {
         result.card.isFlipped = false;
       }
-      // Store free-form position for territory
-      if (toZone === 'territory' && posX !== undefined && posY !== undefined) {
+      // Store free-form position for territory and land-of-bondage
+      const FREE_FORM_ZONES: ZoneId[] = ['territory', 'land-of-bondage'];
+      if (FREE_FORM_ZONES.includes(toZone) && posX !== undefined && posY !== undefined) {
         result.card.posX = posX;
         result.card.posY = posY;
       } else {
