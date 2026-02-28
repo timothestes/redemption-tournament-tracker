@@ -1748,6 +1748,7 @@ export default function CardSearchClient() {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-4 mt-2 sm:mt-4">
             {visibleCards.map((c) => {
               const quantityInDeck = getCardQuantity(c.name, c.set, false);
+              const quantityInReserve = getCardQuantity(c.name, c.set, true);
               return (
                 <div 
                   key={c.dataLine} 
@@ -1804,11 +1805,18 @@ export default function CardSearchClient() {
                         </div>
                         
                         {/* Bottom Right: Quantity Display - Always Visible */}
-                        {quantityInDeck > 0 && (
-                          <div className="flex items-center justify-end pr-1">
-                            <div className="bg-black/75 backdrop-blur-sm text-white px-2.5 py-1 rounded-md font-bold text-sm shadow-lg">
-                              ×{quantityInDeck}
-                            </div>
+                        {(quantityInDeck > 0 || quantityInReserve > 0) && (
+                          <div className="flex flex-col items-end justify-end gap-0.5 pr-1 pb-0.5">
+                            {quantityInDeck > 0 && (
+                              <div className="bg-black/75 backdrop-blur-sm text-white px-1.5 py-0.5 rounded font-bold text-xs shadow-lg">
+                                ×{quantityInDeck}
+                              </div>
+                            )}
+                            {quantityInReserve > 0 && (
+                              <div className="bg-black/75 backdrop-blur-sm text-white px-1.5 py-0.5 rounded font-bold text-xs shadow-lg">
+                                ×{quantityInReserve} R
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
