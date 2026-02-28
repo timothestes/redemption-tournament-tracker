@@ -13,6 +13,7 @@ import LoadDeckModal from "./LoadDeckModal";
 import { duplicateDeckAction, toggleDeckPublicAction, loadGlobalTagsAction, updateDeckTagsAction, GlobalTag } from "../../actions";
 import { createGlobalTagAction } from "../../../admin/tags/actions";
 import { HexColorPicker } from "react-colorful";
+import { GoldfishButton } from "../../../goldfish/components/GoldfishButton";
 import { useIsAdmin } from "../../../../hooks/useIsAdmin";
 import UsernameModal from "../../my-decks/UsernameModal";
 import { getParagonNames, getParagonByName } from "../data/paragons";
@@ -815,6 +816,11 @@ export default function DeckBuilderPanel({
                 </svg>
                 New Deck
               </button>
+            )}
+
+            {/* Practice Button */}
+            {deck.id && (
+              <GoldfishButton deckId={deck.id} deckName={deck.name} format={deck.format} iconOnly />
             )}
 
             {/* Menu Dropdown */}

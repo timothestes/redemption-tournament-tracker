@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { loadPublicDecksAction, loadGlobalTagsAction, copyPublicDeckAction, loadPublicDeckAction, LoadPublicDecksParams } from "../actions";
+import { GoldfishButton } from "../../goldfish/components/GoldfishButton";
 
 interface DeckTag { id: string; name: string; color: string; }
 
@@ -518,31 +519,37 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
 
         <div className="p-4">
           <h3 className="font-semibold text-lg truncate mb-1">{deck.name}</h3>
-          {deck.username && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-              by{" "}
-              <span
-                role="link"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  router.push(`/decklist/community?username=${encodeURIComponent(deck.username!)}`);
-                }}
-                className="text-gray-600 dark:text-gray-400 underline hover:text-gray-900 dark:hover:text-gray-200 cursor-pointer"
-              >
-                {deck.username}
-              </span>
-            </p>
-          )}
+          <div className="flex items-center justify-between mb-2">
+            {deck.username && (
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                by{" "}
+                <span
+                  role="link"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    router.push(`/decklist/community?username=${encodeURIComponent(deck.username!)}`);
+                  }}
+                  className="text-gray-600 dark:text-gray-400 underline hover:text-gray-900 dark:hover:text-gray-200 cursor-pointer"
+                >
+                  {deck.username}
+                </span>
+              </p>
+            )}
+            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-500">
+              {(deck.view_count ?? 0) > 0 && <span>{deck.view_count} views</span>}
+              <span>{timeAgo(deck.updated_at)}</span>
+            </div>
+          </div>
 
           <div className="flex items-center gap-3 text-sm mb-3">
             <span className={getDeckTypeBadgeClasses(deck.format)}>{formatDeckType(deck.format)}</span>
             <span className="text-gray-600 dark:text-gray-400">{deck.card_count || 0} cards</span>
           </div>
 
-          {deck.tags && deck.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-3">
-              {deck.tags.slice(0, 6).map((tag) => (
+          <div className="flex flex-wrap gap-1">
+            {deck.tags && deck.tags.length > 0 ? (
+              deck.tags.slice(0, 6).map((tag) => (
                 <span
                   key={tag.id}
                   className="px-2 py-0.5 rounded-full text-xs font-medium"
@@ -550,13 +557,10 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
                 >
                   {tag.name}
                 </span>
-              ))}
-            </div>
-          )}
-
-          <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-500">
-            <span>Updated {timeAgo(deck.updated_at)}</span>
-            {(deck.view_count ?? 0) > 0 && <span>{deck.view_count} views</span>}
+              ))
+            ) : (
+              <span className="text-xs text-gray-400 dark:text-gray-500 italic">No tags yet</span>
+            )}
           </div>
         </div>
       </Link>
@@ -567,7 +571,7 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
           href={`/decklist/${deck.id}`}
           className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
           </svg>
@@ -579,7 +583,7 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
             href={`/decklist/card-search?deckId=${deck.id}`}
             className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
             </svg>
             Edit
@@ -597,15 +601,17 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
             )}
-            {copying ? "Copying…" : "Edit Copy"}
+            {copying ? "Copying…" : "Copy"}
           </button>
         ))}
+
+        <GoldfishButton deckId={deck.id} deckName={deck.name} format={deck.format} iconOnly />
 
         <button
           onClick={handleDownload}
           disabled={downloading}
           title="Download .txt"
-          className="flex items-center justify-center px-3 self-stretch border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 flex-shrink-0"
+          className="flex items-center justify-center px-2.5 self-stretch border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 flex-shrink-0"
         >
           {downloading ? (
             <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />

@@ -12,6 +12,7 @@ import ReactMarkdown from "react-markdown";
 import { CARD_DATA_URL } from "../card-search/constants";
 import { Card } from "../card-search/utils";
 import ModalWithClose from "../card-search/ModalWithClose";
+import { GoldfishButton } from "../../goldfish/components/GoldfishButton";
 
 interface PublicDeckData {
   id: string;
@@ -709,6 +710,8 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                 </>
               )}
             </button>
+
+            <GoldfishButton deckId={deck.id} deckName={deck.name} format={deck.format} />
 
             <button
               onClick={handleDownloadTxt}

@@ -18,6 +18,7 @@ import {
   FolderData,
   GlobalTag,
 } from "../actions";
+import { GoldfishButton } from "../../goldfish/components/GoldfishButton";
 import DeleteDeckModal from "./DeleteDeckModal";
 import FolderModal from "./FolderModal";
 import UsernameModal from "./UsernameModal";
@@ -976,13 +977,14 @@ function DeckCard({
         </div>
       </div>
 
-      <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3">
+      <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3 flex gap-2">
         <button
           onClick={() => onEdit(deck.id!)}
-          className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 font-medium transition-colors"
+          className="flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 font-medium transition-colors"
         >
           Open Deck
         </button>
+        <GoldfishButton deckId={deck.id} deckName={deck.name} format={deck.format} iconOnly />
       </div>
     </div>
   );

@@ -1,0 +1,1694 @@
+'use client';
+
+import { useRef, useState, useCallback, useEffect, useMemo, memo } from 'react';
+import { Stage, Layer, Rect, Text, Image as KonvaImage, Group, Circle, Line } from 'react-konva';
+import type Konva from 'konva';
+import { useGame } from '../state/GameContext';
+import { calculateZoneLayout, getCardDimensions, calculateCardPositionsInZone, type ZoneRect } from '../layout/zoneLayout';
+import { calculateHandPositions } from '../layout/handLayout';
+import { GameCard, ZoneId, ZONE_LABELS, COUNTER_COLORS } from '../types';
+import { PhaseBar } from './PhaseBar';
+import { GameToolbar } from './GameToolbar';
+import { CardContextMenu } from './CardContextMenu';
+import { CardHoverPreview } from './CardHoverPreview';
+import { ZoneBrowseModal } from './ZoneBrowseModal';
+import { DeckSearchModal } from './DeckSearchModal';
+import { DeckContextMenu } from './DeckContextMenu';
+import { DeckPeekModal } from './DeckPeekModal';
+import { DeckDropPopup } from './DeckDropPopup';
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
+import { useModalCardDrag } from '../hooks/useModalCardDrag';
+import { useSelectionState, type CardBound } from '../hooks/useSelectionState';
+import { MultiCardContextMenu } from './MultiCardContextMenu';
+import { GameToastContainer, showGameToast } from './GameToast';
+
+const BLOB_BASE_URL = process.env.NEXT_PUBLIC_BLOB_BASE_URL || '';
+
+function sanitizeImgFile(f: string): string {
+  return f.replace(/\.jpe?g$/i, '');
+}
+
+function getCardImageUrl(imgFile: string): string {
+  if (!imgFile) return '';
+  return `${BLOB_BASE_URL}/card-images/${sanitizeImgFile(imgFile)}.jpg`;
+}
+
+// Card back image — loaded once and shared across all instances
+let cardBackImage: HTMLImageElement | null = null;
+let cardBackLoaded = false;
+const cardBackListeners: (() => void)[] = [];
+if (typeof window !== 'undefined') {
+  cardBackImage = new window.Image();
+  cardBackImage.onload = () => {
+    cardBackLoaded = true;
+    cardBackListeners.forEach(fn => fn());
+    cardBackListeners.length = 0;
+  };
+  cardBackImage.src = '/gameplay/cardback.webp';
+}
+
+function CardBackShape({ width, height }: { width: number; height: number }) {
+  if (cardBackImage && cardBackLoaded) {
+    return (
+      <KonvaImage
+        image={cardBackImage}
+        width={width}
+        height={height}
+        cornerRadius={4}
+      />
+    );
+  }
+  // Fallback while image loads
+  return (
+    <Rect
+      width={width}
+      height={height}
+      fill="#2a1f12"
+      stroke="#6b4e27"
+      strokeWidth={1}
+      cornerRadius={4}
+    />
+  );
+}
+
+// Individual card component — memoized to avoid re-rendering cards that haven't changed
+const GameCardNode = memo(function GameCardNode({
+  card,
+  x,
+  y,
+  rotation,
+  cardWidth,
+  cardHeight,
+  image,
+  isSelected,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+  onContextMenu,
+  onClick,
+  onDblClick,
+  onMouseEnter,
+  onMouseLeave,
+}: {
+  card: GameCard;
+  x: number;
+  y: number;
+  rotation: number;
+  cardWidth: number;
+  cardHeight: number;
+  image: HTMLImageElement | undefined;
+  isSelected?: boolean;
+  onDragStart: (card: GameCard) => void;
+  onDragMove: (e: Konva.KonvaEventObject<DragEvent>) => void;
+  onDragEnd: (card: GameCard, e: Konva.KonvaEventObject<DragEvent>) => void;
+  onContextMenu: (card: GameCard, e: Konva.KonvaEventObject<PointerEvent>) => void;
+  onClick?: (card: GameCard, e: Konva.KonvaEventObject<MouseEvent>) => void;
+  onDblClick: (card: GameCard) => void;
+  onMouseEnter: (card: GameCard, e: Konva.KonvaEventObject<MouseEvent>) => void;
+  onMouseLeave: () => void;
+}) {
+  const showFace = !card.isFlipped && image;
+
+  return (
+    <Group
+      x={x}
+      y={y}
+      rotation={rotation}
+      draggable
+      onDragStart={() => onDragStart(card)}
+      onDragMove={onDragMove}
+      onDragEnd={(e) => onDragEnd(card, e)}
+      onContextMenu={(e) => onContextMenu(card, e)}
+      onClick={onClick ? (e) => onClick(card, e) : undefined}
+      onTap={onClick ? (e) => onClick(card, e as unknown as Konva.KonvaEventObject<MouseEvent>) : undefined}
+      onDblClick={() => onDblClick(card)}
+      onDblTap={() => onDblClick(card)}
+      onMouseEnter={(e) => onMouseEnter(card, e)}
+      onMouseLeave={onMouseLeave}
+    >
+      {/* Selection highlight — golden glow border */}
+      {isSelected && (
+        <Rect
+          x={-3}
+          y={-3}
+          width={cardWidth + 6}
+          height={cardHeight + 6}
+          fill="transparent"
+          stroke="#c4955a"
+          strokeWidth={2}
+          cornerRadius={6}
+          shadowColor="#c4955a"
+          shadowBlur={8}
+          shadowOpacity={0.6}
+        />
+      )}
+
+      {/* Inner group handles meek rotation around card center without affecting drag */}
+      <Group
+        rotation={card.isMeek ? 180 : 0}
+        offsetX={card.isMeek ? cardWidth / 2 : 0}
+        offsetY={card.isMeek ? cardHeight / 2 : 0}
+        x={card.isMeek ? cardWidth / 2 : 0}
+        y={card.isMeek ? cardHeight / 2 : 0}
+      >
+        {showFace ? (
+          <KonvaImage
+            image={image}
+            width={cardWidth}
+            height={cardHeight}
+            cornerRadius={4}
+          />
+        ) : (
+          <CardBackShape width={cardWidth} height={cardHeight} />
+        )}
+
+        {/* Counter badges — top-right, stacked down the side */}
+        {card.counters.map((counter, idx) => {
+          const colorDef = COUNTER_COLORS.find(c => c.id === counter.color);
+          return (
+            <Group key={counter.color} x={cardWidth - 12} y={8 + idx * 22}>
+              <Circle radius={10} fill={colorDef?.hex ?? '#8b1a1a'} stroke="rgba(0,0,0,0.5)" strokeWidth={1} />
+              <Text
+                text={String(counter.count)}
+                fontSize={11}
+                fill="white"
+                fontStyle="bold"
+                width={20}
+                height={20}
+                align="center"
+                verticalAlign="middle"
+                offsetX={10}
+                offsetY={10}
+              />
+            </Group>
+          );
+        })}
+
+        {/* Notes indicator */}
+        {card.notes && (
+          <Circle
+            x={cardWidth - 14}
+            y={cardHeight - 8}
+            radius={5}
+            fill="#c4955a"
+          />
+        )}
+      </Group>
+    </Group>
+  );
+});
+
+interface GoldfishCanvasProps {
+  width: number;
+  height: number;
+}
+
+export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
+  const { state, dispatch, drawCard, drawMultiple, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleDeck, meekCard, unmeekCard } = useGame();
+  const stageRef = useRef<Konva.Stage>(null);
+
+  // Prevent browser-native drag on the canvas container.
+  // Without this, the browser can hijack card drags (especially multi-select)
+  // and show a ghosted overlay of the page instead of the Konva drag behavior.
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const container = stage.container();
+    const preventDrag = (e: Event) => e.preventDefault();
+    container.addEventListener('dragstart', preventDrag);
+    container.addEventListener('dragover', preventDrag);
+    container.style.userSelect = 'none';
+    container.style.webkitUserSelect = 'none';
+    return () => {
+      container.removeEventListener('dragstart', preventDrag);
+      container.removeEventListener('dragover', preventDrag);
+    };
+  }, []);
+
+  // Use ref for image cache to avoid re-renders on every image load.
+  // A version counter triggers a single re-render when images finish loading.
+  const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
+  const pendingLoads = useRef(0);
+  const [imageVersion, setImageVersion] = useState(0);
+
+  // Re-render once cardback image finishes loading
+  useEffect(() => {
+    if (cardBackLoaded) return;
+    const onLoad = () => setImageVersion(v => v + 1);
+    cardBackListeners.push(onLoad);
+    return () => {
+      const idx = cardBackListeners.indexOf(onLoad);
+      if (idx >= 0) cardBackListeners.splice(idx, 1);
+    };
+  }, []);
+
+  const [contextMenu, setContextMenu] = useState<{
+    card: GameCard;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [hoverCard, setHoverCard] = useState<{
+    card: GameCard;
+    x: number;
+    y: number;
+  } | null>(null);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isDraggingRef = useRef(false);
+  const dragSourceZoneRef = useRef<ZoneId | null>(null);
+  const [browseZone, setBrowseZone] = useState<ZoneId | null>(null);
+
+  // Keep hover preview in sync with game state (e.g. when meekifying a hovered card)
+  useEffect(() => {
+    if (!hoverCard) return;
+    const allCards = Object.values(state.zones).flat();
+    const updated = allCards.find((c) => c.instanceId === hoverCard.card.instanceId);
+    if (updated && updated !== hoverCard.card) {
+      setHoverCard((prev) => prev ? { ...prev, card: updated } : null);
+    } else if (!updated) {
+      setHoverCard(null);
+    }
+  }, [state.zones, hoverCard?.card.instanceId]);
+  const [showDeckSearch, setShowDeckSearch] = useState(false);
+  const [deckMenu, setDeckMenu] = useState<{ x: number; y: number } | null>(null);
+  const [peekCount, setPeekCount] = useState<number | null>(null);
+  const [revealCards, setRevealCards] = useState<{ name: string; imgFile: string; label?: string }[] | null>(null);
+  const [deckDropPopup, setDeckDropPopup] = useState<{ cardInstanceId: string; x: number; y: number } | null>(null);
+  const [canvasDragZone, setCanvasDragZone] = useState<ZoneId | null>(null);
+  const isCanvasDragging = useRef(false);
+  const [multiCardContextMenu, setMultiCardContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const multiCardMenuTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [batchDeckDropIds, setBatchDeckDropIds] = useState<string[] | null>(null);
+  const [cardRenderKey, setCardRenderKey] = useState(0);
+
+  // Selection state
+  const {
+    selectedIds, isSelectingRef, onRectChangeRef,
+    startSelectionDrag, updateSelectionDrag, endSelectionDrag,
+    toggleSelect, clearSelection,
+  } = useSelectionState();
+  const selectionRectRef = useRef<Konva.Rect | null>(null);
+  const selectionLayerRef = useRef<Konva.Layer | null>(null);
+  // Wire up imperative rect updates
+  onRectChangeRef.current = useCallback((rect: { startX: number; startY: number; currentX: number; currentY: number } | null) => {
+    const node = selectionRectRef.current;
+    const layer = selectionLayerRef.current;
+    if (!node || !layer) return;
+    if (!rect) {
+      node.visible(false);
+      layer.batchDraw();
+      return;
+    }
+    const w = Math.abs(rect.currentX - rect.startX);
+    const h = Math.abs(rect.currentY - rect.startY);
+    // Don't show the selection rectangle until it's large enough to be intentional
+    if (w < 8 && h < 8) {
+      node.visible(false);
+      layer.batchDraw();
+      return;
+    }
+    node.visible(true);
+    node.x(Math.min(rect.startX, rect.currentX));
+    node.y(Math.min(rect.startY, rect.currentY));
+    node.width(w);
+    node.height(h);
+    layer.batchDraw();
+  }, []);
+
+  useKeyboardShortcuts();
+
+  const isParagon = state.format === 'Paragon';
+  const zoneLayout = useMemo(() => calculateZoneLayout(width, height, isParagon), [width, height, isParagon]);
+  const { cardWidth, cardHeight } = useMemo(() => getCardDimensions(width), [width]);
+
+  // Escape key clears selection
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedIds.size > 0) {
+        clearSelection();
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [selectedIds.size, clearSelection]);
+
+  // Load images into ref — batch the version bump
+  useEffect(() => {
+    const cache = imageCacheRef.current;
+    const allCards = Object.values(state.zones).flat();
+    const urlsToLoad: string[] = [];
+
+    for (const card of allCards) {
+      if (card.cardImgFile && !card.isFlipped) {
+        const url = getCardImageUrl(card.cardImgFile);
+        if (!cache.has(url)) {
+          urlsToLoad.push(url);
+        }
+      }
+    }
+
+    if (urlsToLoad.length === 0) return;
+
+    // Deduplicate
+    const uniqueUrls = [...new Set(urlsToLoad)];
+    pendingLoads.current += uniqueUrls.length;
+
+    for (const url of uniqueUrls) {
+      // Mark as loading (set to a placeholder so we don't re-request)
+      cache.set(url, null as any);
+      const img = new window.Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        cache.set(url, img);
+        pendingLoads.current--;
+        // Batch: only bump version when all pending loads finish
+        if (pendingLoads.current <= 0) {
+          pendingLoads.current = 0;
+          setImageVersion(v => v + 1);
+        }
+      };
+      img.onerror = () => {
+        cache.delete(url);
+        pendingLoads.current--;
+        if (pendingLoads.current <= 0) {
+          pendingLoads.current = 0;
+          setImageVersion(v => v + 1);
+        }
+      };
+      img.src = url;
+    }
+  }, [state.zones]); // No imageCache dependency — prevents cascade
+
+  // Zone hit-test for drag and drop — check smaller sidebar zones first
+  // so they aren't swallowed by larger overlapping zones like territory.
+  const ZONE_HIT_ORDER: ZoneId[] = useMemo(() => [
+    // Sidebar zones first (small, precise targets)
+    'land-of-redemption', 'banish', 'reserve', 'deck', 'discard',
+    ...(isParagon ? ['paragon' as ZoneId] : []),
+    // Then main area zones
+    'land-of-bondage', 'territory', 'hand',
+  ], [isParagon]);
+
+  const findZoneAtPosition = useCallback(
+    (x: number, y: number): ZoneId | null => {
+      for (const zoneId of ZONE_HIT_ORDER) {
+        const rect = zoneLayout[zoneId];
+        if (!rect) continue;
+        if (
+          x >= rect.x &&
+          x <= rect.x + rect.width &&
+          y >= rect.y &&
+          y <= rect.y + rect.height
+        ) {
+          return zoneId;
+        }
+      }
+      return null;
+    },
+    [zoneLayout, ZONE_HIT_ORDER]
+  );
+
+  // Shared handler: when a card is dropped on the deck zone, show popup
+  const handleDeckDrop = useCallback((cardInstanceId: string, screenX: number, screenY: number) => {
+    setDeckDropPopup({ cardInstanceId, x: screenX, y: screenY });
+  }, []);
+
+  // Modal card drag (drag from search/peek/browse modals to canvas zones)
+  const { dragState: modalDrag, startDrag: modalStartDrag, hoveredZone: modalHoveredZone, ghostRef: modalGhostRef } = useModalCardDrag({
+    stageRef,
+    zoneLayout,
+    findZoneAtPosition,
+    moveCard,
+    onDeckDrop: handleDeckDrop,
+    cardWidth,
+    cardHeight,
+  });
+
+  // Clear hover state and mark dragging on drag start
+  const handleCardDragStart = useCallback((card: GameCard) => {
+    isDraggingRef.current = true;
+    isCanvasDragging.current = true;
+    dragSourceZoneRef.current = card.zone;
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    setHoverCard(null);
+  }, []);
+
+  const canvasDragZoneRef = useRef<ZoneId | null>(null);
+  const handleCardDragMove = useCallback(
+    (e: Konva.KonvaEventObject<DragEvent>) => {
+      const node = e.target;
+      const centerX = node.x() + cardWidth / 2;
+      const centerY = node.y() + cardHeight / 2;
+      const zone = findZoneAtPosition(centerX, centerY);
+      // Only trigger a re-render when the hovered zone actually changes
+      if (zone !== canvasDragZoneRef.current) {
+        canvasDragZoneRef.current = zone;
+        setCanvasDragZone(zone);
+      }
+    },
+    [findZoneAtPosition, cardWidth, cardHeight]
+  );
+
+  const handleCardDragEnd = useCallback(
+    (card: GameCard, e: Konva.KonvaEventObject<DragEvent>) => {
+      isDraggingRef.current = false;
+      isCanvasDragging.current = false;
+      canvasDragZoneRef.current = null;
+      dragSourceZoneRef.current = null;
+      setCanvasDragZone(null);
+      const node = e.target;
+      const dropX = node.x();
+      const dropY = node.y();
+      // Use card center for hit-testing so drops near zone edges work intuitively
+      const centerX = dropX + cardWidth / 2;
+      const centerY = dropY + cardHeight / 2;
+      const targetZone = findZoneAtPosition(centerX, centerY);
+
+      // Block removing cards from reserve on turn 1
+      if (card.zone === 'reserve' && targetZone !== 'reserve' && state.turn === 1) {
+        showGameToast('Cannot remove cards from reserve on turn 1');
+        return;
+      }
+
+      // Group drag: if this card is selected and there are multiple selections
+      const isGroupDrag = selectedIds.has(card.instanceId) && selectedIds.size > 1;
+      const cardIds = isGroupDrag ? Array.from(selectedIds) : [card.instanceId];
+
+      if (targetZone === 'deck' && card.zone !== 'deck') {
+        // Hide the card so it doesn't awkwardly sit at the deck position while the popup is open
+        let cardGroup: Konva.Node | null = node;
+        while (cardGroup && !cardGroup.draggable()) {
+          cardGroup = cardGroup.parent;
+        }
+        if (cardGroup) {
+          cardGroup.visible(false);
+          cardGroup.getLayer()?.batchDraw();
+        }
+        const stage = stageRef.current;
+        if (stage) {
+          const rect = stage.container().getBoundingClientRect();
+          if (isGroupDrag) {
+            setBatchDeckDropIds(cardIds);
+          }
+          handleDeckDrop(card.instanceId, rect.left + centerX, rect.top + centerY);
+        }
+      } else if (targetZone && (targetZone !== card.zone || targetZone === 'territory' || targetZone === 'land-of-bondage')) {
+        // Hide the dragged card group immediately so it doesn't linger at the drop position
+        // while React processes the state update and re-renders the card in its new zone.
+        // Walk up from e.target to find the draggable Group (the card-level container).
+        // Skip hiding for free-form zones where repositioning within the same zone is allowed.
+        const freeFormZones: ZoneId[] = ['territory', 'land-of-bondage'];
+        if (!freeFormZones.includes(targetZone)) {
+          let cardGroup: Konva.Node | null = node;
+          while (cardGroup && !cardGroup.draggable()) {
+            cardGroup = cardGroup.parent;
+          }
+          if (cardGroup) {
+            cardGroup.visible(false);
+            cardGroup.getLayer()?.batchDraw();
+          }
+        }
+        if (isGroupDrag) {
+          moveCardsBatch(cardIds, targetZone);
+          clearSelection();
+        } else if (freeFormZones.includes(targetZone) && card.zone === targetZone) {
+          moveCard(card.instanceId, targetZone, undefined, dropX, dropY);
+        } else {
+          moveCard(card.instanceId, targetZone, undefined, dropX, dropY);
+        }
+      }
+    },
+    [findZoneAtPosition, moveCard, moveCardsBatch, handleDeckDrop, cardWidth, cardHeight, selectedIds, clearSelection, state.turn]
+  );
+
+  const handleCardContextMenu = useCallback(
+    (card: GameCard, e: Konva.KonvaEventObject<PointerEvent>) => {
+      e.evt.preventDefault();
+      const stage = stageRef.current;
+      if (!stage) return;
+      const container = stage.container().getBoundingClientRect();
+      if (hoverTimerRef.current) {
+        clearTimeout(hoverTimerRef.current);
+        hoverTimerRef.current = null;
+      }
+      setHoverCard(null);
+
+      // If right-clicking a selected card with multi-selection, show multi-card menu
+      if (selectedIds.has(card.instanceId) && selectedIds.size > 1) {
+        setMultiCardContextMenu({
+          x: e.evt.clientX - container.left,
+          y: e.evt.clientY - container.top,
+        });
+      } else {
+        // Clear selection if right-clicking an unselected card
+        if (selectedIds.size > 0 && !selectedIds.has(card.instanceId)) {
+          clearSelection();
+        }
+        setContextMenu({
+          card,
+          x: e.evt.clientX - container.left,
+          y: e.evt.clientY - container.top,
+        });
+      }
+    },
+    [selectedIds, clearSelection]
+  );
+
+  const contextMenuRef = useRef(contextMenu);
+  contextMenuRef.current = contextMenu;
+
+  const handleCardMouseEnter = useCallback(
+    (card: GameCard, e: Konva.KonvaEventObject<MouseEvent>) => {
+      if (card.isFlipped || isDraggingRef.current || contextMenuRef.current) return;
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = setTimeout(() => {
+        if (isDraggingRef.current || contextMenuRef.current) return;
+        setHoverCard({
+          card,
+          x: e.evt.clientX,
+          y: e.evt.clientY,
+        });
+      }, 700);
+    },
+    []
+  );
+
+  const handleCardMouseLeave = useCallback(() => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    setHoverCard(null);
+  }, []);
+
+  const handleCardDblClick = useCallback(
+    (card: GameCard) => {
+      if (card.isMeek) {
+        unmeekCard(card.instanceId);
+      } else {
+        meekCard(card.instanceId);
+      }
+    },
+    [meekCard, unmeekCard]
+  );
+
+  const handleDeckContextMenu = useCallback(
+    (e: Konva.KonvaEventObject<PointerEvent>) => {
+      e.evt.preventDefault();
+      const stage = stageRef.current;
+      if (!stage) return;
+      const container = stage.container().getBoundingClientRect();
+      setDeckMenu({
+        x: e.evt.clientX - container.left,
+        y: e.evt.clientY - container.top,
+      });
+    },
+    []
+  );
+
+  const handleZoneClick = useCallback(
+    (zoneId: ZoneId) => {
+      const browsable: ZoneId[] = ['discard', 'reserve', 'banish', 'land-of-redemption'];
+      if (browsable.includes(zoneId) && state.zones[zoneId].length > 0) {
+        setBrowseZone(zoneId);
+      }
+    },
+    [state.zones]
+  );
+
+  // Zones where cards should open browse modal instead of card context menu
+  const BROWSE_ONLY_ZONES: ZoneId[] = ['discard', 'reserve', 'banish'];
+
+  const handleBrowseZoneCardContextMenu = useCallback(
+    (card: GameCard, e: Konva.KonvaEventObject<PointerEvent>) => {
+      e.evt.preventDefault();
+      // Open the browse modal for the card's zone instead of the card context menu
+      const zone = card.zone;
+      if (zone && BROWSE_ONLY_ZONES.includes(zone)) {
+        setBrowseZone(zone);
+      }
+    },
+    []
+  );
+
+  const handleBrowseZoneCardClick = useCallback(
+    (card: GameCard, e: Konva.KonvaEventObject<MouseEvent>) => {
+      if (e.evt.shiftKey) {
+        toggleSelect(card.instanceId);
+        return;
+      }
+      if (selectedIds.size > 0 && !selectedIds.has(card.instanceId)) {
+        clearSelection();
+      }
+      const zone = card.zone;
+      if (zone && BROWSE_ONLY_ZONES.includes(zone)) {
+        setBrowseZone(zone);
+      }
+    },
+    [selectedIds, clearSelection, toggleSelect]
+  );
+
+  // Universal card click handler for selection support
+  const handleCardClick = useCallback(
+    (card: GameCard, e: Konva.KonvaEventObject<MouseEvent>) => {
+      if (e.evt.shiftKey) {
+        toggleSelect(card.instanceId);
+        return;
+      }
+      if (selectedIds.size > 0 && !selectedIds.has(card.instanceId)) {
+        clearSelection();
+      }
+    },
+    [selectedIds, clearSelection, toggleSelect]
+  );
+
+  // Calculate card positions for each zone
+  const handPositions = useMemo(
+    () => calculateHandPositions(state.zones.hand.length, width, height, state.isSpreadHand),
+    [state.zones.hand.length, width, height, state.isSpreadHand]
+  );
+
+  // Render all zones except hand
+  const nonHandZones: ZoneId[] = useMemo(() => [
+    'territory', 'land-of-bondage',
+    'land-of-redemption', 'deck', 'discard', 'reserve', 'banish',
+    ...(isParagon ? ['paragon' as ZoneId] : []),
+  ], [isParagon]);
+
+  // Compute card bounds for all visible cards (used for selection rectangle intersection)
+  const allCardBounds = useMemo((): CardBound[] => {
+    const bounds: CardBound[] = [];
+
+    // Hand cards
+    const handPos = calculateHandPositions(state.zones.hand.length, width, height, state.isSpreadHand);
+    state.zones.hand.forEach((card, i) => {
+      const pos = handPos[i];
+      if (pos) bounds.push({ instanceId: card.instanceId, x: pos.x, y: pos.y, width: cardWidth, height: cardHeight, rotation: pos.rotation });
+    });
+
+    // Territory cards (free-form)
+    const tZone = zoneLayout['territory'];
+    if (tZone) {
+      state.zones.territory.forEach((card, i) => {
+        const x = card.posX ?? (tZone.x + 8 + (i % 8) * (cardWidth + 4));
+        const y = card.posY ?? (tZone.y + 20 + Math.floor(i / 8) * (cardHeight * 0.35));
+        bounds.push({ instanceId: card.instanceId, x, y, width: cardWidth, height: cardHeight, rotation: 0 });
+      });
+    }
+
+    // Land of bondage (free-form)
+    const lobZone = zoneLayout['land-of-bondage'];
+    if (lobZone) {
+      state.zones['land-of-bondage'].forEach((card, i) => {
+        const x = card.posX ?? (lobZone.x + 8 + (i % 8) * (cardWidth + 4));
+        const y = card.posY ?? (lobZone.y + 20 + Math.floor(i / 8) * (cardHeight * 0.35));
+        bounds.push({ instanceId: card.instanceId, x, y, width: cardWidth, height: cardHeight, rotation: 0 });
+      });
+    }
+
+    // Reserve (horizontal overlap)
+    const resZone = zoneLayout['reserve'];
+    if (resZone && state.zones.reserve.length > 0) {
+      const pad = 8;
+      const availW = resZone.width - pad * 2;
+      const cards = state.zones.reserve;
+      const overlap = cards.length <= 1 ? 0 : Math.min(cardWidth * 0.3, (availW - cardWidth) / (cards.length - 1));
+      cards.forEach((card, i) => {
+        bounds.push({ instanceId: card.instanceId, x: resZone.x + pad + i * overlap, y: resZone.y + 24, width: cardWidth, height: cardHeight, rotation: 0 });
+      });
+    }
+
+    // Discard and Banish are browse-only piles — not drag-selectable
+
+    // Land of Redemption (horizontal overlap)
+    const lorZone = zoneLayout['land-of-redemption'];
+    if (lorZone && state.zones['land-of-redemption'].length > 0) {
+      const pad = 8;
+      const availW = lorZone.width - pad * 2;
+      const cards = state.zones['land-of-redemption'];
+      const overlap = cards.length <= 1 ? 0 : Math.min(cardWidth * 0.3, (availW - cardWidth) / (cards.length - 1));
+      cards.forEach((card, i) => {
+        bounds.push({ instanceId: card.instanceId, x: lorZone.x + pad + i * overlap, y: lorZone.y + 24, width: cardWidth, height: cardHeight, rotation: 0 });
+      });
+    }
+
+    return bounds;
+  }, [state.zones, width, height, state.isSpreadHand, zoneLayout, cardWidth, cardHeight]);
+
+  // Stage event handlers for rectangular selection drag
+  const handleStageMouseDown = useCallback(
+    (e: Konva.KonvaEventObject<MouseEvent>) => {
+      // Only left-click
+      if (e.evt.button !== 0) return;
+      // Only start selection drag on empty canvas space (not cards).
+      // Walk up the node tree to detect any draggable ancestor (card Group),
+      // since the click target may be a nested child (e.g. KonvaImage inside
+      // a non-draggable meek-rotation Group inside the draggable card Group).
+      const target = e.target;
+      let ancestor: Konva.Node | null = target.parent;
+      let isCard = false;
+      while (ancestor && ancestor !== stageRef.current) {
+        if (ancestor.draggable?.()) { isCard = true; break; }
+        ancestor = ancestor.parent;
+      }
+      if (isCard) return;
+
+      // Cancel any pending multi-card menu from a previous drag
+      if (multiCardMenuTimerRef.current) {
+        clearTimeout(multiCardMenuTimerRef.current);
+        multiCardMenuTimerRef.current = null;
+      }
+      if (!e.evt.shiftKey && selectedIds.size > 0) {
+        clearSelection();
+      }
+      const stage = stageRef.current;
+      if (!stage) return;
+      const pos = stage.getPointerPosition();
+      if (!pos) return;
+      startSelectionDrag(pos.x, pos.y, e.evt.shiftKey);
+    },
+    [selectedIds.size, clearSelection, startSelectionDrag]
+  );
+
+  const handleStageMouseMove = useCallback(
+    (e: Konva.KonvaEventObject<MouseEvent>) => {
+      if (!isSelectingRef.current) return;
+      // If a card drag started (handleCardDragStart fired), cancel the selection
+      // so the dotted rect doesn't flash alongside the card drag.
+      if (isDraggingRef.current) {
+        isSelectingRef.current = false;
+        onRectChangeRef.current?.(null);
+        return;
+      }
+      const stage = stageRef.current;
+      if (!stage) return;
+      const pos = stage.getPointerPosition();
+      if (pos) {
+        updateSelectionDrag(pos.x, pos.y, allCardBounds, e.evt.shiftKey);
+      }
+    },
+    [updateSelectionDrag, allCardBounds]
+  );
+
+  const handleStageMouseUp = useCallback(
+    (e: Konva.KonvaEventObject<MouseEvent>) => {
+      if (!isSelectingRef.current) return;
+      const { wasClick, selectedCount } = endSelectionDrag(e.evt.shiftKey);
+
+      // Auto-open multi-card context menu after a real drag-select that selected 2+ cards
+      if (!wasClick && selectedCount > 1) {
+        // Dismiss any hover preview that might be pending/showing
+        if (hoverTimerRef.current) {
+          clearTimeout(hoverTimerRef.current);
+          hoverTimerRef.current = null;
+        }
+        setHoverCard(null);
+
+        const stage = stageRef.current;
+        const pos = stage?.getPointerPosition();
+        if (pos) {
+          // Brief delay so the selection highlights render before the menu appears
+          if (multiCardMenuTimerRef.current) clearTimeout(multiCardMenuTimerRef.current);
+          multiCardMenuTimerRef.current = setTimeout(() => {
+            setMultiCardContextMenu({ x: pos.x, y: pos.y });
+            multiCardMenuTimerRef.current = null;
+          }, 300);
+        }
+      }
+    },
+    [endSelectionDrag]
+  );
+
+  // Access image cache via ref (imageVersion ensures we read current values after loads complete)
+  const getImage = useCallback((imgFile: string): HTMLImageElement | undefined => {
+    if (!imgFile) return undefined;
+    const url = getCardImageUrl(imgFile);
+    const img = imageCacheRef.current.get(url);
+    return img || undefined;
+  }, [imageVersion]); // imageVersion dependency ensures fresh reads after batch load
+
+  const SIDEBAR_ZONES_WITH_BADGE: ZoneId[] = ['deck', 'reserve', 'discard', 'banish', 'land-of-redemption', 'territory', 'land-of-bondage'];
+
+  // Abbreviated labels for narrow sidebar zones
+  const SHORT_ZONE_LABELS: Partial<Record<ZoneId, string>> = {
+    'land-of-redemption': 'L.O.R.',
+    'land-of-bondage': 'L.O.B.',
+    'banish': 'Banish',
+  };
+  const sidebarWidth = zoneLayout['deck']?.width ?? 0;
+  const useShortenedLabels = sidebarWidth < 160;
+
+  return (
+    <>
+      <Stage
+        ref={stageRef}
+        width={width}
+        height={height}
+        onContextMenu={(e) => e.evt.preventDefault()}
+        onMouseDown={handleStageMouseDown}
+        onMouseMove={handleStageMouseMove}
+        onMouseUp={handleStageMouseUp}
+      >
+        {/* Zone backgrounds layer */}
+        <Layer listening={true}>
+          {nonHandZones.map(zoneId => {
+            const rect = zoneLayout[zoneId];
+            if (!rect) return null;
+            const cardCount = state.zones[zoneId]?.length || 0;
+
+            return (
+              <Group
+                key={zoneId}
+                onClick={() => {
+                  if (zoneId !== 'deck') handleZoneClick(zoneId);
+                }}
+                onDblClick={() => {
+                  if (zoneId === 'deck') drawCard();
+                }}
+                onDblTap={() => {
+                  if (zoneId === 'deck') drawCard();
+                }}
+                onContextMenu={(e) => {
+                  if (zoneId === 'deck') handleDeckContextMenu(e);
+                }}
+              >
+                <Rect
+                  x={rect.x}
+                  y={rect.y}
+                  width={rect.width}
+                  height={rect.height}
+                  fill="#1e1610"
+                  stroke="#6b4e27"
+                  strokeWidth={1}
+                  cornerRadius={3}
+                  opacity={0.35}
+                />
+                <Text
+                  x={rect.x + 8}
+                  y={rect.y + 6}
+                  text={(useShortenedLabels && SHORT_ZONE_LABELS[zoneId] ? SHORT_ZONE_LABELS[zoneId] : rect.label).toUpperCase()}
+                  fontSize={SIDEBAR_ZONES_WITH_BADGE.includes(zoneId) && useShortenedLabels ? 11 : 14}
+                  fontFamily="Cinzel, Georgia, serif"
+                  fill="#e8d5a3"
+                  letterSpacing={SIDEBAR_ZONES_WITH_BADGE.includes(zoneId) && useShortenedLabels ? 1 : 2}
+                  width={rect.width - 8 - 38}
+                  ellipsis={true}
+                />
+                {/* Count badge for sidebar zones */}
+                {SIDEBAR_ZONES_WITH_BADGE.includes(zoneId) && (
+                  <Group x={rect.x + rect.width - 34} y={rect.y + 4}>
+                    <Rect width={28} height={20} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} />
+                    <Text
+                      text={String(cardCount)}
+                      fontSize={14}
+                      fontStyle="bold"
+                      fill="#e8d5a3"
+                      width={28}
+                      height={20}
+                      align="center"
+                      verticalAlign="middle"
+                    />
+                  </Group>
+                )}
+              </Group>
+            );
+          })}
+
+          {/* Hand zone background */}
+          <Rect
+            x={zoneLayout.hand.x}
+            y={zoneLayout.hand.y}
+            width={zoneLayout.hand.width}
+            height={zoneLayout.hand.height}
+            fill="#0d0905"
+            opacity={0.5}
+          />
+          {/* Hand label + count */}
+          <Text
+            x={zoneLayout.hand.x + 8}
+            y={zoneLayout.hand.y + 4}
+            text="HAND"
+            fontSize={14}
+            fontFamily="Cinzel, Georgia, serif"
+            fill="#e8d5a3"
+            letterSpacing={2}
+          />
+          <Group x={zoneLayout.hand.x + 70} y={zoneLayout.hand.y + 2}>
+            <Rect width={28} height={20} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} />
+            <Text
+              text={String(state.zones.hand.length)}
+              fontSize={14}
+              fontStyle="bold"
+              fill="#e8d5a3"
+              width={28}
+              height={20}
+              align="center"
+              verticalAlign="middle"
+            />
+          </Group>
+          {state.zones.hand.length === 0 && (
+            <Text
+              x={zoneLayout.hand.x}
+              y={zoneLayout.hand.y + zoneLayout.hand.height / 2 - 8}
+              width={zoneLayout.hand.width}
+              text="Hand is empty"
+              fontSize={14}
+              fontFamily="Cinzel, Georgia, serif"
+              fill="#6b4e27"
+              opacity={0.5}
+              align="center"
+            />
+          )}
+        </Layer>
+
+        {/* Card layer — non-hand zones */}
+        <Layer key={`cards-${cardRenderKey}`}>
+          {nonHandZones.map(zoneId => {
+            const cards = state.zones[zoneId];
+            if (!cards || cards.length === 0) return null;
+
+            // Deck: show top card face-down, right-click opens deck search
+            if (zoneId === 'deck') {
+              const zone = zoneLayout[zoneId];
+              const x = zone.x + zone.width / 2 - cardWidth / 2;
+              const y = zone.y + 24;
+              return (
+                <Group key={zoneId}>
+                  {cards.length > 1 && (
+                    <Group x={x - 2} y={y - 2}>
+                      <CardBackShape width={cardWidth} height={cardHeight} />
+                    </Group>
+                  )}
+                  <Group
+                    x={x}
+                    y={y}
+                    onContextMenu={handleDeckContextMenu}
+                    onDblClick={() => drawCard()}
+                    onDblTap={() => drawCard()}
+                  >
+                    <CardBackShape width={cardWidth} height={cardHeight} />
+                  </Group>
+                </Group>
+              );
+            }
+
+            // Reserve: show top card face-down
+            // Reserve: overlap cards horizontally within zone bounds
+            if (zoneId === 'reserve') {
+              const zone = zoneLayout[zoneId];
+              const pad = 8;
+              const availW = zone.width - pad * 2;
+              const overlap = cards.length <= 1
+                ? 0
+                : Math.min(cardWidth * 0.3, (availW - cardWidth) / (cards.length - 1));
+              return (
+                <Group key={zoneId}>
+                  {cards.map((card, i) => (
+                    <GameCardNode
+                      key={card.instanceId}
+                      card={card}
+                      x={zone.x + pad + i * overlap}
+                      y={zone.y + 24}
+                      rotation={0}
+                      cardWidth={cardWidth}
+                      cardHeight={cardHeight}
+                      image={getImage(card.cardImgFile)}
+                      isSelected={selectedIds.has(card.instanceId)}
+                      onDragStart={handleCardDragStart}
+                      onDragMove={handleCardDragMove}
+                      onDragEnd={handleCardDragEnd}
+                      onContextMenu={handleBrowseZoneCardContextMenu}
+                      onClick={handleBrowseZoneCardClick}
+                      onDblClick={handleCardDblClick}
+                      onMouseEnter={handleCardMouseEnter}
+                      onMouseLeave={handleCardMouseLeave}
+                    />
+                  ))}
+                </Group>
+              );
+            }
+
+            // Banish: face-down stacked pile (like deck), click opens browse modal
+            if (zoneId === 'banish') {
+              const zone = zoneLayout[zoneId];
+              const x = zone.x + zone.width / 2 - cardWidth / 2;
+              const y = zone.y + 24;
+              return (
+                <Group key={zoneId}>
+                  {cards.length > 1 && (
+                    <Group x={x - 2} y={y - 2}>
+                      <CardBackShape width={cardWidth} height={cardHeight} />
+                    </Group>
+                  )}
+                  <Group
+                    x={x}
+                    y={y}
+                    onClick={() => setBrowseZone('banish')}
+                    onTap={() => setBrowseZone('banish')}
+                    onContextMenu={(e) => { e.evt.preventDefault(); setBrowseZone('banish'); }}
+                  >
+                    <CardBackShape width={cardWidth} height={cardHeight} />
+                  </Group>
+                </Group>
+              );
+            }
+
+            // Discard: stack with natural jitter
+            if (zoneId === 'discard') {
+              const zone = zoneLayout[zoneId];
+              const baseX = zone.x + zone.width / 2 - cardWidth / 2;
+              const baseY = zone.y + 24;
+              return (
+                <Group key={zoneId}>
+                  {cards.map((card, i) => {
+                    // Stable per-card jitter from instanceId hash
+                    let h = 0;
+                    for (let c = 0; c < card.instanceId.length; c++) {
+                      h = ((h << 5) - h + card.instanceId.charCodeAt(c)) | 0;
+                    }
+                    const jitterX = ((h & 0xff) / 255 - 0.5) * 6;
+                    const jitterY = (((h >> 8) & 0xff) / 255 - 0.5) * 6;
+                    const jitterRot = (((h >> 16) & 0xff) / 255 - 0.5) * 8;
+                    return (
+                      <GameCardNode
+                        key={card.instanceId}
+                        card={{ ...card, isFlipped: false }}
+                        x={baseX + jitterX}
+                        y={baseY + jitterY}
+                        rotation={jitterRot}
+                        cardWidth={cardWidth}
+                        cardHeight={cardHeight}
+                        image={getImage(card.cardImgFile)}
+                        isSelected={selectedIds.has(card.instanceId)}
+                        onDragStart={handleCardDragStart}
+                        onDragMove={handleCardDragMove}
+                        onDragEnd={handleCardDragEnd}
+                        onContextMenu={handleBrowseZoneCardContextMenu}
+                        onClick={handleBrowseZoneCardClick}
+                        onDblClick={handleCardDblClick}
+                        onMouseEnter={handleCardMouseEnter}
+                        onMouseLeave={handleCardMouseLeave}
+                      />
+                    );
+                  })}
+                </Group>
+              );
+            }
+
+            // Land of Redemption: overlap cards within zone bounds
+            if (zoneId === 'land-of-redemption') {
+              const zone = zoneLayout[zoneId];
+              const pad = 8;
+              const availW = zone.width - pad * 2;
+              const overlap = cards.length <= 1
+                ? 0
+                : Math.min(cardWidth * 0.3, (availW - cardWidth) / (cards.length - 1));
+              return (
+                <Group key={zoneId}>
+                  {cards.map((card, i) => (
+                    <GameCardNode
+                      key={card.instanceId}
+                      card={card}
+                      x={zone.x + pad + i * overlap}
+                      y={zone.y + 24}
+                      rotation={0}
+                      cardWidth={cardWidth}
+                      cardHeight={cardHeight}
+                      image={getImage(card.cardImgFile)}
+                      isSelected={selectedIds.has(card.instanceId)}
+                      onDragStart={handleCardDragStart}
+                      onDragMove={handleCardDragMove}
+                      onDragEnd={handleCardDragEnd}
+                      onContextMenu={handleCardContextMenu}
+                      onClick={handleCardClick}
+                      onDblClick={handleCardDblClick}
+                      onMouseEnter={handleCardMouseEnter}
+                      onMouseLeave={handleCardMouseLeave}
+                    />
+                  ))}
+                </Group>
+              );
+            }
+
+            // Territory: free-form placement using stored positions
+            if (zoneId === 'territory') {
+              const zone = zoneLayout[zoneId];
+              return (
+                <Group key={zoneId}>
+                  {cards.map((card, i) => {
+                    const x = card.posX ?? (zone.x + 8 + (i % 8) * (cardWidth + 4));
+                    const y = card.posY ?? (zone.y + 20 + Math.floor(i / 8) * (cardHeight * 0.35));
+                    return (
+                      <GameCardNode
+                        key={card.instanceId}
+                        card={card}
+                        x={x}
+                        y={y}
+                        rotation={0}
+                        cardWidth={cardWidth}
+                        cardHeight={cardHeight}
+                        image={getImage(card.cardImgFile)}
+                        isSelected={selectedIds.has(card.instanceId)}
+                        onDragStart={handleCardDragStart}
+                        onDragMove={handleCardDragMove}
+                        onDragEnd={handleCardDragEnd}
+                        onContextMenu={handleCardContextMenu}
+                        onClick={handleCardClick}
+                        onDblClick={handleCardDblClick}
+                        onMouseEnter={handleCardMouseEnter}
+                        onMouseLeave={handleCardMouseLeave}
+                      />
+                    );
+                  })}
+                </Group>
+              );
+            }
+
+            // Land of Bondage: free-form placement using stored positions
+            if (zoneId === 'land-of-bondage') {
+              const zone = zoneLayout[zoneId];
+              return (
+                <Group key={zoneId}>
+                  {cards.map((card, i) => {
+                    const x = card.posX ?? (zone.x + 8 + (i % 8) * (cardWidth + 4));
+                    const y = card.posY ?? (zone.y + 20 + Math.floor(i / 8) * (cardHeight * 0.35));
+                    return (
+                      <GameCardNode
+                        key={card.instanceId}
+                        card={card}
+                        x={x}
+                        y={y}
+                        rotation={0}
+                        cardWidth={cardWidth}
+                        cardHeight={cardHeight}
+                        image={getImage(card.cardImgFile)}
+                        isSelected={selectedIds.has(card.instanceId)}
+                        onDragStart={handleCardDragStart}
+                        onDragMove={handleCardDragMove}
+                        onDragEnd={handleCardDragEnd}
+                        onContextMenu={handleCardContextMenu}
+                        onClick={handleCardClick}
+                        onDblClick={handleCardDblClick}
+                        onMouseEnter={handleCardMouseEnter}
+                        onMouseLeave={handleCardMouseLeave}
+                      />
+                    );
+                  })}
+                </Group>
+              );
+            }
+
+            // For other zones, lay cards out in a grid
+            const positions = calculateCardPositionsInZone(
+              zoneLayout[zoneId],
+              cards.length,
+              cardWidth,
+              cardHeight
+            );
+            const isBrowseOnly = BROWSE_ONLY_ZONES.includes(zoneId);
+
+            return (
+              <Group key={zoneId}>
+                {cards.map((card, i) => {
+                  const pos = positions[i];
+                  if (!pos) return null;
+                  return (
+                    <GameCardNode
+                      key={card.instanceId}
+                      card={card}
+                      x={pos.x}
+                      y={pos.y}
+                      rotation={0}
+                      cardWidth={cardWidth}
+                      cardHeight={cardHeight}
+                      image={getImage(card.cardImgFile)}
+                      isSelected={selectedIds.has(card.instanceId)}
+                      onDragStart={handleCardDragStart}
+                      onDragMove={handleCardDragMove}
+                      onDragEnd={handleCardDragEnd}
+                      onContextMenu={isBrowseOnly ? handleBrowseZoneCardContextMenu : handleCardContextMenu}
+                      onClick={isBrowseOnly ? handleBrowseZoneCardClick : handleCardClick}
+                      onDblClick={handleCardDblClick}
+                      onMouseEnter={handleCardMouseEnter}
+                      onMouseLeave={handleCardMouseLeave}
+                    />
+                  );
+                })}
+              </Group>
+            );
+          })}
+        </Layer>
+
+        {/* Hand layer — separate for z-ordering */}
+        <Layer key={`hand-${cardRenderKey}`}>
+          {state.zones.hand.map((card, i) => {
+            const pos = handPositions[i];
+            if (!pos) return null;
+            return (
+              <GameCardNode
+                key={card.instanceId}
+                card={card}
+                x={pos.x}
+                y={pos.y}
+                rotation={pos.rotation}
+                cardWidth={cardWidth}
+                cardHeight={cardHeight}
+                image={getImage(card.cardImgFile)}
+                isSelected={selectedIds.has(card.instanceId)}
+                onDragStart={handleCardDragStart}
+                onDragMove={handleCardDragMove}
+                onDragEnd={handleCardDragEnd}
+                onContextMenu={handleCardContextMenu}
+                onClick={handleCardClick}
+                onDblClick={handleCardDblClick}
+                onMouseEnter={handleCardMouseEnter}
+                onMouseLeave={handleCardMouseLeave}
+              />
+            );
+          })}
+        </Layer>
+
+        {/* Selection rectangle layer — updated imperatively for performance */}
+        <Layer ref={selectionLayerRef as any} listening={false}>
+          <Rect
+            ref={selectionRectRef as any}
+            visible={false}
+            fill="rgba(196,149,90,0.12)"
+            stroke="#c4955a"
+            strokeWidth={1}
+            dash={[6, 3]}
+          />
+        </Layer>
+      </Stage>
+
+      {/* DOM overlays */}
+
+      {/* Reserve lock indicator on turn 1 */}
+      {state.turn === 1 && zoneLayout.reserve && (
+        <div
+          className="reserve-lock-wrapper"
+          onContextMenu={(e) => e.preventDefault()}
+          style={{
+            position: 'absolute',
+            left: zoneLayout.reserve.x + zoneLayout.reserve.width - 52,
+            top: zoneLayout.reserve.y + 5,
+            pointerEvents: 'auto',
+            cursor: 'help',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            zIndex: 50,
+          }}
+        >
+          <svg width="12" height="14" viewBox="0 0 12 14" fill="none" style={{ opacity: 0.7 }}>
+            <rect x="1" y="6" width="10" height="7" rx="1.5" fill="#6b4e27" stroke="#8b6532" strokeWidth="0.8" />
+            <path d="M3.5 6V4.5C3.5 3.1 4.6 2 6 2s2.5 1.1 2.5 2.5V6" stroke="#8b6532" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+            <circle cx="6" cy="9.5" r="1" fill="#c9b99a" />
+          </svg>
+          <span
+            className="reserve-lock-tip"
+            style={{
+              position: 'absolute',
+              right: 0,
+              bottom: '100%',
+              marginBottom: 4,
+              padding: '4px 8px',
+              background: '#2a1f12',
+              border: '1px solid #6b4e27',
+              borderRadius: 4,
+              color: '#e8d5a3',
+              fontSize: 10,
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none',
+              opacity: 0,
+              transition: 'opacity 0.05s',
+            }}
+          >
+            Cannot remove cards from reserve on turn 1
+          </span>
+          <style>{`
+            .reserve-lock-wrapper:hover .reserve-lock-tip {
+              opacity: 1 !important;
+            }
+          `}</style>
+        </div>
+      )}
+
+      <PhaseBar />
+      <GameToolbar />
+
+      {contextMenu && (
+        <CardContextMenu
+          card={contextMenu.card}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+
+      {multiCardContextMenu && (
+        <MultiCardContextMenu
+          selectedIds={Array.from(selectedIds)}
+          x={multiCardContextMenu.x}
+          y={multiCardContextMenu.y}
+          onClose={() => setMultiCardContextMenu(null)}
+          onClearSelection={() => { clearSelection(); setMultiCardContextMenu(null); }}
+        />
+      )}
+
+      {deckMenu && (
+        <DeckContextMenu
+          x={deckMenu.x}
+          y={deckMenu.y}
+          deckSize={state.zones.deck.length}
+          onClose={() => setDeckMenu(null)}
+          onSearchDeck={() => { setDeckMenu(null); setShowDeckSearch(true); }}
+          onShuffleDeck={() => { setDeckMenu(null); shuffleDeck(); }}
+          // Top card actions
+          onDrawTop={(count) => {
+            setDeckMenu(null);
+            const deck = state.zones.deck;
+            if (deck.length === 0) { showGameToast('Deck is empty'); return; }
+            const handSpace = 16 - state.zones.hand.length;
+            if (handSpace <= 0) { showGameToast('Hand is full (max 16 cards)'); return; }
+            if (count === 1) drawCard(); else drawMultiple(count);
+            if (count > handSpace) {
+              showGameToast(`Hand is full — drew ${Math.min(handSpace, deck.length)}`);
+            }
+          }}
+          onRevealTop={(count) => { setDeckMenu(null); setPeekCount(count); }}
+          onDiscardTop={(count) => {
+            setDeckMenu(null);
+            const deck = state.zones.deck;
+            if (deck.length === 0) { showGameToast('Deck is empty'); return; }
+            const ids = deck.slice(0, Math.min(count, deck.length)).map(c => c.instanceId);
+            ids.forEach(id => moveCard(id, 'discard'));
+          }}
+          onReserveTop={(count) => {
+            setDeckMenu(null);
+            const deck = state.zones.deck;
+            if (deck.length === 0) { showGameToast('Deck is empty'); return; }
+            const ids = deck.slice(0, Math.min(count, deck.length)).map(c => c.instanceId);
+            ids.forEach(id => moveCard(id, 'reserve'));
+          }}
+          // Bottom card actions
+          onDrawBottom={(count) => {
+            setDeckMenu(null);
+            const deck = state.zones.deck;
+            if (deck.length === 0) { showGameToast('Deck is empty'); return; }
+            const handSpace = 16 - state.zones.hand.length;
+            if (handSpace <= 0) { showGameToast('Hand is full (max 16 cards)'); return; }
+            const n = Math.min(count, deck.length);
+            const cards = deck.slice(-n);
+            let drawn = 0;
+            cards.forEach(c => {
+              const isLS = c.type === 'LS' || c.type === 'Lost Soul' || c.type.toLowerCase().includes('lost soul');
+              if (isLS) {
+                moveCard(c.instanceId, 'land-of-bondage');
+              } else if (drawn < handSpace) {
+                moveCard(c.instanceId, 'hand');
+                drawn++;
+              }
+            });
+            if (count > handSpace) {
+              showGameToast(`Hand is full — drew ${drawn}`);
+            }
+          }}
+          onRevealBottom={(count) => {
+            setDeckMenu(null);
+            const deck = state.zones.deck;
+            if (deck.length === 0) { showGameToast('Deck is empty'); return; }
+            const n = Math.min(count, deck.length);
+            const bottomN = deck.slice(-n);
+            setRevealCards(bottomN.map(c => ({ name: c.cardName, imgFile: c.cardImgFile, label: 'Bottom of Deck' })));
+          }}
+          onDiscardBottom={(count) => {
+            setDeckMenu(null);
+            const deck = state.zones.deck;
+            if (deck.length === 0) { showGameToast('Deck is empty'); return; }
+            const ids = deck.slice(-Math.min(count, deck.length)).map(c => c.instanceId);
+            ids.forEach(id => moveCard(id, 'discard'));
+          }}
+          onReserveBottom={(count) => {
+            setDeckMenu(null);
+            const deck = state.zones.deck;
+            if (deck.length === 0) { showGameToast('Deck is empty'); return; }
+            const ids = deck.slice(-Math.min(count, deck.length)).map(c => c.instanceId);
+            ids.forEach(id => moveCard(id, 'reserve'));
+          }}
+          // Random card actions
+          onDrawRandom={(count) => {
+            setDeckMenu(null);
+            const deck = state.zones.deck;
+            if (deck.length === 0) { showGameToast('Deck is empty'); return; }
+            const handSpace = 16 - state.zones.hand.length;
+            if (handSpace <= 0) { showGameToast('Hand is full (max 16 cards)'); return; }
+            const shuffled = [...deck].sort(() => Math.random() - 0.5);
+            const cards = shuffled.slice(0, Math.min(count, deck.length));
+            let drawn = 0;
+            cards.forEach(c => {
+              const isLS = c.type === 'LS' || c.type === 'Lost Soul' || c.type.toLowerCase().includes('lost soul');
+              if (isLS) {
+                moveCard(c.instanceId, 'land-of-bondage');
+              } else if (drawn < handSpace) {
+                moveCard(c.instanceId, 'hand');
+                drawn++;
+              }
+            });
+            if (count > handSpace) {
+              showGameToast(`Hand is full — drew ${drawn}`);
+            }
+          }}
+          onRevealRandom={(count) => {
+            setDeckMenu(null);
+            const deck = state.zones.deck;
+            if (deck.length === 0) { showGameToast('Deck is empty'); return; }
+            const shuffled = [...deck].sort(() => Math.random() - 0.5);
+            const picked = shuffled.slice(0, Math.min(count, deck.length));
+            setRevealCards(picked.map(c => ({ name: c.cardName, imgFile: c.cardImgFile, label: 'Random' })));
+          }}
+          onDiscardRandom={(count) => {
+            setDeckMenu(null);
+            const deck = state.zones.deck;
+            if (deck.length === 0) { showGameToast('Deck is empty'); return; }
+            const shuffled = [...deck].sort(() => Math.random() - 0.5);
+            const ids = shuffled.slice(0, Math.min(count, deck.length)).map(c => c.instanceId);
+            ids.forEach(id => moveCard(id, 'discard'));
+          }}
+          onReserveRandom={(count) => {
+            setDeckMenu(null);
+            const deck = state.zones.deck;
+            if (deck.length === 0) { showGameToast('Deck is empty'); return; }
+            const shuffled = [...deck].sort(() => Math.random() - 0.5);
+            const ids = shuffled.slice(0, Math.min(count, deck.length)).map(c => c.instanceId);
+            ids.forEach(id => moveCard(id, 'reserve'));
+          }}
+        />
+      )}
+
+      {hoverCard && (
+        <CardHoverPreview
+          card={hoverCard.card}
+          anchorX={hoverCard.x}
+          anchorY={hoverCard.y}
+        />
+      )}
+
+      {browseZone && (
+        <ZoneBrowseModal
+          zoneId={browseZone}
+          onClose={() => setBrowseZone(null)}
+          onStartDrag={modalStartDrag}
+          isDragActive={modalDrag.isDragging}
+        />
+      )}
+
+      {showDeckSearch && (
+        <DeckSearchModal
+          onClose={() => setShowDeckSearch(false)}
+          onStartDrag={modalStartDrag}
+          isDragActive={modalDrag.isDragging}
+        />
+      )}
+
+      {peekCount !== null && (
+        <DeckPeekModal
+          count={peekCount}
+          onClose={() => setPeekCount(null)}
+          onStartDrag={modalStartDrag}
+          isDragActive={modalDrag.isDragging}
+        />
+      )}
+
+      {revealCards && revealCards.length > 0 && (
+        <div
+          onClick={() => setRevealCards(null)}
+          onContextMenu={(e) => e.preventDefault()}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.7)',
+            zIndex: 600,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+          }}
+        >
+          <div style={{ textAlign: 'center' }}>
+            <div style={{
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              color: '#8b6532',
+              fontSize: 11,
+              marginBottom: 8,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+            }}>
+              {revealCards[0].label || 'Reveal'}
+            </div>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', maxWidth: revealCards.length > 4 ? 700 : undefined }}>
+              {revealCards.map((rc, i) => (
+                rc.imgFile ? (
+                  <img
+                    key={i}
+                    src={getCardImageUrl(rc.imgFile)}
+                    alt={rc.name}
+                    style={{ width: revealCards.length === 1 ? 220 : 150, borderRadius: 6, border: '1px solid #6b4e27' }}
+                  />
+                ) : (
+                  <div key={i} style={{
+                    width: revealCards.length === 1 ? 220 : 150,
+                    aspectRatio: '5/7',
+                    background: '#2a1f12',
+                    border: '1px solid #6b4e27',
+                    borderRadius: 6,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#c9b99a',
+                    fontFamily: 'var(--font-cinzel), Georgia, serif',
+                    fontSize: 11,
+                    padding: 8,
+                    textAlign: 'center',
+                  }}>
+                    {rc.name}
+                  </div>
+                )
+              ))}
+            </div>
+            <div style={{
+              color: '#6b4e27',
+              fontSize: 10,
+              marginTop: 6,
+            }}>
+              Click anywhere to close
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Zone drop target highlights — visible during any drag */}
+      {(modalDrag.isDragging || canvasDragZone !== null) && (
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 450 }}>
+          {(Object.entries(zoneLayout) as [ZoneId, ZoneRect][]).map(([zoneId, rect]) => {
+            // Don't show highlight for the zone the card is being dragged from
+            if (!modalDrag.isDragging && dragSourceZoneRef.current === zoneId) return null;
+            const activeHoveredZone = modalDrag.isDragging ? modalHoveredZone : canvasDragZone;
+            const isHovered = activeHoveredZone === zoneId;
+            return (
+              <div
+                key={zoneId}
+                style={{
+                  position: 'absolute',
+                  left: rect.x,
+                  top: rect.y,
+                  width: rect.width,
+                  height: rect.height,
+                  border: isHovered ? '1px solid rgba(196,149,90,0.6)' : '1px solid rgba(196,149,90,0.15)',
+                  background: isHovered ? 'rgba(196,149,90,0.12)' : 'transparent',
+                  borderRadius: 4,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <span style={{
+                  color: isHovered ? 'rgba(232,213,163,0.7)' : 'rgba(232,213,163,0.3)',
+                  fontSize: 12,
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  textTransform: 'uppercase',
+                  letterSpacing: 2,
+                }}>
+                  {rect.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Floating drag ghost */}
+      {modalDrag.isDragging && modalDrag.imageUrl && (
+        <img
+          ref={modalGhostRef}
+          src={modalDrag.imageUrl}
+          alt="Dragging card"
+          style={{
+            position: 'fixed',
+            width: 80,
+            borderRadius: 4,
+            border: '2px solid #c4955a',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
+            pointerEvents: 'none',
+            zIndex: 700,
+            opacity: 0.9,
+          }}
+        />
+      )}
+
+      {deckDropPopup && (
+        <DeckDropPopup
+          x={deckDropPopup.x}
+          y={deckDropPopup.y}
+          onShuffleIn={() => {
+            const ids = batchDeckDropIds || [deckDropPopup.cardInstanceId];
+            if (ids.length === 1) {
+              moveCard(ids[0], 'deck');
+            } else {
+              moveCardsBatch(ids, 'deck');
+            }
+            shuffleDeck();
+            setDeckDropPopup(null);
+            setBatchDeckDropIds(null);
+            if (batchDeckDropIds) clearSelection();
+          }}
+          onTopDeck={() => {
+            const ids = batchDeckDropIds || [deckDropPopup.cardInstanceId];
+            for (const id of ids) {
+              moveCardToTopOfDeck(id);
+            }
+            setDeckDropPopup(null);
+            setBatchDeckDropIds(null);
+            if (batchDeckDropIds) clearSelection();
+          }}
+          onBottomDeck={() => {
+            const ids = batchDeckDropIds || [deckDropPopup.cardInstanceId];
+            for (const id of ids) {
+              moveCardToBottomOfDeck(id);
+            }
+            setDeckDropPopup(null);
+            setBatchDeckDropIds(null);
+            if (batchDeckDropIds) clearSelection();
+          }}
+          onCancel={() => { setDeckDropPopup(null); setBatchDeckDropIds(null); setCardRenderKey(k => k + 1); }}
+        />
+      )}
+
+      <GameToastContainer />
+    </>
+  );
+}
