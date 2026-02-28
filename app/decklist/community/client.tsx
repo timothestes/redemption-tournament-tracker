@@ -559,7 +559,7 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
                 </span>
               ))
             ) : (
-              <span className="text-xs text-gray-400 dark:text-gray-500 italic">&lt;no tags yet&gt;</span>
+              <span className="text-xs text-gray-400 dark:text-gray-500 italic">No tags yet</span>
             )}
           </div>
         </div>
