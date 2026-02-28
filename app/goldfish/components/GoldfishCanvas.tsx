@@ -47,7 +47,7 @@ if (typeof window !== 'undefined') {
   cardBackImage.src = '/gameplay/cardback.webp';
 }
 
-const CardBackShape = memo(function CardBackShape({ width, height }: { width: number; height: number }) {
+function CardBackShape({ width, height }: { width: number; height: number }) {
   if (cardBackImage && cardBackLoaded) {
     return (
       <KonvaImage
@@ -69,7 +69,7 @@ const CardBackShape = memo(function CardBackShape({ width, height }: { width: nu
       cornerRadius={4}
     />
   );
-});
+}
 
 // Individual card component — memoized to avoid re-rendering cards that haven't changed
 const GameCardNode = memo(function GameCardNode({
