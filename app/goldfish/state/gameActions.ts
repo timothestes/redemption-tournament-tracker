@@ -67,6 +67,10 @@ export const actions = {
     return createAction('ADVANCE_PHASE');
   },
 
+  regressPhase(): GameAction {
+    return createAction('REGRESS_PHASE');
+  },
+
   endTurn(): GameAction {
     return createAction('END_TURN');
   },
@@ -81,5 +85,9 @@ export const actions = {
 
   removeOpponentToken(cardInstanceId: string): GameAction {
     return createAction('REMOVE_OPPONENT_TOKEN', { cardInstanceId });
+  },
+
+  moveCardsBatch(cardInstanceIds: string[], toZone: ZoneId): GameAction {
+    return createAction('MOVE_CARDS_BATCH', { cardInstanceIds, toZone });
   },
 };

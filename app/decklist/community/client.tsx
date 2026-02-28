@@ -519,31 +519,37 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
 
         <div className="p-4">
           <h3 className="font-semibold text-lg truncate mb-1">{deck.name}</h3>
-          {deck.username && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-              by{" "}
-              <span
-                role="link"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  router.push(`/decklist/community?username=${encodeURIComponent(deck.username!)}`);
-                }}
-                className="text-gray-600 dark:text-gray-400 underline hover:text-gray-900 dark:hover:text-gray-200 cursor-pointer"
-              >
-                {deck.username}
-              </span>
-            </p>
-          )}
+          <div className="flex items-center justify-between mb-2">
+            {deck.username && (
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                by{" "}
+                <span
+                  role="link"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    router.push(`/decklist/community?username=${encodeURIComponent(deck.username!)}`);
+                  }}
+                  className="text-gray-600 dark:text-gray-400 underline hover:text-gray-900 dark:hover:text-gray-200 cursor-pointer"
+                >
+                  {deck.username}
+                </span>
+              </p>
+            )}
+            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-500">
+              {(deck.view_count ?? 0) > 0 && <span>{deck.view_count} views</span>}
+              <span>{timeAgo(deck.updated_at)}</span>
+            </div>
+          </div>
 
           <div className="flex items-center gap-3 text-sm mb-3">
             <span className={getDeckTypeBadgeClasses(deck.format)}>{formatDeckType(deck.format)}</span>
             <span className="text-gray-600 dark:text-gray-400">{deck.card_count || 0} cards</span>
           </div>
 
-          {deck.tags && deck.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-3">
-              {deck.tags.slice(0, 6).map((tag) => (
+          <div className="flex flex-wrap gap-1">
+            {deck.tags && deck.tags.length > 0 ? (
+              deck.tags.slice(0, 6).map((tag) => (
                 <span
                   key={tag.id}
                   className="px-2 py-0.5 rounded-full text-xs font-medium"
@@ -551,13 +557,10 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
                 >
                   {tag.name}
                 </span>
-              ))}
-            </div>
-          )}
-
-          <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-500">
-            <span>Updated {timeAgo(deck.updated_at)}</span>
-            {(deck.view_count ?? 0) > 0 && <span>{deck.view_count} views</span>}
+              ))
+            ) : (
+              <span className="text-xs text-gray-400 dark:text-gray-500 italic">&lt;no tags yet&gt;</span>
+            )}
           </div>
         </div>
       </Link>

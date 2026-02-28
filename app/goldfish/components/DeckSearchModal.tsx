@@ -400,20 +400,6 @@ export function DeckSearchModal({ onClose, onStartDrag, isDragActive }: DeckSear
                         {card.cardName}
                       </div>
                     )}
-                    {/* Card name */}
-                    <div
-                      style={{
-                        fontSize: 9,
-                        color: '#c9b99a',
-                        textAlign: 'center',
-                        marginTop: 2,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {card.cardName}
-                    </div>
                   </div>
                 );
               })}

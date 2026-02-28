@@ -1,8 +1,10 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useGame } from '../state/GameContext';
 import { PHASE_ORDER, GamePhase } from '../types';
 import { motion } from 'framer-motion';
+import { showGameToast } from './GameToast';
 
 const PHASE_LABELS: Record<GamePhase, string> = {
   setup: 'Setup',
@@ -23,8 +25,12 @@ const PHASE_TIPS: Record<GamePhase, string> = {
 };
 
 export function PhaseBar() {
-  const { state, advancePhase, endTurn } = useGame();
+  const { state, advancePhase, regressPhase, endTurn } = useGame();
+  const router = useRouter();
   const currentPhase = state.phase;
+  const currentIdx = PHASE_ORDER.indexOf(currentPhase as GamePhase);
+  const isFirstPhase = currentIdx <= 0;
+  const isLastPhase = currentIdx >= PHASE_ORDER.length - 1;
 
   const handlePhaseClick = (phase: GamePhase) => {
     if (phase === currentPhase) return;
@@ -38,6 +44,30 @@ export function PhaseBar() {
         advancePhase();
       }
     }
+  };
+
+  const HAND_LIMIT = 16;
+
+  const handleEndTurn = () => {
+    const handSize = state.zones.hand.length;
+    const deckSize = state.zones.deck.length;
+    const canDraw = Math.min(3, deckSize, HAND_LIMIT - handSize);
+    endTurn();
+    if (canDraw < 3 && handSize >= HAND_LIMIT - 2) {
+      showGameToast(`Hand limit reached — only drew ${Math.max(0, canDraw)} card${canDraw === 1 ? '' : 's'}`);
+    } else if (deckSize === 0) {
+      showGameToast('Deck is empty — no cards drawn');
+    } else if (deckSize < 3) {
+      showGameToast(`Only ${deckSize} card${deckSize === 1 ? '' : 's'} left in deck`);
+    }
+  };
+
+  const handleLogoClick = () => {
+    if (!state.deckId) {
+      router.push('/decklist/community');
+      return;
+    }
+    router.push(`/decklist/${state.deckId}`);
   };
 
   return (
@@ -58,22 +88,27 @@ export function PhaseBar() {
         padding: '0 16px',
       }}
     >
-      {/* Turn counter */}
-      <span
+      {/* Previous phase arrow */}
+      <button
+        onClick={regressPhase}
+        disabled={isFirstPhase}
+        title="Previous phase"
         style={{
-          position: 'absolute',
-          left: 16,
-          fontFamily: 'var(--font-cinzel), Georgia, serif',
-          fontSize: 12,
-          letterSpacing: '0.06em',
-          color: '#8b6532',
+          background: 'transparent',
+          border: 'none',
+          cursor: isFirstPhase ? 'default' : 'pointer',
+          color: isFirstPhase ? '#4a3520' : '#8b6532',
+          fontSize: 18,
+          fontFamily: 'serif',
+          padding: '2px 6px',
+          transition: 'color 0.2s',
+          lineHeight: 1,
         }}
+        onMouseEnter={(e) => { if (!isFirstPhase) e.currentTarget.style.color = '#e8d5a3'; }}
+        onMouseLeave={(e) => { if (!isFirstPhase) e.currentTarget.style.color = '#8b6532'; }}
       >
-        Turn{' '}
-        <span style={{ color: '#e8d5a3', fontSize: 14, fontWeight: 'bold' }}>
-          {state.turn}
-        </span>
-      </span>
+        &#x276E;
+      </button>
 
       {PHASE_ORDER.map((phase) => {
         const isActive = phase === currentPhase;
@@ -117,9 +152,30 @@ export function PhaseBar() {
         );
       })}
 
+      {/* Next phase arrow */}
+      <button
+        onClick={isLastPhase ? handleEndTurn : advancePhase}
+        title={isLastPhase ? 'End turn' : 'Next phase'}
+        style={{
+          background: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          color: '#8b6532',
+          fontSize: 18,
+          fontFamily: 'serif',
+          padding: '2px 6px',
+          transition: 'color 0.2s',
+          lineHeight: 1,
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = '#e8d5a3'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = '#8b6532'; }}
+      >
+        &#x276F;
+      </button>
+
       {/* End Turn button */}
       <button
-        onClick={endTurn}
+        onClick={handleEndTurn}
         style={{
           padding: '6px 16px',
           background: 'transparent',
@@ -137,9 +193,55 @@ export function PhaseBar() {
         End Turn
       </button>
 
+      {/* Left side: logo */}
+      <button
+        onClick={handleLogoClick}
+        title="Back to deck"
+        style={{
+          position: 'absolute',
+          left: 12,
+          background: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          padding: 0,
+          display: 'flex',
+          alignItems: 'center',
+        }}
+      >
+        <img
+          src="/darkmode_redemptionccgapp.webp"
+          alt="Back to deck"
+          style={{
+            height: 28,
+            width: 'auto',
+            opacity: 0.85,
+            transition: 'opacity 0.2s',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.85'; }}
+        />
+      </button>
+
+      {/* Right side: turn counter */}
+      <span
+        style={{
+          position: 'absolute',
+          right: 12,
+          fontFamily: 'var(--font-cinzel), Georgia, serif',
+          fontSize: 12,
+          letterSpacing: '0.06em',
+          color: '#8b6532',
+        }}
+      >
+        Turn{' '}
+        <span style={{ color: '#e8d5a3', fontSize: 14, fontWeight: 'bold' }}>
+          {state.turn}
+        </span>
+      </span>
+
       {/* Arrow indicators between phases */}
       <style jsx>{`
-        button:hover {
+        button:hover:not(:disabled) {
           color: #e8d5a3 !important;
         }
       `}</style>

@@ -1166,13 +1166,8 @@ webpack: (config) => {
 
 ## TODOS:
 
-- click and drag to select selection
-- fix spacing on LAND OF REDEMPTION TEXT for smaller screens
 - add animations
 - add sounds
 - add music
 - add options to disable sounds/music, etc.
-- add "back to redemptionccg.app
-- add redemptionccg.app logo
 - unify the play buttons
-- draw 3 at end of turn should show toast if at hand limit

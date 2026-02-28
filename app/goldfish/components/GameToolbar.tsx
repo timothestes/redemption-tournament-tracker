@@ -34,8 +34,8 @@ export function GameToolbar() {
   const buttons = [
     { icon: Play, label: 'Draw', onClick: handleDraw, shortcut: 'D' },
     { icon: Undo2, label: 'Undo', onClick: undo, shortcut: '⌘Z' },
+    { icon: PanelBottomOpen, label: state.isSpreadHand ? 'Fan' : 'Unfan', onClick: toggleSpreadHand, shortcut: 'H' },
     { icon: RotateCcw, label: 'New Game', onClick: newGame, shortcut: '' },
-    { icon: PanelBottomOpen, label: 'Spread', onClick: toggleSpreadHand, shortcut: 'H' },
   ];
 
   return (

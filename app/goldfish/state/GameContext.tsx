@@ -19,6 +19,7 @@ interface GameContextValue {
   undo: () => void;
   newGame: () => void;
   advancePhase: () => void;
+  regressPhase: () => void;
   endTurn: () => void;
   addCounter: (cardInstanceId: string, color?: CounterColorId) => void;
   removeCounter: (cardInstanceId: string, color?: CounterColorId) => void;
@@ -28,6 +29,7 @@ interface GameContextValue {
   addNote: (cardInstanceId: string, note: string) => void;
   addOpponentLostSoul: () => void;
   removeOpponentToken: (cardInstanceId: string) => void;
+  moveCardsBatch: (cardInstanceIds: string[], toZone: ZoneId) => void;
   toggleSpreadHand: () => void;
 }
 
@@ -102,6 +104,7 @@ export function GameProvider({ children, deck, optionsOverrides }: GameProviderP
   }, [deck, optionsOverrides]);
 
   const advancePhase = useCallback(() => dispatch(actions.advancePhase()), [dispatch]);
+  const regressPhase = useCallback(() => dispatch(actions.regressPhase()), [dispatch]);
   const endTurn = useCallback(() => dispatch(actions.endTurn()), [dispatch]);
   const addCounter = useCallback((id: string, color?: CounterColorId) => dispatch(actions.addCounter(id, color)), [dispatch]);
   const removeCounter = useCallback((id: string, color?: CounterColorId) => dispatch(actions.removeCounter(id, color)), [dispatch]);
@@ -118,6 +121,11 @@ export function GameProvider({ children, deck, optionsOverrides }: GameProviderP
   );
   const removeOpponentToken = useCallback(
     (id: string) => dispatch(actions.removeOpponentToken(id)),
+    [dispatch]
+  );
+  const moveCardsBatch = useCallback(
+    (cardInstanceIds: string[], toZone: ZoneId) =>
+      dispatch(actions.moveCardsBatch(cardInstanceIds, toZone)),
     [dispatch]
   );
 
@@ -147,6 +155,7 @@ export function GameProvider({ children, deck, optionsOverrides }: GameProviderP
       undo,
       newGame,
       advancePhase,
+      regressPhase,
       endTurn,
       addCounter,
       removeCounter,
@@ -156,14 +165,15 @@ export function GameProvider({ children, deck, optionsOverrides }: GameProviderP
       addNote,
       addOpponentLostSoul,
       removeOpponentToken,
+      moveCardsBatch,
       toggleSpreadHand,
     }),
     [
       state, dispatch, drawCard, drawMultiple, moveCard,
       moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck,
-      shuffleDeck, undo, newGame, advancePhase, endTurn,
+      shuffleDeck, undo, newGame, advancePhase, regressPhase, endTurn,
       addCounter, removeCounter, meekCard, unmeekCard, flipCard,
-      addNote, addOpponentLostSoul, removeOpponentToken, toggleSpreadHand,
+      addNote, addOpponentLostSoul, removeOpponentToken, moveCardsBatch, toggleSpreadHand,
     ]
   );
 

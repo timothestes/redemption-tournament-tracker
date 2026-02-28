@@ -80,6 +80,7 @@ export default async function GoldfishPage({
     name: deck.name,
     format: deck.format || 'Type 1',
     paragon: deck.paragon || null,
+    isOwner: result.isOwner ?? false,
     cards: (deck.cards || []).map((c: any) => {
       const imgFile = (c.card_img_file || '').replace(/\.jpe?g$/i, '');
       // Try exact match first, then name+set, then name-only

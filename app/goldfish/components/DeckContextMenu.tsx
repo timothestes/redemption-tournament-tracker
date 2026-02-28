@@ -114,7 +114,11 @@ function SubMenuActionRow({
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'center' }}>
+      <div
+        style={{ display: 'flex', alignItems: 'center', margin: '0 4px', borderRadius: 6 }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(196,149,90,0.15)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+      >
         <button
           onClick={() => setExpanded(!expanded)}
           onMouseEnter={(e) => {
@@ -133,20 +137,24 @@ function SubMenuActionRow({
             fontSize: 9,
             fontFamily: 'var(--font-cinzel), Georgia, serif',
             fontWeight: 'bold',
-            padding: '2px 8px',
-            borderRadius: 10,
+            width: 24,
+            height: 24,
+            padding: 0,
+            borderRadius: '50%',
             marginLeft: 10,
             letterSpacing: '0.05em',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
           }}
           title={`${label} multiple...`}
         >
           N
         </button>
         <button
-          style={{ ...ITEM_STYLE, flex: 1 }}
+          style={{ ...ITEM_STYLE, flex: 1, background: 'transparent' }}
           onClick={() => onAction(1)}
-          onMouseEnter={hoverEnter}
-          onMouseLeave={hoverLeave}
         >
           {icon}
           {label}

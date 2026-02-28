@@ -82,12 +82,14 @@ export type ActionType =
   | 'RESET_GAME'
   | 'START_GAME'
   | 'ADVANCE_PHASE'
+  | 'REGRESS_PHASE'
   | 'END_TURN'
   | 'ADD_NOTE'
   | 'ADD_OPPONENT_LOST_SOUL'
   | 'REMOVE_OPPONENT_TOKEN'
   | 'SHUFFLE_AND_MOVE_TO_TOP'
-  | 'SHUFFLE_AND_MOVE_TO_BOTTOM';
+  | 'SHUFFLE_AND_MOVE_TO_BOTTOM'
+  | 'MOVE_CARDS_BATCH';
 
 export interface GameAction {
   id: string;
@@ -96,6 +98,7 @@ export interface GameAction {
   timestamp: number;
   payload: {
     cardInstanceId?: string;
+    cardInstanceIds?: string[];
     fromZone?: ZoneId;
     toZone?: ZoneId;
     toIndex?: number;
@@ -131,6 +134,7 @@ export interface GameState {
   sessionId: string;
   deckId: string;
   deckName: string;
+  isOwner: boolean;
   format: 'T1' | 'T2' | 'Paragon';
   paragonName: string | null;
   turn: number;
@@ -147,6 +151,7 @@ export interface DeckDataForGoldfish {
   name: string;
   format: string;
   paragon?: string | null;
+  isOwner?: boolean;
   cards: {
     card_name: string;
     card_set: string;

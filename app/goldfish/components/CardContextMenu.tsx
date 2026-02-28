@@ -108,11 +108,6 @@ export function CardContextMenu({ card: initialCard, x, y, onClose }: CardContex
 
   return (
     <div ref={menuRef} style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
-      {/* Card name header */}
-      <div style={{ ...labelStyle, color: '#e8d5a3', fontSize: 11 }}>
-        {card.cardName}
-      </div>
-      <div style={separatorStyle} />
 
       {/* Counter swatches — only for territory and land-of-bondage */}
       {(card.zone === 'territory' || card.zone === 'land-of-bondage') && (

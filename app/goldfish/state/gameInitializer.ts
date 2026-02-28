@@ -162,6 +162,7 @@ export function buildInitialGameState(
     sessionId: crypto.randomUUID(),
     deckId: deck.id || '',
     deckName: deck.name,
+    isOwner: deck.isOwner ?? false,
     format,
     paragonName: deck.paragon || null,
     turn: 1,

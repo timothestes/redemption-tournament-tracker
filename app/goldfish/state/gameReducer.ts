@@ -298,6 +298,14 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return { ...state, phase: PHASE_ORDER[currentIdx + 1], history };
     }
 
+    case 'REGRESS_PHASE': {
+      const currentIdx = PHASE_ORDER.indexOf(state.phase as any);
+      if (currentIdx <= 0) {
+        return state;
+      }
+      return { ...state, phase: PHASE_ORDER[currentIdx - 1], history };
+    }
+
     case 'END_TURN': {
       // End turn: increment turn, reset to draw phase, and auto-draw 3 cards
       let newState: GameState = {
@@ -320,6 +328,24 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         newState.drawnThisTurn = true;
       }
       return newState;
+    }
+
+    case 'MOVE_CARDS_BATCH': {
+      const { cardInstanceIds, toZone } = action.payload;
+      if (!cardInstanceIds || !toZone) return state;
+
+      for (const instanceId of cardInstanceIds) {
+        const result = findAndRemoveCard(zones, instanceId);
+        if (!result) continue;
+        result.card.zone = toZone;
+        if (toZone !== 'deck') {
+          result.card.isFlipped = false;
+        }
+        result.card.posX = undefined;
+        result.card.posY = undefined;
+        zones[toZone].push(result.card);
+      }
+      return { ...state, zones, history };
     }
 
     case 'ADD_OPPONENT_LOST_SOUL': {
