@@ -34,6 +34,8 @@ const LOADING_MESSAGES = [
   'Downloading some heavy revies at Patmos...',
   'Drafting up Darius\'s Decree...',
   'Studying ancient Ugarit...',
+  'Dusting out the manger...',
+  'Consulting the wise men...',
 ];
 
 export function LoadingScreen({ progress }: { progress: number }) {

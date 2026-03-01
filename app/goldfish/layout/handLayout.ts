@@ -18,11 +18,15 @@ export function calculateHandPositions(
 ): HandCardPosition[] {
   if (cardCount === 0) return [];
 
-  const { cardWidth, cardHeight } = getCardDimensions(stageWidth);
-  const handY = stageHeight - stageHeight * 0.22;
-  const mainAreaWidth = stageWidth * 0.85; // sidebar takes 15% on the right
-  const centerX = mainAreaWidth / 2;
-  const handAreaWidth = mainAreaWidth * 0.9;
+  const { cardWidth, cardHeight } = getCardDimensions(stageWidth, stageHeight);
+  const handZoneTop = stageHeight - stageHeight * 0.22;
+  const centerX = stageWidth / 2;
+  const handAreaWidth = stageWidth * 0.75;
+
+  // Vertically center cards in the hand zone, leaving room for the toolbar (~60px)
+  const toolbarReserve = 60;
+  const availableHeight = stageHeight - handZoneTop - toolbarReserve;
+  const handY = handZoneTop + Math.max(0, (availableHeight - cardHeight) / 2);
 
   if (isSpread) {
     // Flat spread — no overlap, no rotation
@@ -30,7 +34,7 @@ export function calculateHandPositions(
     const startX = centerX - totalWidth / 2;
     return Array.from({ length: cardCount }, (_, i) => ({
       x: startX + i * (cardWidth + 6),
-      y: handY + 20,
+      y: handY,
       rotation: 0,
     }));
   }
@@ -60,7 +64,7 @@ export function calculateHandPositions(
     const yOffset = normalizedPos * normalizedPos * 15; // parabolic arc
     return {
       x,
-      y: handY + 20 + yOffset,
+      y: handY + yOffset,
       rotation,
     };
   });

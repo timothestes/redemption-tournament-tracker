@@ -23,18 +23,35 @@ interface GoldfishClientProps {
   deck: DeckDataForGoldfish;
 }
 
+// Cap the game area width so the layout doesn't break on ultrawide monitors.
+// Beyond this ratio, the extra width becomes visible cave background.
+const MAX_ASPECT_RATIO = 2.0;
+
+function getEffectiveDimensions(viewportWidth: number, viewportHeight: number) {
+  const ar = viewportWidth / viewportHeight;
+  const effectiveWidth = ar > MAX_ASPECT_RATIO
+    ? Math.round(viewportHeight * MAX_ASPECT_RATIO)
+    : viewportWidth;
+  return { width: effectiveWidth, height: viewportHeight };
+}
+
 export default function GoldfishClient({ deck }: GoldfishClientProps) {
-  const [dimensions, setDimensions] = useState({
+  const [viewport, setViewport] = useState({
     width: typeof window !== 'undefined' ? window.innerWidth : 1280,
     height: typeof window !== 'undefined' ? window.innerHeight : 800,
   });
 
   useEffect(() => {
     const onResize = () =>
-      setDimensions({ width: window.innerWidth, height: window.innerHeight });
+      setViewport({ width: window.innerWidth, height: window.innerHeight });
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  const dimensions = useMemo(
+    () => getEffectiveDimensions(viewport.width, viewport.height),
+    [viewport.width, viewport.height]
+  );
 
   // Collect all unique image URLs to preload
   const imageUrls = useMemo(() => {
@@ -90,8 +107,17 @@ export default function GoldfishClient({ deck }: GoldfishClientProps) {
           }}
         />
 
-        {/* Konva canvas */}
-        <GoldfishCanvas width={dimensions.width} height={dimensions.height} />
+        {/* Game area — capped width, centered. Acts as positioning context for all overlays. */}
+        <div
+          style={{
+            position: 'relative',
+            width: dimensions.width,
+            height: '100%',
+            margin: '0 auto',
+          }}
+        >
+          <GoldfishCanvas width={dimensions.width} height={dimensions.height} />
+        </div>
       </div>
     </GameProvider>
   );

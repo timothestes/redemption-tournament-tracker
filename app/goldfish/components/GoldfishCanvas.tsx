@@ -318,7 +318,10 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
 
   const isParagon = false; // TODO: re-enable paragon zone later
   const zoneLayout = useMemo(() => calculateZoneLayout(width, height, isParagon), [width, height, isParagon]);
-  const { cardWidth, cardHeight } = useMemo(() => getCardDimensions(width), [width]);
+  const { cardWidth, cardHeight } = useMemo(() => getCardDimensions(width, height), [width, height]);
+  // Rotate deck/discard/banish sideways when the aspect ratio is wide enough
+  // that cards would overflow their sidebar zones vertically
+  const rotateSidebarPiles = width / height > 1.9;
 
   // Escape key clears selection
   useEffect(() => {
@@ -972,18 +975,27 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
             // Deck: show top card face-down, right-click opens deck search
             if (zoneId === 'deck') {
               const zone = zoneLayout[zoneId];
-              const x = zone.x + zone.width / 2 - cardWidth / 2;
-              const y = zone.y + 24;
+              const cx = zone.x + zone.width / 2;
+              const cy = zone.y + zone.height / 2;
+              const rot = rotateSidebarPiles ? -90 : 0;
+              const oX = rotateSidebarPiles ? cardWidth / 2 : 0;
+              const oY = rotateSidebarPiles ? cardHeight / 2 : 0;
+              // When not rotated, position top-left so card sits below the label
+              const px = rotateSidebarPiles ? cx : zone.x + zone.width / 2 - cardWidth / 2;
+              const py = rotateSidebarPiles ? cy : zone.y + 24;
               return (
                 <Group key={zoneId}>
                   {cards.length > 1 && (
-                    <Group x={x - 2} y={y - 2}>
+                    <Group x={px - 2} y={py - 2} rotation={rot} offsetX={oX} offsetY={oY}>
                       <CardBackShape width={cardWidth} height={cardHeight} />
                     </Group>
                   )}
                   <Group
-                    x={x}
-                    y={y}
+                    x={px}
+                    y={py}
+                    rotation={rot}
+                    offsetX={oX}
+                    offsetY={oY}
                     onContextMenu={handleDeckContextMenu}
                     onDblClick={() => drawCard()}
                     onDblTap={() => drawCard()}
@@ -1030,21 +1042,29 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
               );
             }
 
-            // Banish: face-down stacked pile (like deck), click opens browse modal
+            // Banish: face-down stacked pile, click opens browse modal
             if (zoneId === 'banish') {
               const zone = zoneLayout[zoneId];
-              const x = zone.x + zone.width / 2 - cardWidth / 2;
-              const y = zone.y + 24;
+              const cx = zone.x + zone.width / 2;
+              const cy = zone.y + zone.height / 2;
+              const rot = rotateSidebarPiles ? -90 : 0;
+              const oX = rotateSidebarPiles ? cardWidth / 2 : 0;
+              const oY = rotateSidebarPiles ? cardHeight / 2 : 0;
+              const px = rotateSidebarPiles ? cx : zone.x + zone.width / 2 - cardWidth / 2;
+              const py = rotateSidebarPiles ? cy : zone.y + 24;
               return (
                 <Group key={zoneId}>
                   {cards.length > 1 && (
-                    <Group x={x - 2} y={y - 2}>
+                    <Group x={px - 2} y={py - 2} rotation={rot} offsetX={oX} offsetY={oY}>
                       <CardBackShape width={cardWidth} height={cardHeight} />
                     </Group>
                   )}
                   <Group
-                    x={x}
-                    y={y}
+                    x={px}
+                    y={py}
+                    rotation={rot}
+                    offsetX={oX}
+                    offsetY={oY}
                     onClick={() => setBrowseZone('banish')}
                     onTap={() => setBrowseZone('banish')}
                     onContextMenu={(e) => { e.evt.preventDefault(); setBrowseZone('banish'); }}
@@ -1058,8 +1078,13 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
             // Discard: stack with natural jitter
             if (zoneId === 'discard') {
               const zone = zoneLayout[zoneId];
-              const baseX = zone.x + zone.width / 2 - cardWidth / 2;
-              const baseY = zone.y + 24;
+              const cx = zone.x + zone.width / 2;
+              const cy = zone.y + zone.height / 2;
+              // When rotated, GameCardNode rotates around top-left, so pre-offset
+              // so the visual center lands at (cx, cy).
+              const baseX = rotateSidebarPiles ? cx - cardHeight / 2 : cx - cardWidth / 2;
+              const baseY = rotateSidebarPiles ? cy + cardWidth / 2 : zone.y + 24;
+              const baseRot = rotateSidebarPiles ? -90 : 0;
               return (
                 <Group key={zoneId}>
                   {cards.map((card, i) => {
@@ -1077,7 +1102,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                         card={{ ...card, isFlipped: false }}
                         x={baseX + jitterX}
                         y={baseY + jitterY}
-                        rotation={jitterRot}
+                        rotation={baseRot + jitterRot}
                         cardWidth={cardWidth}
                         cardHeight={cardHeight}
                         image={getImage(card.cardImgFile)}

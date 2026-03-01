@@ -13,10 +13,21 @@ export const CARD_WIDTH_RATIO = 0.052; // ~100px at 1920
 export const CARD_HEIGHT_RATIO = 0.093; // ~100 * 1.4 aspect ratio at 1080
 export const CARD_ASPECT_RATIO = 1.4;
 
-export function getCardDimensions(stageWidth: number) {
-  const width = Math.round(stageWidth * CARD_WIDTH_RATIO);
-  const height = Math.round(width * CARD_ASPECT_RATIO);
-  return { cardWidth: width, cardHeight: height };
+export function getCardDimensions(stageWidth: number, stageHeight?: number) {
+  const widthBased = Math.round(stageWidth * CARD_WIDTH_RATIO);
+
+  if (stageHeight) {
+    // Ensure a card fits inside a sidebar zone (5 zones in play area, ~24px label padding)
+    const playAreaHeight = stageHeight * 0.73; // after phase bar and hand
+    const sidebarZoneHeight = playAreaHeight / 5;
+    const maxCardHeight = sidebarZoneHeight - 28; // room for label + padding
+    const heightBased = Math.round(maxCardHeight / CARD_ASPECT_RATIO);
+    const w = Math.min(widthBased, heightBased);
+    return { cardWidth: w, cardHeight: Math.round(w * CARD_ASPECT_RATIO) };
+  }
+
+  const height = Math.round(widthBased * CARD_ASPECT_RATIO);
+  return { cardWidth: widthBased, cardHeight: height };
 }
 
 /**
