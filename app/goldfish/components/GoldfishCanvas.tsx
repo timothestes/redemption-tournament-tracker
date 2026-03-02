@@ -437,13 +437,27 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
     setDeckDropPopup({ cardInstanceId, x: screenX, y: screenY });
   }, []);
 
+  // Batch deck drop handler for multi-card modal drags
+  const handleBatchDeckDrop = useCallback((cardInstanceIds: string[]) => {
+    setBatchDeckDropIds(cardInstanceIds);
+  }, []);
+
   // Modal card drag (drag from search/peek/browse modals to canvas zones)
-  const { dragState: modalDrag, startDrag: modalStartDrag, hoveredZone: modalHoveredZone, ghostRef: modalGhostRef } = useModalCardDrag({
+  const {
+    dragState: modalDrag,
+    startDrag: modalStartDrag,
+    startMultiDrag: modalStartMultiDrag,
+    hoveredZone: modalHoveredZone,
+    ghostRef: modalGhostRef,
+    didDragRef: modalDidDragRef,
+  } = useModalCardDrag({
     stageRef,
     zoneLayout,
     findZoneAtPosition,
     moveCard,
+    moveCardsBatch,
     onDeckDrop: handleDeckDrop,
+    onBatchDeckDrop: handleBatchDeckDrop,
     cardWidth,
     cardHeight,
   });
@@ -1664,6 +1678,8 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
           zoneId={browseZone}
           onClose={() => setBrowseZone(null)}
           onStartDrag={modalStartDrag}
+          onStartMultiDrag={modalStartMultiDrag}
+          didDragRef={modalDidDragRef}
           isDragActive={modalDrag.isDragging}
         />
       )}
@@ -1795,21 +1811,88 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
 
       {/* Floating drag ghost */}
       {modalDrag.isDragging && modalDrag.imageUrl && (
-        <img
-          ref={modalGhostRef}
-          src={modalDrag.imageUrl}
-          alt="Dragging card"
-          style={{
-            position: 'fixed',
-            width: 80,
-            borderRadius: 4,
-            border: '2px solid #c4955a',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
-            pointerEvents: 'none',
-            zIndex: 700,
-            opacity: 0.9,
-          }}
-        />
+        modalDrag.additionalCards.length > 0 ? (
+          <div
+            ref={modalGhostRef as React.RefObject<HTMLDivElement>}
+            style={{
+              position: 'fixed',
+              pointerEvents: 'none',
+              zIndex: 700,
+            }}
+          >
+            {/* Stacked offset cards behind (max 2 for performance) */}
+            {[...modalDrag.additionalCards.slice(0, 2)].reverse().map((extra, i) => (
+              <img
+                key={extra.card.instanceId}
+                src={extra.imageUrl}
+                alt=""
+                draggable={false}
+                style={{
+                  position: 'absolute',
+                  width: 80,
+                  borderRadius: 4,
+                  border: '1px solid #8b6532',
+                  opacity: 0.4 - i * 0.15,
+                  top: -(6 + i * 4),
+                  left: 4 + i * 2,
+                  zIndex: -1 - i,
+                }}
+              />
+            ))}
+            {/* Primary card on top */}
+            <img
+              src={modalDrag.imageUrl}
+              alt="Dragging cards"
+              draggable={false}
+              style={{
+                width: 80,
+                borderRadius: 4,
+                border: '2px solid #c4955a',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
+                opacity: 0.9,
+              }}
+            />
+            {/* Count badge */}
+            <div
+              style={{
+                position: 'absolute',
+                top: -8,
+                right: -8,
+                background: '#c4955a',
+                color: '#1e1610',
+                borderRadius: '50%',
+                width: 22,
+                height: 22,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 11,
+                fontWeight: 'bold',
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.5)',
+              }}
+            >
+              {modalDrag.additionalCards.length + 1}
+            </div>
+          </div>
+        ) : (
+          <img
+            ref={modalGhostRef as React.RefObject<HTMLImageElement>}
+            src={modalDrag.imageUrl}
+            alt="Dragging card"
+            draggable={false}
+            style={{
+              position: 'fixed',
+              width: 80,
+              borderRadius: 4,
+              border: '2px solid #c4955a',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
+              pointerEvents: 'none',
+              zIndex: 700,
+              opacity: 0.9,
+            }}
+          />
+        )
       )}
 
       {deckDropPopup && (
