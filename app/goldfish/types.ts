@@ -107,6 +107,7 @@ export interface GameAction {
     color?: CounterColorId;
     posX?: number;
     posY?: number;
+    positions?: Record<string, { posX: number; posY: number }>;
   };
 }
 

@@ -29,7 +29,7 @@ interface GameContextValue {
   addNote: (cardInstanceId: string, note: string) => void;
   addOpponentLostSoul: () => void;
   removeOpponentToken: (cardInstanceId: string) => void;
-  moveCardsBatch: (cardInstanceIds: string[], toZone: ZoneId) => void;
+  moveCardsBatch: (cardInstanceIds: string[], toZone: ZoneId, positions?: Record<string, { posX: number; posY: number }>) => void;
   toggleSpreadHand: () => void;
 }
 
@@ -124,8 +124,8 @@ export function GameProvider({ children, deck, optionsOverrides }: GameProviderP
     [dispatch]
   );
   const moveCardsBatch = useCallback(
-    (cardInstanceIds: string[], toZone: ZoneId) =>
-      dispatch(actions.moveCardsBatch(cardInstanceIds, toZone)),
+    (cardInstanceIds: string[], toZone: ZoneId, positions?: Record<string, { posX: number; posY: number }>) =>
+      dispatch(actions.moveCardsBatch(cardInstanceIds, toZone, positions)),
     [dispatch]
   );
 

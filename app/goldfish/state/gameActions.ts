@@ -87,7 +87,7 @@ export const actions = {
     return createAction('REMOVE_OPPONENT_TOKEN', { cardInstanceId });
   },
 
-  moveCardsBatch(cardInstanceIds: string[], toZone: ZoneId): GameAction {
-    return createAction('MOVE_CARDS_BATCH', { cardInstanceIds, toZone });
+  moveCardsBatch(cardInstanceIds: string[], toZone: ZoneId, positions?: Record<string, { posX: number; posY: number }>): GameAction {
+    return createAction('MOVE_CARDS_BATCH', { cardInstanceIds, toZone, positions });
   },
 };

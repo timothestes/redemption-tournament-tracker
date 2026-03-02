@@ -332,7 +332,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case 'MOVE_CARDS_BATCH': {
-      const { cardInstanceIds, toZone } = action.payload;
+      const { cardInstanceIds, toZone, positions } = action.payload;
       if (!cardInstanceIds || !toZone) return state;
 
       for (const instanceId of cardInstanceIds) {
@@ -342,8 +342,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         if (toZone !== 'deck') {
           result.card.isFlipped = false;
         }
-        result.card.posX = undefined;
-        result.card.posY = undefined;
+        const pos = positions?.[instanceId];
+        result.card.posX = pos?.posX;
+        result.card.posY = pos?.posY;
         zones[toZone].push(result.card);
       }
       return { ...state, zones, history };

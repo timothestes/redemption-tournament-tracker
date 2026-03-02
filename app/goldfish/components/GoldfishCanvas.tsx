@@ -3,6 +3,7 @@
 import { useRef, useState, useCallback, useEffect, useMemo, memo } from 'react';
 import { Stage, Layer, Rect, Text, Image as KonvaImage, Group, Circle, Line } from 'react-konva';
 import type Konva from 'konva';
+import KonvaLib from 'konva';
 import { useGame } from '../state/GameContext';
 import { calculateZoneLayout, getCardDimensions, calculateCardPositionsInZone, type ZoneRect } from '../layout/zoneLayout';
 import { calculateHandPositions } from '../layout/handLayout';
@@ -81,6 +82,7 @@ const GameCardNode = memo(function GameCardNode({
   cardHeight,
   image,
   isSelected,
+  nodeRef,
   onDragStart,
   onDragMove,
   onDragEnd,
@@ -98,6 +100,7 @@ const GameCardNode = memo(function GameCardNode({
   cardHeight: number;
   image: HTMLImageElement | undefined;
   isSelected?: boolean;
+  nodeRef?: (instanceId: string, node: Konva.Group | null) => void;
   onDragStart: (card: GameCard) => void;
   onDragMove: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onDragEnd: (card: GameCard, e: Konva.KonvaEventObject<DragEvent>) => void;
@@ -109,8 +112,13 @@ const GameCardNode = memo(function GameCardNode({
 }) {
   const showFace = !card.isFlipped && image;
 
+  const groupRefCb = useCallback((node: Konva.Group | null) => {
+    nodeRef?.(card.instanceId, node);
+  }, [card.instanceId, nodeRef]);
+
   return (
     <Group
+      ref={groupRefCb as any}
       x={x}
       y={y}
       rotation={rotation}
@@ -276,9 +284,23 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
   const [canvasDragZone, setCanvasDragZone] = useState<ZoneId | null>(null);
   const isCanvasDragging = useRef(false);
   const [multiCardContextMenu, setMultiCardContextMenu] = useState<{ x: number; y: number } | null>(null);
-  const multiCardMenuTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [batchDeckDropIds, setBatchDeckDropIds] = useState<string[] | null>(null);
   const [cardRenderKey, setCardRenderKey] = useState(0);
+
+  // Card node ref map for imperative multi-card drag
+  const cardNodeRefs = useRef<Map<string, Konva.Group>>(new Map());
+  const registerCardNode = useCallback((instanceId: string, node: Konva.Group | null) => {
+    if (node) {
+      cardNodeRefs.current.set(instanceId, node);
+    } else {
+      cardNodeRefs.current.delete(instanceId);
+    }
+  }, []);
+  // Offsets of follower cards relative to the dragged card during group drag
+  const dragFollowerOffsets = useRef<Map<string, { dx: number; dy: number }> | null>(null);
+  // Ghost image for multi-card drag — a single rasterized snapshot of all followers
+  const dragGhostRef = useRef<Konva.Image | null>(null);
+  const dragGhostLayerRef = useRef<Konva.Layer | null>(null);
 
   // Selection state
   const {
@@ -436,19 +458,125 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
       hoverTimerRef.current = null;
     }
     setHoverCard(null);
-  }, []);
+
+    // Multi-card drag: build a single rasterized ghost of all follower cards
+    if (selectedIds.has(card.instanceId) && selectedIds.size > 1) {
+      const dragNode = cardNodeRefs.current.get(card.instanceId);
+      if (dragNode) {
+        const offsets = new Map<string, { dx: number; dy: number }>();
+        const baseX = dragNode.x();
+        const baseY = dragNode.y();
+
+        // Collect follower nodes and compute offsets
+        const followers: { id: string; node: Konva.Group; dx: number; dy: number }[] = [];
+        for (const id of selectedIds) {
+          if (id === card.instanceId) continue;
+          const node = cardNodeRefs.current.get(id);
+          if (node) {
+            const dx = node.x() - baseX;
+            const dy = node.y() - baseY;
+            offsets.set(id, { dx, dy });
+            followers.push({ id, node, dx, dy });
+          }
+        }
+        dragFollowerOffsets.current = offsets;
+
+        // Rasterize followers into a single ghost image
+        if (followers.length > 0) {
+          // Compute bounding box of all followers relative to the drag card
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+          for (const f of followers) {
+            minX = Math.min(minX, f.dx);
+            minY = Math.min(minY, f.dy);
+            maxX = Math.max(maxX, f.dx + cardWidth);
+            maxY = Math.max(maxY, f.dy + cardHeight);
+          }
+          const ghostW = maxX - minX;
+          const ghostH = maxY - minY;
+
+          // Draw all followers onto an offscreen canvas
+          const offscreen = document.createElement('canvas');
+          offscreen.width = ghostW * 2;  // 2x for sharpness
+          offscreen.height = ghostH * 2;
+          const ctx = offscreen.getContext('2d');
+          if (ctx) {
+            ctx.scale(2, 2);
+            ctx.globalAlpha = 0.5;
+            for (const f of followers) {
+              // Rasterize this individual card node
+              const cardCanvas = f.node.toCanvas({ pixelRatio: 1 });
+              ctx.drawImage(cardCanvas, f.dx - minX, f.dy - minY, cardWidth, cardHeight);
+            }
+
+            // Create a Konva.Image from the offscreen canvas
+            const ghostImage = new KonvaLib.Image({
+              image: offscreen,
+              x: baseX + minX,
+              y: baseY + minY,
+              width: ghostW,
+              height: ghostH,
+              listening: false,
+              opacity: 1,
+            }) as Konva.Image;
+
+            // Add to a dedicated ghost layer
+            const stage = stageRef.current;
+            if (stage) {
+              let ghostLayer = dragGhostLayerRef.current;
+              if (!ghostLayer) {
+                ghostLayer = new KonvaLib.Layer({ listening: false }) as Konva.Layer;
+                dragGhostLayerRef.current = ghostLayer;
+                stage.add(ghostLayer);
+              }
+              ghostLayer.add(ghostImage);
+              ghostLayer.moveToTop();
+              ghostLayer.batchDraw();
+              dragGhostRef.current = ghostImage;
+            }
+
+            // Hide the real follower nodes
+            for (const f of followers) {
+              f.node.visible(false);
+            }
+            dragNode.getLayer()?.batchDraw();
+          }
+        }
+      }
+    } else {
+      dragFollowerOffsets.current = null;
+    }
+  }, [selectedIds, cardWidth, cardHeight]);
 
   const canvasDragZoneRef = useRef<ZoneId | null>(null);
+  // Track the ghost's offset from the drag card origin for repositioning
+  const dragGhostOffsetRef = useRef<{ dx: number; dy: number } | null>(null);
   const handleCardDragMove = useCallback(
     (e: Konva.KonvaEventObject<DragEvent>) => {
       const node = e.target;
-      const centerX = node.x() + cardWidth / 2;
-      const centerY = node.y() + cardHeight / 2;
+      const x = node.x();
+      const y = node.y();
+      const centerX = x + cardWidth / 2;
+      const centerY = y + cardHeight / 2;
       const zone = findZoneAtPosition(centerX, centerY);
       // Only trigger a re-render when the hovered zone actually changes
       if (zone !== canvasDragZoneRef.current) {
         canvasDragZoneRef.current = zone;
         setCanvasDragZone(zone);
+      }
+
+      // Multi-card drag: move the single ghost image (one node, not N)
+      const ghost = dragGhostRef.current;
+      if (ghost) {
+        // On first move, compute the ghost's offset relative to the drag card
+        if (!dragGhostOffsetRef.current) {
+          dragGhostOffsetRef.current = {
+            dx: ghost.x() - x,
+            dy: ghost.y() - y,
+          };
+        }
+        ghost.x(x + dragGhostOffsetRef.current.dx);
+        ghost.y(y + dragGhostOffsetRef.current.dy);
+        dragGhostLayerRef.current?.batchDraw();
       }
     },
     [findZoneAtPosition, cardWidth, cardHeight]
@@ -456,11 +584,29 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
 
   const handleCardDragEnd = useCallback(
     (card: GameCard, e: Konva.KonvaEventObject<DragEvent>) => {
+      // Capture follower offsets before clearing
+      const followerOffsets = dragFollowerOffsets.current;
       isDraggingRef.current = false;
       isCanvasDragging.current = false;
       canvasDragZoneRef.current = null;
       dragSourceZoneRef.current = null;
+      dragFollowerOffsets.current = null;
+      dragGhostOffsetRef.current = null;
       setCanvasDragZone(null);
+
+      // Clean up ghost image
+      if (dragGhostRef.current) {
+        dragGhostRef.current.destroy();
+        dragGhostRef.current = null;
+        dragGhostLayerRef.current?.batchDraw();
+      }
+      // Restore follower node visibility
+      if (followerOffsets) {
+        for (const [id] of followerOffsets) {
+          const node = cardNodeRefs.current.get(id);
+          if (node) node.visible(true);
+        }
+      }
       const node = e.target;
       const dropX = node.x();
       const dropY = node.y();
@@ -514,9 +660,19 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
           }
         }
         if (isGroupDrag) {
-          moveCardsBatch(cardIds, targetZone);
+          // For free-form zones, preserve each card's drop position
+          let positions: Record<string, { posX: number; posY: number }> | undefined;
+          if (freeFormZones.includes(targetZone)) {
+            positions = { [card.instanceId]: { posX: dropX, posY: dropY } };
+            if (followerOffsets) {
+              for (const [id, offset] of followerOffsets) {
+                positions[id] = { posX: dropX + offset.dx, posY: dropY + offset.dy };
+              }
+            }
+          }
+          moveCardsBatch(cardIds, targetZone, positions);
           clearSelection();
-        } else if (freeFormZones.includes(targetZone) && card.zone === targetZone) {
+        } else if (freeFormZones.includes(targetZone)) {
           moveCard(card.instanceId, targetZone, undefined, dropX, dropY);
         } else {
           moveCard(card.instanceId, targetZone, undefined, dropX, dropY);
@@ -758,11 +914,6 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
       }
       if (isCard) return;
 
-      // Cancel any pending multi-card menu from a previous drag
-      if (multiCardMenuTimerRef.current) {
-        clearTimeout(multiCardMenuTimerRef.current);
-        multiCardMenuTimerRef.current = null;
-      }
       if (!e.evt.shiftKey && selectedIds.size > 0) {
         clearSelection();
       }
@@ -798,28 +949,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
   const handleStageMouseUp = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
       if (!isSelectingRef.current) return;
-      const { wasClick, selectedCount } = endSelectionDrag(e.evt.shiftKey);
-
-      // Auto-open multi-card context menu after a real drag-select that selected 2+ cards
-      if (!wasClick && selectedCount > 1) {
-        // Dismiss any hover preview that might be pending/showing
-        if (hoverTimerRef.current) {
-          clearTimeout(hoverTimerRef.current);
-          hoverTimerRef.current = null;
-        }
-        setHoverCard(null);
-
-        const stage = stageRef.current;
-        const pos = stage?.getPointerPosition();
-        if (pos) {
-          // Brief delay so the selection highlights render before the menu appears
-          if (multiCardMenuTimerRef.current) clearTimeout(multiCardMenuTimerRef.current);
-          multiCardMenuTimerRef.current = setTimeout(() => {
-            setMultiCardContextMenu({ x: pos.x, y: pos.y });
-            multiCardMenuTimerRef.current = null;
-          }, 300);
-        }
-      }
+      endSelectionDrag(e.evt.shiftKey);
     },
     [endSelectionDrag]
   );
@@ -1028,6 +1158,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                       cardHeight={cardHeight}
                       image={getImage(card.cardImgFile)}
                       isSelected={selectedIds.has(card.instanceId)}
+                      nodeRef={registerCardNode}
                       onDragStart={handleCardDragStart}
                       onDragMove={handleCardDragMove}
                       onDragEnd={handleCardDragEnd}
@@ -1107,6 +1238,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                         cardHeight={cardHeight}
                         image={getImage(card.cardImgFile)}
                         isSelected={selectedIds.has(card.instanceId)}
+                        nodeRef={registerCardNode}
                         onDragStart={handleCardDragStart}
                         onDragMove={handleCardDragMove}
                         onDragEnd={handleCardDragEnd}
@@ -1143,6 +1275,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                       cardHeight={cardHeight}
                       image={getImage(card.cardImgFile)}
                       isSelected={selectedIds.has(card.instanceId)}
+                      nodeRef={registerCardNode}
                       onDragStart={handleCardDragStart}
                       onDragMove={handleCardDragMove}
                       onDragEnd={handleCardDragEnd}
@@ -1176,6 +1309,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                         cardHeight={cardHeight}
                         image={getImage(card.cardImgFile)}
                         isSelected={selectedIds.has(card.instanceId)}
+                        nodeRef={registerCardNode}
                         onDragStart={handleCardDragStart}
                         onDragMove={handleCardDragMove}
                         onDragEnd={handleCardDragEnd}
@@ -1210,6 +1344,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                         cardHeight={cardHeight}
                         image={getImage(card.cardImgFile)}
                         isSelected={selectedIds.has(card.instanceId)}
+                        nodeRef={registerCardNode}
                         onDragStart={handleCardDragStart}
                         onDragMove={handleCardDragMove}
                         onDragEnd={handleCardDragEnd}
@@ -1250,6 +1385,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                       cardHeight={cardHeight}
                       image={getImage(card.cardImgFile)}
                       isSelected={selectedIds.has(card.instanceId)}
+                      nodeRef={registerCardNode}
                       onDragStart={handleCardDragStart}
                       onDragMove={handleCardDragMove}
                       onDragEnd={handleCardDragEnd}
@@ -1282,6 +1418,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                 cardHeight={cardHeight}
                 image={getImage(card.cardImgFile)}
                 isSelected={selectedIds.has(card.instanceId)}
+                nodeRef={registerCardNode}
                 onDragStart={handleCardDragStart}
                 onDragMove={handleCardDragMove}
                 onDragEnd={handleCardDragEnd}
