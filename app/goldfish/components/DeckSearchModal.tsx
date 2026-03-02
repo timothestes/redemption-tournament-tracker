@@ -28,11 +28,14 @@ const MOVE_ZONES: { id: ZoneId; label: string }[] = [
 interface DeckSearchModalProps {
   onClose: () => void;
   onStartDrag?: (card: GameCard, imageUrl: string, e: React.PointerEvent) => void;
+  onStartMultiDrag?: (cards: { card: GameCard; imageUrl: string }[], e: React.PointerEvent) => void;
+  didDragRef?: React.MutableRefObject<boolean>;
   isDragActive?: boolean;
 }
 
 function CardContextPopup({
   card,
+  count,
   x,
   y,
   onClose,
@@ -41,6 +44,7 @@ function CardContextPopup({
   onMoveToBottom,
 }: {
   card: GameCard;
+  count?: number;
   x: number;
   y: number;
   onClose: () => void;
@@ -71,6 +75,8 @@ function CardContextPopup({
     fontFamily: 'var(--font-cinzel), Georgia, serif',
   };
 
+  const label = count && count > 1 ? `Move ${count} cards to...` : 'Move to...';
+
   return (
     <div
       ref={ref}
@@ -89,9 +95,9 @@ function CardContextPopup({
       }}
     >
       <div style={{ ...itemStyle, color: '#8b6532', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', cursor: 'default', padding: '3px 12px' }}>
-        Move to...
+        {label}
       </div>
-      {MOVE_ZONES.map(({ id, label }) => (
+      {MOVE_ZONES.map(({ id, label: zoneLabel }) => (
         <button
           key={id}
           style={itemStyle}
@@ -99,7 +105,7 @@ function CardContextPopup({
           onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(196,149,90,0.15)'; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
         >
-          {label}
+          {zoneLabel}
         </button>
       ))}
       <div style={{ height: 1, background: '#6b4e27', margin: '4px 8px', opacity: 0.5 }} />
@@ -123,15 +129,38 @@ function CardContextPopup({
   );
 }
 
-export function DeckSearchModal({ onClose, onStartDrag, isDragActive }: DeckSearchModalProps) {
-  const { state, moveCard, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleDeck } = useGame();
+function rectsOverlap(
+  ax: number, ay: number, aw: number, ah: number,
+  bx: number, by: number, bw: number, bh: number,
+): boolean {
+  return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+}
+
+export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive }: DeckSearchModalProps) {
+  const { state, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleDeck } = useGame();
   const [search, setSearch] = useState('');
-  const [searchField, setSearchField] = useState<'type' | 'name' | 'brigade' | 'alignment' | 'ability' | 'identifier'>('type');
+  const [searchField, setSearchField] = useState<'all' | 'type' | 'name' | 'brigade' | 'alignment' | 'ability' | 'identifier'>('all');
   const [autoShuffle, setAutoShuffle] = useState(true);
   const [contextCard, setContextCard] = useState<{ card: GameCard; x: number; y: number } | null>(null);
   const { hover, onCardMouseEnter, onCardMouseLeave } = useModalCardHover(800);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Refs for card DOM elements (for lasso hit-testing)
+  const cardElRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const registerCardEl = useCallback((instanceId: string, el: HTMLDivElement | null) => {
+    if (el) cardElRefs.current.set(instanceId, el);
+    else cardElRefs.current.delete(instanceId);
+  }, []);
+
+  // Lasso selection state
+  const gridRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [lassoRect, setLassoRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const lassoStart = useRef<{ x: number; y: number } | null>(null);
+  const isLassoing = useRef(false);
 
   const SEARCH_FIELDS: { id: typeof searchField; label: string }[] = [
+    { id: 'all', label: 'All' },
     { id: 'type', label: 'Type' },
     { id: 'name', label: 'Name' },
     { id: 'brigade', label: 'Brigade' },
@@ -140,20 +169,31 @@ export function DeckSearchModal({ onClose, onStartDrag, isDragActive }: DeckSear
     { id: 'ability', label: 'Ability' },
   ];
 
-  const getFieldValue = (c: GameCard): string => {
+  const matchesSearch = (c: GameCard, term: string): boolean => {
+    const t = term.toLowerCase();
+    if (searchField === 'all') {
+      return (
+        c.type.toLowerCase().includes(t) ||
+        c.cardName.toLowerCase().includes(t) ||
+        c.brigade.toLowerCase().includes(t) ||
+        c.alignment.toLowerCase().includes(t) ||
+        c.identifier.toLowerCase().includes(t) ||
+        c.specialAbility.toLowerCase().includes(t)
+      );
+    }
     switch (searchField) {
-      case 'type': return c.type;
-      case 'name': return c.cardName;
-      case 'brigade': return c.brigade;
-      case 'alignment': return c.alignment;
-      case 'identifier': return c.identifier;
-      case 'ability': return c.specialAbility;
+      case 'type': return c.type.toLowerCase().includes(t);
+      case 'name': return c.cardName.toLowerCase().includes(t);
+      case 'brigade': return c.brigade.toLowerCase().includes(t);
+      case 'alignment': return c.alignment.toLowerCase().includes(t);
+      case 'identifier': return c.identifier.toLowerCase().includes(t);
+      case 'ability': return c.specialAbility.toLowerCase().includes(t);
     }
   };
 
   const deckCards = state.zones.deck;
   const filtered = search
-    ? deckCards.filter(c => getFieldValue(c).toLowerCase().includes(search.toLowerCase()))
+    ? deckCards.filter(c => matchesSearch(c, search))
     : deckCards;
 
   const handleClose = useCallback(() => {
@@ -163,18 +203,165 @@ export function DeckSearchModal({ onClose, onStartDrag, isDragActive }: DeckSear
     onClose();
   }, [autoShuffle, shuffleDeck, onClose]);
 
+  // Close modal after a successful drag-to-canvas completes
+  const prevDragActive = useRef(false);
+  useEffect(() => {
+    if (prevDragActive.current && !isDragActive) {
+      setSelectedIds(new Set());
+      handleClose();
+    }
+    prevDragActive.current = !!isDragActive;
+  }, [isDragActive, handleClose]);
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') handleClose();
+      if (e.key === 'Escape') {
+        if (selectedIds.size > 0) {
+          setSelectedIds(new Set());
+        } else {
+          handleClose();
+        }
+      }
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [handleClose]);
+  }, [handleClose, selectedIds.size]);
 
   const handleCardContextMenu = (card: GameCard, e: React.MouseEvent) => {
     e.preventDefault();
+    onCardMouseLeave();
     setContextCard({ card, x: e.clientX, y: e.clientY });
   };
+
+  // Track pointer down card to distinguish click from drag on pointer up
+  const pointerDownCardRef = useRef<string | null>(null);
+
+  const handlePointerDown = (card: GameCard, imageUrl: string, e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    onCardMouseLeave();
+    pointerDownCardRef.current = card.instanceId;
+    if (didDragRef) didDragRef.current = false;
+
+    const isSelected = selectedIds.has(card.instanceId);
+    if (isSelected && selectedIds.size > 1 && onStartMultiDrag) {
+      const allSelected = filtered.filter(c => selectedIds.has(c.instanceId));
+      onStartMultiDrag(
+        allSelected.map(c => ({ card: c, imageUrl: getCardImageUrl(c.cardImgFile) })),
+        e,
+      );
+    } else if (onStartDrag) {
+      onStartDrag(card, imageUrl, e);
+    }
+  };
+
+  const handlePointerUp = (card: GameCard) => {
+    if (pointerDownCardRef.current !== card.instanceId) return;
+    pointerDownCardRef.current = null;
+    if (didDragRef?.current) {
+      didDragRef.current = false;
+      return;
+    }
+    setContextCard(null);
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(card.instanceId)) {
+        next.delete(card.instanceId);
+      } else {
+        next.add(card.instanceId);
+      }
+      return next;
+    });
+  };
+
+  // Lasso selection: pointer down on empty space
+  const handleContentPointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    const tag = target.tagName.toLowerCase();
+    if (tag === 'button' || tag === 'img' || tag === 'input' || tag === 'select' || tag === 'label') return;
+    if (target.closest('[data-card-id]')) return;
+    const grid = gridRef.current;
+    if (!grid) return;
+    const rect = grid.getBoundingClientRect();
+    const scrollContainer = scrollContainerRef.current;
+    const scrollTop = scrollContainer?.scrollTop ?? 0;
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top + scrollTop;
+    lassoStart.current = { x, y };
+    isLassoing.current = true;
+    setLassoRect(null);
+    if (!e.shiftKey) {
+      setSelectedIds(new Set());
+    }
+    e.preventDefault();
+  };
+
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      if (!isLassoing.current || !lassoStart.current || !gridRef.current) return;
+      const grid = gridRef.current;
+      const rect = grid.getBoundingClientRect();
+      const scrollContainer = scrollContainerRef.current;
+      const scrollTop = scrollContainer?.scrollTop ?? 0;
+      const currentX = e.clientX - rect.left;
+      const currentY = e.clientY - rect.top + scrollTop;
+      const sx = Math.min(lassoStart.current.x, currentX);
+      const sy = Math.min(lassoStart.current.y, currentY);
+      const sw = Math.abs(currentX - lassoStart.current.x);
+      const sh = Math.abs(currentY - lassoStart.current.y);
+
+      setLassoRect({ x: sx, y: sy, w: sw, h: sh });
+
+      if (sw > 5 || sh > 5) {
+        const hits = new Set<string>();
+        for (const [instanceId, el] of cardElRefs.current) {
+          const cardRect = el.getBoundingClientRect();
+          const cx = cardRect.left - rect.left;
+          const cy = cardRect.top - rect.top + scrollTop;
+          if (rectsOverlap(sx, sy, sw, sh, cx, cy, cardRect.width, cardRect.height)) {
+            hits.add(instanceId);
+          }
+        }
+        setSelectedIds(hits);
+      }
+    };
+
+    const onUp = () => {
+      if (isLassoing.current) {
+        isLassoing.current = false;
+        lassoStart.current = null;
+        setLassoRect(null);
+      }
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  }, []);
+
+  // Multi-card context menu handlers
+  const handleMultiMove = (zone: ZoneId) => {
+    moveCardsBatch(Array.from(selectedIds), zone);
+    setSelectedIds(new Set());
+    setContextCard(null);
+  };
+
+  const handleMultiTopDeck = () => {
+    for (const id of selectedIds) moveCardToTopOfDeck(id);
+    setSelectedIds(new Set());
+    setContextCard(null);
+  };
+
+  const handleMultiBottomDeck = () => {
+    for (const id of selectedIds) moveCardToBottomOfDeck(id);
+    setSelectedIds(new Set());
+    setContextCard(null);
+  };
+
+  const isMultiContext = contextCard && selectedIds.has(contextCard.card.instanceId) && selectedIds.size > 1;
 
   return (
     <motion.div
@@ -196,6 +383,7 @@ export function DeckSearchModal({ onClose, onStartDrag, isDragActive }: DeckSear
     >
       <div
         onClick={(e) => { e.stopPropagation(); setContextCard(null); }}
+        onPointerDown={handleContentPointerDown}
         style={{
           background: '#2a1f12',
           border: '1px solid #6b4e27',
@@ -214,15 +402,43 @@ export function DeckSearchModal({ onClose, onStartDrag, isDragActive }: DeckSear
       >
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h2
-            style={{
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 16,
-              color: '#e8d5a3',
-            }}
-          >
-            Search Deck ({deckCards.length} cards)
-          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <h2
+              style={{
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+                fontSize: 16,
+                color: '#e8d5a3',
+              }}
+            >
+              Search Deck ({deckCards.length} cards)
+            </h2>
+            {selectedIds.size > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{
+                  color: '#c4955a',
+                  fontSize: 12,
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                }}>
+                  {selectedIds.size} selected
+                </span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setSelectedIds(new Set()); }}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid #6b4e27',
+                    borderRadius: 4,
+                    color: '#8b6532',
+                    fontSize: 10,
+                    padding: '2px 6px',
+                    cursor: 'pointer',
+                    fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  }}
+                >
+                  Deselect
+                </button>
+              </div>
+            )}
+          </div>
           <button
             onClick={handleClose}
             style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#8b6532' }}
@@ -282,7 +498,7 @@ export function DeckSearchModal({ onClose, onStartDrag, isDragActive }: DeckSear
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={`Search by ${SEARCH_FIELDS.find(f => f.id === searchField)?.label.toLowerCase()}...`}
+              placeholder={searchField === 'all' ? 'Search all fields...' : `Search by ${SEARCH_FIELDS.find(f => f.id === searchField)?.label.toLowerCase()}...`}
               autoFocus
               style={{
                 width: '100%',
@@ -343,29 +559,35 @@ export function DeckSearchModal({ onClose, onStartDrag, isDragActive }: DeckSear
         </div>
 
         {/* Card grid */}
-        <div style={{ overflow: 'auto', flex: 1 }}>
+        <div ref={scrollContainerRef} style={{ overflow: 'auto', flex: 1 }}>
           {filtered.length === 0 ? (
             <p style={{ color: '#8b6532', fontStyle: 'italic', textAlign: 'center', padding: 20 }}>
               {search ? 'No cards match your search' : 'Deck is empty'}
             </p>
           ) : (
             <div
+              ref={gridRef}
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
                 gap: 8,
+                position: 'relative',
+                userSelect: 'none',
               }}
             >
               {filtered.map((card) => {
                 const imageUrl = getCardImageUrl(card.cardImgFile);
+                const isSelected = selectedIds.has(card.instanceId);
                 return (
                   <div
                     key={card.instanceId}
+                    ref={(el) => registerCardEl(card.instanceId, el)}
+                    data-card-id={card.instanceId}
                     style={{ position: 'relative', cursor: 'grab' }}
                     onContextMenu={(e) => { onCardMouseLeave(); handleCardContextMenu(card, e); }}
-                    onPointerDown={(e) => {
-                      if (e.button === 0 && onStartDrag) { onCardMouseLeave(); onStartDrag(card, imageUrl, e); }
-                    }}
+                    onPointerDown={(e) => { e.stopPropagation(); handlePointerDown(card, imageUrl, e); }}
+                    onPointerUp={() => handlePointerUp(card)}
+                    onClick={(e) => e.stopPropagation()}
                     onMouseEnter={(e) => onCardMouseEnter(card.cardImgFile, card.cardName, e)}
                     onMouseLeave={onCardMouseLeave}
                   >
@@ -377,7 +599,9 @@ export function DeckSearchModal({ onClose, onStartDrag, isDragActive }: DeckSear
                         style={{
                           width: '100%',
                           borderRadius: 4,
-                          border: '1px solid #6b4e27',
+                          border: isSelected ? '2px solid #c4955a' : '1px solid #6b4e27',
+                          boxShadow: isSelected ? '0 0 8px rgba(196,149,90,0.4)' : 'none',
+                          transition: 'border 0.1s ease, box-shadow 0.1s ease',
                         }}
                       />
                     ) : (
@@ -386,7 +610,8 @@ export function DeckSearchModal({ onClose, onStartDrag, isDragActive }: DeckSear
                           width: '100%',
                           aspectRatio: '1/1.4',
                           background: '#1e1610',
-                          border: '1px solid #6b4e27',
+                          border: isSelected ? '2px solid #c4955a' : '1px solid #6b4e27',
+                          boxShadow: isSelected ? '0 0 8px rgba(196,149,90,0.4)' : 'none',
                           borderRadius: 4,
                           display: 'flex',
                           alignItems: 'center',
@@ -395,6 +620,7 @@ export function DeckSearchModal({ onClose, onStartDrag, isDragActive }: DeckSear
                           fontSize: 10,
                           padding: 4,
                           textAlign: 'center',
+                          transition: 'border 0.1s ease, box-shadow 0.1s ease',
                         }}
                       >
                         {card.cardName}
@@ -403,6 +629,24 @@ export function DeckSearchModal({ onClose, onStartDrag, isDragActive }: DeckSear
                   </div>
                 );
               })}
+
+              {/* Lasso selection rectangle */}
+              {lassoRect && lassoRect.w > 5 && lassoRect.h > 5 && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: lassoRect.x,
+                    top: lassoRect.y,
+                    width: lassoRect.w,
+                    height: lassoRect.h,
+                    border: '1px dashed #c4955a',
+                    background: 'rgba(196,149,90,0.12)',
+                    borderRadius: 2,
+                    pointerEvents: 'none',
+                    zIndex: 10,
+                  }}
+                />
+              )}
             </div>
           )}
         </div>
@@ -410,17 +654,30 @@ export function DeckSearchModal({ onClose, onStartDrag, isDragActive }: DeckSear
 
       <ModalCardHoverPreview hover={hover} />
 
-      {/* Context menu for card zone choices */}
+      {/* Context menu */}
       {contextCard && (
-        <CardContextPopup
-          card={contextCard.card}
-          x={contextCard.x}
-          y={contextCard.y}
-          onClose={() => setContextCard(null)}
-          onMove={(zone) => moveCard(contextCard.card.instanceId, zone)}
-          onMoveToTop={() => { moveCardToTopOfDeck(contextCard.card.instanceId); onClose(); }}
-          onMoveToBottom={() => { moveCardToBottomOfDeck(contextCard.card.instanceId); onClose(); }}
-        />
+        isMultiContext ? (
+          <CardContextPopup
+            card={contextCard.card}
+            count={selectedIds.size}
+            x={contextCard.x}
+            y={contextCard.y}
+            onClose={() => setContextCard(null)}
+            onMove={handleMultiMove}
+            onMoveToTop={handleMultiTopDeck}
+            onMoveToBottom={handleMultiBottomDeck}
+          />
+        ) : (
+          <CardContextPopup
+            card={contextCard.card}
+            x={contextCard.x}
+            y={contextCard.y}
+            onClose={() => setContextCard(null)}
+            onMove={(zone) => moveCard(contextCard.card.instanceId, zone)}
+            onMoveToTop={() => { moveCardToTopOfDeck(contextCard.card.instanceId); onClose(); }}
+            onMoveToBottom={() => { moveCardToBottomOfDeck(contextCard.card.instanceId); onClose(); }}
+          />
+        )
       )}
     </motion.div>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useGame } from '../state/GameContext';
 import { ZoneId, ZONE_LABELS, GameCard } from '../types';
@@ -27,6 +27,7 @@ const MOVE_ZONES: { id: ZoneId; label: string }[] = [
 
 function CardContextPopup({
   card,
+  count,
   x,
   y,
   currentZone,
@@ -37,6 +38,7 @@ function CardContextPopup({
   onShuffleIntoDeck,
 }: {
   card: GameCard;
+  count?: number;
   x: number;
   y: number;
   currentZone: ZoneId;
@@ -70,6 +72,7 @@ function CardContextPopup({
   };
 
   const filteredZones = MOVE_ZONES.filter(z => z.id !== currentZone);
+  const label = count && count > 1 ? `Move ${count} cards to...` : 'Move to...';
 
   return (
     <div
@@ -89,9 +92,9 @@ function CardContextPopup({
       }}
     >
       <div style={{ ...itemStyle, color: '#8b6532', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', cursor: 'default', padding: '3px 12px' }}>
-        Move to...
+        {label}
       </div>
-      {filteredZones.map(({ id, label }) => (
+      {filteredZones.map(({ id, label: zoneLabel }) => (
         <button
           key={id}
           style={itemStyle}
@@ -99,7 +102,7 @@ function CardContextPopup({
           onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(196,149,90,0.15)'; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
         >
-          {label}
+          {zoneLabel}
         </button>
       ))}
       <div style={{ height: 1, background: '#6b4e27', margin: '4px 8px', opacity: 0.5 }} />
@@ -131,6 +134,14 @@ function CardContextPopup({
   );
 }
 
+// Check if two axis-aligned rectangles overlap
+function rectsOverlap(
+  ax: number, ay: number, aw: number, ah: number,
+  bx: number, by: number, bw: number, bh: number,
+): boolean {
+  return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+}
+
 interface ZoneBrowseModalProps {
   zoneId: ZoneId;
   onClose: () => void;
@@ -147,14 +158,28 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
   const [contextCard, setContextCard] = useState<{ card: GameCard; x: number; y: number } | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  // Clear selection after a drag completes (isDragActive goes from true -> false)
+  // Refs for card DOM elements (for lasso hit-testing)
+  const cardElRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const registerCardEl = useCallback((instanceId: string, el: HTMLDivElement | null) => {
+    if (el) cardElRefs.current.set(instanceId, el);
+    else cardElRefs.current.delete(instanceId);
+  }, []);
+
+  // Lasso selection state
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [lassoRect, setLassoRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const lassoStart = useRef<{ x: number; y: number } | null>(null);
+  const isLassoing = useRef(false);
+
+  // Close modal after a successful drag-to-canvas completes (isDragActive goes from true -> false)
   const prevDragActive = useRef(false);
   useEffect(() => {
     if (prevDragActive.current && !isDragActive) {
       setSelectedIds(new Set());
+      onClose();
     }
     prevDragActive.current = !!isDragActive;
-  }, [isDragActive]);
+  }, [isDragActive, onClose]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -176,8 +201,34 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
     setContextCard({ card, x: e.clientX, y: e.clientY });
   };
 
-  const handleCardClick = (card: GameCard) => {
-    // Skip toggle if a drag just happened
+  // Track pointer down card to distinguish click from drag on pointer up
+  const pointerDownCardRef = useRef<string | null>(null);
+
+  const handlePointerDown = (card: GameCard, imageUrl: string, e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    onCardMouseLeave();
+    pointerDownCardRef.current = card.instanceId;
+
+    // Reset didDragRef so we can detect if a drag fires before pointerUp
+    if (didDragRef) didDragRef.current = false;
+
+    const isSelected = selectedIds.has(card.instanceId);
+    if (isSelected && selectedIds.size > 1 && onStartMultiDrag) {
+      // Multi-card drag: gather all selected cards
+      const allSelected = cards.filter(c => selectedIds.has(c.instanceId));
+      onStartMultiDrag(
+        allSelected.map(c => ({ card: c, imageUrl: getCardImageUrl(c.cardImgFile) })),
+        e,
+      );
+    } else if (onStartDrag) {
+      onStartDrag(card, imageUrl, e);
+    }
+  };
+
+  const handlePointerUp = (card: GameCard) => {
+    // Only toggle selection if this was a click (no drag occurred) on the same card
+    if (pointerDownCardRef.current !== card.instanceId) return;
+    pointerDownCardRef.current = null;
     if (didDragRef?.current) {
       didDragRef.current = false;
       return;
@@ -194,22 +245,76 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
     });
   };
 
-  const handlePointerDown = (card: GameCard, imageUrl: string, e: React.PointerEvent) => {
+  // Lasso selection: pointer down on empty space in the content area starts lasso
+  const contentRef = useRef<HTMLDivElement>(null);
+  const handleContentPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
-    onCardMouseLeave();
-
-    const isSelected = selectedIds.has(card.instanceId);
-    if (isSelected && selectedIds.size > 1 && onStartMultiDrag) {
-      // Multi-card drag: gather all selected cards
-      const allSelected = cards.filter(c => selectedIds.has(c.instanceId));
-      onStartMultiDrag(
-        allSelected.map(c => ({ card: c, imageUrl: getCardImageUrl(c.cardImgFile) })),
-        e,
-      );
-    } else if (onStartDrag) {
-      onStartDrag(card, imageUrl, e);
+    // Block lasso on interactive elements (buttons, card images, inputs)
+    const target = e.target as HTMLElement;
+    const tag = target.tagName.toLowerCase();
+    if (tag === 'button' || tag === 'img' || tag === 'input') return;
+    // Block lasso if clicking inside a card element (has data-card-id)
+    if (target.closest('[data-card-id]')) return;
+    const grid = gridRef.current;
+    if (!grid) return;
+    const rect = grid.getBoundingClientRect();
+    const x = e.clientX - rect.left + grid.scrollLeft;
+    const y = e.clientY - rect.top + grid.scrollTop;
+    lassoStart.current = { x, y };
+    isLassoing.current = true;
+    setLassoRect(null);
+    // Clear selection unless shift is held
+    if (!e.shiftKey) {
+      setSelectedIds(new Set());
     }
+    e.preventDefault();
   };
+
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      if (!isLassoing.current || !lassoStart.current || !gridRef.current) return;
+      const grid = gridRef.current;
+      const rect = grid.getBoundingClientRect();
+      const currentX = e.clientX - rect.left + grid.scrollLeft;
+      const currentY = e.clientY - rect.top + grid.scrollTop;
+      const sx = Math.min(lassoStart.current.x, currentX);
+      const sy = Math.min(lassoStart.current.y, currentY);
+      const sw = Math.abs(currentX - lassoStart.current.x);
+      const sh = Math.abs(currentY - lassoStart.current.y);
+
+      setLassoRect({ x: sx, y: sy, w: sw, h: sh });
+
+      // Hit-test cards against lasso rect
+      if (sw > 5 || sh > 5) {
+        const hits = new Set<string>();
+        for (const [instanceId, el] of cardElRefs.current) {
+          const cardRect = el.getBoundingClientRect();
+          // Convert card rect to grid-relative coordinates
+          const cx = cardRect.left - rect.left + grid.scrollLeft;
+          const cy = cardRect.top - rect.top + grid.scrollTop;
+          if (rectsOverlap(sx, sy, sw, sh, cx, cy, cardRect.width, cardRect.height)) {
+            hits.add(instanceId);
+          }
+        }
+        setSelectedIds(hits);
+      }
+    };
+
+    const onUp = () => {
+      if (isLassoing.current) {
+        isLassoing.current = false;
+        lassoStart.current = null;
+        setLassoRect(null);
+      }
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  }, []);
 
   // Multi-card context menu handlers
   const handleMultiMove = (zone: ZoneId) => {
@@ -258,7 +363,9 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
       }}
     >
       <div
+        ref={contentRef}
         onClick={(e) => { e.stopPropagation(); setContextCard(null); }}
+        onPointerDown={handleContentPointerDown}
         style={{
           background: '#2a1f12',
           border: '1px solid #6b4e27',
@@ -324,10 +431,13 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
           <p style={{ color: '#8b6532', fontStyle: 'italic' }}>Empty</p>
         ) : (
           <div
+            ref={gridRef}
             style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(5, 1fr)',
               gap: 10,
+              position: 'relative',
+              userSelect: 'none',
             }}
           >
             {cards.map((card) => {
@@ -336,9 +446,12 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
               return (
                 <div
                   key={card.instanceId}
+                  ref={(el) => registerCardEl(card.instanceId, el)}
+                  data-card-id={card.instanceId}
                   style={{ position: 'relative', cursor: 'grab' }}
-                  onPointerDown={(e) => handlePointerDown(card, imageUrl, e)}
-                  onClick={(e) => { e.stopPropagation(); handleCardClick(card); }}
+                  onPointerDown={(e) => { e.stopPropagation(); handlePointerDown(card, imageUrl, e); }}
+                  onPointerUp={() => handlePointerUp(card)}
+                  onClick={(e) => e.stopPropagation()}
                   onContextMenu={(e) => handleCardContextMenu(card, e)}
                   onMouseEnter={(e) => { if (!contextCard) onCardMouseEnter(card.cardImgFile, card.cardName, e); }}
                   onMouseLeave={onCardMouseLeave}
@@ -379,6 +492,24 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
                 </div>
               );
             })}
+
+            {/* Lasso selection rectangle */}
+            {lassoRect && lassoRect.w > 5 && lassoRect.h > 5 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  left: lassoRect.x,
+                  top: lassoRect.y,
+                  width: lassoRect.w,
+                  height: lassoRect.h,
+                  border: '1px dashed #c4955a',
+                  background: 'rgba(196,149,90,0.12)',
+                  borderRadius: 2,
+                  pointerEvents: 'none',
+                  zIndex: 10,
+                }}
+              />
+            )}
           </div>
         )}
       </div>
@@ -387,6 +518,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
         isMultiContext ? (
           <CardContextPopup
             card={contextCard.card}
+            count={selectedIds.size}
             x={contextCard.x}
             y={contextCard.y}
             currentZone={zoneId}

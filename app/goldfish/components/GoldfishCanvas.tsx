@@ -567,6 +567,15 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
   const handleCardDragMove = useCallback(
     (e: Konva.KonvaEventObject<DragEvent>) => {
       const node = e.target;
+
+      // Clamp card position to stage bounds
+      const clampedX = Math.max(-cardWidth / 2, Math.min(node.x(), width - cardWidth / 2));
+      const clampedY = Math.max(-cardHeight / 2, Math.min(node.y(), height - cardHeight / 2));
+      if (clampedX !== node.x() || clampedY !== node.y()) {
+        node.x(clampedX);
+        node.y(clampedY);
+      }
+
       const x = node.x();
       const y = node.y();
       const centerX = x + cardWidth / 2;
@@ -593,7 +602,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
         dragGhostLayerRef.current?.batchDraw();
       }
     },
-    [findZoneAtPosition, cardWidth, cardHeight]
+    [findZoneAtPosition, cardWidth, cardHeight, width, height]
   );
 
   const handleCardDragEnd = useCallback(
@@ -1688,6 +1697,8 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
         <DeckSearchModal
           onClose={() => setShowDeckSearch(false)}
           onStartDrag={modalStartDrag}
+          onStartMultiDrag={modalStartMultiDrag}
+          didDragRef={modalDidDragRef}
           isDragActive={modalDrag.isDragging}
         />
       )}
