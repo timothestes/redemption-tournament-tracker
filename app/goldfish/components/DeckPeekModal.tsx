@@ -2,9 +2,9 @@
 
 import { motion } from 'framer-motion';
 import { useGame } from '../state/GameContext';
-import { GameCard, ZoneId, ZONE_LABELS } from '../types';
-import { X } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { GameCard } from '../types';
+import { X, ArrowUp, ArrowDown, Shuffle } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { useModalCardHover, ModalCardHoverPreview } from './ModalCardHoverPreview';
 
 const BLOB_BASE_URL = process.env.NEXT_PUBLIC_BLOB_BASE_URL || '';
@@ -18,6 +18,45 @@ function getCardImageUrl(imgFile: string): string {
   return `${BLOB_BASE_URL}/card-images/${sanitizeImgFile(imgFile)}.jpg`;
 }
 
+function PeekActionButton({ icon, label, onClick, style }: {
+  icon?: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 5,
+        padding: '5px 12px',
+        background: '#2a1f12',
+        border: '1px solid #6b4e27',
+        borderRadius: 5,
+        color: '#e8d5a3',
+        fontSize: 12,
+        fontFamily: 'var(--font-cinzel), Georgia, serif',
+        cursor: 'pointer',
+        transition: 'background 0.15s, border-color 0.15s',
+        ...style,
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = '#3d2e1a';
+        e.currentTarget.style.borderColor = '#c4955a';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = '#2a1f12';
+        e.currentTarget.style.borderColor = '#6b4e27';
+      }}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
 interface DeckPeekModalProps {
   count: number;
   onClose: () => void;
@@ -26,7 +65,7 @@ interface DeckPeekModalProps {
 }
 
 export function DeckPeekModal({ count, onClose, onStartDrag, isDragActive }: DeckPeekModalProps) {
-  const { state } = useGame();
+  const { state, moveCardsBatch, shuffleDeck } = useGame();
   const { hover, onCardMouseEnter, onCardMouseLeave } = useModalCardHover();
 
   // Snapshot the top N card instance IDs on mount so they don't shift as cards are moved
@@ -39,13 +78,29 @@ export function DeckPeekModal({ count, onClose, onStartDrag, isDragActive }: Dec
     .map(id => state.zones.deck.find(c => c.instanceId === id))
     .filter((c): c is GameCard => !!c);
 
+  const remainingIds = peekedCards.map(c => c.instanceId);
+  const hasRemaining = remainingIds.length > 0;
+
+  const handleCloseAction = (action: 'top' | 'bottom' | 'shuffle') => {
+    if (hasRemaining) {
+      if (action === 'bottom') {
+        // Remove from current positions and push to bottom of deck
+        moveCardsBatch(remainingIds, 'deck');
+      } else if (action === 'shuffle') {
+        shuffleDeck();
+      }
+      // 'top' → cards are already on top, do nothing
+    }
+    onClose();
+  };
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') handleCloseAction('top');
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [onClose]);
+  }, [hasRemaining, remainingIds]);
 
   return (
     <div
@@ -58,7 +113,7 @@ export function DeckPeekModal({ count, onClose, onStartDrag, isDragActive }: Dec
         alignItems: 'center',
         justifyContent: 'center',
       }}
-      onClick={onClose}
+      onClick={() => handleCloseAction('top')}
       onContextMenu={(e) => e.preventDefault()}
     >
       <motion.div
@@ -91,7 +146,7 @@ export function DeckPeekModal({ count, onClose, onStartDrag, isDragActive }: Dec
             Top {count} of Deck
           </h2>
           <button
-            onClick={onClose}
+            onClick={() => handleCloseAction('top')}
             style={{ background: 'none', border: 'none', color: '#c9b99a', cursor: 'pointer' }}
           >
             <X size={18} />
@@ -187,6 +242,51 @@ export function DeckPeekModal({ count, onClose, onStartDrag, isDragActive }: Dec
             ))}
           </div>
         )}
+
+        {/* Action footer — choose where remaining peeked cards go */}
+        <div style={{
+          marginTop: 16,
+          paddingTop: 12,
+          borderTop: '1px solid #3d2e1a',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          flexWrap: 'wrap',
+        }}>
+          {hasRemaining ? (
+            <>
+              <span style={{
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+                color: '#6b4e27',
+                fontSize: 11,
+                marginRight: 4,
+              }}>
+                Put back:
+              </span>
+              <PeekActionButton
+                icon={<ArrowUp size={13} />}
+                label="Top of Deck"
+                onClick={() => handleCloseAction('top')}
+              />
+              <PeekActionButton
+                icon={<ArrowDown size={13} />}
+                label="Bottom of Deck"
+                onClick={() => handleCloseAction('bottom')}
+              />
+              <PeekActionButton
+                icon={<Shuffle size={13} />}
+                label="Shuffle In"
+                onClick={() => handleCloseAction('shuffle')}
+              />
+            </>
+          ) : (
+            <PeekActionButton
+              label="Close"
+              onClick={onClose}
+              style={{ marginLeft: 'auto' }}
+            />
+          )}
+        </div>
       </motion.div>
 
       <ModalCardHoverPreview hover={hover} />

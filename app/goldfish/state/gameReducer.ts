@@ -86,11 +86,11 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const result = findAndRemoveCard(zones, cardInstanceId);
       if (!result) return state;
 
-      result.card.zone = toZone;
-      // Flip face-up when moving out of deck
-      if (toZone !== 'deck') {
+      // Flip face-up only when the card is actually leaving the deck
+      if (result.fromZone === 'deck' && toZone !== 'deck') {
         result.card.isFlipped = false;
       }
+      result.card.zone = toZone;
       // Store free-form position for territory and land-of-bondage
       const FREE_FORM_ZONES: ZoneId[] = ['territory', 'land-of-bondage'];
       if (FREE_FORM_ZONES.includes(toZone) && posX !== undefined && posY !== undefined) {
@@ -338,10 +338,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       for (const instanceId of cardInstanceIds) {
         const result = findAndRemoveCard(zones, instanceId);
         if (!result) continue;
-        result.card.zone = toZone;
-        if (toZone !== 'deck') {
+        if (result.fromZone === 'deck' && toZone !== 'deck') {
           result.card.isFlipped = false;
         }
+        result.card.zone = toZone;
         const pos = positions?.[instanceId];
         result.card.posX = pos?.posX;
         result.card.posY = pos?.posY;
