@@ -460,8 +460,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
       {/* Header with stats */}
       <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-lg">
         <div className="px-6 py-4">
-          <div className="flex items-center justify-between mb-3">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{deck.name}</h1>
+          <div className="flex items-center justify-end mb-3">
             <div className="flex items-center gap-4 text-sm">
               {/* View Mode Toggle */}
               <button
@@ -607,22 +606,16 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
               <span className="font-bold text-gray-900 dark:text-white">{totalCards}</span>
             </div>
             
-            <div className="flex items-center gap-2">
-              <span className="text-gray-500 dark:text-gray-400">Main Deck:</span>
-              <span className="font-semibold text-gray-900 dark:text-white">{mainDeckCount}</span>
-            </div>
-
             {reserveCount > 0 && (
               <>
-                <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
                 <div className="flex items-center gap-2">
                   <span className="text-gray-500 dark:text-gray-400">Reserve:</span>
                   <span className="font-semibold text-gray-900 dark:text-white">{reserveCount}</span>
                 </div>
+                <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
               </>
             )}
 
-            <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
             <div className="flex items-center gap-2">
               <span className="text-gray-500 dark:text-gray-400">Unique Cards:</span>
               <span className="font-semibold text-gray-900 dark:text-white">{uniqueCards}</span>

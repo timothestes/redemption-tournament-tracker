@@ -1185,7 +1185,7 @@ export default function DeckBuilderPanel({
       <div className="flex-shrink-0 flex items-center border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-x-auto scrollbar-hide">
         <button
           onClick={() => handleTabChange("main")}
-          className={`flex-shrink-0 px-3 py-3 text-sm font-medium transition-colors whitespace-nowrap ${
+          className={`flex-1 px-3 py-3 text-sm font-medium transition-colors whitespace-nowrap text-center ${
             activeTab === "main"
               ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
@@ -1195,7 +1195,7 @@ export default function DeckBuilderPanel({
         </button>
         <button
           onClick={() => handleTabChange("reserve")}
-          className={`flex-shrink-0 px-3 py-3 text-sm font-medium transition-colors whitespace-nowrap ${
+          className={`flex-1 px-3 py-3 text-sm font-medium transition-colors whitespace-nowrap text-center ${
             activeTab === "reserve"
               ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
@@ -1207,7 +1207,7 @@ export default function DeckBuilderPanel({
           onClick={() => handleTabChange("info")}
           onMouseEnter={() => setShowValidationTooltip(true)}
           onMouseLeave={() => setShowValidationTooltip(false)}
-          className={`relative flex-shrink-0 px-3 py-3 text-sm font-medium transition-colors whitespace-nowrap ${
+          className={`relative flex-1 px-3 py-3 text-sm font-medium transition-colors whitespace-nowrap text-center ${
             activeTab === "info"
               ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
@@ -1279,7 +1279,7 @@ export default function DeckBuilderPanel({
         {/* Details Tab (Cover Cards + Description) */}
         <button
           onClick={() => handleTabChange("cover")}
-          className={`flex-shrink-0 px-3 py-3 text-sm font-medium transition-colors whitespace-nowrap ${
+          className={`flex-1 px-3 py-3 text-sm font-medium transition-colors whitespace-nowrap text-center ${
             activeTab === "cover"
               ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
