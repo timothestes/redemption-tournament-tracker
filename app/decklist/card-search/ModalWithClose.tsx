@@ -63,10 +63,12 @@ export default function ModalWithClose({
   const { getImageUrl } = useCardImageUrl();
   const [showMenu, setShowMenu] = React.useState(false);
 
-  // Touch/swipe state
+  // Swipe/carousel state
   const touchStartRef = React.useRef<{ x: number; y: number; time: number } | null>(null);
+  const isSwipingRef = React.useRef(false);
   const [swipeOffset, setSwipeOffset] = React.useState(0);
-  const [isSwipeTransitioning, setIsSwipeTransitioning] = React.useState(false);
+  const [slideAnim, setSlideAnim] = React.useState<{ direction: 'left' | 'right'; active: boolean } | null>(null);
+  const containerRef = React.useRef<HTMLDivElement>(null);
 
   // Close menu when clicking outside
   React.useEffect(() => {
@@ -75,6 +77,15 @@ export default function ModalWithClose({
     document.addEventListener('click', handleClick);
     return () => document.removeEventListener('click', handleClick);
   }, [showMenu]);
+
+  // Reset slide animation when card changes
+  React.useEffect(() => {
+    if (slideAnim?.active) {
+      // Card has changed, snap to entrance position
+      const timer = setTimeout(() => setSlideAnim(null), 20);
+      return () => clearTimeout(timer);
+    }
+  }, [modalCard?.dataLine]);
 
   React.useEffect(() => {
     function handleKeyDown(e) {
@@ -99,15 +110,12 @@ export default function ModalWithClose({
 
         setModalCard(visibleCards[nextIndex]);
       } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-        // Only handle up/down if we have deck management functions
         if (!onAddCard || !onRemoveCard) return;
 
         if (e.key === "ArrowUp") {
-          // Up arrow adds to the active tab (main or reserve)
           const isReserve = activeDeckTab === "reserve";
           onAddCard(modalCard, isReserve);
         } else {
-          // Down arrow removes from the active tab
           const isReserve = activeDeckTab === "reserve";
           onRemoveCard(modalCard.name, modalCard.set, isReserve);
         }
@@ -118,7 +126,38 @@ export default function ModalWithClose({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [setModalCard, modalCard, visibleCards, showMenu, onAddCard, onRemoveCard, activeDeckTab]);
 
-  // Swipe navigation helpers
+  // Get adjacent card for preview during swipe
+  const getAdjacentCard = React.useCallback((direction: 'left' | 'right') => {
+    if (!visibleCards || visibleCards.length <= 1) return null;
+    const idx = visibleCards.findIndex(card => card.dataLine === modalCard.dataLine);
+    if (idx === -1) return null;
+    if (direction === 'left') {
+      return visibleCards[idx === 0 ? visibleCards.length - 1 : idx - 1];
+    }
+    return visibleCards[idx === visibleCards.length - 1 ? 0 : idx + 1];
+  }, [visibleCards, modalCard]);
+
+  // Navigate with slide animation
+  const navigateWithSlide = React.useCallback((direction: 'left' | 'right') => {
+    if (!visibleCards || visibleCards.length <= 1) return;
+    const currentIndex = visibleCards.findIndex(card => card.dataLine === modalCard.dataLine);
+    if (currentIndex === -1) return;
+    let nextIndex;
+    if (direction === 'left') {
+      nextIndex = currentIndex === 0 ? visibleCards.length - 1 : currentIndex - 1;
+    } else {
+      nextIndex = currentIndex === visibleCards.length - 1 ? 0 : currentIndex + 1;
+    }
+    // Set the slide animation direction, then change the card
+    setSlideAnim({ direction, active: true });
+    setSwipeOffset(0);
+    // Small delay so the CSS transition plays before the card changes
+    requestAnimationFrame(() => {
+      setModalCard(visibleCards[nextIndex]);
+    });
+  }, [visibleCards, modalCard, setModalCard]);
+
+  // Swipe navigation (no animation, used by desktop)
   const navigateToCard = React.useCallback((direction: 'left' | 'right') => {
     if (!visibleCards || visibleCards.length <= 1) return;
     const currentIndex = visibleCards.findIndex(card => card.dataLine === modalCard.dataLine);
@@ -132,44 +171,57 @@ export default function ModalWithClose({
     setModalCard(visibleCards[nextIndex]);
   }, [visibleCards, modalCard, setModalCard]);
 
-  // Touch handlers for swipe navigation
+  // Touch handlers
   const handleTouchStart = React.useCallback((e: React.TouchEvent) => {
     touchStartRef.current = {
       x: e.touches[0].clientX,
       y: e.touches[0].clientY,
       time: Date.now(),
     };
+    isSwipingRef.current = false;
     setSwipeOffset(0);
-    setIsSwipeTransitioning(false);
   }, []);
 
   const handleTouchMove = React.useCallback((e: React.TouchEvent) => {
     if (!touchStartRef.current || !visibleCards || visibleCards.length <= 1) return;
     const deltaX = e.touches[0].clientX - touchStartRef.current.x;
     const deltaY = e.touches[0].clientY - touchStartRef.current.y;
-    // Only track horizontal swipes (ignore vertical scrolling)
-    if (Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+    // Lock into horizontal swipe if horizontal movement dominates
+    if (!isSwipingRef.current && Math.abs(deltaX) > 10) {
+      if (Math.abs(deltaX) > Math.abs(deltaY) * 1.2) {
+        isSwipingRef.current = true;
+      }
+    }
+    if (isSwipingRef.current) {
+      e.preventDefault();
       setSwipeOffset(deltaX);
     }
   }, [visibleCards]);
 
   const handleTouchEnd = React.useCallback(() => {
     if (!touchStartRef.current) return;
-    const swipeThreshold = 50;
-    const timeThreshold = 300;
+    const containerWidth = containerRef.current?.offsetWidth || 300;
+    const swipeThreshold = containerWidth * 0.2; // 20% of container width
+    const velocityThreshold = 0.3; // px/ms
     const elapsed = Date.now() - touchStartRef.current.time;
+    const velocity = Math.abs(swipeOffset) / Math.max(elapsed, 1);
 
-    if (Math.abs(swipeOffset) > swipeThreshold || (Math.abs(swipeOffset) > 30 && elapsed < timeThreshold)) {
+    const shouldNavigate = Math.abs(swipeOffset) > swipeThreshold || velocity > velocityThreshold;
+
+    if (shouldNavigate && isSwipingRef.current) {
       if (swipeOffset > 0) {
-        navigateToCard('left'); // Swipe right = go to previous
+        navigateWithSlide('left');
       } else {
-        navigateToCard('right'); // Swipe left = go to next
+        navigateWithSlide('right');
       }
+    } else {
+      // Snap back
+      setSwipeOffset(0);
     }
 
     touchStartRef.current = null;
-    setSwipeOffset(0);
-  }, [swipeOffset, navigateToCard]);
+    isSwipingRef.current = false;
+  }, [swipeOffset, navigateWithSlide]);
 
   if (!modalCard) return null;
 
@@ -225,49 +277,70 @@ export default function ModalWithClose({
           </button>
         </div>
 
-        {/* Mobile Card Image - swipeable, fills available space */}
+        {/* Mobile Card Image - carousel swipe */}
         <div
-          className="flex-1 flex items-center justify-center overflow-hidden relative bg-black/5 dark:bg-black/20"
+          ref={containerRef}
+          className="flex-1 overflow-hidden relative bg-black/5 dark:bg-black/20 touch-pan-y"
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         >
-          {/* Swipe direction indicators */}
-          {hasNavigation && swipeOffset !== 0 && (
-            <>
-              {swipeOffset > 30 && (
-                <div className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/80 dark:bg-gray-800/80 rounded-full p-2">
-                  <svg className="w-5 h-5 text-gray-700 dark:text-gray-200" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                </div>
-              )}
-              {swipeOffset < -30 && (
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/80 dark:bg-gray-800/80 rounded-full p-2">
-                  <svg className="w-5 h-5 text-gray-700 dark:text-gray-200" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                  </svg>
-                </div>
-              )}
-            </>
-          )}
-          <img
-            src={getImageUrl(modalCard.imgFile)}
-            alt={modalCard.name}
-            className="max-w-full max-h-full object-contain select-none"
+          {/* Carousel track - holds prev, current, next cards side by side */}
+          <div
+            className="flex h-full items-center"
             style={{
-              transform: swipeOffset ? `translateX(${swipeOffset * 0.4}px)` : undefined,
-              transition: swipeOffset ? 'none' : 'transform 0.2s ease-out',
+              transform: `translateX(calc(-100% + ${swipeOffset}px))`,
+              transition: swipeOffset !== 0 ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+              willChange: 'transform',
             }}
-            draggable={false}
-          />
+          >
+            {/* Previous card */}
+            <div className="w-full h-full flex-shrink-0 flex items-center justify-center p-4">
+              {hasNavigation && (() => {
+                const prev = getAdjacentCard('left');
+                return prev ? (
+                  <img
+                    src={getImageUrl(prev.imgFile)}
+                    alt={prev.name}
+                    className="max-w-full max-h-full object-contain select-none rounded shadow-lg"
+                    draggable={false}
+                  />
+                ) : null;
+              })()}
+            </div>
+
+            {/* Current card */}
+            <div className="w-full h-full flex-shrink-0 flex items-center justify-center p-4">
+              <img
+                src={getImageUrl(modalCard.imgFile)}
+                alt={modalCard.name}
+                className="max-w-full max-h-full object-contain select-none rounded shadow-lg"
+                draggable={false}
+              />
+            </div>
+
+            {/* Next card */}
+            <div className="w-full h-full flex-shrink-0 flex items-center justify-center p-4">
+              {hasNavigation && (() => {
+                const next = getAdjacentCard('right');
+                return next ? (
+                  <img
+                    src={getImageUrl(next.imgFile)}
+                    alt={next.name}
+                    className="max-w-full max-h-full object-contain select-none rounded shadow-lg"
+                    draggable={false}
+                  />
+                ) : null;
+              })()}
+            </div>
+          </div>
         </div>
 
         {/* Mobile Footer - compact action buttons */}
         <div className="flex-shrink-0 px-3 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
           {hasNavigation && (
-            <div className="text-[10px] text-gray-400 text-center mb-1.5">
-              Swipe left/right to navigate
+            <div className="text-[10px] text-gray-400 text-center mb-1">
+              Swipe to browse cards
             </div>
           )}
           <div className="flex items-center gap-2">
