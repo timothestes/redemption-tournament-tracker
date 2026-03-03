@@ -1402,11 +1402,14 @@ export default function DeckBuilderPanel({
               })
             ) : (
               <div className="text-center py-12">
+                <svg className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
                 <p className="text-gray-500 dark:text-gray-400 text-sm">
                   No cards in main deck yet
                 </p>
                 <p className="text-gray-400 dark:text-gray-500 text-xs mt-2 mb-4">
-                  Click cards from search to add them
+                  Search for cards and add them to your deck
                 </p>
                 <button
                   onClick={() => {
@@ -1494,7 +1497,7 @@ export default function DeckBuilderPanel({
                   No cards in reserve yet
                 </p>
                 <p className="text-gray-400 dark:text-gray-500 text-xs mt-2">
-                  Use "Add to Deck" button on cards and select "Add to Reserve"
+                  Use the <span className="font-medium">...</span> menu on cards to add to reserve
                 </p>
               </div>
             )}

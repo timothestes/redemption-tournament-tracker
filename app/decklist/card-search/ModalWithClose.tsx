@@ -66,9 +66,13 @@ export default function ModalWithClose({
   // Swipe/carousel state
   const touchStartRef = React.useRef<{ x: number; y: number; time: number } | null>(null);
   const isSwipingRef = React.useRef(false);
+  const isAnimatingRef = React.useRef(false);
   const [swipeOffset, setSwipeOffset] = React.useState(0);
-  const [slideAnim, setSlideAnim] = React.useState<{ direction: 'left' | 'right'; active: boolean } | null>(null);
+  // animatingTo: target panel position during slide-out animation (0 = prev, -200% = next)
+  const [animatingTo, setAnimatingTo] = React.useState<string | null>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
+  // Pending card to set after animation completes
+  const pendingCardRef = React.useRef<any>(null);
 
   // Close menu when clicking outside
   React.useEffect(() => {
@@ -77,15 +81,6 @@ export default function ModalWithClose({
     document.addEventListener('click', handleClick);
     return () => document.removeEventListener('click', handleClick);
   }, [showMenu]);
-
-  // Reset slide animation when card changes
-  React.useEffect(() => {
-    if (slideAnim?.active) {
-      // Card has changed, snap to entrance position
-      const timer = setTimeout(() => setSlideAnim(null), 20);
-      return () => clearTimeout(timer);
-    }
-  }, [modalCard?.dataLine]);
 
   React.useEffect(() => {
     function handleKeyDown(e) {
@@ -137,9 +132,20 @@ export default function ModalWithClose({
     return visibleCards[idx === visibleCards.length - 1 ? 0 : idx + 1];
   }, [visibleCards, modalCard]);
 
-  // Navigate with slide animation
+  // Called when the CSS slide-out animation finishes
+  const handleTransitionEnd = React.useCallback(() => {
+    if (!pendingCardRef.current || !isAnimatingRef.current) return;
+    // Swap the card and instantly reset position (no transition)
+    isAnimatingRef.current = false;
+    setAnimatingTo(null);
+    setSwipeOffset(0);
+    setModalCard(pendingCardRef.current);
+    pendingCardRef.current = null;
+  }, [setModalCard]);
+
+  // Navigate: animate the track to the adjacent card, then swap on transition end
   const navigateWithSlide = React.useCallback((direction: 'left' | 'right') => {
-    if (!visibleCards || visibleCards.length <= 1) return;
+    if (!visibleCards || visibleCards.length <= 1 || isAnimatingRef.current) return;
     const currentIndex = visibleCards.findIndex(card => card.dataLine === modalCard.dataLine);
     if (currentIndex === -1) return;
     let nextIndex;
@@ -148,14 +154,13 @@ export default function ModalWithClose({
     } else {
       nextIndex = currentIndex === visibleCards.length - 1 ? 0 : currentIndex + 1;
     }
-    // Set the slide animation direction, then change the card
-    setSlideAnim({ direction, active: true });
+    // Store the card to switch to after animation
+    pendingCardRef.current = visibleCards[nextIndex];
+    isAnimatingRef.current = true;
+    // Animate track: show prev (0%) or next (-200%)
     setSwipeOffset(0);
-    // Small delay so the CSS transition plays before the card changes
-    requestAnimationFrame(() => {
-      setModalCard(visibleCards[nextIndex]);
-    });
-  }, [visibleCards, modalCard, setModalCard]);
+    setAnimatingTo(direction === 'left' ? '0%' : '-200%');
+  }, [visibleCards, modalCard]);
 
   // Swipe navigation (no animation, used by desktop)
   const navigateToCard = React.useCallback((direction: 'left' | 'right') => {
@@ -173,6 +178,7 @@ export default function ModalWithClose({
 
   // Touch handlers
   const handleTouchStart = React.useCallback((e: React.TouchEvent) => {
+    if (isAnimatingRef.current) return; // Don't start new swipe during animation
     touchStartRef.current = {
       x: e.touches[0].clientX,
       y: e.touches[0].clientY,
@@ -180,10 +186,11 @@ export default function ModalWithClose({
     };
     isSwipingRef.current = false;
     setSwipeOffset(0);
+    setAnimatingTo(null);
   }, []);
 
   const handleTouchMove = React.useCallback((e: React.TouchEvent) => {
-    if (!touchStartRef.current || !visibleCards || visibleCards.length <= 1) return;
+    if (!touchStartRef.current || !visibleCards || visibleCards.length <= 1 || isAnimatingRef.current) return;
     const deltaX = e.touches[0].clientX - touchStartRef.current.x;
     const deltaY = e.touches[0].clientY - touchStartRef.current.y;
     // Lock into horizontal swipe if horizontal movement dominates
@@ -199,10 +206,10 @@ export default function ModalWithClose({
   }, [visibleCards]);
 
   const handleTouchEnd = React.useCallback(() => {
-    if (!touchStartRef.current) return;
+    if (!touchStartRef.current || isAnimatingRef.current) return;
     const containerWidth = containerRef.current?.offsetWidth || 300;
-    const swipeThreshold = containerWidth * 0.2; // 20% of container width
-    const velocityThreshold = 0.3; // px/ms
+    const swipeThreshold = containerWidth * 0.2;
+    const velocityThreshold = 0.3;
     const elapsed = Date.now() - touchStartRef.current.time;
     const velocity = Math.abs(swipeOffset) / Math.max(elapsed, 1);
 
@@ -210,12 +217,12 @@ export default function ModalWithClose({
 
     if (shouldNavigate && isSwipingRef.current) {
       if (swipeOffset > 0) {
-        navigateWithSlide('left');
+        navigateWithSlide('left');  // Swiped right → go to previous
       } else {
-        navigateWithSlide('right');
+        navigateWithSlide('right'); // Swiped left → go to next
       }
     } else {
-      // Snap back
+      // Snap back to center
       setSwipeOffset(0);
     }
 
@@ -289,10 +296,18 @@ export default function ModalWithClose({
           <div
             className="flex h-full items-center"
             style={{
-              transform: `translateX(calc(-100% + ${swipeOffset}px))`,
-              transition: swipeOffset !== 0 ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+              // During drag: follow finger (no transition). During animation: slide to target. At rest: centered.
+              transform: animatingTo
+                ? `translateX(${animatingTo})`
+                : `translateX(calc(-100% + ${swipeOffset}px))`,
+              transition: animatingTo
+                ? 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+                : swipeOffset !== 0
+                  ? 'none'
+                  : 'transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
               willChange: 'transform',
             }}
+            onTransitionEnd={handleTransitionEnd}
           >
             {/* Previous card */}
             <div className="w-full h-full flex-shrink-0 flex items-center justify-center p-4">
