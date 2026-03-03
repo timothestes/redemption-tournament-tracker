@@ -278,8 +278,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
   }, [state.zones, hoverCard?.card.instanceId]);
   const [showDeckSearch, setShowDeckSearch] = useState(false);
   const [deckMenu, setDeckMenu] = useState<{ x: number; y: number } | null>(null);
-  const [peekCount, setPeekCount] = useState<number | null>(null);
-  const [revealCards, setRevealCards] = useState<{ name: string; imgFile: string; label?: string }[] | null>(null);
+  const [peekState, setPeekState] = useState<{ cardIds: string[]; title: string } | null>(null);
   const [deckDropPopup, setDeckDropPopup] = useState<{ cardInstanceId: string; x: number; y: number } | null>(null);
   const [canvasDragZone, setCanvasDragZone] = useState<ZoneId | null>(null);
   const isCanvasDragging = useRef(false);
@@ -1020,8 +1019,8 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                 onClick={() => {
                   if (zoneId !== 'deck') handleZoneClick(zoneId);
                 }}
-                onDblClick={() => {
-                  if (zoneId === 'deck') drawCard();
+                onDblClick={(e) => {
+                  if (zoneId === 'deck' && e.evt.button === 0) drawCard();
                 }}
                 onDblTap={() => {
                   if (zoneId === 'deck') drawCard();
@@ -1150,7 +1149,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                     offsetX={oX}
                     offsetY={oY}
                     onContextMenu={handleDeckContextMenu}
-                    onDblClick={() => drawCard()}
+                    onDblClick={(e) => { if (e.evt.button === 0) drawCard(); }}
                     onDblTap={() => drawCard()}
                   >
                     <CardBackShape width={cardWidth} height={cardHeight} />
@@ -1564,7 +1563,14 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
               showGameToast(`Hand is full — drew ${Math.min(handSpace, deck.length)}`);
             }
           }}
-          onRevealTop={(count) => { setDeckMenu(null); setPeekCount(count); }}
+          onRevealTop={(count) => {
+            setDeckMenu(null);
+            const deck = state.zones.deck;
+            if (deck.length === 0) { showGameToast('Deck is empty'); return; }
+            const n = Math.min(count, deck.length);
+            const ids = deck.slice(0, n).map(c => c.instanceId);
+            setPeekState({ cardIds: ids, title: `Top ${n} of Deck` });
+          }}
           onDiscardTop={(count) => {
             setDeckMenu(null);
             const deck = state.zones.deck;
@@ -1607,8 +1613,8 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
             const deck = state.zones.deck;
             if (deck.length === 0) { showGameToast('Deck is empty'); return; }
             const n = Math.min(count, deck.length);
-            const bottomN = deck.slice(-n);
-            setRevealCards(bottomN.map(c => ({ name: c.cardName, imgFile: c.cardImgFile, label: 'Bottom of Deck' })));
+            const ids = deck.slice(-n).map(c => c.instanceId);
+            setPeekState({ cardIds: ids, title: `Bottom ${n} of Deck` });
           }}
           onDiscardBottom={(count) => {
             setDeckMenu(null);
@@ -1652,8 +1658,9 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
             const deck = state.zones.deck;
             if (deck.length === 0) { showGameToast('Deck is empty'); return; }
             const shuffled = [...deck].sort(() => Math.random() - 0.5);
-            const picked = shuffled.slice(0, Math.min(count, deck.length));
-            setRevealCards(picked.map(c => ({ name: c.cardName, imgFile: c.cardImgFile, label: 'Random' })));
+            const n = Math.min(count, deck.length);
+            const ids = shuffled.slice(0, n).map(c => c.instanceId);
+            setPeekState({ cardIds: ids, title: `Random ${n} from Deck` });
           }}
           onDiscardRandom={(count) => {
             setDeckMenu(null);
@@ -1703,80 +1710,14 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
         />
       )}
 
-      {peekCount !== null && (
+      {peekState !== null && (
         <DeckPeekModal
-          count={peekCount}
-          onClose={() => setPeekCount(null)}
+          cardIds={peekState.cardIds}
+          title={peekState.title}
+          onClose={() => setPeekState(null)}
           onStartDrag={modalStartDrag}
           isDragActive={modalDrag.isDragging}
         />
-      )}
-
-      {revealCards && revealCards.length > 0 && (
-        <div
-          onClick={() => setRevealCards(null)}
-          onContextMenu={(e) => e.preventDefault()}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.7)',
-            zIndex: 600,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-          }}
-        >
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              color: '#8b6532',
-              fontSize: 11,
-              marginBottom: 8,
-              textTransform: 'uppercase',
-              letterSpacing: '0.08em',
-            }}>
-              {revealCards[0].label || 'Reveal'}
-            </div>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', maxWidth: revealCards.length > 4 ? 700 : undefined }}>
-              {revealCards.map((rc, i) => (
-                rc.imgFile ? (
-                  <img
-                    key={i}
-                    src={getCardImageUrl(rc.imgFile)}
-                    alt={rc.name}
-                    style={{ width: revealCards.length === 1 ? 220 : 150, borderRadius: 6, border: '1px solid #6b4e27' }}
-                  />
-                ) : (
-                  <div key={i} style={{
-                    width: revealCards.length === 1 ? 220 : 150,
-                    aspectRatio: '5/7',
-                    background: '#2a1f12',
-                    border: '1px solid #6b4e27',
-                    borderRadius: 6,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#c9b99a',
-                    fontFamily: 'var(--font-cinzel), Georgia, serif',
-                    fontSize: 11,
-                    padding: 8,
-                    textAlign: 'center',
-                  }}>
-                    {rc.name}
-                  </div>
-                )
-              ))}
-            </div>
-            <div style={{
-              color: '#6b4e27',
-              fontSize: 10,
-              marginTop: 6,
-            }}>
-              Click anywhere to close
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Zone drop target highlights — visible during any drag */}

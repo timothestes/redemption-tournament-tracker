@@ -1,7 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useCallback, useEffect, useRef, useState } from 'react';
 import { Search, Shuffle, Eye, Trash2, Archive, ChevronRight, Play, Dices } from 'lucide-react';
+
+// Context to let SubMenuActionRow lock/unlock the parent SubmenuTrigger from auto-closing
+const SubmenuLockContext = createContext<{
+  lock: () => void;
+  unlock: () => void;
+} | null>(null);
 
 interface DeckContextMenuProps {
   x: number;
@@ -29,12 +35,12 @@ const ITEM_STYLE: React.CSSProperties = {
   alignItems: 'center',
   gap: 8,
   width: '100%',
-  padding: '8px 14px',
+  padding: '10px 16px',
   background: 'transparent',
   border: 'none',
   cursor: 'pointer',
   color: '#c9b99a',
-  fontSize: 12,
+  fontSize: 13,
   textAlign: 'left',
   fontFamily: 'var(--font-cinzel), Georgia, serif',
 };
@@ -76,15 +82,16 @@ const GO_BTN_STYLE: React.CSSProperties = {
 
 const SUBMENU_STYLE: React.CSSProperties = {
   position: 'absolute',
-  left: '100%',
+  left: 'auto',
+  right: '100%',
   top: -4,
-  marginLeft: -2,
+  marginRight: -2,
   background: '#2a1f12',
   border: '1px solid #6b4e27',
   borderRadius: 6,
   padding: '4px 0',
-  minWidth: 170,
   boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+  whiteSpace: 'nowrap',
 };
 
 function hoverEnter(e: React.MouseEvent<HTMLButtonElement | HTMLDivElement>) {
@@ -97,7 +104,25 @@ function hoverLeave(e: React.MouseEvent<HTMLButtonElement | HTMLDivElement>) {
   e.currentTarget.style.color = '#c9b99a';
 }
 
-/** A submenu action row: click label for 1, or press N to expand stepper */
+const QUICK_COUNT_STYLE: React.CSSProperties = {
+  width: 26,
+  height: 24,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: 'rgba(196,149,90,0.12)',
+  border: '1px solid #6b4e27',
+  borderRadius: 4,
+  color: '#c9b99a',
+  fontSize: 11,
+  fontWeight: 'bold',
+  fontFamily: 'var(--font-cinzel), Georgia, serif',
+  cursor: 'pointer',
+  padding: 0,
+  flexShrink: 0,
+};
+
+/** A submenu action row: click label for 1, quick-counts on the right, X for custom */
 function SubMenuActionRow({
   icon,
   label,
@@ -111,6 +136,17 @@ function SubMenuActionRow({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [count, setCount] = useState(3);
+  const lockCtx = useContext(SubmenuLockContext);
+
+  const toggleExpanded = () => {
+    const next = !expanded;
+    setExpanded(next);
+    if (next) {
+      lockCtx?.lock();
+    } else {
+      lockCtx?.unlock();
+    }
+  };
 
   return (
     <>
@@ -120,7 +156,48 @@ function SubMenuActionRow({
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
         <button
-          onClick={() => setExpanded(!expanded)}
+          style={{ ...ITEM_STYLE, flex: 1, background: 'transparent', paddingRight: 6 }}
+          onClick={() => onAction(1)}
+        >
+          {icon}
+          {label}
+        </button>
+        {max >= 3 && (
+          <button
+            style={QUICK_COUNT_STYLE}
+            onClick={() => onAction(3)}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(196,149,90,0.35)';
+              e.currentTarget.style.borderColor = '#c4955a';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(196,149,90,0.12)';
+              e.currentTarget.style.borderColor = '#6b4e27';
+            }}
+            title={`${label} 3`}
+          >
+            3
+          </button>
+        )}
+        {max >= 6 && (
+          <button
+            style={{ ...QUICK_COUNT_STYLE, marginLeft: 2 }}
+            onClick={() => onAction(6)}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(196,149,90,0.35)';
+              e.currentTarget.style.borderColor = '#c4955a';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(196,149,90,0.12)';
+              e.currentTarget.style.borderColor = '#6b4e27';
+            }}
+            title={`${label} 6`}
+          >
+            6
+          </button>
+        )}
+        <button
+          onClick={toggleExpanded}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = 'rgba(196,149,90,0.35)';
             e.currentTarget.style.borderColor = '#c4955a';
@@ -130,38 +207,20 @@ function SubMenuActionRow({
             e.currentTarget.style.borderColor = '#6b4e27';
           }}
           style={{
+            ...QUICK_COUNT_STYLE,
+            marginLeft: 2,
+            marginRight: 6,
             background: expanded ? 'rgba(196,149,90,0.25)' : 'rgba(196,149,90,0.12)',
-            border: '1px solid #6b4e27',
-            cursor: 'pointer',
-            color: '#e8d5a3',
             fontSize: 9,
-            fontFamily: 'var(--font-cinzel), Georgia, serif',
-            fontWeight: 'bold',
-            width: 24,
-            height: 24,
-            padding: 0,
-            borderRadius: '50%',
-            marginLeft: 10,
             letterSpacing: '0.05em',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
           }}
-          title={`${label} multiple...`}
+          title={`${label} custom amount...`}
         >
-          N
-        </button>
-        <button
-          style={{ ...ITEM_STYLE, flex: 1, background: 'transparent' }}
-          onClick={() => onAction(1)}
-        >
-          {icon}
-          {label}
+          X
         </button>
       </div>
       {expanded && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 14px 6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 14px 6px', justifyContent: 'center' }}>
           <button
             style={{ ...STEPPER_BTN_STYLE, opacity: count <= 1 ? 0.3 : 1 }}
             onClick={() => setCount(Math.max(1, count - 1))}
@@ -201,43 +260,29 @@ function SubmenuTrigger({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const [flipLeft, setFlipLeft] = useState(false);
   const triggerRef = useRef<HTMLDivElement>(null);
   const openTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lockedRef = useRef(false);
+
+  const lock = useCallback(() => { lockedRef.current = true; }, []);
+  const unlock = useCallback(() => { lockedRef.current = false; }, []);
 
   const showSub = () => {
-    // Cancel any pending close
     if (closeTimerRef.current) { clearTimeout(closeTimerRef.current); closeTimerRef.current = null; }
-
-    // If already open, no delay needed (user is hovering back)
     if (open) return;
-
-    // Delay opening so diagonal mouse movement across siblings doesn't steal focus
     if (!openTimerRef.current) {
       openTimerRef.current = setTimeout(() => {
         openTimerRef.current = null;
-        if (triggerRef.current) {
-          const rect = triggerRef.current.getBoundingClientRect();
-          setFlipLeft(rect.right + 170 > window.innerWidth);
-        }
         setOpen(true);
       }, 180);
     }
   };
 
   const hideSub = () => {
-    // Cancel any pending open
     if (openTimerRef.current) { clearTimeout(openTimerRef.current); openTimerRef.current = null; }
-    // Delay close so user can move to the submenu
+    if (lockedRef.current) return;
     closeTimerRef.current = setTimeout(() => setOpen(false), 150);
-  };
-
-  const subStyle: React.CSSProperties = {
-    ...SUBMENU_STYLE,
-    ...(flipLeft
-      ? { left: 'auto', right: '100%', marginLeft: 0, marginRight: -2 }
-      : {}),
   };
 
   return (
@@ -248,16 +293,18 @@ function SubmenuTrigger({
       onMouseLeave={hideSub}
     >
       <div
-        style={{ ...ITEM_STYLE, justifyContent: 'space-between', paddingRight: 10 }}
+        style={ITEM_STYLE}
         onMouseEnter={(e) => { hoverEnter(e); showSub(); }}
         onMouseLeave={(e) => { hoverLeave(e); }}
       >
+        <ChevronRight size={12} style={{ opacity: 0.6, transform: 'rotate(180deg)' }} />
         <span>{label}</span>
-        <ChevronRight size={12} style={{ opacity: 0.6, transform: flipLeft ? 'rotate(180deg)' : undefined }} />
       </div>
       {open && (
-        <div style={subStyle} onContextMenu={(e) => e.preventDefault()}>
-          {children}
+        <div style={SUBMENU_STYLE} onContextMenu={(e) => e.preventDefault()}>
+          <SubmenuLockContext.Provider value={{ lock, unlock }}>
+            {children}
+          </SubmenuLockContext.Provider>
         </div>
       )}
     </div>
@@ -272,8 +319,13 @@ export function DeckContextMenu({
   onDrawRandom, onRevealRandom, onDiscardRandom, onReserveRandom,
 }: DeckContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
-  const [showDrawN, setShowDrawN] = useState(false);
-  const [drawNCount, setDrawNCount] = useState(3);
+  const [showDrawX, setShowDrawX] = useState(false);
+  const [drawXCount, setDrawXCount] = useState(3);
+
+  // Right-align the menu when the click is near the right edge
+  const MENU_WIDTH = 200;
+  const rightAligned = x + MENU_WIDTH > window.innerWidth;
+  const menuLeft = rightAligned ? Math.max(0, x - MENU_WIDTH) : x;
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -298,15 +350,15 @@ export function DeckContextMenu({
       onContextMenu={(e) => e.preventDefault()}
       style={{
         position: 'absolute',
-        left: Math.min(x, window.innerWidth - 200),
+        left: menuLeft,
         top: Math.min(y, window.innerHeight - 300),
         background: '#2a1f12',
         border: '1px solid #6b4e27',
         borderRadius: 6,
         padding: '4px 0',
         zIndex: 500,
-        minWidth: 180,
         boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+        whiteSpace: 'nowrap',
       }}
     >
       <button style={ITEM_STYLE} onClick={onSearchDeck} onMouseEnter={hoverEnter} onMouseLeave={hoverLeave}>
@@ -317,28 +369,28 @@ export function DeckContextMenu({
         <Play size={14} />
         Draw 1
       </button>
-      <button style={ITEM_STYLE} onClick={() => setShowDrawN(!showDrawN)} onMouseEnter={hoverEnter} onMouseLeave={hoverLeave}>
+      <button style={ITEM_STYLE} onClick={() => setShowDrawX(!showDrawX)} onMouseEnter={hoverEnter} onMouseLeave={hoverLeave}>
         <Play size={14} />
-        Draw N...
+        Draw X...
       </button>
-      {showDrawN && (
+      {showDrawX && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 14px 6px' }}>
           <button
-            style={{ ...STEPPER_BTN_STYLE, opacity: drawNCount <= 1 ? 0.3 : 1 }}
-            onClick={() => setDrawNCount(Math.max(1, drawNCount - 1))}
+            style={{ ...STEPPER_BTN_STYLE, opacity: drawXCount <= 1 ? 0.3 : 1 }}
+            onClick={() => setDrawXCount(Math.max(1, drawXCount - 1))}
           >
             &minus;
           </button>
           <span style={{ width: 24, textAlign: 'center', color: '#e8d5a3', fontSize: 13, fontWeight: 'bold', fontFamily: 'var(--font-cinzel), Georgia, serif' }}>
-            {drawNCount}
+            {drawXCount}
           </span>
           <button
-            style={{ ...STEPPER_BTN_STYLE, opacity: drawNCount >= deckSize ? 0.3 : 1 }}
-            onClick={() => setDrawNCount(Math.min(deckSize, drawNCount + 1))}
+            style={{ ...STEPPER_BTN_STYLE, opacity: drawXCount >= deckSize ? 0.3 : 1 }}
+            onClick={() => setDrawXCount(Math.min(deckSize, drawXCount + 1))}
           >
             +
           </button>
-          <button style={GO_BTN_STYLE} onClick={() => onDrawTop(drawNCount)}>Go</button>
+          <button style={GO_BTN_STYLE} onClick={() => onDrawTop(drawXCount)}>Go</button>
         </div>
       )}
 

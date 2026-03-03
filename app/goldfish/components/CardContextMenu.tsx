@@ -59,21 +59,21 @@ export function CardContextMenu({ card: initialCard, x, y, onClose }: CardContex
     borderRadius: 6,
     padding: '4px 0',
     zIndex: 500,
-    minWidth: 180,
     maxHeight: '80vh',
     overflowY: 'auto',
     boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+    whiteSpace: 'nowrap',
   };
 
   const itemStyle: React.CSSProperties = {
     display: 'block',
     width: '100%',
-    padding: '6px 14px',
+    padding: '8px 16px',
     background: 'transparent',
     border: 'none',
     cursor: 'pointer',
     color: '#c9b99a',
-    fontSize: 12,
+    fontSize: 13,
     textAlign: 'left',
     fontFamily: 'var(--font-cinzel), Georgia, serif',
   };
@@ -92,7 +92,7 @@ export function CardContextMenu({ card: initialCard, x, y, onClose }: CardContex
     textTransform: 'uppercase' as const,
     letterSpacing: '0.08em',
     cursor: 'default',
-    padding: '4px 14px 2px',
+    padding: '4px 16px 2px',
   };
 
   const doAction = (fn: () => void) => {
@@ -112,9 +112,9 @@ export function CardContextMenu({ card: initialCard, x, y, onClose }: CardContex
       {/* Counter swatches — only for territory and land-of-bondage */}
       {(card.zone === 'territory' || card.zone === 'land-of-bondage') && (
         <>
-          <div style={labelStyle}>Counters <span style={{ fontSize: 8, opacity: 0.6 }}>click +1 · right-click -1</span></div>
-          <div style={{ display: 'flex', gap: 6, padding: '4px 14px 6px' }}>
-            {COUNTER_COLORS.map((color) => {
+          <div style={labelStyle}>Counters</div>
+          <div style={{ display: 'flex', gap: 6, padding: '4px 16px 2px' }}>
+            {COUNTER_COLORS.filter(c => c.id === 'red' || c.id === 'green' || c.id === 'blue').map((color) => {
               const count = getCount(color.id);
               return (
                 <button
@@ -130,8 +130,8 @@ export function CardContextMenu({ card: initialCard, x, y, onClose }: CardContex
                     if (count > 0) removeCounter(card.instanceId, color.id);
                   }}
                   style={{
-                    width: 26,
-                    height: 26,
+                    width: 30,
+                    height: 30,
                     borderRadius: '50%',
                     background: color.hex,
                     border: count > 0 ? '2px solid rgba(255,255,255,0.8)' : '2px solid rgba(255,255,255,0.2)',
@@ -152,6 +152,9 @@ export function CardContextMenu({ card: initialCard, x, y, onClose }: CardContex
                 </button>
               );
             })}
+          </div>
+          <div style={{ padding: '0 16px 4px', fontSize: 9, color: '#6b4e27', fontFamily: 'var(--font-cinzel), Georgia, serif' }}>
+            Left-click +1 · Right-click -1
           </div>
         </>
       )}

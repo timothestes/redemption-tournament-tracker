@@ -58,20 +58,19 @@ function PeekActionButton({ icon, label, onClick, style }: {
 }
 
 interface DeckPeekModalProps {
-  count: number;
+  cardIds: string[];
+  title: string;
   onClose: () => void;
   onStartDrag?: (card: GameCard, imageUrl: string, e: React.PointerEvent) => void;
   isDragActive?: boolean;
 }
 
-export function DeckPeekModal({ count, onClose, onStartDrag, isDragActive }: DeckPeekModalProps) {
+export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, isDragActive }: DeckPeekModalProps) {
   const { state, moveCardsBatch, shuffleDeck } = useGame();
   const { hover, onCardMouseEnter, onCardMouseLeave } = useModalCardHover();
 
-  // Snapshot the top N card instance IDs on mount so they don't shift as cards are moved
-  const [peekedIds] = useState(() =>
-    state.zones.deck.slice(0, count).map(c => c.instanceId)
-  );
+  // Snapshot the card IDs on mount so the list is stable
+  const [peekedIds] = useState(() => cardIds);
 
   // Derive live cards from current state (they may have been moved already)
   const peekedCards = peekedIds
@@ -143,7 +142,7 @@ export function DeckPeekModal({ count, onClose, onStartDrag, isDragActive }: Dec
             fontSize: 16,
             margin: 0,
           }}>
-            Top {count} of Deck
+            {title}
           </h2>
           <button
             onClick={() => handleCloseAction('top')}
@@ -180,7 +179,7 @@ export function DeckPeekModal({ count, onClose, onStartDrag, isDragActive }: Dec
               gap: 12,
             }}
           >
-            {peekedCards.map((card, idx) => (
+            {peekedCards.map((card) => (
               <div
                 key={card.instanceId}
                 style={{ position: 'relative', cursor: 'grab' }}
@@ -193,21 +192,6 @@ export function DeckPeekModal({ count, onClose, onStartDrag, isDragActive }: Dec
                 onMouseEnter={(e) => onCardMouseEnter(card.cardImgFile, card.cardName, e)}
                 onMouseLeave={onCardMouseLeave}
               >
-                <div style={{
-                  position: 'absolute',
-                  top: 4,
-                  left: 4,
-                  background: 'rgba(30,22,16,0.85)',
-                  border: '1px solid #6b4e27',
-                  borderRadius: 4,
-                  padding: '2px 6px',
-                  fontSize: 10,
-                  color: '#c4955a',
-                  fontFamily: 'var(--font-cinzel), Georgia, serif',
-                  zIndex: 1,
-                }}>
-                  #{idx + 1}
-                </div>
                 {card.cardImgFile ? (
                   <img
                     src={getCardImageUrl(card.cardImgFile)}
