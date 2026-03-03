@@ -2067,7 +2067,12 @@ export default function CardSearchClient() {
       {/* Mobile Bottom Nav */}
       <MobileBottomNav
         isDeckOpen={isMobileDeckDrawerOpen}
-        onToggleDeck={() => setIsMobileDeckDrawerOpen(prev => !prev)}
+        onToggleDeck={() => {
+          setIsMobileDeckDrawerOpen(prev => {
+            if (!prev) setModalCard(null); // Close card carousel when opening deck
+            return !prev;
+          });
+        }}
         deckCardCount={getDeckStats().mainDeckCount + getDeckStats().reserveCount}
         onSaveDeck={saveDeckToCloud}
         hasUnsavedChanges={hasUnsavedChanges}
