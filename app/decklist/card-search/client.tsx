@@ -20,6 +20,8 @@ import { parseDeckText, generateDeckText, downloadDeckAsFile, copyDeckToClipboar
 import { createClient } from "../../../utils/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { deleteDeckAction } from "../actions";
+import { MobileDrawer } from "../../../components/ui/mobile-drawer";
+import { MobileBottomNav } from "./components/MobileBottomNav";
 
 // Helper component for rename form in new deck modal
 function NewDeckRenameForm({ 
@@ -200,7 +202,7 @@ export default function CardSearchClient() {
   // Panel visibility state
   const [showDeckBuilder, setShowDeckBuilder] = useState(true);
   const [showSearch, setShowSearch] = useState(true);
-  const [showMobileBanner, setShowMobileBanner] = useState(false);
+  const [isMobileDeckDrawerOpen, setIsMobileDeckDrawerOpen] = useState(false);
 
   // Deck panel resize state
   const containerRef = useRef<HTMLDivElement>(null);
@@ -252,16 +254,6 @@ export default function CardSearchClient() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!localStorage.getItem('mobile-banner-dismissed')) {
-      setShowMobileBanner(true);
-      const timer = setTimeout(() => {
-        setShowMobileBanner(false);
-        localStorage.setItem('mobile-banner-dismissed', '1');
-      }, 4000);
-      return () => clearTimeout(timer);
-    }
-  }, []);
 
   // Track active tab in deck builder
   const [activeDeckTab, setActiveDeckTab] = useState<TabType>("main");
@@ -1084,6 +1076,9 @@ export default function CardSearchClient() {
     // If format is Paragon, automatically set legality filter to Paragon
     if (format.toLowerCase().includes('paragon')) {
       setLegalityMode('Paragon');
+    } else if (legalityMode === 'Paragon') {
+      // Switching away from Paragon — reset filter back to Rotation
+      setLegalityMode('Rotation');
     }
   }
 
@@ -1284,39 +1279,22 @@ export default function CardSearchClient() {
       )}
       
     <div ref={containerRef} className="flex w-full h-screen overflow-hidden bg-gray-100 dark:bg-gray-900">
-      {/* Mobile notice */}
-      {showMobileBanner && (
-        <div className="md:hidden fixed top-16 left-0 right-0 z-50 bg-blue-100 dark:bg-blue-900 border-b border-blue-300 dark:border-blue-700 px-4 py-3 text-center">
-          <button
-            onClick={() => { setShowMobileBanner(false); localStorage.setItem('mobile-banner-dismissed', '1'); }}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-900 dark:text-blue-100 hover:text-blue-700 dark:hover:text-blue-300"
-            aria-label="Close banner"
-          >
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
-          </button>
-          <p className="text-sm text-blue-900 dark:text-blue-100 font-medium">
-            ℹ️ Deckbuilder isn't supported on mobile (yet)
-          </p>
-        </div>
-      )}
       {/* Left panel: Card search */}
       {showSearch && (
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <div className="bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200 flex-1 flex flex-col overflow-hidden">
           <div className="p-2 flex flex-col items-center sticky top-0 z-40 bg-white text-gray-900 border-b border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-800 dark:shadow-lg">
-        <div className="relative w-full max-w-xl px-2 flex flex-col sm:flex-row sm:flex-wrap items-center justify-center gap-2">
+        <div className="relative w-full max-w-2xl px-2 flex flex-col sm:flex-row sm:flex-wrap items-center justify-center gap-2">
           <div className="w-full flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-center sm:gap-2 text-center">
             <div className="flex flex-col gap-2 w-full sm:w-auto">
               {queries.map((queryObj, index) => (
-                <div key={index} className="flex items-center gap-1">
+                <div key={index} className="flex items-center gap-1 min-w-0">
                   {/* Field dropdown */}
                   <select
                     value={queryObj.field}
                     onChange={e => updateQueryField(index, e.target.value)}
-                    className="border rounded px-2 py-1.5 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center text-sm"
-                    style={{ minHeight: 44, maxWidth: 120 }}
+                    className="border rounded px-1 sm:px-2 py-1.5 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center text-sm min-w-0"
+                    style={{ minHeight: 44 }}
                   >
                     <option value="everything">All</option>
                     <option value="name">Name</option>
@@ -1332,8 +1310,8 @@ export default function CardSearchClient() {
                   <select
                     value={queryObj.operator}
                     onChange={e => updateQueryOperator(index, e.target.value as QueryOperator)}
-                    className="border rounded px-2 py-1.5 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center text-sm"
-                    style={{ minHeight: 44, maxWidth: 100 }}
+                    className="border rounded px-1 sm:px-2 py-1.5 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center text-sm min-w-0"
+                    style={{ minHeight: 44 }}
                     title={index === 0 ? "Negate this query" : "How to combine this query with previous results"}
                   >
                     {index === 0 ? (
@@ -1355,11 +1333,11 @@ export default function CardSearchClient() {
                     ref={el => { inputRefs.current[index] = el; }}
                     type="text"
                     placeholder={index === 0 ? "Search" : `Search ${index + 1}`}
-                    className="flex-1 sm:w-auto p-2 sm:p-3 pr-8 sm:pr-10 border rounded text-sm sm:text-base focus:ring-2 focus:ring-blue-400 text-gray-900 bg-white dark:text-white dark:bg-gray-900"
+                    className="flex-1 min-w-0 sm:w-auto p-2 sm:p-3 pr-8 sm:pr-10 border rounded text-sm sm:text-base focus:ring-2 focus:ring-blue-400 text-gray-900 bg-white dark:text-white dark:bg-gray-900 sm:max-w-[180px]"
                     value={queryObj.text}
                     onChange={(e) => updateQuery(index, e.target.value)}
                     maxLength={64}
-                    style={{ minHeight: 44, maxWidth: 180 }}
+                    style={{ minHeight: 44 }}
                   />
                   
                   {/* Remove button - only show if more than one query */}
@@ -1377,14 +1355,19 @@ export default function CardSearchClient() {
                 </div>
               ))}
             </div>
-            <div className="flex flex-row gap-2 w-full sm:w-auto">
+            <div className="flex flex-row gap-2 w-full sm:w-auto shrink-0">
             <button
               className="px-3 sm:px-4 flex-1 sm:flex-none sm:w-auto rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center text-sm"
               onClick={handleResetFilters}
               style={{ minHeight: 44, height: 44 }}
             >
               <span className="hidden sm:inline">Reset Filters</span>
-              <span className="sm:hidden">↺ Reset</span>
+              <span className="sm:hidden flex items-center justify-center gap-1.5">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Reset
+              </span>
             </button>
             <button
               className={`px-4 sm:w-auto rounded border transition font-semibold shadow text-center relative hidden sm:block ${
@@ -1404,7 +1387,7 @@ export default function CardSearchClient() {
               {copyLinkNotification ? '✓' : '🔗'}
             </button>
             <button
-              className="px-4 flex-1 sm:flex-none sm:w-auto rounded bg-green-200 text-green-900 hover:bg-green-400 hover:text-green-900 border border-green-300 dark:bg-green-700 dark:text-white dark:hover:bg-green-600 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center relative"
+              className="px-4 flex-1 sm:flex-none sm:w-auto shrink-0 rounded bg-green-200 text-green-900 hover:bg-green-400 hover:text-green-900 border border-green-300 dark:bg-green-700 dark:text-white dark:hover:bg-green-600 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center relative"
               onClick={addNewQuery}
               style={{ minHeight: 44, height: 44 }}
               title="Add new query"
@@ -1674,7 +1657,7 @@ export default function CardSearchClient() {
           </button>
         </div>
       </div>
-      <main className="p-2 overflow-auto bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200">
+      <main className="p-2 pb-16 md:pb-2 overflow-auto bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200">
         {/* Responsive grid for filters */}
         {!filterGridCollapsed && (
           <FilterGrid
@@ -1766,61 +1749,48 @@ export default function CardSearchClient() {
                       sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 16vw"
                     />
                     
-                    {/* Controls Overlay - Shows on Hover */}
-                    <div className="absolute inset-x-0 bottom-0 transition-opacity duration-200">
-                      {/* Using golden ratio: top section ~61.8%, bottom ~38.2% */}
-                      <div className="grid grid-rows-[1.618fr_1fr] grid-cols-2 gap-1 p-2 h-20 md:gap-1.5 md:p-3 md:h-32">
-                        {/* Top Left: Decrement */}
-                        <div className="flex items-center justify-center">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeCard(c.name, c.set, activeDeckTab === "reserve");
-                            }}
-                            className="flex w-10 h-10 md:w-14 md:h-14 max-w-full max-h-full items-center justify-center rounded-lg bg-black/50 md:bg-black/30 md:hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-2xl md:text-3xl border border-white/20 md:opacity-0 md:group-hover:opacity-100 md:pointer-events-none md:group-hover:pointer-events-auto"
-                            aria-label="Remove card"
-                            title="Remove card from deck"
-                          >
-                            −
-                          </button>
-                        </div>
-
-                        {/* Top Right: Increment */}
-                        <div className="flex items-center justify-center">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              addCard(c, activeDeckTab === "reserve");
-                            }}
-                            className="flex w-10 h-10 md:w-14 md:h-14 max-w-full max-h-full items-center justify-center rounded-lg bg-black/50 md:bg-black/30 md:hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-2xl md:text-3xl border border-white/20 md:opacity-0 md:group-hover:opacity-100 md:pointer-events-none md:group-hover:pointer-events-auto"
-                            aria-label="Add card"
-                            title="Add card to deck"
-                          >
-                            +
-                          </button>
-                        </div>
-                        
-                        {/* Bottom Left: Empty space */}
-                        <div className="flex items-center justify-center">
-                        </div>
-                        
-                        {/* Bottom Right: Quantity Display - Always Visible */}
-                        {(quantityInDeck > 0 || quantityInReserve > 0) && (
-                          <div className="flex flex-col items-end justify-end gap-0.5 pr-1 pb-0.5">
-                            {quantityInDeck > 0 && (
-                              <div className="bg-black/75 backdrop-blur-sm text-white px-1.5 py-0.5 rounded font-bold text-xs shadow-lg">
-                                ×{quantityInDeck}
-                              </div>
-                            )}
-                            {quantityInReserve > 0 && (
-                              <div className="bg-black/75 backdrop-blur-sm text-white px-1.5 py-0.5 rounded font-bold text-xs shadow-lg">
-                                ×{quantityInReserve} R
-                              </div>
-                            )}
+                    {/* Controls Overlay - Centered on Card */}
+                    <div className="absolute inset-0 flex items-center justify-center transition-opacity duration-200">
+                      <div className="flex items-center gap-3 md:gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeCard(c.name, c.set, activeDeckTab === "reserve");
+                          }}
+                          className="flex w-11 h-11 md:w-9 md:h-9 items-center justify-center rounded-lg bg-black/50 md:bg-black/30 md:hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-2xl md:text-xl border border-white/20 md:opacity-0 md:group-hover:opacity-100 md:pointer-events-none md:group-hover:pointer-events-auto"
+                          aria-label="Remove card"
+                          title="Remove card from deck"
+                        >
+                          −
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            addCard(c, activeDeckTab === "reserve");
+                          }}
+                          className="flex w-11 h-11 md:w-9 md:h-9 items-center justify-center rounded-lg bg-black/50 md:bg-black/30 md:hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-2xl md:text-xl border border-white/20 md:opacity-0 md:group-hover:opacity-100 md:pointer-events-none md:group-hover:pointer-events-auto"
+                          aria-label="Add card"
+                          title="Add card to deck"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                    {/* Quantity Badge - Bottom Right, Always Visible */}
+                    {(quantityInDeck > 0 || quantityInReserve > 0) && (
+                      <div className="absolute bottom-1 right-1 flex flex-col items-end gap-0.5">
+                        {quantityInDeck > 0 && (
+                          <div className="bg-black/75 backdrop-blur-sm text-white px-1.5 py-0.5 rounded font-bold text-xs shadow-lg">
+                            ×{quantityInDeck}
+                          </div>
+                        )}
+                        {quantityInReserve > 0 && (
+                          <div className="bg-black/75 backdrop-blur-sm text-white px-1.5 py-0.5 rounded font-bold text-xs shadow-lg">
+                            ×{quantityInReserve} R
                           </div>
                         )}
                       </div>
-                    </div>
+                    )}
                   </div>
                   
                   <p className="text-xs sm:text-sm mt-1 text-center truncate hidden sm:block">{c.name}</p>
@@ -1978,6 +1948,67 @@ export default function CardSearchClient() {
         </div>
       )}
       
+      {/* Mobile Bottom Nav */}
+      <MobileBottomNav
+        isDeckOpen={isMobileDeckDrawerOpen}
+        onToggleDeck={() => setIsMobileDeckDrawerOpen(prev => !prev)}
+        deckCardCount={getDeckStats().mainDeckCount + getDeckStats().reserveCount}
+      />
+
+      {/* Mobile Deck Drawer */}
+      <MobileDrawer
+        isOpen={isMobileDeckDrawerOpen}
+        onClose={() => setIsMobileDeckDrawerOpen(false)}
+      >
+        {isInitializing ? (
+          <div className="flex-1 flex items-center justify-center bg-white dark:bg-gray-800 p-8">
+            <div className="text-gray-400 dark:text-gray-500 text-sm">Loading deck...</div>
+          </div>
+        ) : (
+          <DeckBuilderPanel
+            deck={deck}
+            syncStatus={syncStatus}
+            hasUnsavedChanges={hasUnsavedChanges}
+            isAuthenticated={!!user}
+            isExpanded={false}
+            forceDisableHoverPreview
+            onDeckNameChange={setDeckName}
+            onDeckFormatChange={handleDeckFormatChange}
+            onParagonChange={setDeckParagon}
+            onDeckPublicChange={setDeckPublic}
+            onSaveDeck={saveDeckToCloud}
+            onAddCard={(cardName, cardSet, isReserve) => {
+              const card = cards.find(c => c.name === cardName && c.set === cardSet);
+              if (card) {
+                addCard(card, isReserve);
+              }
+            }}
+            onRemoveCard={(cardName, cardSet, isReserve) => {
+              removeCard(cardName, cardSet, isReserve);
+            }}
+            onExport={handleExportDeck}
+            onDownload={handleDownloadDeck}
+            onImport={() => setShowImportModal(true)}
+            onDelete={handleDeleteDeck}
+            onDuplicate={() => {}}
+            onNewDeck={handleNewDeck}
+            onLoadDeck={loadDeckFromCloud}
+            onActiveTabChange={setActiveDeckTab}
+            onViewCard={(card, isReserve) => {
+              setFullDeckViewSection(isReserve ? 'reserve' : 'main');
+              setModalCard(card);
+              setIsMobileDeckDrawerOpen(false);
+            }}
+            onNotify={(message, type) => {
+              setNotification({ message, type });
+              setTimeout(() => setNotification(null), 3000);
+            }}
+            onPreviewCardsChange={setPreviewCards}
+            onDescriptionChange={setDeckDescription}
+          />
+        )}
+      </MobileDrawer>
+
       {/* Import modal */}
       {showImportModal && (
         <div 

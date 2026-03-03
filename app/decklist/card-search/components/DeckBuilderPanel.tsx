@@ -79,6 +79,8 @@ interface DeckBuilderPanelProps {
   onPreviewCardsChange?: (card1: string | null, card2: string | null) => void;
   /** Callback when user changes deck description */
   onDescriptionChange?: (description: string) => void;
+  /** Force-disable hover previews (e.g. on mobile) */
+  forceDisableHoverPreview?: boolean;
 }
 
 /**
@@ -109,6 +111,7 @@ export default function DeckBuilderPanel({
   onNotify,
   onPreviewCardsChange,
   onDescriptionChange,
+  forceDisableHoverPreview = false,
 }: DeckBuilderPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>("main");
   const [isEditingName, setIsEditingName] = useState(false);
@@ -244,7 +247,7 @@ export default function DeckBuilderPanel({
   // View options
   const [viewLayout, setViewLayout] = useState<'grid' | 'list'>('grid');
   const [groupBy, setGroupBy] = useState<'type' | 'alignment'>('type');
-  const [disableHoverPreview, setDisableHoverPreview] = useState(false);
+  const [disableHoverPreview, setDisableHoverPreview] = useState(forceDisableHoverPreview);
   
   // Initialize deck type based on deck.format
   const [deckType, setDeckType] = useState<'T1' | 'T2' | 'Paragon'>(() => {
@@ -597,7 +600,7 @@ export default function DeckBuilderPanel({
         )}
 
         {/* Card Count and Menu Button Row */}
-        <div className="mt-2 flex items-center justify-between gap-3 min-w-0">
+        <div className="mt-2 flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-3 min-w-0">
           <div className="flex items-center gap-3 text-sm flex-wrap min-w-0" suppressHydrationWarning>
             <div className="flex items-center gap-1">
               <span className="text-gray-600 dark:text-gray-400">Main:</span>
@@ -643,7 +646,7 @@ export default function DeckBuilderPanel({
                 onClick={() => handleDeckTypeChange('Paragon')}
                 className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
                   deckType === 'Paragon'
-                    ? 'bg-purple-600 dark:bg-purple-500 text-white'
+                    ? 'bg-amber-600 dark:bg-amber-500 text-white'
                     : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 cursor-pointer'
                 }`}
               >
@@ -657,7 +660,7 @@ export default function DeckBuilderPanel({
                 <span className="text-gray-600 dark:text-gray-400 text-xs">Paragon:</span>
                 <button
                     onClick={() => setShowParagonDropdown(!showParagonDropdown)}
-                    className="text-xs px-2 py-0.5 bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-700 rounded text-purple-900 dark:text-purple-100 font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 flex items-center gap-1.5 min-w-[180px] justify-between"
+                    className="text-xs px-2 py-0.5 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded text-amber-900 dark:text-amber-100 font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 flex items-center gap-1.5 min-w-[180px] justify-between"
                   >
                     {deck.paragon ? (
                       <span className="flex items-center gap-1.5">
@@ -686,7 +689,7 @@ export default function DeckBuilderPanel({
                         })()}
                       </span>
                     ) : (
-                      <span className="text-purple-700 dark:text-purple-300">Choose a Paragon...</span>
+                      <span className="text-amber-700 dark:text-amber-300">Choose a Paragon...</span>
                     )}
                     <svg className={`w-3 h-3 transition-transform ${showParagonDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -714,8 +717,8 @@ export default function DeckBuilderPanel({
                               onParagonChange?.(name);
                               setShowParagonDropdown(false);
                             }}
-                            className={`w-full px-3 py-2 text-left text-xs hover:bg-purple-50 dark:hover:bg-purple-900/30 transition-colors flex items-center gap-2 ${
-                              deck.paragon === name ? 'bg-purple-100 dark:bg-purple-900/50 text-purple-900 dark:text-purple-100' : 'text-gray-700 dark:text-gray-300'
+                            className={`w-full px-3 py-2 text-left text-xs hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors flex items-center gap-2 ${
+                              deck.paragon === name ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-100' : 'text-gray-700 dark:text-gray-300'
                             }`}
                           >
                             {paragonData && (
@@ -743,7 +746,7 @@ export default function DeckBuilderPanel({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
             {/* Save Button */}
             {onSaveDeck && isAuthenticated && (
               <button
@@ -760,7 +763,7 @@ export default function DeckBuilderPanel({
                   }
                 }}
                 disabled={syncStatus?.isSaving || !isAuthenticated}
-                className={`px-4 py-1.5 text-sm font-medium rounded transition-all flex items-center gap-2 min-w-[140px] justify-center ${
+                className={`px-3 md:px-4 py-1.5 text-sm font-medium rounded transition-all flex items-center gap-2 md:min-w-[140px] justify-center ${
                   syncStatus?.isSaving || !isAuthenticated
                     ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-500 cursor-not-allowed'
                     : hasUnsavedChanges
@@ -792,7 +795,8 @@ export default function DeckBuilderPanel({
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                     </svg>
-                    Save (Ctrl+S)
+                    <span className="hidden md:inline">Save (Ctrl+S)</span>
+                    <span className="md:hidden">Save</span>
                   </>
                 ) : (
                   <>
@@ -814,7 +818,7 @@ export default function DeckBuilderPanel({
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-                New Deck
+                <span className="hidden md:inline">New Deck</span>
               </button>
             )}
 
@@ -1502,7 +1506,7 @@ export default function DeckBuilderPanel({
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
                 Choose the two cards shown as the thumbnail on the community page.
               </p>
-              <div className="flex gap-3 mb-3">
+              <div className="flex gap-3 mb-3 justify-center">
                 {([1, 2] as const).map((slot) => {
                   const imgFile = slot === 1 ? deck.previewCard1 : deck.previewCard2;
                   const imgUrl = imgFile ? getImageUrl(imgFile) : null;

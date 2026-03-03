@@ -1170,3 +1170,6 @@ webpack: (config) => {
 - add sounds
 - add music
 - add options to disable sounds/music, etc.
+- add lackey options for revealed cards
+- improve hand ux for cards, allowing cards to overlap
+- add automatic saving of deck when pressing "play" when playing deck from deckbuilder
