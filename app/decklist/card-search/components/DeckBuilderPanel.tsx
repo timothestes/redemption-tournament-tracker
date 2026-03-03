@@ -114,6 +114,7 @@ export default function DeckBuilderPanel({
   forceDisableHoverPreview = false,
 }: DeckBuilderPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>("main");
+  const [isMobileHeaderExpanded, setIsMobileHeaderExpanded] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(deck.name);
   const [showMenu, setShowMenu] = useState(false);
@@ -596,15 +597,142 @@ export default function DeckBuilderPanel({
                 {deck.isPublic ? "Public" : "Private"}
               </span>
             )}
-            {/* Inline card counts on mobile */}
-            <span className="md:hidden text-xs text-gray-500 dark:text-gray-400 flex-shrink-0 ml-auto" suppressHydrationWarning>
-              {mainDeckCount}{reserveCount > 0 ? `+${reserveCount}R` : ''}
-            </span>
+            {/* Mobile header expand/collapse toggle */}
+            <button
+              className="md:hidden flex-shrink-0 p-1 ml-auto text-gray-400 dark:text-gray-500"
+              onClick={() => setIsMobileHeaderExpanded(prev => !prev)}
+              aria-label={isMobileHeaderExpanded ? "Collapse header" : "Expand header"}
+            >
+              <svg className={`w-4 h-4 transition-transform ${isMobileHeaderExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
           </div>
         )}
 
-        {/* Card Count and Menu Button Row */}
-        <div className="mt-1.5 md:mt-2 flex flex-col md:flex-row md:items-center md:justify-between gap-1.5 md:gap-3 min-w-0">
+        {/* Mobile: Format selector + Paragon always visible */}
+        <div className="md:hidden mt-1.5 flex items-center gap-2 flex-wrap">
+          {/* Format Selector (T1/T2/Paragon) */}
+          <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-full p-0.5">
+            <button
+              onClick={() => handleDeckTypeChange('T1')}
+              className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                deckType === 'T1'
+                  ? 'bg-blue-600 dark:bg-blue-500 text-white'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 cursor-pointer'
+              }`}
+            >
+              T1
+            </button>
+            <button
+              onClick={() => handleDeckTypeChange('T2')}
+              className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                deckType === 'T2'
+                  ? 'bg-purple-600 dark:bg-purple-500 text-white'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 cursor-pointer'
+              }`}
+            >
+              T2
+            </button>
+            <button
+              onClick={() => handleDeckTypeChange('Paragon')}
+              className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                deckType === 'Paragon'
+                  ? 'bg-amber-600 dark:bg-amber-500 text-white'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 cursor-pointer'
+              }`}
+            >
+              Paragon
+            </button>
+          </div>
+
+          {/* Paragon Selector */}
+          {deckType === 'Paragon' && (
+            <div className="relative flex items-center gap-1">
+              <button
+                onClick={() => setShowParagonDropdown(!showParagonDropdown)}
+                className="text-xs px-2 py-0.5 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded text-amber-900 dark:text-amber-100 font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 flex items-center gap-1.5 justify-between"
+              >
+                {deck.paragon ? (
+                  <span className="flex items-center gap-1.5">
+                    {(() => {
+                      const paragonData = getParagonByName(deck.paragon);
+                      if (paragonData) {
+                        return (
+                          <>
+                            <span className="flex gap-0.5">
+                              <span
+                                className="w-3 h-3 rounded-sm border border-black"
+                                style={{ backgroundColor: getBrigadeColor(paragonData.goodBrigade) }}
+                              />
+                              <span
+                                className="w-3 h-3 rounded-sm border border-black"
+                                style={{ backgroundColor: getBrigadeColor(paragonData.evilBrigade) }}
+                              />
+                            </span>
+                            <span>{deck.paragon}</span>
+                          </>
+                        );
+                      }
+                      return <span>{deck.paragon}</span>;
+                    })()}
+                  </span>
+                ) : (
+                  <span className="text-amber-700 dark:text-amber-300">Choose...</span>
+                )}
+                <svg className={`w-3 h-3 ml-1 transition-transform ${showParagonDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {showParagonDropdown && (
+                <div className="absolute top-full mt-1 left-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto min-w-[240px]">
+                  <button
+                    onClick={() => {
+                      onParagonChange?.(undefined);
+                      setShowParagonDropdown(false);
+                    }}
+                    className="w-full px-3 py-2 text-left text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Choose a Paragon...
+                  </button>
+                  {getParagonNames().map((name) => {
+                    const paragonData = getParagonByName(name);
+                    return (
+                      <button
+                        key={name}
+                        onClick={() => {
+                          onParagonChange?.(name);
+                          setShowParagonDropdown(false);
+                        }}
+                        className={`w-full px-3 py-2 text-left text-xs hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors flex items-center gap-2 ${
+                          deck.paragon === name ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-100' : 'text-gray-700 dark:text-gray-300'
+                        }`}
+                      >
+                        {paragonData && (
+                          <span className="flex gap-0.5 flex-shrink-0">
+                            <span
+                              className="w-3 h-3 rounded-sm border border-black"
+                              style={{ backgroundColor: getBrigadeColor(paragonData.goodBrigade) }}
+                            />
+                            <span
+                              className="w-3 h-3 rounded-sm border border-black"
+                              style={{ backgroundColor: getBrigadeColor(paragonData.evilBrigade) }}
+                            />
+                          </span>
+                        )}
+                        <span className="font-medium">{name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Card Count and Menu Button Row - collapsible on mobile, always visible on desktop */}
+        <div className={`mt-1.5 md:mt-2 flex flex-col md:flex-row md:items-center md:justify-between gap-1.5 md:gap-3 min-w-0 ${isMobileHeaderExpanded ? '' : 'hidden md:flex'}`}>
           <div className="flex items-center gap-2 md:gap-3 text-sm flex-wrap min-w-0" suppressHydrationWarning>
             <div className="hidden md:flex items-center gap-1">
               <span className="text-gray-600 dark:text-gray-400">Main:</span>
@@ -620,9 +748,9 @@ export default function DeckBuilderPanel({
               <span className="text-gray-600 dark:text-gray-400">Total:</span>
               <span className="font-semibold text-gray-900 dark:text-white">{totalCards}</span>
             </div>
-            
-            {/* Format Selector (T1/T2/Paragon) */}
-            <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-full p-0.5">
+
+            {/* Desktop: Format Selector (T1/T2/Paragon) */}
+            <div className="hidden md:flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-full p-0.5">
               <button
                 onClick={() => handleDeckTypeChange('T1')}
                 className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
@@ -654,10 +782,10 @@ export default function DeckBuilderPanel({
                 Paragon
               </button>
             </div>
-            
-            {/* Paragon Selector (only show for Paragon format) */}
+
+            {/* Desktop: Paragon Selector (only show for Paragon format) */}
             {deckType === 'Paragon' && (
-              <div className="relative flex items-center gap-1">
+              <div className="hidden md:flex relative items-center gap-1">
                 <span className="text-gray-600 dark:text-gray-400 text-xs">Paragon:</span>
                 <button
                     onClick={() => setShowParagonDropdown(!showParagonDropdown)}
@@ -696,7 +824,7 @@ export default function DeckBuilderPanel({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </button>
-                  
+
                   {/* Custom Dropdown Menu */}
                   {showParagonDropdown && (
                     <div className="absolute top-full mt-1 left-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto min-w-[240px]">
@@ -1297,30 +1425,38 @@ export default function DeckBuilderPanel({
         {deckType === 'Paragon' && deck.paragon && validation.paragonStats && (
           <div className="mb-4">
             <div className="p-4 bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-2 border-purple-300 dark:border-purple-600 rounded-xl shadow-md">
-              <div className="flex items-start gap-4">
+              {/* Mobile: stack vertically. Desktop: side by side */}
+              <div className="flex flex-col md:flex-row md:items-start gap-3 md:gap-4">
                 {/* Paragon Card Artwork - Click to Expand */}
-                <div 
-                  className="relative group w-32 h-40 rounded-lg shadow-xl flex-shrink-0 cursor-pointer hover:scale-105 hover:shadow-2xl transition-transform overflow-hidden bg-gray-200 dark:bg-gray-700 border-2 border-white dark:border-gray-600"
-                  onClick={() => setShowParagonModal(true)}
-                  title="Click to view full card"
-                >
-                  <img 
-                    src={`/paragons/Paragon ${deck.paragon}.png`}
-                    alt={deck.paragon}
-                    className="w-full h-full object-cover object-[1%_center]"
-                    onError={(e) => {
-                      // Hide container if image doesn't exist
-                      e.currentTarget.parentElement!.style.display = 'none';
-                    }}
-                  />
-                  {/* Click Indicator Icon - Bottom Left */}
-                  <div className="absolute bottom-2 left-2 bg-white/90 dark:bg-purple-600/90 rounded-full p-1.5 shadow-lg">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-purple-600 dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
-                    </svg>
+                <div className="flex items-center gap-3 md:block">
+                  <div
+                    className="relative group w-20 h-28 md:w-32 md:h-40 rounded-lg shadow-xl flex-shrink-0 cursor-pointer hover:scale-105 hover:shadow-2xl transition-transform overflow-hidden bg-gray-200 dark:bg-gray-700 border-2 border-white dark:border-gray-600"
+                    onClick={() => setShowParagonModal(true)}
+                    title="Click to view full card"
+                  >
+                    <img
+                      src={`/paragons/Paragon ${deck.paragon}.png`}
+                      alt={deck.paragon}
+                      className="w-full h-full object-cover object-[1%_center]"
+                      onError={(e) => {
+                        // Hide container if image doesn't exist
+                        e.currentTarget.parentElement!.style.display = 'none';
+                      }}
+                    />
+                    {/* Click Indicator Icon - Bottom Left */}
+                    <div className="absolute bottom-1 left-1 md:bottom-2 md:left-2 bg-white/90 dark:bg-purple-600/90 rounded-full p-1 md:p-1.5 shadow-lg">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 md:h-5 md:w-5 text-purple-600 dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                      </svg>
+                    </div>
+                  </div>
+                  {/* Mobile: show paragon name + note inline next to image */}
+                  <div className="md:hidden flex-1 min-w-0">
+                    <span className="text-sm font-semibold text-purple-900 dark:text-purple-100">{deck.paragon} Requirements</span>
+                    <p className="mt-1 text-xs text-purple-700 dark:text-purple-300">No Lost Souls. 40 Main, 10 Reserve. Max 7 Dominants.</p>
                   </div>
                 </div>
-                
+
                 {/* Paragon Requirements */}
                 <div className="flex-1 min-w-0">
                   <ParagonRequirements

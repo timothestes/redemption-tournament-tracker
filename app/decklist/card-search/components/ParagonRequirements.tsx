@@ -66,19 +66,19 @@ export default function ParagonRequirements({ paragonName, stats }: ParagonRequi
   ];
 
   return (
-    <div className="mt-3 p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-lg">
-      <div className="flex items-center gap-2 mb-2">
+    <div className="md:mt-3 p-2 md:p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-lg">
+      {/* Title - hidden on mobile (shown inline next to paragon image instead) */}
+      <div className="hidden md:flex items-center gap-2 mb-2">
         <span className="text-sm font-semibold text-purple-900 dark:text-purple-100">
           {paragon.name} Requirements
         </span>
       </div>
-      
-      <div className="grid grid-cols-6 gap-2">
+
+      <div className="grid grid-cols-6 gap-1.5 md:gap-2">
         {requirements.map((req, index) => {
           const isMet = req.isMax ? req.current <= req.required : req.current === req.required;
           const isOver = req.current > req.required;
-          const isUnder = !req.isMax && req.current < req.required;
-          
+
           return (
             <div
               key={index}
@@ -86,7 +86,7 @@ export default function ParagonRequirements({ paragonName, stats }: ParagonRequi
               title={req.description}
             >
               <div
-                className={`text-center p-2 rounded border transition-all ${
+                className={`text-center px-1 py-1.5 md:p-2 rounded border transition-all ${
                   isMet
                     ? 'bg-green-100 dark:bg-green-900/30 border-green-500 dark:border-green-600'
                     : isOver
@@ -94,20 +94,20 @@ export default function ParagonRequirements({ paragonName, stats }: ParagonRequi
                     : 'bg-red-100 dark:bg-red-900/30 border-red-500 dark:border-red-600'
                 }`}
               >
-                <div className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate">
+                <div className="text-[10px] md:text-xs font-medium text-gray-700 dark:text-gray-300 truncate">
                   {req.label}
                 </div>
-                <div className={`text-lg font-bold ${
+                <div className={`text-sm md:text-lg font-bold ${
                   isMet
                     ? 'text-green-700 dark:text-green-300'
                     : isOver
                     ? 'text-yellow-700 dark:text-yellow-300'
                     : 'text-red-700 dark:text-red-300'
                 }`}>
-                  {req.isMax ? `${req.current}/${req.required}` : `${req.current}/${req.required}`}
+                  {req.current}/{req.required}
                 </div>
               </div>
-              
+
               {/* Tooltip on hover */}
               <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-10 whitespace-nowrap">
                 {req.description}
@@ -117,8 +117,9 @@ export default function ParagonRequirements({ paragonName, stats }: ParagonRequi
           );
         })}
       </div>
-      
-      <div className="mt-2 text-xs text-purple-700 dark:text-purple-300">
+
+      {/* Note - hidden on mobile (shown inline next to paragon image instead) */}
+      <div className="hidden md:block mt-2 text-xs text-purple-700 dark:text-purple-300">
         <strong>Note:</strong> No Lost Souls. 40 Card Main deck. 10 Card Reserve. Maximum 7 Dominants.
       </div>
     </div>
