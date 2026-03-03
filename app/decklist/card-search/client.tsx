@@ -257,9 +257,27 @@ export default function CardSearchClient() {
 
   // Track active tab in deck builder
   const [activeDeckTab, setActiveDeckTab] = useState<TabType>("main");
-  
+
   // Track which section we're viewing in full deck view (for modal navigation)
   const [fullDeckViewSection, setFullDeckViewSection] = useState<'main' | 'reserve'>('main');
+
+  // Track which card's "..." menu is open in the search results grid
+  const [openSearchMenuCard, setOpenSearchMenuCard] = useState<string | null>(null);
+
+  // Close search card menu on click-outside or ESC
+  useEffect(() => {
+    if (!openSearchMenuCard) return;
+    const handleClick = () => setOpenSearchMenuCard(null);
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpenSearchMenuCard(null);
+    };
+    document.addEventListener('click', handleClick);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('click', handleClick);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [openSearchMenuCard]);
 
   // User authentication state
   const [user, setUser] = useState<User | null>(null);
@@ -546,7 +564,8 @@ export default function CardSearchClient() {
       // Ctrl+S / Cmd+S to save
       if (e.key === 's') {
         e.preventDefault();
-        if (user && !syncStatus?.isSaving) {
+        const stats = getDeckStats();
+        if (user && !syncStatus?.isSaving && (stats.mainDeckCount + stats.reserveCount) > 0) {
           saveDeckToCloud();
         }
       }
@@ -566,7 +585,7 @@ export default function CardSearchClient() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [user, syncStatus?.isSaving, saveDeckToCloud, handleExportDeck, showSearch, showDeckBuilder, modalCard]);
+  }, [user, syncStatus?.isSaving, saveDeckToCloud, handleExportDeck, showSearch, showDeckBuilder, modalCard, getDeckStats]);
 
   // sanitize imgFile to avoid duplicate extensions - now imported from utils
 
@@ -1732,13 +1751,94 @@ export default function CardSearchClient() {
             {visibleCards.map((c) => {
               const quantityInDeck = getCardQuantity(c.name, c.set, false);
               const quantityInReserve = getCardQuantity(c.name, c.set, true);
+              const isMenuOpen = openSearchMenuCard === c.dataLine;
               return (
-                <div 
-                  key={c.dataLine} 
+                <div
+                  key={c.dataLine}
                   className="relative cursor-pointer group rounded overflow-hidden shadow hover:shadow-xl transition-all duration-200"
                 >
+                  {/* Backdrop overlay when menu is open */}
+                  {isMenuOpen && (
+                    <div
+                      className="absolute inset-0 bg-black/60 backdrop-blur-sm z-30 rounded"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenSearchMenuCard(null);
+                      }}
+                    />
+                  )}
+
+                  {/* Menu items overlay */}
+                  {isMenuOpen && (
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-1.5 py-4 z-40">
+                      {/* Add to Main Deck */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addCard(c, false);
+                          setOpenSearchMenuCard(null);
+                        }}
+                        className="w-10 h-10 hover:scale-110 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 flex items-center justify-center text-gray-700 dark:text-gray-200 transition-all"
+                        title="Add to deck"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                        </svg>
+                      </button>
+
+                      {/* Add to Reserve */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addCard(c, true);
+                          setOpenSearchMenuCard(null);
+                        }}
+                        className="w-10 h-10 hover:scale-110 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 flex items-center justify-center text-gray-700 dark:text-gray-200 transition-all"
+                        title="Add to reserve"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                        </svg>
+                      </button>
+
+                      {/* Remove from Deck (only if card is in deck) */}
+                      {quantityInDeck > 0 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeCard(c.name, c.set, false);
+                            setOpenSearchMenuCard(null);
+                          }}
+                          className="w-10 h-10 hover:scale-110 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 flex items-center justify-center text-red-600 dark:text-red-400 transition-all"
+                          title="Remove from deck"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20 12H4" />
+                          </svg>
+                        </button>
+                      )}
+
+                      {/* Remove from Reserve (only if card is in reserve) */}
+                      {quantityInReserve > 0 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeCard(c.name, c.set, true);
+                            setOpenSearchMenuCard(null);
+                          }}
+                          className="w-10 h-10 hover:scale-110 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 flex items-center justify-center text-orange-600 dark:text-orange-400 transition-all"
+                          title="Remove from reserve"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  )}
+
                   {/* Card Image - Click to view modal */}
-                  <div 
+                  <div
                     className="relative overflow-hidden rounded"
                     onClick={() => setModalCard(c)}
                   >
@@ -1748,7 +1848,7 @@ export default function CardSearchClient() {
                       className="rounded w-full"
                       sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 16vw"
                     />
-                    
+
                     {/* Controls Overlay - Centered on Card */}
                     <div className="absolute inset-0 flex items-center justify-center transition-opacity duration-200">
                       <div className="flex items-center gap-3 md:gap-2">
@@ -1776,6 +1876,23 @@ export default function CardSearchClient() {
                         </button>
                       </div>
                     </div>
+
+                    {/* Menu Button - Bottom Left */}
+                    <div className="absolute bottom-0.5 left-0.5 z-10">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenSearchMenuCard(isMenuOpen ? null : c.dataLine);
+                        }}
+                        className="w-9 h-9 md:w-7 md:h-7 flex items-center justify-center rounded-lg md:rounded-md bg-black/50 md:bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all border border-white/20 md:opacity-0 md:group-hover:opacity-100 md:pointer-events-none md:group-hover:pointer-events-auto"
+                        aria-label="Card options"
+                      >
+                        <svg className="w-5 h-5 md:w-4 md:h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
+                        </svg>
+                      </button>
+                    </div>
+
                     {/* Quantity Badge - Bottom Right, Always Visible */}
                     {(quantityInDeck > 0 || quantityInReserve > 0) && (
                       <div className="absolute bottom-1 right-1 flex flex-col items-end gap-0.5">
@@ -1792,7 +1909,7 @@ export default function CardSearchClient() {
                       </div>
                     )}
                   </div>
-                  
+
                   <p className="text-xs sm:text-sm mt-1 text-center truncate hidden sm:block">{c.name}</p>
                 </div>
               );
@@ -1953,6 +2070,10 @@ export default function CardSearchClient() {
         isDeckOpen={isMobileDeckDrawerOpen}
         onToggleDeck={() => setIsMobileDeckDrawerOpen(prev => !prev)}
         deckCardCount={getDeckStats().mainDeckCount + getDeckStats().reserveCount}
+        onSaveDeck={saveDeckToCloud}
+        hasUnsavedChanges={hasUnsavedChanges}
+        isSaving={syncStatus?.isSaving}
+        isAuthenticated={!!user}
       />
 
       {/* Mobile Deck Drawer */}

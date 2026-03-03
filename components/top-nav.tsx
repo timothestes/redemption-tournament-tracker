@@ -144,7 +144,7 @@ const TopNav: React.FC = () => {
           </Link>
 
           {/* Desktop Navigation - Center */}
-          <div className="hidden md:flex md:items-center md:space-x-1 flex-1 justify-center">
+          <div className="hidden lg:flex lg:items-center lg:space-x-1 flex-1 justify-center">
             {navLinks.slice(0, 1).map((link) => {
               const Icon = link.icon;
               const isHighlight = link.highlight;
@@ -353,7 +353,7 @@ const TopNav: React.FC = () => {
           </div>
 
           {/* Auth Section - Right Side */}
-          <div className="hidden md:flex md:items-center md:gap-3">
+          <div className="hidden lg:flex lg:items-center lg:gap-3">
             <ThemeSwitcher />
             {authLoading ? (
               // Invisible placeholder matching the logged-out button sizes so layout doesn't shift
@@ -387,7 +387,7 @@ const TopNav: React.FC = () => {
           {/* Mobile menu button */}
           <button
             onClick={toggleMobileMenu}
-            className="md:hidden p-2 rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+            className="lg:hidden p-2 rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
           >
             {isMobileMenuOpen ? <IoClose size={24} /> : <HiMenu size={24} />}
           </button>
@@ -396,7 +396,7 @@ const TopNav: React.FC = () => {
 
       {/* Mobile Navigation */}
       {isMobileMenuOpen && (
-        <div className="md:hidden border-t border-gray-200 dark:border-gray-700 max-h-[calc(100dvh-4rem)] overflow-y-auto">
+        <div className="lg:hidden border-t border-gray-200 dark:border-gray-700 max-h-[calc(100dvh-4rem)] overflow-y-auto">
           <div className="px-2 pt-2 pb-3 space-y-1">
             {/* Nationals link */}
             {navLinks.slice(0, 1).map((link) => {
