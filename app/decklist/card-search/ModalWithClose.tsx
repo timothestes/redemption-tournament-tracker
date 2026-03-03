@@ -62,72 +62,7 @@ export default function ModalWithClose({
 }) {
   const { getImageUrl } = useCardImageUrl();
   const [showMenu, setShowMenu] = React.useState(false);
-  const [swipeAction, setSwipeAction] = React.useState<string | null>(null);
-  const touchStartRef = React.useRef({ x: 0, y: 0 });
-  const swipeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Swipe handlers for mobile card image
-  const handleTouchStart = React.useCallback((e: React.TouchEvent) => {
-    touchStartRef.current = {
-      x: e.touches[0].clientX,
-      y: e.touches[0].clientY,
-    };
-  }, []);
-
-  const handleTouchEnd = React.useCallback((e: React.TouchEvent) => {
-    const deltaX = e.changedTouches[0].clientX - touchStartRef.current.x;
-    const deltaY = e.changedTouches[0].clientY - touchStartRef.current.y;
-    const absX = Math.abs(deltaX);
-    const absY = Math.abs(deltaY);
-    const threshold = 50;
-
-    if (absX < threshold && absY < threshold) return; // Too small, not a swipe
-
-    const showFeedback = (msg: string) => {
-      if (swipeTimerRef.current) clearTimeout(swipeTimerRef.current);
-      setSwipeAction(msg);
-      swipeTimerRef.current = setTimeout(() => setSwipeAction(null), 800);
-    };
-
-    if (absX > absY) {
-      // Horizontal swipe — navigate cards
-      if (!visibleCards || visibleCards.length <= 1) return;
-      const currentIndex = visibleCards.findIndex(card => card.dataLine === modalCard?.dataLine);
-      if (currentIndex === -1) return;
-
-      if (deltaX < -threshold) {
-        // Swipe left → next card
-        const nextIndex = currentIndex === visibleCards.length - 1 ? 0 : currentIndex + 1;
-        setModalCard(visibleCards[nextIndex]);
-      } else if (deltaX > threshold) {
-        // Swipe right → previous card
-        const prevIndex = currentIndex === 0 ? visibleCards.length - 1 : currentIndex - 1;
-        setModalCard(visibleCards[prevIndex]);
-      }
-    } else {
-      // Vertical swipe — add/remove from deck
-      if (!onAddCard || !onRemoveCard) return;
-      const isReserve = activeDeckTab === "reserve";
-
-      if (deltaY < -threshold) {
-        // Swipe up → add to deck
-        onAddCard(modalCard, isReserve);
-        showFeedback("+ Added to " + (isReserve ? "Reserve" : "Deck"));
-      } else if (deltaY > threshold) {
-        // Swipe down → remove from deck
-        onRemoveCard(modalCard.name, modalCard.set, isReserve);
-        showFeedback("− Removed from " + (isReserve ? "Reserve" : "Deck"));
-      }
-    }
-  }, [visibleCards, modalCard, setModalCard, onAddCard, onRemoveCard, activeDeckTab]);
-
-  // Cleanup swipe timer
-  React.useEffect(() => {
-    return () => {
-      if (swipeTimerRef.current) clearTimeout(swipeTimerRef.current);
-    };
-  }, []);
-
+  
   // Close menu when clicking outside
   React.useEffect(() => {
     if (!showMenu) return;
@@ -204,25 +139,12 @@ export default function ModalWithClose({
           <div className="truncate">{modalCard.name}</div>
         </div>
         <div className="px-4 py-2 flex flex-col items-center relative flex-1 overflow-hidden">
-          <div
-            className="relative w-full flex justify-center mb-4 touch-pan-x"
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
-          >
+          <div className="relative w-full flex justify-center mb-4">
             <img
               src={getImageUrl(modalCard.imgFile)}
               alt={modalCard.name}
-              className="w-full max-w-md h-auto max-h-[60vh] object-contain mx-auto rounded shadow-lg select-none"
-              draggable={false}
+              className="w-full max-w-md h-auto max-h-[60vh] object-contain mx-auto rounded shadow-lg"
             />
-            {/* Swipe action feedback */}
-            {swipeAction && (
-              <div className={`absolute top-2 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full text-sm font-semibold shadow-lg animate-pulse z-10 ${
-                swipeAction.startsWith('+') ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
-              }`}>
-                {swipeAction}
-              </div>
-            )}
           </div>
           <div className="w-full flex-1 overflow-auto px-2">
             <div className="space-y-1">
@@ -242,11 +164,7 @@ export default function ModalWithClose({
         <div className="px-4 pb-4 pt-2 border-t bg-gray-50 dark:bg-gray-800">
           {visibleCards && visibleCards.length > 1 && (
             <div className="text-xs text-gray-500 dark:text-gray-400 text-center mb-2">
-              <span className="hidden md:inline">
-                Use ← → to navigate{onAddCard && onRemoveCard && ' • ↑ to add • ↓ to remove'} • </span>
-              <span className="md:hidden">
-                Swipe ← → to browse{onAddCard && onRemoveCard && ' • ↑ add • ↓ remove'} • </span>
-              {visibleCards.findIndex(card => card.dataLine === modalCard.dataLine) + 1} of {visibleCards.length}
+              Use ← → to navigate{onAddCard && onRemoveCard && ' • ↑ to add • ↓ to remove'} • {visibleCards.findIndex(card => card.dataLine === modalCard.dataLine) + 1} of {visibleCards.length}
             </div>
           )}
           <div className="flex justify-center gap-2 items-center">
