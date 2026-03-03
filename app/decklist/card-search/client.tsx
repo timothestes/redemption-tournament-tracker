@@ -2434,7 +2434,7 @@ export default function CardSearchClient() {
                 </>
               ) : (
                 <p className="text-gray-600 dark:text-gray-300 mb-5 leading-relaxed">
-                  Are you sure you want to create a new deck? Your current deck will be replaced.
+                  Are you sure you want to create a new deck?
                 </p>
               )}
             </div>
@@ -2483,7 +2483,7 @@ export default function CardSearchClient() {
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                     </svg>
-                    Discard Changes & Create New Deck
+                    Discard Any Changes & Create New Deck
                   </button>
 
                   <button
