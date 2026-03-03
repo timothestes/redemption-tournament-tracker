@@ -43,8 +43,23 @@ export default function DeckCardList({
 }: DeckCardListProps) {
   const [openMenuCard, setOpenMenuCard] = React.useState<string | null>(null);
   const [previewCard, setPreviewCard] = React.useState<{ card: Card; x: number; y: number } | null>(null);
+  const [mobilePreviewCard, setMobilePreviewCard] = React.useState<Card | null>(null);
+  const lastTapRef = React.useRef<{ time: number; key: string }>({ time: 0, key: "" });
   const { getImageUrl } = useCardImageUrl();
-  
+
+  // Double-tap handler for mobile card preview
+  const handleCardTap = React.useCallback((card: Card, cardKey: string) => {
+    const now = Date.now();
+    const last = lastTapRef.current;
+    if (last.key === cardKey && now - last.time < 350) {
+      // Double tap detected
+      setMobilePreviewCard(card);
+      lastTapRef.current = { time: 0, key: "" };
+    } else {
+      lastTapRef.current = { time: now, key: cardKey };
+    }
+  }, []);
+
   // Close menu when clicking outside or pressing ESC
   React.useEffect(() => {
     const handleClickOutside = () => {
@@ -163,9 +178,16 @@ export default function DeckCardList({
               )}
 
               {/* Card Image */}
-              <div 
+              <div
                 className="aspect-[2.5/3.5] bg-gray-200 dark:bg-gray-700 cursor-pointer relative"
-                onClick={() => onViewCard?.(card)}
+                onClick={() => {
+                  // On touch devices, use double-tap for preview
+                  if ('ontouchstart' in window) {
+                    handleCardTap(card, cardKey);
+                  } else {
+                    onViewCard?.(card);
+                  }
+                }}
               >
                 <img
                   src={getImageUrl(card.imgFile)}
@@ -304,6 +326,31 @@ export default function DeckCardList({
               className="rounded-lg shadow-2xl border-2 border-gray-300 dark:border-gray-600"
               style={{ maxHeight: '400px', width: 'auto' }}
             />
+          </div>
+        )}
+
+        {/* Mobile Card Preview Overlay (double-tap) */}
+        {mobilePreviewCard && (
+          <div
+            className="md:hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+            onClick={() => setMobilePreviewCard(null)}
+          >
+            <div className="relative max-w-[75vw] max-h-[70vh]" onClick={(e) => e.stopPropagation()}>
+              <img
+                src={getImageUrl(mobilePreviewCard.imgFile)}
+                alt={mobilePreviewCard.name}
+                className="rounded-xl shadow-2xl border-2 border-white/20 w-full h-auto max-h-[70vh] object-contain"
+              />
+              <button
+                onClick={() => setMobilePreviewCard(null)}
+                className="absolute -top-3 -right-3 w-8 h-8 bg-black/70 rounded-full flex items-center justify-center text-white border border-white/30"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <p className="text-center text-white text-sm font-medium mt-2 drop-shadow-lg">{mobilePreviewCard.name}</p>
+            </div>
           </div>
         )}
       </div>
@@ -655,8 +702,13 @@ export default function DeckCardList({
 
             {/* Card Info */}
             <div className="flex-1 min-w-0">
-              <div 
+              <div
                 className="text-sm font-medium text-gray-900 dark:text-white truncate cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                onClick={() => {
+                  if ('ontouchstart' in window) {
+                    setMobilePreviewCard(card);
+                  }
+                }}
                 onMouseEnter={(e) => {
                   const pos = calculatePreviewPosition(e.currentTarget);
                   setPreviewCard({
@@ -728,6 +780,31 @@ export default function DeckCardList({
             className="rounded-lg shadow-2xl border-2 border-gray-300 dark:border-gray-600"
             style={{ maxHeight: '400px', width: 'auto' }}
           />
+        </div>
+      )}
+
+      {/* Mobile Card Preview Overlay (double-tap / tap name) */}
+      {mobilePreviewCard && (
+        <div
+          className="md:hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+          onClick={() => setMobilePreviewCard(null)}
+        >
+          <div className="relative max-w-[75vw] max-h-[70vh]" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={getImageUrl(mobilePreviewCard.imgFile)}
+              alt={mobilePreviewCard.name}
+              className="rounded-xl shadow-2xl border-2 border-white/20 w-full h-auto max-h-[70vh] object-contain"
+            />
+            <button
+              onClick={() => setMobilePreviewCard(null)}
+              className="absolute -top-3 -right-3 w-8 h-8 bg-black/70 rounded-full flex items-center justify-center text-white border border-white/30"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <p className="text-center text-white text-sm font-medium mt-2 drop-shadow-lg">{mobilePreviewCard.name}</p>
+          </div>
         </div>
       )}
     </div>
