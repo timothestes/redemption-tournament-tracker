@@ -51,18 +51,23 @@ function prettifyFieldName(key: string): string {
   return map[key] || key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, s => s.toUpperCase());
 }
 
-export default function ModalWithClose({ 
-  modalCard, 
-  setModalCard, 
-  visibleCards, 
-  onAddCard, 
-  onRemoveCard, 
+export default function ModalWithClose({
+  modalCard,
+  setModalCard,
+  visibleCards,
+  onAddCard,
+  onRemoveCard,
   getCardQuantity,
   activeDeckTab = "main" // Default to main if not provided
 }) {
   const { getImageUrl } = useCardImageUrl();
   const [showMenu, setShowMenu] = React.useState(false);
-  
+
+  // Touch/swipe state
+  const touchStartRef = React.useRef<{ x: number; y: number; time: number } | null>(null);
+  const [swipeOffset, setSwipeOffset] = React.useState(0);
+  const [isSwipeTransitioning, setIsSwipeTransitioning] = React.useState(false);
+
   // Close menu when clicking outside
   React.useEffect(() => {
     if (!showMenu) return;
@@ -70,7 +75,7 @@ export default function ModalWithClose({
     document.addEventListener('click', handleClick);
     return () => document.removeEventListener('click', handleClick);
   }, [showMenu]);
-  
+
   React.useEffect(() => {
     function handleKeyDown(e) {
       if (e.key === "Escape") {
@@ -81,22 +86,22 @@ export default function ModalWithClose({
         }
       } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
         if (!visibleCards || visibleCards.length <= 1) return;
-        
+
         const currentIndex = visibleCards.findIndex(card => card.dataLine === modalCard.dataLine);
         if (currentIndex === -1) return;
-        
+
         let nextIndex;
         if (e.key === "ArrowLeft") {
           nextIndex = currentIndex === 0 ? visibleCards.length - 1 : currentIndex - 1;
         } else {
           nextIndex = currentIndex === visibleCards.length - 1 ? 0 : currentIndex + 1;
         }
-        
+
         setModalCard(visibleCards[nextIndex]);
       } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
         // Only handle up/down if we have deck management functions
         if (!onAddCard || !onRemoveCard) return;
-        
+
         if (e.key === "ArrowUp") {
           // Up arrow adds to the active tab (main or reserve)
           const isReserve = activeDeckTab === "reserve";
@@ -108,19 +113,198 @@ export default function ModalWithClose({
         }
       }
     }
-    
+
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [setModalCard, modalCard, visibleCards, showMenu, onAddCard, onRemoveCard, activeDeckTab]);
 
+  // Swipe navigation helpers
+  const navigateToCard = React.useCallback((direction: 'left' | 'right') => {
+    if (!visibleCards || visibleCards.length <= 1) return;
+    const currentIndex = visibleCards.findIndex(card => card.dataLine === modalCard.dataLine);
+    if (currentIndex === -1) return;
+    let nextIndex;
+    if (direction === 'left') {
+      nextIndex = currentIndex === 0 ? visibleCards.length - 1 : currentIndex - 1;
+    } else {
+      nextIndex = currentIndex === visibleCards.length - 1 ? 0 : currentIndex + 1;
+    }
+    setModalCard(visibleCards[nextIndex]);
+  }, [visibleCards, modalCard, setModalCard]);
+
+  // Touch handlers for swipe navigation
+  const handleTouchStart = React.useCallback((e: React.TouchEvent) => {
+    touchStartRef.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY,
+      time: Date.now(),
+    };
+    setSwipeOffset(0);
+    setIsSwipeTransitioning(false);
+  }, []);
+
+  const handleTouchMove = React.useCallback((e: React.TouchEvent) => {
+    if (!touchStartRef.current || !visibleCards || visibleCards.length <= 1) return;
+    const deltaX = e.touches[0].clientX - touchStartRef.current.x;
+    const deltaY = e.touches[0].clientY - touchStartRef.current.y;
+    // Only track horizontal swipes (ignore vertical scrolling)
+    if (Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+      setSwipeOffset(deltaX);
+    }
+  }, [visibleCards]);
+
+  const handleTouchEnd = React.useCallback(() => {
+    if (!touchStartRef.current) return;
+    const swipeThreshold = 50;
+    const timeThreshold = 300;
+    const elapsed = Date.now() - touchStartRef.current.time;
+
+    if (Math.abs(swipeOffset) > swipeThreshold || (Math.abs(swipeOffset) > 30 && elapsed < timeThreshold)) {
+      if (swipeOffset > 0) {
+        navigateToCard('left'); // Swipe right = go to previous
+      } else {
+        navigateToCard('right'); // Swipe left = go to next
+      }
+    }
+
+    touchStartRef.current = null;
+    setSwipeOffset(0);
+  }, [swipeOffset, navigateToCard]);
+
   if (!modalCard) return null;
+
+  const currentIndex = visibleCards ? visibleCards.findIndex(card => card.dataLine === modalCard.dataLine) : -1;
+  const hasNavigation = visibleCards && visibleCards.length > 1;
+  const isFundraiser = modalCard.set === "Fund" || modalCard.officialSet === "Fundraiser";
+
+  // Get quantities for badge display
+  const quantityInDeck = getCardQuantity ? getCardQuantity(modalCard.name, modalCard.set, false) : 0;
+  const quantityInReserve = getCardQuantity ? getCardQuantity(modalCard.name, modalCard.set, true) : 0;
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 md:p-4"
       onClick={() => setModalCard(null)}
     >
+      {/* Mobile: full-screen layout, with bottom padding for MobileBottomNav */}
       <div
-        className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white rounded shadow-lg max-w-2xl w-full max-h-[90vh] overflow-hidden relative flex flex-col"
+        className="md:hidden bg-white dark:bg-gray-900 text-gray-900 dark:text-white w-full h-full flex flex-col relative pb-14"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Mobile Header - compact */}
+        <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+          <div className="flex-1 min-w-0 mr-2">
+            <div className="font-semibold text-base truncate">{modalCard.name}</div>
+            {hasNavigation && (
+              <div className="text-[10px] text-gray-400">{currentIndex + 1} of {visibleCards.length}</div>
+            )}
+          </div>
+          {/* Quantity badges */}
+          {(quantityInDeck > 0 || quantityInReserve > 0) && (
+            <div className="flex items-center gap-1 mr-2 flex-shrink-0">
+              {quantityInDeck > 0 && (
+                <span className="bg-blue-600 text-white px-1.5 py-0.5 rounded text-xs font-bold">
+                  ×{quantityInDeck}
+                </span>
+              )}
+              {quantityInReserve > 0 && (
+                <span className="bg-amber-600 text-white px-1.5 py-0.5 rounded text-xs font-bold">
+                  ×{quantityInReserve} R
+                </span>
+              )}
+            </div>
+          )}
+          <button
+            className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-red-600 hover:bg-red-700 rounded-full text-white"
+            aria-label="Close modal"
+            onClick={() => setModalCard(null)}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Mobile Card Image - swipeable, fills available space */}
+        <div
+          className="flex-1 flex items-center justify-center overflow-hidden relative bg-black/5 dark:bg-black/20"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          {/* Swipe direction indicators */}
+          {hasNavigation && swipeOffset !== 0 && (
+            <>
+              {swipeOffset > 30 && (
+                <div className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/80 dark:bg-gray-800/80 rounded-full p-2">
+                  <svg className="w-5 h-5 text-gray-700 dark:text-gray-200" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                </div>
+              )}
+              {swipeOffset < -30 && (
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/80 dark:bg-gray-800/80 rounded-full p-2">
+                  <svg className="w-5 h-5 text-gray-700 dark:text-gray-200" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                  </svg>
+                </div>
+              )}
+            </>
+          )}
+          <img
+            src={getImageUrl(modalCard.imgFile)}
+            alt={modalCard.name}
+            className="max-w-full max-h-full object-contain select-none"
+            style={{
+              transform: swipeOffset ? `translateX(${swipeOffset * 0.4}px)` : undefined,
+              transition: swipeOffset ? 'none' : 'transform 0.2s ease-out',
+            }}
+            draggable={false}
+          />
+        </div>
+
+        {/* Mobile Footer - compact action buttons */}
+        <div className="flex-shrink-0 px-3 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+          {hasNavigation && (
+            <div className="text-[10px] text-gray-400 text-center mb-1.5">
+              Swipe left/right to navigate
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            {isFundraiser ? (
+              <button
+                onClick={() => window.open('https://cactus-game-design-inc.square.site/s/shop', '_blank')}
+                className="flex-1 h-9 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg flex items-center justify-center gap-1.5 font-semibold text-sm"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/>
+                </svg>
+                Shop
+              </button>
+            ) : (
+              <button
+                onClick={() => openYTGSearchPage(modalCard.name)}
+                className="flex-1 h-9 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg flex items-center justify-center gap-1.5 font-semibold text-sm"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd"/>
+                </svg>
+                Search YTG
+              </button>
+            )}
+            <button
+              onClick={() => setModalCard(null)}
+              className="h-9 px-4 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-900 dark:hover:text-red-300 rounded-lg font-medium text-sm"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop: centered modal (unchanged) */}
+      <div
+        className="hidden md:flex bg-white dark:bg-gray-900 text-gray-900 dark:text-white rounded shadow-lg max-w-2xl w-full max-h-[90vh] overflow-hidden relative flex-col"
         onClick={e => e.stopPropagation()}
       >
         {/* X close button */}
@@ -162,19 +346,15 @@ export default function ModalWithClose({
           </div>
         </div>
         <div className="px-4 pb-4 pt-2 border-t bg-gray-50 dark:bg-gray-800">
-          {visibleCards && visibleCards.length > 1 && (
+          {hasNavigation && (
             <div className="text-xs text-gray-500 dark:text-gray-400 text-center mb-2">
-              Use ← → to navigate{onAddCard && onRemoveCard && ' • ↑ to add • ↓ to remove'} • {visibleCards.findIndex(card => card.dataLine === modalCard.dataLine) + 1} of {visibleCards.length}
+              Use ← → to navigate{onAddCard && onRemoveCard && ' • ↑ to add • ↓ to remove'} • {currentIndex + 1} of {visibleCards.length}
             </div>
           )}
           <div className="flex justify-center gap-2 items-center">
-            {visibleCards && visibleCards.length > 1 && (
+            {hasNavigation && (
               <button
-                onClick={() => {
-                  const currentIndex = visibleCards.findIndex(card => card.dataLine === modalCard.dataLine);
-                  const prevIndex = currentIndex === 0 ? visibleCards.length - 1 : currentIndex - 1;
-                  setModalCard(visibleCards[prevIndex]);
-                }}
+                onClick={() => navigateToCard('left')}
                 className="px-3 h-10 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium transition-colors flex items-center"
                 title="Previous card (Left arrow)"
               >
@@ -184,7 +364,7 @@ export default function ModalWithClose({
               </button>
             )}
             {onAddCard && onRemoveCard && getCardQuantity && (
-              <div className="relative hidden md:block">
+              <div className="relative">
                 <div className="flex gap-0 h-10">
                   {/* Main add button - adds to active tab */}
                   <button
@@ -284,52 +464,39 @@ export default function ModalWithClose({
                 )}
               </div>
             )}
-            {(() => {
-              // Check if card is a fundraiser card
-              const isFundraiser = modalCard.set === "Fund" || modalCard.officialSet === "Fundraiser";
-              
-              if (isFundraiser) {
-                return (
-                  <Button 
-                    onClick={() => window.open('https://cactus-game-design-inc.square.site/s/shop', '_blank')}
-                    className="px-4 h-10 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg flex items-center gap-1.5 font-semibold transition-colors text-sm whitespace-nowrap"
-                    size="sm"
-                  >
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/>
-                    </svg>
-                    Shop Fundraiser
-                  </Button>
-                );
-              }
-              
-              return (
-                <Button 
-                  onClick={() => openYTGSearchPage(modalCard.name)}
-                  className="px-4 h-10 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg flex items-center gap-1.5 font-semibold transition-colors text-sm whitespace-nowrap"
-                  size="sm"
-                >
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                    <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd"/>
-                  </svg>
-                  Search YTG
-                </Button>
-              );
-            })()}
-            <Button 
-              onClick={() => setModalCard(null)} 
+            {isFundraiser ? (
+              <Button
+                onClick={() => window.open('https://cactus-game-design-inc.square.site/s/shop', '_blank')}
+                className="px-4 h-10 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg flex items-center gap-1.5 font-semibold transition-colors text-sm whitespace-nowrap"
+                size="sm"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/>
+                </svg>
+                Shop Fundraiser
+              </Button>
+            ) : (
+              <Button
+                onClick={() => openYTGSearchPage(modalCard.name)}
+                className="px-4 h-10 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg flex items-center gap-1.5 font-semibold transition-colors text-sm whitespace-nowrap"
+                size="sm"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                  <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd"/>
+                </svg>
+                Search YTG
+              </Button>
+            )}
+            <Button
+              onClick={() => setModalCard(null)}
               className="px-4 h-10 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-900 dark:hover:text-red-300 rounded-lg font-medium transition-colors text-sm whitespace-nowrap"
               size="sm"
             >
               Close
             </Button>
-            {visibleCards && visibleCards.length > 1 && (
+            {hasNavigation && (
               <button
-                onClick={() => {
-                  const currentIndex = visibleCards.findIndex(card => card.dataLine === modalCard.dataLine);
-                  const nextIndex = currentIndex === visibleCards.length - 1 ? 0 : currentIndex + 1;
-                  setModalCard(visibleCards[nextIndex]);
-                }}
+                onClick={() => navigateToCard('right')}
                 className="px-3 h-10 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium transition-colors flex items-center"
                 title="Next card (Right arrow)"
               >

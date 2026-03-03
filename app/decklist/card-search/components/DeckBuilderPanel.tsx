@@ -562,8 +562,8 @@ export default function DeckBuilderPanel({
   return (
     <div className="w-full h-full flex flex-col bg-gray-50 dark:bg-gray-900 overflow-hidden">
       {/* Header */}
-      <div className="flex-shrink-0 p-4 border-b border-gray-200 dark:border-gray-700 overflow-visible">
-        {/* Deck Name */}
+      <div className="flex-shrink-0 px-3 py-2 md:p-4 border-b border-gray-200 dark:border-gray-700 overflow-visible">
+        {/* Deck Name + Counts Row */}
         {isEditingName ? (
           <input
             type="text"
@@ -571,13 +571,13 @@ export default function DeckBuilderPanel({
             onChange={(e) => setEditedName(e.target.value)}
             onBlur={handleNameSubmit}
             onKeyDown={handleNameKeyDown}
-            className="w-full text-xl font-semibold px-2 py-1 rounded border border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full text-lg md:text-xl font-semibold px-2 py-1 rounded border border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             autoFocus
           />
         ) : (
           <div className="flex items-center gap-2">
             <h2
-              className="text-xl font-semibold text-gray-900 dark:text-white cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate"
+              className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate"
               onClick={() => {
                 setIsEditingName(true);
                 setEditedName(deck.name);
@@ -596,31 +596,32 @@ export default function DeckBuilderPanel({
                 {deck.isPublic ? "Public" : "Private"}
               </span>
             )}
+            {/* Inline card counts on mobile */}
+            <span className="md:hidden text-xs text-gray-500 dark:text-gray-400 flex-shrink-0 ml-auto" suppressHydrationWarning>
+              {mainDeckCount}{reserveCount > 0 ? `+${reserveCount}R` : ''}
+            </span>
           </div>
         )}
 
         {/* Card Count and Menu Button Row */}
-        <div className="mt-2 flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-3 min-w-0">
-          <div className="flex items-center gap-3 text-sm flex-wrap min-w-0" suppressHydrationWarning>
-            <div className="flex items-center gap-1">
+        <div className="mt-1.5 md:mt-2 flex flex-col md:flex-row md:items-center md:justify-between gap-1.5 md:gap-3 min-w-0">
+          <div className="flex items-center gap-2 md:gap-3 text-sm flex-wrap min-w-0" suppressHydrationWarning>
+            <div className="hidden md:flex items-center gap-1">
               <span className="text-gray-600 dark:text-gray-400">Main:</span>
               <span className="font-semibold text-gray-900 dark:text-white">{mainDeckCount}</span>
             </div>
             {reserveCount > 0 && (
-              <>
-                <div className="flex items-center gap-1">
-                  <span className="text-gray-600 dark:text-gray-400">Reserve:</span>
-                  <span className="font-semibold text-gray-900 dark:text-white">{reserveCount}</span>
-                </div>
-              </>
+              <div className="hidden md:flex items-center gap-1">
+                <span className="text-gray-600 dark:text-gray-400">Reserve:</span>
+                <span className="font-semibold text-gray-900 dark:text-white">{reserveCount}</span>
+              </div>
             )}
-            <div className="flex items-center gap-1">
+            <div className="hidden md:flex items-center gap-1">
               <span className="text-gray-600 dark:text-gray-400">Total:</span>
               <span className="font-semibold text-gray-900 dark:text-white">{totalCards}</span>
             </div>
             
             {/* Format Selector (T1/T2/Paragon) */}
-            <span className="text-gray-400"></span>
             <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-full p-0.5">
               <button
                 onClick={() => handleDeckTypeChange('T1')}
@@ -746,7 +747,7 @@ export default function DeckBuilderPanel({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+          <div className="flex items-center gap-1.5 md:gap-2 flex-shrink-0 flex-wrap">
             {/* Save Button */}
             {onSaveDeck && isAuthenticated && (
               <button
@@ -1053,10 +1054,10 @@ export default function DeckBuilderPanel({
       {/* ...existing code... */}
       {/* Tabs - Hide when expanded (full screen view) */}
       {!isExpanded && (
-      <div className="flex-shrink-0 flex items-center border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+      <div className="flex-shrink-0 flex items-center border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-x-auto scrollbar-hide">
         <button
           onClick={() => handleTabChange("main")}
-          className={`flex-1 px-3 py-3 text-sm font-medium transition-colors ${
+          className={`flex-shrink-0 px-3 py-3 text-sm font-medium transition-colors whitespace-nowrap ${
             activeTab === "main"
               ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
@@ -1066,7 +1067,7 @@ export default function DeckBuilderPanel({
         </button>
         <button
           onClick={() => handleTabChange("reserve")}
-          className={`flex-1 px-3 py-3 text-sm font-medium transition-colors ${
+          className={`flex-shrink-0 px-3 py-3 text-sm font-medium transition-colors whitespace-nowrap ${
             activeTab === "reserve"
               ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
@@ -1078,7 +1079,7 @@ export default function DeckBuilderPanel({
           onClick={() => handleTabChange("info")}
           onMouseEnter={() => setShowValidationTooltip(true)}
           onMouseLeave={() => setShowValidationTooltip(false)}
-          className={`relative flex-1 px-3 py-3 text-sm font-medium transition-colors ${
+          className={`relative flex-shrink-0 px-3 py-3 text-sm font-medium transition-colors whitespace-nowrap ${
             activeTab === "info"
               ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
@@ -1150,7 +1151,7 @@ export default function DeckBuilderPanel({
         {/* Details Tab (Cover Cards + Description) */}
         <button
           onClick={() => handleTabChange("cover")}
-          className={`flex-1 px-3 py-3 text-sm font-medium transition-colors ${
+          className={`flex-shrink-0 px-3 py-3 text-sm font-medium transition-colors whitespace-nowrap ${
             activeTab === "cover"
               ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"

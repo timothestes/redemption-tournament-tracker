@@ -20,7 +20,6 @@ import { parseDeckText, generateDeckText, downloadDeckAsFile, copyDeckToClipboar
 import { createClient } from "../../../utils/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { deleteDeckAction } from "../actions";
-import { MobileDrawer } from "../../../components/ui/mobile-drawer";
 import { MobileBottomNav } from "./components/MobileBottomNav";
 
 // Helper component for rename form in new deck modal
@@ -2076,59 +2075,58 @@ export default function CardSearchClient() {
         isAuthenticated={!!user}
       />
 
-      {/* Mobile Deck Drawer */}
-      <MobileDrawer
-        isOpen={isMobileDeckDrawerOpen}
-        onClose={() => setIsMobileDeckDrawerOpen(false)}
-      >
-        {isInitializing ? (
-          <div className="flex-1 flex items-center justify-center bg-white dark:bg-gray-800 p-8">
-            <div className="text-gray-400 dark:text-gray-500 text-sm">Loading deck...</div>
-          </div>
-        ) : (
-          <DeckBuilderPanel
-            deck={deck}
-            syncStatus={syncStatus}
-            hasUnsavedChanges={hasUnsavedChanges}
-            isAuthenticated={!!user}
-            isExpanded={false}
-            forceDisableHoverPreview
-            onDeckNameChange={setDeckName}
-            onDeckFormatChange={handleDeckFormatChange}
-            onParagonChange={setDeckParagon}
-            onDeckPublicChange={setDeckPublic}
-            onSaveDeck={saveDeckToCloud}
-            onAddCard={(cardName, cardSet, isReserve) => {
-              const card = cards.find(c => c.name === cardName && c.set === cardSet);
-              if (card) {
-                addCard(card, isReserve);
-              }
-            }}
-            onRemoveCard={(cardName, cardSet, isReserve) => {
-              removeCard(cardName, cardSet, isReserve);
-            }}
-            onExport={handleExportDeck}
-            onDownload={handleDownloadDeck}
-            onImport={() => setShowImportModal(true)}
-            onDelete={handleDeleteDeck}
-            onDuplicate={() => {}}
-            onNewDeck={handleNewDeck}
-            onLoadDeck={loadDeckFromCloud}
-            onActiveTabChange={setActiveDeckTab}
-            onViewCard={(card, isReserve) => {
-              setFullDeckViewSection(isReserve ? 'reserve' : 'main');
-              setModalCard(card);
-              setIsMobileDeckDrawerOpen(false);
-            }}
-            onNotify={(message, type) => {
-              setNotification({ message, type });
-              setTimeout(() => setNotification(null), 3000);
-            }}
-            onPreviewCardsChange={setPreviewCards}
-            onDescriptionChange={setDeckDescription}
-          />
-        )}
-      </MobileDrawer>
+      {/* Mobile Deck View (replaces search when Deck tab is active) */}
+      {isMobileDeckDrawerOpen && (
+        <div className="md:hidden fixed inset-x-0 top-[64px] bottom-[3.5rem] z-40 bg-white dark:bg-gray-900 flex flex-col overflow-hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+          {isInitializing ? (
+            <div className="flex-1 flex items-center justify-center p-8">
+              <div className="text-gray-400 dark:text-gray-500 text-sm">Loading deck...</div>
+            </div>
+          ) : (
+            <DeckBuilderPanel
+              deck={deck}
+              syncStatus={syncStatus}
+              hasUnsavedChanges={hasUnsavedChanges}
+              isAuthenticated={!!user}
+              isExpanded={false}
+              forceDisableHoverPreview
+              onDeckNameChange={setDeckName}
+              onDeckFormatChange={handleDeckFormatChange}
+              onParagonChange={setDeckParagon}
+              onDeckPublicChange={setDeckPublic}
+              onSaveDeck={saveDeckToCloud}
+              onAddCard={(cardName, cardSet, isReserve) => {
+                const card = cards.find(c => c.name === cardName && c.set === cardSet);
+                if (card) {
+                  addCard(card, isReserve);
+                }
+              }}
+              onRemoveCard={(cardName, cardSet, isReserve) => {
+                removeCard(cardName, cardSet, isReserve);
+              }}
+              onExport={handleExportDeck}
+              onDownload={handleDownloadDeck}
+              onImport={() => setShowImportModal(true)}
+              onDelete={handleDeleteDeck}
+              onDuplicate={() => {}}
+              onNewDeck={handleNewDeck}
+              onLoadDeck={loadDeckFromCloud}
+              onActiveTabChange={setActiveDeckTab}
+              onViewCard={(card, isReserve) => {
+                setFullDeckViewSection(isReserve ? 'reserve' : 'main');
+                setModalCard(card);
+                setIsMobileDeckDrawerOpen(false);
+              }}
+              onNotify={(message, type) => {
+                setNotification({ message, type });
+                setTimeout(() => setNotification(null), 3000);
+              }}
+              onPreviewCardsChange={setPreviewCards}
+              onDescriptionChange={setDeckDescription}
+            />
+          )}
+        </div>
+      )}
 
       {/* Import modal */}
       {showImportModal && (
