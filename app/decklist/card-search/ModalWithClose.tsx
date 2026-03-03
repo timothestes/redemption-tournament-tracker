@@ -73,6 +73,8 @@ export default function ModalWithClose({
   const containerRef = React.useRef<HTMLDivElement>(null);
   // Pending card to set after animation completes
   const pendingCardRef = React.useRef<any>(null);
+  // Skip transition for one frame after card swap to prevent reverse-slide visual glitch
+  const skipTransitionRef = React.useRef(false);
 
   // Close menu when clicking outside
   React.useEffect(() => {
@@ -135,13 +137,24 @@ export default function ModalWithClose({
   // Called when the CSS slide-out animation finishes
   const handleTransitionEnd = React.useCallback(() => {
     if (!pendingCardRef.current || !isAnimatingRef.current) return;
-    // Swap the card and instantly reset position (no transition)
+    // Suppress transition for the card-swap render to prevent reverse-slide glitch
+    skipTransitionRef.current = true;
     isAnimatingRef.current = false;
     setAnimatingTo(null);
     setSwipeOffset(0);
     setModalCard(pendingCardRef.current);
     pendingCardRef.current = null;
   }, [setModalCard]);
+
+  // Clear the skip-transition flag after the no-transition frame has painted
+  React.useLayoutEffect(() => {
+    if (skipTransitionRef.current) {
+      const id = requestAnimationFrame(() => {
+        skipTransitionRef.current = false;
+      });
+      return () => cancelAnimationFrame(id);
+    }
+  });
 
   // Navigate: animate the track to the adjacent card, then swap on transition end
   const navigateWithSlide = React.useCallback((direction: 'left' | 'right') => {
@@ -302,7 +315,7 @@ export default function ModalWithClose({
                 : `translateX(calc(-100% + ${swipeOffset}px))`,
               transition: animatingTo
                 ? 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
-                : swipeOffset !== 0
+                : (skipTransitionRef.current || swipeOffset !== 0)
                   ? 'none'
                   : 'transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
               willChange: 'transform',
