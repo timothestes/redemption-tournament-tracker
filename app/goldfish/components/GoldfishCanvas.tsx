@@ -700,6 +700,19 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
           moveCard(card.instanceId, targetZone, undefined, dropX, dropY);
         }
       }
+
+      // Re-trigger hover preview since cursor is still over the card after drag
+      if (!card.isFlipped) {
+        if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+        hoverTimerRef.current = setTimeout(() => {
+          if (isDraggingRef.current || contextMenuRef.current) return;
+          setHoverCard({
+            card,
+            x: e.evt.clientX,
+            y: e.evt.clientY,
+          });
+        }, 700);
+      }
     },
     [findZoneAtPosition, moveCard, moveCardsBatch, handleDeckDrop, cardWidth, cardHeight, selectedIds, clearSelection, state.turn]
   );
