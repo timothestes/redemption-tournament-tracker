@@ -1479,6 +1479,8 @@ export default function DeckBuilderPanel({
             deck={deck}
             onViewCard={onViewCard}
             isAuthenticated={isAuthenticated}
+            viewMode={expandedViewMode}
+            groupBy={expandedGroupBy}
           />
         ) : (
           <>
