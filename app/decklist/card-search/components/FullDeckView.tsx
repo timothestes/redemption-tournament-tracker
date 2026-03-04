@@ -132,8 +132,9 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
     setCreateColor("#6366f1");
     setCreateColorOpen(false);
     setCreateError(null);
+    setTagFilter("");
   }
-  
+
   // Separate main deck and reserve
   const mainDeckCards = deck.cards.filter((dc) => !dc.isReserve);
   const reserveCards = deck.cards.filter((dc) => dc.isReserve);

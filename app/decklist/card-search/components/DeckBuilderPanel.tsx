@@ -243,6 +243,7 @@ export default function DeckBuilderPanel({
     setCreateColor("#6366f1");
     setCreateColorOpen(false);
     setCreateError(null);
+    setTagFilter("");
   }
 
   // View options

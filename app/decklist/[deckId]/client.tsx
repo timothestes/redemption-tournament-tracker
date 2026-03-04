@@ -258,6 +258,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
     setCreateName("");
     setCreateColor("#6366f1");
     setCreateError(null);
+    setTagFilter("");
   }
 
   // Cover card editor (owner only)
