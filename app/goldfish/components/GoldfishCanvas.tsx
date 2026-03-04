@@ -1729,6 +1729,8 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
           title={peekState.title}
           onClose={() => setPeekState(null)}
           onStartDrag={modalStartDrag}
+          onStartMultiDrag={modalStartMultiDrag}
+          didDragRef={modalDidDragRef}
           isDragActive={modalDrag.isDragging}
         />
       )}

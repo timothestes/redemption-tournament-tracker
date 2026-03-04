@@ -9,6 +9,13 @@ const SubmenuLockContext = createContext<{
   unlock: () => void;
 } | null>(null);
 
+// Context to coordinate which submenu is open (shared across sibling triggers)
+const ActiveSubmenuContext = createContext<{
+  active: string | null;
+  setActive: (label: string | null) => void;
+  closeTimerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
+} | null>(null);
+
 interface DeckContextMenuProps {
   x: number;
   y: number;
@@ -259,35 +266,46 @@ function SubmenuTrigger({
   label: string;
   children: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
-  const triggerRef = useRef<HTMLDivElement>(null);
+  const ctx = useContext(ActiveSubmenuContext);
+  const isOpen = ctx?.active === label;
   const openTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lockedRef = useRef(false);
 
   const lock = useCallback(() => { lockedRef.current = true; }, []);
   const unlock = useCallback(() => { lockedRef.current = false; }, []);
 
+  useEffect(() => {
+    return () => {
+      if (openTimerRef.current) clearTimeout(openTimerRef.current);
+    };
+  }, []);
+
   const showSub = () => {
-    if (closeTimerRef.current) { clearTimeout(closeTimerRef.current); closeTimerRef.current = null; }
-    if (open) return;
+    // Cancel any pending close from any sibling trigger
+    if (ctx?.closeTimerRef.current) { clearTimeout(ctx.closeTimerRef.current); ctx.closeTimerRef.current = null; }
+    if (isOpen) return;
+
+    // Use a delay whether opening fresh or switching between triggers.
+    // Switching delay is longer so brief cursor pass-throughs don't steal focus.
     if (!openTimerRef.current) {
       openTimerRef.current = setTimeout(() => {
         openTimerRef.current = null;
-        setOpen(true);
-      }, 180);
+        ctx?.setActive(label);
+      }, ctx?.active ? 300 : 180);
     }
   };
 
   const hideSub = () => {
     if (openTimerRef.current) { clearTimeout(openTimerRef.current); openTimerRef.current = null; }
     if (lockedRef.current) return;
-    closeTimerRef.current = setTimeout(() => setOpen(false), 150);
+    // Long delay so users can reach the submenu even with imprecise cursor paths
+    if (ctx) {
+      ctx.closeTimerRef.current = setTimeout(() => ctx.setActive(null), 400);
+    }
   };
 
   return (
     <div
-      ref={triggerRef}
       style={{ position: 'relative' }}
       onMouseEnter={showSub}
       onMouseLeave={hideSub}
@@ -300,7 +318,7 @@ function SubmenuTrigger({
         <ChevronRight size={12} style={{ opacity: 0.6, transform: 'rotate(180deg)' }} />
         <span>{label}</span>
       </div>
-      {open && (
+      {isOpen && (
         <div style={SUBMENU_STYLE} onContextMenu={(e) => e.preventDefault()}>
           <SubmenuLockContext.Provider value={{ lock, unlock }}>
             {children}
@@ -321,6 +339,8 @@ export function DeckContextMenu({
   const menuRef = useRef<HTMLDivElement>(null);
   const [showDrawX, setShowDrawX] = useState(false);
   const [drawXCount, setDrawXCount] = useState(3);
+  const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
+  const submenuCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Right-align the menu when the click is near the right edge
   const MENU_WIDTH = 200;
@@ -395,24 +415,26 @@ export function DeckContextMenu({
       )}
 
       <div style={SEPARATOR_STYLE} />
-      <SubmenuTrigger label="Top Card">
-        <SubMenuActionRow icon={<Play size={14} />} label="Draw" max={deckSize} onAction={onDrawTop} />
-        <SubMenuActionRow icon={<Eye size={14} />} label="Reveal" max={deckSize} onAction={onRevealTop} />
-        <SubMenuActionRow icon={<Trash2 size={14} />} label="Discard" max={deckSize} onAction={onDiscardTop} />
-        <SubMenuActionRow icon={<Archive size={14} />} label="Reserve" max={deckSize} onAction={onReserveTop} />
-      </SubmenuTrigger>
-      <SubmenuTrigger label="Bottom Card">
-        <SubMenuActionRow icon={<Play size={14} />} label="Draw" max={deckSize} onAction={onDrawBottom} />
-        <SubMenuActionRow icon={<Eye size={14} />} label="Reveal" max={deckSize} onAction={onRevealBottom} />
-        <SubMenuActionRow icon={<Trash2 size={14} />} label="Discard" max={deckSize} onAction={onDiscardBottom} />
-        <SubMenuActionRow icon={<Archive size={14} />} label="Reserve" max={deckSize} onAction={onReserveBottom} />
-      </SubmenuTrigger>
-      <SubmenuTrigger label="Random Card">
-        <SubMenuActionRow icon={<Play size={14} />} label="Draw" max={deckSize} onAction={onDrawRandom} />
-        <SubMenuActionRow icon={<Eye size={14} />} label="Reveal" max={deckSize} onAction={onRevealRandom} />
-        <SubMenuActionRow icon={<Trash2 size={14} />} label="Discard" max={deckSize} onAction={onDiscardRandom} />
-        <SubMenuActionRow icon={<Archive size={14} />} label="Reserve" max={deckSize} onAction={onReserveRandom} />
-      </SubmenuTrigger>
+      <ActiveSubmenuContext.Provider value={{ active: activeSubmenu, setActive: setActiveSubmenu, closeTimerRef: submenuCloseTimerRef }}>
+        <SubmenuTrigger label="Top Card">
+          <SubMenuActionRow icon={<Play size={14} />} label="Draw" max={deckSize} onAction={onDrawTop} />
+          <SubMenuActionRow icon={<Eye size={14} />} label="Reveal" max={deckSize} onAction={onRevealTop} />
+          <SubMenuActionRow icon={<Trash2 size={14} />} label="Discard" max={deckSize} onAction={onDiscardTop} />
+          <SubMenuActionRow icon={<Archive size={14} />} label="Reserve" max={deckSize} onAction={onReserveTop} />
+        </SubmenuTrigger>
+        <SubmenuTrigger label="Bottom Card">
+          <SubMenuActionRow icon={<Play size={14} />} label="Draw" max={deckSize} onAction={onDrawBottom} />
+          <SubMenuActionRow icon={<Eye size={14} />} label="Reveal" max={deckSize} onAction={onRevealBottom} />
+          <SubMenuActionRow icon={<Trash2 size={14} />} label="Discard" max={deckSize} onAction={onDiscardBottom} />
+          <SubMenuActionRow icon={<Archive size={14} />} label="Reserve" max={deckSize} onAction={onReserveBottom} />
+        </SubmenuTrigger>
+        <SubmenuTrigger label="Random Card">
+          <SubMenuActionRow icon={<Play size={14} />} label="Draw" max={deckSize} onAction={onDrawRandom} />
+          <SubMenuActionRow icon={<Eye size={14} />} label="Reveal" max={deckSize} onAction={onRevealRandom} />
+          <SubMenuActionRow icon={<Trash2 size={14} />} label="Discard" max={deckSize} onAction={onDiscardRandom} />
+          <SubMenuActionRow icon={<Archive size={14} />} label="Reserve" max={deckSize} onAction={onReserveRandom} />
+        </SubmenuTrigger>
+      </ActiveSubmenuContext.Provider>
 
       <div style={SEPARATOR_STYLE} />
       <button style={ITEM_STYLE} onClick={onShuffleDeck} onMouseEnter={hoverEnter} onMouseLeave={hoverLeave}>
