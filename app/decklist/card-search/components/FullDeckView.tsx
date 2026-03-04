@@ -458,16 +458,16 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
     <div className="h-full w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-white overflow-y-auto">
       {/* Tags header */}
       {(deckTags.length > 0 || (isAuthenticated && deck.id)) && (
-      <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm">
-        <div className="px-6 py-2">
-          <div className="flex items-center gap-2 flex-wrap min-h-[1.75rem]">
+      <div className="sticky top-0 z-20 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-b border-gray-200/60 dark:border-gray-700/60">
+        <div className="px-3 md:px-4 py-1 md:py-1.5">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
               {/* Current tag pills */}
               {deckTags.map((tag) => (
                 isAuthenticated ? (
                   <button
                     key={tag.id}
                     onClick={() => toggleTag(tag)}
-                    className="group flex items-center gap-1 pl-2.5 pr-1.5 py-0.5 rounded-full text-xs font-medium transition-opacity"
+                    className="group flex items-center gap-1 pl-2.5 pr-1.5 py-0.5 rounded-full text-xs font-medium transition-opacity flex-shrink-0 whitespace-nowrap"
                     style={{ backgroundColor: tag.color, color: getTagContrastColor(tag.color) }}
                     title={`Remove "${tag.name}"`}
                   >
@@ -479,7 +479,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                 ) : (
                   <span
                     key={tag.id}
-                    className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+                    className="px-2.5 py-0.5 rounded-full text-xs font-medium flex-shrink-0 whitespace-nowrap"
                     style={{ backgroundColor: tag.color, color: getTagContrastColor(tag.color) }}
                   >
                     {tag.name}
@@ -489,10 +489,10 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
 
               {/* Picker trigger */}
               {isAuthenticated && deck.id && (
-                <div className="relative" ref={tagPickerRef}>
+                <div className="relative flex-shrink-0" ref={tagPickerRef}>
                   <button
                     onClick={() => { setTagPickerOpen((o) => !o); setTagFilter(""); setCreateMode(false); }}
-                    className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-dashed border-gray-400 dark:border-gray-500 text-xs text-gray-500 dark:text-gray-400 hover:border-gray-600 dark:hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-dashed border-gray-400 dark:border-gray-500 text-xs text-gray-500 dark:text-gray-400 hover:border-gray-600 dark:hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200 transition-colors whitespace-nowrap"
                   >
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -616,7 +616,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
       )}
 
       {/* Main content area */}
-      <div className="px-6 py-6">
+      <div className="px-3 py-3 md:px-4 md:py-3">
         {/* Single column layout - all cards together */}
         <div>
           {/* Main Deck */}
@@ -650,9 +650,9 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                           )}
                           <div className="flex flex-col gap-2 items-center">
                             {column.cards.flatMap((deckCard) =>
-                              Array.from({ length: deckCard.quantity }, (_, i) => (
+                              Array.from({ length: viewMode === 'stacked' ? deckCard.quantity : 1 }, (_, i) => (
                                 <React.Fragment key={`${deckCard.card.name}-${deckCard.card.set}-${i}`}>
-                                  {renderCompactCard(deckCard, i, true, true)}
+                                  {renderCompactCard(deckCard, i, viewMode === 'stacked', viewMode === 'stacked')}
                                 </React.Fragment>
                               ))
                             )}
@@ -670,9 +670,9 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                         </div>
                         <div className="flex flex-col gap-2 items-center">
                           {sortCards(reserveCards).flatMap((deckCard) =>
-                            Array.from({ length: deckCard.quantity }, (_, i) => (
+                            Array.from({ length: viewMode === 'stacked' ? deckCard.quantity : 1 }, (_, i) => (
                               <React.Fragment key={`${deckCard.card.name}-${deckCard.card.set}-reserve-${i}`}>
-                                {renderCompactCard(deckCard, i, true, true)}
+                                {renderCompactCard(deckCard, i, viewMode === 'stacked', viewMode === 'stacked')}
                               </React.Fragment>
                             ))
                           )}

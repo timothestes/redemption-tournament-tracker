@@ -2048,6 +2048,7 @@ export default function CardSearchClient() {
             }}
             onNewDeck={handleNewDeck}
             onLoadDeck={loadDeckFromCloud}
+            defaultTab={activeDeckTab}
             onActiveTabChange={setActiveDeckTab}
             onViewCard={(card, isReserve) => {
               setFullDeckViewSection(isReserve ? 'reserve' : 'main');
@@ -2064,6 +2065,18 @@ export default function CardSearchClient() {
         </div>
       )}
       
+      {/* Mobile Reserve Indicator - shows on Search tab when Reserve is active */}
+      {!isMobileDeckDrawerOpen && activeDeckTab === "reserve" && (
+        <div className="md:hidden fixed bottom-14 inset-x-0 z-50 flex justify-center pointer-events-none pb-[env(safe-area-inset-bottom)]">
+          <div className="pointer-events-auto bg-amber-500 dark:bg-amber-600 text-white text-xs font-semibold px-3 py-1 rounded-full shadow-lg flex items-center gap-1.5">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            +/− adds to Reserve
+          </div>
+        </div>
+      )}
+
       {/* Mobile Bottom Nav */}
       <MobileBottomNav
         isDeckOpen={isMobileDeckDrawerOpen}
@@ -2116,6 +2129,7 @@ export default function CardSearchClient() {
               onDuplicate={() => {}}
               onNewDeck={handleNewDeck}
               onLoadDeck={loadDeckFromCloud}
+              defaultTab={activeDeckTab}
               onActiveTabChange={setActiveDeckTab}
               onViewCard={(card, isReserve) => {
                 setFullDeckViewSection(isReserve ? 'reserve' : 'main');

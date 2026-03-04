@@ -22,6 +22,8 @@ interface DeckCardListProps {
   showTypeIcons?: boolean;
   /** Optional: Layout view mode (default: 'list') */
   viewLayout?: 'grid' | 'list';
+  /** Optional: Grid density for mobile (default: 'normal' = 2 cols, 'compact' = 3 cols) */
+  gridDensity?: 'normal' | 'compact';
   /** Optional: Disable card hover preview */
   disableHoverPreview?: boolean;
 }
@@ -39,6 +41,7 @@ export default function DeckCardList({
   onMoveCard,
   showTypeIcons = true,
   viewLayout = 'list',
+  gridDensity = 'normal',
   disableHoverPreview = false,
 }: DeckCardListProps) {
   const [openMenuCard, setOpenMenuCard] = React.useState<string | null>(null);
@@ -133,7 +136,11 @@ export default function DeckCardList({
   // Grid View
   if (viewLayout === 'grid') {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
+      <div className={`grid gap-2 ${
+        gridDensity === 'compact'
+          ? 'grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7'
+          : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'
+      }`}>
         {displayCards.map((deckCard) => {
           const { card, quantity, isReserve } = deckCard;
           const cardKey = `${card.name}-${card.set}-${isReserve}`;
