@@ -637,12 +637,6 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
       const centerY = dropY + cardHeight / 2;
       const targetZone = findZoneAtPosition(centerX, centerY);
 
-      // Block removing cards from reserve on turn 1
-      if (card.zone === 'reserve' && targetZone !== 'reserve' && state.turn === 1) {
-        showGameToast('Cannot remove cards from reserve on turn 1');
-        return;
-      }
-
       // Group drag: if this card is selected and there are multiple selections
       const isGroupDrag = selectedIds.has(card.instanceId) && selectedIds.size > 1;
       const cardIds = isGroupDrag ? Array.from(selectedIds) : [card.instanceId];
@@ -701,8 +695,11 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
         }
       }
 
-      // Re-trigger hover preview since cursor is still over the card after drag
-      if (!card.isFlipped) {
+      // Re-trigger hover preview only if the card stayed in place (no zone change).
+      // If the card moved zones, it's no longer under the cursor and mouseLeave
+      // won't fire, so the preview would get stuck.
+      const movedZones = targetZone && targetZone !== card.zone;
+      if (!card.isFlipped && !movedZones) {
         if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
         hoverTimerRef.current = setTimeout(() => {
           if (isDraggingRef.current || contextMenuRef.current) return;
@@ -1171,18 +1168,20 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
               );
             }
 
-            // Reserve: show top card face-down
-            // Reserve: overlap cards horizontally within zone bounds
+            // Reserve: overlap cards horizontally, sorted by type then name
             if (zoneId === 'reserve') {
               const zone = zoneLayout[zoneId];
               const pad = 8;
               const availW = zone.width - pad * 2;
-              const overlap = cards.length <= 1
+              const sorted = [...cards].sort((a, b) =>
+                a.type.localeCompare(b.type) || a.cardName.localeCompare(b.cardName)
+              );
+              const overlap = sorted.length <= 1
                 ? 0
-                : Math.min(cardWidth * 0.3, (availW - cardWidth) / (cards.length - 1));
+                : Math.min(cardWidth * 0.3, (availW - cardWidth) / (sorted.length - 1));
               return (
                 <Group key={zoneId}>
-                  {cards.map((card, i) => (
+                  {sorted.map((card, i) => (
                     <GameCardNode
                       key={card.instanceId}
                       card={card}
