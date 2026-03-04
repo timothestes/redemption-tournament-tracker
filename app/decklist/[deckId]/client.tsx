@@ -142,6 +142,8 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   const [modalCard, setModalCard] = useState<Card | null>(null);
   const [viewMode, setViewMode] = useState<"normal" | "stacked">("stacked");
   const [groupBy, setGroupBy] = useState<"type" | "alignment" | "none">("type");
+  const [showParagonModal, setShowParagonModal] = useState(false);
+  const [paragonVisible, setParagonVisible] = useState(true);
 
   // Inline name editing (owner only)
   const [deckName, setDeckName] = useState(deck.name);
@@ -425,6 +427,34 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
           onRemoveCard={null}
           getCardQuantity={null}
         />
+      )}
+
+      {/* Paragon Card Modal */}
+      {showParagonModal && deck.paragon && (
+        <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowParagonModal(false)}
+        >
+          <div
+            className="relative max-w-4xl w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowParagonModal(false)}
+              className="absolute -top-4 -right-4 w-10 h-10 bg-white dark:bg-gray-800 rounded-full shadow-lg flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors z-10"
+              aria-label="Close"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <img
+              src={`/paragons/Paragon ${deck.paragon}.png`}
+              alt={deck.paragon}
+              className="w-full h-auto rounded-lg shadow-2xl"
+            />
+          </div>
+        </div>
       )}
 
       {/* Breadcrumb */}
@@ -911,14 +941,29 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
         );
       })()}
 
-      {/* Paragon image */}
+      {/* Paragon image — collapsible */}
       {deck.paragon && formatDeckType(deck.format) === "Paragon" && (
-        <div className="mb-8 max-w-xs">
-          <img
-            src={`/paragons/Paragon ${deck.paragon}.png`}
-            alt={deck.paragon}
-            className="w-full rounded-lg shadow-md"
-          />
+        <div className="mb-8">
+          <button
+            onClick={() => setParagonVisible((v) => !v)}
+            className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors mb-2"
+          >
+            <svg className={`w-4 h-4 transition-transform ${paragonVisible ? 'rotate-0' : '-rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+            {paragonVisible ? 'Hide' : 'Show'} Paragon Card
+          </button>
+          {paragonVisible && (
+            <div className="max-w-xs">
+              <img
+                src={`/paragons/Paragon ${deck.paragon}.png`}
+                alt={deck.paragon}
+                className="w-full rounded-lg shadow-md cursor-pointer hover:scale-105 hover:shadow-xl transition-all"
+                onClick={() => setShowParagonModal(true)}
+                title="Click to view full size"
+              />
+            </div>
+          )}
         </div>
       )}
 

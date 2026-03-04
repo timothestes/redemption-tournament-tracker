@@ -19,20 +19,18 @@ interface FullDeckViewProps {
   deck: Deck;
   onViewCard?: (card: Card, isReserve?: boolean) => void;
   isAuthenticated?: boolean;
+  viewMode: 'normal' | 'stacked';
+  groupBy: 'none' | 'alignment' | 'type';
 }
 
 /**
  * Full-screen optimized deck view with compact card display
  * Shows entire deck at a glance with minimal scrolling
  */
-export default function FullDeckView({ deck, onViewCard, isAuthenticated = false }: FullDeckViewProps) {
+export default function FullDeckView({ deck, onViewCard, isAuthenticated = false, viewMode, groupBy }: FullDeckViewProps) {
   const { getImageUrl } = useCardImageUrl();
   const { isAdmin, permissions } = useIsAdmin();
   const canManageTags = isAdmin && permissions.includes('manage_tags');
-
-  // View mode state
-    const [viewMode, setViewMode] = useState<'normal' | 'stacked'>('stacked');
-    const [groupBy, setGroupBy] = useState<'none' | 'alignment' | 'type'>('type');
 
   // Tags state
   const [deckTags, setDeckTags] = useState<GlobalTag[]>([]);
@@ -457,174 +455,11 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
 
   return (
     <div className="h-full w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-white overflow-y-auto">
-      {/* Header with stats */}
-      <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-lg">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-end mb-3">
-            <div className="flex items-center gap-4 text-sm">
-              {/* View Mode Toggle */}
-              <button
-                onClick={() => {
-                  const newMode = viewMode === 'normal' ? 'stacked' : 'normal';
-                  setViewMode(newMode);
-                  if (newMode === 'normal') {
-                    setGroupBy('none');
-                  }
-                }}
-                className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors"
-                title={viewMode === 'normal' ? 'Switch to stacked view' : 'Switch to normal view'}
-              >
-                <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  {viewMode === 'normal' ? (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                  ) : (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-                  )}
-                </svg>
-                <span className="text-gray-600 dark:text-gray-300 text-xs font-medium">
-                  {viewMode === 'normal' ? 'Normal' : 'Stacked'}
-                </span>
-              </button>
-
-              {/* Group By Dropdown - Only show in stacked mode */}
-              {viewMode === 'stacked' && (
-                <div className="relative">
-                  <select
-                    value={groupBy}
-                    onChange={(e) => setGroupBy(e.target.value as 'none' | 'alignment' | 'type')}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors text-gray-700 dark:text-gray-300 text-xs font-medium cursor-pointer appearance-none pr-8"
-                    title="Group cards by"
-                  >
-                    <option value="none">No Grouping</option>
-                    <option value="alignment">Group by Alignment</option>
-                    <option value="type">Group by Type</option>
-                  </select>
-                  <svg className="w-4 h-4 text-gray-500 dark:text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              )}
-              
-              <div className="flex items-center gap-2">
-                <span className="text-gray-500 dark:text-gray-400">Format:</span>
-                <span className="font-semibold text-blue-400">{deck.format || 'Type 1'}</span>
-              </div>
-            </div>
-          </div>
-          
-          {/* Quick stats bar */}
-          <div className="flex items-center gap-6 text-sm">
-            {/* Validation Status */}
-            <div className={`relative group flex items-center gap-2 px-3 py-1.5 border rounded-lg cursor-help ${
-              validation.isValid && validation.stats.totalCards > 0
-                ? 'bg-green-50 dark:bg-green-900/30 border-green-300 dark:border-green-700/50'
-                : validation.stats.totalCards === 0
-                ? 'bg-gray-100 dark:bg-gray-800/30 border-gray-300 dark:border-gray-700/50'
-                : 'bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-700/50'
-            }`}>
-              {validation.isValid && validation.stats.totalCards > 0 ? (
-                <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                </svg>
-              ) : validation.stats.totalCards === 0 ? (
-                <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              )}
-              <span className={`font-semibold ${
-                validation.isValid && validation.stats.totalCards > 0
-                  ? 'text-green-400'
-                  : validation.stats.totalCards === 0
-                  ? 'text-gray-400'
-                  : 'text-red-400'
-              }`}>
-                {validation.isValid && validation.stats.totalCards > 0
-                  ? 'Valid'
-                  : validation.stats.totalCards === 0
-                  ? 'Empty'
-                  : 'Invalid'
-                }
-              </span>
-              
-              {/* Tooltip showing validation details */}
-              {validation.stats.totalCards > 0 && (
-                <div className={`absolute left-0 top-full mt-2 w-80 p-4 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none ${
-                  validation.isValid
-                    ? "bg-green-50 dark:bg-green-900/90 border-2 border-green-300 dark:border-green-600"
-                    : "bg-red-50 dark:bg-red-900/90 border-2 border-red-300 dark:border-red-600"
-                }`}>
-                  {/* Arrow */}
-                  <div className={`absolute left-4 bottom-full w-0 h-0 border-l-8 border-r-8 border-b-8 border-l-transparent border-r-transparent ${
-                    validation.isValid
-                      ? "border-b-green-300 dark:border-b-green-600"
-                      : "border-b-red-300 dark:border-b-red-600"
-                  }`}></div>
-                  
-                  {/* Content */}
-                  <div className={`font-semibold mb-3 text-base ${
-                    validation.isValid
-                      ? "text-green-800 dark:text-green-200"
-                      : "text-red-800 dark:text-red-200"
-                  }`}>
-                    {validation.isValid ? "✓ Passed Basic Checks" : `✗ ${validation.issues.filter(i => i.type === "error").length} Error${validation.issues.filter(i => i.type === "error").length !== 1 ? "s" : ""}`}
-                  </div>
-                  
-                  {validation.issues.length > 0 && (
-                    <div className="space-y-2">
-                      {validation.issues.map((issue, idx) => (
-                        <div
-                          key={idx}
-                          className={`text-sm flex items-start gap-2 ${
-                            issue.type === "error"
-                              ? "text-red-700 dark:text-red-300"
-                              : issue.type === "warning"
-                              ? "text-yellow-700 dark:text-yellow-300"
-                              : "text-blue-700 dark:text-blue-300"
-                          }`}
-                        >
-                          <span className="mt-0.5 flex-shrink-0">
-                            {issue.type === "error" ? "⚠" : issue.type === "warning" ? "⚠" : "ℹ"}
-                          </span>
-                          <span className="flex-1">{issue.message}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-            
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-green-800/50 rounded-lg">
-              <svg className="w-4 h-4 text-blue-500 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-              <span className="text-gray-500 dark:text-gray-400">Total:</span>
-              <span className="font-bold text-gray-900 dark:text-white">{totalCards}</span>
-            </div>
-            
-            {reserveCount > 0 && (
-              <>
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-500 dark:text-gray-400">Reserve:</span>
-                  <span className="font-semibold text-gray-900 dark:text-white">{reserveCount}</span>
-                </div>
-                <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
-              </>
-            )}
-
-            <div className="flex items-center gap-2">
-              <span className="text-gray-500 dark:text-gray-400">Unique Cards:</span>
-              <span className="font-semibold text-gray-900 dark:text-white">{uniqueCards}</span>
-            </div>
-          </div>
-
-          {/* Tags row */}
-          {(deckTags.length > 0 || (isAuthenticated && deck.id)) && (
-            <div className="flex items-center gap-2 flex-wrap mt-3 pt-3 border-t border-gray-200 dark:border-gray-700/50 min-h-[1.75rem]">
+      {/* Tags header */}
+      {(deckTags.length > 0 || (isAuthenticated && deck.id)) && (
+      <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+        <div className="px-6 py-2">
+          <div className="flex items-center gap-2 flex-wrap min-h-[1.75rem]">
               {/* Current tag pills */}
               {deckTags.map((tag) => (
                 isAuthenticated ? (
@@ -774,10 +609,10 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                   )}
                 </div>
               )}
-            </div>
-          )}
+          </div>
         </div>
       </div>
+      )}
 
       {/* Main content area */}
       <div className="px-6 py-6">

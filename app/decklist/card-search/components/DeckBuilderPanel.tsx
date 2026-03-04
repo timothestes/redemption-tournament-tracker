@@ -248,6 +248,10 @@ export default function DeckBuilderPanel({
   // View options
   const [viewLayout, setViewLayout] = useState<'grid' | 'list'>('grid');
   const [groupBy, setGroupBy] = useState<'type' | 'alignment'>('type');
+
+  // Expanded (FullDeckView) view options
+  const [expandedViewMode, setExpandedViewMode] = useState<'normal' | 'stacked'>('stacked');
+  const [expandedGroupBy, setExpandedGroupBy] = useState<'none' | 'alignment' | 'type'>('type');
   const [disableHoverPreview, setDisableHoverPreview] = useState(forceDisableHoverPreview);
   
   // Initialize deck type based on deck.format
