@@ -91,6 +91,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
   const [tagFilterInput, setTagFilterInput] = useState("");
   const tagDropdownRef = useRef<HTMLDivElement>(null);
+  const isInitialLoad = useRef(true);
 
   useEffect(() => {
     if (!tagDropdownOpen) return;
@@ -145,6 +146,12 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
   }, [page, sort, format, search, usernameFilter, selectedTagIds]);
 
   useEffect(() => {
+    // Skip the initial fetch if we already have server-provided data
+    // (no username filter means we used initialDecks from the server component)
+    if (isInitialLoad.current) {
+      isInitialLoad.current = false;
+      if (!initialUsername) return;
+    }
     loadDecks();
   }, [loadDecks]);
 
