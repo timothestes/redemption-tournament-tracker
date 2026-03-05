@@ -145,6 +145,11 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   const [showParagonModal, setShowParagonModal] = useState(false);
   const [paragonVisible, setParagonVisible] = useState(true);
 
+  // Hover preview state (desktop only)
+  const [hoveredCard, setHoveredCard] = useState<{ name: string; imgFile: string; set?: string; type?: string } | null>(null);
+  const [showPreview, setShowPreview] = useState(true);
+  const [showStats, setShowStats] = useState(false);
+
   // Inline name editing (owner only)
   const [deckName, setDeckName] = useState(deck.name);
   const [editingName, setEditingName] = useState(false);
@@ -459,7 +464,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
       )}
 
       {/* Breadcrumb */}
-      <nav className="mb-6 flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
+      <nav className="mb-4 flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
         <a href="/decklist/community" className="hover:text-gray-800 dark:hover:text-gray-200 transition-colors">
           Community Decks
         </a>
@@ -470,7 +475,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
       </nav>
 
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             {isOwner && editingName ? (
@@ -483,11 +488,11 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                   if (e.key === "Enter") handleNameSubmit();
                   if (e.key === "Escape") { setNameInput(deckName); setEditingName(false); }
                 }}
-                className="text-3xl font-bold bg-transparent border-b-2 border-blue-500 outline-none w-full min-w-0 mb-3"
+                className="text-3xl font-bold bg-transparent border-b-2 border-blue-500 outline-none w-full min-w-0 mb-2"
               />
             ) : (
               <h1
-                className={`text-3xl font-bold mb-3 ${isOwner ? "cursor-pointer hover:text-blue-500 dark:hover:text-blue-400 transition-colors" : ""}`}
+                className={`text-3xl font-bold mb-2 ${isOwner ? "cursor-pointer hover:text-blue-500 dark:hover:text-blue-400 transition-colors" : ""}`}
                 onClick={isOwner ? () => { setNameInput(deckName); setEditingName(true); } : undefined}
                 title={isOwner ? "Click to rename" : undefined}
               >
@@ -530,7 +535,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
 
             {/* Tags row */}
             {(deckTags.length > 0 || isOwner) && (
-              <div className="flex items-center gap-2 flex-wrap mt-2">
+              <div className="flex items-center gap-2 flex-wrap mt-3">
                 {deckTags.map((tag) =>
                   isOwner ? (
                     <button
@@ -944,7 +949,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
 
       {/* Paragon image — collapsible */}
       {deck.paragon && formatDeckType(deck.format) === "Paragon" && (
-        <div className="mb-8">
+        <div className="mb-6">
           <button
             onClick={() => setParagonVisible((v) => !v)}
             className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors mb-2"
@@ -993,7 +998,150 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
           <option value="alignment">Group by Alignment</option>
           <option value="none">No Grouping</option>
         </select>
+
+        {/* Preview sidebar toggle — desktop only */}
+        <button
+          onClick={() => setShowPreview((v) => !v)}
+          className={`hidden lg:flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm transition-colors ${
+            showPreview
+              ? 'border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+              : 'border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+          }`}
+          title={showPreview ? 'Hide card preview' : 'Show card preview'}
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            {showPreview ? (
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            ) : (
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878l4.242 4.242M15.12 15.12L21 21" />
+            )}
+          </svg>
+          Preview
+        </button>
+
+        {/* Stats toggle */}
+        <button
+          onClick={() => setShowStats((v) => !v)}
+          className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm transition-colors ${
+            showStats
+              ? 'border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+              : 'border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+          }`}
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          Stats
+        </button>
       </div>
+
+      {/* Stats Panel — collapsible */}
+      {showStats && cardDatabase && (
+        <div className="mb-6 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Alignment Breakdown */}
+            <div>
+              <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                Alignment Breakdown
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                {(() => {
+                  const alignmentCounts = enrichedCards.reduce((acc, card) => {
+                    let alignment = card.alignment || "Neutral";
+                    if (alignment.includes("Good/Evil")) alignment = "Neutral";
+                    acc[alignment] = (acc[alignment] || 0) + card.quantity;
+                    return acc;
+                  }, {} as Record<string, number>);
+
+                  const alignmentConfig = [
+                    { name: 'Good', color: 'bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-800 dark:text-blue-200' },
+                    { name: 'Evil', color: 'bg-red-100 dark:bg-red-900/30 border-red-300 dark:border-red-700 text-red-800 dark:text-red-200' },
+                    { name: 'Neutral', color: 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200' },
+                    { name: 'Dual', color: 'bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700 text-purple-800 dark:text-purple-200' },
+                  ];
+
+                  return alignmentConfig.map(({ name, color }) => {
+                    const count = alignmentCounts[name] || 0;
+                    if (count === 0 && name === 'Dual') return null;
+                    return (
+                      <div key={name} className={`p-3 rounded-lg border-2 ${color}`}>
+                        <div className="text-xs font-semibold uppercase tracking-wide mb-1">{name}</div>
+                        <div className="text-2xl font-bold">{count}</div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+
+            {/* Deck Statistics */}
+            <div>
+              <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                Deck Statistics
+              </h3>
+              <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                <div className="flex justify-between">
+                  <span>Total Cards:</span>
+                  <span className="font-medium">{mainDeckCount + reserveCount}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Unique Cards:</span>
+                  <span className="font-medium">{enrichedCards.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Main Deck:</span>
+                  <span className="font-medium">{mainDeckCount}</span>
+                </div>
+                {reserveCount > 0 && (
+                  <div className="flex justify-between">
+                    <span>Reserve:</span>
+                    <span className="font-medium">{reserveCount}</span>
+                  </div>
+                )}
+                <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                  <div className="flex justify-between">
+                    <span>Lost Souls:</span>
+                    <span className="font-medium">
+                      {enrichedCards.filter(c => c.type === 'LS' || c.type === 'Lost Soul').reduce((s, c) => s + c.quantity, 0)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Dominants:</span>
+                    <span className="font-medium">
+                      {enrichedCards.filter(c => c.type === 'Dom' || c.type === 'Dominant').reduce((s, c) => s + c.quantity, 0)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Card Type Breakdown */}
+            <div>
+              <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                Card Types
+              </h3>
+              <div className="space-y-0.5 text-sm text-gray-600 dark:text-gray-400">
+                {(() => {
+                  const typeCounts = enrichedCards.reduce((acc, card) => {
+                    const type = prettifyTypeName(card.type || "Unknown");
+                    acc[type] = (acc[type] || 0) + card.quantity;
+                    return acc;
+                  }, {} as Record<string, number>);
+
+                  return Object.entries(typeCounts)
+                    .sort(([, a], [, b]) => b - a)
+                    .map(([type, count]) => (
+                      <div key={type} className="flex justify-between gap-2">
+                        <span className="flex-shrink-0">{type}:</span>
+                        <span className="font-medium ml-auto">{count}</span>
+                      </div>
+                    ));
+                })()}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Loading state while card database fetches */}
       {!cardDatabase && deck.cards.length > 0 && (
@@ -1006,7 +1154,9 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
       )}
 
       {/* Deck cards — only render after card database is loaded */}
-      {cardDatabase && <><div className="mb-8">
+      {cardDatabase && <div className="lg:flex lg:gap-6">
+      <div className="flex-1 min-w-0">
+      <div className="mb-8">
         <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
           Main Deck
           <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
@@ -1036,6 +1186,8 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                           key={`${card.card_name}-${card.card_set}-${colIndex}-${i}`}
                           className="group relative w-28 flex-shrink-0 cursor-pointer transition-all hover:z-20 -mb-32 last:mb-0"
                           onClick={() => card.fullCard && setModalCard(card.fullCard)}
+                          onMouseEnter={() => setHoveredCard({ name: card.card_name, imgFile: card.card_img_file || "", set: card.card_set, type: card.type })}
+                          onMouseLeave={() => setHoveredCard(null)}
                         >
                           <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-gray-800 border border-gray-700 hover:border-blue-500 transition-all cursor-pointer hover:scale-105 hover:z-10 shadow-md hover:shadow-xl">
                             <img
@@ -1074,6 +1226,8 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                         key={`reserve-${card.card_name}-${card.card_set}-${colIndex}-${i}`}
                         className="group relative w-28 flex-shrink-0 cursor-pointer transition-all hover:z-20 -mb-32 last:mb-0"
                         onClick={() => card.fullCard && setModalCard(card.fullCard)}
+                        onMouseEnter={() => setHoveredCard({ name: card.card_name, imgFile: card.card_img_file || "", set: card.card_set, type: card.type })}
+                        onMouseLeave={() => setHoveredCard(null)}
                       >
                         <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-gray-800 border border-gray-700 hover:border-blue-500 transition-all cursor-pointer hover:scale-105 hover:z-10 shadow-md hover:shadow-xl">
                           <img
@@ -1114,6 +1268,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                         key={`main-${card.card_name}-${card.card_set}-${index}`}
                         card={card}
                         onClick={() => card.fullCard && setModalCard(card.fullCard)}
+                        onHover={setHoveredCard}
                         compact
                       />
                     ))}
@@ -1140,6 +1295,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                 key={`reserve-${card.card_name}-${card.card_set}-${index}`}
                 card={card}
                 onClick={() => card.fullCard && setModalCard(card.fullCard)}
+                onHover={setHoveredCard}
                 compact
               />
             ))}
@@ -1201,7 +1357,35 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
           ) : null}
         </div>
       )}
-      </>}
+      </div>
+
+      {/* Sticky sidebar card preview — desktop only */}
+      {showPreview && (
+        <div className="hidden lg:block w-72 flex-shrink-0">
+          <div className="sticky top-24">
+            {hoveredCard ? (
+              <div className="transition-opacity duration-150">
+                <div className="aspect-[2.5/3.5] rounded-lg overflow-hidden shadow-lg bg-gray-800">
+                  <img
+                    src={getImageUrl(hoveredCard.imgFile)}
+                    alt={hoveredCard.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <p className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">{hoveredCard.name}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {hoveredCard.set}{hoveredCard.type ? ` · ${prettifyTypeName(hoveredCard.type)}` : ''}
+                </p>
+              </div>
+            ) : (
+              <div className="aspect-[2.5/3.5] rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 flex items-center justify-center">
+                <p className="text-sm text-gray-400 dark:text-gray-500 text-center px-4">Hover over a card to preview</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      </div>}
 
     </div>
   );
@@ -1299,12 +1483,17 @@ function groupAndSortCards(
   return ordered;
 }
 
-function CardTile({ card, onClick, compact }: { card: EnrichedCard | DeckCardData; onClick?: () => void; compact?: boolean }) {
+function CardTile({ card, onClick, onHover, compact }: { card: EnrichedCard | DeckCardData; onClick?: () => void; onHover?: (card: { name: string; imgFile: string; set?: string; type?: string } | null) => void; compact?: boolean }) {
   const [imgError, setImgError] = useState(false);
   const src = getImageUrl(card.card_img_file || "");
 
   return (
-    <div className={`relative group cursor-pointer ${compact ? "w-[calc(100%/12-4px)] min-w-[70px] -mb-6 last:mb-0 hover:z-20" : ""}`} onClick={onClick}>
+    <div
+      className={`relative group cursor-pointer ${compact ? "w-[calc(100%/12-4px)] min-w-[70px] -mb-6 last:mb-0 hover:z-20" : ""}`}
+      onClick={onClick}
+      onMouseEnter={onHover ? () => onHover({ name: card.card_name, imgFile: card.card_img_file || "", set: card.card_set, type: (card as EnrichedCard).type }) : undefined}
+      onMouseLeave={onHover ? () => onHover(null) : undefined}
+    >
       <div className="relative w-full aspect-[2.5/3.5] bg-gray-100 dark:bg-gray-800 rounded-md overflow-hidden shadow-sm hover:shadow-md transition-all hover:scale-105 hover:z-10">
         {imgError ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 text-xs p-1">

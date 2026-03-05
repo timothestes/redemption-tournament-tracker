@@ -117,7 +117,6 @@ export default function DeckBuilderPanel({
   defaultTab,
 }: DeckBuilderPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>(defaultTab ?? "main");
-  const [isMobileHeaderExpanded, setIsMobileHeaderExpanded] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(deck.name);
   const [showMenu, setShowMenu] = useState(false);
@@ -608,120 +607,305 @@ export default function DeckBuilderPanel({
                 {deck.isPublic ? "Public" : "Private"}
               </span>
             )}
-            {/* Mobile header expand/collapse toggle */}
-            <button
-              className="md:hidden flex-shrink-0 p-1 ml-auto text-gray-400 dark:text-gray-500"
-              onClick={() => setIsMobileHeaderExpanded(prev => !prev)}
-              aria-label={isMobileHeaderExpanded ? "Collapse header" : "Expand header"}
-            >
-              <svg className={`w-4 h-4 transition-transform ${isMobileHeaderExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
           </div>
         )}
 
-        {/* Mobile: Format selector + Paragon always visible */}
-        <div className="md:hidden mt-1.5 flex items-center gap-2 flex-wrap">
+        {/* Mobile: Unified toolbar — format selector left, actions right */}
+        <div className="md:hidden mt-1.5 flex items-center gap-1.5">
           {/* Format Selector (T1/T2/Paragon) */}
-          <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-full p-0.5">
+          <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-full p-0.5">
             <button
               onClick={() => handleDeckTypeChange('T1')}
-              className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
                 deckType === 'T1'
                   ? 'bg-blue-600 dark:bg-blue-500 text-white'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 cursor-pointer'
+                  : 'text-gray-600 dark:text-gray-400 cursor-pointer'
               }`}
             >
               T1
             </button>
             <button
               onClick={() => handleDeckTypeChange('T2')}
-              className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
                 deckType === 'T2'
                   ? 'bg-purple-600 dark:bg-purple-500 text-white'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 cursor-pointer'
+                  : 'text-gray-600 dark:text-gray-400 cursor-pointer'
               }`}
             >
               T2
             </button>
             <button
               onClick={() => handleDeckTypeChange('Paragon')}
-              className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
                 deckType === 'Paragon'
                   ? 'bg-amber-600 dark:bg-amber-500 text-white'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 cursor-pointer'
+                  : 'text-gray-600 dark:text-gray-400 cursor-pointer'
               }`}
             >
-              Paragon
+              P
             </button>
           </div>
 
-          {/* Paragon Selector */}
-          {deckType === 'Paragon' && (
-            <div className="relative flex items-center gap-1">
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Action icons — tight row */}
+          <div className="flex items-center gap-1">
+            {/* Save */}
+            {onSaveDeck && isAuthenticated && (
               <button
-                onClick={() => setShowParagonDropdown(!showParagonDropdown)}
-                className="text-xs px-2 py-0.5 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded text-amber-900 dark:text-amber-100 font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 flex items-center gap-1.5 justify-between"
+                onClick={async () => {
+                  const result = await onSaveDeck();
+                  if (!result.success && result.error) {
+                    onNotify?.(result.error, 'error');
+                  } else if (result.success) {
+                    onNotify?.('Deck saved successfully!', 'success');
+                  }
+                }}
+                disabled={syncStatus?.isSaving || !isAuthenticated}
+                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                  syncStatus?.isSaving
+                    ? 'text-gray-400 dark:text-gray-500'
+                    : hasUnsavedChanges
+                    ? 'bg-green-600 text-white shadow-sm'
+                    : 'text-gray-400 dark:text-gray-500'
+                }`}
+                title={hasUnsavedChanges ? 'Save deck' : 'All changes saved'}
               >
-                {deck.paragon ? (
-                  <span className="flex items-center gap-1.5">
-                    {(() => {
-                      const paragonData = getParagonByName(deck.paragon);
-                      if (paragonData) {
-                        return (
-                          <>
-                            <span className="flex gap-0.5">
-                              <span
-                                className="w-3 h-3 rounded-sm border border-black"
-                                style={{ backgroundColor: getBrigadeColor(paragonData.goodBrigade) }}
-                              />
-                              <span
-                                className="w-3 h-3 rounded-sm border border-black"
-                                style={{ backgroundColor: getBrigadeColor(paragonData.evilBrigade) }}
-                              />
-                            </span>
-                            <span>{deck.paragon}</span>
-                          </>
-                        );
-                      }
-                      return <span>{deck.paragon}</span>;
-                    })()}
-                  </span>
+                {syncStatus?.isSaving ? (
+                  <svg className="w-4.5 h-4.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                ) : hasUnsavedChanges ? (
+                  <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
                 ) : (
-                  <span className="text-amber-700 dark:text-amber-300">Choose...</span>
+                  <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
                 )}
-                <svg className={`w-3 h-3 ml-1 transition-transform ${showParagonDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </button>
+            )}
+
+            {/* New Deck */}
+            {onNewDeck && (
+              <button
+                onClick={() => onNewDeck(undefined, deck.folderId)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-blue-600 dark:text-blue-400 border border-blue-300 dark:border-blue-600 transition-colors"
+                title="New deck"
+              >
+                <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                 </svg>
               </button>
+            )}
 
-              {showParagonDropdown && (
-                <div className="absolute top-full mt-1 left-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto min-w-[240px]">
+            {/* Practice */}
+            {deck.id && (
+              <GoldfishButton deckId={deck.id} deckName={deck.name} format={deck.format} iconOnly />
+            )}
+
+            {/* More menu — full menu dropdown for mobile */}
+            <div className="relative">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMenu(!showMenu);
+                }}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-500 dark:text-gray-400 transition-colors"
+                title="More options"
+              >
+                <svg className="w-[18px] h-[18px]" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                </svg>
+              </button>
+              {showMenu && (
+                <div className="absolute top-full mt-1 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50 min-w-[180px]">
                   <button
-                    onClick={() => {
-                      onParagonChange?.(undefined);
-                      setShowParagonDropdown(false);
-                    }}
-                    className="w-full px-3 py-2 text-left text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    onClick={() => { onImport(); setShowMenu(false); }}
+                    className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-gray-900 dark:text-white text-sm"
                   >
-                    Choose a Paragon...
+                    <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Import
                   </button>
-                  {getParagonNames().map((name) => {
-                    const paragonData = getParagonByName(name);
-                    return (
+                  <button
+                    onClick={() => { onExport(); setShowMenu(false); }}
+                    className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-gray-900 dark:text-white text-sm"
+                  >
+                    <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                    </svg>
+                    Copy to Clipboard
+                  </button>
+                  {onDownload && (
+                    <button
+                      onClick={() => { onDownload(); setShowMenu(false); }}
+                      className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-gray-900 dark:text-white text-sm"
+                    >
+                      <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      Download .txt
+                    </button>
+                  )}
+                  <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+                  {onDuplicate && isAuthenticated && deck.id && (
+                    <button
+                      onClick={async () => {
+                        setShowMenu(false);
+                        const result = await duplicateDeckAction(deck.id!);
+                        if (result.success) {
+                          onNotify?.('Deck duplicated successfully!', 'success');
+                          if (onLoadDeck && result.deckId) onLoadDeck(result.deckId);
+                        } else {
+                          onNotify?.(result.error || 'Failed to duplicate deck', 'error');
+                        }
+                      }}
+                      className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-gray-900 dark:text-white text-sm"
+                    >
+                      <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                      Duplicate
+                    </button>
+                  )}
+                  {onLoadDeck && isAuthenticated && (
+                    <button
+                      onClick={() => { setShowLoadDeckModal(true); setShowMenu(false); }}
+                      className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-gray-900 dark:text-white text-sm"
+                    >
+                      <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                      </svg>
+                      Load Deck
+                    </button>
+                  )}
+                  {isAuthenticated && deck.id && (
+                    <>
+                      <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
                       <button
-                        key={name}
-                        onClick={() => {
-                          onParagonChange?.(name);
-                          setShowParagonDropdown(false);
+                        onClick={async () => {
+                          setShowMenu(false);
+                          const newPublicState = !deck.isPublic;
+                          const result = await toggleDeckPublicAction(deck.id!, newPublicState);
+                          if (result.success) {
+                            onDeckPublicChange?.(newPublicState);
+                            onNotify?.(newPublicState ? 'Deck is now public' : 'Deck is now private', 'success');
+                          } else if ((result as any).needsUsername) {
+                            setShowUsernameModal(true);
+                          } else {
+                            onNotify?.(result.error || 'Failed to change visibility', 'error');
+                          }
                         }}
-                        className={`w-full px-3 py-2 text-left text-xs hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors flex items-center gap-2 ${
-                          deck.paragon === name ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-100' : 'text-gray-700 dark:text-gray-300'
-                        }`}
+                        className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-gray-900 dark:text-white text-sm"
                       >
-                        {paragonData && (
-                          <span className="flex gap-0.5 flex-shrink-0">
+                        {deck.isPublic ? (
+                          <>
+                            <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                            Make Private
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Make Public
+                          </>
+                        )}
+                      </button>
+                      {deck.isPublic && (
+                        <>
+                          <button
+                            onClick={() => {
+                              const url = `${window.location.origin}/decklist/${deck.id}`;
+                              navigator.clipboard.writeText(url);
+                              setLinkCopied(true);
+                              setTimeout(() => setLinkCopied(false), 2000);
+                            }}
+                            className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-gray-900 dark:text-white text-sm"
+                          >
+                            <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                            </svg>
+                            {linkCopied ? 'Link Copied!' : 'Copy Share Link'}
+                          </button>
+                          <a
+                            href={`/decklist/${deck.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={() => setShowMenu(false)}
+                            className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-gray-900 dark:text-white text-sm"
+                          >
+                            <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            View Public Page
+                          </a>
+                        </>
+                      )}
+                    </>
+                  )}
+                  <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+                  <button
+                    onClick={() => { setShowGeneratePDFModal(true); setShowMenu(false); }}
+                    className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-gray-900 dark:text-white text-sm"
+                  >
+                    <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    Generate PDF
+                  </button>
+                  <button
+                    onClick={() => { setShowGenerateImageModal(true); setShowMenu(false); }}
+                    className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-gray-900 dark:text-white text-sm"
+                  >
+                    <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    Generate Image
+                  </button>
+                  {isAuthenticated && (
+                    <>
+                      <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+                      <button
+                        onClick={() => { setShowDeleteDeckModal(true); setShowMenu(false); }}
+                        className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-red-600 dark:text-red-400 text-sm"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Delete Deck
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile: Paragon selector — second row when Paragon format active */}
+        {deckType === 'Paragon' && (
+          <div className="md:hidden mt-1 relative">
+            <button
+              onClick={() => setShowParagonDropdown(!showParagonDropdown)}
+              className="w-full text-xs px-2.5 py-1.5 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-lg text-amber-900 dark:text-amber-100 font-medium flex items-center gap-1.5 justify-between"
+            >
+              {deck.paragon ? (
+                <span className="flex items-center gap-1.5">
+                  {(() => {
+                    const paragonData = getParagonByName(deck.paragon);
+                    if (paragonData) {
+                      return (
+                        <>
+                          <span className="flex gap-0.5">
                             <span
                               className="w-3 h-3 rounded-sm border border-black"
                               style={{ backgroundColor: getBrigadeColor(paragonData.goodBrigade) }}
@@ -731,19 +915,68 @@ export default function DeckBuilderPanel({
                               style={{ backgroundColor: getBrigadeColor(paragonData.evilBrigade) }}
                             />
                           </span>
-                        )}
-                        <span className="font-medium">{name}</span>
-                      </button>
-                    );
-                  })}
-                </div>
+                          <span>{deck.paragon}</span>
+                        </>
+                      );
+                    }
+                    return <span>{deck.paragon}</span>;
+                  })()}
+                </span>
+              ) : (
+                <span className="text-amber-700 dark:text-amber-300">Choose Paragon...</span>
               )}
-            </div>
-          )}
-        </div>
+              <svg className={`w-3 h-3 transition-transform ${showParagonDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
 
-        {/* Card Count and Menu Button Row - collapsible on mobile, always visible on desktop */}
-        <div className={`mt-1.5 md:mt-2 flex flex-col md:flex-row md:items-center md:justify-between gap-1.5 md:gap-3 min-w-0 ${isMobileHeaderExpanded ? '' : 'hidden md:flex'}`}>
+            {showParagonDropdown && (
+              <div className="absolute top-full mt-1 left-0 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto">
+                <button
+                  onClick={() => {
+                    onParagonChange?.(undefined);
+                    setShowParagonDropdown(false);
+                  }}
+                  className="w-full px-3 py-2 text-left text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Choose a Paragon...
+                </button>
+                {getParagonNames().map((name) => {
+                  const paragonData = getParagonByName(name);
+                  return (
+                    <button
+                      key={name}
+                      onClick={() => {
+                        onParagonChange?.(name);
+                        setShowParagonDropdown(false);
+                      }}
+                      className={`w-full px-3 py-2 text-left text-xs hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors flex items-center gap-2 ${
+                        deck.paragon === name ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-100' : 'text-gray-700 dark:text-gray-300'
+                      }`}
+                    >
+                      {paragonData && (
+                        <span className="flex gap-0.5 flex-shrink-0">
+                          <span
+                            className="w-3 h-3 rounded-sm border border-black"
+                            style={{ backgroundColor: getBrigadeColor(paragonData.goodBrigade) }}
+                          />
+                          <span
+                            className="w-3 h-3 rounded-sm border border-black"
+                            style={{ backgroundColor: getBrigadeColor(paragonData.evilBrigade) }}
+                          />
+                        </span>
+                      )}
+                      <span className="font-medium">{name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Card Count and Menu Button Row — desktop only */}
+        <div className="hidden md:flex mt-2 flex-col md:flex-row md:items-center md:justify-between gap-3 min-w-0">
           <div className="flex items-center gap-2 md:gap-3 text-sm flex-wrap min-w-0" suppressHydrationWarning>
             <div className="hidden md:flex items-center gap-1">
               <span className="text-gray-600 dark:text-gray-400">Main:</span>
@@ -885,9 +1118,9 @@ export default function DeckBuilderPanel({
             )}
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-1.5 md:gap-2 flex-shrink-0 flex-wrap">
-            {/* Save Button */}
+          {/* Action Buttons — desktop only (mobile has unified toolbar) */}
+          <div className="hidden md:flex items-center gap-2 flex-shrink-0 flex-wrap">
+            {/* Save Button - desktop only (mobile save is in the format selector row) */}
             {onSaveDeck && isAuthenticated && (
               <button
                 onClick={async () => {
@@ -903,7 +1136,7 @@ export default function DeckBuilderPanel({
                   }
                 }}
                 disabled={syncStatus?.isSaving || !isAuthenticated}
-                className={`px-3 md:px-4 py-1.5 text-sm font-medium rounded transition-all flex items-center gap-2 md:min-w-[140px] justify-center ${
+                className={`hidden md:flex px-4 py-1.5 text-sm font-medium rounded transition-all items-center gap-2 min-w-[140px] justify-center ${
                   syncStatus?.isSaving || !isAuthenticated
                     ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-500 cursor-not-allowed'
                     : hasUnsavedChanges
@@ -935,8 +1168,7 @@ export default function DeckBuilderPanel({
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                     </svg>
-                    <span className="hidden md:inline">Save (Ctrl+S)</span>
-                    <span className="md:hidden">Save</span>
+                    Save (Ctrl+S)
                   </>
                 ) : (
                   <>
@@ -1193,7 +1425,7 @@ export default function DeckBuilderPanel({
       {/* ...existing code... */}
       {/* Tabs - Hide when expanded (full screen view) */}
       {!isExpanded && (
-      <div className="flex-shrink-0 flex items-center border-b border-gray-200/60 dark:border-gray-700/60 bg-white dark:bg-gray-800 overflow-visible">
+      <div className="flex-shrink-0 flex items-center border-b border-gray-200/60 dark:border-gray-700/60 bg-white dark:bg-gray-800 overflow-visible relative z-20">
         <button
           onClick={() => handleTabChange("main")}
           className={`flex-1 px-3 py-3 text-sm font-medium transition-colors whitespace-nowrap text-center ${
@@ -1228,7 +1460,7 @@ export default function DeckBuilderPanel({
             Stats
             {validation.stats.totalCards > 0 && (
               <span
-                className={`inline-flex items-center justify-center w-4 h-4 text-xs rounded-full ${
+                className={`hidden md:inline-flex items-center justify-center w-4 h-4 text-xs rounded-full ${
                   validation.isValid
                     ? "bg-green-500 text-white"
                     : "bg-red-500 text-white"
@@ -1557,13 +1789,96 @@ export default function DeckBuilderPanel({
         
         {/* Show Full Deck View when expanded */}
         {isExpanded ? (
-          <FullDeckView
-            deck={deck}
-            onViewCard={onViewCard}
-            isAuthenticated={isAuthenticated}
-            viewMode={expandedViewMode}
-            groupBy={expandedGroupBy}
-          />
+          <div className="flex flex-col h-full">
+            {/* View Controls */}
+            <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+              <div className="flex items-center gap-1 bg-gray-200 dark:bg-gray-700 rounded-lg p-0.5">
+                <button
+                  onClick={() => setExpandedViewMode('stacked')}
+                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                    expandedViewMode === 'stacked'
+                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400'
+                  }`}
+                >
+                  Stacked
+                </button>
+                <button
+                  onClick={() => setExpandedViewMode('normal')}
+                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                    expandedViewMode === 'normal'
+                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400'
+                  }`}
+                >
+                  Normal
+                </button>
+              </div>
+              <div className="flex items-center gap-1 bg-gray-200 dark:bg-gray-700 rounded-lg p-0.5">
+                <button
+                  onClick={() => setExpandedGroupBy('type')}
+                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                    expandedGroupBy === 'type'
+                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400'
+                  }`}
+                >
+                  Type
+                </button>
+                <button
+                  onClick={() => setExpandedGroupBy('alignment')}
+                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                    expandedGroupBy === 'alignment'
+                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400'
+                  }`}
+                >
+                  Align
+                </button>
+                <button
+                  onClick={() => setExpandedGroupBy('none')}
+                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                    expandedGroupBy === 'none'
+                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400'
+                  }`}
+                >
+                  None
+                </button>
+              </div>
+              {/* Preview sidebar toggle */}
+              <div className="hidden lg:block ml-auto">
+                <button
+                  onClick={() => setDisableHoverPreview((v) => !v)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                    !disableHoverPreview
+                      ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+                  }`}
+                  title={disableHoverPreview ? 'Show card preview' : 'Hide card preview'}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    {!disableHoverPreview ? (
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    ) : (
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878l4.242 4.242M15.12 15.12L21 21" />
+                    )}
+                  </svg>
+                  Preview
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto">
+              <FullDeckView
+                deck={deck}
+                onViewCard={onViewCard}
+                isAuthenticated={isAuthenticated}
+                viewMode={expandedViewMode}
+                groupBy={expandedGroupBy}
+                showPreview={!disableHoverPreview}
+              />
+            </div>
+          </div>
         ) : (
           <>
         {activeTab === "main" ? (
@@ -2168,7 +2483,7 @@ export default function DeckBuilderPanel({
                   
                   // Define order and styling for alignments
                   const alignmentConfig = [
-                    { name: 'Good', color: 'bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-green-800 text-blue-800 dark:text-blue-200' },
+                    { name: 'Good', color: 'bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-800 dark:text-blue-200' },
                     { name: 'Evil', color: 'bg-red-100 dark:bg-red-900/30 border-red-300 dark:border-red-700 text-red-800 dark:text-red-200' },
                     { name: 'Neutral', color: 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200' },
                     { name: 'Dual', color: 'bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700 text-purple-800 dark:text-purple-200' },

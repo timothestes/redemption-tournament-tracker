@@ -900,7 +900,7 @@ function DeckCard({
   const updatedDate = formatDateTime(deck.updated_at!);
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow">
+    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow flex flex-col">
       {/* Image Header */}
       {formatDeckType(deck.format) === "Paragon" && deck.paragon ? (
         <div className="h-32 overflow-hidden rounded-t-lg cursor-pointer" onClick={() => onEdit(deck.id!)}>
@@ -917,7 +917,7 @@ function DeckCard({
         </div>
       ) : null}
 
-      <div className="p-4">
+      <div className="p-4 flex-1 flex flex-col">
         <div className="flex items-start justify-between mb-2">
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <h3 className="font-semibold text-lg truncate">{deck.name}</h3>
@@ -956,9 +956,9 @@ function DeckCard({
           </div>
         </div>
 
-        {deck.tags && deck.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
-            {deck.tags.slice(0, 6).map((tag) => (
+        <div className="flex flex-wrap gap-1 mt-2 mb-3">
+          {deck.tags && deck.tags.length > 0 ? (
+            deck.tags.slice(0, 6).map((tag) => (
               <span
                 key={tag.id}
                 className="px-2 py-0.5 rounded-full text-xs font-medium"
@@ -966,11 +966,13 @@ function DeckCard({
               >
                 {tag.name}
               </span>
-            ))}
-          </div>
-        )}
+            ))
+          ) : (
+            <span className="text-xs text-gray-400 dark:text-gray-500 italic">No tags yet...</span>
+          )}
+        </div>
 
-        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+        <div className="mt-auto pt-3 border-t border-gray-200 dark:border-gray-700">
           <p className="text-xs text-gray-500 dark:text-gray-500">
             Updated {updatedDate}
           </p>

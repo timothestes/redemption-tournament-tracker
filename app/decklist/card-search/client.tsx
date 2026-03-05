@@ -203,6 +203,13 @@ export default function CardSearchClient() {
   const [showSearch, setShowSearch] = useState(true);
   const [isMobileDeckDrawerOpen, setIsMobileDeckDrawerOpen] = useState(false);
 
+  // Auto-open deck drawer on mobile when editing an existing deck
+  useEffect(() => {
+    if (deckIdFromUrl && !isNewDeck && window.innerWidth < 768) {
+      setIsMobileDeckDrawerOpen(true);
+    }
+  }, [deckIdFromUrl, isNewDeck]);
+
   // Deck panel resize state
   const containerRef = useRef<HTMLDivElement>(null);
   const isResizingRef = useRef(false);

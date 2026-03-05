@@ -21,16 +21,20 @@ interface FullDeckViewProps {
   isAuthenticated?: boolean;
   viewMode: 'normal' | 'stacked';
   groupBy: 'none' | 'alignment' | 'type';
+  showPreview?: boolean;
 }
 
 /**
  * Full-screen optimized deck view with compact card display
  * Shows entire deck at a glance with minimal scrolling
  */
-export default function FullDeckView({ deck, onViewCard, isAuthenticated = false, viewMode, groupBy }: FullDeckViewProps) {
+export default function FullDeckView({ deck, onViewCard, isAuthenticated = false, viewMode, groupBy, showPreview = true }: FullDeckViewProps) {
   const { getImageUrl } = useCardImageUrl();
   const { isAdmin, permissions } = useIsAdmin();
   const canManageTags = isAdmin && permissions.includes('manage_tags');
+
+  // Hover preview state (desktop only)
+  const [hoveredCard, setHoveredCard] = useState<Card | null>(null);
 
   // Tags state
   const [deckTags, setDeckTags] = useState<GlobalTag[]>([]);
@@ -407,16 +411,17 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
 
     return (
       <div
-        className={`group relative w-28 flex-shrink-0 cursor-pointer transition-all hover:z-20 ${
+        className={`group relative w-[calc((100%-1rem)/3)] md:w-28 flex-shrink-0 cursor-pointer transition-all hover:z-20 ${
           isVerticalStack ? '-mb-32' : viewMode === 'stacked' ? '-mb-24' : ''
         }`}
         onClick={(e) => {
           e.stopPropagation();
-          console.log('Card clicked:', card.name, 'onViewCard exists:', !!onViewCard);
           if (onViewCard) {
             onViewCard(card, deckCard.isReserve);
           }
         }}
+        onMouseEnter={() => setHoveredCard(card)}
+        onMouseLeave={() => setHoveredCard(null)}
       >
         {/* Card image - compact */}
         <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-blue-500 transition-all cursor-pointer hover:scale-105 hover:z-10 shadow-md hover:shadow-xl">
@@ -455,7 +460,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
   };
 
   return (
-    <div className="h-full w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-white overflow-y-auto">
+    <div className="h-full w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
       {/* Tags header */}
       {(deckTags.length > 0 || (isAuthenticated && deck.id)) && (
       <div className="sticky top-0 z-20 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-b border-gray-200/60 dark:border-gray-700/60">
@@ -616,9 +621,9 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
       )}
 
       {/* Main content area */}
-      <div className="px-3 py-3 md:px-4 md:py-3">
-        {/* Single column layout - all cards together */}
-        <div>
+      <div className="px-3 py-3 md:px-4 md:py-3 lg:flex lg:gap-4">
+        {/* Deck cards */}
+        <div className="flex-1 min-w-0">
           {/* Main Deck */}
           <div>
             {groupBy === 'type' || groupBy === 'alignment' ? (
@@ -632,52 +637,94 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                 </div>
                 
                 {mainDeckCards.length > 0 ? (
-                  <div className="flex gap-4 items-start flex-wrap">
+                  <div className="md:flex md:gap-4 md:items-start md:flex-wrap space-y-4 md:space-y-0">
                     {Object.entries(groupCards(mainDeckCards)).map(([groupName, cards]) => {
                       // Use different splitting logic for alignment vs type grouping
-                      const columns = groupBy === 'alignment' 
+                      const columns = groupBy === 'alignment'
                         ? splitAlignmentGroup(cards)
                         : splitTypeGroup(cards).map(col => ({ cards: col }));
-                      
-                      return columns.map((column, colIndex) => (
-                        <div key={`${groupName}-${colIndex}`} className="flex flex-col">
-                          {/* Show group header for alignment grouping (only on first column) */}
-                          {groupBy === 'alignment' && colIndex === 0 && (
-                            <div className="mb-2 flex items-center gap-2">
-                              <h3 className={`text-lg font-semibold ${getAlignmentColor(groupName)}`}>{groupName}</h3>
-                              <span className="text-xs text-gray-500">({cards.reduce((sum, dc) => sum + dc.quantity, 0)})</span>
+
+                      return (
+                        <React.Fragment key={groupName}>
+                          {/* Mobile: horizontal card layout per group */}
+                          <div className="md:hidden">
+                            {groupBy === 'alignment' && (
+                              <div className="mb-1.5 flex items-center gap-2">
+                                <h3 className={`text-sm font-semibold ${getAlignmentColor(groupName)}`}>{groupName}</h3>
+                                <span className="text-xs text-gray-500">({cards.reduce((sum, dc) => sum + dc.quantity, 0)})</span>
+                              </div>
+                            )}
+                            <div className="flex flex-wrap gap-2 items-start">
+                              {cards.flatMap((deckCard) =>
+                                Array.from({ length: viewMode === 'stacked' ? deckCard.quantity : 1 }, (_, i) => (
+                                  <React.Fragment key={`${deckCard.card.name}-${deckCard.card.set}-m-${i}`}>
+                                    {renderCompactCard(deckCard, i, false, viewMode === 'stacked')}
+                                  </React.Fragment>
+                                ))
+                              )}
                             </div>
-                          )}
-                          <div className="flex flex-col gap-2 items-center">
-                            {column.cards.flatMap((deckCard) =>
+                          </div>
+
+                          {/* Desktop: vertical column layout per group */}
+                          {columns.map((column, colIndex) => (
+                            <div key={`${groupName}-${colIndex}`} className="hidden md:flex flex-col">
+                              {groupBy === 'alignment' && colIndex === 0 && (
+                                <div className="mb-2 flex items-center gap-2">
+                                  <h3 className={`text-lg font-semibold ${getAlignmentColor(groupName)}`}>{groupName}</h3>
+                                  <span className="text-xs text-gray-500">({cards.reduce((sum, dc) => sum + dc.quantity, 0)})</span>
+                                </div>
+                              )}
+                              <div className="flex flex-col gap-2 items-center">
+                                {column.cards.flatMap((deckCard) =>
+                                  Array.from({ length: viewMode === 'stacked' ? deckCard.quantity : 1 }, (_, i) => (
+                                    <React.Fragment key={`${deckCard.card.name}-${deckCard.card.set}-${i}`}>
+                                      {renderCompactCard(deckCard, i, viewMode === 'stacked', viewMode === 'stacked')}
+                                    </React.Fragment>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </React.Fragment>
+                      );
+                    })}
+
+                    {/* Reserve - Show immediately after main deck columns */}
+                    {reserveCount > 0 && (
+                      <>
+                        {/* Mobile reserve */}
+                        <div className="md:hidden">
+                          <div className="mb-1.5 flex items-center gap-2">
+                            <h3 className="text-sm font-semibold text-purple-400">Reserve</h3>
+                            <span className="text-xs text-gray-500">({reserveCount})</span>
+                          </div>
+                          <div className="flex flex-wrap gap-2 items-start">
+                            {sortCards(reserveCards).flatMap((deckCard) =>
                               Array.from({ length: viewMode === 'stacked' ? deckCard.quantity : 1 }, (_, i) => (
-                                <React.Fragment key={`${deckCard.card.name}-${deckCard.card.set}-${i}`}>
+                                <React.Fragment key={`${deckCard.card.name}-${deckCard.card.set}-reserve-m-${i}`}>
+                                  {renderCompactCard(deckCard, i, false, viewMode === 'stacked')}
+                                </React.Fragment>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                        {/* Desktop reserve */}
+                        <div className="hidden md:flex flex-col ml-4">
+                          <div className="mb-2 flex items-center gap-2">
+                            <h3 className="text-lg font-semibold text-purple-400">Reserve</h3>
+                            <span className="text-xs text-gray-500">({reserveCount})</span>
+                          </div>
+                          <div className="flex flex-col gap-2 items-center">
+                            {sortCards(reserveCards).flatMap((deckCard) =>
+                              Array.from({ length: viewMode === 'stacked' ? deckCard.quantity : 1 }, (_, i) => (
+                                <React.Fragment key={`${deckCard.card.name}-${deckCard.card.set}-reserve-${i}`}>
                                   {renderCompactCard(deckCard, i, viewMode === 'stacked', viewMode === 'stacked')}
                                 </React.Fragment>
                               ))
                             )}
                           </div>
                         </div>
-                      ));
-                    })}
-                    
-                    {/* Reserve - Show immediately after main deck columns */}
-                    {reserveCount > 0 && (
-                      <div className="flex flex-col ml-4">
-                        <div className="mb-2 flex items-center gap-2">
-                          <h3 className="text-lg font-semibold text-purple-400">Reserve</h3>
-                          <span className="text-xs text-gray-500">({reserveCount})</span>
-                        </div>
-                        <div className="flex flex-col gap-2 items-center">
-                          {sortCards(reserveCards).flatMap((deckCard) =>
-                            Array.from({ length: viewMode === 'stacked' ? deckCard.quantity : 1 }, (_, i) => (
-                              <React.Fragment key={`${deckCard.card.name}-${deckCard.card.set}-reserve-${i}`}>
-                                {renderCompactCard(deckCard, i, viewMode === 'stacked', viewMode === 'stacked')}
-                              </React.Fragment>
-                            ))
-                          )}
-                        </div>
-                      </div>
+                      </>
                     )}
                   </div>
                 ) : (
@@ -743,6 +790,33 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
             </div>
           )}
         </div>
+
+        {/* Sticky sidebar card preview — desktop only */}
+        {showPreview && (
+          <div className="hidden lg:block w-72 flex-shrink-0">
+            <div className="sticky top-12">
+              {hoveredCard ? (
+                <div className="transition-opacity duration-150">
+                  <div className="aspect-[2.5/3.5] rounded-lg overflow-hidden shadow-lg bg-gray-800">
+                    <img
+                      src={getImageUrl(hoveredCard.imgFile)}
+                      alt={hoveredCard.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <p className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">{hoveredCard.name}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {hoveredCard.set}{hoveredCard.type ? ` · ${hoveredCard.type}` : ''}
+                  </p>
+                </div>
+              ) : (
+                <div className="aspect-[2.5/3.5] rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 flex items-center justify-center">
+                  <p className="text-sm text-gray-400 dark:text-gray-500 text-center px-4">Hover over a card to preview</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
