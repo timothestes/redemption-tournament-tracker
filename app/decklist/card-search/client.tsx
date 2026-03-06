@@ -1034,6 +1034,26 @@ export default function CardSearchClient() {
       .slice(0, visibleCount);
   }, [filtered, visibleCount]);
 
+  // Whether any filter pills should be shown in the summary bar
+  const hasActiveFilters = queries.some(q => q.text.trim()) ||
+    legalityMode !== 'Rotation' ||
+    selectedAlignmentFilters.length > 0 ||
+    selectedRarityFilters.length > 0 ||
+    selectedIconFilters.length > 0 ||
+    selectedTestaments.length > 0 ||
+    isGospel ||
+    strengthFilter !== null ||
+    toughnessFilter !== null ||
+    !noAltArt ||
+    !noFirstPrint ||
+    nativityOnly ||
+    hasStarOnly ||
+    cloudOnly ||
+    angelOnly ||
+    demonOnly ||
+    danielOnly ||
+    postexilicOnly;
+
   // Infinite scroll: load more cards when sentinel comes into view
   useEffect(() => {
     const sentinel = sentinelRef.current;
@@ -1303,15 +1323,15 @@ export default function CardSearchClient() {
         />
       )}
       
-    <div ref={containerRef} className="flex w-full h-screen overflow-hidden bg-gray-100 dark:bg-gray-900">
+    <div ref={containerRef} className="flex w-full h-screen overflow-hidden bg-white dark:bg-gray-900">
       {/* Left panel: Card search */}
       {showSearch && (
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <div className="bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200 flex-1 flex flex-col overflow-hidden">
+        <div className="bg-white text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200 flex-1 flex flex-col overflow-hidden">
           <div className="p-2 flex flex-col items-center sticky top-0 z-40 bg-white text-gray-900 border-b border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-800 dark:shadow-lg">
-        <div className="relative w-full max-w-2xl px-2 flex flex-col sm:flex-row sm:flex-wrap items-center justify-center gap-2">
-          <div className="w-full flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-center sm:gap-2 text-center">
-            <div className="flex flex-col gap-2 w-full sm:w-auto">
+        <div className="relative w-full px-2 flex flex-col items-center justify-center gap-2">
+          <div className="w-full flex flex-col gap-2 text-center">
+            <div className="flex flex-col gap-2 w-full">
               {queries.map((queryObj, index) => (
                 <div key={index} className="flex items-center gap-1 min-w-0">
                   {/* Field dropdown */}
@@ -1358,7 +1378,7 @@ export default function CardSearchClient() {
                     ref={el => { inputRefs.current[index] = el; }}
                     type="text"
                     placeholder={index === 0 ? "Search" : `Search ${index + 1}`}
-                    className="flex-1 min-w-0 sm:w-auto p-2 sm:p-3 pr-8 sm:pr-10 border rounded text-sm sm:text-base focus:ring-2 focus:ring-blue-400 text-gray-900 bg-white dark:text-white dark:bg-gray-900 sm:max-w-[180px]"
+                    className="flex-1 min-w-0 p-2 sm:p-3 pr-8 sm:pr-10 border rounded text-sm sm:text-base focus:ring-2 focus:ring-blue-400 text-gray-900 bg-white dark:text-white dark:bg-gray-900"
                     value={queryObj.text}
                     onChange={(e) => updateQuery(index, e.target.value)}
                     maxLength={64}
@@ -1380,7 +1400,7 @@ export default function CardSearchClient() {
                 </div>
               ))}
             </div>
-            <div className="flex flex-row gap-2 w-full sm:w-auto shrink-0">
+            <div className="flex flex-row flex-wrap gap-2 w-full justify-center">
             <button
               className="px-3 sm:px-4 flex-1 sm:flex-none sm:w-auto rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center text-sm"
               onClick={handleResetFilters}
@@ -1419,12 +1439,37 @@ export default function CardSearchClient() {
             >
               +
             </button>
+            {/* Filter collapse button — desktop only (hidden on mobile, shown in filters bar instead) */}
+            <button
+              aria-label="Toggle filter grid"
+              className={`hidden md:flex px-3 shrink-0 rounded items-center justify-center gap-1.5 border transition font-semibold shadow text-sm ${
+                filterGridCollapsed
+                  ? 'bg-blue-200 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
+                  : 'bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
+              }`}
+              style={{ minHeight: 44, height: 44 }}
+              onClick={() => setFilterGridCollapsed(v => !v)}
+              title={filterGridCollapsed ? 'Show filters' : 'Hide filters'}
+            >
+              {filterGridCollapsed ? (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                </svg>
+              )}
+              Filters
+            </button>
             </div>
           </div>
         </div>
       </div>
-      {/* Active Filters Summary Bar */}
-      <div className="w-full min-h-[44px] transition-all duration-300 sticky top-[120px] sm:top-[64px] z-30 bg-white text-gray-900 border-b border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-900 dark:shadow flex items-center">
+      {/* Active Filters Summary Bar — only render when there are active filter pills */}
+      {hasActiveFilters && (
+      <div className="w-full transition-all duration-300 sticky top-[120px] sm:top-[64px] z-30 bg-white text-gray-900 border-b border-gray-200 dark:bg-gray-900 dark:text-white dark:border-gray-800 flex items-center">
         {/* Scrollable pills area */}
         <div className="flex-1 overflow-x-auto flex flex-nowrap sm:flex-wrap gap-2 items-center sm:justify-center px-2 sm:px-4 py-2 sm:overflow-visible">
         {/* Query Pills */}
@@ -1656,33 +1701,33 @@ export default function CardSearchClient() {
           </span>
         )}
         </div>
-        {/* Collapse/Expand Filter Grid Button — outside scroll area so it never overlaps pills */}
-        <div className="flex-shrink-0 pr-3 flex flex-row items-center gap-1.5">
-          <span className="md:hidden text-xs text-gray-500 dark:text-gray-400 font-medium">
-            Filters
-          </span>
-          <button
-            aria-label="Toggle filter grid"
-            className={`w-8 h-8 rounded-full flex items-center justify-center border border-gray-400 dark:border-gray-700 shadow transition bg-gray-300 dark:bg-gray-700 ${filterGridCollapsed ? 'ring-2 ring-blue-400' : ''}`}
-            style={{ outline: 'none' }}
-            onClick={() => setFilterGridCollapsed(v => !v)}
-          >
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              style={{ transitionProperty: 'transform', transitionDuration: '0.2s', transitionTimingFunction: 'ease', transform: filterGridCollapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}
-              suppressHydrationWarning
-            >
-              <circle cx="12" cy="12" r="11" className="fill-gray-200 stroke-gray-400 dark:fill-gray-700 dark:stroke-gray-600" strokeWidth="1" />
-              <path d="M8 10l4 4 4-4" className="stroke-gray-700 dark:stroke-gray-400" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-        </div>
       </div>
-      <main className="p-2 pb-16 md:pb-2 overflow-auto bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200">
+      )}
+      {/* Collapse/Expand Filter Grid Button — mobile only (on desktop it's in the search header) */}
+      <div className="flex-shrink-0 flex md:hidden flex-row items-center justify-end px-3 py-1.5 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+        <button
+          aria-label="Toggle filter grid"
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-semibold transition ${
+            filterGridCollapsed
+              ? 'bg-blue-200 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
+              : 'bg-gray-200 text-gray-900 border-gray-300 dark:bg-gray-700 dark:text-white dark:border-transparent'
+          }`}
+          onClick={() => setFilterGridCollapsed(v => !v)}
+        >
+          {filterGridCollapsed ? (
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+          ) : (
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+            </svg>
+          )}
+          Filters
+        </button>
+      </div>
+      <main className="p-2 pb-16 md:pb-2 overflow-auto bg-white text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200">
         {/* Responsive grid for filters */}
         {!filterGridCollapsed && (
           <FilterGrid

@@ -15,7 +15,7 @@ export default async function DecklistLayout({ children }) {
         <Suspense fallback={null}>
           <HeaderServer />
         </Suspense>
-        <main className="flex-1 p-4">
+        <main className="flex-1">
           {children}
         </main>
       </div>

@@ -184,7 +184,7 @@ export default function FilterGrid({
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 mb-4 items-start bg-white text-gray-900 border border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-900 dark:shadow p-3 md:p-4 rounded-lg">
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 mb-4 items-start text-gray-900 dark:text-white p-3 md:p-4">
       {/* Legality & Alignment — spans full width on mobile so Types/Brigades get their own column */}
       <div className="col-span-2 md:col-span-1">
         <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Legality</p>
