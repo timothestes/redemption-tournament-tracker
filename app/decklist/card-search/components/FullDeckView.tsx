@@ -411,7 +411,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
 
     return (
       <div
-        className={`group relative w-[calc((100%-1rem)/3)] md:w-28 flex-shrink-0 cursor-pointer transition-all hover:z-20 ${
+        className={`group relative w-[calc((100%-1rem)/3)] md:w-28 flex-shrink-0 cursor-pointer transition-all ${
           isVerticalStack ? '-mb-32' : viewMode === 'stacked' ? '-mb-24' : ''
         }`}
         onClick={(e) => {
@@ -424,7 +424,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
         onMouseLeave={() => setHoveredCard(null)}
       >
         {/* Card image - compact */}
-        <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-blue-500 transition-all cursor-pointer hover:scale-105 hover:z-10 shadow-md hover:shadow-xl">
+        <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-gray-800 hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer shadow-md">
           {imageUrl ? (
             <img
               src={imageUrl}

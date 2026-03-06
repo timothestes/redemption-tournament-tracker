@@ -1184,12 +1184,12 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                       Array.from({ length: card.quantity }, (_, i) => (
                         <div
                           key={`${card.card_name}-${card.card_set}-${colIndex}-${i}`}
-                          className="group relative w-28 flex-shrink-0 cursor-pointer transition-all hover:z-20 -mb-32 last:mb-0"
+                          className="group relative w-28 flex-shrink-0 cursor-pointer transition-all -mb-32 last:mb-0"
                           onClick={() => card.fullCard && setModalCard(card.fullCard)}
                           onMouseEnter={() => setHoveredCard({ name: card.card_name, imgFile: card.card_img_file || "", set: card.card_set, type: card.type })}
                           onMouseLeave={() => setHoveredCard(null)}
                         >
-                          <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-gray-800 border border-gray-700 hover:border-blue-500 transition-all cursor-pointer hover:scale-105 hover:z-10 shadow-md hover:shadow-xl">
+                          <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-gray-800 hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer shadow-md">
                             <img
                               src={getImageUrl(card.card_img_file || "")}
                               alt={card.card_name}
@@ -1224,12 +1224,12 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                     Array.from({ length: card.quantity }, (_, i) => (
                       <div
                         key={`reserve-${card.card_name}-${card.card_set}-${colIndex}-${i}`}
-                        className="group relative w-28 flex-shrink-0 cursor-pointer transition-all hover:z-20 -mb-32 last:mb-0"
+                        className="group relative w-28 flex-shrink-0 cursor-pointer transition-all -mb-32 last:mb-0"
                         onClick={() => card.fullCard && setModalCard(card.fullCard)}
                         onMouseEnter={() => setHoveredCard({ name: card.card_name, imgFile: card.card_img_file || "", set: card.card_set, type: card.type })}
                         onMouseLeave={() => setHoveredCard(null)}
                       >
-                        <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-gray-800 border border-gray-700 hover:border-blue-500 transition-all cursor-pointer hover:scale-105 hover:z-10 shadow-md hover:shadow-xl">
+                        <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-gray-800 hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer shadow-md">
                           <img
                             src={getImageUrl(card.card_img_file || "")}
                             alt={card.card_name}
@@ -1489,12 +1489,12 @@ function CardTile({ card, onClick, onHover, compact }: { card: EnrichedCard | De
 
   return (
     <div
-      className={`relative group cursor-pointer ${compact ? "w-[calc(100%/12-4px)] min-w-[70px] -mb-6 last:mb-0 hover:z-20" : ""}`}
+      className={`relative group cursor-pointer ${compact ? "w-[calc(100%/12-4px)] min-w-[70px] -mb-6 last:mb-0" : ""}`}
       onClick={onClick}
       onMouseEnter={onHover ? () => onHover({ name: card.card_name, imgFile: card.card_img_file || "", set: card.card_set, type: (card as EnrichedCard).type }) : undefined}
       onMouseLeave={onHover ? () => onHover(null) : undefined}
     >
-      <div className="relative w-full aspect-[2.5/3.5] bg-gray-100 dark:bg-gray-800 rounded-md overflow-hidden shadow-sm hover:shadow-md transition-all hover:scale-105 hover:z-10">
+      <div className="relative w-full aspect-[2.5/3.5] bg-gray-100 dark:bg-gray-800 rounded-md overflow-hidden shadow-sm hover:shadow-md transition-all hover:ring-2 hover:ring-blue-500">
         {imgError ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 text-xs p-1">
             <div className="text-center font-medium text-[10px] leading-tight">{card.card_name}</div>
