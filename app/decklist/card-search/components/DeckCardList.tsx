@@ -133,7 +133,7 @@ export default function DeckCardList({
   // Grid View
   if (viewLayout === 'grid') {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
+      <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 sm:gap-2">
         {displayCards.map((deckCard) => {
           const { card, quantity, isReserve } = deckCard;
           const cardKey = `${card.name}-${card.set}-${isReserve}`;

@@ -1327,19 +1327,19 @@ export default function CardSearchClient() {
       {/* Left panel: Card search */}
       {showSearch && (
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <div className="bg-white text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200 flex-1 flex flex-col overflow-hidden">
-          <div className="p-2 flex flex-col items-center sticky top-0 z-40 bg-white text-gray-900 border-b border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-800 dark:shadow-lg">
-        <div className="relative w-full px-2 flex flex-col items-center justify-center gap-2">
-          <div className="w-full flex flex-col gap-2 text-center">
-            <div className="flex flex-col gap-2 w-full">
+        <div className="bg-white text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200 flex-1 flex flex-col overflow-auto md:overflow-hidden">
+          <div className="p-1.5 md:p-2 flex flex-col items-center md:sticky md:top-0 z-40 bg-white text-gray-900 border-b border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-800 dark:shadow-lg">
+        <div className="relative w-full px-1 md:px-2 flex flex-col items-center justify-center gap-1.5 md:gap-2">
+          <div className="w-full flex flex-col gap-1.5 md:gap-2 text-center">
+            <div className="flex flex-col gap-1.5 md:gap-2 w-full">
               {queries.map((queryObj, index) => (
                 <div key={index} className="flex items-center gap-1 min-w-0">
                   {/* Field dropdown */}
                   <select
                     value={queryObj.field}
                     onChange={e => updateQueryField(index, e.target.value)}
-                    className="border rounded px-1 sm:px-2 py-1.5 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center text-sm min-w-0"
-                    style={{ minHeight: 44 }}
+                    className="border rounded px-1 sm:px-2 py-1 sm:py-1.5 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center text-xs sm:text-sm min-w-0"
+                    style={{ minHeight: 36 }}
                   >
                     <option value="everything">All</option>
                     <option value="name">Name</option>
@@ -1355,8 +1355,8 @@ export default function CardSearchClient() {
                   <select
                     value={queryObj.operator}
                     onChange={e => updateQueryOperator(index, e.target.value as QueryOperator)}
-                    className="border rounded px-1 sm:px-2 py-1.5 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center text-sm min-w-0"
-                    style={{ minHeight: 44 }}
+                    className="border rounded px-1 sm:px-2 py-1 sm:py-1.5 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center text-xs sm:text-sm min-w-0"
+                    style={{ minHeight: 36 }}
                     title={index === 0 ? "Negate this query" : "How to combine this query with previous results"}
                   >
                     {index === 0 ? (
@@ -1378,11 +1378,11 @@ export default function CardSearchClient() {
                     ref={el => { inputRefs.current[index] = el; }}
                     type="text"
                     placeholder={index === 0 ? "Search" : `Search ${index + 1}`}
-                    className="flex-1 min-w-0 p-2 sm:p-3 pr-8 sm:pr-10 border rounded text-sm sm:text-base focus:ring-2 focus:ring-blue-400 text-gray-900 bg-white dark:text-white dark:bg-gray-900"
+                    className="flex-1 min-w-0 p-1.5 sm:p-3 pr-8 sm:pr-10 border rounded text-base focus:ring-2 focus:ring-blue-400 text-gray-900 bg-white dark:text-white dark:bg-gray-900"
                     value={queryObj.text}
                     onChange={(e) => updateQuery(index, e.target.value)}
                     maxLength={64}
-                    style={{ minHeight: 44 }}
+                    style={{ minHeight: 36 }}
                   />
                   
                   {/* Remove button - only show if more than one query */}
@@ -1390,9 +1390,9 @@ export default function CardSearchClient() {
                     <button
                       type="button"
                       onClick={() => removeQuery(index)}
-                      className="p-2 text-red-600 hover:text-red-800 hover:bg-red-100 rounded transition-colors dark:hover:bg-red-900"
+                      className="p-1.5 sm:p-2 text-red-600 hover:text-red-800 hover:bg-red-100 rounded transition-colors dark:hover:bg-red-900"
                       title="Remove this query"
-                      style={{ minHeight: 44 }}
+                      style={{ minHeight: 36 }}
                     >
                       ×
                     </button>
@@ -1400,22 +1400,48 @@ export default function CardSearchClient() {
                 </div>
               ))}
             </div>
-            <div className="flex flex-row flex-wrap gap-2 w-full justify-center">
+            {/* Mobile: original layout */}
+            <div className="flex sm:hidden flex-row flex-wrap gap-1.5 w-full justify-center">
             <button
-              className="px-3 sm:px-4 flex-1 sm:flex-none sm:w-auto rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center text-sm"
+              className="px-2.5 flex-1 rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center text-xs"
               onClick={handleResetFilters}
-              style={{ minHeight: 44, height: 44 }}
+              style={{ minHeight: 32, height: 32 }}
             >
-              <span className="hidden sm:inline">Reset Filters</span>
-              <span className="sm:hidden flex items-center justify-center gap-1.5">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <span className="flex items-center justify-center gap-1">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
                 Reset
               </span>
             </button>
             <button
-              className={`px-4 sm:w-auto rounded border transition font-semibold shadow text-center relative hidden sm:block ${
+              className="px-3 flex-1 shrink-0 rounded bg-green-200 text-green-900 hover:bg-green-400 hover:text-green-900 border border-green-300 dark:bg-green-700 dark:text-white dark:hover:bg-green-600 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center relative text-xs"
+              onClick={addNewQuery}
+              style={{ minHeight: 32, height: 32 }}
+              title="Add new query"
+            >
+              +
+            </button>
+            </div>
+            {/* Desktop: centered buttons with filters right-aligned */}
+            <div className="hidden sm:flex flex-row gap-2 w-full items-center justify-center relative">
+            <button
+              className="px-4 shrink-0 rounded bg-green-200 text-green-900 hover:bg-green-400 hover:text-green-900 border border-green-300 dark:bg-green-700 dark:text-white dark:hover:bg-green-600 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center relative"
+              onClick={addNewQuery}
+              style={{ minHeight: 44, height: 44 }}
+              title="Add new query"
+            >
+              +
+            </button>
+            <button
+              className="px-4 rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center text-sm"
+              onClick={handleResetFilters}
+              style={{ minHeight: 44, height: 44 }}
+            >
+              Reset Filters
+            </button>
+            <button
+              className={`px-4 rounded border transition font-semibold shadow text-center relative ${
                 queries.filter(q => q.text.trim()).length > 1
                   ? 'bg-gray-400 text-gray-600 border-gray-500 cursor-not-allowed opacity-50 dark:bg-gray-800 dark:text-gray-500 dark:border-gray-600'
                   : 'bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
@@ -1431,18 +1457,10 @@ export default function CardSearchClient() {
             >
               {copyLinkNotification ? '✓' : '🔗'}
             </button>
-            <button
-              className="px-4 flex-1 sm:flex-none sm:w-auto shrink-0 rounded bg-green-200 text-green-900 hover:bg-green-400 hover:text-green-900 border border-green-300 dark:bg-green-700 dark:text-white dark:hover:bg-green-600 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center relative"
-              onClick={addNewQuery}
-              style={{ minHeight: 44, height: 44 }}
-              title="Add new query"
-            >
-              +
-            </button>
-            {/* Filter collapse button — desktop only (hidden on mobile, shown in filters bar instead) */}
+            {/* Filter collapse button — desktop only */}
             <button
               aria-label="Toggle filter grid"
-              className={`hidden md:flex px-3 shrink-0 rounded items-center justify-center gap-1.5 border transition font-semibold shadow text-sm ${
+              className={`hidden md:flex absolute right-0 px-3 shrink-0 rounded items-center justify-center gap-1.5 border transition font-semibold shadow text-sm ${
                 filterGridCollapsed
                   ? 'bg-blue-200 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
                   : 'bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
@@ -1469,9 +1487,9 @@ export default function CardSearchClient() {
       </div>
       {/* Active Filters Summary Bar — only render when there are active filter pills */}
       {hasActiveFilters && (
-      <div className="w-full transition-all duration-300 sticky top-[120px] sm:top-[64px] z-30 bg-white text-gray-900 border-b border-gray-200 dark:bg-gray-900 dark:text-white dark:border-gray-800 flex items-center">
+      <div className="w-full transition-all duration-300 md:sticky md:top-[64px] z-30 bg-white text-gray-900 border-b border-gray-200 dark:bg-gray-900 dark:text-white dark:border-gray-800 flex items-center">
         {/* Scrollable pills area */}
-        <div className="flex-1 overflow-x-auto flex flex-nowrap sm:flex-wrap gap-2 items-center sm:justify-center px-2 sm:px-4 py-2 sm:overflow-visible">
+        <div className="flex-1 overflow-x-auto flex flex-nowrap sm:flex-wrap gap-1.5 sm:gap-2 items-center sm:justify-center px-2 sm:px-4 py-1.5 sm:py-2 sm:overflow-visible">
         {/* Query Pills */}
         {queries.map((queryObj, originalIndex) => {
           if (!queryObj.text.trim()) return null;
@@ -1500,14 +1518,14 @@ export default function CardSearchClient() {
               aria-label={`Remove Search filter ${originalIndex + 1}`}
             >
               {operatorPrefix && <span className="font-bold mr-1">{operatorPrefix}</span>}
-              {queryObj.field === 'everything' && `Search: "${queryObj.text}"`}
-              {queryObj.field === 'name' && `Name contains: "${queryObj.text}"`}
-              {queryObj.field === 'type' && `Type contains: "${queryObj.text}"`}
-              {queryObj.field === 'brigade' && `Brigade contains: "${queryObj.text}"`}
-              {queryObj.field === 'specialAbility' && `Special Ability contains: "${queryObj.text}"`}
-              {queryObj.field === 'setName' && `Set Name contains: "${queryObj.text}"`}
-              {queryObj.field === 'identifier' && `Identifier contains: "${queryObj.text}"`}
-              {queryObj.field === 'reference' && `Reference contains: "${queryObj.text}"`}
+              {queryObj.field === 'everything' && `"${queryObj.text}"`}
+              {queryObj.field === 'name' && `Name: "${queryObj.text}"`}
+              {queryObj.field === 'type' && `Type: "${queryObj.text}"`}
+              {queryObj.field === 'brigade' && `Brigade: "${queryObj.text}"`}
+              {queryObj.field === 'specialAbility' && `Ability: "${queryObj.text}"`}
+              {queryObj.field === 'setName' && `Set: "${queryObj.text}"`}
+              {queryObj.field === 'identifier' && `ID: "${queryObj.text}"`}
+              {queryObj.field === 'reference' && `Ref: "${queryObj.text}"`}
               <span className="ml-1 text-blue-900 dark:text-white">×</span>
             </span>
           );
@@ -1704,7 +1722,7 @@ export default function CardSearchClient() {
       </div>
       )}
       {/* Collapse/Expand Filter Grid Button — mobile only (on desktop it's in the search header) */}
-      <div className="flex-shrink-0 flex md:hidden flex-row items-center justify-end px-3 py-1.5 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+      <div className="flex-shrink-0 sticky top-0 z-30 flex md:hidden flex-row items-center justify-end px-3 py-1.5 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
         <button
           aria-label="Toggle filter grid"
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-semibold transition ${
@@ -1727,7 +1745,7 @@ export default function CardSearchClient() {
           Filters
         </button>
       </div>
-      <main className="p-2 pb-16 md:pb-2 overflow-auto bg-white text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200">
+      <main className="p-2 pb-16 md:pb-2 md:overflow-auto md:flex-1 bg-white text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200">
         {/* Responsive grid for filters */}
         {!filterGridCollapsed && (
           <FilterGrid

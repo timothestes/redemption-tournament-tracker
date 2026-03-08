@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Deck } from "../types/deck";
 import { SyncStatus } from "../hooks/useDeckState";
 import DeckCardList from "./DeckCardList";
@@ -151,6 +152,7 @@ export default function DeckBuilderPanel({
   const [tagFilter, setTagFilter] = useState("");
   const [savingTags, setSavingTags] = useState(false);
   const tagPickerRef = useRef<HTMLDivElement>(null);
+  const [tagsBarContainer, setTagsBarContainer] = useState<HTMLDivElement | null>(null);
   const [createMode, setCreateMode] = useState(false);
   const [createName, setCreateName] = useState("");
   const [createColor, setCreateColor] = useState("#6366f1");
@@ -252,7 +254,7 @@ export default function DeckBuilderPanel({
 
   // View options
   const [viewLayout, setViewLayout] = useState<'grid' | 'list'>('grid');
-  const [gridDensity, setGridDensity] = useState<'normal' | 'compact'>('compact');
+
   const [groupBy, setGroupBy] = useState<'type' | 'alignment'>('type');
 
   // Expanded (FullDeckView) view options
@@ -392,14 +394,9 @@ export default function DeckBuilderPanel({
     );
     
     if (deckCard) {
-      // Remove all copies from current location
-      for (let i = 0; i < deckCard.quantity; i++) {
-        onRemoveCard(cardName, cardSet, fromReserve);
-      }
-      // Add all copies to new location
-      for (let i = 0; i < deckCard.quantity; i++) {
-        onAddCard(cardName, cardSet, toReserve);
-      }
+      // Move one copy from current location to new location
+      onRemoveCard(cardName, cardSet, fromReserve);
+      onAddCard(cardName, cardSet, toReserve);
     }
   };
 
@@ -607,6 +604,17 @@ export default function DeckBuilderPanel({
                 {deck.isPublic ? "Public" : "Private"}
               </span>
             )}
+            <span className="hidden md:flex items-center gap-1 text-xs whitespace-nowrap ml-auto flex-shrink-0" suppressHydrationWarning>
+              <span className="text-gray-500 dark:text-gray-400">{mainDeckCount}</span>
+              {reserveCount > 0 && (
+                <>
+                  <span className="text-gray-400 dark:text-gray-600">/</span>
+                  <span className="text-gray-500 dark:text-gray-400">{reserveCount}</span>
+                </>
+              )}
+              <span className="text-gray-400 dark:text-gray-600">=</span>
+              <span className="font-semibold text-gray-700 dark:text-gray-300">{totalCards}</span>
+            </span>
           </div>
         )}
 
@@ -722,7 +730,7 @@ export default function DeckBuilderPanel({
                 </svg>
               </button>
               {showMenu && (
-                <div className="absolute top-full mt-1 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50 min-w-[180px]">
+                <div className="absolute top-full mt-1 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50 min-w-[180px] max-h-[70vh] overflow-y-auto">
                   <button
                     onClick={() => { onImport(); setShowMenu(false); }}
                     className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-gray-900 dark:text-white text-sm"
@@ -978,21 +986,6 @@ export default function DeckBuilderPanel({
         {/* Card Count and Menu Button Row — desktop only */}
         <div className="hidden md:flex mt-2 flex-col md:flex-row md:items-center md:justify-between gap-3 min-w-0">
           <div className="flex items-center gap-2 md:gap-3 text-sm flex-wrap min-w-0" suppressHydrationWarning>
-            <div className="hidden md:flex items-center gap-1">
-              <span className="text-gray-600 dark:text-gray-400">Main:</span>
-              <span className="font-semibold text-gray-900 dark:text-white">{mainDeckCount}</span>
-            </div>
-            {reserveCount > 0 && (
-              <div className="hidden md:flex items-center gap-1">
-                <span className="text-gray-600 dark:text-gray-400">Reserve:</span>
-                <span className="font-semibold text-gray-900 dark:text-white">{reserveCount}</span>
-              </div>
-            )}
-            <div className="hidden md:flex items-center gap-1">
-              <span className="text-gray-600 dark:text-gray-400">Total:</span>
-              <span className="font-semibold text-gray-900 dark:text-white">{totalCards}</span>
-            </div>
-
             {/* Desktop: Format Selector (T1/T2/Paragon) */}
             <div className="hidden md:flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-full p-0.5">
               <button
@@ -1213,7 +1206,7 @@ export default function DeckBuilderPanel({
               </svg>
             </button>
             {showMenu && (
-              <div className="absolute top-full mt-1 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50 min-w-[160px]">
+              <div className="absolute top-full mt-1 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50 min-w-[160px] max-h-[70vh] overflow-y-auto">
               {/* Import/Export Section */}
               <button
                 onClick={() => {
@@ -1425,32 +1418,34 @@ export default function DeckBuilderPanel({
       {/* ...existing code... */}
       {/* Tabs - Hide when expanded (full screen view) */}
       {!isExpanded && (
-      <div className="flex-shrink-0 flex items-center border-b border-gray-200/60 dark:border-gray-700/60 bg-white dark:bg-gray-800 overflow-visible relative z-20">
+      <div className="flex-shrink-0 flex items-center border-b border-gray-200/60 dark:border-gray-700/60 bg-white dark:bg-gray-800 relative z-20">
         <button
           onClick={() => handleTabChange("main")}
-          className={`flex-1 px-3 py-3 text-sm font-medium transition-colors whitespace-nowrap text-center ${
+          className={`flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors whitespace-nowrap text-center ${
             activeTab === "main"
               ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
           }`}
         >
-          Main ({mainDeckCount})
+          <span className="md:hidden">Main <span className="text-[10px] opacity-75">{mainDeckCount}</span></span>
+          <span className="hidden md:inline">Main ({mainDeckCount})</span>
         </button>
         <button
           onClick={() => handleTabChange("reserve")}
-          className={`flex-1 px-3 py-3 text-sm font-medium transition-colors whitespace-nowrap text-center ${
+          className={`flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors whitespace-nowrap text-center ${
             activeTab === "reserve"
               ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
           }`}
         >
-          Reserve ({reserveCount})
+          <span className="md:hidden">Res <span className="text-[10px] opacity-75">{reserveCount}</span></span>
+          <span className="hidden md:inline">Reserve ({reserveCount})</span>
         </button>
         <button
           onClick={() => handleTabChange("info")}
           onMouseEnter={() => setShowValidationTooltip(true)}
           onMouseLeave={() => setShowValidationTooltip(false)}
-          className={`relative flex-1 px-3 py-3 text-sm font-medium transition-colors whitespace-nowrap text-center ${
+          className={`relative flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors whitespace-nowrap text-center ${
             activeTab === "info"
               ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
@@ -1470,10 +1465,10 @@ export default function DeckBuilderPanel({
               </span>
             )}
           </span>
-          
+
           {/* Validation Tooltip */}
           {showValidationTooltip && validation.stats.totalCards > 0 && (
-            <div className={`absolute left-1/2 -translate-x-1/2 top-full mt-2 w-72 p-4 rounded-lg shadow-xl z-50 pointer-events-none ${
+            <div className={`hidden md:block absolute left-1/2 -translate-x-1/2 top-full mt-2 w-72 p-4 rounded-lg shadow-xl z-50 pointer-events-none ${
               validation.isValid
                 ? "bg-green-50 dark:bg-green-900/90 border-2 border-green-300 dark:border-green-600"
                 : "bg-red-50 dark:bg-red-900/90 border-2 border-red-300 dark:border-red-600"
@@ -1484,7 +1479,7 @@ export default function DeckBuilderPanel({
                   ? "border-b-green-300 dark:border-b-green-600"
                   : "border-b-red-300 dark:border-b-red-600"
               }`}></div>
-              
+
               {/* Content */}
               <div className={`font-semibold mb-3 text-base ${
                 validation.isValid
@@ -1493,7 +1488,7 @@ export default function DeckBuilderPanel({
               }`}>
                 {validation.isValid ? "✓ Passed Basic Checks" : `✗ ${validation.issues.filter(i => i.type === "error").length} Error${validation.issues.filter(i => i.type === "error").length !== 1 ? "s" : ""}`}
               </div>
-              
+
               {validation.issues.length > 0 && (
                 <div className="space-y-2">
                   {validation.issues.map((issue, idx) => (
@@ -1522,7 +1517,7 @@ export default function DeckBuilderPanel({
         {/* Details Tab (Cover Cards + Description) */}
         <button
           onClick={() => handleTabChange("cover")}
-          className={`flex-1 px-3 py-3 text-sm font-medium transition-colors whitespace-nowrap text-center ${
+          className={`flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors whitespace-nowrap text-center ${
             activeTab === "cover"
               ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
@@ -1538,7 +1533,7 @@ export default function DeckBuilderPanel({
               e.stopPropagation();
               setShowViewDropdown(!showViewDropdown);
             }}
-            className="px-2 md:px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-1"
+            className="px-1.5 md:px-3 py-2 text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-1"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
@@ -1549,189 +1544,150 @@ export default function DeckBuilderPanel({
             </svg>
           </button>
           
+          {/* View dropdown - desktop: absolute dropdown, mobile: fixed bottom sheet */}
           {showViewDropdown && (
-            <div className="absolute top-full mt-1 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl py-2 z-50 min-w-[220px]">
-              {/* Layout Section */}
-              <div className="px-3 py-2">
-                <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
-                  Layout
+            <>
+              {/* Mobile: backdrop */}
+              <div
+                className="md:hidden fixed inset-0 bg-black/40 z-[60]"
+                onClick={() => setShowViewDropdown(false)}
+              />
+              <div className="
+                md:absolute md:top-full md:mt-1 md:right-0 md:rounded-lg md:min-w-[220px] md:max-h-[70vh] md:overflow-y-auto
+                fixed bottom-14 left-0 right-0 pb-[env(safe-area-inset-bottom)] rounded-t-2xl max-h-[70vh] overflow-y-auto
+                md:static-auto
+                bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl py-2 z-[70]
+              ">
+                {/* Mobile: drag handle */}
+                <div className="md:hidden flex justify-center py-2">
+                  <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setViewLayout('grid');
-                    }}
-                    className={`flex-1 p-2 rounded flex flex-col items-center gap-1 transition-colors ${
-                      viewLayout === 'grid'
-                        ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
-                    }`}
-                    title="Grid view"
-                  >
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                    </svg>
-                    <span className="text-xs font-medium">Grid</span>
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setViewLayout('list');
-                    }}
-                    className={`flex-1 p-2 rounded flex flex-col items-center gap-1 transition-colors ${
-                      viewLayout === 'list'
-                        ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
-                    }`}
-                    title="List view"
-                  >
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-                    </svg>
-                    <span className="text-xs font-medium">List</span>
-                  </button>
-                </div>
-              </div>
-              
-              {/* Grid Density Section (only shown when grid layout is active) */}
-              {viewLayout === 'grid' && (
-                <>
-                  <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
-                  <div className="px-3 py-2">
-                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
-                      Grid Size
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setGridDensity('normal');
-                        }}
-                        className={`flex-1 p-2 rounded flex flex-col items-center gap-1 transition-colors ${
-                          gridDensity === 'normal'
-                            ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
-                            : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
-                        }`}
-                        title="Normal grid (fewer, larger cards)"
-                      >
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                          <rect x="2" y="2" width="7" height="7" rx="1" />
-                          <rect x="11" y="2" width="7" height="7" rx="1" />
-                          <rect x="2" y="11" width="7" height="7" rx="1" />
-                          <rect x="11" y="11" width="7" height="7" rx="1" />
-                        </svg>
-                        <span className="text-xs font-medium">Normal</span>
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setGridDensity('compact');
-                        }}
-                        className={`flex-1 p-2 rounded flex flex-col items-center gap-1 transition-colors ${
-                          gridDensity === 'compact'
-                            ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
-                            : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
-                        }`}
-                        title="Compact grid (more, smaller cards)"
-                      >
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                          <rect x="1" y="1" width="5" height="5" rx="0.5" />
-                          <rect x="7.5" y="1" width="5" height="5" rx="0.5" />
-                          <rect x="14" y="1" width="5" height="5" rx="0.5" />
-                          <rect x="1" y="7.5" width="5" height="5" rx="0.5" />
-                          <rect x="7.5" y="7.5" width="5" height="5" rx="0.5" />
-                          <rect x="14" y="7.5" width="5" height="5" rx="0.5" />
-                          <rect x="1" y="14" width="5" height="5" rx="0.5" />
-                          <rect x="7.5" y="14" width="5" height="5" rx="0.5" />
-                          <rect x="14" y="14" width="5" height="5" rx="0.5" />
-                        </svg>
-                        <span className="text-xs font-medium">Compact</span>
-                      </button>
-                    </div>
+                {/* Layout Section */}
+                <div className="px-3 py-2">
+                  <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+                    Layout
                   </div>
-                </>
-              )}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setViewLayout('grid');
+                      }}
+                      className={`flex-1 p-2 rounded flex flex-col items-center gap-1 transition-colors ${
+                        viewLayout === 'grid'
+                          ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                      title="Grid view"
+                    >
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                      </svg>
+                      <span className="text-xs font-medium">Grid</span>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setViewLayout('list');
+                      }}
+                      className={`flex-1 p-2 rounded flex flex-col items-center gap-1 transition-colors ${
+                        viewLayout === 'list'
+                          ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                      title="List view"
+                    >
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-xs font-medium">List</span>
+                    </button>
+                  </div>
+                </div>
 
-              <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
 
-              {/* Card Hover Preview Toggle */}
-              <div className="px-3 py-2 flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Card Hover Preview</span>
-                <Switch
-                  checked={!disableHoverPreview}
-                  onChange={() => setDisableHoverPreview((v) => !v)}
-                  className={`${!disableHoverPreview ? 'bg-green-700' : 'bg-gray-300 dark:bg-gray-700'} relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none`}
+                <div className="hidden md:block border-t border-gray-200 dark:border-gray-700 my-2"></div>
+
+                {/* Card Hover Preview Toggle — desktop only */}
+                <div className="hidden md:flex px-3 py-2 items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Card Hover Preview</span>
+                  <Switch
+                    checked={!disableHoverPreview}
+                    onChange={() => setDisableHoverPreview((v) => !v)}
+                    className={`${!disableHoverPreview ? 'bg-green-700' : 'bg-gray-300 dark:bg-gray-700'} relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${!disableHoverPreview ? 'translate-x-5' : 'translate-x-1'}`}
+                    />
+                  </Switch>
+                </div>
+                {/* Divider for new section */}
+                <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
+
+                {/* Group By Section */}
+                <div className="px-3 py-2">
+                  <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+                    Group by
+                  </div>
+                  <div className="space-y-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setGroupBy('type');
+                      }}
+                      className={`w-full px-3 py-2 text-left text-sm rounded transition-colors flex items-center justify-between ${
+                        groupBy === 'type'
+                          ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-medium'
+                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      <span>Type</span>
+                      {groupBy === 'type' && (
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setGroupBy('alignment');
+                      }}
+                      className={`w-full px-3 py-2 text-left text-sm rounded transition-colors flex items-center justify-between ${
+                        groupBy === 'alignment'
+                          ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-medium'
+                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      <span>Alignment</span>
+                      {groupBy === 'alignment' && (
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Full Deck View (mobile only) */}
+                <div className="md:hidden border-t border-gray-200 dark:border-gray-700 my-2"></div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowMobileFullDeckView(true);
+                    setShowViewDropdown(false);
+                  }}
+                  className="md:hidden w-full px-3 py-2.5 text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
                 >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${!disableHoverPreview ? 'translate-x-5' : 'translate-x-1'}`}
-                  />
-                </Switch>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                  </svg>
+                  Full Deck View
+                </button>
+                {/* Mobile: bottom safe area padding */}
+                <div className="md:hidden h-4" />
               </div>
-              {/* Divider for new section */}
-              <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
-              
-              {/* Group By Section */}
-              <div className="px-3 py-2">
-                <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
-                  Group by
-                </div>
-                <div className="space-y-1">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setGroupBy('type');
-                    }}
-                    className={`w-full px-3 py-2 text-left text-sm rounded transition-colors flex items-center justify-between ${
-                      groupBy === 'type'
-                        ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-medium'
-                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    <span>Type</span>
-                    {groupBy === 'type' && (
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setGroupBy('alignment');
-                    }}
-                    className={`w-full px-3 py-2 text-left text-sm rounded transition-colors flex items-center justify-between ${
-                      groupBy === 'alignment'
-                        ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-medium'
-                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    <span>Alignment</span>
-                    {groupBy === 'alignment' && (
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* Full Deck View (mobile only) */}
-              <div className="md:hidden border-t border-gray-200 dark:border-gray-700 my-2"></div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowMobileFullDeckView(true);
-                  setShowViewDropdown(false);
-                }}
-                className="md:hidden w-full px-3 py-2.5 text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                </svg>
-                Full Deck View
-              </button>
-            </div>
+            </>
           )}
         </div>
       </div>
@@ -1868,6 +1824,7 @@ export default function DeckBuilderPanel({
                 </button>
               </div>
             </div>
+            <div ref={setTagsBarContainer} className="relative z-50" />
             <div className="flex-1 overflow-auto">
               <FullDeckView
                 deck={deck}
@@ -1876,6 +1833,7 @@ export default function DeckBuilderPanel({
                 viewMode={expandedViewMode}
                 groupBy={expandedGroupBy}
                 showPreview={!disableHoverPreview}
+                tagsBarContainer={tagsBarContainer}
               />
             </div>
           </div>
@@ -1934,7 +1892,7 @@ export default function DeckBuilderPanel({
                     onMoveCard={handleMoveCard}
                     showTypeIcons={false}
                     viewLayout={viewLayout}
-                    gridDensity={gridDensity}
+
                     disableHoverPreview={disableHoverPreview}
                   />
                 </div>
@@ -2026,7 +1984,7 @@ export default function DeckBuilderPanel({
                     onMoveCard={handleMoveCard}
                     showTypeIcons={false}
                     viewLayout={viewLayout}
-                    gridDensity={gridDensity}
+
                     disableHoverPreview={disableHoverPreview}
                   />
                 </div>
@@ -2715,39 +2673,25 @@ export default function DeckBuilderPanel({
         })}
       </div>
 
-      {/* Mobile Full Deck View Overlay */}
-      {showMobileFullDeckView && (
-        <div className="md:hidden fixed inset-0 z-[60] bg-white dark:bg-gray-900 flex flex-col">
-          {/* Header */}
-          <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-              {deck.name} ({mainDeckCount + reserveCount})
-            </h2>
-            <button
-              onClick={() => { setShowMobileFullDeckView(false); setFullViewPreviewCard(null); }}
-              className="p-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          {/* View Controls */}
-          <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-            <div className="flex items-center gap-1 bg-gray-200 dark:bg-gray-700 rounded-lg p-0.5">
+      {/* Mobile Full Deck View Overlay — portaled to body to escape stacking contexts */}
+      {showMobileFullDeckView && createPortal(
+        <div className="md:hidden fixed inset-0 z-[100] bg-white dark:bg-gray-900 flex flex-col pt-[env(safe-area-inset-top)]">
+          {/* Header + View Controls — single compact row */}
+          <div className="flex-shrink-0 flex items-center gap-1.5 px-2 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+            <div className="flex items-center gap-0.5 bg-gray-200 dark:bg-gray-700 rounded-lg p-0.5">
               <button
                 onClick={() => setExpandedViewMode('stacked')}
-                className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                className={`px-2 py-1 text-[11px] font-medium rounded-md transition-colors ${
                   expandedViewMode === 'stacked'
                     ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
                     : 'text-gray-600 dark:text-gray-400'
                 }`}
               >
-                Stacked
+                Stack
               </button>
               <button
                 onClick={() => setExpandedViewMode('normal')}
-                className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                className={`px-2 py-1 text-[11px] font-medium rounded-md transition-colors ${
                   expandedViewMode === 'normal'
                     ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
                     : 'text-gray-600 dark:text-gray-400'
@@ -2756,10 +2700,10 @@ export default function DeckBuilderPanel({
                 Normal
               </button>
             </div>
-            <div className="flex items-center gap-1 bg-gray-200 dark:bg-gray-700 rounded-lg p-0.5">
+            <div className="flex items-center gap-0.5 bg-gray-200 dark:bg-gray-700 rounded-lg p-0.5">
               <button
                 onClick={() => setExpandedGroupBy('type')}
-                className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                className={`px-2 py-1 text-[11px] font-medium rounded-md transition-colors ${
                   expandedGroupBy === 'type'
                     ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
                     : 'text-gray-600 dark:text-gray-400'
@@ -2769,7 +2713,7 @@ export default function DeckBuilderPanel({
               </button>
               <button
                 onClick={() => setExpandedGroupBy('alignment')}
-                className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                className={`px-2 py-1 text-[11px] font-medium rounded-md transition-colors ${
                   expandedGroupBy === 'alignment'
                     ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
                     : 'text-gray-600 dark:text-gray-400'
@@ -2779,7 +2723,7 @@ export default function DeckBuilderPanel({
               </button>
               <button
                 onClick={() => setExpandedGroupBy('none')}
-                className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                className={`px-2 py-1 text-[11px] font-medium rounded-md transition-colors ${
                   expandedGroupBy === 'none'
                     ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
                     : 'text-gray-600 dark:text-gray-400'
@@ -2788,6 +2732,12 @@ export default function DeckBuilderPanel({
                 None
               </button>
             </div>
+            <button
+              onClick={() => { setShowMobileFullDeckView(false); setFullViewPreviewCard(null); }}
+              className="ml-auto flex-shrink-0 px-2.5 py-1 rounded-lg text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-[11px] font-medium"
+            >
+              Close
+            </button>
           </div>
           {/* Deck Content */}
           <div className="flex-1 overflow-auto">
@@ -2823,7 +2773,8 @@ export default function DeckBuilderPanel({
               </div>
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Deck } from "../types/deck";
 import { Card } from "../utils";
 import { useCardImageUrl } from "../hooks/useCardImageUrl";
@@ -22,13 +23,14 @@ interface FullDeckViewProps {
   viewMode: 'normal' | 'stacked';
   groupBy: 'none' | 'alignment' | 'type';
   showPreview?: boolean;
+  tagsBarContainer?: HTMLElement | null;
 }
 
 /**
  * Full-screen optimized deck view with compact card display
  * Shows entire deck at a glance with minimal scrolling
  */
-export default function FullDeckView({ deck, onViewCard, isAuthenticated = false, viewMode, groupBy, showPreview = true }: FullDeckViewProps) {
+export default function FullDeckView({ deck, onViewCard, isAuthenticated = false, viewMode, groupBy, showPreview = true, tagsBarContainer }: FullDeckViewProps) {
   const { getImageUrl } = useCardImageUrl();
   const { isAdmin, permissions } = useIsAdmin();
   const canManageTags = isAdmin && permissions.includes('manage_tags');
@@ -211,16 +213,16 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
       if (groupBy === 'alignment') {
         key = deckCard.card.alignment || 'Neutral';
       } else if (groupBy === 'type') {
-        const typeName = prettifyTypeName(deckCard.card.type || 'Unknown');
+        const rawType = deckCard.card.type || 'Unknown';
+        const typeName = prettifyTypeName(rawType);
+        // Dual-type cards (e.g. "Hero/GE", "Evil Character/EE") go into a shared pile
+        if (rawType.includes('/')) {
+          key = 'Dual-Type';
         // Combine certain types together
-        if (typeName === 'Artifact' || typeName === 'Covenant' || typeName === 'Curse') {
+        } else if (typeName === 'Artifact' || typeName === 'Covenant' || typeName === 'Curse') {
           key = 'Artifact/Covenant/Curse';
         } else if (typeName === 'Fortress' || typeName === 'Site' || typeName === 'City') {
           key = 'Fortress/Site';
-        } else if (typeName === 'Good Enhancement' || deckCard.card.type === 'Hero/GE') {
-          key = 'Good Enhancement';
-        } else if (typeName === 'Evil Enhancement' || deckCard.card.type === 'Evil Character/EE') {
-          key = 'Evil Enhancement';
         } else {
           key = typeName;
         }
@@ -459,14 +461,12 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
     );
   };
 
-  return (
-    <div className="h-full w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
-      {/* Tags header */}
-      {(deckTags.length > 0 || (isAuthenticated && deck.id)) && (
-      <div className="sticky top-0 z-20 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-b border-gray-200/60 dark:border-gray-700/60">
+  const tagsBarContent = (deckTags.length > 0 || (isAuthenticated && deck.id)) ? (
+      <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-b border-gray-200/60 dark:border-gray-700/60">
         <div className="px-3 md:px-4 py-1 md:py-1.5">
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-              {/* Current tag pills */}
+          <div className="flex items-center gap-2">
+              {/* Scrollable tag pills */}
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar min-w-0">
               {deckTags.map((tag) => (
                 isAuthenticated ? (
                   <button
@@ -491,8 +491,9 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                   </span>
                 )
               ))}
+              </div>
 
-              {/* Picker trigger */}
+              {/* Picker trigger — outside the scrollable area so dropdown isn't clipped */}
               {isAuthenticated && deck.id && (
                 <div className="relative flex-shrink-0" ref={tagPickerRef}>
                   <button
@@ -618,8 +619,12 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
           </div>
         </div>
       </div>
-      )}
+  ) : null;
 
+  return (
+    <>
+      {tagsBarContainer ? (tagsBarContent && createPortal(tagsBarContent, tagsBarContainer)) : tagsBarContent}
+      <div className="h-full w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
       {/* Main content area */}
       <div className="px-3 py-3 md:px-4 md:py-3 lg:flex lg:gap-4">
         {/* Deck cards */}
@@ -818,6 +823,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </>
   );
 }

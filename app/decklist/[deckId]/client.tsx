@@ -974,10 +974,10 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
       )}
 
       {/* View Controls */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-2 md:gap-3 mb-6 flex-wrap">
         <button
           onClick={() => setViewMode(viewMode === "normal" ? "stacked" : "normal")}
-          className="flex items-center gap-2 px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-xs md:text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
         >
           <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             {viewMode === "normal" ? (
@@ -992,7 +992,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
         <select
           value={groupBy}
           onChange={(e) => setGroupBy(e.target.value as "type" | "alignment" | "none")}
-          className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm"
+          className="px-2.5 md:px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-xs md:text-sm"
         >
           <option value="type">Group by Type</option>
           <option value="alignment">Group by Alignment</option>
@@ -1022,7 +1022,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
         {/* Stats toggle */}
         <button
           onClick={() => setShowStats((v) => !v)}
-          className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm transition-colors ${
+          className={`flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 border rounded-lg text-xs md:text-sm transition-colors ${
             showStats
               ? 'border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
               : 'border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'

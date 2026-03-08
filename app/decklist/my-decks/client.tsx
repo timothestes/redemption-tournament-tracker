@@ -381,7 +381,7 @@ export default function MyDecksClient() {
   }
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 py-8">
+    <div className="w-full max-w-7xl mx-auto px-3 md:px-4 py-4 md:py-8 overflow-x-hidden">
 
       {/* Mobile folder strip (hidden on lg+) */}
       <div className="lg:hidden mb-4">
@@ -493,30 +493,32 @@ export default function MyDecksClient() {
         {/* Main Content */}
         <div className="flex-1">
           {/* Header */}
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">{selectedFolderName}</h1>
-              <p className="text-gray-600 dark:text-gray-400">
+          <div className="flex items-center justify-between mb-4 md:mb-8 gap-2">
+            <div className="min-w-0">
+              <h1 className="text-2xl md:text-3xl font-bold mb-1 md:mb-2 truncate">{selectedFolderName}</h1>
+              <p className="text-sm md:text-base text-gray-600 dark:text-gray-400">
                 {filteredDecks.length} {filteredDecks.length === 1 ? "deck" : "decks"}
                 {selectedTagIds.length > 0 && ` · ${selectedTagIds.length} tag${selectedTagIds.length > 1 ? "s" : ""} selected`}
               </p>
             </div>
             <button
               onClick={handleNewDeck}
-              className="px-6 py-3 border-2 border-blue-500 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg font-medium transition-colors"
+              className="flex-shrink-0 px-3 md:px-6 py-2 md:py-3 border-2 border-blue-500 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg text-sm md:text-base font-medium transition-colors"
             >
-              + New Deck
+              + New
+              <span className="hidden md:inline"> Deck</span>
             </button>
           </div>
 
           {/* Controls */}
-          <div className="flex items-center justify-between mb-3 gap-4">
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-600 dark:text-gray-400">Sort by:</label>
+          <div className="flex items-center justify-between mb-3 gap-2 md:gap-4">
+            <div className="flex items-center gap-1.5 md:gap-2 min-w-0 flex-1">
+              <label className="text-sm text-gray-600 dark:text-gray-400 hidden md:inline flex-shrink-0">Sort by:</label>
+              <label className="text-xs text-gray-600 dark:text-gray-400 md:hidden flex-shrink-0">Sort</label>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
-                className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm"
+                className="px-2 md:px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-xs md:text-sm max-w-[140px] md:max-w-none"
               >
                 <option value="updated">Last Modified</option>
                 <option value="created">Date Created</option>
@@ -528,7 +530,7 @@ export default function MyDecksClient() {
                 <div className="relative" ref={tagDropdownRef}>
                   <button
                     onClick={() => { setTagDropdownOpen((o) => !o); setTagFilterInput(""); }}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm transition-colors ${
+                    className={`flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 border rounded-lg text-xs md:text-sm transition-colors ${
                       selectedTagIds.length > 0
                         ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
                         : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
@@ -604,10 +606,10 @@ export default function MyDecksClient() {
               )}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
               <button
                 onClick={() => setViewMode("grid")}
-                className={`p-2 rounded ${
+                className={`p-1.5 md:p-2 rounded ${
                   viewMode === "grid"
                     ? "bg-gray-200 dark:bg-gray-700"
                     : "hover:bg-gray-100 dark:hover:bg-gray-800"
@@ -620,7 +622,7 @@ export default function MyDecksClient() {
               </button>
               <button
                 onClick={() => setViewMode("list")}
-                className={`p-2 rounded ${
+                className={`p-1.5 md:p-2 rounded ${
                   viewMode === "list"
                     ? "bg-gray-200 dark:bg-gray-700"
                     : "hover:bg-gray-100 dark:hover:bg-gray-800"
@@ -694,7 +696,7 @@ export default function MyDecksClient() {
               </button>
             </div>
           ) : viewMode === "grid" ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
               {sortedDecks.map((deck) => (
                 <DeckCard
                   key={deck.id}
@@ -1022,13 +1024,13 @@ function DeckListItem({
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
-      <div className="flex items-center gap-4 p-4">
+      <div className="flex items-center gap-2 md:gap-4 p-3 md:p-4">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
             <span className={getDeckTypeBadgeClasses(deck.format)}>
               {formatDeckType(deck.format)}
             </span>
-            <h3 className="font-semibold truncate">{deck.name}</h3>
+            <h3 className="font-semibold truncate text-sm md:text-base">{deck.name}</h3>
             <span className={`px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
               deck.is_public
                 ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300"
@@ -1036,6 +1038,9 @@ function DeckListItem({
             }`}>
               {deck.is_public ? "Public" : "Private"}
             </span>
+          </div>
+          <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400 md:hidden">
+            <span>{deck.card_count || 0} cards</span>
           </div>
           {deck.tags && deck.tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1.5">
@@ -1052,15 +1057,15 @@ function DeckListItem({
           )}
         </div>
 
-        <div className="flex items-center gap-6 text-sm text-gray-600 dark:text-gray-400">
+        <div className="hidden md:flex items-center gap-6 text-sm text-gray-600 dark:text-gray-400">
           <span>{deck.card_count || 0} cards</span>
           <span className="text-xs">Updated {updatedDate}</span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
           <button
             onClick={() => onEdit(deck.id!)}
-            className="px-4 py-2 bg-green-700 text-white rounded-md hover:bg-green-800 font-medium transition-colors"
+            className="px-2 md:px-4 py-1.5 md:py-2 bg-green-700 text-white rounded-md hover:bg-green-800 text-xs md:text-sm font-medium transition-colors"
           >
             Edit
           </button>
