@@ -140,7 +140,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   const [copyResult, setCopyResult] = useState<{ success: boolean; message: string } | null>(null);
   const [cardDatabase, setCardDatabase] = useState<Map<string, Card> | null>(null);
   const [modalCard, setModalCard] = useState<Card | null>(null);
-  const [viewMode, setViewMode] = useState<"normal" | "stacked">("stacked");
+  const [viewMode, setViewMode] = useState<"normal" | "stacked">("normal");
   const [groupBy, setGroupBy] = useState<"type" | "alignment" | "none">("type");
   const [showParagonModal, setShowParagonModal] = useState(false);
   const [paragonVisible, setParagonVisible] = useState(true);

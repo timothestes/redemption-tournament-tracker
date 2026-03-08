@@ -189,7 +189,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 py-8">
+    <div className="w-full max-w-7xl mx-auto px-3 md:px-4 py-4 md:py-8 overflow-x-hidden">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Community Decks</h1>
@@ -207,8 +207,8 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            placeholder="Search by deck name or username..."
-            className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm"
+            placeholder="Search decks..."
+            className="flex-1 min-w-0 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm"
           />
           <button
             onClick={handleSearch}
