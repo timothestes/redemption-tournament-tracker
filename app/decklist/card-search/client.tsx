@@ -1722,7 +1722,7 @@ export default function CardSearchClient() {
       </div>
       )}
       {/* Collapse/Expand Filter Grid Button — mobile only (on desktop it's in the search header) */}
-      <div className="flex-shrink-0 sticky top-0 z-30 flex md:hidden flex-row items-center justify-end px-3 py-1.5 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+      <div className={`flex-shrink-0 ${!filterGridCollapsed ? 'sticky top-0 z-30' : ''} flex md:hidden flex-row items-center justify-end px-3 py-1.5 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800`}>
         <button
           aria-label="Toggle filter grid"
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-semibold transition ${
