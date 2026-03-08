@@ -273,6 +273,8 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   const [coverPickerSlot, setCoverPickerSlot] = useState<1 | 2 | null>(null);
   const [coverSaving, setCoverSaving] = useState(false);
   const [coverSaved, setCoverSaved] = useState(false);
+  const [coverPickerSort, setCoverPickerSort] = useState<"default" | "name" | "type" | "brigade">("type");
+  const [coverPickerSearch, setCoverPickerSearch] = useState("");
 
   useEffect(() => {
     if (!coverEditorOpen) return;
@@ -829,17 +831,32 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
 
       {/* Cover card editor modal — owner only */}
       {isOwner && coverEditorOpen && (() => {
-        const mainCards = deck.cards.filter(c => !c.is_reserve);
+        const coverMainCards = enrichedCards.filter(c => !c.is_reserve);
+        const filteredCoverCards = coverPickerSearch.trim()
+          ? coverMainCards.filter(c => c.card_name.toLowerCase().includes(coverPickerSearch.trim().toLowerCase()))
+          : coverMainCards;
+        const sortedCoverCards = [...filteredCoverCards].sort((a, b) => {
+          switch (coverPickerSort) {
+            case "name":
+              return a.card_name.localeCompare(b.card_name);
+            case "type":
+              return (a.type || "").localeCompare(b.type || "") || a.card_name.localeCompare(b.card_name);
+            case "brigade":
+              return (a.brigade || "").localeCompare(b.brigade || "") || a.card_name.localeCompare(b.card_name);
+            default:
+              return 0;
+          }
+        });
         const close = () => { setCoverEditorOpen(false); setCoverPickerSlot(null); };
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={close}>
-            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/60" onClick={close}>
+            <div className="bg-white dark:bg-gray-900 rounded-t-xl sm:rounded-xl shadow-2xl w-full sm:max-w-2xl flex flex-col max-h-[95vh] sm:max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
 
               {/* Header */}
-              <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+              <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
                 <div>
-                  <h2 className="text-lg font-semibold">Cover Cards</h2>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">These two cards appear as the thumbnail on the Community Decks page.</p>
+                  <h2 className="text-base sm:text-lg font-semibold">Cover Cards</h2>
+                  <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-0.5">Choose thumbnail cards for the Community page.</p>
                 </div>
                 <button onClick={close} className="ml-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 flex-shrink-0">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -848,23 +865,23 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                 </button>
               </div>
 
-              <div className="px-6 py-5 flex-shrink-0">
+              <div className="px-4 sm:px-6 py-3 sm:py-5 flex-shrink-0">
                 {/* Two card slots */}
-                <div className="flex gap-6 justify-center mb-2">
+                <div className="flex gap-4 sm:gap-6 justify-center mb-2">
                   {([1, 2] as const).map((slot) => {
                     const imgFile = slot === 1 ? previewCard1 : previewCard2;
                     const imgUrl = imgFile ? getImageUrl(imgFile) : null;
                     const isActive = coverPickerSlot === slot;
                     return (
-                      <div key={slot} className="flex flex-col items-center gap-2">
+                      <div key={slot} className="flex flex-col items-center gap-1 sm:gap-2">
                         <button
                           onClick={() => setCoverPickerSlot(slot)}
                           className={`relative rounded-xl overflow-hidden border-2 transition-all ${
                             isActive
                               ? "border-blue-500 ring-4 ring-blue-200 dark:ring-blue-800 scale-105"
                               : "border-gray-300 dark:border-gray-600 hover:border-green-600 hover:scale-102"
-                          } bg-gray-100 dark:bg-gray-800`}
-                          style={{ width: 130, aspectRatio: "2.5/3.5" }}
+                          } bg-gray-100 dark:bg-gray-800 w-20 sm:w-[130px]`}
+                          style={{ aspectRatio: "2.5/3.5" }}
                           title={`Set cover card ${slot}`}
                         >
                           {imgUrl ? (
@@ -897,10 +914,46 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                 </p>
               </div>
 
+              {/* Sort + Search */}
+              <div className="px-4 sm:px-6 pb-2 flex-shrink-0 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">Sort:</span>
+                  <select
+                    value={coverPickerSort}
+                    onChange={(e) => setCoverPickerSort(e.target.value as any)}
+                    className="text-xs px-1.5 py-0.5 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                  >
+                    <option value="default">Default</option>
+                    <option value="name">Name</option>
+                    <option value="type">Type</option>
+                    <option value="brigade">Brigade</option>
+                  </select>
+                </div>
+                <div className="relative">
+                  <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder="Search cards..."
+                    value={coverPickerSearch}
+                    onChange={(e) => setCoverPickerSearch(e.target.value)}
+                    className="w-full pl-8 pr-8 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                  {coverPickerSearch && (
+                    <button onClick={() => setCoverPickerSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              </div>
+
               {/* Card grid — scrollable */}
-              <div className="flex-1 overflow-y-auto px-6 pb-4 min-h-0">
-                <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
-                  {mainCards.map((card) => (
+              <div className="flex-1 overflow-y-auto px-4 sm:px-6 pb-4 min-h-0">
+                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+                  {sortedCoverCards.map((card) => (
                     <button
                       key={`${card.card_name}|${card.card_set}`}
                       onClick={async () => {

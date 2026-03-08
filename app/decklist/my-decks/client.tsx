@@ -14,7 +14,9 @@ import {
   loadDeckByIdAction,
   toggleDeckPublicAction,
   loadGlobalTagsAction,
+  updateDeckPreviewCardsAction,
   DeckData,
+  DeckCardData,
   FolderData,
   GlobalTag,
 } from "../actions";
@@ -92,6 +94,7 @@ export default function MyDecksClient() {
   const [folderToDelete, setFolderToDelete] = useState<{ id: string; name: string } | null>(null);
   const [pdfDeck, setPdfDeck] = useState<Deck | null>(null); // For PDF generation modal
   const [usernameModalDeckId, setUsernameModalDeckId] = useState<string | null>(null);
+  const [coverPickerDeckId, setCoverPickerDeckId] = useState<string | null>(null);
 
   // Tag filter state
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
@@ -811,6 +814,7 @@ export default function MyDecksClient() {
                   onTogglePublic={handleTogglePublic}
                   onCopyLink={handleCopyLink}
                   onViewPublic={handleViewPublic}
+                  onEditCover={(id) => setCoverPickerDeckId(id)}
                 />
               ))}
             </div>
@@ -886,6 +890,23 @@ export default function MyDecksClient() {
           onClose={() => setUsernameModalDeckId(null)}
         />
       )}
+
+      {coverPickerDeckId && (() => {
+        const coverDeck = decks.find(d => d.id === coverPickerDeckId);
+        return coverDeck ? (
+          <CoverPickerModal
+            deckId={coverPickerDeckId}
+            initialCard1={coverDeck.preview_card_1 ?? null}
+            initialCard2={coverDeck.preview_card_2 ?? null}
+            onClose={() => setCoverPickerDeckId(null)}
+            onSaved={(deckId, card1, card2) => {
+              setDecks(prev => prev.map(d =>
+                d.id === deckId ? { ...d, preview_card_1: card1, preview_card_2: card2 } : d
+              ));
+            }}
+          />
+        ) : null;
+      })()}
     </div>
   );
 }
@@ -986,6 +1007,7 @@ function DeckCard({
   onTogglePublic,
   onCopyLink,
   onViewPublic,
+  onEditCover,
 }: {
   deck: DeckData;
   folders: FolderData[];
@@ -998,6 +1020,7 @@ function DeckCard({
   onTogglePublic: (deckId: string, currentlyPublic: boolean) => void;
   onCopyLink: (deckId: string) => void;
   onViewPublic: (deckId: string) => void;
+  onEditCover: (deckId: string) => void;
 }) {
   const updatedDate = formatDateTime(deck.updated_at!);
 
@@ -1013,9 +1036,31 @@ function DeckCard({
           />
         </div>
       ) : (getCardImageUrl(deck.preview_card_1) || getCardImageUrl(deck.preview_card_2)) ? (
-        <div className="h-32 overflow-hidden rounded-t-lg bg-gray-100 dark:bg-gray-900 flex items-center justify-center gap-1 px-2 py-2 cursor-pointer" onClick={() => onEdit(deck.id!)}>
+        <div className="relative h-32 overflow-hidden rounded-t-lg bg-gray-100 dark:bg-gray-900 flex items-center justify-center gap-1 px-2 py-2 cursor-pointer" onClick={() => onEdit(deck.id!)}>
           {getCardImageUrl(deck.preview_card_1) && <img src={getCardImageUrl(deck.preview_card_1)!} alt="" className="h-full object-contain rounded" />}
           {getCardImageUrl(deck.preview_card_2) && <img src={getCardImageUrl(deck.preview_card_2)!} alt="" className="h-full object-contain rounded" />}
+          <button
+            onClick={(e) => { e.stopPropagation(); onEditCover(deck.id!); }}
+            className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/30 hover:bg-black/50 text-white/60 hover:text-white transition-colors"
+            title="Change cover cards"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+        </div>
+      ) : formatDeckType(deck.format) !== "Paragon" ? (
+        <div className="h-12 rounded-t-lg bg-gray-50 dark:bg-gray-800/50 flex items-center justify-center">
+          <button
+            onClick={() => onEditCover(deck.id!)}
+            className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            title="Set cover cards"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14" />
+            </svg>
+            Add cover
+          </button>
         </div>
       ) : null}
 
@@ -1220,11 +1265,23 @@ function DropdownMenu({
   const [isOpen, setIsOpen] = useState(false);
   const [showMoveMenu, setShowMoveMenu] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [openUpward, setOpenUpward] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  function handleToggle() {
+    if (!isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      setOpenUpward(spaceBelow < 350);
+    }
+    setIsOpen(!isOpen);
+  }
 
   return (
     <div className="relative">
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        ref={buttonRef}
+        onClick={handleToggle}
         className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
       >
         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -1241,7 +1298,9 @@ function DropdownMenu({
               setShowMoveMenu(false);
             }}
           />
-          <div className="absolute right-0 mt-2 w-52 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 z-20">
+          <div className={`absolute right-0 w-52 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 z-20 ${
+            openUpward ? "bottom-full mb-2" : "mt-2"
+          }`}>
             <button
               onClick={() => {
                 onEdit();
@@ -1417,6 +1476,165 @@ function DropdownMenu({
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+// Cover Picker Modal — pick preview cards for a deck
+function CoverPickerModal({
+  deckId,
+  initialCard1,
+  initialCard2,
+  onClose,
+  onSaved,
+}: {
+  deckId: string;
+  initialCard1: string | null;
+  initialCard2: string | null;
+  onClose: () => void;
+  onSaved: (deckId: string, card1: string | null, card2: string | null) => void;
+}) {
+  const [cards, setCards] = useState<DeckCardData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [previewCard1, setPreviewCard1] = useState<string | null>(initialCard1);
+  const [previewCard2, setPreviewCard2] = useState<string | null>(initialCard2);
+  const [activeSlot, setActiveSlot] = useState<1 | 2>(1);
+  const [saving, setSaving] = useState(false);
+  const [coverSearch, setCoverSearch] = useState("");
+
+  useEffect(() => {
+    loadDeckByIdAction(deckId).then((result) => {
+      if (result.success && result.deck) {
+        setCards((result.deck as any).cards?.filter((c: DeckCardData) => !c.is_reserve) || []);
+      }
+      setLoading(false);
+    });
+  }, [deckId]);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  const filteredCards = coverSearch.trim()
+    ? cards.filter(c => c.card_name.toLowerCase().includes(coverSearch.trim().toLowerCase()))
+    : cards;
+  const sortedCards = [...filteredCards].sort((a, b) => a.card_name.localeCompare(b.card_name));
+
+  async function handleSelect(imgFile: string) {
+    const c1 = activeSlot === 1 ? imgFile : previewCard1;
+    const c2 = activeSlot === 2 ? imgFile : previewCard2;
+    if (activeSlot === 1) setPreviewCard1(imgFile);
+    else setPreviewCard2(imgFile);
+    const nextSlot = activeSlot === 1 ? 2 : 1;
+    setActiveSlot(nextSlot as 1 | 2);
+    setSaving(true);
+    const result = await updateDeckPreviewCardsAction(deckId, c1, c2);
+    setSaving(false);
+    if (result.success) {
+      onSaved(deckId, c1, c2);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/60" onClick={onClose}>
+      <div className="bg-white dark:bg-gray-900 rounded-t-xl sm:rounded-xl shadow-2xl w-full sm:max-w-2xl flex flex-col max-h-[95vh] sm:max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+          <h2 className="text-base sm:text-lg font-semibold">Cover Cards</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Card slots */}
+        <div className="px-4 sm:px-6 py-3 sm:py-4 flex-shrink-0">
+          <div className="flex gap-4 justify-center mb-2">
+            {([1, 2] as const).map((slot) => {
+              const imgFile = slot === 1 ? previewCard1 : previewCard2;
+              const imgUrl = imgFile ? getCardImageUrl(imgFile) : null;
+              const isActive = activeSlot === slot;
+              return (
+                <button
+                  key={slot}
+                  onClick={() => setActiveSlot(slot)}
+                  className={`relative w-16 sm:w-24 aspect-[2.5/3.5] rounded-lg overflow-hidden border-2 transition-all ${
+                    isActive
+                      ? "border-blue-500 ring-2 ring-blue-300 dark:ring-blue-700"
+                      : "border-gray-300 dark:border-gray-600 hover:border-gray-400"
+                  } bg-gray-100 dark:bg-gray-800`}
+                >
+                  {imgUrl ? (
+                    <img src={imgUrl} alt={`Cover ${slot}`} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
+                      <svg className="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+                      </svg>
+                      <span className="text-[10px]">Card {slot}</span>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-center text-xs text-gray-500 dark:text-gray-400">
+            {saving ? "Saving..." : `Click a card below to set cover card ${activeSlot}`}
+          </p>
+        </div>
+
+        {/* Search */}
+        <div className="px-4 sm:px-6 pb-3 flex-shrink-0">
+          <div className="relative">
+            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search cards..."
+              value={coverSearch}
+              onChange={(e) => setCoverSearch(e.target.value)}
+              className="w-full pl-8 pr-8 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+            {coverSearch && (
+              <button onClick={() => setCoverSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 pb-4 min-h-0">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-6 h-6 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
+            </div>
+          ) : cards.length === 0 ? (
+            <p className="text-center text-sm text-gray-500 py-8">No cards in this deck yet.</p>
+          ) : (
+            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 gap-2">
+              {sortedCards.map((card) => (
+                <button
+                  key={`${card.card_name}|${card.card_set}`}
+                  onClick={() => handleSelect(card.card_img_file || "")}
+                  className="relative rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600 hover:border-blue-500 hover:scale-105 transition-all"
+                  style={{ aspectRatio: "2.5/3.5" }}
+                  title={card.card_name}
+                >
+                  <img src={getCardImageUrl(card.card_img_file || "") || ""} alt={card.card_name} className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

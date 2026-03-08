@@ -138,6 +138,20 @@ export default function DeckBuilderPanel({
 
   // Cover card picker: which slot is open (1, 2, or null)
   const [coverPickerSlot, setCoverPickerSlot] = useState<1 | 2 | null>(null);
+  const [coverPickerSort, setCoverPickerSort] = useState<"default" | "name" | "type" | "brigade">("type");
+  const [coverPickerSearch, setCoverPickerSearch] = useState("");
+
+  // Close cover picker on Escape
+  useEffect(() => {
+    if (coverPickerSlot === null) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setCoverPickerSlot(null);
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [coverPickerSlot]);
 
   // Description preview mode
   const [descriptionPreview, setDescriptionPreview] = useState(false);
@@ -1468,13 +1482,13 @@ export default function DeckBuilderPanel({
 
           {/* Validation Tooltip */}
           {showValidationTooltip && validation.stats.totalCards > 0 && (
-            <div className={`hidden md:block absolute left-1/2 -translate-x-1/2 top-full mt-2 w-72 p-4 rounded-lg shadow-xl z-50 pointer-events-none ${
+            <div className={`hidden md:block absolute right-0 top-full mt-2 w-72 p-4 rounded-lg shadow-xl z-50 pointer-events-none ${
               validation.isValid
                 ? "bg-green-50 dark:bg-green-900/90 border-2 border-green-300 dark:border-green-600"
                 : "bg-red-50 dark:bg-red-900/90 border-2 border-red-300 dark:border-red-600"
             }`}>
               {/* Arrow */}
-              <div className={`absolute left-1/2 -translate-x-1/2 bottom-full w-0 h-0 border-l-8 border-r-8 border-b-8 border-l-transparent border-r-transparent ${
+              <div className={`absolute right-6 bottom-full w-0 h-0 border-l-8 border-r-8 border-b-8 border-l-transparent border-r-transparent ${
                 validation.isValid
                   ? "border-b-green-300 dark:border-b-green-600"
                   : "border-b-red-300 dark:border-b-red-600"
@@ -2051,20 +2065,68 @@ export default function DeckBuilderPanel({
               {/* Card picker grid */}
               {coverPickerSlot !== null && (() => {
                 const mainCards = deck.cards.filter(dc => !dc.isReserve && dc.quantity > 0);
+                const filteredPickerCards = coverPickerSearch.trim()
+                  ? mainCards.filter(dc => dc.card.name.toLowerCase().includes(coverPickerSearch.trim().toLowerCase()))
+                  : mainCards;
+                const sortedPickerCards = [...filteredPickerCards].sort((a, b) => {
+                  switch (coverPickerSort) {
+                    case "name":
+                      return a.card.name.localeCompare(b.card.name);
+                    case "type":
+                      return (a.card.type || "").localeCompare(b.card.type || "") || a.card.name.localeCompare(b.card.name);
+                    case "brigade":
+                      return (a.card.brigade || "").localeCompare(b.card.brigade || "") || a.card.name.localeCompare(b.card.name);
+                    default:
+                      return 0;
+                  }
+                });
                 return (
                   <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                     <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                       <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
                         Select card for slot {coverPickerSlot}
                       </span>
-                      <button onClick={() => setCoverPickerSlot(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={coverPickerSort}
+                          onChange={(e) => setCoverPickerSort(e.target.value as any)}
+                          className="text-xs px-1.5 py-0.5 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                        >
+                          <option value="default">Default</option>
+                          <option value="name">Name</option>
+                          <option value="type">Type</option>
+                          <option value="brigade">Brigade</option>
+                        </select>
+                        <button onClick={() => setCoverPickerSlot(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
-                    <div className="p-2 max-h-48 overflow-y-auto grid grid-cols-4 gap-1.5">
-                      {mainCards.map((dc) => (
+                    <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+                      <div className="relative">
+                        <svg className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <input
+                          type="text"
+                          placeholder="Search cards..."
+                          value={coverPickerSearch}
+                          onChange={(e) => setCoverPickerSearch(e.target.value)}
+                          className="w-full pl-7 pr-7 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                        {coverPickerSearch && (
+                          <button onClick={() => setCoverPickerSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="p-2 grid grid-cols-4 gap-1.5">
+                      {sortedPickerCards.map((dc) => (
                         <button
                           key={`${dc.card.name}|${dc.card.set}`}
                           onClick={() => {
