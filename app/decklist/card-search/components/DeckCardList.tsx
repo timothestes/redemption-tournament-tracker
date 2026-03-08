@@ -22,8 +22,6 @@ interface DeckCardListProps {
   showTypeIcons?: boolean;
   /** Optional: Layout view mode (default: 'list') */
   viewLayout?: 'grid' | 'list';
-  /** Optional: Grid density for mobile (default: 'normal' = 2 cols, 'compact' = 3 cols) */
-  gridDensity?: 'normal' | 'compact';
   /** Optional: Disable card hover preview */
   disableHoverPreview?: boolean;
 }
@@ -41,7 +39,6 @@ export default function DeckCardList({
   onMoveCard,
   showTypeIcons = true,
   viewLayout = 'list',
-  gridDensity = 'normal',
   disableHoverPreview = false,
 }: DeckCardListProps) {
   const [openMenuCard, setOpenMenuCard] = React.useState<string | null>(null);
@@ -136,11 +133,7 @@ export default function DeckCardList({
   // Grid View
   if (viewLayout === 'grid') {
     return (
-      <div className={`grid gap-2 ${
-        gridDensity === 'compact'
-          ? 'grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7'
-          : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'
-      }`}>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
         {displayCards.map((deckCard) => {
           const { card, quantity, isReserve } = deckCard;
           const cardKey = `${card.name}-${card.set}-${isReserve}`;
@@ -245,50 +238,61 @@ export default function DeckCardList({
                 </div>
               )}
 
-              {/* Controls Overlay - Centered on Card */}
-              <div className="absolute inset-0 flex items-center justify-center transition-opacity duration-200">
-                <div className="flex items-center gap-3 md:gap-2">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDecrement(card.name, card.set, isReserve);
-                    }}
-                    className="w-11 h-11 md:w-9 md:h-9 flex items-center justify-center rounded-lg md:rounded-md bg-black/50 md:bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-2xl md:text-xl border border-white/20 md:opacity-0 md:group-hover:opacity-100 md:pointer-events-none md:group-hover:pointer-events-auto"
-                    aria-label="Decrease quantity"
-                  >
-                    −
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onIncrement(card.name, card.set, isReserve);
-                    }}
-                    className="w-11 h-11 md:w-9 md:h-9 flex items-center justify-center rounded-lg md:rounded-md bg-black/50 md:bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-2xl md:text-xl border border-white/20 md:opacity-0 md:group-hover:opacity-100 md:pointer-events-none md:group-hover:pointer-events-auto"
-                    aria-label="Increase quantity"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-              {/* Menu Button - Bottom Left */}
-              <div className="absolute bottom-0.5 left-0.5">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setOpenMenuCard(openMenuCard === cardKey ? null : cardKey);
-                  }}
-                  className="w-9 h-9 md:w-7 md:h-7 flex items-center justify-center rounded-lg md:rounded-md bg-black/50 md:bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all border border-white/20 md:opacity-0 md:group-hover:opacity-100 md:pointer-events-none md:group-hover:pointer-events-auto"
-                  aria-label="Card options"
-                >
-                  <svg className="w-5 h-5 md:w-4 md:h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
-                  </svg>
-                </button>
-              </div>
-              {/* Quantity Badge - Bottom Right */}
-              <div className="absolute bottom-0.5 right-0.5 flex items-center justify-center">
-                <div className="bg-black/75 backdrop-blur-sm text-white px-1.5 py-0.5 rounded font-bold text-xs shadow-lg">
-                  ×{quantity}
+              {/* Controls Overlay - Shows on Hover, Golden Ratio 2x2 Grid */}
+              <div className="absolute inset-x-0 bottom-0 transition-opacity duration-200">
+                {/* Using golden ratio: top section ~61.8%, bottom ~38.2% */}
+                <div className="grid grid-rows-[1.618fr_1fr] grid-cols-2 gap-1.5 p-3 h-32">
+                  {/* Top Left: Decrement */}
+                  <div className="flex items-center justify-center">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDecrement(card.name, card.set, isReserve);
+                      }}
+                      className="w-14 h-14 max-w-full max-h-full flex items-center justify-center rounded-lg bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-3xl border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
+                      aria-label="Decrease quantity"
+                    >
+                      −
+                    </button>
+                  </div>
+                  
+                  {/* Top Right: Increment */}
+                  <div className="flex items-center justify-center">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onIncrement(card.name, card.set, isReserve);
+                      }}
+                      className="w-14 h-14 max-w-full max-h-full flex items-center justify-center rounded-lg bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-3xl border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
+                      aria-label="Increase quantity"
+                    >
+                      +
+                    </button>
+                  </div>
+                  
+                  {/* Bottom Left: Menu Button */}
+                  <div className="flex items-center justify-center">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenMenuCard(openMenuCard === cardKey ? null : cardKey);
+                      }}
+                      className="w-10 h-10 max-w-full max-h-full flex items-center justify-center rounded-lg bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
+                      aria-label="Card options"
+                    >
+                      {/* Horizontal dots icon */}
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
+                      </svg>
+                    </button>
+                  </div>
+                  
+                  {/* Bottom Right: Quantity Display - Always Visible, Compact Style */}
+                  <div className="flex items-center justify-center">
+                    <div className="bg-black/75 backdrop-blur-sm text-white px-2.5 py-1 rounded-md font-bold text-sm shadow-lg">
+                      ×{quantity}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
