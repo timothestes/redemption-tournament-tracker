@@ -88,3 +88,4 @@ next-env.d.ts
 tmp/*
 .claude
 claude.md
+test_shopify.py
