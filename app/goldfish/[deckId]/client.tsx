@@ -79,6 +79,7 @@ export default function GoldfishClient({ deck }: GoldfishClientProps) {
           height: '100vh',
           overflow: 'hidden',
           background: '#0d0905',
+          cursor: 'default',
         }}
       >
         {/* Cave background image */}

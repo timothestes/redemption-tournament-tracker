@@ -162,16 +162,9 @@ function SubMenuActionRow({
         onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(196,149,90,0.15)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
-        <button
-          style={{ ...ITEM_STYLE, flex: 1, background: 'transparent', paddingRight: 6 }}
-          onClick={() => onAction(1)}
-        >
-          {icon}
-          {label}
-        </button>
         {max >= 3 && (
           <button
-            style={QUICK_COUNT_STYLE}
+            style={{ ...QUICK_COUNT_STYLE, marginLeft: 10 }}
             onClick={() => onAction(3)}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = 'rgba(196,149,90,0.35)';
@@ -216,7 +209,6 @@ function SubMenuActionRow({
           style={{
             ...QUICK_COUNT_STYLE,
             marginLeft: 2,
-            marginRight: 6,
             background: expanded ? 'rgba(196,149,90,0.25)' : 'rgba(196,149,90,0.12)',
             fontSize: 9,
             letterSpacing: '0.05em',
@@ -224,6 +216,13 @@ function SubMenuActionRow({
           title={`${label} custom amount...`}
         >
           X
+        </button>
+        <button
+          style={{ ...ITEM_STYLE, flex: 1, background: 'transparent', paddingLeft: 8 }}
+          onClick={() => onAction(1)}
+        >
+          {icon}
+          {label}
         </button>
       </div>
       {expanded && (

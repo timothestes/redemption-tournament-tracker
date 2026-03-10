@@ -247,6 +247,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
     container.addEventListener('dragover', preventDrag);
     container.style.userSelect = 'none';
     container.style.webkitUserSelect = 'none';
+    container.style.cursor = 'default';
     return () => {
       container.removeEventListener('dragstart', preventDrag);
       container.removeEventListener('dragover', preventDrag);
