@@ -15,9 +15,10 @@ interface MultiCardContextMenuProps {
   y: number;
   onClose: () => void;
   onClearSelection: () => void;
+  onExchange?: (cardIds: string[]) => void;
 }
 
-export function MultiCardContextMenu({ selectedIds, x, y, onClose, onClearSelection }: MultiCardContextMenuProps) {
+export function MultiCardContextMenu({ selectedIds, x, y, onClose, onClearSelection, onExchange }: MultiCardContextMenuProps) {
   const {
     state, moveCardsBatch, shuffleDeck,
     meekCard, unmeekCard, flipCard,
@@ -192,6 +193,15 @@ export function MultiCardContextMenu({ selectedIds, x, y, onClose, onClearSelect
       >
         Shuffle into Deck
       </button>
+      {onExchange && (
+        <button
+          style={itemStyle}
+          onClick={() => { onClose(); onExchange(selectedIds); }}
+          {...hoverHandlers}
+        >
+          Exchange with Deck
+        </button>
+      )}
 
       <div style={separatorStyle} />
 

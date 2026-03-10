@@ -17,6 +17,7 @@ import { DeckSearchModal } from './DeckSearchModal';
 import { DeckContextMenu } from './DeckContextMenu';
 import { DeckPeekModal } from './DeckPeekModal';
 import { DeckDropPopup } from './DeckDropPopup';
+import { DeckExchangeModal } from './DeckExchangeModal';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useModalCardDrag } from '../hooks/useModalCardDrag';
 import { useSelectionState, type CardBound } from '../hooks/useSelectionState';
@@ -82,6 +83,7 @@ const GameCardNode = memo(function GameCardNode({
   cardHeight,
   image,
   isSelected,
+  hoverProgress,
   nodeRef,
   onDragStart,
   onDragMove,
@@ -100,6 +102,7 @@ const GameCardNode = memo(function GameCardNode({
   cardHeight: number;
   image: HTMLImageElement | undefined;
   isSelected?: boolean;
+  hoverProgress?: number;
   nodeRef?: (instanceId: string, node: Konva.Group | null) => void;
   onDragStart: (card: GameCard) => void;
   onDragMove: (e: Konva.KonvaEventObject<DragEvent>) => void;
@@ -148,6 +151,23 @@ const GameCardNode = memo(function GameCardNode({
           shadowColor="#c4955a"
           shadowBlur={8}
           shadowOpacity={0.6}
+        />
+      )}
+
+      {/* Hover highlight — warm golden glow that intensifies over time */}
+      {hoverProgress != null && hoverProgress > 0 && !isSelected && (
+        <Rect
+          x={-3}
+          y={-3}
+          width={cardWidth + 6}
+          height={cardHeight + 6}
+          fill="transparent"
+          stroke={`rgba(224, 180, 100, ${0.3 + hoverProgress * 0.5})`}
+          strokeWidth={1.5 + hoverProgress * 1.5}
+          cornerRadius={6}
+          shadowColor={`rgba(255, 215, 140, ${0.3 + hoverProgress * 0.5})`}
+          shadowBlur={6 + hoverProgress * 14}
+          shadowOpacity={0.4 + hoverProgress * 0.5}
         />
       )}
 
@@ -260,6 +280,10 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
     x: number;
     y: number;
   } | null>(null);
+  const [hoveredInstanceId, setHoveredInstanceId] = useState<string | null>(null);
+  const [hoverProgress, setHoverProgress] = useState(0);
+  const hoverAnimFrameRef = useRef<number | null>(null);
+  const hoverStartTimeRef = useRef<number | null>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isDraggingRef = useRef(false);
   const dragSourceZoneRef = useRef<ZoneId | null>(null);
@@ -284,6 +308,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
   const isCanvasDragging = useRef(false);
   const [multiCardContextMenu, setMultiCardContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [batchDeckDropIds, setBatchDeckDropIds] = useState<string[] | null>(null);
+  const [exchangeCardIds, setExchangeCardIds] = useState<string[] | null>(null);
   const [cardRenderKey, setCardRenderKey] = useState(0);
 
   // Card node ref map for imperative multi-card drag
@@ -471,6 +496,8 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
       hoverTimerRef.current = null;
     }
     setHoverCard(null);
+    setHoveredInstanceId(null);
+    stopHoverAnimation();
 
     // Multi-card drag: build a single rasterized ghost of all follower cards
     if (selectedIds.has(card.instanceId) && selectedIds.size > 1) {
@@ -750,12 +777,43 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
   const contextMenuRef = useRef(contextMenu);
   contextMenuRef.current = contextMenu;
 
+  const startHoverAnimation = useCallback(() => {
+    if (hoverAnimFrameRef.current) cancelAnimationFrame(hoverAnimFrameRef.current);
+    hoverStartTimeRef.current = performance.now();
+    const animate = () => {
+      const elapsed = performance.now() - hoverStartTimeRef.current!;
+      const progress = Math.min(elapsed / 700, 1);
+      setHoverProgress(progress);
+      if (progress < 1) {
+        hoverAnimFrameRef.current = requestAnimationFrame(animate);
+      }
+    };
+    hoverAnimFrameRef.current = requestAnimationFrame(animate);
+  }, []);
+
+  const stopHoverAnimation = useCallback(() => {
+    if (hoverAnimFrameRef.current) {
+      cancelAnimationFrame(hoverAnimFrameRef.current);
+      hoverAnimFrameRef.current = null;
+    }
+    hoverStartTimeRef.current = null;
+    setHoverProgress(0);
+  }, []);
+
   const handleCardMouseEnter = useCallback(
     (card: GameCard, e: Konva.KonvaEventObject<MouseEvent>) => {
       if (card.isFlipped || isDraggingRef.current || contextMenuRef.current) return;
+      setHoveredInstanceId(card.instanceId);
+      startHoverAnimation();
       if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
       hoverTimerRef.current = setTimeout(() => {
         if (isDraggingRef.current || contextMenuRef.current) return;
+        // Stop the rAF loop but keep progress at 1 so glow stays while preview is showing
+        if (hoverAnimFrameRef.current) {
+          cancelAnimationFrame(hoverAnimFrameRef.current);
+          hoverAnimFrameRef.current = null;
+        }
+        setHoverProgress(1);
         setHoverCard({
           card,
           x: e.evt.clientX,
@@ -763,16 +821,18 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
         });
       }, 700);
     },
-    []
+    [startHoverAnimation, stopHoverAnimation]
   );
 
   const handleCardMouseLeave = useCallback(() => {
+    setHoveredInstanceId(null);
+    stopHoverAnimation();
     if (hoverTimerRef.current) {
       clearTimeout(hoverTimerRef.current);
       hoverTimerRef.current = null;
     }
     setHoverCard(null);
-  }, []);
+  }, [stopHoverAnimation]);
 
   const handleCardDblClick = useCallback(
     (card: GameCard) => {
@@ -1192,6 +1252,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                       cardHeight={cardHeight}
                       image={getImage(card.cardImgFile)}
                       isSelected={selectedIds.has(card.instanceId)}
+                      hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
                       nodeRef={registerCardNode}
                       onDragStart={handleCardDragStart}
                       onDragMove={handleCardDragMove}
@@ -1272,6 +1333,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                         cardHeight={cardHeight}
                         image={getImage(card.cardImgFile)}
                         isSelected={selectedIds.has(card.instanceId)}
+                      hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
                         nodeRef={registerCardNode}
                         onDragStart={handleCardDragStart}
                         onDragMove={handleCardDragMove}
@@ -1309,6 +1371,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                       cardHeight={cardHeight}
                       image={getImage(card.cardImgFile)}
                       isSelected={selectedIds.has(card.instanceId)}
+                      hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
                       nodeRef={registerCardNode}
                       onDragStart={handleCardDragStart}
                       onDragMove={handleCardDragMove}
@@ -1343,6 +1406,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                         cardHeight={cardHeight}
                         image={getImage(card.cardImgFile)}
                         isSelected={selectedIds.has(card.instanceId)}
+                      hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
                         nodeRef={registerCardNode}
                         onDragStart={handleCardDragStart}
                         onDragMove={handleCardDragMove}
@@ -1378,6 +1442,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                         cardHeight={cardHeight}
                         image={getImage(card.cardImgFile)}
                         isSelected={selectedIds.has(card.instanceId)}
+                      hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
                         nodeRef={registerCardNode}
                         onDragStart={handleCardDragStart}
                         onDragMove={handleCardDragMove}
@@ -1419,6 +1484,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                       cardHeight={cardHeight}
                       image={getImage(card.cardImgFile)}
                       isSelected={selectedIds.has(card.instanceId)}
+                      hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
                       nodeRef={registerCardNode}
                       onDragStart={handleCardDragStart}
                       onDragMove={handleCardDragMove}
@@ -1452,6 +1518,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                 cardHeight={cardHeight}
                 image={getImage(card.cardImgFile)}
                 isSelected={selectedIds.has(card.instanceId)}
+                      hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
                 nodeRef={registerCardNode}
                 onDragStart={handleCardDragStart}
                 onDragMove={handleCardDragMove}
@@ -1542,6 +1609,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
           x={contextMenu.x}
           y={contextMenu.y}
           onClose={() => setContextMenu(null)}
+          onExchange={(ids) => setExchangeCardIds(ids)}
         />
       )}
 
@@ -1552,6 +1620,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
           y={multiCardContextMenu.y}
           onClose={() => setMultiCardContextMenu(null)}
           onClearSelection={() => { clearSelection(); setMultiCardContextMenu(null); }}
+          onExchange={(ids) => setExchangeCardIds(ids)}
         />
       )}
 
@@ -1895,7 +1964,30 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
             setBatchDeckDropIds(null);
             if (batchDeckDropIds) clearSelection();
           }}
+          onExchange={() => {
+            const ids = batchDeckDropIds || [deckDropPopup.cardInstanceId];
+            setExchangeCardIds(ids);
+            setDeckDropPopup(null);
+            setBatchDeckDropIds(null);
+          }}
           onCancel={() => { setDeckDropPopup(null); setBatchDeckDropIds(null); setCardRenderKey(k => k + 1); }}
+        />
+      )}
+
+      {exchangeCardIds && (
+        <DeckExchangeModal
+          exchangeCardIds={exchangeCardIds}
+          onComplete={() => {
+            setExchangeCardIds(null);
+            clearSelection();
+          }}
+          onCancel={() => {
+            setExchangeCardIds(null);
+            setCardRenderKey(k => k + 1);
+          }}
+          onStartDrag={modalStartDrag}
+          didDragRef={modalDidDragRef}
+          isDragActive={modalDrag.isDragging}
         />
       )}
 

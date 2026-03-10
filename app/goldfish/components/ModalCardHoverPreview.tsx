@@ -24,18 +24,55 @@ interface HoverState {
 export function useModalCardHover(delay = 400) {
   const [hover, setHover] = useState<HoverState | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [hoverProgress, setHoverProgress] = useState(0);
+  const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
+  const animFrameRef = useRef<number | null>(null);
+  const hoverStartRef = useRef<number | null>(null);
+  const delayRef = useRef(delay);
+  delayRef.current = delay;
 
-  const onCardMouseEnter = useCallback((imgFile: string, cardName: string, e: React.MouseEvent) => {
+  const stopAnimation = useCallback(() => {
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    hoverStartRef.current = null;
+    setHoverProgress(0);
+  }, []);
+
+  const startAnimation = useCallback(() => {
+    stopAnimation();
+    hoverStartRef.current = performance.now();
+    const animate = () => {
+      const elapsed = performance.now() - hoverStartRef.current!;
+      const progress = Math.min(elapsed / delayRef.current, 1);
+      setHoverProgress(progress);
+      if (progress < 1) {
+        animFrameRef.current = requestAnimationFrame(animate);
+      }
+    };
+    animFrameRef.current = requestAnimationFrame(animate);
+  }, [stopAnimation]);
+
+  const onCardMouseEnter = useCallback((imgFile: string, cardName: string, e: React.MouseEvent, instanceId?: string) => {
     if (timerRef.current) clearTimeout(timerRef.current);
     const x = e.clientX;
     const y = e.clientY;
+    setHoveredCardId(instanceId ?? imgFile);
+    startAnimation();
     timerRef.current = setTimeout(() => {
+      // Stop the rAF loop but keep progress at 1 so glow stays while preview is showing
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
+      setHoverProgress(1);
       const imageUrl = getCardImageUrl(imgFile);
       if (imageUrl) {
         setHover({ imageUrl, cardName, x, y });
       }
     }, delay);
-  }, [delay]);
+  }, [delay, startAnimation, stopAnimation]);
 
   const onCardMouseLeave = useCallback(() => {
     if (timerRef.current) {
@@ -43,9 +80,21 @@ export function useModalCardHover(delay = 400) {
       timerRef.current = null;
     }
     setHover(null);
-  }, []);
+    setHoveredCardId(null);
+    stopAnimation();
+  }, [stopAnimation]);
 
-  return { hover, onCardMouseEnter, onCardMouseLeave };
+  return { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave };
+}
+
+/** Returns a CSS box-shadow string for the hover glow effect based on progress (0-1) */
+export function getHoverGlowStyle(progress: number): React.CSSProperties | undefined {
+  if (progress <= 0) return undefined;
+  const opacity = 0.3 + progress * 0.6;
+  const blur = 6 + progress * 14;
+  return {
+    boxShadow: `0 0 ${blur}px rgba(224, 180, 100, ${opacity}), 0 0 ${blur * 0.5}px rgba(255, 215, 140, ${opacity * 0.5})`,
+  };
 }
 
 export function ModalCardHoverPreview({ hover }: { hover: HoverState | null }) {

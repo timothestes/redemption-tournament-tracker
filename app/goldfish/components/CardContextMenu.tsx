@@ -14,9 +14,10 @@ interface CardContextMenuProps {
   x: number;
   y: number;
   onClose: () => void;
+  onExchange?: (cardIds: string[]) => void;
 }
 
-export function CardContextMenu({ card: initialCard, x, y, onClose }: CardContextMenuProps) {
+export function CardContextMenu({ card: initialCard, x, y, onClose, onExchange }: CardContextMenuProps) {
   const {
     state, moveCard, moveCardToTopOfDeck, moveCardToBottomOfDeck,
     shuffleCardIntoDeck, addCounter, removeCounter,
@@ -205,6 +206,16 @@ export function CardContextMenu({ card: initialCard, x, y, onClose }: CardContex
       >
         Shuffle into Deck
       </button>
+      {onExchange && card.zone !== 'deck' && (
+        <button
+          style={itemStyle}
+          onClick={() => { onClose(); onExchange([card.instanceId]); }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(196,149,90,0.15)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+        >
+          Exchange with Deck
+        </button>
+      )}
 
       <div style={separatorStyle} />
 

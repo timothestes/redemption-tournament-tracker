@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { useGame } from '../state/GameContext';
 import { ZoneId, ZONE_LABELS, GameCard } from '../types';
 import { X } from 'lucide-react';
-import { useModalCardHover, ModalCardHoverPreview } from './ModalCardHoverPreview';
+import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './ModalCardHoverPreview';
 
 const BLOB_BASE_URL = process.env.NEXT_PUBLIC_BLOB_BASE_URL || '';
 
@@ -154,7 +154,7 @@ interface ZoneBrowseModalProps {
 export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive }: ZoneBrowseModalProps) {
   const { state, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck } = useGame();
   const cards = state.zones[zoneId];
-  const { hover, onCardMouseEnter, onCardMouseLeave } = useModalCardHover();
+  const { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave } = useModalCardHover();
   const [contextCard, setContextCard] = useState<{ card: GameCard; x: number; y: number } | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -453,42 +453,47 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
                   onPointerUp={() => handlePointerUp(card)}
                   onClick={(e) => e.stopPropagation()}
                   onContextMenu={(e) => handleCardContextMenu(card, e)}
-                  onMouseEnter={(e) => { if (!contextCard) onCardMouseEnter(card.cardImgFile, card.cardName, e); }}
+                  onMouseEnter={(e) => { if (!contextCard) onCardMouseEnter(card.cardImgFile, card.cardName, e, card.instanceId); }}
                   onMouseLeave={onCardMouseLeave}
                 >
-                  {imageUrl ? (
-                    <img
-                      src={imageUrl}
-                      alt={card.cardName}
-                      draggable={false}
-                      style={{
-                        width: '100%',
-                        borderRadius: 4,
-                        border: isSelected ? '2px solid #c4955a' : '1px solid #6b4e27',
-                        boxShadow: isSelected ? '0 0 8px rgba(196,149,90,0.4)' : 'none',
-                        transition: 'border 0.1s ease, box-shadow 0.1s ease',
-                      }}
-                    />
-                  ) : (
-                    <div
-                      style={{
-                        width: '100%',
-                        aspectRatio: '1/1.4',
-                        background: '#1e1610',
-                        border: isSelected ? '2px solid #c4955a' : '1px solid #6b4e27',
-                        boxShadow: isSelected ? '0 0 8px rgba(196,149,90,0.4)' : 'none',
-                        borderRadius: 4,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#8b6532',
-                        fontSize: 10,
-                        transition: 'border 0.1s ease, box-shadow 0.1s ease',
-                      }}
-                    >
-                      {card.cardName}
-                    </div>
-                  )}
+                  {(() => {
+                    const isHoveredCard = hoveredCardId === card.instanceId && !isSelected;
+                    const glowStyle = isHoveredCard ? getHoverGlowStyle(hoverProgress) : undefined;
+                    const selectedShadow = isSelected ? '0 0 8px rgba(196,149,90,0.4)' : 'none';
+                    return imageUrl ? (
+                      <img
+                        src={imageUrl}
+                        alt={card.cardName}
+                        draggable={false}
+                        style={{
+                          width: '100%',
+                          borderRadius: 4,
+                          border: isSelected ? '2px solid #c4955a' : '1px solid #6b4e27',
+                          boxShadow: glowStyle?.boxShadow ?? selectedShadow,
+                          transition: 'border 0.1s ease',
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: '100%',
+                          aspectRatio: '1/1.4',
+                          background: '#1e1610',
+                          border: isSelected ? '2px solid #c4955a' : '1px solid #6b4e27',
+                          boxShadow: glowStyle?.boxShadow ?? selectedShadow,
+                          borderRadius: 4,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#8b6532',
+                          fontSize: 10,
+                          transition: 'border 0.1s ease',
+                        }}
+                      >
+                        {card.cardName}
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}

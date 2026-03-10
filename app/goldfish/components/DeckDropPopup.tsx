@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useEffect } from 'react';
-import { Shuffle, ArrowUp, ArrowDown } from 'lucide-react';
+import { Shuffle, ArrowUp, ArrowDown, ArrowLeftRight } from 'lucide-react';
 
 interface DeckDropPopupProps {
   x: number;
@@ -9,10 +9,11 @@ interface DeckDropPopupProps {
   onShuffleIn: () => void;
   onTopDeck: () => void;
   onBottomDeck: () => void;
+  onExchange: () => void;
   onCancel: () => void;
 }
 
-export function DeckDropPopup({ x, y, onShuffleIn, onTopDeck, onBottomDeck, onCancel }: DeckDropPopupProps) {
+export function DeckDropPopup({ x, y, onShuffleIn, onTopDeck, onBottomDeck, onExchange, onCancel }: DeckDropPopupProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -95,6 +96,15 @@ export function DeckDropPopup({ x, y, onShuffleIn, onTopDeck, onBottomDeck, onCa
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
         <ArrowDown size={13} /> Bottom of Deck
+      </button>
+      <div style={{ height: 1, background: '#6b4e27', margin: '4px 8px', opacity: 0.5 }} />
+      <button
+        style={btnStyle}
+        onClick={onExchange}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(196,149,90,0.15)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+      >
+        <ArrowLeftRight size={13} /> Exchange
       </button>
     </div>
   );

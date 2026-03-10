@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { useGame } from '../state/GameContext';
 import { GameCard, ZoneId, ZONE_LABELS } from '../types';
 import { X, Search } from 'lucide-react';
-import { useModalCardHover, ModalCardHoverPreview } from './ModalCardHoverPreview';
+import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './ModalCardHoverPreview';
 
 const BLOB_BASE_URL = process.env.NEXT_PUBLIC_BLOB_BASE_URL || '';
 
@@ -141,8 +141,9 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
   const [search, setSearch] = useState('');
   const [searchField, setSearchField] = useState<'all' | 'type' | 'name' | 'brigade' | 'alignment' | 'ability' | 'identifier'>('all');
   const [autoShuffle, setAutoShuffle] = useState(true);
+  const [leaveOpen, setLeaveOpen] = useState(false);
   const [contextCard, setContextCard] = useState<{ card: GameCard; x: number; y: number } | null>(null);
-  const { hover, onCardMouseEnter, onCardMouseLeave } = useModalCardHover(800);
+  const { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave } = useModalCardHover(800);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Refs for card DOM elements (for lasso hit-testing)
@@ -203,15 +204,17 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
     onClose();
   }, [autoShuffle, shuffleDeck, onClose]);
 
-  // Close modal after a successful drag-to-canvas completes
+  // Close modal after a successful drag-to-canvas completes (unless "leave open" is on)
   const prevDragActive = useRef(false);
   useEffect(() => {
     if (prevDragActive.current && !isDragActive) {
       setSelectedIds(new Set());
-      handleClose();
+      if (!leaveOpen) {
+        handleClose();
+      }
     }
     prevDragActive.current = !!isDragActive;
-  }, [isDragActive, handleClose]);
+  }, [isDragActive, handleClose, leaveOpen]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -539,23 +542,42 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
           <span style={{ color: '#6b4e27', fontSize: 10 }}>
             Drag to a zone · Right-click for more · Hover to enlarge
           </span>
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              color: '#8b6532',
-              fontSize: 11,
-              cursor: 'pointer',
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={autoShuffle}
-              onChange={(e) => setAutoShuffle(e.target.checked)}
-            />
-            Shuffle on close
-          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                color: '#8b6532',
+                fontSize: 11,
+                cursor: 'pointer',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={leaveOpen}
+                onChange={(e) => setLeaveOpen(e.target.checked)}
+              />
+              Leave open
+            </label>
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                color: '#8b6532',
+                fontSize: 11,
+                cursor: 'pointer',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={autoShuffle}
+                onChange={(e) => setAutoShuffle(e.target.checked)}
+              />
+              Shuffle on close
+            </label>
+          </div>
         </div>
 
         {/* Card grid */}
@@ -588,44 +610,49 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
                     onPointerDown={(e) => { e.stopPropagation(); handlePointerDown(card, imageUrl, e); }}
                     onPointerUp={() => handlePointerUp(card)}
                     onClick={(e) => e.stopPropagation()}
-                    onMouseEnter={(e) => onCardMouseEnter(card.cardImgFile, card.cardName, e)}
+                    onMouseEnter={(e) => onCardMouseEnter(card.cardImgFile, card.cardName, e, card.instanceId)}
                     onMouseLeave={onCardMouseLeave}
                   >
-                    {imageUrl ? (
-                      <img
-                        src={imageUrl}
-                        alt={card.cardName}
-                        draggable={false}
-                        style={{
-                          width: '100%',
-                          borderRadius: 4,
-                          border: isSelected ? '2px solid #c4955a' : '1px solid #6b4e27',
-                          boxShadow: isSelected ? '0 0 8px rgba(196,149,90,0.4)' : 'none',
-                          transition: 'border 0.1s ease, box-shadow 0.1s ease',
-                        }}
-                      />
-                    ) : (
-                      <div
-                        style={{
-                          width: '100%',
-                          aspectRatio: '1/1.4',
-                          background: '#1e1610',
-                          border: isSelected ? '2px solid #c4955a' : '1px solid #6b4e27',
-                          boxShadow: isSelected ? '0 0 8px rgba(196,149,90,0.4)' : 'none',
-                          borderRadius: 4,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#8b6532',
-                          fontSize: 10,
-                          padding: 4,
-                          textAlign: 'center',
-                          transition: 'border 0.1s ease, box-shadow 0.1s ease',
-                        }}
-                      >
-                        {card.cardName}
-                      </div>
-                    )}
+                    {(() => {
+                      const isHoveredCard = hoveredCardId === card.instanceId && !isSelected;
+                      const glowStyle = isHoveredCard ? getHoverGlowStyle(hoverProgress) : undefined;
+                      const selectedShadow = isSelected ? '0 0 8px rgba(196,149,90,0.4)' : 'none';
+                      return imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt={card.cardName}
+                          draggable={false}
+                          style={{
+                            width: '100%',
+                            borderRadius: 4,
+                            border: isSelected ? '2px solid #c4955a' : '1px solid #6b4e27',
+                            boxShadow: glowStyle?.boxShadow ?? selectedShadow,
+                            transition: 'border 0.1s ease',
+                          }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            width: '100%',
+                            aspectRatio: '1/1.4',
+                            background: '#1e1610',
+                            border: isSelected ? '2px solid #c4955a' : '1px solid #6b4e27',
+                            boxShadow: glowStyle?.boxShadow ?? selectedShadow,
+                            borderRadius: 4,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#8b6532',
+                            fontSize: 10,
+                            padding: 4,
+                            textAlign: 'center',
+                            transition: 'border 0.1s ease',
+                          }}
+                        >
+                          {card.cardName}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}

@@ -5,7 +5,7 @@ import { useGame } from '../state/GameContext';
 import { GameCard } from '../types';
 import { X, ArrowUp, ArrowDown, Shuffle } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useModalCardHover, ModalCardHoverPreview } from './ModalCardHoverPreview';
+import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './ModalCardHoverPreview';
 
 const BLOB_BASE_URL = process.env.NEXT_PUBLIC_BLOB_BASE_URL || '';
 
@@ -77,7 +77,7 @@ interface DeckPeekModalProps {
 
 export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive }: DeckPeekModalProps) {
   const { state, moveCardsBatch, shuffleDeck } = useGame();
-  const { hover, onCardMouseEnter, onCardMouseLeave } = useModalCardHover();
+  const { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave } = useModalCardHover();
 
   // Guard against stray click events closing the modal immediately after mount
   const [readyForClose, setReadyForClose] = useState(false);
@@ -378,43 +378,48 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
                   onPointerDown={(e) => { e.stopPropagation(); handlePointerDown(card, imageUrl, e); }}
                   onPointerUp={() => handlePointerUp(card)}
                   onClick={(e) => e.stopPropagation()}
-                  onMouseEnter={(e) => onCardMouseEnter(card.cardImgFile, card.cardName, e)}
+                  onMouseEnter={(e) => onCardMouseEnter(card.cardImgFile, card.cardName, e, card.instanceId)}
                   onMouseLeave={onCardMouseLeave}
                 >
-                  {card.cardImgFile ? (
-                    <img
-                      src={imageUrl}
-                      alt={card.cardName}
-                      draggable={false}
-                      style={{
+                  {(() => {
+                    const isHoveredCard = hoveredCardId === card.instanceId && !isSelected;
+                    const glowStyle = isHoveredCard ? getHoverGlowStyle(hoverProgress) : undefined;
+                    const selectedShadow = isSelected ? '0 0 8px rgba(196,149,90,0.4)' : 'none';
+                    return card.cardImgFile ? (
+                      <img
+                        src={imageUrl}
+                        alt={card.cardName}
+                        draggable={false}
+                        style={{
+                          width: '100%',
+                          borderRadius: 4,
+                          border: isSelected ? '2px solid #c4955a' : '1px solid #6b4e27',
+                          boxShadow: glowStyle?.boxShadow ?? selectedShadow,
+                          transition: 'border 0.1s ease',
+                        }}
+                      />
+                    ) : (
+                      <div style={{
                         width: '100%',
-                        borderRadius: 4,
+                        aspectRatio: '2.5/3.5',
+                        background: '#2a1f12',
                         border: isSelected ? '2px solid #c4955a' : '1px solid #6b4e27',
-                        boxShadow: isSelected ? '0 0 8px rgba(196,149,90,0.4)' : 'none',
-                        transition: 'border 0.1s ease, box-shadow 0.1s ease',
-                      }}
-                    />
-                  ) : (
-                    <div style={{
-                      width: '100%',
-                      aspectRatio: '2.5/3.5',
-                      background: '#2a1f12',
-                      border: isSelected ? '2px solid #c4955a' : '1px solid #6b4e27',
-                      boxShadow: isSelected ? '0 0 8px rgba(196,149,90,0.4)' : 'none',
-                      borderRadius: 4,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#c9b99a',
-                      fontSize: 11,
-                      fontFamily: 'var(--font-cinzel), Georgia, serif',
-                      textAlign: 'center',
-                      padding: 8,
-                      transition: 'border 0.1s ease, box-shadow 0.1s ease',
-                    }}>
-                      {card.cardName}
-                    </div>
-                  )}
+                        boxShadow: glowStyle?.boxShadow ?? selectedShadow,
+                        borderRadius: 4,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#c9b99a',
+                        fontSize: 11,
+                        fontFamily: 'var(--font-cinzel), Georgia, serif',
+                        textAlign: 'center',
+                        padding: 8,
+                        transition: 'border 0.1s ease',
+                      }}>
+                        {card.cardName}
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}
