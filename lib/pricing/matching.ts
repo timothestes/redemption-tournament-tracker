@@ -51,6 +51,37 @@ async function loadSetAliases(): Promise<Map<string, string>> {
 }
 
 /**
+ * Full set name → shopify abbreviation mapping for tag-based matching.
+ * Used when products only have set info in tags (e.g. Legacy Rare items).
+ */
+const TAG_SET_TO_ABBREV: Record<string, string> = {
+  'gospel of christ': 'GoC',
+  'lineage of christ': 'LoC',
+  'prophecies of christ': 'PoC',
+  'fall of man': 'FoM',
+  'cloud of witnesses': 'CoW',
+  'revelation of john': 'RoJ',
+  'rock of ages': 'RoA',
+  'apostles': 'Ap',
+  'patriarchs': 'Pa',
+  'priests': 'Pi',
+  'prophets': 'Pr',
+  'warriors': 'Wa',
+  'women': 'Wo',
+  'kings': 'Ki',
+  'disciples': 'Di',
+  'early church': 'EC',
+  'persecuted church': 'PC',
+  'thesaurus ex preteritus': 'TxP',
+  'angel wars': 'AW',
+  "israel's inheritance": 'II',
+  "israel's rebellion": 'IR',
+  'food of faith': 'FooF',
+  'tent of meeting': 'TtC',
+  'roots': 'Roots',
+};
+
+/**
  * Load Shopify products from Supabase, indexed by normalized title.
  */
 async function loadShopifyProducts(): Promise<{
@@ -123,6 +154,7 @@ function pass1Exact(
 
 /**
  * Pass 2: Normalized match — strip embedded set from card name, then retry exact.
+ * Also tries variant patterns like "Name (Legacy Rare) (Set)".
  */
 function pass2Normalized(
   card: CardRow,
@@ -130,21 +162,84 @@ function pass2Normalized(
   byTitle: Map<string, ShopifyProductRow>
 ): MatchResult | null {
   const cleanName = stripEmbeddedSet(card.name);
-  if (cleanName === card.name) return null;
 
-  const candidate = `${cleanName} (${shopifyAbbrev})`;
-  const product = byTitle.get(normalize(candidate));
-  if (product) {
-    return {
-      card_key: card.card_key,
-      card_name: card.name,
-      set_code: card.set_code,
-      shopify_product_id: product.id,
-      confidence: 0.95,
-      match_method: 'normalized',
-      status: 'auto_matched',
-    };
+  // Try cleaned name + set abbreviation
+  if (cleanName !== card.name) {
+    const candidate = `${cleanName} (${shopifyAbbrev})`;
+    const product = byTitle.get(normalize(candidate));
+    if (product) {
+      return {
+        card_key: card.card_key,
+        card_name: card.name,
+        set_code: card.set_code,
+        shopify_product_id: product.id,
+        confidence: 0.95,
+        match_method: 'normalized',
+        status: 'auto_matched',
+      };
+    }
   }
+
+  // Try variant patterns: "Name (Legacy Rare) (Set)", "Name (Borderless) (Set)"
+  const baseName = cleanName !== card.name ? cleanName : card.name;
+  const variantQualifiers = ['Legacy Rare', 'Borderless', 'UR+', 'Foil'];
+  for (const qual of variantQualifiers) {
+    const candidate = `${baseName} (${qual}) (${shopifyAbbrev})`;
+    const product = byTitle.get(normalize(candidate));
+    if (product) {
+      return {
+        card_key: card.card_key,
+        card_name: card.name,
+        set_code: card.set_code,
+        shopify_product_id: product.id,
+        confidence: 0.93,
+        match_method: 'normalized_variant',
+        status: 'auto_matched',
+      };
+    }
+  }
+
+  // Try "Name (Legacy Rare)" products that only have set info in tags
+  // e.g. "The Gates of Hell (Legacy Rare)" with tag "Gospel of Christ" → GoC
+  const legacyCandidate = `${baseName} (Legacy Rare)`;
+  const legacyProduct = byTitle.get(normalize(legacyCandidate));
+  if (legacyProduct && legacyProduct.tags) {
+    const tagList = legacyProduct.tags.split(',').map(t => t.trim().toLowerCase());
+    for (const tag of tagList) {
+      const tagAbbrev = TAG_SET_TO_ABBREV[tag];
+      if (tagAbbrev && tagAbbrev === shopifyAbbrev) {
+        return {
+          card_key: card.card_key,
+          card_name: card.name,
+          set_code: card.set_code,
+          shopify_product_id: legacyProduct.id,
+          confidence: 0.92,
+          match_method: 'normalized_legacy_rare',
+          status: 'auto_matched',
+        };
+      }
+    }
+  }
+
+  // For AB variants (e.g. "CoW AB"), fall back to base set ("CoW")
+  // since YTG sells AB cards under the same product as non-AB
+  if (shopifyAbbrev.includes(' ')) {
+    const baseAbbrev = shopifyAbbrev.split(' ')[0];
+    const abCandidate = `${baseName} (${baseAbbrev})`;
+    const abProduct = byTitle.get(normalize(abCandidate));
+    if (abProduct) {
+      return {
+        card_key: card.card_key,
+        card_name: card.name,
+        set_code: card.set_code,
+        shopify_product_id: abProduct.id,
+        confidence: 0.90,
+        match_method: 'normalized_ab_fallback',
+        status: 'auto_matched',
+      };
+    }
+  }
+
   return null;
 }
 
@@ -185,20 +280,45 @@ async function pass3and4Fuzzy(
     }
     return null;
   }
-  if (fuzzyDebugCount < 5) {
-    console.log(`  [fuzzy debug] "${searchTerm}" → top: "${data[0].title}" (score: ${data[0].score})`);
+  if (fuzzyDebugCount < 10) {
+    const topTitles = data.slice(0, 3).map((d: any) => `"${d.title}" (${d.score})`).join(', ');
+    console.log(`  [fuzzy debug] "${searchTerm}" → ${topTitles}`);
     fuzzyDebugCount++;
   }
 
   // Apply multi-signal scoring to all candidates
-  let bestCandidate: { id: string; rawScore: number; boostedScore: number } | null = null;
+  let bestCandidate: { id: string; rawScore: number; boostedScore: number; title: string } | null = null;
 
   for (const candidate of data) {
     const rawScore = candidate.score as number;
     let boostedScore = rawScore;
+    const candidateTitle = (candidate.title as string) || '';
+
+    // Strong boost for matching set abbreviation in the title
+    // This is critical for multi-version cards like "Urim and Thummim (PoC)" vs "(Pi)"
+    if (shopifyAbbrev) {
+      const setPattern = `(${shopifyAbbrev})`;
+      if (candidateTitle.includes(setPattern)) {
+        boostedScore += 0.3;
+      }
+    }
 
     if (candidate.tags) {
       const parsed = parseShopifyTags(candidate.tags);
+
+      // Boost for matching set via tags (e.g. tag "Lineage of Christ" → LoC)
+      // Handles products where set info is only in tags, not title
+      if (shopifyAbbrev) {
+        const tagList = (candidate.tags as string).split(',').map((t: string) => t.trim().toLowerCase());
+        for (const tag of tagList) {
+          const tagAbbrev = TAG_SET_TO_ABBREV[tag];
+          if (tagAbbrev && tagAbbrev === shopifyAbbrev) {
+            boostedScore += 0.2;
+            break;
+          }
+        }
+      }
+
       if (card.brigade && parsed.brigade.some((b: string) =>
         b === card.brigade.toLowerCase() ||
         card.brigade.toLowerCase().includes(b)
@@ -214,7 +334,7 @@ async function pass3and4Fuzzy(
     }
 
     if (!bestCandidate || boostedScore > bestCandidate.boostedScore) {
-      bestCandidate = { id: candidate.id, rawScore, boostedScore };
+      bestCandidate = { id: candidate.id, rawScore, boostedScore, title: candidateTitle };
     }
   }
 
