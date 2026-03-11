@@ -84,6 +84,8 @@ export interface MatchingSummary {
   needs_review: number;
   no_price_exists: number;
   unmatched: number;
+  unmatchedCards?: MatchResult[];
+  noPriceCards?: MatchResult[];
 }
 
 export interface PricesResponse {

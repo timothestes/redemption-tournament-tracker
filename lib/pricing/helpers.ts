@@ -6,8 +6,8 @@
 export function normalize(s: string): string {
   return s
     .toLowerCase()
-    .replace(/['']/g, "'")
-    .replace(/[""]/g, '"')
+    .replace(/[\u2018\u2019\u0060\u00B4]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -29,18 +29,22 @@ export function stripEmbeddedSet(name: string): string {
   });
   // Remove trailing "(SetCode AB)" alternate border suffixes: "(CoW AB)", "(RoJ AB)"
   cleaned = cleaned.replace(/\s*\([A-Z][A-Za-z0-9]{1,4} AB\)\s*$/, '').trim();
+  // Remove trailing "(SetCode Rarity)" patterns: "(GoC UR+)", "(LoC LR)", "(FoM UR+)"
+  cleaned = cleaned.replace(/\s*\([A-Z][A-Za-z0-9]{1,4}\s+(?:UR\+?|LR|R[1-3]?)\)\s*$/, '').trim();
   // Remove "1st Print" variant suffixes
   cleaned = cleaned.replace(/\s*\(1st Print[^)]*\)\s*$/, '').trim();
   return cleaned.trim();
 }
 
 /**
- * Strip *Banned* / *Out of Print* suffixes from Shopify titles.
+ * Strip *Banned...* / *Out of Print* / (errata/corrected) suffixes from Shopify titles.
  */
 export function stripShopifySuffixes(title: string): string {
   return title
-    .replace(/\s*\*Banned\*\s*/gi, '')
+    .replace(/\s*\*Banned[^*]*\*\s*/gi, '')
     .replace(/\s*\*Out of Print\*\s*/gi, '')
+    .replace(/\s*\*Errata[^*]*\*\s*/gi, '')
+    .replace(/\s*\(errata\/corrected\)\s*/gi, '')
     .trim();
 }
 

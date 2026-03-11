@@ -13,6 +13,7 @@ import { CARD_DATA_URL } from "../card-search/constants";
 import { Card } from "../card-search/utils";
 import ModalWithClose from "../card-search/ModalWithClose";
 import { GoldfishButton } from "../../goldfish/components/GoldfishButton";
+import { useCardPrices } from "../card-search/hooks/useCardPrices";
 
 interface PublicDeckData {
   id: string;
@@ -149,6 +150,9 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   const [hoveredCard, setHoveredCard] = useState<{ name: string; imgFile: string; set?: string; type?: string } | null>(null);
   const [showPreview, setShowPreview] = useState(true);
   const [showStats, setShowStats] = useState(false);
+
+  // Card prices
+  const { getPrice, getProductUrl } = useCardPrices();
 
   // Inline name editing (owner only)
   const [deckName, setDeckName] = useState(deck.name);
@@ -348,6 +352,20 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   const mainDeckCount = mainCards.reduce((sum, c) => sum + c.quantity, 0);
   const reserveCount = reserveCards.reduce((sum, c) => sum + c.quantity, 0);
 
+  const totalDeckPrice = useMemo(() => {
+    let total = 0;
+    let hasAnyPrice = false;
+    for (const card of enrichedCards) {
+      const priceKey = `${card.card_name}|${card.card_set}|${sanitizeImgFile(card.card_img_file || "")}`;
+      const priceInfo = getPrice(priceKey);
+      if (priceInfo) {
+        total += priceInfo.price * card.quantity;
+        hasAnyPrice = true;
+      }
+    }
+    return hasAnyPrice ? total : null;
+  }, [enrichedCards, getPrice]);
+
   // Group and sort cards based on current groupBy setting
   const groupedMainCards = useMemo(() => {
     return groupAndSortCards(mainCards, groupBy);
@@ -523,6 +541,9 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
               )}
               <span className="text-sm text-gray-500 dark:text-gray-400">
                 {mainDeckCount} cards{reserveCount > 0 && ` + ${reserveCount} reserve`}
+                {totalDeckPrice !== null && (
+                  <span className="text-green-600 dark:text-green-400 font-medium"> · ${totalDeckPrice.toFixed(2)}</span>
+                )}
               </span>
               <span className="text-sm text-gray-400 dark:text-gray-500">
                 Created {new Date(deck.created_at).toLocaleDateString()}
@@ -1164,6 +1185,12 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                       {enrichedCards.filter(c => c.type === 'Dom' || c.type === 'Dominant').reduce((s, c) => s + c.quantity, 0)}
                     </span>
                   </div>
+                  {totalDeckPrice !== null && (
+                    <div className="flex justify-between">
+                      <span>Est. Price:</span>
+                      <span className="font-medium text-green-600 dark:text-green-400">${totalDeckPrice.toFixed(2)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1428,6 +1455,13 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                 <p className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">{hoveredCard.name}</p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   {hoveredCard.set}{hoveredCard.type ? ` · ${prettifyTypeName(hoveredCard.type)}` : ''}
+                  {(() => {
+                    const priceKey = `${hoveredCard.name}|${hoveredCard.set}|${hoveredCard.imgFile}`;
+                    const priceInfo = getPrice(priceKey);
+                    return priceInfo ? (
+                      <span className="text-green-600 dark:text-green-400 font-medium"> · ${priceInfo.price.toFixed(2)}</span>
+                    ) : null;
+                  })()}
                 </p>
               </div>
             ) : (

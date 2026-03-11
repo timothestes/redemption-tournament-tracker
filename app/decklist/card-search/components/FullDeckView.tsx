@@ -8,6 +8,7 @@ import { loadGlobalTagsAction, updateDeckTagsAction, GlobalTag } from "../../act
 import { createGlobalTagAction } from "../../../admin/tags/actions";
 import { HexColorPicker } from "react-colorful";
 import { useIsAdmin } from "../../../../hooks/useIsAdmin";
+import { useCardPrices } from "../hooks/useCardPrices";
 
 function getTagContrastColor(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -33,6 +34,7 @@ interface FullDeckViewProps {
 export default function FullDeckView({ deck, onViewCard, isAuthenticated = false, viewMode, groupBy, showPreview = true, tagsBarContainer }: FullDeckViewProps) {
   const { getImageUrl } = useCardImageUrl();
   const { isAdmin, permissions } = useIsAdmin();
+  const { getPrice } = useCardPrices();
   const canManageTags = isAdmin && permissions.includes('manage_tags');
 
   // Hover preview state (desktop only)
@@ -812,6 +814,13 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                   <p className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">{hoveredCard.name}</p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     {hoveredCard.set}{hoveredCard.type ? ` · ${hoveredCard.type}` : ''}
+                    {(() => {
+                      const priceKey = `${hoveredCard.name}|${hoveredCard.set}|${hoveredCard.imgFile}`;
+                      const priceInfo = getPrice(priceKey);
+                      return priceInfo ? (
+                        <span className="text-green-600 dark:text-green-400 font-medium"> · ${priceInfo.price.toFixed(2)}</span>
+                      ) : null;
+                    })()}
                   </p>
                 </div>
               ) : (

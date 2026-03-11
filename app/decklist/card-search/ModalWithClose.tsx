@@ -257,7 +257,7 @@ export default function ModalWithClose({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 md:p-4"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-50 md:p-4"
       onClick={() => setModalCard(null)}
     >
       {/* Mobile: full-screen layout, with bottom padding for MobileBottomNav */}
@@ -269,9 +269,18 @@ export default function ModalWithClose({
         <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
           <div className="flex-1 min-w-0 mr-2">
             <div className="font-semibold text-base truncate">{modalCard.name}</div>
-            {hasNavigation && (
-              <div className="text-[10px] text-gray-400">{currentIndex + 1} of {visibleCards.length}</div>
-            )}
+            <div className="flex items-center gap-2">
+              {(() => {
+                const cardKey = `${modalCard.name}|${modalCard.set}|${modalCard.imgFile}`;
+                const priceInfo = getPrice(cardKey);
+                return priceInfo ? (
+                  <span className="text-xs font-medium text-green-600 dark:text-green-400">${priceInfo.price.toFixed(2)}</span>
+                ) : null;
+              })()}
+              {hasNavigation && (
+                <span className="text-[10px] text-gray-400">{currentIndex + 1} of {visibleCards.length}</span>
+              )}
+            </div>
           </div>
           {/* Quantity badges */}
           {(quantityInDeck > 0 || quantityInReserve > 0) && (
@@ -443,11 +452,11 @@ export default function ModalWithClose({
                       ? window.open(productUrl, '_blank', 'noopener,noreferrer')
                       : openYTGSearchPage(modalCard.name)
                   }
-                  className="h-9 px-3 flex-shrink-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg flex items-center gap-1.5 font-medium text-sm"
+                  className={`h-9 px-3 flex-shrink-0 text-white rounded-lg flex items-center gap-1.5 font-medium text-sm ${isFundraiser ? 'bg-gradient-to-r from-green-600 to-emerald-600' : 'bg-gradient-to-r from-blue-600 to-purple-600'}`}
                 >
                   {priceInfo ? (
                     <>
-                      <span>${priceInfo.price.toFixed(2)}</span>
+                      <span>{isFundraiser ? `$${priceInfo.price.toFixed(0)}` : `$${priceInfo.price.toFixed(2)}`}</span>
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                       </svg>
@@ -484,8 +493,17 @@ export default function ModalWithClose({
             <line x1="22" y1="10" x2="10" y2="22" stroke="white" strokeWidth="3.5" strokeLinecap="round" />
           </svg>
         </button>
-        <div className="px-4 pt-4 pb-2 border-b font-semibold text-lg text-center truncate">
+        <div className="px-4 pt-4 pb-2 border-b font-semibold text-lg text-center">
           <div className="truncate">{modalCard.name}</div>
+          {(() => {
+            const cardKey = `${modalCard.name}|${modalCard.set}|${modalCard.imgFile}`;
+            const priceInfo = getPrice(cardKey);
+            return priceInfo ? (
+              <div className="text-sm font-medium text-green-600 dark:text-green-400 mt-0.5">
+                ${priceInfo.price.toFixed(2)}
+              </div>
+            ) : null;
+          })()}
         </div>
         <div className="px-4 py-2 flex flex-col items-center relative flex-1 overflow-hidden">
           <div className="relative w-full flex justify-center mb-4">
@@ -635,10 +653,15 @@ export default function ModalWithClose({
                 className="px-4 h-10 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg flex items-center gap-1.5 font-semibold transition-colors text-sm whitespace-nowrap"
                 size="sm"
               >
+                {(() => {
+                  const cardKey = `${modalCard.name}|${modalCard.set}|${modalCard.imgFile}`;
+                  const priceInfo = getPrice(cardKey);
+                  return priceInfo ? <span>${priceInfo.price.toFixed(0)}</span> : null;
+                })()}
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                   <path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/>
                 </svg>
-                Shop Fundraiser
+                Fundraiser
               </Button>
             ) : (() => {
               const cardKey = `${modalCard.name}|${modalCard.set}|${modalCard.imgFile}`;

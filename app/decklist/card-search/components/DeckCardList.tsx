@@ -2,6 +2,7 @@ import React from "react";
 import { DeckCard } from "../types/deck";
 import { Card } from "../utils";
 import { useCardImageUrl } from "../hooks/useCardImageUrl";
+import { useCardPrices } from "../hooks/useCardPrices";
 
 interface DeckCardListProps {
   /** Array of cards to display */
@@ -44,6 +45,7 @@ export default function DeckCardList({
   const [openMenuCard, setOpenMenuCard] = React.useState<string | null>(null);
   const [previewCard, setPreviewCard] = React.useState<{ card: Card; x: number; y: number } | null>(null);
   const { getImageUrl } = useCardImageUrl();
+  const { getPrice } = useCardPrices();
   
   // Close menu when clicking outside or pressing ESC
   React.useEffect(() => {
@@ -666,7 +668,7 @@ export default function DeckCardList({
 
             {/* Card Info */}
             <div className="flex-1 min-w-0">
-              <div 
+              <div
                 className="text-sm font-medium text-gray-900 dark:text-white truncate cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                 onMouseEnter={(e) => {
                   const pos = calculatePreviewPosition(e.currentTarget);
@@ -680,6 +682,17 @@ export default function DeckCardList({
                 {card.name}
               </div>
             </div>
+
+            {/* Price */}
+            {(() => {
+              const priceKey = `${card.name}|${card.set}|${card.imgFile}`;
+              const priceInfo = getPrice(priceKey);
+              return priceInfo ? (
+                <span className="text-xs text-green-600 dark:text-green-400 font-medium flex-shrink-0 tabular-nums">
+                  ${priceInfo.price.toFixed(2)}
+                </span>
+              ) : null;
+            })()}
 
             {/* Additional Controls */}
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

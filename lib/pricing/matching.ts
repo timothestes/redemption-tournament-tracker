@@ -8,6 +8,25 @@ const CARD_DATA_URL =
   'https://raw.githubusercontent.com/jalstad/RedemptionLackeyCCG/master/RedemptionQuick/sets/carddata.txt';
 
 /**
+ * Manual name aliases for cards where carddata and Shopify names differ.
+ * Key: normalized carddata name, Value: Shopify name to search for.
+ */
+const NAME_ALIASES: Record<string, string> = {
+  "nicolatian's teaching": "Nicolaitans' Teaching",
+};
+
+/**
+ * Art variant cards that use description-based naming in carddata
+ * but numbered/named variants in Shopify. Cannot be auto-matched.
+ */
+const ART_VARIANT_PATTERNS = [
+  /^(Pharisees|Sadducees)\s*-\s*/,
+  /^Obsidian Minion\s*-\s*/,
+  /^Seraphim\s*-\s*/,
+  /^Shadow\s*-\s*/,
+];
+
+/**
  * Load and parse card data from GitHub.
  */
 export async function loadCardData(): Promise<CardRow[]> {
@@ -21,7 +40,8 @@ export async function loadCardData(): Promise<CardRow[]> {
       const cols = line.split('\t');
       const name = cols[0]?.trim() ?? '';
       const set_code = cols[1]?.trim() ?? '';
-      const img_file = cols[2]?.trim() ?? '';
+      // Strip .jpg/.jpeg extension to match the UI's sanitizeImgFile behavior
+      const img_file = (cols[2]?.trim() ?? '').replace(/\.jpe?g$/i, '');
       return {
         name,
         set_code,
@@ -180,8 +200,26 @@ function pass2Normalized(
     }
   }
 
-  // Try variant patterns: "Name (Legacy Rare) (Set)", "Name (Borderless) (Set)"
+  // Try name aliases (for cards where carddata and Shopify names differ)
   const baseName = cleanName !== card.name ? cleanName : card.name;
+  const aliasName = NAME_ALIASES[normalize(baseName)];
+  if (aliasName) {
+    const aliasCandidate = `${aliasName} (${shopifyAbbrev})`;
+    const aliasProduct = byTitle.get(normalize(aliasCandidate));
+    if (aliasProduct) {
+      return {
+        card_key: card.card_key,
+        card_name: card.name,
+        set_code: card.set_code,
+        shopify_product_id: aliasProduct.id,
+        confidence: 0.90,
+        match_method: 'name_alias',
+        status: 'auto_matched',
+      };
+    }
+  }
+
+  // Try variant patterns: "Name (Legacy Rare) (Set)", "Name (Borderless) (Set)"
   const variantQualifiers = ['Legacy Rare', 'Borderless', 'UR+', 'Foil'];
   for (const qual of variantQualifiers) {
     const candidate = `${baseName} (${qual}) (${shopifyAbbrev})`;
@@ -201,8 +239,18 @@ function pass2Normalized(
 
   // Try "Name (Legacy Rare)" products that only have set info in tags
   // e.g. "The Gates of Hell (Legacy Rare)" with tag "Gospel of Christ" → GoC
-  const legacyCandidate = `${baseName} (Legacy Rare)`;
-  const legacyProduct = byTitle.get(normalize(legacyCandidate));
+  // Also try quoted name: '"He is Risen" (Legacy Rare)'
+  const legacyCandidates = [
+    `${baseName} (Legacy Rare)`,
+    `"${baseName}" (Legacy Rare)`,
+  ];
+  if (aliasName) {
+    legacyCandidates.push(`${aliasName} (Legacy Rare)`);
+    legacyCandidates.push(`"${aliasName}" (Legacy Rare)`);
+  }
+  const legacyProduct = legacyCandidates
+    .map(c => byTitle.get(normalize(c)))
+    .find(p => p != null) ?? null;
   if (legacyProduct && legacyProduct.tags) {
     const tagList = legacyProduct.tags.split(',').map(t => t.trim().toLowerCase());
     for (const tag of tagList) {
@@ -225,8 +273,12 @@ function pass2Normalized(
   // since YTG sells AB cards under the same product as non-AB
   if (shopifyAbbrev.includes(' ')) {
     const baseAbbrev = shopifyAbbrev.split(' ')[0];
-    const abCandidate = `${baseName} (${baseAbbrev})`;
-    const abProduct = byTitle.get(normalize(abCandidate));
+    // Try both original name and alias
+    const abNames = [baseName];
+    if (aliasName) abNames.push(aliasName);
+    const abProduct = abNames
+      .map(n => byTitle.get(normalize(`${n} (${baseAbbrev})`)))
+      .find(p => p != null) ?? null;
     if (abProduct) {
       return {
         card_key: card.card_key,
@@ -238,6 +290,225 @@ function pass2Normalized(
         status: 'auto_matched',
       };
     }
+  }
+
+  return null;
+}
+
+/**
+ * Pass 2a-ban: Banned/errata card matching.
+ * Cards from "[Ban]" sets may exist in Shopify with suffixes like:
+ *   "Name (Set) *Banned from official play*"
+ *   "Name (errata/corrected) (Set)"
+ *   "Name (Set) *Errata received*"
+ */
+function pass2aBanned(
+  card: CardRow,
+  shopifyAbbrev: string,
+  byTitle: Map<string, ShopifyProductRow>,
+  isBannedSet: boolean
+): MatchResult | null {
+  if (!isBannedSet) return null;
+
+  const baseName = stripEmbeddedSet(card.name);
+  const nameToUse = baseName !== card.name ? baseName : card.name;
+
+  // Also strip "(Banned)" suffix from carddata names like "Endless Treasures (Banned)"
+  const cleanedName = nameToUse.replace(/\s*\(Banned\)\s*$/, '').trim();
+
+  // Try various banned/errata Shopify title patterns
+  const candidates = [
+    `${cleanedName} (${shopifyAbbrev}) *Banned from official play*`,
+    `${cleanedName} (errata/corrected) (${shopifyAbbrev})`,
+    `${cleanedName} (${shopifyAbbrev}) *Errata received*`,
+    `${cleanedName} (${shopifyAbbrev}) *Out of Print*`,
+  ];
+
+  for (const candidate of candidates) {
+    // stripShopifySuffixes + normalize is what the byTitle map uses as keys,
+    // so we need to match against that
+    const product = byTitle.get(normalize(stripShopifySuffixes(candidate)));
+    if (product) {
+      return {
+        card_key: card.card_key,
+        card_name: card.name,
+        set_code: card.set_code,
+        shopify_product_id: product.id,
+        confidence: 0.92,
+        match_method: 'banned_set_match',
+        status: 'auto_matched',
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Pass 2b: Lost Soul bracket notation.
+ * Carddata:  Lost Soul "Nickname" [Scripture] or [Scripture - LR]
+ * Shopify:   Lost Soul (Scripture) "Nickname" (Set) or Lost Soul "Nickname" (Scripture) (Legacy Rare)
+ *
+ * Tries multiple candidate patterns since Shopify ordering varies.
+ */
+function pass2bLostSoulBracket(
+  card: CardRow,
+  shopifyAbbrev: string,
+  byTitle: Map<string, ShopifyProductRow>
+): MatchResult | null {
+  // Only applies to Lost Soul cards with bracket notation
+  if (!card.name.startsWith('Lost Soul') || !card.name.includes('[')) return null;
+
+  // Match: Lost Soul [Token] "Nickname" [Scripture - LR]
+  const lrMatch = card.name.match(/^(Lost Soul(?:\s+Token)?\s+[\u201C""]([^"\u201D]+)[\u201D""])\s*\[([^\]]+)\s*-\s*LR\]$/);
+  // Match: Lost Soul [Token] "Nickname" [Scripture]
+  const plainMatch = card.name.match(/^(Lost Soul(?:\s+Token)?\s+[\u201C""]([^"\u201D]+)[\u201D""])\s*\[([^\]]+)\]$/);
+
+  const match = lrMatch || plainMatch;
+  if (!match) return null;
+
+  const isLR = !!lrMatch;
+  const nickname = match[2].trim();
+  const scripture = match[3].trim();
+
+  const candidates: string[] = [];
+
+  if (isLR) {
+    // Try Legacy Rare patterns (with and without set)
+    candidates.push(`Lost Soul "${nickname}" (${scripture}) (Legacy Rare) (${shopifyAbbrev})`);
+    candidates.push(`Lost Soul (${scripture}) "${nickname}" (Legacy Rare) (${shopifyAbbrev})`);
+    candidates.push(`Lost Soul "${nickname}" (${scripture}) (Legacy Rare)`);
+    candidates.push(`Lost Soul (${scripture}) "${nickname}" (Legacy Rare)`);
+  } else {
+    // Try standard patterns (paren and bracket notation for scripture)
+    candidates.push(`Lost Soul "${nickname}" (${scripture}) (${shopifyAbbrev})`);
+    candidates.push(`Lost Soul (${scripture}) "${nickname}" (${shopifyAbbrev})`);
+    candidates.push(`Lost Soul "${nickname}" [${scripture}] (${shopifyAbbrev})`);
+  }
+
+  for (const candidate of candidates) {
+    const product = byTitle.get(normalize(candidate));
+    if (product) {
+      return {
+        card_key: card.card_key,
+        card_name: card.name,
+        set_code: card.set_code,
+        shopify_product_id: product.id,
+        confidence: isLR ? 0.93 : 0.95,
+        match_method: 'lost_soul_bracket',
+        status: 'auto_matched',
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Pass 2c: Promo fallback.
+ * For promo cards that don't match their specific promo product,
+ * try matching to any non-promo version of the same card.
+ */
+export function pass2cPromoFallback(
+  card: CardRow,
+  shopifyAbbrev: string,
+  byTitle: Map<string, ShopifyProductRow>,
+  allProducts: ShopifyProductRow[]
+): MatchResult | null {
+  // Only for promo sets
+  if (!shopifyAbbrev.includes('Promo') && shopifyAbbrev !== 'Promo') return null;
+
+  // Extract bracket content before stripping (e.g., "2023 - 1st Place" from "[2023 - 1st Place]")
+  const bracketMatch = card.name.match(/\[([^\]]+)\]\s*$/);
+  const bracketContent = bracketMatch?.[1] ?? '';
+
+  // Strip promo-related suffixes from card name
+  let baseName = card.name
+    .replace(/\s*\(\d{4}\s+Promo\)\s*$/, '')    // "(2016 Promo)"
+    .replace(/\s*\(Promo\)\s*$/, '')              // "(Promo)"
+    .replace(/\s*\[\d{4}\s*-\s*[^\]]+\]\s*$/, '') // "[2023 - Seasonal]"
+    .trim();
+  baseName = stripEmbeddedSet(baseName);
+
+  // First try: if we had bracket content with distinguishing info (e.g., "2023 - 1st Place"),
+  // search for a Shopify product whose title contains both the base name AND the bracket keywords.
+  if (bracketContent) {
+    const bracketKeywords = bracketContent.split(/[\s\-,]+/).filter(w => w.length > 1);
+    const normalizedBase = normalize(baseName);
+    const specificMatches = allProducts.filter(p => {
+      const normTitle = normalize(p.title);
+      if (!normTitle.includes(normalizedBase)) return false;
+      // Require all bracket keywords to appear in the Shopify title
+      return bracketKeywords.every(kw => normTitle.includes(normalize(kw)));
+    });
+    if (specificMatches.length === 1) {
+      return {
+        card_key: card.card_key,
+        card_name: card.name,
+        set_code: card.set_code,
+        shopify_product_id: specificMatches[0].id,
+        confidence: 0.92,
+        match_method: 'promo_bracket_match',
+        status: 'auto_matched',
+      };
+    }
+    if (specificMatches.length > 1) {
+      // Multiple matches — pick the cheapest
+      const best = specificMatches.reduce((a, b) =>
+        (a.price ?? Infinity) < (b.price ?? Infinity) ? a : b
+      );
+      return {
+        card_key: card.card_key,
+        card_name: card.name,
+        set_code: card.set_code,
+        shopify_product_id: best.id,
+        confidence: 0.90,
+        match_method: 'promo_bracket_match',
+        status: 'auto_matched',
+      };
+    }
+  }
+
+  // Second try: find any Shopify product matching "baseName (Promo)"
+  const promoCandidate = `${baseName} (Promo)`;
+  const promoProduct = byTitle.get(normalize(promoCandidate));
+  if (promoProduct) {
+    return {
+      card_key: card.card_key,
+      card_name: card.name,
+      set_code: card.set_code,
+      shopify_product_id: promoProduct.id,
+      confidence: 0.88,
+      match_method: 'promo_fallback',
+      status: 'auto_matched',
+    };
+  }
+
+  // Second try: find any non-promo version — pick cheapest
+  // Extract card name by stripping everything after the LAST paren group
+  const normalizedBase = normalize(baseName);
+  const matches = allProducts.filter(p => {
+    const cleanTitle = stripShopifySuffixes(p.title);
+    const normTitle = normalize(cleanTitle);
+    // Strip all trailing paren groups to get base name
+    const cardNamePart = normTitle.replace(/(\s*\([^)]+\))+\s*$/, '').trim();
+    return cardNamePart === normalizedBase;
+  });
+
+  if (matches.length > 0) {
+    // Pick cheapest available product
+    const cheapest = matches.reduce((best, p) =>
+      (p.price ?? Infinity) < (best.price ?? Infinity) ? p : best
+    );
+    return {
+      card_key: card.card_key,
+      card_name: card.name,
+      set_code: card.set_code,
+      shopify_product_id: cheapest.id,
+      confidence: 0.85,
+      match_method: 'promo_fallback_cheapest',
+      status: 'auto_matched',
+    };
   }
 
   return null;
@@ -451,10 +722,30 @@ export async function runMatchingPipeline(options?: {
       continue;
     }
 
-    const shopifyAbbrev = aliases.get(card.set_code);
+    // Resolve set alias — for banned sets like "PoC [Ban]", strip suffix and use base set
+    const isBannedSet = card.set_code.includes('[Ban]');
+    const baseSetCode = isBannedSet ? card.set_code.replace(/\s*\[Ban\]$/, '').trim() : card.set_code;
+    const shopifyAbbrev = aliases.get(card.set_code) ?? aliases.get(baseSetCode);
 
     // No alias → no price exists
     if (!shopifyAbbrev) {
+      results.push({
+        card_key: card.card_key,
+        card_name: card.name,
+        set_code: card.set_code,
+        shopify_product_id: null,
+        confidence: 0,
+        match_method: 'none',
+        status: 'no_price_exists',
+      });
+      summary.no_price_exists++;
+      continue;
+    }
+
+    // Detect tokens and art variants — not sold by YTG as distinct products
+    // Exclude cards with scripture references (e.g. Lost Soul Token "Lost Souls" [Proverbs 2:16-17])
+    const isToken = /\bToken\b/.test(card.name) && !/\[\w+\s+\d+:\d+/.test(card.name);
+    if (isToken || ART_VARIANT_PATTERNS.some(p => p.test(card.name))) {
       results.push({
         card_key: card.card_key,
         card_name: card.name,
@@ -475,6 +766,15 @@ export async function runMatchingPipeline(options?: {
     }
     if (!match && passes.includes(2)) {
       match = pass2Normalized(card, shopifyAbbrev, shopify.byNormalizedTitle);
+    }
+    if (!match && passes.includes(2)) {
+      match = pass2aBanned(card, shopifyAbbrev, shopify.byNormalizedTitle, isBannedSet);
+    }
+    if (!match && passes.includes(2)) {
+      match = pass2bLostSoulBracket(card, shopifyAbbrev, shopify.byNormalizedTitle);
+    }
+    if (!match && passes.includes(2)) {
+      match = pass2cPromoFallback(card, shopifyAbbrev, shopify.byNormalizedTitle, shopify.all);
     }
 
     if (match) {
@@ -556,6 +856,9 @@ export async function runMatchingPipeline(options?: {
     log('Regenerating card_prices...');
     await regenerateCardPrices();
   }
+
+  summary.unmatchedCards = results.filter(r => r.status === 'unmatched');
+  summary.noPriceCards = results.filter(r => r.status === 'no_price_exists');
 
   log(`Done! matched=${summary.matched} review=${summary.needs_review} no_price=${summary.no_price_exists} unmatched=${summary.unmatched}`);
   return summary;

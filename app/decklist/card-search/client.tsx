@@ -21,6 +21,7 @@ import { createClient } from "../../../utils/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { deleteDeckAction } from "../actions";
 import { MobileBottomNav } from "./components/MobileBottomNav";
+import { useCardPrices } from "./hooks/useCardPrices";
 
 // Helper component for rename form in new deck modal
 function NewDeckRenameForm({ 
@@ -313,6 +314,8 @@ export default function CardSearchClient() {
     getDeckStats,
     clearUnsavedChanges,
   } = useDeckState(deckIdFromUrl, folderIdFromUrl, isNewDeck);
+
+  const { getPrice } = useCardPrices();
 
   // Refs for input fields to enable auto-focus
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -1824,7 +1827,7 @@ export default function CardSearchClient() {
               return (
                 <div
                   key={c.dataLine}
-                  className="relative cursor-pointer group rounded overflow-hidden shadow hover:shadow-xl transition-all duration-200"
+                  className="relative cursor-pointer group rounded overflow-hidden transition-all duration-200"
                 >
                   {/* Backdrop overlay when menu is open */}
                   {isMenuOpen && (
@@ -1962,6 +1965,7 @@ export default function CardSearchClient() {
                       </button>
                     </div>
 
+
                     {/* Quantity Badge - Bottom Right, Always Visible */}
                     {(quantityInDeck > 0 || quantityInReserve > 0) && (
                       <div className="absolute bottom-1 right-1 flex flex-col items-end gap-0.5">
@@ -1980,6 +1984,13 @@ export default function CardSearchClient() {
                   </div>
 
                   <p className="text-xs sm:text-sm mt-1 text-center truncate hidden sm:block">{c.name}</p>
+                  {(() => {
+                    const priceKey = `${c.name}|${c.set}|${c.imgFile}`;
+                    const priceInfo = getPrice(priceKey);
+                    return priceInfo ? (
+                      <p className="text-[10px] sm:text-xs text-center text-gray-700 dark:text-gray-400 font-medium">${priceInfo.price.toFixed(2)}</p>
+                    ) : null;
+                  })()}
                 </div>
               );
             })}
