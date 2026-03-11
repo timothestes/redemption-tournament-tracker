@@ -135,7 +135,16 @@ export default function CardSearchClient() {
   const [legalityMode, setLegalityMode] = useState<'Rotation'|'Classic'|'Banned'|'Scrolls'|'Paragon'>('Rotation');
   const [visibleCount, setVisibleCount] = useState(0); // Number of cards to show
 
-  const [modalCard, setModalCard] = useState<Card | null>(null);
+  const [modalCard, setModalCardRaw] = useState<Card | null>(null);
+  const modalOpenedFromDeckRef = useRef(false);
+  const setModalCard = React.useCallback((card: Card | null) => {
+    if (card === null && modalOpenedFromDeckRef.current) {
+      // Reopen deck drawer when closing modal that was opened from deck
+      setIsMobileDeckDrawerOpen(true);
+      modalOpenedFromDeckRef.current = false;
+    }
+    setModalCardRaw(card);
+  }, []);
   // Alignment filters: Good, Evil, Neutral (multiple selection)
   const [selectedAlignmentFilters, setSelectedAlignmentFilters] = useState<string[]>([]);
   // Rarity filters
@@ -1988,7 +1997,7 @@ export default function CardSearchClient() {
                     const priceKey = `${c.name}|${c.set}|${c.imgFile}`;
                     const priceInfo = getPrice(priceKey);
                     return priceInfo ? (
-                      <p className="text-[10px] sm:text-xs text-center text-gray-700 dark:text-gray-400 font-medium">${priceInfo.price.toFixed(2)}</p>
+                      <p className="text-xs sm:text-xs text-center text-green-700 dark:text-green-400 font-semibold">${priceInfo.price.toFixed(2)}</p>
                     ) : null;
                   })()}
                 </div>
@@ -2090,7 +2099,7 @@ export default function CardSearchClient() {
       {/* Right panel: Deck builder (hidden on mobile, toggleable on desktop) */}
       {showDeckBuilder && (
         <div
-          className="hidden md:flex flex-col overflow-hidden flex-shrink-0"
+          className="hidden md:flex flex-col overflow-visible flex-shrink-0"
           style={{ width: showSearch ? `${deckPanelWidth}%` : '100%' }}
         >
           {isInitializing ? (
@@ -2104,6 +2113,7 @@ export default function CardSearchClient() {
             hasUnsavedChanges={hasUnsavedChanges}
             isAuthenticated={!!user}
             isExpanded={!showSearch}
+            onToggleExpand={() => setShowSearch(prev => !prev)}
             onDeckNameChange={setDeckName}
             onDeckFormatChange={handleDeckFormatChange}
             onParagonChange={setDeckParagon}
@@ -2214,6 +2224,7 @@ export default function CardSearchClient() {
               onActiveTabChange={setActiveDeckTab}
               onViewCard={(card, isReserve) => {
                 setFullDeckViewSection(isReserve ? 'reserve' : 'main');
+                modalOpenedFromDeckRef.current = true;
                 setModalCard(card);
                 setIsMobileDeckDrawerOpen(false);
               }}

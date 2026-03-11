@@ -21,7 +21,7 @@ export function MobileBottomNav({
   isAuthenticated = false,
 }: MobileBottomNavProps) {
   return (
-    <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex items-center justify-around h-14 pb-[env(safe-area-inset-bottom)]">
+    <nav className="md:hidden fixed bottom-0 inset-x-0 z-[70] bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex items-center justify-around h-14 pb-[env(safe-area-inset-bottom)]">
       {isAuthenticated && onSaveDeck && deckCardCount > 0 && (
         <button
           onClick={onSaveDeck}

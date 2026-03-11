@@ -262,7 +262,7 @@ export default function ModalWithClose({
     >
       {/* Mobile: full-screen layout, with bottom padding for MobileBottomNav */}
       <div
-        className="md:hidden bg-white dark:bg-gray-900 text-gray-900 dark:text-white w-full h-full flex flex-col relative pb-14"
+        className={`md:hidden bg-white dark:bg-gray-900 text-gray-900 dark:text-white w-full h-full flex flex-col relative ${onAddCard ? 'pb-14' : ''}`}
         onClick={e => e.stopPropagation()}
       >
         {/* Mobile Header - compact */}
@@ -334,7 +334,7 @@ export default function ModalWithClose({
             onTransitionEnd={handleTransitionEnd}
           >
             {/* Previous card */}
-            <div className="w-full h-full flex-shrink-0 flex items-center justify-center p-4">
+            <div className="w-full h-full flex-shrink-0 flex items-center justify-center px-2 py-1">
               {hasNavigation && (() => {
                 const prev = getAdjacentCard('left');
                 return prev ? (
@@ -349,7 +349,7 @@ export default function ModalWithClose({
             </div>
 
             {/* Current card */}
-            <div className="w-full h-full flex-shrink-0 flex items-center justify-center p-4">
+            <div className="w-full h-full flex-shrink-0 flex items-center justify-center px-2 py-1">
               <img
                 src={getImageUrl(modalCard.imgFile)}
                 alt={modalCard.name}
@@ -359,7 +359,7 @@ export default function ModalWithClose({
             </div>
 
             {/* Next card */}
-            <div className="w-full h-full flex-shrink-0 flex items-center justify-center p-4">
+            <div className="w-full h-full flex-shrink-0 flex items-center justify-center px-2 py-1">
               {hasNavigation && (() => {
                 const next = getAdjacentCard('right');
                 return next ? (
@@ -378,10 +378,10 @@ export default function ModalWithClose({
         {/* Mobile Footer */}
         <div className="flex-shrink-0 px-3 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
           <div className="flex items-center gap-2">
-            {/* Add/Remove button groups */}
+            {/* Deck builder: add/remove controls */}
             {onAddCard && onRemoveCard && getCardQuantity && (
               <>
-                {/* Main deck group - no gap between - and + */}
+                {/* Main deck group */}
                 <div className="flex flex-shrink-0">
                   <button
                     onClick={() => onRemoveCard(modalCard.name, modalCard.set, false)}
@@ -408,7 +408,7 @@ export default function ModalWithClose({
                     })()}
                   </button>
                 </div>
-                {/* Reserve group - no gap between - and + */}
+                {/* Reserve group */}
                 <div className="flex flex-shrink-0">
                   <button
                     onClick={() => onRemoveCard(modalCard.name, modalCard.set, true)}
@@ -436,6 +436,17 @@ export default function ModalWithClose({
                   </button>
                 </div>
               </>
+            )}
+            {/* Public view: card details */}
+            {!(onAddCard && onRemoveCard && getCardQuantity) && (
+              <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-gray-500 dark:text-gray-400">
+                {modalCard.type && <span>{modalCard.type}</span>}
+                {modalCard.brigade && <span>{modalCard.brigade}</span>}
+                {modalCard.strength && modalCard.toughness && <span>{modalCard.strength}/{modalCard.toughness}</span>}
+                {modalCard.officialSet && <span>{modalCard.officialSet}</span>}
+                {modalCard.rarity && <span>{modalCard.rarity}</span>}
+                {modalCard.identifier && <span className="italic">{modalCard.identifier}</span>}
+              </div>
             )}
             {/* Spacer */}
             <div className="flex-1" />

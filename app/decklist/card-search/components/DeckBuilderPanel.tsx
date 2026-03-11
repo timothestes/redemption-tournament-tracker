@@ -43,6 +43,8 @@ interface DeckBuilderPanelProps {
   isAuthenticated?: boolean;
   /** Whether the panel is expanded to full width */
   isExpanded?: boolean;
+  /** Callback to toggle expanded/fullscreen mode */
+  onToggleExpand?: () => void;
   /** Callback when deck name changes */
   onDeckNameChange: (name: string) => void;
   /** Callback when deck format changes */
@@ -96,6 +98,7 @@ export default function DeckBuilderPanel({
   hasUnsavedChanges = false,
   isAuthenticated = false,
   isExpanded = false,
+  onToggleExpand,
   onDeckNameChange,
   onDeckFormatChange,
   onParagonChange,
@@ -600,9 +603,9 @@ export default function DeckBuilderPanel({
   };
 
   return (
-    <div className="w-full h-full flex flex-col bg-gray-50 dark:bg-gray-900 overflow-hidden">
+    <div className="w-full h-full flex flex-col bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <div className="flex-shrink-0 px-3 py-2 md:p-4 border-b border-gray-200/60 dark:border-gray-700/60 overflow-visible">
+      <div className="flex-shrink-0 px-3 py-2 md:p-4 border-b border-gray-200/60 dark:border-gray-700/60 overflow-visible relative z-30">
         {/* Deck Name + Counts Row */}
         {isEditingName ? (
           <input
@@ -615,9 +618,9 @@ export default function DeckBuilderPanel({
             autoFocus
           />
         ) : (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <h2
-              className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate"
+              className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate min-w-0 flex-shrink"
               onClick={() => {
                 setIsEditingName(true);
                 setEditedName(deck.name);
@@ -634,6 +637,11 @@ export default function DeckBuilderPanel({
                   : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
               }`}>
                 {deck.isPublic ? "Public" : "Private"}
+              </span>
+            )}
+            {totalDeckPrice !== null && (
+              <span className="md:hidden flex-shrink-0 text-sm font-semibold text-green-600 dark:text-green-400">
+                ${totalDeckPrice.toFixed(2)}
               </span>
             )}
             <span className="hidden md:flex items-center gap-1 text-xs whitespace-nowrap ml-auto flex-shrink-0" suppressHydrationWarning>
@@ -704,8 +712,6 @@ export default function DeckBuilderPanel({
                   const result = await onSaveDeck();
                   if (!result.success && result.error) {
                     onNotify?.(result.error, 'error');
-                  } else if (result.success) {
-                    onNotify?.('Deck saved successfully!', 'success');
                   }
                 }}
                 disabled={syncStatus?.isSaving || !isAuthenticated}
@@ -753,7 +759,7 @@ export default function DeckBuilderPanel({
               <GoldfishButton deckId={deck.id} deckName={deck.name} format={deck.format} iconOnly />
             )}
 
-            {/* More menu — full menu dropdown for mobile */}
+            {/* More menu */}
             <div className="relative">
               <button
                 onClick={(e) => {
@@ -768,7 +774,11 @@ export default function DeckBuilderPanel({
                 </svg>
               </button>
               {showMenu && (
-                <div className="absolute top-full mt-1 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50 min-w-[180px] max-h-[70vh] overflow-y-auto">
+                <>
+                  <div className="fixed inset-0 z-[40]" onClick={() => setShowMenu(false)} />
+                  <div
+                    className="absolute top-full right-0 mt-1 z-[50] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-[180px] max-h-[70vh] overflow-y-auto"
+                  >
                   <button
                     onClick={() => { onImport(); setShowMenu(false); }}
                     className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-gray-900 dark:text-white text-sm"
@@ -931,7 +941,8 @@ export default function DeckBuilderPanel({
                       </button>
                     </>
                   )}
-                </div>
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -1162,8 +1173,6 @@ export default function DeckBuilderPanel({
                   const result = await onSaveDeck();
                   if (!result.success && result.error) {
                     onNotify?.(result.error, 'error');
-                  } else if (result.success) {
-                    onNotify?.('Deck saved successfully!', 'success');
                   }
                 }}
                 disabled={syncStatus?.isSaving || !isAuthenticated}
@@ -1763,6 +1772,26 @@ export default function DeckBuilderPanel({
                     </button>
                   </div>
                 </div>
+                {/* Full Deck View */}
+                <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onToggleExpand) {
+                      onToggleExpand();
+                    }
+                    setShowViewDropdown(false);
+                  }}
+                  className="w-full px-3 py-2.5 text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d={isExpanded
+                      ? "M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25"
+                      : "M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+                    } />
+                  </svg>
+                  {isExpanded ? 'Exit Full View' : 'Full Deck View'}
+                </button>
               </div>
             </>,
             document.body
@@ -1902,7 +1931,7 @@ export default function DeckBuilderPanel({
                 </button>
               </div>
             </div>
-            <div ref={setTagsBarContainer} className="relative z-50" />
+            <div ref={setTagsBarContainer} className="relative z-10" />
             <div className="flex-1 overflow-auto">
               <FullDeckView
                 deck={deck}
@@ -2870,9 +2899,12 @@ export default function DeckBuilderPanel({
             </div>
             <button
               onClick={() => { setShowMobileFullDeckView(false); setFullViewPreviewCard(null); }}
-              className="ml-auto flex-shrink-0 px-2.5 py-1 rounded-lg text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-[11px] font-medium"
+              className="ml-auto flex-shrink-0 w-8 h-8 flex items-center justify-center bg-red-600 hover:bg-red-700 rounded-full text-white"
+              aria-label="Close"
             >
-              Close
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
           </div>
           {/* Deck Content */}
