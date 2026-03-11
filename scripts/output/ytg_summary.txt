@@ -1,0 +1,266 @@
+Total products: 5131
+
+Product types:
+  Single: 4868
+  Contender Deck: 57
+  (none): 45
+  Complete Set: 36
+  Challenger Deck: 32
+  Booster Pack: 28
+  Starter Deck: 14
+  Champion Deck: 11
+  Playmats & Tubes: 8
+  Card Sleeves: 8
+  Deck Boxes: 8
+  Dice & Tokens: 3
+  Coloring Battle Cards: 3
+  Gift cards: 3
+  Folders & Pages: 2
+  Display Box: 2
+  T-shirt: 1
+  Battle Boxes: 1
+  Battle Box (200 cards): 1
+
+Vendors:
+  Your Turn Games: 5131
+
+Unique tags: 88
+Top 30 tags:
+  Rotation Cards: 2343
+  Good Enhancement: 1212
+  Hero: 1066
+  Evil Enhancement: 986
+  Evil Character: 956
+  White: 432
+  Green: 382
+  Brown: 372
+  Black: 370
+  Crimson: 362
+  Silver: 356
+  Gray: 351
+  Red: 327
+  Purple: 325
+  Gold: 323
+  Blue: 322
+  Pale Green: 316
+  Gospel of Christ: 287
+  Artifact: 286
+  Clay: 279
+  Lineage of Christ: 272
+  Priests: 253
+  Kings: 252
+  Prophecies of Christ: 244
+  Evil Gold: 235
+  Roots: 224
+  Lost Soul: 215
+  Apostles: 209
+  Promos: 198
+  Orange: 177
+
+Variants per product:
+  1 variant(s): 5044 products
+  2 variant(s): 29 products
+  3 variant(s): 16 products
+  4 variant(s): 14 products
+  5 variant(s): 2 products
+  6 variant(s): 7 products
+  7 variant(s): 1 products
+  8 variant(s): 4 products
+  9 variant(s): 1 products
+  10 variant(s): 1 products
+  11 variant(s): 5 products
+  12 variant(s): 2 products
+  13 variant(s): 2 products
+  26 variant(s): 1 products
+  63 variant(s): 1 products
+  64 variant(s): 1 products
+
+Sample product titles (first 30):
+  [6761588228253] "Authority of Christ" Playmat — $30.00, $20.00, $45.00
+  [7547261026529] "He is Risen" (Legacy Rare) — $1.50
+  [1014354837540] "I AM" Has Sent Me (PoC) — $0.75
+  [5431865114781] "Need Redemption?" T-Shirt — $14.95, $14.95, $14.95
+  [7461191614689] "Redemption is Here!" T-shirt — $14.95
+  [7900979069153] "Stone Rolled Away" Playmat — $30.00
+  [8985513001185] "The Second Coming" Playmat — $30.00
+  [1479397146660] "Three Woes" Playmat — $30.00
+  [8983953015009] "Walking with Jesus" Playmat — $30.00
+  [8881023320289] *Clearance* Accessories — $9.95, $9.95, $1.95, $1.95
+  [8880859906273] *Clearance* Israel's Rebellion - Commons Set — $30.00
+  [8880861872353] *Clearance* Israel's Rebellion - Complete Set — $125.00
+  [8880860332257] *Clearance* Israel's Rebellion - Rares Set — $40.00
+  [8880861184225] *Clearance* Israel's Rebellion - Ultra Rares Set — $70.00
+  [8880815440097] *Clearance* Lineage of Christ - Complete Set — $400.00
+  [8881014276321] *Clearance* Prophecies of Christ - Complete Set — $300.00
+  [8954573979873] *New* "Christ Block" (PoC/LoC/GoC) Grab Bag (200 cards) — $69.96, $99.95, $119.95
+  [8956705669345] *New* "Israel Block" (IR/II) Grab Bag (100 cards) — $44.95, $54.95, $64.95
+  [9400386519265] *New* Abraham, Paragon of Faith — $75.00
+  [9400388550881] *New* Benaiah, Paragon of Prowess — $75.00
+  [9174944743649] *New* Daniel Heroes/Babylonians — $105.00
+  [9395538886881] *New* Daniel, Paragon of Insight — $75.00
+  [9400388878561] *New* Deborah, Paragon of Justice — $75.00
+  [9319468564705] *New* Disciples’ Devotion — $85.00
+  [9400385831137] *New* Esther, Paragon of Courage — $75.00
+  [9400387338465] *New* Hannah, Paragon of Faith — $75.00
+  [9319468007649] *New* Holy Night — $85.00
+  [9183529369825] *New* Isaiah Heroes/Greeks — $105.00
+  [9400388288737] *New* Job, Paragon of Patience — $75.00
+  [9400389861601] *New* Joseph, Paragon of Forgiveness — $75.00
+
+Sample variant titles (first 20 multi-variant products):
+  "Authority of Christ" Playmat:
+    - Green Logo @ $30.00 (SKU: )
+    - Yellow Logo @ $20.00 (SKU: )
+    - Both playmats (Yellow and Green Logos) @ $45.00 (SKU: )
+  "Need Redemption?" T-Shirt:
+    - Medium / White @ $14.95 (SKU: )
+    - XL / White @ $14.95 (SKU: )
+    - 2XL / Black @ $14.95 (SKU: )
+  *Clearance* Accessories:
+    - Ultra Pro Superman Sleeves (65) @ $9.95 (SKU: None)
+    - Redemption Tin @ $9.95 (SKU: None)
+    - Ultra Pro Deck Box (Light Green) @ $1.95 (SKU: None)
+    - Ultra Pro Deck Box (Pink) @ $1.95 (SKU: None)
+  *New* "Christ Block" (PoC/LoC/GoC) Grab Bag (200 cards):
+    - "Christ Block" (PoC/LoC/GoC) Grab Bag (200 commons) @ $69.96 (SKU: )
+    - "Christ Block" (PoC/LoC/GoC) Grab Bag (175 commons & 25 rares) @ $99.95 (SKU: )
+    - "Christ Block" (PoC/LoC/GoC) Grab Bag (150 commons & 50 rares) @ $119.95 (SKU: )
+  *New* "Israel Block" (IR/II) Grab Bag (100 cards):
+    - "Israel Block" (IR/II) Grab Bag (100 commons) @ $44.95 (SKU: )
+    - "Israel Block" (IR/II) Grab Bag (85 commons & 15 rares) @ $54.95 (SKU: )
+    - "Israel Block" (IR/II) Grab Bag (70 commons & 30 rares) @ $64.95 (SKU: )
+  *Sale* Times to Come - Sets:
+    - Complete Set (129 cards) @ $345.00 (SKU: None)
+    - Commons (90 cards) @ $45.00 (SKU: None)
+    - Rares (36 cards) @ $65.00 (SKU: None)
+    - Ulra Rares (3 cards) @ $140.00 (SKU: None)
+  2024 1st Place/2nd Place - Nativity Heroes/Herods Champion Deck:
+    - New Jerusalem/Angel of the Lord @ $399.00 (SKU: )
+    - The Second Coming/Three Woes @ $499.00 (SKU: )
+  2024 3rd Place - Angel Nativity Heroes/Thieves Champion Deck:
+    - New Jerusalem/Vain Philosophy @ $374.00 (SKU: )
+    - The Second Coming/Three Woes @ $474.00 (SKU: )
+  2024 4th Place - Clay Heroes/Herods Champion Deck:
+    - New Jerusalem/Angel of the Lord @ $374.00 (SKU: )
+    - The Second Coming/Three Woes @ $474.00 (SKU: )
+  Angel Wars:
+    - Booster pack @ $1.75 (SKU: )
+    - Display case @ $75.00 (SKU: )
+  Apostles:
+    - Booster pack @ $1.75 (SKU: )
+    - Display case @ $75.00 (SKU: )
+  BCW Elite 2 Deck Guards (Matte) - 100 Count:
+    - Seafoam @ $11.95 (SKU: )
+    - Green @ $11.95 (SKU: )
+    - White @ $11.95 (SKU: )
+    - Azure @ $11.95 (SKU: )
+    - Autumn @ $11.95 (SKU: )
+    - Black @ $11.95 (SKU: )
+    - Blue @ $11.95 (SKU: )
+    - Mulberry @ $11.95 (SKU: )
+    - Red @ $11.95 (SKU: )
+    - Teal @ $11.95 (SKU: )
+    - Cool Grey @ $11.95 (SKU: )
+  BCW Tandem Deck Box:
+    - Green @ $5.50 (SKU: )
+    - Black @ $5.50 (SKU: )
+    - Red @ $5.50 (SKU: )
+    - White @ $5.50 (SKU: )
+  Booster Draft Kit:
+    - Israel's Inheritance / Standard @ $30.00 (SKU: None)
+    - Israel's Rebellion / Standard @ $30.00 (SKU: None)
+    - Gospel of Christ / Standard @ $30.00 (SKU: None)
+    - Lineage of Christ / Standard @ $30.00 (SKU: None)
+    - Prophecies of Christ / Standard @ $30.00 (SKU: None)
+    - Fall of Man / Standard @ $30.00 (SKU: None)
+    - Revelation of John / Standard @ $30.00 (SKU: None)
+    - Cloud of Witnesses / Standard @ $30.00 (SKU: None)
+    - Combination of Sets - YTG Will E-mail You! / Standard @ $30.00 (SKU: None)
+  Brigade-Specific Grab Bag (100 cards):
+    - Good Brigade - Blue / Evil Brigade - Black @ $39.95 (SKU: )
+    - Good Brigade - Blue / Evil Brigade - Brown @ $39.95 (SKU: )
+    - Good Brigade - Blue / Evil Brigade - Crimson @ $39.95 (SKU: )
+    - Good Brigade - Blue / Evil Brigade - Evil Gold @ $39.95 (SKU: )
+    - Good Brigade - Blue / Evil Brigade - Gray @ $39.95 (SKU: )
+    - Good Brigade - Blue / Evil Brigade - Orange @ $39.95 (SKU: )
+    - Good Brigade - Blue / Evil Brigade - Pale Green @ $39.95 (SKU: )
+    - Good Brigade - Clay / Evil Brigade - Black @ $39.95 (SKU: )
+    - Good Brigade - Clay / Evil Brigade - Brown @ $39.95 (SKU: )
+    - Good Brigade - Clay / Evil Brigade - Crimson @ $39.95 (SKU: )
+    - Good Brigade - Clay / Evil Brigade - Evil Gold @ $39.95 (SKU: )
+    - Good Brigade - Clay / Evil Brigade - Gray @ $39.95 (SKU: )
+    - Good Brigade - Clay / Evil Brigade - Orange @ $39.95 (SKU: )
+    - Good Brigade - Clay / Evil Brigade - Pale Green @ $39.95 (SKU: )
+    - Good Brigade - Gold / Evil Brigade - Black @ $39.95 (SKU: )
+    - Good Brigade - Gold / Evil Brigade - Brown @ $39.95 (SKU: )
+    - Good Brigade - Gold / Evil Brigade - Crimson @ $39.95 (SKU: )
+    - Good Brigade - Gold / Evil Brigade - Evil Gold @ $39.95 (SKU: )
+    - Good Brigade - Gold / Evil Brigade - Gray @ $39.95 (SKU: )
+    - Good Brigade - Gold / Evil Brigade - Orange @ $39.95 (SKU: )
+    - Good Brigade - Gold / Evil Brigade - Pale Green @ $39.95 (SKU: )
+    - Good Brigade - Green / Evil Brigade - Black @ $39.95 (SKU: )
+    - Good Brigade - Green / Evil Brigade - Brown @ $39.95 (SKU: )
+    - Good Brigade - Green / Evil Brigade - Crimson @ $39.95 (SKU: )
+    - Good Brigade - Green / Evil Brigade - Evil Gold @ $39.95 (SKU: )
+    - Good Brigade - Green / Evil Brigade - Gray @ $39.95 (SKU: )
+    - Good Brigade - Green / Evil Brigade - Orange @ $39.95 (SKU: )
+    - Good Brigade - Green / Evil Brigade - Pale Green @ $39.95 (SKU: )
+    - Good Brigade - Purple / Evil Brigade - Black @ $39.95 (SKU: )
+    - Good Brigade - Purple / Evil Brigade - Brown @ $39.95 (SKU: )
+    - Good Brigade - Purple / Evil Brigade - Crimson @ $39.95 (SKU: )
+    - Good Brigade - Purple / Evil Brigade - Evil Gold @ $39.95 (SKU: )
+    - Good Brigade - Purple / Evil Brigade - Gray @ $39.95 (SKU: )
+    - Good Brigade - Purple / Evil Brigade - Orange @ $39.95 (SKU: )
+    - Good Brigade - Purple / Evil Brigade - Pale Green @ $39.95 (SKU: )
+    - Good Brigade - Red / Evil Brigade - Black @ $39.95 (SKU: )
+    - Good Brigade - Red / Evil Brigade - Brown @ $39.95 (SKU: )
+    - Good Brigade - Red / Evil Brigade - Crimson @ $39.95 (SKU: )
+    - Good Brigade - Red / Evil Brigade - Evil Gold @ $39.95 (SKU: )
+    - Good Brigade - Red / Evil Brigade - Gray @ $39.95 (SKU: )
+    - Good Brigade - Red / Evil Brigade - Orange @ $39.95 (SKU: )
+    - Good Brigade - Red / Evil Brigade - Pale Green @ $39.95 (SKU: )
+    - Good Brigade - Silver / Evil Brigade - Black @ $39.95 (SKU: )
+    - Good Brigade - Silver / Evil Brigade - Brown @ $39.95 (SKU: )
+    - Good Brigade - Silver / Evil Brigade - Crimson @ $39.95 (SKU: )
+    - Good Brigade - Silver / Evil Brigade - Evil Gold @ $39.95 (SKU: )
+    - Good Brigade - Silver / Evil Brigade - Gray @ $39.95 (SKU: )
+    - Good Brigade - Silver / Evil Brigade - Orange @ $39.95 (SKU: )
+    - Good Brigade - Silver / Evil Brigade - Pale Green @ $39.95 (SKU: )
+    - Good Brigade - Teal / Evil Brigade - Black @ $39.95 (SKU: )
+    - Good Brigade - Teal / Evil Brigade - Brown @ $39.95 (SKU: )
+    - Good Brigade - Teal / Evil Brigade - Crimson @ $39.95 (SKU: )
+    - Good Brigade - Teal / Evil Brigade - Evil Gold @ $39.95 (SKU: )
+    - Good Brigade - Teal / Evil Brigade - Gray @ $39.95 (SKU: )
+    - Good Brigade - Teal / Evil Brigade - Orange @ $39.95 (SKU: )
+    - Good Brigade - Teal / Evil Brigade - Pale Green @ $39.95 (SKU: )
+    - Good Brigade - White / Evil Brigade - Black @ $39.95 (SKU: )
+    - Good Brigade - White / Evil Brigade - Brown @ $39.95 (SKU: )
+    - Good Brigade - White / Evil Brigade - Crimson @ $39.95 (SKU: )
+    - Good Brigade - White / Evil Brigade - Evil Gold @ $39.95 (SKU: )
+    - Good Brigade - White / Evil Brigade - Gray @ $39.95 (SKU: )
+    - Good Brigade - White / Evil Brigade - Orange @ $39.95 (SKU: )
+    - Good Brigade - White / Evil Brigade - Pale Green @ $39.95 (SKU: )
+  Chessex 12mm, 6-sided Dice (36 count):
+    - Opaque (Red/White) @ $12.95 (SKU: CHX 23806)
+    - Opaque (Red/Black) @ $12.95 (SKU: CHX 23803)
+    - Opaque (Orange/Black) @ $12.95 (SKU: CHX 25944)
+  Cloud of Witnesses (CoW)-Only Grab Bag (50 cards):
+    - Cloud of Witnesses (CoW)-Only Grab Bag (45 commons & 5 rares) @ $24.95 (SKU: )
+    - Cloud of Witnesses (CoW)-Only Grab Bag (40 commons & 10 rares) @ $29.95 (SKU: )
+    - Cloud of Witnesses (CoW)-Only Grab Bag (35 commons & 15 rares) @ $34.95 (SKU: )
+  Cloud of Witnesses - Complete Set:
+    - Commons (90) @ $75.00 (SKU: )
+    - Rares (36) @ $150.00 (SKU: )
+    - Complete with Ultra-Rares (129) @ $325.00 (SKU: )
+    - Ultra-Rares (3) @ $140.00 (SKU: )
+  Cloud of Witnesses Booster Packs & Display Boxes (w/ Roots Cards):
+    - Booster pack @ $5.00 (SKU: None)
+    - Display box @ $120.00 (SKU: )
+  Custom Sleeves:
+    - Ninja (50 sleeves) - by Legion @ $4.00 (SKU: )
+    - Green Camouflage (50 sleeves) - by Legion @ $4.00 (SKU: )
+    - Blue Camouflage (50 sleeves) - by Legion @ $5.00 (SKU: )
+    - Draw! (50 sleeves) - by Legion @ $5.00 (SKU: )
+    - Tuxedo (50 sleeves) - by Legion @ $4.00 (SKU: )
+    - G.I. Joe - Duke (100 sleeves) - by Ultra Pro @ $9.75 (SKU: )
+    - G.I. Joe - Cobra logo (100 sleeves) - by Ultra Pro @ $10.50 (SKU: )

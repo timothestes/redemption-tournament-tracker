@@ -2,6 +2,7 @@ import React from "react";
 import { Button } from "flowbite-react";
 import { openYTGSearchPage } from "./ytgUtils";
 import { useCardImageUrl } from "./hooks/useCardImageUrl";
+import { useCardPrices } from "./hooks/useCardPrices";
 
 function Attribute({ label, value }: { label: string; value: string | boolean }) {
   // Prettify testament display if it's an array
@@ -61,6 +62,7 @@ export default function ModalWithClose({
   activeDeckTab = "main" // Default to main if not provided
 }) {
   const { getImageUrl } = useCardImageUrl();
+  const { getPrice, getProductUrl } = useCardPrices();
   const [showMenu, setShowMenu] = React.useState(false);
 
   // Swipe/carousel state
@@ -428,19 +430,39 @@ export default function ModalWithClose({
             )}
             {/* Spacer */}
             <div className="flex-1" />
-            {/* Shop button */}
-            <button
-              onClick={() => isFundraiser
-                ? window.open('https://cactus-game-design-inc.square.site/s/shop', '_blank')
-                : openYTGSearchPage(modalCard.name)
-              }
-              className="h-9 px-3 flex-shrink-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg flex items-center gap-1.5 font-medium text-sm"
-            >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd"/>
-              </svg>
-              Shop
-            </button>
+            {/* Shop button with price */}
+            {(() => {
+              const cardKey = `${modalCard.name}|${modalCard.set}|${modalCard.imgFile}`;
+              const priceInfo = getPrice(cardKey);
+              const productUrl = getProductUrl(cardKey);
+              return (
+                <button
+                  onClick={() => isFundraiser
+                    ? window.open('https://cactus-game-design-inc.square.site/s/shop', '_blank')
+                    : productUrl
+                      ? window.open(productUrl, '_blank', 'noopener,noreferrer')
+                      : openYTGSearchPage(modalCard.name)
+                  }
+                  className="h-9 px-3 flex-shrink-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg flex items-center gap-1.5 font-medium text-sm"
+                >
+                  {priceInfo ? (
+                    <>
+                      <span>${priceInfo.price.toFixed(2)}</span>
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd"/>
+                      </svg>
+                      Shop
+                    </>
+                  )}
+                </button>
+              );
+            })()}
           </div>
         </div>
       </div>
@@ -618,18 +640,37 @@ export default function ModalWithClose({
                 </svg>
                 Shop Fundraiser
               </Button>
-            ) : (
-              <Button
-                onClick={() => openYTGSearchPage(modalCard.name)}
-                className="px-4 h-10 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg flex items-center gap-1.5 font-semibold transition-colors text-sm whitespace-nowrap"
-                size="sm"
-              >
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                  <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd"/>
-                </svg>
-                Search YTG
-              </Button>
-            )}
+            ) : (() => {
+              const cardKey = `${modalCard.name}|${modalCard.set}|${modalCard.imgFile}`;
+              const priceInfo = getPrice(cardKey);
+              const productUrl = getProductUrl(cardKey);
+              return (
+                <Button
+                  onClick={() => productUrl
+                    ? window.open(productUrl, '_blank', 'noopener,noreferrer')
+                    : openYTGSearchPage(modalCard.name)
+                  }
+                  className="px-4 h-10 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg flex items-center gap-1.5 font-semibold transition-colors text-sm whitespace-nowrap"
+                  size="sm"
+                >
+                  {priceInfo ? (
+                    <>
+                      <span>${priceInfo.price.toFixed(2)}</span>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                        <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd"/>
+                      </svg>
+                      Search YTG
+                    </>
+                  )}
+                </Button>
+              );
+            })()}
             <Button
               onClick={() => setModalCard(null)}
               className="px-4 h-10 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-900 dark:hover:text-red-300 rounded-lg font-medium transition-colors text-sm whitespace-nowrap"
