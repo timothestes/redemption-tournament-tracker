@@ -1997,7 +1997,7 @@ export default function CardSearchClient() {
                     const priceKey = `${c.name}|${c.set}|${c.imgFile}`;
                     const priceInfo = getPrice(priceKey);
                     return priceInfo ? (
-                      <p className="text-xs sm:text-xs text-center text-green-700 dark:text-green-400 font-semibold">${priceInfo.price.toFixed(2)}</p>
+                      <p className="text-xs sm:text-xs text-center text-gray-500 dark:text-gray-400 font-medium">${priceInfo.price.toFixed(2)}</p>
                     ) : null;
                   })()}
                 </div>
