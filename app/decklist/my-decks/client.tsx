@@ -1100,6 +1100,9 @@ function DeckCard({
             <span className="text-gray-600 dark:text-gray-400">
               {deck.card_count || 0} cards
             </span>
+            {deck.total_price != null && deck.total_price > 0 && (
+              <span className="text-green-600 dark:text-green-400">${deck.total_price.toFixed(2)}</span>
+            )}
           </div>
         </div>
 
@@ -1186,6 +1189,9 @@ function DeckListItem({
           </div>
           <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400 md:hidden">
             <span>{deck.card_count || 0} cards</span>
+            {deck.total_price != null && deck.total_price > 0 && (
+              <span className="text-green-600 dark:text-green-400">${deck.total_price.toFixed(2)}</span>
+            )}
           </div>
           {deck.tags && deck.tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1.5">
@@ -1204,6 +1210,9 @@ function DeckListItem({
 
         <div className="hidden md:flex items-center gap-6 text-sm text-gray-600 dark:text-gray-400">
           <span>{deck.card_count || 0} cards</span>
+          {deck.total_price != null && deck.total_price > 0 && (
+            <span className="text-green-600 dark:text-green-400">${deck.total_price.toFixed(2)}</span>
+          )}
           <span className="text-xs">Updated {updatedDate}</span>
         </div>
 

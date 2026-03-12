@@ -220,6 +220,14 @@ export default function CardSearchClient() {
     }
   }, [deckIdFromUrl, isNewDeck]);
 
+  // Lock body scroll when mobile deck drawer is open to prevent iOS elastic overscroll
+  useEffect(() => {
+    if (isMobileDeckDrawerOpen && window.innerWidth < 768) {
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = ''; };
+    }
+  }, [isMobileDeckDrawerOpen]);
+
   // Deck panel resize state
   const containerRef = useRef<HTMLDivElement>(null);
   const isResizingRef = useRef(false);

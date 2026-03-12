@@ -2462,7 +2462,7 @@ export default function DeckBuilderPanel({
                   <p className="text-xs text-blue-800 dark:text-blue-200">
                     Not all deckbuilding checks are implemented, just the basic ones. Please refer to the{' '}
                     <a 
-                      href="https://landofredemption.com/wp-content/uploads/2024/10/Deck_Building_Rules_1.2.pdf"
+                      href="https://landofredemption.com/wp-content/uploads/2026/03/Deck_Building_Rules_1.3.pdf"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="font-semibold underline hover:text-blue-600 dark:hover:text-blue-300 transition-colors"

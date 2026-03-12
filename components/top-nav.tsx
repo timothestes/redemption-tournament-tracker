@@ -101,9 +101,9 @@ const TopNav: React.FC = () => {
   ];
 
   const tournamentResources = [
-    { href: "https://landofredemption.com/wp-content/uploads/2025/03/REG_PDF_10.0.0.pdf", label: "REG (Official Rulebook)", icon: PiPencilLineBold },
-    { href: "https://landofredemption.com/wp-content/uploads/2025/03/ORDIR_PDF_6.0.0.pdf", label: "ORDIR (Dictionary)", icon: FaBookOpen },
-    { href: "https://landofredemption.com/wp-content/uploads/2024/10/Deck_Building_Rules_1.2.pdf", label: "Deck Building Rules", icon: TbCardsFilled },
+    { href: "https://landofredemption.com/wp-content/uploads/2026/03/REG_PDF_11.0.0.pdf", label: "REG (Official Rulebook)", icon: PiPencilLineBold },
+    { href: "https://landofredemption.com/wp-content/uploads/2026/03/ORDIR_PDF_7.0.0.pdf", label: "ORDIR (Dictionary)", icon: FaBookOpen },
+    { href: "https://landofredemption.com/wp-content/uploads/2026/03/Deck_Building_Rules_1.3.pdf", label: "Deck Building Rules", icon: TbCardsFilled },
   ];
 
   const paragonResources = [

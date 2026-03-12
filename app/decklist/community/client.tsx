@@ -556,7 +556,7 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
             <span className={getDeckTypeBadgeClasses(deck.format)}>{formatDeckType(deck.format)}</span>
             <span className="text-gray-600 dark:text-gray-400">{deck.card_count || 0} cards</span>
             {deck.total_price != null && deck.total_price > 0 && (
-              <span className="text-gray-400 dark:text-gray-500">${deck.total_price.toFixed(2)}</span>
+              <span className="text-green-600 dark:text-green-400">${deck.total_price.toFixed(2)}</span>
             )}
           </div>
 
