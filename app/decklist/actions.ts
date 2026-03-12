@@ -19,6 +19,7 @@ export interface DeckData {
   created_at?: string;
   updated_at?: string;
   tags?: GlobalTag[];
+  total_price?: number | null;
 }
 
 export interface DeckCardData {
@@ -270,6 +271,22 @@ export async function loadUserDecksAction() {
       }
     }
 
+    // Batch-fetch total prices for all returned decks
+    let priceMap = new Map<string, number>();
+    if (deckIds.length > 0) {
+      const { data: priceRows, error: priceError } = await supabase.rpc("get_deck_total_prices", {
+        deck_ids: deckIds,
+      });
+      if (priceError) {
+        console.error("Error fetching deck prices:", priceError);
+      }
+      for (const row of (priceRows || []) as any[]) {
+        if (row.total_price > 0) {
+          priceMap.set(row.deck_id, parseFloat(row.total_price));
+        }
+      }
+    }
+
     const decksWithCounts = (decks || []).map((deck: any) => {
       const mainDeckCount = (deck.deck_cards || [])
         .filter((card: any) => !card.is_reserve)
@@ -280,6 +297,7 @@ export async function loadUserDecksAction() {
         card_count: mainDeckCount,
         deck_cards: undefined,
         tags: tagsMap.get(deck.id) || [],
+        total_price: priceMap.get(deck.id) || null,
       };
     });
 
@@ -1220,10 +1238,27 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
       }
     }
 
+    // Batch-fetch total prices for all returned decks
+    let priceMap = new Map<string, number>();
+    if (deckIds.length > 0) {
+      const { data: priceRows, error: priceError } = await supabase.rpc("get_deck_total_prices", {
+        deck_ids: deckIds,
+      });
+      if (priceError) {
+        console.error("Error fetching deck prices:", priceError);
+      }
+      for (const row of (priceRows || []) as any[]) {
+        if (row.total_price > 0) {
+          priceMap.set(row.deck_id, parseFloat(row.total_price));
+        }
+      }
+    }
+
     const decksWithUsername = (decks || []).map((d: any) => ({
       ...d,
       username: usernameMap.get(d.user_id) || null,
       tags: tagsMap.get(d.id) || [],
+      total_price: priceMap.get(d.id) || null,
     }));
 
     return { success: true, decks: decksWithUsername, totalCount: count || 0 };

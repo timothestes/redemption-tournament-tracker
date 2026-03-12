@@ -89,3 +89,4 @@ tmp/*
 .claude
 claude.md
 test_shopify.py
+.mcp.json

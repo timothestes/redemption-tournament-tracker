@@ -439,7 +439,7 @@ export default function ModalWithClose({
             )}
             {/* Public view: card details */}
             {!(onAddCard && onRemoveCard && getCardQuantity) && (
-              <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-gray-500 dark:text-gray-400">
+              <div className="flex-1 min-w-0 h-9 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-gray-500 dark:text-gray-400 overflow-hidden">
                 {modalCard.type && <span>{modalCard.type}</span>}
                 {modalCard.brigade && <span>{modalCard.brigade}</span>}
                 {modalCard.strength && modalCard.toughness && <span>{modalCard.strength}/{modalCard.toughness}</span>}
