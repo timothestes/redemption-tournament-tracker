@@ -1220,10 +1220,24 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
       }
     }
 
+    // Batch-fetch total prices for all returned decks
+    let priceMap = new Map<string, number>();
+    if (deckIds.length > 0) {
+      const { data: priceRows } = await supabase.rpc("get_deck_total_prices", {
+        deck_ids: deckIds,
+      });
+      for (const row of (priceRows || []) as any[]) {
+        if (row.total_price > 0) {
+          priceMap.set(row.deck_id, parseFloat(row.total_price));
+        }
+      }
+    }
+
     const decksWithUsername = (decks || []).map((d: any) => ({
       ...d,
       username: usernameMap.get(d.user_id) || null,
       tags: tagsMap.get(d.id) || [],
+      total_price: priceMap.get(d.id) || null,
     }));
 
     return { success: true, decks: decksWithUsername, totalCount: count || 0 };

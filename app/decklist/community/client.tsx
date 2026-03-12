@@ -23,6 +23,7 @@ interface PublicDeck {
   created_at: string;
   updated_at: string;
   tags?: DeckTag[];
+  total_price?: number | null;
 }
 
 function getContrastColor(hex: string): string {
@@ -554,6 +555,9 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
           <div className="flex items-center gap-3 text-sm mb-3">
             <span className={getDeckTypeBadgeClasses(deck.format)}>{formatDeckType(deck.format)}</span>
             <span className="text-gray-600 dark:text-gray-400">{deck.card_count || 0} cards</span>
+            {deck.total_price != null && deck.total_price > 0 && (
+              <span className="text-gray-400 dark:text-gray-500">${deck.total_price.toFixed(2)}</span>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-1">
