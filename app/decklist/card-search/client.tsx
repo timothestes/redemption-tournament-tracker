@@ -1353,8 +1353,8 @@ export default function CardSearchClient() {
       {/* Left panel: Card search */}
       {showSearch && (
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <div className="bg-card text-foreground transition-colors duration-200 flex-1 flex flex-col overflow-auto md:overflow-hidden">
-          <div className="p-1.5 md:p-2 flex flex-col items-center md:sticky md:top-0 z-40 bg-card text-foreground border-b border-border shadow-sm">
+        <div className="bg-background text-foreground transition-colors duration-200 flex-1 flex flex-col overflow-auto md:overflow-hidden">
+          <div className="p-1.5 md:p-2 flex flex-col items-center md:sticky md:top-0 z-40 bg-background text-foreground border-b border-border shadow-sm">
         <div className="relative w-full px-1 md:px-2 flex flex-col items-center justify-center gap-1.5 md:gap-2">
           <div className="w-full flex flex-col gap-1.5 md:gap-2 text-center">
             <div className="flex flex-col gap-1.5 md:gap-2 w-full">
@@ -1502,7 +1502,7 @@ export default function CardSearchClient() {
         </div>
       </div>
       {/* Active Filters Summary Bar — always visible on desktop to prevent layout jump, hidden on mobile when empty */}
-      <div className={`w-full transition-all duration-300 md:sticky md:top-[64px] z-30 bg-card text-foreground border-b border-border ${hasActiveFilters ? 'flex' : 'hidden md:flex'} items-center`}>
+      <div className={`w-full transition-all duration-300 md:sticky md:top-[64px] z-30 bg-background text-foreground border-b border-border ${hasActiveFilters ? 'flex' : 'hidden md:flex'} items-center`}>
         {/* Scrollable pills area */}
         <div className="flex-1 overflow-x-auto flex flex-nowrap sm:flex-wrap gap-1.5 sm:gap-2 items-center sm:justify-center px-2 sm:px-4 py-1.5 sm:py-2 sm:overflow-visible min-h-[44px]">
         {/* Query Pills */}
@@ -1714,7 +1714,7 @@ export default function CardSearchClient() {
         </div>
       </div>
       {/* Collapse/Expand Filter Grid Button — mobile only (on desktop it's in the search header) */}
-      <div className={`flex-shrink-0 ${!filterGridCollapsed ? 'sticky top-0 z-30' : ''} flex md:hidden flex-row items-center justify-end px-3 py-1.5 bg-card border-b border-border`}>
+      <div className={`flex-shrink-0 ${!filterGridCollapsed ? 'sticky top-0 z-30' : ''} flex md:hidden flex-row items-center justify-end px-3 py-1.5 bg-background border-b border-border`}>
         <button
           aria-label="Toggle filter grid"
           className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full border text-xs font-semibold transition ${
@@ -1737,7 +1737,7 @@ export default function CardSearchClient() {
           Filters
         </button>
       </div>
-      <main className="p-2 pb-16 md:pb-2 md:overflow-auto md:flex-1 bg-card text-foreground transition-colors duration-200" style={{ scrollbarGutter: 'stable' }}>
+      <main className="p-2 pb-16 md:pb-2 md:overflow-auto md:flex-1 bg-background text-foreground transition-colors duration-200" style={{ scrollbarGutter: 'stable' }}>
         {/* Responsive grid for filters */}
         {!filterGridCollapsed && (
           <FilterGrid
@@ -2086,7 +2086,7 @@ export default function CardSearchClient() {
           style={{ width: showSearch ? `${deckPanelWidth}%` : '100%' }}
         >
           {isInitializing ? (
-            <div className="flex-1 flex items-center justify-center bg-card">
+            <div className="flex-1 flex items-center justify-center bg-background">
               <div className="text-muted-foreground text-sm">Loading deck...</div>
             </div>
           ) : (
