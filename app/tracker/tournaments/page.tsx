@@ -102,8 +102,7 @@ export default function TournamentsPage() {
           <h1 className="text-2xl font-bold mr-8 mt-2">Your Tournaments</h1>
           <Button
             onClick={() => setisAddTournamentModalOpen(true)}
-            className="flex items-center gap-3 mt-2"
-            variant="success"
+            className="flex items-center gap-3 mt-2 bg-emerald-700 dark:bg-emerald-800 text-white hover:bg-emerald-700/90 dark:hover:bg-emerald-800/90"
           >
             <div className="flex items-center gap-1">
               <HiPlus className="w-4 h-4" />

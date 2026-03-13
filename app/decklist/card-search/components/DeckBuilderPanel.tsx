@@ -132,6 +132,9 @@ export default function DeckBuilderPanel({
   const [showValidationTooltip, setShowValidationTooltip] = useState(false);
   const [showViewDropdown, setShowViewDropdown] = useState(false);
   const viewDropdownBtnRef = useRef<HTMLButtonElement>(null);
+  const tabBarRef = useRef<HTMLDivElement>(null);
+  const tabRefs = useRef<Record<TabType, HTMLButtonElement | null>>({ main: null, reserve: null, info: null, cover: null });
+  const [tabIndicator, setTabIndicator] = useState({ left: 0, width: 0 });
   const [showMobileFullDeckView, setShowMobileFullDeckView] = useState(false);
   const [fullViewPreviewCard, setFullViewPreviewCard] = useState<Card | null>(null);
   const [showParagonDropdown, setShowParagonDropdown] = useState(false);
@@ -145,6 +148,17 @@ export default function DeckBuilderPanel({
   const [coverPickerSlot, setCoverPickerSlot] = useState<1 | 2 | null>(null);
   const [coverPickerSort, setCoverPickerSort] = useState<"default" | "name" | "type" | "brigade">("type");
   const [coverPickerSearch, setCoverPickerSearch] = useState("");
+
+  // Measure active tab position for sliding indicator
+  useEffect(() => {
+    const tab = tabRefs.current[activeTab];
+    const bar = tabBarRef.current;
+    if (tab && bar) {
+      const barRect = bar.getBoundingClientRect();
+      const tabRect = tab.getBoundingClientRect();
+      setTabIndicator({ left: tabRect.left - barRect.left, width: tabRect.width });
+    }
+  }, [activeTab]);
 
   // Close cover picker on Escape
   useEffect(() => {
@@ -1469,12 +1483,22 @@ export default function DeckBuilderPanel({
       {/* ...existing code... */}
       {/* Tabs - Hide when expanded (full screen view) */}
       {!isExpanded && (
-      <div className="flex-shrink-0 flex items-center border-b border-gray-200/60 dark:border-gray-700/60 bg-white dark:bg-gray-800 relative z-20">
+      <div ref={tabBarRef} className="flex-shrink-0 flex items-center border-b border-gray-200/60 dark:border-gray-700/60 bg-white dark:bg-gray-800 relative z-20">
+        {/* Sliding tab indicator */}
+        <div
+          className="absolute bottom-0 h-0.5 bg-blue-600 dark:bg-blue-500 transition-all duration-200"
+          style={{
+            transitionTimingFunction: 'var(--ease-out-quart)',
+            width: tabIndicator.width,
+            transform: `translateX(${tabIndicator.left}px)`,
+          }}
+        />
         <button
+          ref={(el) => { tabRefs.current.main = el; }}
           onClick={() => handleTabChange("main")}
-          className={`flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors whitespace-nowrap text-center ${
+          className={`flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
             activeTab === "main"
-              ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
+              ? "text-blue-600 dark:text-blue-400"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
           }`}
         >
@@ -1482,10 +1506,11 @@ export default function DeckBuilderPanel({
           <span className="hidden md:inline">Main ({mainDeckCount})</span>
         </button>
         <button
+          ref={(el) => { tabRefs.current.reserve = el; }}
           onClick={() => handleTabChange("reserve")}
-          className={`flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors whitespace-nowrap text-center ${
+          className={`flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
             activeTab === "reserve"
-              ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
+              ? "text-blue-600 dark:text-blue-400"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
           }`}
         >
@@ -1493,12 +1518,13 @@ export default function DeckBuilderPanel({
           <span className="hidden md:inline">Reserve ({reserveCount})</span>
         </button>
         <button
+          ref={(el) => { tabRefs.current.info = el; }}
           onClick={() => handleTabChange("info")}
           onMouseEnter={() => setShowValidationTooltip(true)}
           onMouseLeave={() => setShowValidationTooltip(false)}
-          className={`relative flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors whitespace-nowrap text-center ${
+          className={`relative flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
             activeTab === "info"
-              ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
+              ? "text-blue-600 dark:text-blue-400"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
           }`}
         >
@@ -1567,10 +1593,11 @@ export default function DeckBuilderPanel({
 
         {/* Details Tab (Cover Cards + Description) */}
         <button
+          ref={(el) => { tabRefs.current.cover = el; }}
           onClick={() => handleTabChange("cover")}
-          className={`flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors whitespace-nowrap text-center ${
+          className={`flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
             activeTab === "cover"
-              ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
+              ? "text-blue-600 dark:text-blue-400"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
           }`}
         >

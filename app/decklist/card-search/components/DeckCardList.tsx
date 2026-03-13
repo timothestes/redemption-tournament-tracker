@@ -143,7 +143,7 @@ export default function DeckCardList({
           return (
             <div
               key={cardKey}
-              className="relative group rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-200"
+              className="deck-card-enter relative group rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-200"
               onMouseEnter={disableHoverPreview ? undefined : (e) => {
                 const pos = calculatePreviewPosition(e.currentTarget);
                 setPreviewCard({
@@ -165,15 +165,19 @@ export default function DeckCardList({
               )}
 
               {/* Card Image */}
-              <div 
-                className="aspect-[2.5/3.5] bg-gray-200 dark:bg-gray-700 cursor-pointer relative"
+              <div
+                className="aspect-[2.5/3.5] bg-gray-200 dark:bg-gray-700 animate-pulse cursor-pointer relative"
                 onClick={() => onViewCard?.(card)}
               >
                 <img
                   src={getImageUrl(card.imgFile)}
                   alt={card.name}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover opacity-0 transition-opacity duration-300"
                   crossOrigin="anonymous"
+                  onLoad={(e) => {
+                    e.currentTarget.classList.replace('opacity-0', 'opacity-100');
+                    e.currentTarget.parentElement?.classList.remove('animate-pulse');
+                  }}
                   onError={(e) => {
                     e.currentTarget.src = '/placeholder-card.png';
                   }}
@@ -291,7 +295,7 @@ export default function DeckCardList({
                   
                   {/* Bottom Right: Quantity Display - Always Visible, Compact Style */}
                   <div className="flex items-center justify-center">
-                    <div className="bg-black/75 backdrop-blur-sm text-white px-2.5 py-1 rounded-md font-bold text-sm shadow-lg">
+                    <div key={quantity} className="animate-qty-pop bg-black/75 backdrop-blur-sm text-white px-2.5 py-1 rounded-md font-bold text-sm shadow-lg">
                       ×{quantity}
                     </div>
                   </div>
@@ -651,7 +655,7 @@ export default function DeckCardList({
               </button>
 
               {/* Quantity Badge (always visible, not a button) */}
-              <div className="flex-shrink-0 w-9 h-7 flex items-center justify-center text-gray-900 dark:text-white font-bold text-sm">
+              <div key={quantity} className="animate-qty-pop flex-shrink-0 w-9 h-7 flex items-center justify-center text-gray-900 dark:text-white font-bold text-sm">
                 {quantity}
               </div>
 

@@ -663,8 +663,8 @@ export default function FilterGrid({
               src={`/filter-icons/Color=${encodeURIComponent(icon)}.png`}
               alt={icon}
               className={clsx(
-                "h-10 w-10 sm:h-8 sm:w-auto cursor-pointer",
-                selectedIconFilters.some(f => f.icon === icon) && "ring-2 ring-white/80"
+                "h-10 w-10 sm:h-8 sm:w-auto cursor-pointer rounded-lg transition-all duration-150",
+                selectedIconFilters.some(f => f.icon === icon) && "ring-[2.5px] ring-blue-400 dark:ring-blue-400 scale-110"
               )}
               onClick={() => toggleIconFilter(icon)}
               style={{ minWidth: 32, minHeight: 32 }}
@@ -679,8 +679,8 @@ export default function FilterGrid({
               src={`/filter-icons/Color=${encodeURIComponent(icon)}.png`}
               alt={icon}
               className={clsx(
-                "h-10 w-10 sm:h-8 sm:w-auto cursor-pointer",
-                selectedIconFilters.some(f => f.icon === icon) && "ring-2 ring-white/80"
+                "h-10 w-10 sm:h-8 sm:w-auto cursor-pointer rounded-lg transition-all duration-150",
+                selectedIconFilters.some(f => f.icon === icon) && "ring-[2.5px] ring-blue-400 dark:ring-blue-400 scale-110"
               )}
               onClick={() => toggleIconFilter(icon)}
               style={{ minWidth: 32, minHeight: 32 }}

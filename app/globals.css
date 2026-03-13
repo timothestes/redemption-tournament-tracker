@@ -83,6 +83,47 @@
   body {
     @apply bg-background text-foreground;
   }
+  html {
+    --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  }
+}
+
+/* Deck builder animations */
+@keyframes pill-enter {
+  from { opacity: 0; transform: translateY(-4px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes qty-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+@keyframes card-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-pill-enter {
+  animation: pill-enter 200ms cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+.animate-qty-pop {
+  animation: qty-pop 250ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+.animate-card-in {
+  animation: card-fade-in 300ms cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+/* Deck card entrance — desktop only */
+@media (min-width: 768px) {
+  .deck-card-enter {
+    animation: card-fade-in 300ms cubic-bezier(0.25, 1, 0.5, 1) both;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-pill-enter,
+  .animate-qty-pop,
+  .animate-card-in,
+  .deck-card-enter {
+    animation: none;
+  }
 }
 
 /* Goldfish (solitaire game) theme tokens */

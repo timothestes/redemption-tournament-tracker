@@ -64,6 +64,28 @@ export default function ModalWithClose({
   const { getImageUrl } = useCardImageUrl();
   const { getPrice, getProductUrl } = useCardPrices();
   const [showMenu, setShowMenu] = React.useState(false);
+  const [isVisible, setIsVisible] = React.useState(false);
+  const [isClosing, setIsClosing] = React.useState(false);
+
+  // Animate in on mount
+  React.useEffect(() => {
+    if (modalCard) {
+      requestAnimationFrame(() => setIsVisible(true));
+      setIsClosing(false);
+    } else {
+      setIsVisible(false);
+    }
+  }, [modalCard]);
+
+  // Wrap setModalCard to animate out before unmounting
+  const closeModal = React.useCallback(() => {
+    setIsClosing(true);
+    setIsVisible(false);
+    setTimeout(() => {
+      setIsClosing(false);
+      setModalCard(null);
+    }, 200);
+  }, [setModalCard]);
 
   // Swipe/carousel state
   const touchStartRef = React.useRef<{ x: number; y: number; time: number } | null>(null);
@@ -92,7 +114,7 @@ export default function ModalWithClose({
         if (showMenu) {
           setShowMenu(false);
         } else {
-          setModalCard(null);
+          closeModal();
         }
       } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
         if (!visibleCards || visibleCards.length <= 1) return;
@@ -123,7 +145,7 @@ export default function ModalWithClose({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [setModalCard, modalCard, visibleCards, showMenu, onAddCard, onRemoveCard, activeDeckTab]);
+  }, [setModalCard, closeModal, modalCard, visibleCards, showMenu, onAddCard, onRemoveCard, activeDeckTab]);
 
   // Get adjacent card for preview during swipe
   const getAdjacentCard = React.useCallback((direction: 'left' | 'right') => {
@@ -257,12 +279,12 @@ export default function ModalWithClose({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-50 md:p-4"
-      onClick={() => setModalCard(null)}
+      className={`fixed inset-0 z-[60] flex items-center justify-center md:p-4 transition-colors duration-200 ${isVisible && !isClosing ? 'bg-black/50' : 'bg-black/0'}`}
+      onClick={() => closeModal()}
     >
       {/* Mobile: full-screen layout, with bottom padding for MobileBottomNav */}
       <div
-        className="md:hidden bg-card text-foreground w-full h-full flex flex-col relative pb-[calc(3.5rem+env(safe-area-inset-bottom))]"
+        className={`md:hidden bg-card text-foreground w-full h-full flex flex-col relative pb-[calc(3.5rem+env(safe-area-inset-bottom))] transition-all duration-200 ${isVisible && !isClosing ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
         onClick={e => e.stopPropagation()}
       >
         {/* Mobile Header - compact */}
@@ -296,7 +318,7 @@ export default function ModalWithClose({
           <button
             className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full text-muted-foreground active:bg-muted"
             aria-label="Close modal"
-            onClick={() => setModalCard(null)}
+            onClick={() => closeModal()}
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -508,14 +530,14 @@ export default function ModalWithClose({
 
       {/* Desktop: centered modal (unchanged) */}
       <div
-        className="hidden md:flex bg-card text-foreground rounded shadow-lg max-w-2xl w-full max-h-[90vh] overflow-hidden relative flex-col"
+        className={`hidden md:flex bg-card text-foreground rounded shadow-lg max-w-2xl w-full max-h-[90vh] overflow-hidden relative flex-col transition-all duration-200 ${isVisible && !isClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
         onClick={e => e.stopPropagation()}
       >
         {/* X close button */}
         <button
           className="absolute top-2 right-2 flex items-center justify-center rounded-full w-9 h-9 text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none z-20 transition-all duration-150"
           aria-label="Close modal"
-          onClick={() => setModalCard(null)}
+          onClick={() => closeModal()}
         >
           <svg width="20" height="20" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
             <line x1="10" y1="10" x2="22" y2="22" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
@@ -702,28 +724,28 @@ export default function ModalWithClose({
                     ? window.open(productUrl, '_blank', 'noopener,noreferrer')
                     : openYTGSearchPage(modalCard.name)
                   }
-                  className="px-4 h-10 border border-border text-muted-foreground hover:text-foreground hover:bg-card rounded-lg flex items-center gap-1.5 font-medium transition-colors text-sm whitespace-nowrap"
+                  className="px-4 h-10 border border-emerald-600/30 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 rounded-lg flex items-center gap-1.5 font-medium transition-colors text-sm whitespace-nowrap active:translate-y-[1px]"
                 >
                   {priceInfo ? (
                     <>
-                      <span>${priceInfo.price.toFixed(2)}</span>
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      <span className="font-semibold">${priceInfo.price.toFixed(2)}</span>
+                      <svg className="w-3.5 h-3.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
                       </svg>
                     </>
                   ) : (
                     <>
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                        <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd"/>
+                      <svg className="w-3.5 h-3.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
                       </svg>
-                      Search YTG
+                      <span>Shop</span>
                     </>
                   )}
                 </button>
               );
             })()}
             <button
-              onClick={() => setModalCard(null)}
+              onClick={() => closeModal()}
               className="px-4 h-10 border border-border text-muted-foreground hover:bg-muted hover:text-foreground rounded-lg font-medium transition-colors text-sm whitespace-nowrap"
             >
               Close

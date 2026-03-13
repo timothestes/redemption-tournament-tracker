@@ -15,7 +15,7 @@ export default function RandomCardClient() {
   const [allCards, setAllCards] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isRevealing, setIsRevealing] = useState(false);
+  const [isRevealing, setIsRevealing] = useState(true);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
 
@@ -33,11 +33,25 @@ export default function RandomCardClient() {
           return;
         }
         setAllCards(dataLines);
-        // Initial load: pick a card directly without reveal animation
+        // Initial load: pick a card and preload its image, then fade in
         const randomIndex = Math.floor(Math.random() * dataLines.length);
         const parsed = parseCard(dataLines[randomIndex]);
         setCard(parsed);
         setLoading(false);
+
+        const imgUrl = getImageUrl(parsed.imgFile);
+        const img = new Image();
+        img.src = imgUrl;
+        img.onload = () => {
+          setImageLoaded(true);
+          requestAnimationFrame(() => setIsRevealing(false));
+        };
+        img.onerror = () => {
+          setImageError(true);
+          requestAnimationFrame(() => setIsRevealing(false));
+        };
+        // Safety timeout
+        setTimeout(() => setIsRevealing(false), 3000);
       } catch {
         setError("Failed to load card data");
         setLoading(false);
@@ -173,18 +187,7 @@ export default function RandomCardClient() {
     }, 3000);
   }, [allCards, parseCard, getImageUrl]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-muted-foreground border-t-primary mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">Drawing a card...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !card) {
+  if (error || (!loading && !card)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background px-4">
         <div className="text-center">
@@ -203,66 +206,71 @@ export default function RandomCardClient() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4 pb-[calc(3.5rem+env(safe-area-inset-bottom))]">
       <div className="flex flex-col items-center w-full max-w-xs md:max-w-sm">
-        {/* Card image — fixed aspect ratio so buttons never move */}
+        {/* Card image + name — this fades in/out on reveal */}
         <div
-          className={`w-full aspect-[5/7] relative rounded-lg overflow-hidden transition-all duration-300 ease-out ${
+          className={`w-full transition-all duration-300 ${
             isRevealing ? 'scale-95 opacity-0' : 'scale-100 opacity-100'
           }`}
+          style={{ transitionTimingFunction: 'var(--ease-out-quart)' }}
         >
-          {!imageLoaded && !imageError && (
-            <div className="absolute inset-0 bg-muted animate-pulse rounded-lg" />
-          )}
-          {imageError && (
-            <div className="absolute inset-0 bg-muted flex items-center justify-center rounded-lg">
-              <span className="text-muted-foreground text-sm">No image available</span>
-            </div>
-          )}
-          <img
-            src={getImageUrl(card.imgFile)}
-            alt={card.name}
-            className={`absolute inset-0 w-full h-full object-contain rounded-lg shadow-2xl ${imageLoaded ? 'block' : 'hidden'}`}
-            onLoad={() => setImageLoaded(true)}
-            onError={() => { setImageError(true); setImageLoaded(false); }}
-            draggable={false}
-          />
+          <div className="w-full aspect-[5/7] relative rounded-lg overflow-hidden">
+            {!imageLoaded && !imageError && (
+              <div className="absolute inset-0 bg-muted animate-pulse rounded-lg" />
+            )}
+            {imageError && (
+              <div className="absolute inset-0 bg-muted flex items-center justify-center rounded-lg">
+                <span className="text-muted-foreground text-sm">No image available</span>
+              </div>
+            )}
+            {card && (
+              <img
+                src={getImageUrl(card.imgFile)}
+                alt={card.name}
+                className={`absolute inset-0 w-full h-full object-contain rounded-lg shadow-2xl ${imageLoaded ? 'block' : 'hidden'}`}
+                onLoad={() => setImageLoaded(true)}
+                onError={() => { setImageError(true); setImageLoaded(false); }}
+                draggable={false}
+              />
+            )}
+          </div>
+
+          {/* Card name + price */}
+          <div className="mt-3 flex items-center justify-center gap-2 w-full h-7">
+            <h1 className="text-base md:text-lg font-semibold text-foreground truncate">{card?.name}</h1>
+            {card && (() => {
+              const cardKey = `${card.name}|${card.set}|${card.imgFile}`;
+              const priceInfo = getPrice(cardKey);
+              const productUrl = getProductUrl(cardKey);
+              return (
+                <button
+                  onClick={() => productUrl
+                    ? window.open(productUrl, '_blank', 'noopener,noreferrer')
+                    : openYTGSearchPage(card.name)
+                  }
+                  className="flex-shrink-0 h-7 px-2.5 rounded-md flex items-center gap-1.5 text-xs font-semibold border border-emerald-700/25 dark:border-emerald-600/20 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 active:translate-y-[1px] transition-all duration-100"
+                >
+                  {priceInfo ? (
+                    <>
+                      <span>${priceInfo.price.toFixed(2)}</span>
+                      <svg className="w-3 h-3 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                      </svg>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-3 h-3 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                      </svg>
+                      <span>Shop</span>
+                    </>
+                  )}
+                </button>
+              );
+            })()}
+          </div>
         </div>
 
-        {/* Card name + price */}
-        <div className="mt-3 flex items-center justify-center gap-2 w-full h-7">
-          <h1 className="text-base md:text-lg font-semibold text-foreground truncate">{card.name}</h1>
-          {(() => {
-            const cardKey = `${card.name}|${card.set}|${card.imgFile}`;
-            const priceInfo = getPrice(cardKey);
-            const productUrl = getProductUrl(cardKey);
-            return (
-              <button
-                onClick={() => productUrl
-                  ? window.open(productUrl, '_blank', 'noopener,noreferrer')
-                  : openYTGSearchPage(card.name)
-                }
-                className="flex-shrink-0 h-7 px-2.5 rounded-md flex items-center gap-1.5 text-xs font-semibold border border-green-600/30 dark:border-green-500/25 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 active:translate-y-[1px] transition-all duration-100"
-              >
-                {priceInfo ? (
-                  <>
-                    <span>${priceInfo.price.toFixed(2)}</span>
-                    <svg className="w-3 h-3 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                    </svg>
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-3 h-3 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-                    </svg>
-                    <span>Shop</span>
-                  </>
-                )}
-              </button>
-            );
-          })()}
-        </div>
-
-        {/* Actions */}
+        {/* Actions — always visible, never fade */}
         <div className="flex gap-2 w-full mt-4">
           <button
             onClick={() => router.push("/decklist/card-search")}
@@ -273,7 +281,7 @@ export default function RandomCardClient() {
           <button
             onClick={() => pickRandomCard()}
             disabled={isRevealing}
-            className="h-11 flex-1 rounded-lg bg-primary text-white font-semibold text-sm flex items-center justify-center gap-2 hover:bg-primary/90 active:translate-y-[1px] transition-all duration-100 disabled:opacity-60"
+            className="h-11 flex-1 rounded-lg bg-emerald-700 dark:bg-emerald-800 text-white font-semibold text-sm flex items-center justify-center gap-2 hover:bg-emerald-700/90 dark:hover:bg-emerald-800/90 active:translate-y-[1px] transition-all duration-100 disabled:opacity-60"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 00-3.7-3.7 48.678 48.678 0 00-7.324 0 4.006 4.006 0 00-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3l-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 003.7 3.7 48.656 48.656 0 007.324 0 4.006 4.006 0 003.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3l-3 3" />

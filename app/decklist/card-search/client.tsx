@@ -134,6 +134,7 @@ export default function CardSearchClient() {
   // Card legality filter mode: Rotation, Classic (all), Banned, Scrolls (not Rotation or Banned), Paragon
   const [legalityMode, setLegalityMode] = useState<'Rotation'|'Classic'|'Banned'|'Scrolls'|'Paragon'>('Rotation');
   const [visibleCount, setVisibleCount] = useState(0); // Number of cards to show
+  const prevVisibleCountRef = useRef(0);
 
   const [modalCard, setModalCardRaw] = useState<Card | null>(null);
   const modalOpenedFromDeckRef = useRef(false);
@@ -1074,6 +1075,11 @@ export default function CardSearchClient() {
     danielOnly ||
     postexilicOnly;
 
+  // Track previous visible count for staggered entrance animation
+  useEffect(() => {
+    prevVisibleCountRef.current = visibleCards.length;
+  }, [visibleCards.length]);
+
   // Infinite scroll: load more cards when sentinel comes into view
   useEffect(() => {
     const sentinel = sentinelRef.current;
@@ -1519,8 +1525,8 @@ export default function CardSearchClient() {
           
           return (
             <span
-              key={originalIndex}
-              className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap"
+              key={`${originalIndex}-${queryObj.field}-${queryObj.text}`}
+              className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap"
               onClick={() => updateQuery(originalIndex, "")}
               tabIndex={0}
               role="button"
@@ -1541,7 +1547,7 @@ export default function CardSearchClient() {
         })}
         {/* Legality */}
         {legalityMode !== 'Rotation' && (
-          <span className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => setLegalityMode('Rotation')} tabIndex={0} role="button" aria-label="Remove Legality filter">
+          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => setLegalityMode('Rotation')} tabIndex={0} role="button" aria-label="Remove Legality filter">
             {legalityMode}
             <span className="ml-1">×</span>
           </span>
@@ -1550,7 +1556,7 @@ export default function CardSearchClient() {
         {selectedAlignmentFilters.map(mode => (
           <span
             key={mode}
-            className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap"
+            className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap"
             onClick={() => setSelectedAlignmentFilters(selectedAlignmentFilters.filter(m => m !== mode))}
             tabIndex={0}
             role="button"
@@ -1564,7 +1570,7 @@ export default function CardSearchClient() {
         {selectedRarityFilters.map(rarity => (
           <span
             key={rarity}
-            className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap"
+            className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap"
             onClick={() => setSelectedRarityFilters(selectedRarityFilters.filter(r => r !== rarity))}
             tabIndex={0}
             role="button"
@@ -1576,7 +1582,7 @@ export default function CardSearchClient() {
         ))}
         {/* Icon Filters */}
         {selectedIconFilters.map((filter, idx) => {
-          const pillClass = 'bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap';
+          const pillClass = 'animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap';
           return (
             <React.Fragment key={filter.icon}>
               <span className={pillClass} onClick={() => setSelectedIconFilters(selectedIconFilters.filter(f => f.icon !== filter.icon))} tabIndex={0} role="button" aria-label={`Remove ${filter.icon} filter`}>
@@ -1585,7 +1591,7 @@ export default function CardSearchClient() {
               </span>
               {idx < selectedIconFilters.length - 1 && (
                 <span 
-                  className="mx-1 font-bold text-xs text-gray-500 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors px-2 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                  className="animate-pill-enter mx-1 font-bold text-xs text-gray-500 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors px-2 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
                   onClick={(e) => {
                     e.preventDefault();
                     // Left-click: cycle through AND → OR → AND NOT → AND
@@ -1624,83 +1630,83 @@ export default function CardSearchClient() {
         })}
         {/* Testament */}
         {selectedTestaments.map(t => (
-          <span key={t} className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setSelectedTestaments(selectedTestaments.filter(x => x !== t)); setTestamentNots(prev => { const newNots = { ...prev }; delete newNots[t]; return newNots; }); }} tabIndex={0} role="button" aria-label={`Remove ${t} testament filter`}>
+          <span key={t} className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setSelectedTestaments(selectedTestaments.filter(x => x !== t)); setTestamentNots(prev => { const newNots = { ...prev }; delete newNots[t]; return newNots; }); }} tabIndex={0} role="button" aria-label={`Remove ${t} testament filter`}>
             {testamentNots[t] ? 'NOT ' : ''}{t}
             <span className="ml-1">×</span>
           </span>
         ))}
         {/* Gospel */}
         {isGospel && (
-          <span className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setIsGospel(false); setGospelNot(false); }} tabIndex={0} role="button" aria-label="Remove Gospel filter">
+          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setIsGospel(false); setGospelNot(false); }} tabIndex={0} role="button" aria-label="Remove Gospel filter">
             {gospelNot ? 'NOT ' : ''}Gospel
             <span className="ml-1">×</span>
           </span>
         )}
         {/* Strength */}
         {strengthFilter !== null && (
-          <span className="bg-destructive/15 text-destructive px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setStrengthFilter(null)} tabIndex={0} role="button" aria-label="Remove Strength filter">
+          <span className="animate-pill-enter bg-destructive/15 text-destructive px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => setStrengthFilter(null)} tabIndex={0} role="button" aria-label="Remove Strength filter">
             Strength {strengthOp === 'eq' ? '=' : strengthOp === 'lt' ? '<' : strengthOp === 'lte' ? '≤' : strengthOp === 'gt' ? '>' : '≥'} {strengthFilter}
             <span className="ml-1">×</span>
           </span>
         )}
         {/* Toughness */}
         {toughnessFilter !== null && (
-          <span className="bg-destructive/15 text-destructive px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setToughnessFilter(null)} tabIndex={0} role="button" aria-label="Remove Toughness filter">
+          <span className="animate-pill-enter bg-destructive/15 text-destructive px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => setToughnessFilter(null)} tabIndex={0} role="button" aria-label="Remove Toughness filter">
             Toughness {toughnessOp === 'eq' ? '=' : toughnessOp === 'lt' ? '<' : toughnessOp === 'lte' ? '≤' : toughnessOp === 'gt' ? '>' : '≥'} {toughnessFilter}
             <span className="ml-1">×</span>
           </span>
         )}
         {/* Misc */}
         {noAltArt === false && (
-          <span className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => setnoAltArt(true)} tabIndex={0} role="button" aria-label="Remove AB Versions filter">
+          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => setnoAltArt(true)} tabIndex={0} role="button" aria-label="Remove AB Versions filter">
             AB Versions
             <span className="ml-1">×</span>
           </span>
         )}
         {noFirstPrint === false && (
-          <span className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => setnoFirstPrint(true)} tabIndex={0} role="button" aria-label="Remove 1st Print K/L Starters filter">
+          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => setnoFirstPrint(true)} tabIndex={0} role="button" aria-label="Remove 1st Print K/L Starters filter">
             1st Print K/L Starters
             <span className="ml-1">×</span>
           </span>
         )}
         {nativityOnly && (
-          <span className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setNativityOnly(false); setNativityNot(false); }} tabIndex={0} role="button" aria-label="Remove Nativity filter">
+          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setNativityOnly(false); setNativityNot(false); }} tabIndex={0} role="button" aria-label="Remove Nativity filter">
             {nativityNot ? 'NOT ' : ''}Nativity
             <span className="ml-1">×</span>
           </span>
         )}
         {hasStarOnly && (
-          <span className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setHasStarOnly(false); setHasStarNot(false); }} tabIndex={0} role="button" aria-label="Remove Has Star filter">
+          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setHasStarOnly(false); setHasStarNot(false); }} tabIndex={0} role="button" aria-label="Remove Has Star filter">
             {hasStarNot ? 'NOT ' : ''}Has Star
             <span className="ml-1">×</span>
           </span>
         )}
         {cloudOnly && (
-          <span className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setCloudOnly(false); setCloudNot(false); }} tabIndex={0} role="button" aria-label="Remove Cloud filter">
+          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setCloudOnly(false); setCloudNot(false); }} tabIndex={0} role="button" aria-label="Remove Cloud filter">
             {cloudNot ? 'NOT ' : ''}Cloud
             <span className="ml-1">×</span>
           </span>
         )}
         {angelOnly && (
-          <span className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setAngelOnly(false); setAngelNot(false); }} tabIndex={0} role="button" aria-label="Remove Angel filter">
+          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setAngelOnly(false); setAngelNot(false); }} tabIndex={0} role="button" aria-label="Remove Angel filter">
             {angelNot ? 'NOT ' : ''}Angel
             <span className="ml-1">×</span>
           </span>
         )}
         {demonOnly && (
-          <span className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setDemonOnly(false); setDemonNot(false); }} tabIndex={0} role="button" aria-label="Remove Demon filter">
+          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setDemonOnly(false); setDemonNot(false); }} tabIndex={0} role="button" aria-label="Remove Demon filter">
             {demonNot ? 'NOT ' : ''}Demon
             <span className="ml-1">×</span>
           </span>
         )}
         {danielOnly && (
-          <span className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setDanielOnly(false); setDanielNot(false); }} tabIndex={0} role="button" aria-label="Remove Daniel filter">
+          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setDanielOnly(false); setDanielNot(false); }} tabIndex={0} role="button" aria-label="Remove Daniel filter">
             {danielNot ? 'NOT ' : ''}Daniel
             <span className="ml-1">×</span>
           </span>
         )}
         {postexilicOnly && (
-          <span className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setPostexilicOnly(false); setPostexilicNot(false); }} tabIndex={0} role="button" aria-label="Remove Postexilic filter">
+          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setPostexilicOnly(false); setPostexilicNot(false); }} tabIndex={0} role="button" aria-label="Remove Postexilic filter">
             {postexilicNot ? 'NOT ' : ''}Postexilic
             <span className="ml-1">×</span>
           </span>
@@ -1731,7 +1737,7 @@ export default function CardSearchClient() {
           Filters
         </button>
       </div>
-      <main className="p-2 pb-16 md:pb-2 md:overflow-auto md:flex-1 bg-card text-foreground transition-colors duration-200">
+      <main className="p-2 pb-16 md:pb-2 md:overflow-auto md:flex-1 bg-card text-foreground transition-colors duration-200" style={{ scrollbarGutter: 'stable' }}>
         {/* Responsive grid for filters */}
         {!filterGridCollapsed && (
           <FilterGrid
@@ -1803,14 +1809,17 @@ export default function CardSearchClient() {
         {visibleCards.length > 0 ? (
           <>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-4 mt-2 sm:mt-4">
-            {visibleCards.map((c) => {
+            {visibleCards.map((c, cardIndex) => {
               const quantityInDeck = getCardQuantity(c.name, c.set, false);
               const quantityInReserve = getCardQuantity(c.name, c.set, true);
               const isMenuOpen = openSearchMenuCard === c.dataLine;
+              const isInitialBatch = prevVisibleCountRef.current === 0;
+              const isNewCard = isInitialBatch && cardIndex < 12;
               return (
                 <div
                   key={c.dataLine}
-                  className="relative cursor-pointer group rounded overflow-hidden transition-all duration-200"
+                  className={`relative cursor-pointer group rounded overflow-hidden transition-all duration-200${isNewCard ? ' animate-card-in' : ''}`}
+                  style={isNewCard ? { animationDelay: `${cardIndex * 30}ms` } : undefined}
                 >
                   {/* Backdrop overlay when menu is open */}
                   {isMenuOpen && (
@@ -1953,12 +1962,12 @@ export default function CardSearchClient() {
                     {(quantityInDeck > 0 || quantityInReserve > 0) && (
                       <div className="absolute bottom-1 right-1 flex flex-col items-end gap-0.5">
                         {quantityInDeck > 0 && (
-                          <div className="bg-black/75 backdrop-blur-sm text-white px-1.5 py-0.5 rounded font-bold text-xs shadow-lg">
+                          <div key={`m${quantityInDeck}`} className="animate-qty-pop bg-black/75 backdrop-blur-sm text-white px-1.5 py-0.5 rounded font-bold text-xs shadow-lg">
                             ×{quantityInDeck}
                           </div>
                         )}
                         {quantityInReserve > 0 && (
-                          <div className="bg-black/75 backdrop-blur-sm text-white px-1.5 py-0.5 rounded font-bold text-xs shadow-lg">
+                          <div key={`r${quantityInReserve}`} className="animate-qty-pop bg-black/75 backdrop-blur-sm text-white px-1.5 py-0.5 rounded font-bold text-xs shadow-lg">
                             ×{quantityInReserve} R
                           </div>
                         )}
