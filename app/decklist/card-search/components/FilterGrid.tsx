@@ -244,131 +244,57 @@ export default function FilterGrid({
             ))}
           </div>
         </div>
-      </div>
-
-      {/* Divider between text and icon bands */}
-      <div className="h-px bg-border" />
-
-      {/* Band 2: Icon filters — full width, types + brigades */}
-      <div className="flex flex-wrap items-start gap-x-6 gap-y-2">
-        {/* Types */}
-        <div>
-          <p className="text-muted-foreground uppercase mb-1 text-xs font-medium">Types</p>
-          <div className="flex flex-wrap gap-1">
-            {typeIcons.map((t) => {
-              const src = `/filter-icons/${encodeURIComponent(t)}.png`;
-              return (
-                <img
-                  key={t}
-                  src={src}
-                  alt={t}
-                  className={clsx(
-                    'h-8 w-auto md:h-10 cursor-pointer rounded transition-transform duration-150',
-                    selectedIconFilters.some(f => f.icon === t)
-                      ? 'ring-2 ring-blue-400 scale-110'
-                      : 'opacity-80 hover:opacity-100'
-                  )}
-                  onClick={() => toggleIconFilter(t)}
-                  style={{ minWidth: 28, minHeight: 28 }}
-                />
-              );
-            })}
-          </div>
+        {/* Utility controls — inline with text filter rows */}
+        <div className="flex items-center gap-2">
+          <span
+            className="text-muted-foreground text-sm cursor-help"
+            title="Controls how multiple icon filters combine: Click button to cycle through modes"
+          >
+            Icon Filter Mode:
+          </span>
+          <button
+            className={clsx(
+              'px-2 py-0.5 md:px-2 md:py-1.5 border rounded text-sm font-semibold transition',
+              'bg-muted text-foreground border-border hover:bg-muted/80'
+            )}
+            onClick={(e) => {
+              e.preventDefault();
+              let newMode: 'AND' | 'OR' | 'AND NOT';
+              if (iconFilterMode === 'AND') {
+                newMode = 'OR';
+              } else if (iconFilterMode === 'OR') {
+                newMode = 'AND NOT';
+              } else {
+                newMode = 'AND';
+              }
+              setIconFilterMode(newMode);
+              updateAllIconFilterOperators(newMode);
+            }}
+            title="Click to cycle: AND → OR → AND NOT (applies to all active filters)"
+          >
+            {iconFilterMode}
+          </button>
+          <span className="text-border select-none">|</span>
+          <button
+            className={clsx(
+              'px-2 py-0.5 md:px-2 md:py-1.5 border rounded text-sm transition hover:bg-muted/80',
+              'bg-muted text-foreground border-border'
+            )}
+            onClick={(e) => {
+              e.preventDefault();
+              router.push('/decklist/card-search/random');
+            }}
+            title="I'm feeling lucky"
+          >
+            🎲
+          </button>
+          <button
+            className="px-2.5 py-0.5 md:px-3 md:py-1.5 border rounded text-sm bg-muted text-foreground hover:bg-muted/80 font-semibold"
+            onClick={() => setAdvancedOpen(!advancedOpen)}
+          >
+            Advanced Filters {advancedOpen ? '▲' : '▼'}
+          </button>
         </div>
-        {/* Good Brigades */}
-        <div>
-          <p className="text-muted-foreground uppercase mb-1 text-xs font-medium">Good Brigades</p>
-          <div className="flex flex-wrap gap-1">
-            {goodBrigadeIcons.map((icon) => (
-              <img
-                key={icon}
-                src={`/filter-icons/Color=${encodeURIComponent(icon)}.png`}
-                alt={icon}
-                className={clsx(
-                  "h-8 w-auto md:h-9 cursor-pointer rounded-md transition-transform duration-150",
-                  selectedIconFilters.some(f => f.icon === icon)
-                    ? "ring-2 ring-blue-400 scale-110"
-                    : "opacity-80 hover:opacity-100"
-                )}
-                onClick={() => toggleIconFilter(icon)}
-                style={{ minWidth: 28, minHeight: 28 }}
-              />
-            ))}
-          </div>
-        </div>
-        {/* Evil Brigades */}
-        <div>
-          <p className="text-muted-foreground uppercase mb-1 text-xs font-medium">Evil Brigades</p>
-          <div className="flex flex-wrap gap-1">
-            {evilBrigadeIcons.map((icon) => (
-              <img
-                key={icon}
-                src={`/filter-icons/Color=${encodeURIComponent(icon)}.png`}
-                alt={icon}
-                className={clsx(
-                  "h-8 w-auto md:h-9 cursor-pointer rounded-md transition-transform duration-150",
-                  selectedIconFilters.some(f => f.icon === icon)
-                    ? "ring-2 ring-blue-400 scale-110"
-                    : "opacity-80 hover:opacity-100"
-                )}
-                onClick={() => toggleIconFilter(icon)}
-                style={{ minWidth: 28, minHeight: 28 }}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Utility bar: Advanced Filters + Icon Filter Mode + dice */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <button
-          className="px-2.5 py-1 md:px-3 md:py-1.5 border rounded text-sm bg-muted text-foreground hover:bg-muted/80 font-semibold"
-          onClick={() => setAdvancedOpen(!advancedOpen)}
-        >
-          Advanced Filters {advancedOpen ? '▲' : '▼'}
-        </button>
-        <span className="text-border select-none">|</span>
-        <span
-          className="text-muted-foreground text-sm cursor-help"
-          title="Controls how multiple icon filters combine: Click button to cycle through modes"
-        >
-          Icon Filter Mode:
-        </span>
-        <button
-          className={clsx(
-            'px-2 py-1 border rounded text-sm font-semibold transition',
-            'bg-muted text-foreground border-border hover:bg-muted/80'
-          )}
-          onClick={(e) => {
-            e.preventDefault();
-            let newMode: 'AND' | 'OR' | 'AND NOT';
-            if (iconFilterMode === 'AND') {
-              newMode = 'OR';
-            } else if (iconFilterMode === 'OR') {
-              newMode = 'AND NOT';
-            } else {
-              newMode = 'AND';
-            }
-            setIconFilterMode(newMode);
-            updateAllIconFilterOperators(newMode);
-          }}
-          title="Click to cycle: AND → OR → AND NOT (applies to all active filters)"
-        >
-          {iconFilterMode}
-        </button>
-        <button
-          className={clsx(
-            'px-2 py-1 border rounded text-sm transition opacity-70 hover:opacity-100',
-            'bg-muted text-muted-foreground border-border hover:bg-muted/80'
-          )}
-          onClick={(e) => {
-            e.preventDefault();
-            router.push('/decklist/card-search/random');
-          }}
-          title="I'm feeling lucky"
-        >
-          🎲
-        </button>
       </div>
 
       {/* Advanced Filters panel — full width when open */}
@@ -673,6 +599,79 @@ export default function FilterGrid({
           </div>
         </div>
       )}
+
+      {/* Divider between text and icon bands */}
+      <div className="h-px bg-border" />
+
+      {/* Band 2: Icon filters — full width, types + brigades */}
+      <div className="flex flex-wrap items-start gap-x-6 gap-y-2">
+        {/* Types */}
+        <div>
+          <p className="text-muted-foreground uppercase mb-1 text-xs font-medium">Types</p>
+          <div className="flex flex-wrap gap-1">
+            {typeIcons.map((t) => {
+              const src = `/filter-icons/${encodeURIComponent(t)}.png`;
+              return (
+                <img
+                  key={t}
+                  src={src}
+                  alt={t}
+                  className={clsx(
+                    'h-8 w-auto md:h-10 cursor-pointer rounded transition-transform duration-150',
+                    selectedIconFilters.some(f => f.icon === t)
+                      ? 'ring-2 ring-blue-400 scale-110'
+                      : 'opacity-80 hover:opacity-100'
+                  )}
+                  onClick={() => toggleIconFilter(t)}
+                  style={{ minWidth: 28, minHeight: 28 }}
+                />
+              );
+            })}
+          </div>
+        </div>
+        {/* Good Brigades */}
+        <div>
+          <p className="text-muted-foreground uppercase mb-1 text-xs font-medium">Good Brigades</p>
+          <div className="flex flex-wrap gap-1">
+            {goodBrigadeIcons.map((icon) => (
+              <img
+                key={icon}
+                src={`/filter-icons/Color=${encodeURIComponent(icon)}.png`}
+                alt={icon}
+                className={clsx(
+                  "h-8 w-auto md:h-9 cursor-pointer rounded-md transition-transform duration-150",
+                  selectedIconFilters.some(f => f.icon === icon)
+                    ? "ring-2 ring-blue-400 scale-110"
+                    : "opacity-80 hover:opacity-100"
+                )}
+                onClick={() => toggleIconFilter(icon)}
+                style={{ minWidth: 28, minHeight: 28 }}
+              />
+            ))}
+          </div>
+        </div>
+        {/* Evil Brigades */}
+        <div>
+          <p className="text-muted-foreground uppercase mb-1 text-xs font-medium">Evil Brigades</p>
+          <div className="flex flex-wrap gap-1">
+            {evilBrigadeIcons.map((icon) => (
+              <img
+                key={icon}
+                src={`/filter-icons/Color=${encodeURIComponent(icon)}.png`}
+                alt={icon}
+                className={clsx(
+                  "h-8 w-auto md:h-9 cursor-pointer rounded-md transition-transform duration-150",
+                  selectedIconFilters.some(f => f.icon === icon)
+                    ? "ring-2 ring-blue-400 scale-110"
+                    : "opacity-80 hover:opacity-100"
+                )}
+                onClick={() => toggleIconFilter(icon)}
+                style={{ minWidth: 28, minHeight: 28 }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

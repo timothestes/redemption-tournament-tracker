@@ -100,7 +100,6 @@ We will want to let the host print it out easily
 # Backlog
 
 ## short term
-YTG Sponsorship
 Google Auth Options
 Spawn Lost Soul Tokens
 Paragon Deck Check PDF support

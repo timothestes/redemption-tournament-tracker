@@ -134,7 +134,7 @@ export default function CardSearchClient() {
   // Card legality filter mode: Rotation, Classic (all), Banned, Scrolls (not Rotation or Banned), Paragon
   const [legalityMode, setLegalityMode] = useState<'Rotation'|'Classic'|'Banned'|'Scrolls'|'Paragon'>('Rotation');
   const [visibleCount, setVisibleCount] = useState(0); // Number of cards to show
-  const prevVisibleCountRef = useRef(0);
+  const [sortBy, setSortBy] = useState<'name' | 'set' | 'strength' | 'toughness' | 'type' | 'brigade'>('name');
 
   const [modalCard, setModalCardRaw] = useState<Card | null>(null);
   const modalOpenedFromDeckRef = useRef(false);
@@ -1051,9 +1051,31 @@ export default function CardSearchClient() {
 
   const visibleCards = useMemo(() => {
     return [...filtered]
-      .sort((a, b) => a.name.localeCompare(b.name))
+      .sort((a, b) => {
+        switch (sortBy) {
+          case 'set':
+            return a.officialSet.localeCompare(b.officialSet) || a.name.localeCompare(b.name);
+          case 'strength': {
+            const aStr = parseInt(a.strength) || 0;
+            const bStr = parseInt(b.strength) || 0;
+            return bStr - aStr || a.name.localeCompare(b.name);
+          }
+          case 'toughness': {
+            const aTgh = parseInt(a.toughness) || 0;
+            const bTgh = parseInt(b.toughness) || 0;
+            return bTgh - aTgh || a.name.localeCompare(b.name);
+          }
+          case 'type':
+            return a.type.localeCompare(b.type) || a.name.localeCompare(b.name);
+          case 'brigade':
+            return a.brigade.localeCompare(b.brigade) || a.name.localeCompare(b.name);
+          case 'name':
+          default:
+            return a.name.localeCompare(b.name);
+        }
+      })
       .slice(0, visibleCount);
-  }, [filtered, visibleCount]);
+  }, [filtered, visibleCount, sortBy]);
 
   // Whether any filter pills should be shown in the summary bar
   const hasActiveFilters = queries.some(q => q.text.trim()) ||
@@ -1075,10 +1097,6 @@ export default function CardSearchClient() {
     danielOnly ||
     postexilicOnly;
 
-  // Track previous visible count for staggered entrance animation
-  useEffect(() => {
-    prevVisibleCountRef.current = visibleCards.length;
-  }, [visibleCards.length]);
 
   // Infinite scroll: load more cards when sentinel comes into view
   useEffect(() => {
@@ -1474,10 +1492,27 @@ export default function CardSearchClient() {
             >
               {copyLinkNotification ? '✓' : '🔗'}
             </button>
-            {/* Filter collapse button — desktop only */}
+            {/* Sort + Filter collapse — desktop only, right-aligned */}
+            <div className="hidden md:flex absolute right-0 items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <label htmlFor="card-sort" className="text-sm text-muted-foreground font-medium">Sort:</label>
+              <select
+                id="card-sort"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="px-2 py-1.5 border rounded text-sm font-semibold bg-muted text-foreground border-border focus:outline-none h-9 sm:h-11"
+              >
+                <option value="name">Name</option>
+                <option value="set">Set</option>
+                <option value="strength">Strength</option>
+                <option value="toughness">Toughness</option>
+                <option value="type">Type</option>
+                <option value="brigade">Brigade</option>
+              </select>
+            </div>
             <button
               aria-label="Toggle filter grid"
-              className={`hidden md:flex absolute right-0 px-3 shrink-0 rounded items-center justify-center gap-1.5 border transition font-medium shadow-sm text-sm h-9 sm:h-11 ${
+              className={`flex px-3 shrink-0 rounded items-center justify-center gap-1.5 border transition font-medium shadow-sm text-sm h-9 sm:h-11 ${
                 filterGridCollapsed
                   ? 'bg-primary/15 text-primary border-primary/30'
                   : 'bg-muted text-muted-foreground hover:bg-muted/80 border-border'
@@ -1497,6 +1532,7 @@ export default function CardSearchClient() {
               )}
               Filters
             </button>
+            </div>{/* end Sort + Filter collapse wrapper */}
             </div>
           </div>
         </div>
@@ -1714,7 +1750,23 @@ export default function CardSearchClient() {
         </div>
       </div>
       {/* Collapse/Expand Filter Grid Button — mobile only (on desktop it's in the search header) */}
-      <div className={`flex-shrink-0 ${!filterGridCollapsed ? 'sticky top-0 z-30' : ''} flex md:hidden flex-row items-center justify-end px-3 py-1.5 bg-background border-b border-border`}>
+      <div className={`flex-shrink-0 ${!filterGridCollapsed ? 'sticky top-0 z-30' : ''} flex md:hidden flex-row items-center justify-between px-3 py-1.5 bg-background border-b border-border`}>
+        <div className="flex items-center gap-1.5">
+          <label htmlFor="card-sort-mobile" className="text-xs text-muted-foreground font-medium">Sort:</label>
+          <select
+            id="card-sort-mobile"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+            className="px-2 py-1 border rounded text-xs font-semibold bg-muted text-foreground border-border focus:outline-none"
+          >
+            <option value="name">Name</option>
+            <option value="set">Set</option>
+            <option value="strength">Strength</option>
+            <option value="toughness">Toughness</option>
+            <option value="type">Type</option>
+            <option value="brigade">Brigade</option>
+          </select>
+        </div>
         <button
           aria-label="Toggle filter grid"
           className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full border text-xs font-semibold transition ${
@@ -1808,18 +1860,16 @@ export default function CardSearchClient() {
         {/* Card grid */}
         {visibleCards.length > 0 ? (
           <>
+          {/* Sort + count bar */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-4 mt-2 sm:mt-4">
             {visibleCards.map((c, cardIndex) => {
               const quantityInDeck = getCardQuantity(c.name, c.set, false);
               const quantityInReserve = getCardQuantity(c.name, c.set, true);
               const isMenuOpen = openSearchMenuCard === c.dataLine;
-              const isInitialBatch = prevVisibleCountRef.current === 0;
-              const isNewCard = isInitialBatch && cardIndex < 12;
               return (
                 <div
                   key={c.dataLine}
-                  className={`relative cursor-pointer group rounded overflow-hidden transition-all duration-200${isNewCard ? ' animate-card-in' : ''}`}
-                  style={isNewCard ? { animationDelay: `${cardIndex * 30}ms` } : undefined}
+                  className="relative cursor-pointer group rounded overflow-hidden transition-all duration-200"
                 >
                   {/* Backdrop overlay when menu is open */}
                   {isMenuOpen && (
@@ -1987,8 +2037,8 @@ export default function CardSearchClient() {
               );
             })}
           </div>
-          <div className="py-3 text-center text-sm text-gray-500 dark:text-gray-400">
-            Showing {Math.min(visibleCount, filtered.length)} of {filtered.length} cards
+          <div className="py-3 text-center text-xs sm:text-sm text-muted-foreground">
+            Showing {Math.min(visibleCount, filtered.length)} of {filtered.length}
           </div>
           {visibleCount < filtered.length && (
             <div ref={sentinelRef} className="h-8 flex items-center justify-center mt-2">
