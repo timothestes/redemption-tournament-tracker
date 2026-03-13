@@ -603,7 +603,7 @@ export default function DeckBuilderPanel({
   };
 
   return (
-    <div className="w-full h-full flex flex-col bg-gray-50 dark:bg-gray-900">
+    <div className="w-full h-full flex flex-col bg-card">
       {/* Header */}
       <div className="flex-shrink-0 px-3 py-2 md:p-4 border-b border-gray-200/60 dark:border-gray-700/60 overflow-visible relative z-30">
         {/* Deck Name + Counts Row */}

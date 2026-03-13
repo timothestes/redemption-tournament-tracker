@@ -27,7 +27,7 @@ export default async function Login({
       <h1 className="text-2xl font-semibold mb-3 text-foreground">Sign in</h1>
       <p className="text-sm text-muted-foreground mb-6">
         Don't have an account?{" "}
-        <Link className="text-primary hover:text-primary/80 font-medium underline" href="/sign-up">
+        <Link className="text-blue-500 hover:text-blue-400 font-medium underline" href="/sign-up">
           Sign up
         </Link>
       </p>
@@ -50,7 +50,7 @@ export default async function Login({
             <div className="flex justify-between items-center">
               <Label htmlFor="password" className="text-foreground font-medium text-base">Password</Label>
               <Link
-                className="text-xs text-primary hover:text-primary/80 font-medium"
+                className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
                 href="/forgot-password"
               >
                 Forgot Password?

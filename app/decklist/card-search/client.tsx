@@ -1343,7 +1343,7 @@ export default function CardSearchClient() {
         />
       )}
       
-    <div ref={containerRef} className="flex w-full h-screen overflow-hidden bg-card">
+    <div ref={containerRef} className="flex w-full h-screen overflow-hidden bg-background">
       {/* Left panel: Card search */}
       {showSearch && (
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
@@ -2079,8 +2079,8 @@ export default function CardSearchClient() {
           style={{ width: showSearch ? `${deckPanelWidth}%` : '100%' }}
         >
           {isInitializing ? (
-            <div className="flex-1 flex items-center justify-center bg-white dark:bg-gray-800">
-              <div className="text-gray-400 dark:text-gray-500 text-sm">Loading deck...</div>
+            <div className="flex-1 flex items-center justify-center bg-card">
+              <div className="text-muted-foreground text-sm">Loading deck...</div>
             </div>
           ) : (
           <DeckBuilderPanel
