@@ -108,3 +108,6 @@ Spawn Lost Soul Tokens
 Comprehensive Deck Legality Validation
 Paragon Deck Check PDF support
 Deck Check PDF screen: ability to select one of your decks
+Add Iron Man checkbox to side event
+Add sort options for card search
+Cactus tournament data pipeline
