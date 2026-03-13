@@ -96,3 +96,15 @@ Then it has a place for each player to write their signature.
 Do you think anything else should be included on a givne match slip
 
 We will want to let the host print it out easily
+
+# Backlog
+
+Wiki-style Card Rulings section
+Collection Tracker
+YTG Sponsorship
+Google Auth Options
+Play Redemption Online with Matchmaking
+Spawn Lost Soul Tokens
+Comprehensive Deck Legality Validation
+Paragon Deck Check PDF support
+Deck Check PDF screen: ability to select one of your decks

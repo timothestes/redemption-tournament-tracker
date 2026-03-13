@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "teach-impeccable": {
+      "source": "pbakaus/impeccable",
+      "sourceType": "github",
+      "computedHash": "61855594bf79bc5b2665cfca3580b93840cfe645872c5a2deeaa5ad336570d5a"
+    }
+  }
+}
