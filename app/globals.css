@@ -111,6 +111,42 @@
 .animate-card-in {
   animation: card-fade-in 300ms cubic-bezier(0.25, 1, 0.5, 1) both;
 }
+/* Card exit — list view: fade + slide, then collapse height */
+@keyframes card-list-exit {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+    max-height: 80px;
+  }
+  50% {
+    opacity: 0;
+    transform: translateX(-10px);
+    max-height: 80px;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-10px);
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+.animate-card-out-list {
+  animation: card-list-exit 180ms cubic-bezier(0.25, 1, 0.5, 1) both;
+  overflow: hidden;
+  pointer-events: none;
+  transition: none !important;
+}
+/* Card exit — grid view: fade + scale down */
+@keyframes card-grid-exit {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.92); }
+}
+.animate-card-out-grid {
+  animation: card-grid-exit 120ms cubic-bezier(0.25, 1, 0.5, 1) both;
+  pointer-events: none;
+  transition: none !important;
+}
 /* Deck card entrance — desktop only */
 @media (min-width: 768px) {
   .deck-card-enter {
@@ -121,6 +157,8 @@
   .animate-pill-enter,
   .animate-qty-pop,
   .animate-card-in,
+  .animate-card-out-list,
+  .animate-card-out-grid,
   .deck-card-enter {
     animation: none;
   }

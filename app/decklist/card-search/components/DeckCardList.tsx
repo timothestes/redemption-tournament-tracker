@@ -44,8 +44,63 @@ export default function DeckCardList({
 }: DeckCardListProps) {
   const [openMenuCard, setOpenMenuCard] = React.useState<string | null>(null);
   const [previewCard, setPreviewCard] = React.useState<{ card: Card; x: number; y: number } | null>(null);
+  const [exitingCards, setExitingCards] = React.useState<Set<string>>(new Set());
+  const [ghostCards, setGhostCards] = React.useState<Map<string, DeckCard>>(new Map());
+  const exitCallbacksRef = React.useRef<Map<string, () => void>>(new Map());
+  const prevCardsRef = React.useRef<DeckCard[]>(cards);
   const { getImageUrl } = useCardImageUrl();
   const { getPrice } = useCardPrices();
+
+  // Detect externally removed cards (e.g. via card search panel) and keep them as ghosts for exit animation
+  React.useLayoutEffect(() => {
+    const prev = prevCardsRef.current;
+    prevCardsRef.current = cards;
+
+    const currentKeys = new Set(cards.map(dc => `${dc.card.name}-${dc.card.set}-${dc.isReserve}`));
+
+    const removed: [string, DeckCard][] = [];
+    for (const dc of prev) {
+      const key = `${dc.card.name}-${dc.card.set}-${dc.isReserve}`;
+      // Skip cards already being animated out internally (via animateOut)
+      if (!currentKeys.has(key) && !exitCallbacksRef.current.has(key)) {
+        removed.push([key, dc]);
+      }
+    }
+
+    if (removed.length > 0) {
+      setGhostCards(prev => {
+        const merged = new Map(prev);
+        removed.forEach(([k, v]) => merged.set(k, v));
+        return merged;
+      });
+      setExitingCards(prev => {
+        const next = new Set(prev);
+        removed.forEach(([key]) => next.add(key));
+        return next;
+      });
+    }
+  }, [cards]);
+
+  // Wrap removal/move to animate out first — callback fires via onAnimationEnd
+  const animateOut = React.useCallback((cardKey: string, callback: () => void) => {
+    exitCallbacksRef.current.set(cardKey, callback);
+    setExitingCards(prev => new Set(prev).add(cardKey));
+  }, []);
+
+  const handleAnimationEnd = React.useCallback((cardKey: string) => {
+    const callback = exitCallbacksRef.current.get(cardKey);
+    if (callback) {
+      exitCallbacksRef.current.delete(cardKey);
+      callback();
+    }
+    setGhostCards(prev => {
+      if (!prev.has(cardKey)) return prev;
+      const next = new Map(prev);
+      next.delete(cardKey);
+      return next;
+    });
+    setExitingCards(prev => { const next = new Set(prev); next.delete(cardKey); return next; });
+  }, []);
   
   // Close menu when clicking outside or pressing ESC
   React.useEffect(() => {
@@ -121,8 +176,15 @@ export default function DeckCardList({
     return cards.filter((dc) => dc.isReserve === filterReserve);
   }, [cards, filterReserve]);
 
-  // Use filtered cards directly - parent component handles sorting
-  const displayCards = filteredCards;
+  // Include ghost cards (externally removed, still animating out) in the display list
+  const displayCards = React.useMemo(() => {
+    if (ghostCards.size === 0) return filteredCards;
+    const ghosts = [...ghostCards.values()].filter(dc => {
+      if (filterReserve === undefined) return true;
+      return dc.isReserve === filterReserve;
+    });
+    return [...filteredCards, ...ghosts];
+  }, [filteredCards, ghostCards, filterReserve]);
 
   if (displayCards.length === 0) {
     return (
@@ -140,10 +202,12 @@ export default function DeckCardList({
           const { card, quantity, isReserve } = deckCard;
           const cardKey = `${card.name}-${card.set}-${isReserve}`;
           
+          const isExiting = exitingCards.has(cardKey);
           return (
             <div
               key={cardKey}
-              className="deck-card-enter relative group rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-200"
+              className={`${isExiting ? 'animate-card-out-grid' : 'deck-card-enter'} relative group rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-200`}
+              onAnimationEnd={isExiting ? () => handleAnimationEnd(cardKey) : undefined}
               onMouseEnter={disableHoverPreview ? undefined : (e) => {
                 const pos = calculatePreviewPosition(e.currentTarget);
                 setPreviewCard({
@@ -192,8 +256,8 @@ export default function DeckCardList({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        onMoveCard(card.name, card.set, isReserve, !isReserve);
                         setOpenMenuCard(null);
+                        animateOut(cardKey, () => onMoveCard(card.name, card.set, isReserve, !isReserve));
                       }}
                       className="w-10 h-10 hover:scale-110 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 flex items-center justify-center text-gray-700 dark:text-gray-200 transition-all"
                       title={isReserve ? "Move to main deck" : "Move to reserve"}
@@ -231,8 +295,8 @@ export default function DeckCardList({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      onRemove(card.name, card.set, isReserve);
                       setOpenMenuCard(null);
+                      animateOut(cardKey, () => onRemove(card.name, card.set, isReserve));
                     }}
                     className="w-10 h-10 hover:scale-110 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 flex items-center justify-center text-red-600 dark:text-red-400 transition-all"
                     title="Remove all copies"
@@ -253,7 +317,11 @@ export default function DeckCardList({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        onDecrement(card.name, card.set, isReserve);
+                        if (quantity === 1) {
+                          animateOut(cardKey, () => onDecrement(card.name, card.set, isReserve));
+                        } else {
+                          onDecrement(card.name, card.set, isReserve);
+                        }
                       }}
                       className="w-14 h-14 max-w-full max-h-full flex items-center justify-center rounded-lg bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-3xl border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
                       aria-label="Decrease quantity"
@@ -405,10 +473,12 @@ export default function DeckCardList({
         const isDualEEEC = card.type === 'EE/Evil Character' || card.type === 'Evil Character/EE';
         const isDualGEEC = card.type === 'GE/Evil Character' || card.type === 'Evil Character/GE';
 
+        const isExiting = exitingCards.has(cardKey);
         return (
           <div
             key={cardKey}
-            className="flex items-center gap-2 p-2 rounded bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
+            className={`flex items-center gap-2 p-2 rounded bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group ${isExiting ? 'animate-card-out-list' : ''}`}
+            onAnimationEnd={isExiting ? () => handleAnimationEnd(cardKey) : undefined}
           >
             {/* Type Icon */}
             {showTypeIcons && (
@@ -646,7 +716,13 @@ export default function DeckCardList({
             <div className="flex items-center gap-0.5 flex-shrink-0">
               {/* Decrement Button (always visible) */}
               <button
-                onClick={() => onDecrement(card.name, card.set, isReserve)}
+                onClick={() => {
+                  if (quantity === 1) {
+                    animateOut(cardKey, () => onDecrement(card.name, card.set, isReserve));
+                  } else {
+                    onDecrement(card.name, card.set, isReserve);
+                  }
+                }}
                 className="w-7 h-7 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 transition-colors font-semibold text-base"
                 aria-label="Decrease quantity"
                 title="Decrease quantity"
@@ -717,7 +793,7 @@ export default function DeckCardList({
               {/* Move Card Button (between main deck and reserve) */}
               {onMoveCard && filterReserve !== undefined && (
                 <button
-                  onClick={() => onMoveCard(card.name, card.set, isReserve, !isReserve)}
+                  onClick={() => animateOut(cardKey, () => onMoveCard(card.name, card.set, isReserve, !isReserve))}
                   className="w-8 h-6 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 transition-colors text-xs font-bold"
                   aria-label={isReserve ? "Move to main deck" : "Move to reserve"}
                   title={isReserve ? "Move to main deck" : "Move to reserve"}
@@ -728,7 +804,7 @@ export default function DeckCardList({
 
               {/* Remove Button */}
               <button
-                onClick={() => onRemove(card.name, card.set, isReserve)}
+                onClick={() => animateOut(cardKey, () => onRemove(card.name, card.set, isReserve))}
                 className="w-6 h-6 flex items-center justify-center rounded bg-red-500 hover:bg-red-600 text-white transition-colors"
                 aria-label="Remove card"
                 title="Remove card from deck"
