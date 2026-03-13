@@ -527,7 +527,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                               value={createName}
                               onChange={(e) => setCreateName(e.target.value)}
                               maxLength={50}
-                              className="flex-1 px-2.5 py-1.5 text-sm rounded-lg border border-gray-600 bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="flex-1 px-2.5 py-1.5 text-sm rounded-lg border border-gray-600 bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-ring"
                             />
                           </div>
                           {createColorOpen && (
@@ -561,7 +561,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                               placeholder="Filter tags…"
                               value={tagFilter}
                               onChange={(e) => setTagFilter(e.target.value)}
-                              className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-gray-600 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-gray-600 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-ring"
                             />
                           </div>
                           <div className="max-h-52 overflow-y-auto">

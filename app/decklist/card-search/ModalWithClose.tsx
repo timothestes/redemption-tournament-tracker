@@ -298,6 +298,13 @@ export default function ModalWithClose({
               {modalCard.officialSet && (
                 <span className="text-[10px] text-muted-foreground">{modalCard.officialSet}</span>
               )}
+              {(() => {
+                const cardKey = `${modalCard.name}|${modalCard.set}|${modalCard.imgFile}`;
+                const priceInfo = getPrice(cardKey);
+                return priceInfo ? (
+                  <span className="text-[10px] text-muted-foreground">${priceInfo.price.toFixed(2)}</span>
+                ) : null;
+              })()}
             </div>
           </div>
           {/* Quantity badges */}
@@ -550,7 +557,7 @@ export default function ModalWithClose({
             const cardKey = `${modalCard.name}|${modalCard.set}|${modalCard.imgFile}`;
             const priceInfo = getPrice(cardKey);
             return priceInfo ? (
-              <div className="text-sm font-medium text-green-600 dark:text-green-400 mt-0.5">
+              <div className="text-sm font-medium text-muted-foreground mt-0.5">
                 ${priceInfo.price.toFixed(2)}
               </div>
             ) : null;

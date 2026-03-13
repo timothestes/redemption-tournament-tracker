@@ -52,7 +52,7 @@ function NewDeckRenameForm({
           value={deckName}
           onChange={(e) => setDeckName(e.target.value)}
           placeholder="Enter deck name..."
-          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-ring focus:border-transparent"
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               onSubmit(deckName.trim() || "Untitled Deck");

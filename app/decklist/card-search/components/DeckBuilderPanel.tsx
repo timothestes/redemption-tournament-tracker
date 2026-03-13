@@ -632,7 +632,7 @@ export default function DeckBuilderPanel({
             onChange={(e) => setEditedName(e.target.value)}
             onBlur={handleNameSubmit}
             onKeyDown={handleNameKeyDown}
-            className="w-full text-lg md:text-xl font-semibold px-2 py-1 rounded border border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full text-lg md:text-xl font-semibold px-2 py-1 rounded border border-ring bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-ring"
             autoFocus
           />
         ) : (
@@ -2264,7 +2264,7 @@ export default function DeckBuilderPanel({
                           placeholder="Search cards..."
                           value={coverPickerSearch}
                           onChange={(e) => setCoverPickerSearch(e.target.value)}
-                          className="w-full pl-7 pr-7 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="w-full pl-7 pr-7 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-ring"
                         />
                         {coverPickerSearch && (
                           <button onClick={() => setCoverPickerSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
@@ -2363,7 +2363,7 @@ export default function DeckBuilderPanel({
                                   value={createName}
                                   onChange={(e) => setCreateName(e.target.value)}
                                   maxLength={50}
-                                  className="flex-1 px-2.5 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  className="flex-1 px-2.5 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-ring"
                                 />
                               </div>
                               {createColorOpen && (
@@ -2397,7 +2397,7 @@ export default function DeckBuilderPanel({
                                   placeholder="Filter tags…"
                                   value={tagFilter}
                                   onChange={(e) => setTagFilter(e.target.value)}
-                                  className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-ring"
                                 />
                               </div>
                               <div className="max-h-52 overflow-y-auto">
@@ -2501,7 +2501,7 @@ export default function DeckBuilderPanel({
                   value={deck.description || ""}
                   onChange={(e) => onDescriptionChange?.(e.target.value)}
                   placeholder="Deck strategy, card choices, matchup notes..."
-                  className="w-full h-32 p-3 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full h-32 p-3 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
                 />
               )}
             </div>

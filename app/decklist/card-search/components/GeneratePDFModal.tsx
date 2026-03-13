@@ -161,7 +161,7 @@ export default function GeneratePDFModal({ deck, onClose }: GeneratePDFModalProp
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   maxLength={50}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all text-base"
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all text-base"
                   placeholder="Enter your name"
                 />
               </div>
@@ -180,7 +180,7 @@ export default function GeneratePDFModal({ deck, onClose }: GeneratePDFModalProp
                   value={event}
                   onChange={(e) => setEvent(e.target.value)}
                   maxLength={100}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all text-base"
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all text-base"
                   placeholder="Enter tournament name"
                 />
               </div>
@@ -197,7 +197,7 @@ export default function GeneratePDFModal({ deck, onClose }: GeneratePDFModalProp
                   id="deckType"
                   value={deckType}
                   onChange={(e) => setDeckType(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all text-base font-medium"
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all text-base font-medium"
                 >
                   <option value="type_1">Type 1</option>
                   <option value="type_2">Type 2</option>

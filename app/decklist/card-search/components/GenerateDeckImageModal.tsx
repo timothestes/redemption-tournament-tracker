@@ -138,7 +138,7 @@ export default function GenerateDeckImageModal({ deck, onClose }: GenerateDeckIm
                   <select
                     value={nCardColumns}
                     onChange={(e) => setNCardColumns(parseInt(e.target.value))}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-base font-medium"
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-ring focus:border-transparent transition-all text-base font-medium"
                   >
                     <option value={6}>6 columns</option>
                     <option value={8}>8 columns</option>
@@ -170,7 +170,7 @@ export default function GenerateDeckImageModal({ deck, onClose }: GenerateDeckIm
                   <button
                     type="button"
                     onClick={() => setMCount(!mCount)}
-                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
                       mCount ? 'bg-gradient-to-r from-blue-600 to-purple-600' : 'bg-gray-300 dark:bg-gray-600'
                     }`}
                   >

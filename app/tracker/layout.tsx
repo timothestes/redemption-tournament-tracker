@@ -1,5 +1,6 @@
 import HeaderServer from "../../components/header-server";
 import TopNav from "../../components/top-nav";
+import SponsorFooter from "../../components/sponsor-footer";
 import { createClient } from "../../utils/supabase/server";
 
 export default async function TournamentsLayout({ children }) {
@@ -16,6 +17,7 @@ export default async function TournamentsLayout({ children }) {
           {children}
         </main>
       </div>
+      <SponsorFooter />
     </div>
   );
 }

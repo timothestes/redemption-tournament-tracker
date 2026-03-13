@@ -1,5 +1,6 @@
 import HeaderServer from "../../components/header-server";
 import TopNav from "../../components/top-nav";
+import SponsorFooter from "../../components/sponsor-footer";
 import { createClient } from "../../utils/supabase/server";
 import { Suspense } from "react";
 
@@ -19,6 +20,7 @@ export default async function DecklistLayout({ children }) {
           {children}
         </main>
       </div>
+      <SponsorFooter />
     </div>
   );
 }
