@@ -572,11 +572,13 @@ export default function RegistrationPage() {
               </h2>
 
               <div className="space-y-4">
-                <div className="flex items-start space-x-3">
+                <label className="flex items-start space-x-3 cursor-pointer">
                   <button
                     type="button"
+                    role="checkbox"
+                    aria-checked={formData.fantasyDraftOptIn}
                     onClick={() => setFormData({...formData, fantasyDraftOptIn: !formData.fantasyDraftOptIn})}
-                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 ${formData.fantasyDraftOptIn ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
+                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${formData.fantasyDraftOptIn ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
                   >
                     {formData.fantasyDraftOptIn && (
                       <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -584,26 +586,25 @@ export default function RegistrationPage() {
                       </svg>
                     )}
                   </button>
-                  <div className="space-y-1" onClick={() => setFormData({...formData, fantasyDraftOptIn: !formData.fantasyDraftOptIn})}>
-                    <Label
-                      htmlFor="fantasyDraft"
-                      className="font-normal cursor-pointer"
-                    >
+                  <div className="space-y-1">
+                    <span className="text-sm font-normal text-foreground">
                       Would you like to be a draftable player in the Fantasy
                       Draft?
-                    </Label>
+                    </span>
                     <p className="text-sm text-muted-foreground">
                       All players who opt in will be entered into a drawing for
                       a box of the new set even if they are not drafted
                     </p>
                   </div>
-                </div>
+                </label>
 
-                <div className="flex items-center space-x-3">
+                <label className="flex items-center space-x-3 cursor-pointer">
                   <button
                     type="button"
+                    role="checkbox"
+                    aria-checked={formData.firstNationals}
                     onClick={() => setFormData({...formData, firstNationals: !formData.firstNationals})}
-                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${formData.firstNationals ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
+                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${formData.firstNationals ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
                   >
                     {formData.firstNationals && (
                       <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -611,20 +612,18 @@ export default function RegistrationPage() {
                       </svg>
                     )}
                   </button>
-                  <Label
-                    htmlFor="firstNationals"
-                    className="font-normal cursor-pointer"
-                    onClick={() => setFormData({...formData, firstNationals: !formData.firstNationals})}
-                  >
+                  <span className="text-sm font-normal text-foreground">
                     Is this your first National tournament?
-                  </Label>
-                </div>
+                  </span>
+                </label>
 
-                <div className="flex items-start space-x-3">
+                <label className="flex items-start space-x-3 cursor-pointer">
                   <button
                     type="button"
+                    role="checkbox"
+                    aria-checked={formData.needsAirportTransportation}
                     onClick={() => setFormData({...formData, needsAirportTransportation: !formData.needsAirportTransportation})}
-                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 ${formData.needsAirportTransportation ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
+                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${formData.needsAirportTransportation ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
                   >
                     {formData.needsAirportTransportation && (
                       <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -632,34 +631,33 @@ export default function RegistrationPage() {
                       </svg>
                     )}
                   </button>
-                  <div className="space-y-1" onClick={() => setFormData({...formData, needsAirportTransportation: !formData.needsAirportTransportation})}>
-                    <Label
-                      htmlFor="airportTransportation"
-                      className="font-normal cursor-pointer"
-                    >
+                  <div className="space-y-1">
+                    <span className="text-sm font-normal text-foreground">
                       Will you need transportation to/from{" "}
                       <a
                         href="https://maps.app.goo.gl/JSoAe6ex487NL9pU9"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-blue-600 dark:text-blue-400 hover:underline"
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={(e) => e.preventDefault()}
                       >
                         Bluegrass International Airport
                       </a>
                       ?
-                    </Label>
+                    </span>
                     <p className="text-sm text-muted-foreground">
                       Shuttle times are TBD but will be sent via email when determined
                     </p>
                   </div>
-                </div>
+                </label>
 
-                <div className="flex items-start space-x-3">
+                <label className="flex items-start space-x-3 cursor-pointer">
                   <button
                     type="button"
+                    role="checkbox"
+                    aria-checked={formData.needsHotelTransportation}
                     onClick={() => setFormData({...formData, needsHotelTransportation: !formData.needsHotelTransportation})}
-                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 ${formData.needsHotelTransportation ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
+                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${formData.needsHotelTransportation ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
                   >
                     {formData.needsHotelTransportation && (
                       <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -667,33 +665,32 @@ export default function RegistrationPage() {
                       </svg>
                     )}
                   </button>
-                  <div className="space-y-1" onClick={() => setFormData({...formData, needsHotelTransportation: !formData.needsHotelTransportation})}>
-                    <Label
-                      htmlFor="hotelTransportation"
-                      className="font-normal cursor-pointer"
-                    >
+                  <div className="space-y-1">
+                    <span className="text-sm font-normal text-foreground">
                       Will you need transportation between the official hotel
                       and the venue?
-                    </Label>
+                    </span>
                     <p className="text-sm text-muted-foreground">
                       Shuttle times are TBD but will be sent via email when determined
                     </p>
                   </div>
-                </div>
+                </label>
 
                 {/* Overnight Stay Section */}
-                <div className="flex items-start space-x-3 pt-2">
+                <label className="flex items-start space-x-3 pt-2 cursor-pointer">
                   <button
                     type="button"
+                    role="checkbox"
+                    aria-checked={formData.stayingOvernight}
                     onClick={() => {
                       const newStayingOvernight = !formData.stayingOvernight;
                       setFormData({
-                        ...formData, 
+                        ...formData,
                         stayingOvernight: newStayingOvernight,
                         overnightStayNights: newStayingOvernight ? formData.overnightStayNights : []
                       });
                     }}
-                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 ${formData.stayingOvernight ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
+                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${formData.stayingOvernight ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
                   >
                     {formData.stayingOvernight && (
                       <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -701,28 +698,15 @@ export default function RegistrationPage() {
                       </svg>
                     )}
                   </button>
-                  <div 
-                    className="space-y-1 cursor-pointer" 
-                    onClick={() => {
-                      const newStayingOvernight = !formData.stayingOvernight;
-                      setFormData({
-                        ...formData, 
-                        stayingOvernight: newStayingOvernight,
-                        overnightStayNights: newStayingOvernight ? formData.overnightStayNights : []
-                      });
-                    }}
-                  >
-                    <Label
-                      htmlFor="stayingOvernight"
-                      className="font-normal cursor-pointer"
-                    >
+                  <div className="space-y-1">
+                    <span className="text-sm font-normal text-foreground">
                       Do you plan to stay overnight at the venue?
-                    </Label>
+                    </span>
                     <p className="text-sm text-muted-foreground">
                       Help us plan for overnight accommodations
                     </p>
                   </div>
-                </div>
+                </label>
 
                 {/* Overnight Stay Nights Selection */}
                 {formData.stayingOvernight && (
@@ -731,18 +715,20 @@ export default function RegistrationPage() {
                       Which nights do you plan to stay?
                     </p>
                     {NATIONALS_CONFIG.overnightStayNights.map((night) => (
-                      <div key={night.value} className="flex items-center space-x-3">
+                      <label key={night.value} className="flex items-center space-x-3 cursor-pointer">
                         <button
                           type="button"
+                          role="checkbox"
+                          aria-checked={formData.overnightStayNights.includes(night.value)}
                           onClick={() => {
                             const nights = formData.overnightStayNights.includes(night.value)
                               ? formData.overnightStayNights.filter(n => n !== night.value)
                               : [...formData.overnightStayNights, night.value];
                             setFormData({...formData, overnightStayNights: nights});
                           }}
-                          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${
-                            formData.overnightStayNights.includes(night.value) 
-                              ? 'bg-blue-500 border-blue-600' 
+                          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                            formData.overnightStayNights.includes(night.value)
+                              ? 'bg-blue-500 border-blue-600'
                               : 'border-gray-300 dark:border-gray-500'
                           }`}
                         >
@@ -752,18 +738,10 @@ export default function RegistrationPage() {
                             </svg>
                           )}
                         </button>
-                        <Label
-                          className="font-normal cursor-pointer text-sm"
-                          onClick={() => {
-                            const nights = formData.overnightStayNights.includes(night.value)
-                              ? formData.overnightStayNights.filter(n => n !== night.value)
-                              : [...formData.overnightStayNights, night.value];
-                            setFormData({...formData, overnightStayNights: nights});
-                          }}
-                        >
+                        <span className="font-normal text-sm text-foreground">
                           {night.label}
-                        </Label>
-                      </div>
+                        </span>
+                      </label>
                     ))}
                   </div>
                 )}

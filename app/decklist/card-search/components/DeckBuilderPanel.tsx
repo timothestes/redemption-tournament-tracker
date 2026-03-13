@@ -1736,7 +1736,7 @@ export default function DeckBuilderPanel({
                   <Switch
                     checked={!disableHoverPreview}
                     onChange={() => setDisableHoverPreview((v) => !v)}
-                    className={`${!disableHoverPreview ? 'bg-green-700' : 'bg-gray-300 dark:bg-gray-700'} relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none`}
+                    className={`${!disableHoverPreview ? 'bg-green-700' : 'bg-gray-300 dark:bg-gray-700'} relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2`}
                   >
                     <span
                       className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${!disableHoverPreview ? 'translate-x-5' : 'translate-x-1'}`}
@@ -2927,6 +2927,7 @@ export default function DeckBuilderPanel({
               <div className="relative max-w-[300px] w-full" onClick={(e) => e.stopPropagation()}>
                 <button
                   onClick={() => setFullViewPreviewCard(null)}
+                  aria-label="Close card preview"
                   className="absolute -top-3 -right-3 z-10 w-8 h-8 rounded-full bg-gray-800 border border-gray-600 text-white flex items-center justify-center hover:bg-gray-700 transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>

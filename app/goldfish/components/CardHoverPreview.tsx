@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GameCard } from '../types';
 
@@ -56,10 +57,11 @@ export function CardHoverPreview({ card, anchorX, anchorY }: CardHoverPreviewPro
           boxShadow: '0 8px 32px rgba(0,0,0,0.8), 0 0 12px rgba(212,168,103,0.3)',
         }}
       >
-        <img
+        <Image
           src={imageUrl}
           alt={card.cardName}
           width={previewWidth}
+          height={previewHeight}
           style={{
             display: 'block',
             borderRadius: 6,

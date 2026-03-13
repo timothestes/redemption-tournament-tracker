@@ -2,6 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { setUsernameAction, checkUsernameAvailableAction } from "../actions";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 interface UsernameModalProps {
   onSuccess: (username: string) => void;
@@ -14,15 +22,6 @@ export default function UsernameModal({ onSuccess, onClose }: UsernameModalProps
   const [checking, setChecking] = useState(false);
   const [available, setAvailable] = useState<boolean | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  // Handle ESC key to close modal
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", handleEscape);
-    return () => document.removeEventListener("keydown", handleEscape);
-  }, [onClose]);
 
   // Debounced availability check
   useEffect(() => {
@@ -59,26 +58,16 @@ export default function UsernameModal({ onSuccess, onClose }: UsernameModalProps
   const canSubmit = isValidLength && isValidChars && available === true && !submitting;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Choose a Username
-          </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+    <Dialog open={true} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent size="md">
+        <DialogHeader>
+          <DialogTitle>Choose a Username</DialogTitle>
+          <DialogDescription>
             Your username will be displayed on your public decks so the community
             can see who built them.
-          </p>
-        </div>
+          </DialogDescription>
+        </DialogHeader>
 
-        {/* Body */}
         <form onSubmit={handleSubmit}>
           <div className="px-6 py-4">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -104,7 +93,6 @@ export default function UsernameModal({ onSuccess, onClose }: UsernameModalProps
               </p>
             </div>
 
-            {/* Availability indicator */}
             {trimmed.length >= 3 && isValidChars && (
               <div className="mt-2 text-sm">
                 {checking ? (
@@ -117,21 +105,18 @@ export default function UsernameModal({ onSuccess, onClose }: UsernameModalProps
               </div>
             )}
 
-            {/* Validation messages */}
             {trimmed.length > 0 && !isValidChars && (
               <p className="mt-2 text-sm text-red-600 dark:text-red-400">
                 Only letters, numbers, underscores, and hyphens are allowed
               </p>
             )}
 
-            {/* Server error */}
             {error && (
               <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>
             )}
           </div>
 
-          {/* Footer */}
-          <div className="bg-gray-50 dark:bg-gray-900/50 px-6 py-4 flex gap-3 justify-end border-t border-gray-200 dark:border-gray-700">
+          <DialogFooter className="bg-gray-50 dark:bg-gray-900/50 justify-end">
             <button
               type="button"
               onClick={onClose}
@@ -146,9 +131,9 @@ export default function UsernameModal({ onSuccess, onClose }: UsernameModalProps
             >
               {submitting ? "Setting..." : "Set Username & Continue"}
             </button>
-          </div>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

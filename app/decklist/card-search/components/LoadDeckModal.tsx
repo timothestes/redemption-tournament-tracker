@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { loadUserDecksAction, loadDeckByIdAction, DeckData } from "../../actions";
+import { loadUserDecksAction, DeckData } from "../../actions";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 // Helper function to normalize deck format display
 function formatDeckType(format?: string): string {
@@ -35,18 +41,6 @@ export default function LoadDeckModal({ onLoadDeck, onClose }: LoadDeckModalProp
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Handle ESC key to close modal
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [onClose]);
-
   // Load user's decks
   useEffect(() => {
     async function loadDecks() {
@@ -54,8 +48,7 @@ export default function LoadDeckModal({ onLoadDeck, onClose }: LoadDeckModalProp
         setLoading(true);
         const result = await loadUserDecksAction();
         if (result.success && result.decks) {
-          // Sort by last updated
-          const sorted = [...result.decks].sort((a, b) => 
+          const sorted = [...result.decks].sort((a, b) =>
             new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
           );
           setDecks(sorted);
@@ -73,8 +66,7 @@ export default function LoadDeckModal({ onLoadDeck, onClose }: LoadDeckModalProp
     loadDecks();
   }, []);
 
-  // Filter decks based on search
-  const filteredDecks = decks.filter(deck => 
+  const filteredDecks = decks.filter(deck =>
     deck.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -84,30 +76,24 @@ export default function LoadDeckModal({ onLoadDeck, onClose }: LoadDeckModalProp
   };
 
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div 
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 overflow-hidden max-h-[80vh] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Dialog open={true} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent size="lg" className="max-w-2xl max-h-[80vh] flex flex-col">
         {/* Header */}
-        <div className="bg-blue-50 dark:bg-blue-900/20 px-6 py-4 border-b border-blue-200 dark:border-blue-800">
+        <DialogHeader className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
-                <svg 
-                  className="w-6 h-6 text-blue-600 dark:text-blue-400" 
-                  fill="none" 
-                  viewBox="0 0 24 24" 
+                <svg
+                  className="w-6 h-6 text-blue-600 dark:text-blue-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
                   stroke="currentColor"
                 >
-                  <path 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                    strokeWidth={2} 
-                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" 
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                   />
                 </svg>
               </div>
@@ -129,7 +115,7 @@ export default function LoadDeckModal({ onLoadDeck, onClose }: LoadDeckModalProp
               </svg>
             </button>
           </div>
-        </div>
+        </DialogHeader>
 
         {/* Search Bar */}
         <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-700">
@@ -182,10 +168,10 @@ export default function LoadDeckModal({ onLoadDeck, onClose }: LoadDeckModalProp
                         </span>
                       </div>
                     </div>
-                    <svg 
-                      className="w-5 h-5 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors flex-shrink-0" 
-                      fill="none" 
-                      viewBox="0 0 24 24" 
+                    <svg
+                      className="w-5 h-5 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors flex-shrink-0"
+                      fill="none"
+                      viewBox="0 0 24 24"
                       stroke="currentColor"
                     >
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -198,15 +184,15 @@ export default function LoadDeckModal({ onLoadDeck, onClose }: LoadDeckModalProp
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+        <DialogFooter className="bg-gray-50 dark:bg-gray-900 justify-end">
           <button
             onClick={onClose}
             className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium transition-colors"
           >
             Cancel
           </button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1343,12 +1343,12 @@ export default function CardSearchClient() {
         />
       )}
       
-    <div ref={containerRef} className="flex w-full h-screen overflow-hidden bg-white dark:bg-gray-900">
+    <div ref={containerRef} className="flex w-full h-screen overflow-hidden bg-card">
       {/* Left panel: Card search */}
       {showSearch && (
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <div className="bg-white text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200 flex-1 flex flex-col overflow-auto md:overflow-hidden">
-          <div className="p-1.5 md:p-2 flex flex-col items-center md:sticky md:top-0 z-40 bg-white text-gray-900 border-b border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-800 dark:shadow-lg">
+        <div className="bg-card text-foreground transition-colors duration-200 flex-1 flex flex-col overflow-auto md:overflow-hidden">
+          <div className="p-1.5 md:p-2 flex flex-col items-center md:sticky md:top-0 z-40 bg-card text-foreground border-b border-border shadow-sm">
         <div className="relative w-full px-1 md:px-2 flex flex-col items-center justify-center gap-1.5 md:gap-2">
           <div className="w-full flex flex-col gap-1.5 md:gap-2 text-center">
             <div className="flex flex-col gap-1.5 md:gap-2 w-full">
@@ -1358,8 +1358,7 @@ export default function CardSearchClient() {
                   <select
                     value={queryObj.field}
                     onChange={e => updateQueryField(index, e.target.value)}
-                    className="border rounded px-1 sm:px-2 py-1 sm:py-1.5 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center text-xs sm:text-sm min-w-0"
-                    style={{ minHeight: 36 }}
+                    className="border rounded px-1 sm:px-2 h-9 sm:h-11 bg-muted text-foreground border-border shadow-sm focus:ring-2 focus:ring-ring text-center text-xs sm:text-sm min-w-0"
                   >
                     <option value="everything">All</option>
                     <option value="name">Name</option>
@@ -1375,13 +1374,12 @@ export default function CardSearchClient() {
                   <select
                     value={queryObj.operator}
                     onChange={e => updateQueryOperator(index, e.target.value as QueryOperator)}
-                    className="border rounded px-1 sm:px-2 py-1 sm:py-1.5 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center text-xs sm:text-sm min-w-0"
-                    style={{ minHeight: 36 }}
+                    className="border rounded px-1 sm:px-2 h-9 sm:h-11 bg-muted text-foreground border-border shadow-sm focus:ring-2 focus:ring-ring text-center text-xs sm:text-sm min-w-0"
                     title={index === 0 ? "Negate this query" : "How to combine this query with previous results"}
                   >
                     {index === 0 ? (
                       <>
-                        <option value="AND">--</option>
+                        <option value="AND">—</option>
                         <option value="NOT">NOT</option>
                       </>
                     ) : (
@@ -1398,11 +1396,10 @@ export default function CardSearchClient() {
                     ref={el => { inputRefs.current[index] = el; }}
                     type="text"
                     placeholder={index === 0 ? "Search" : `Search ${index + 1}`}
-                    className="flex-1 min-w-0 p-1.5 sm:p-3 pr-8 sm:pr-10 border rounded text-base focus:ring-2 focus:ring-blue-400 text-gray-900 bg-white dark:text-white dark:bg-gray-900"
+                    className="flex-1 min-w-0 px-2 sm:px-3 h-9 sm:h-11 border rounded text-base focus:ring-2 focus:ring-ring text-foreground bg-card border-border"
                     value={queryObj.text}
                     onChange={(e) => updateQuery(index, e.target.value)}
                     maxLength={64}
-                    style={{ minHeight: 36 }}
                   />
                   
                   {/* Remove button - only show if more than one query */}
@@ -1410,9 +1407,8 @@ export default function CardSearchClient() {
                     <button
                       type="button"
                       onClick={() => removeQuery(index)}
-                      className="p-1.5 sm:p-2 text-red-600 hover:text-red-800 hover:bg-red-100 rounded transition-colors dark:hover:bg-red-900"
+                      className="p-1.5 sm:p-2 text-destructive hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
                       title="Remove this query"
-                      style={{ minHeight: 36 }}
                     >
                       ×
                     </button>
@@ -1423,9 +1419,8 @@ export default function CardSearchClient() {
             {/* Mobile: original layout */}
             <div className="flex sm:hidden flex-row flex-wrap gap-1.5 w-full justify-center">
             <button
-              className="px-2.5 flex-1 rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center text-xs"
+              className="px-2.5 flex-1 rounded bg-muted text-muted-foreground hover:bg-muted/80 border border-border transition font-medium shadow-sm text-center text-xs h-8"
               onClick={handleResetFilters}
-              style={{ minHeight: 32, height: 32 }}
             >
               <span className="flex items-center justify-center gap-1">
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1435,9 +1430,8 @@ export default function CardSearchClient() {
               </span>
             </button>
             <button
-              className="px-3 flex-1 shrink-0 rounded bg-green-200 text-green-900 hover:bg-green-400 hover:text-green-900 border border-green-300 dark:bg-green-700 dark:text-white dark:hover:bg-green-600 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center relative text-xs"
+              className="px-3 flex-1 shrink-0 rounded bg-muted text-muted-foreground hover:bg-muted/80 border border-border transition font-medium shadow-sm text-center relative text-xs h-8"
               onClick={addNewQuery}
-              style={{ minHeight: 32, height: 32 }}
               title="Add new query"
             >
               +
@@ -1446,28 +1440,25 @@ export default function CardSearchClient() {
             {/* Desktop: centered buttons with filters right-aligned */}
             <div className="hidden sm:flex flex-row gap-2 w-full items-center justify-center relative">
             <button
-              className="px-4 shrink-0 rounded bg-green-200 text-green-900 hover:bg-green-400 hover:text-green-900 border border-green-300 dark:bg-green-700 dark:text-white dark:hover:bg-green-600 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center relative"
+              className="px-4 shrink-0 rounded bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground border border-border transition font-medium shadow-sm text-center relative h-9 sm:h-11"
               onClick={addNewQuery}
-              style={{ minHeight: 44, height: 44 }}
               title="Add new query"
             >
               +
             </button>
             <button
-              className="px-4 rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center text-sm"
+              className="px-4 rounded bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground border border-border transition font-medium shadow-sm text-center text-sm h-9 sm:h-11"
               onClick={handleResetFilters}
-              style={{ minHeight: 44, height: 44 }}
             >
               Reset Filters
             </button>
             <button
-              className={`px-4 rounded border transition font-semibold shadow text-center relative ${
+              className={`px-4 rounded border transition font-medium shadow-sm text-center relative h-9 sm:h-11 ${
                 queries.filter(q => q.text.trim()).length > 1
-                  ? 'bg-gray-400 text-gray-600 border-gray-500 cursor-not-allowed opacity-50 dark:bg-gray-800 dark:text-gray-500 dark:border-gray-600'
-                  : 'bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
+                  ? 'bg-muted text-muted-foreground/50 border-border cursor-not-allowed opacity-50'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground border-border'
               }`}
               onClick={queries.filter(q => q.text.trim()).length > 1 ? undefined : handleCopyLink}
-              style={{ minHeight: 44, height: 44 }}
               title={
                 queries.filter(q => q.text.trim()).length > 1
                   ? 'Multiple query link sharing sadly not supported'
@@ -1480,12 +1471,11 @@ export default function CardSearchClient() {
             {/* Filter collapse button — desktop only */}
             <button
               aria-label="Toggle filter grid"
-              className={`hidden md:flex absolute right-0 px-3 shrink-0 rounded items-center justify-center gap-1.5 border transition font-semibold shadow text-sm ${
+              className={`hidden md:flex absolute right-0 px-3 shrink-0 rounded items-center justify-center gap-1.5 border transition font-medium shadow-sm text-sm h-9 sm:h-11 ${
                 filterGridCollapsed
-                  ? 'bg-blue-200 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
-                  : 'bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
+                  ? 'bg-primary/15 text-primary border-primary/30'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80 border-border'
               }`}
-              style={{ minHeight: 44, height: 44 }}
               onClick={() => setFilterGridCollapsed(v => !v)}
               title={filterGridCollapsed ? 'Show filters' : 'Hide filters'}
             >
@@ -1507,7 +1497,7 @@ export default function CardSearchClient() {
       </div>
       {/* Active Filters Summary Bar — only render when there are active filter pills */}
       {hasActiveFilters && (
-      <div className="w-full transition-all duration-300 md:sticky md:top-[64px] z-30 bg-white text-gray-900 border-b border-gray-200 dark:bg-gray-900 dark:text-white dark:border-gray-800 flex items-center">
+      <div className="w-full transition-all duration-300 md:sticky md:top-[64px] z-30 bg-card text-foreground border-b border-border flex items-center">
         {/* Scrollable pills area */}
         <div className="flex-1 overflow-x-auto flex flex-nowrap sm:flex-wrap gap-1.5 sm:gap-2 items-center sm:justify-center px-2 sm:px-4 py-1.5 sm:py-2 sm:overflow-visible">
         {/* Query Pills */}
@@ -1531,7 +1521,7 @@ export default function CardSearchClient() {
           return (
             <span
               key={originalIndex}
-              className="bg-blue-200 text-blue-900 dark:bg-blue-800 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer"
+              className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer"
               onClick={() => updateQuery(originalIndex, "")}
               tabIndex={0}
               role="button"
@@ -1546,75 +1536,53 @@ export default function CardSearchClient() {
               {queryObj.field === 'setName' && `Set: "${queryObj.text}"`}
               {queryObj.field === 'identifier' && `ID: "${queryObj.text}"`}
               {queryObj.field === 'reference' && `Ref: "${queryObj.text}"`}
-              <span className="ml-1 text-blue-900 dark:text-white">×</span>
+              <span className="ml-1">×</span>
             </span>
           );
         })}
         {/* Legality */}
         {legalityMode !== 'Rotation' && (
-          <span className="bg-blue-400 text-blue-900 dark:bg-green-800 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setLegalityMode('Rotation')} tabIndex={0} role="button" aria-label="Remove Legality filter">
+          <span className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setLegalityMode('Rotation')} tabIndex={0} role="button" aria-label="Remove Legality filter">
             {legalityMode}
-            <span className="ml-1 text-blue-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         )}
         {/* Alignment */}
         {selectedAlignmentFilters.map(mode => (
           <span
             key={mode}
-            className="bg-blue-100 text-blue-900 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer border border-blue-300 shadow-sm"
+            className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer"
             onClick={() => setSelectedAlignmentFilters(selectedAlignmentFilters.filter(m => m !== mode))}
             tabIndex={0}
             role="button"
             aria-label={`Remove ${mode} alignment filter`}
           >
             {mode}
-            <span className="ml-1 text-blue-900">×</span>
+            <span className="ml-1">×</span>
           </span>
         ))}
         {/* Rarity */}
         {selectedRarityFilters.map(rarity => (
           <span
             key={rarity}
-            className="bg-purple-200 text-purple-900 dark:bg-purple-600 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer"
+            className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer"
             onClick={() => setSelectedRarityFilters(selectedRarityFilters.filter(r => r !== rarity))}
             tabIndex={0}
             role="button"
             aria-label={`Remove ${rarity} rarity filter`}
           >
             {rarity}
-            <span className="ml-1 text-purple-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         ))}
         {/* Icon Filters */}
         {selectedIconFilters.map((filter, idx) => {
-          // Brigade color mapping
-          const brigadeColors = {
-            Black: 'bg-black text-white',
-            Blue: 'bg-blue-200 text-blue-900 dark:bg-green-800 dark:text-white',
-            Brown: 'bg-yellow-900 text-white',
-            Clay: 'bg-orange-100 text-orange-900 dark:bg-orange-200 dark:text-gray-900',
-            Crimson: 'bg-red-200 text-red-900 dark:bg-red-900 dark:text-white',
-            Gold: 'bg-yellow-200 text-yellow-900 dark:bg-yellow-400 dark:text-gray-900',
-            'Good Gold': 'bg-yellow-200 text-yellow-900 dark:bg-yellow-400 dark:text-gray-900',
-            'Evil Gold': 'bg-yellow-700 text-white',
-            Gray: 'bg-gray-200 text-gray-900 dark:bg-gray-500 dark:text-white',
-            Green: 'bg-green-200 text-green-900 dark:bg-green-700 dark:text-white',
-            Orange: 'bg-orange-200 text-orange-900 dark:bg-orange-500 dark:text-white',
-            'Pale Green': 'bg-green-100 text-green-900 dark:bg-green-200 dark:text-gray-900',
-            Purple: 'bg-purple-200 text-purple-900 dark:bg-purple-700 dark:text-white',
-            Silver: 'bg-gray-100 text-gray-900 dark:bg-gray-300 dark:text-gray-900',
-            White: 'bg-gray-100 text-gray-900 dark:bg-white dark:text-gray-900',
-            Red: 'bg-red-200 text-red-900 dark:bg-red-700 dark:text-white',
-            Teal: 'bg-teal-100 text-teal-900 dark:bg-teal-600 dark:text-white',
-            'Good Multi': 'bg-gradient-to-r from-blue-200 via-green-200 to-red-200 text-gray-900 dark:from-blue-700 dark:via-green-700 dark:to-red-700 dark:text-white',
-            'Evil Multi': 'bg-gradient-to-r from-gray-200 via-red-200 to-gray-400 text-gray-900 dark:from-black dark:via-crimson dark:to-gray-700 dark:text-white',
-          };
-          const pillClass = brigadeColors[filter.icon] ? `${brigadeColors[filter.icon]} px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer` : 'bg-green-200 text-green-900 dark:bg-green-700 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer';
+          const pillClass = 'bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer';
           return (
             <React.Fragment key={filter.icon}>
               <span className={pillClass} onClick={() => setSelectedIconFilters(selectedIconFilters.filter(f => f.icon !== filter.icon))} tabIndex={0} role="button" aria-label={`Remove ${filter.icon} filter`}>
                 {filter.icon}
-                <span className="ml-1 text-gray-700 dark:text-gray-200">×</span>
+                <span className="ml-1">×</span>
               </span>
               {idx < selectedIconFilters.length - 1 && (
                 <span 
@@ -1657,98 +1625,98 @@ export default function CardSearchClient() {
         })}
         {/* Testament */}
         {selectedTestaments.map(t => (
-          <span key={t} className="bg-yellow-200 text-yellow-900 dark:bg-yellow-700 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setSelectedTestaments(selectedTestaments.filter(x => x !== t)); setTestamentNots(prev => { const newNots = { ...prev }; delete newNots[t]; return newNots; }); }} tabIndex={0} role="button" aria-label={`Remove ${t} testament filter`}>
+          <span key={t} className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setSelectedTestaments(selectedTestaments.filter(x => x !== t)); setTestamentNots(prev => { const newNots = { ...prev }; delete newNots[t]; return newNots; }); }} tabIndex={0} role="button" aria-label={`Remove ${t} testament filter`}>
             {testamentNots[t] ? 'NOT ' : ''}{t}
-            <span className="ml-1 text-yellow-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         ))}
         {/* Gospel */}
         {isGospel && (
-          <span className="bg-yellow-300 text-yellow-900 dark:bg-yellow-800 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setIsGospel(false); setGospelNot(false); }} tabIndex={0} role="button" aria-label="Remove Gospel filter">
+          <span className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setIsGospel(false); setGospelNot(false); }} tabIndex={0} role="button" aria-label="Remove Gospel filter">
             {gospelNot ? 'NOT ' : ''}Gospel
-            <span className="ml-1 text-yellow-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         )}
         {/* Strength */}
         {strengthFilter !== null && (
-          <span className="bg-red-200 text-red-900 dark:bg-red-700 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setStrengthFilter(null)} tabIndex={0} role="button" aria-label="Remove Strength filter">
+          <span className="bg-destructive/15 text-destructive px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setStrengthFilter(null)} tabIndex={0} role="button" aria-label="Remove Strength filter">
             Strength {strengthOp === 'eq' ? '=' : strengthOp === 'lt' ? '<' : strengthOp === 'lte' ? '≤' : strengthOp === 'gt' ? '>' : '≥'} {strengthFilter}
-            <span className="ml-1 text-red-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         )}
         {/* Toughness */}
         {toughnessFilter !== null && (
-          <span className="bg-red-300 text-red-900 dark:bg-red-800 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setToughnessFilter(null)} tabIndex={0} role="button" aria-label="Remove Toughness filter">
+          <span className="bg-destructive/15 text-destructive px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setToughnessFilter(null)} tabIndex={0} role="button" aria-label="Remove Toughness filter">
             Toughness {toughnessOp === 'eq' ? '=' : toughnessOp === 'lt' ? '<' : toughnessOp === 'lte' ? '≤' : toughnessOp === 'gt' ? '>' : '≥'} {toughnessFilter}
-            <span className="ml-1 text-red-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         )}
         {/* Misc */}
         {noAltArt === false && (
-          <span className="bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setnoAltArt(true)} tabIndex={0} role="button" aria-label="Remove AB Versions filter">
+          <span className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setnoAltArt(true)} tabIndex={0} role="button" aria-label="Remove AB Versions filter">
             AB Versions
-            <span className="ml-1 text-gray-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         )}
         {noFirstPrint === false && (
-          <span className="bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setnoFirstPrint(true)} tabIndex={0} role="button" aria-label="Remove 1st Print K/L Starters filter">
+          <span className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setnoFirstPrint(true)} tabIndex={0} role="button" aria-label="Remove 1st Print K/L Starters filter">
             1st Print K/L Starters
-            <span className="ml-1 text-gray-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         )}
         {nativityOnly && (
-          <span className="bg-pink-200 text-pink-900 dark:bg-pink-700 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setNativityOnly(false); setNativityNot(false); }} tabIndex={0} role="button" aria-label="Remove Nativity filter">
+          <span className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setNativityOnly(false); setNativityNot(false); }} tabIndex={0} role="button" aria-label="Remove Nativity filter">
             {nativityNot ? 'NOT ' : ''}Nativity
-            <span className="ml-1 text-pink-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         )}
         {hasStarOnly && (
-          <span className="bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setHasStarOnly(false); setHasStarNot(false); }} tabIndex={0} role="button" aria-label="Remove Has Star filter">
+          <span className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setHasStarOnly(false); setHasStarNot(false); }} tabIndex={0} role="button" aria-label="Remove Has Star filter">
             {hasStarNot ? 'NOT ' : ''}Has Star
-            <span className="ml-1 text-blue-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         )}
         {cloudOnly && (
-          <span className="bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setCloudOnly(false); setCloudNot(false); }} tabIndex={0} role="button" aria-label="Remove Cloud filter">
+          <span className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setCloudOnly(false); setCloudNot(false); }} tabIndex={0} role="button" aria-label="Remove Cloud filter">
             {cloudNot ? 'NOT ' : ''}Cloud
-            <span className="ml-1 text-blue-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         )}
         {angelOnly && (
-          <span className="bg-gray-100 text-gray-900 dark:bg-gray-300 dark:text-gray-900 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setAngelOnly(false); setAngelNot(false); }} tabIndex={0} role="button" aria-label="Remove Angel filter">
+          <span className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setAngelOnly(false); setAngelNot(false); }} tabIndex={0} role="button" aria-label="Remove Angel filter">
             {angelNot ? 'NOT ' : ''}Angel
-            <span className="ml-1 text-gray-900">×</span>
+            <span className="ml-1">×</span>
           </span>
         )}
         {demonOnly && (
-          <span className="bg-orange-200 text-orange-900 dark:bg-orange-500 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setDemonOnly(false); setDemonNot(false); }} tabIndex={0} role="button" aria-label="Remove Demon filter">
+          <span className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setDemonOnly(false); setDemonNot(false); }} tabIndex={0} role="button" aria-label="Remove Demon filter">
             {demonNot ? 'NOT ' : ''}Demon
-            <span className="ml-1 text-orange-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         )}
         {danielOnly && (
-          <span className="bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setDanielOnly(false); setDanielNot(false); }} tabIndex={0} role="button" aria-label="Remove Daniel filter">
+          <span className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setDanielOnly(false); setDanielNot(false); }} tabIndex={0} role="button" aria-label="Remove Daniel filter">
             {danielNot ? 'NOT ' : ''}Daniel
-            <span className="ml-1 text-blue-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         )}
         {postexilicOnly && (
-          <span className="bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setPostexilicOnly(false); setPostexilicNot(false); }} tabIndex={0} role="button" aria-label="Remove Postexilic filter">
+          <span className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setPostexilicOnly(false); setPostexilicNot(false); }} tabIndex={0} role="button" aria-label="Remove Postexilic filter">
             {postexilicNot ? 'NOT ' : ''}Postexilic
-            <span className="ml-1 text-blue-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         )}
         </div>
       </div>
       )}
       {/* Collapse/Expand Filter Grid Button — mobile only (on desktop it's in the search header) */}
-      <div className={`flex-shrink-0 ${!filterGridCollapsed ? 'sticky top-0 z-30' : ''} flex md:hidden flex-row items-center justify-end px-3 py-1.5 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800`}>
+      <div className={`flex-shrink-0 ${!filterGridCollapsed ? 'sticky top-0 z-30' : ''} flex md:hidden flex-row items-center justify-center px-3 py-1.5 bg-card border-b border-border`}>
         <button
           aria-label="Toggle filter grid"
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-semibold transition ${
+          className={`w-full flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-semibold transition ${
             filterGridCollapsed
-              ? 'bg-blue-200 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
-              : 'bg-gray-200 text-gray-900 border-gray-300 dark:bg-gray-700 dark:text-white dark:border-transparent'
+              ? 'bg-primary/15 text-primary border-primary/30'
+              : 'bg-muted text-muted-foreground border-border'
           }`}
           onClick={() => setFilterGridCollapsed(v => !v)}
         >
@@ -1765,7 +1733,7 @@ export default function CardSearchClient() {
           Filters
         </button>
       </div>
-      <main className="p-2 pb-16 md:pb-2 md:overflow-auto md:flex-1 bg-white text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200">
+      <main className="p-2 pb-16 md:pb-2 md:overflow-auto md:flex-1 bg-card text-foreground transition-colors duration-200">
         {/* Responsive grid for filters */}
         {!filterGridCollapsed && (
           <FilterGrid

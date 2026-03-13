@@ -8,7 +8,7 @@ export default function BugPage() {
           to BaboonyTim on the{" "}
           <a
             href="https://discord.com/invite/jREJdTysPp"
-            className="text-blue-600 underline font-medium hover:text-blue-800"
+            className="text-primary underline font-medium hover:text-primary/80"
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -17,7 +17,7 @@ export default function BugPage() {
           or file an issue on the RedemptionCCG App's GitHub{" "}
           <a
             href="https://github.com/timothestes/redemption-tournament-tracker/issues"
-            className="text-blue-600 underline font-medium hover:text-blue-800"
+            className="text-primary underline font-medium hover:text-primary/80"
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -28,7 +28,7 @@ export default function BugPage() {
         <div className="flex flex-row flex-wrap gap-6 items-start mt-4">
           <a
             href="https://discord.com/invite/jREJdTysPp"
-            className="px-6 py-3 bg-green-700 text-white rounded-lg shadow-lg hover:bg-green-800"
+            className="px-6 py-3 bg-primary text-primary-foreground rounded-lg shadow-lg hover:bg-primary/90"
             target="_blank"
             rel="noopener noreferrer"
           >

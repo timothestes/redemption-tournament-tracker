@@ -87,12 +87,12 @@ const TopNav: React.FC = () => {
   const navLinks = [
     { href: "/register", label: NATIONALS_CONFIG.adminOnly ? `${NATIONALS_CONFIG.displayName} (Admin Only)` : `${NATIONALS_CONFIG.displayName}`, icon: HiUserAdd, highlight: true },
     { href: "/tracker/tournaments", label: "Tournaments", icon: FaTrophy, authRequired: true },
+    { href: "/decklist/card-search?new=true", label: "Deck Builder", icon: TbSearch },
   ];
 
   const deckLinks = [
     { href: "/decklist/community", label: "Community Decks", icon: HiGlobeAlt, isNew: true },
     { href: "/decklist/my-decks", label: "My Decks", icon: TbCardsFilled, authRequired: true },
-    { href: "/decklist/card-search?new=true", label: "Deck Builder", icon: TbSearch },
     { href: "/decklist/generate", label: "Deck Check PDF", icon: TbCardsFilled },
   ];
 
@@ -126,7 +126,7 @@ const TopNav: React.FC = () => {
   ];
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b bg-white dark:bg-gray-900 shadow-sm">
+    <nav className="sticky top-0 z-50 w-full border-b bg-background shadow-sm">
       <div className="max-w-full mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
@@ -154,10 +154,10 @@ const TopNav: React.FC = () => {
                   href={link.href}
                   className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
                     ${isHighlight
-                      ? 'border-2 border-green-500 text-green-600 hover:bg-green-50 dark:border-green-400 dark:text-green-400 dark:hover:bg-green-950'
+                      ? 'border-2 border-primary text-primary hover:bg-primary/10'
                       : isActive(link.href)
-                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+                      ? 'bg-muted text-foreground'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                     }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -175,8 +175,8 @@ const TopNav: React.FC = () => {
                   href={link.href}
                   className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors
                     ${isActive(link.href)
-                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+                      ? 'bg-muted text-foreground'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                     }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -195,10 +195,10 @@ const TopNav: React.FC = () => {
                   href={link.href}
                   className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
                     ${isHighlight
-                      ? 'border-2 border-green-500 text-green-600 hover:bg-green-50 dark:border-green-400 dark:text-green-400 dark:hover:bg-green-950'
+                      ? 'border-2 border-primary text-primary hover:bg-primary/10'
                       : isActive(link.href)
-                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+                      ? 'bg-muted text-foreground'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                     }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -213,8 +213,8 @@ const TopNav: React.FC = () => {
                 onClick={toggleDecks}
                 className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
                   ${isDecksOpen || isActive('/decklist')
-                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+                    ? 'bg-muted text-foreground'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                   }`}
               >
                 <TbCardsFilled className="w-4 h-4" />
@@ -230,7 +230,7 @@ const TopNav: React.FC = () => {
               </button>
 
               {isDecksOpen && (
-                <div className="absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5">
+                <div className="absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-card ring-1 ring-black ring-opacity-5">
                   <div className="py-2">
                     {deckLinks.map((link) => {
                       const Icon = link.icon;
@@ -239,12 +239,12 @@ const TopNav: React.FC = () => {
                           key={link.href}
                           href={link.href}
                           onClick={() => setIsDecksOpen(false)}
-                          className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
                         >
                           <Icon className="w-4 h-4" />
                           {link.label}
                           {link.isNew && (
-                            <span className="ml-auto px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] font-bold rounded uppercase">
+                            <span className="ml-auto px-1.5 py-0.5 bg-primary/15 text-primary text-[10px] font-bold rounded uppercase">
                               New
                             </span>
                           )}
@@ -262,8 +262,8 @@ const TopNav: React.FC = () => {
                 onClick={toggleResources}
                 className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
                   ${isResourcesOpen
-                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+                    ? 'bg-muted text-foreground'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                   }`}
               >
                 <HiDocumentText className="w-4 h-4" />
@@ -280,10 +280,10 @@ const TopNav: React.FC = () => {
 
               {/* Resources Dropdown Menu */}
               {isResourcesOpen && (
-                <div className="absolute left-0 mt-2 w-72 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5">
+                <div className="absolute left-0 mt-2 w-72 rounded-md shadow-lg bg-card ring-1 ring-black ring-opacity-5">
                   <div className="py-2">
                     {/* Tournament Resources */}
-                    <div className="px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       Tournament Resources
                     </div>
                     {tournamentResources.map((resource) => {
@@ -294,7 +294,7 @@ const TopNav: React.FC = () => {
                           href={resource.href}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
                         >
                           <Icon className="w-4 h-4" />
                           {resource.label}
@@ -303,7 +303,7 @@ const TopNav: React.FC = () => {
                     })}
 
                     {/* Paragon Resources */}
-                    <div className="px-4 py-2 mt-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-t border-gray-200 dark:border-gray-700">
+                    <div className="px-4 py-2 mt-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-t border-border">
                       Paragon Resources
                     </div>
                     {paragonResources.map((resource) => (
@@ -312,14 +312,14 @@ const TopNav: React.FC = () => {
                         href={resource.href}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        className="block px-4 py-2 text-sm text-foreground hover:bg-muted"
                       >
                         {resource.label}
                       </a>
                     ))}
 
                     {/* Host Resources */}
-                    <div className="px-4 py-2 mt-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-t border-gray-200 dark:border-gray-700">
+                    <div className="px-4 py-2 mt-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-t border-border">
                       Host Resources
                     </div>
                     {hostResources.map((resource) => (
@@ -328,28 +328,28 @@ const TopNav: React.FC = () => {
                         href={resource.href}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        className="block px-4 py-2 text-sm text-foreground hover:bg-muted"
                       >
                         {resource.label}
                       </a>
                     ))}
+
+                    {/* Report a Bug */}
+                    <div className="border-t border-border mt-2 pt-2">
+                      <Link
+                        href="/tracker/bug"
+                        onClick={() => setIsResourcesOpen(false)}
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                      >
+                        <HiArrowSmRight className="w-4 h-4" />
+                        Report a Bug
+                      </Link>
+                    </div>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Report a Bug */}
-            <Link
-              href="/tracker/bug"
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
-                ${isActive('/tracker/bug')
-                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
-                }`}
-            >
-              <HiArrowSmRight className="w-4 h-4" />
-              Report a Bug
-            </Link>
           </div>
 
           {/* Auth Section - Right Side */}
@@ -363,7 +363,7 @@ const TopNav: React.FC = () => {
               </div>
             ) : user ? (
               <>
-                <span className="text-sm text-gray-600 dark:text-gray-300">
+                <span className="text-sm text-muted-foreground">
                   {user.email}
                 </span>
                 <form action={signOutAction}>
@@ -387,7 +387,7 @@ const TopNav: React.FC = () => {
           {/* Mobile menu button */}
           <button
             onClick={toggleMobileMenu}
-            className="lg:hidden p-2 rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+            className="lg:hidden p-2 rounded-md text-muted-foreground hover:bg-muted"
           >
             {isMobileMenuOpen ? <IoClose size={24} /> : <HiMenu size={24} />}
           </button>
@@ -396,7 +396,7 @@ const TopNav: React.FC = () => {
 
       {/* Mobile Navigation */}
       {isMobileMenuOpen && (
-        <div className="lg:hidden border-t border-gray-200 dark:border-gray-700 max-h-[calc(100dvh-4rem)] overflow-y-auto">
+        <div className="lg:hidden border-t border-border max-h-[calc(100dvh-4rem)] overflow-y-auto">
           <div className="px-2 pt-2 pb-3 space-y-1">
             {/* Nationals link */}
             {navLinks.slice(0, 1).map((link) => {
@@ -409,10 +409,10 @@ const TopNav: React.FC = () => {
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={`flex items-center gap-3 px-3 py-2 rounded-md text-base font-medium transition-colors
                     ${isHighlight
-                      ? 'border-2 border-green-500 text-green-600 hover:bg-green-50 dark:border-green-400 dark:text-green-400 dark:hover:bg-green-950'
+                      ? 'border-2 border-primary text-primary hover:bg-primary/10'
                       : isActive(link.href)
-                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                      ? 'bg-muted text-foreground'
+                      : 'text-muted-foreground hover:bg-muted'
                     }`}
                 >
                   <Icon className="w-5 h-5" />
@@ -431,8 +431,8 @@ const TopNav: React.FC = () => {
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={`flex items-center gap-3 px-3 py-2 rounded-md text-base font-medium transition-colors
                     ${isActive(link.href)
-                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                      ? 'bg-muted text-foreground'
+                      : 'text-muted-foreground hover:bg-muted'
                     }`}
                 >
                   <Icon className="w-5 h-5" />
@@ -452,10 +452,10 @@ const TopNav: React.FC = () => {
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={`flex items-center gap-3 px-3 py-2 rounded-md text-base font-medium transition-colors
                     ${isHighlight
-                      ? 'border-2 border-green-500 text-green-600 hover:bg-green-50 dark:border-green-400 dark:text-green-400 dark:hover:bg-green-950'
+                      ? 'border-2 border-primary text-primary hover:bg-primary/10'
                       : isActive(link.href)
-                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                      ? 'bg-muted text-foreground'
+                      : 'text-muted-foreground hover:bg-muted'
                     }`}
                 >
                   <Icon className="w-5 h-5" />
@@ -468,7 +468,7 @@ const TopNav: React.FC = () => {
             <div className="pt-2">
               <button
                 onClick={toggleDecks}
-                className="flex items-center justify-between w-full px-3 py-2 rounded-md text-base font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                className="flex items-center justify-between w-full px-3 py-2 rounded-md text-base font-medium text-muted-foreground hover:bg-muted"
               >
                 <div className="flex items-center gap-3">
                   <TbCardsFilled className="w-5 h-5" />
@@ -493,12 +493,12 @@ const TopNav: React.FC = () => {
                         key={link.href}
                         href={link.href}
                         onClick={() => setIsMobileMenuOpen(false)}
-                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
                       >
                         <Icon className="w-4 h-4" />
                         {link.label}
                         {link.isNew && (
-                          <span className="ml-auto px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] font-bold rounded uppercase">
+                          <span className="ml-auto px-1.5 py-0.5 bg-primary/15 text-primary text-[10px] font-bold rounded uppercase">
                             New
                           </span>
                         )}
@@ -513,7 +513,7 @@ const TopNav: React.FC = () => {
             <div className="pt-2">
               <button
                 onClick={toggleResources}
-                className="flex items-center justify-between w-full px-3 py-2 rounded-md text-base font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                className="flex items-center justify-between w-full px-3 py-2 rounded-md text-base font-medium text-muted-foreground hover:bg-muted"
               >
                 <div className="flex items-center gap-3">
                   <HiDocumentText className="w-5 h-5" />
@@ -531,7 +531,7 @@ const TopNav: React.FC = () => {
 
               {isResourcesOpen && (
                 <div className="mt-2 ml-8 space-y-1">
-                  <div className="px-3 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <div className="px-3 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     Tournament Resources
                   </div>
                   {tournamentResources.map((resource) => {
@@ -542,7 +542,7 @@ const TopNav: React.FC = () => {
                         href={resource.href}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
                       >
                         <Icon className="w-4 h-4" />
                         {resource.label}
@@ -550,7 +550,7 @@ const TopNav: React.FC = () => {
                     );
                   })}
 
-                  <div className="px-3 py-1 mt-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-t border-gray-200 dark:border-gray-700 pt-2">
+                  <div className="px-3 py-1 mt-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-t border-border pt-2">
                     Paragon Resources
                   </div>
                   {paragonResources.map((resource) => (
@@ -559,13 +559,13 @@ const TopNav: React.FC = () => {
                       href={resource.href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block px-3 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                      className="block px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
                     >
                       {resource.label}
                     </a>
                   ))}
 
-                  <div className="px-3 py-1 mt-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-t border-gray-200 dark:border-gray-700 pt-2">
+                  <div className="px-3 py-1 mt-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-t border-border pt-2">
                     Host Resources
                   </div>
                   {hostResources.map((resource) => (
@@ -574,38 +574,36 @@ const TopNav: React.FC = () => {
                       href={resource.href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block px-3 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                      className="block px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
                     >
                       {resource.label}
                     </a>
                   ))}
+
+                  {/* Report a Bug */}
+                  <div className="border-t border-border mt-2 pt-2">
+                    <Link
+                      href="/tracker/bug"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
+                    >
+                      <HiArrowSmRight className="w-4 h-4" />
+                      Report a Bug
+                    </Link>
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* Report a Bug */}
-            <Link
-              href="/tracker/bug"
-              onClick={() => setIsMobileMenuOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2 rounded-md text-base font-medium transition-colors
-                ${isActive('/tracker/bug')
-                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                }`}
-            >
-              <HiArrowSmRight className="w-5 h-5" />
-              Report a Bug
-            </Link>
-
             {/* Mobile Auth Section */}
-            <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700 space-y-3">
+            <div className="pt-4 mt-4 border-t border-border space-y-3">
               <div className="flex items-center justify-between px-3">
-                <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Theme</span>
+                <span className="text-sm font-medium text-muted-foreground">Theme</span>
                 <ThemeSwitcher />
               </div>
               {user ? (
                 <>
-                  <div className="px-3 text-sm text-gray-600 dark:text-gray-300">
+                  <div className="px-3 text-sm text-muted-foreground">
                     {user.email}
                   </div>
                   <form

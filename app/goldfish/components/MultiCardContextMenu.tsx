@@ -69,8 +69,8 @@ export function MultiCardContextMenu({ selectedIds, x, y, onClose, onClearSelect
     position: 'absolute',
     left: pos.left,
     top: pos.top,
-    background: '#2a1f12',
-    border: '1px solid #6b4e27',
+    background: 'var(--gf-bg)',
+    border: '1px solid var(--gf-border)',
     borderRadius: 6,
     padding: '4px 0',
     zIndex: 500,
@@ -89,7 +89,7 @@ export function MultiCardContextMenu({ selectedIds, x, y, onClose, onClearSelect
     background: 'transparent',
     border: 'none',
     cursor: 'pointer',
-    color: '#c9b99a',
+    color: 'var(--gf-text)',
     fontSize: 12,
     textAlign: 'left',
     fontFamily: 'var(--font-cinzel), Georgia, serif',
@@ -97,14 +97,14 @@ export function MultiCardContextMenu({ selectedIds, x, y, onClose, onClearSelect
 
   const separatorStyle: React.CSSProperties = {
     height: 1,
-    background: '#6b4e27',
+    background: 'var(--gf-border)',
     margin: '4px 8px',
     opacity: 0.5,
   };
 
   const labelStyle: React.CSSProperties = {
     ...itemStyle,
-    color: '#8b6532',
+    color: 'var(--gf-text-dim)',
     fontSize: 10,
     textTransform: 'uppercase' as const,
     letterSpacing: '0.08em',
@@ -131,14 +131,14 @@ export function MultiCardContextMenu({ selectedIds, x, y, onClose, onClearSelect
   const flippedCount = selectedCards.filter(c => c.isFlipped).length;
 
   const hoverHandlers = {
-    onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.background = 'rgba(196,149,90,0.15)'; },
+    onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.background = 'var(--gf-hover)'; },
     onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.background = 'transparent'; },
   };
 
   return (
     <div ref={menuRef} style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
       {/* Header */}
-      <div style={{ ...labelStyle, color: '#e8d5a3', fontSize: 11 }}>
+      <div style={{ ...labelStyle, color: 'var(--gf-text-bright)', fontSize: 11 }}>
         {selectedIds.length} cards selected
       </div>
       <div style={separatorStyle} />

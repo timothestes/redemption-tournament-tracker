@@ -69,7 +69,7 @@ function CardContextPopup({
     background: 'transparent',
     border: 'none',
     cursor: 'pointer',
-    color: '#c9b99a',
+    color: 'var(--gf-text)',
     fontSize: 11,
     textAlign: 'left',
     fontFamily: 'var(--font-cinzel), Georgia, serif',
@@ -85,8 +85,8 @@ function CardContextPopup({
         position: 'fixed',
         left: Math.min(x, window.innerWidth - 160),
         top: Math.min(y, window.innerHeight - 300),
-        background: '#2a1f12',
-        border: '1px solid #6b4e27',
+        background: 'var(--gf-bg)',
+        border: '1px solid var(--gf-border)',
         borderRadius: 6,
         padding: '4px 0',
         zIndex: 600,
@@ -94,7 +94,7 @@ function CardContextPopup({
         boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
       }}
     >
-      <div style={{ ...itemStyle, color: '#8b6532', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', cursor: 'default', padding: '3px 12px' }}>
+      <div style={{ ...itemStyle, color: 'var(--gf-text-dim)', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', cursor: 'default', padding: '3px 12px' }}>
         {label}
       </div>
       {MOVE_ZONES.map(({ id, label: zoneLabel }) => (
@@ -102,17 +102,17 @@ function CardContextPopup({
           key={id}
           style={itemStyle}
           onClick={() => { onMove(id); onClose(); }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(196,149,90,0.15)'; }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
         >
           {zoneLabel}
         </button>
       ))}
-      <div style={{ height: 1, background: '#6b4e27', margin: '4px 8px', opacity: 0.5 }} />
+      <div style={{ height: 1, background: 'var(--gf-border)', margin: '4px 8px', opacity: 0.5 }} />
       <button
         style={itemStyle}
         onClick={() => { onMoveToTop(); onClose(); }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(196,149,90,0.15)'; }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
         Top of Deck
@@ -120,7 +120,7 @@ function CardContextPopup({
       <button
         style={itemStyle}
         onClick={() => { onMoveToBottom(); onClose(); }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(196,149,90,0.15)'; }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
         Bottom of Deck
@@ -388,8 +388,8 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
         onClick={(e) => { e.stopPropagation(); setContextCard(null); }}
         onPointerDown={handleContentPointerDown}
         style={{
-          background: '#2a1f12',
-          border: '1px solid #6b4e27',
+          background: 'var(--gf-bg)',
+          border: '1px solid var(--gf-border)',
           borderRadius: 8,
           padding: 20,
           width: '80vw',
@@ -410,7 +410,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
               style={{
                 fontFamily: 'var(--font-cinzel), Georgia, serif',
                 fontSize: 16,
-                color: '#e8d5a3',
+                color: 'var(--gf-text-bright)',
               }}
             >
               Search Deck ({deckCards.length} cards)
@@ -418,7 +418,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
             {selectedIds.size > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{
-                  color: '#c4955a',
+                  color: 'var(--gf-accent)',
                   fontSize: 12,
                   fontFamily: 'var(--font-cinzel), Georgia, serif',
                 }}>
@@ -428,9 +428,9 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
                   onClick={(e) => { e.stopPropagation(); setSelectedIds(new Set()); }}
                   style={{
                     background: 'transparent',
-                    border: '1px solid #6b4e27',
+                    border: '1px solid var(--gf-border)',
                     borderRadius: 4,
-                    color: '#8b6532',
+                    color: 'var(--gf-text-dim)',
                     fontSize: 10,
                     padding: '2px 6px',
                     cursor: 'pointer',
@@ -444,7 +444,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
           </div>
           <button
             onClick={handleClose}
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#8b6532' }}
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--gf-text-dim)' }}
           >
             <X size={18} />
           </button>
@@ -461,9 +461,9 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
                 WebkitAppearance: 'none',
                 padding: '8px 28px 8px 10px',
                 background: '#1e1610',
-                border: '1px solid #6b4e27',
+                border: '1px solid var(--gf-border)',
                 borderRadius: 4,
-                color: '#c9b99a',
+                color: 'var(--gf-text)',
                 fontSize: 12,
                 fontFamily: 'var(--font-cinzel), Georgia, serif',
                 outline: 'none',
@@ -480,7 +480,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
               top: '50%',
               transform: 'translateY(-50%)',
               pointerEvents: 'none',
-              color: '#8b6532',
+              color: 'var(--gf-text-dim)',
               fontSize: 10,
             }}>
               ▼
@@ -494,7 +494,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
                 left: 10,
                 top: '50%',
                 transform: 'translateY(-50%)',
-                color: '#8b6532',
+                color: 'var(--gf-text-dim)',
               }}
             />
             <input
@@ -507,9 +507,9 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
                 width: '100%',
                 padding: '8px 30px 8px 30px',
                 background: '#1e1610',
-                border: '1px solid #6b4e27',
+                border: '1px solid var(--gf-border)',
                 borderRadius: 4,
-                color: '#c9b99a',
+                color: 'var(--gf-text)',
                 fontSize: 13,
                 outline: 'none',
               }}
@@ -525,7 +525,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
                   background: 'transparent',
                   border: 'none',
                   cursor: 'pointer',
-                  color: '#8b6532',
+                  color: 'var(--gf-text-dim)',
                   padding: 2,
                   display: 'flex',
                   alignItems: 'center',
@@ -539,7 +539,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
 
         {/* Hint + auto-shuffle */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <span style={{ color: '#6b4e27', fontSize: 10 }}>
+          <span style={{ color: 'var(--gf-border)', fontSize: 10 }}>
             Drag to a zone · Right-click for more · Hover to enlarge
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -548,7 +548,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
-                color: '#8b6532',
+                color: 'var(--gf-text-dim)',
                 fontSize: 11,
                 cursor: 'pointer',
               }}
@@ -565,7 +565,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
-                color: '#8b6532',
+                color: 'var(--gf-text-dim)',
                 fontSize: 11,
                 cursor: 'pointer',
               }}
@@ -583,7 +583,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
         {/* Card grid */}
         <div ref={scrollContainerRef} style={{ overflow: 'auto', flex: 1 }}>
           {filtered.length === 0 ? (
-            <p style={{ color: '#8b6532', fontStyle: 'italic', textAlign: 'center', padding: 20 }}>
+            <p style={{ color: 'var(--gf-text-dim)', fontStyle: 'italic', textAlign: 'center', padding: 20 }}>
               {search ? 'No cards match your search' : 'Deck is empty'}
             </p>
           ) : (
@@ -625,7 +625,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
                           style={{
                             width: '100%',
                             borderRadius: 4,
-                            border: isSelected ? '2px solid #c4955a' : '1px solid #6b4e27',
+                            border: isSelected ? '2px solid var(--gf-accent)' : '1px solid var(--gf-border)',
                             boxShadow: glowStyle?.boxShadow ?? selectedShadow,
                             transition: 'border 0.1s ease',
                           }}
@@ -636,13 +636,13 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
                             width: '100%',
                             aspectRatio: '1/1.4',
                             background: '#1e1610',
-                            border: isSelected ? '2px solid #c4955a' : '1px solid #6b4e27',
+                            border: isSelected ? '2px solid var(--gf-accent)' : '1px solid var(--gf-border)',
                             boxShadow: glowStyle?.boxShadow ?? selectedShadow,
                             borderRadius: 4,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            color: '#8b6532',
+                            color: 'var(--gf-text-dim)',
                             fontSize: 10,
                             padding: 4,
                             textAlign: 'center',
@@ -666,7 +666,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
                     top: lassoRect.y,
                     width: lassoRect.w,
                     height: lassoRect.h,
-                    border: '1px dashed #c4955a',
+                    border: '1px dashed var(--gf-accent)',
                     background: 'rgba(196,149,90,0.12)',
                     borderRadius: 2,
                     pointerEvents: 'none',

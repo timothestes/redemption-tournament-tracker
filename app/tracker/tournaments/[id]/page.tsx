@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "flowbite-react";
+import { Button } from "../../../../components/ui/button";
 import { useCallback, useEffect, useState } from "react";
 import { HiPencil } from "react-icons/hi";
 import CountdownTimer from "../../../../components/ui/CountdownTimer";
@@ -547,17 +547,34 @@ export default function TournamentPage({
         
         <div className="flex-grow max-w-4xl mx-auto">
           {tournament && (
-            <div className="mb-6">
-              <div className="flex items-center gap-2">
+            <div className="mb-6 space-y-4">
+              {/* Title row with status badge */}
+              <div className="flex items-center gap-3 flex-wrap">
                 <h1 className="text-3xl font-bold">{tournament.name}</h1>
-                <HiPencil
+                <button
                   onClick={() => {
                     setNewTournamentName(tournament.name);
                     setIsEditTournamentModalOpen(true);
                   }}
-                  className="text-gray-500 cursor-pointer hover:text-gray-700 w-6 h-6"
+                  className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                   aria-label="Edit tournament name"
-                />
+                >
+                  <HiPencil className="w-5 h-5" />
+                </button>
+                {/* Status badge */}
+                <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
+                  tournament.has_ended
+                    ? "bg-muted text-muted-foreground"
+                    : tournament.has_started
+                      ? "bg-primary/15 text-primary"
+                      : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                }`}>
+                  {tournament.has_ended
+                    ? "Ended"
+                    : tournament.has_started
+                      ? `Round ${tournament.current_round || 1} of ${tournament.n_rounds || "?"}`
+                      : "Not Started"}
+                </span>
               </div>
               <EditTournamentNameModal
                 isOpen={isEditTournamentModalOpen}
@@ -588,75 +605,73 @@ export default function TournamentPage({
                 tournamentName={newTournamentName}
                 setTournamentName={setNewTournamentName}
               />
-              <p className="text-sm text-gray-500 mt-2">
-                Created on:{" "}
-                {new Intl.DateTimeFormat("en-US", {
-                  year: "numeric",
-                  month: "long",
+
+              {/* Dates — single condensed line */}
+              <p className="text-sm text-muted-foreground">
+                Created {new Intl.DateTimeFormat("en-US", {
+                  month: "short",
                   day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
+                  year: "numeric",
                 }).format(new Date(tournament.created_at))}
+                {tournament.started_at && (
+                  <> · Started {new Intl.DateTimeFormat("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }).format(new Date(tournament.started_at))}</>
+                )}
+                {tournament.ended_at && (
+                  <> · Ended {new Intl.DateTimeFormat("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }).format(new Date(tournament.ended_at))}</>
+                )}
               </p>
-              {tournament.started_at && (
-                <p className="text-sm text-gray-500">
-                  Started at:{"\u00A0\u00A0\u00A0"}
-                  {new Intl.DateTimeFormat("en-US", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  }).format(new Date(tournament.started_at))}
-                </p>
-              )}
-              {tournament.ended_at && (
-                <p className="text-sm text-gray-500">
-                  Ended at:{"\u00A0\u00A0\u00A0\u00A0\u00A0"}
-                  {new Intl.DateTimeFormat("en-US", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  }).format(new Date(tournament.ended_at))}
-                </p>
-              )}
+
               {participants.length === 0 && (
-                <p className="text-sm text-gray-500 mt-2">
-                  To start a tournament, first add some participants
+                <p className="text-sm text-muted-foreground">
+                  Add participants to get started
                 </p>
               )}
-              <div className="flex flex-col gap-4 mt-4">
+
+              {/* Timer — full width, prominent when active */}
+              {tournament?.has_started &&
+                !tournament?.has_ended &&
+                tournament?.round_length && (
+                  <CountdownTimer
+                    key={latestRound?.started_at || "inactive"}
+                    startTime={latestRound?.started_at || null}
+                    durationMinutes={tournament.round_length}
+                    soundNotifications={tournament.sound_notifications ?? false}
+                  />
+                )}
+
+              {/* End Tournament — destructive styling, less prominent */}
+              {!tournament?.has_ended && (
                 <Button
-                  disabled={participants.length === 0 || tournament?.has_ended}
-                  color={
-                    tournament?.has_ended
-                      ? "gray"
-                      : Boolean(tournament?.has_started)
-                        ? "failure"
-                        : "success"
+                  disabled={participants.length === 0}
+                  variant={
+                    Boolean(tournament?.has_started)
+                      ? "destructive"
+                      : "success"
                   }
                   onClick={handleTournamentStatusToggle}
-                  className="w-fit"
+                  className={`w-fit ${tournament?.has_started ? "opacity-80" : ""}`}
+                  size={tournament?.has_started ? "sm" : "default"}
                 >
-                  {tournament?.has_ended
-                    ? "Tournament Ended"
-                    : Boolean(tournament?.has_started)
-                      ? "End Tournament"
-                      : "Start Tournament"}
+                  {Boolean(tournament?.has_started)
+                    ? "End Tournament"
+                    : "Start Tournament"}
                 </Button>
-                {tournament?.has_started &&
-                  !tournament?.has_ended &&
-                  tournament?.round_length && (
-                    <CountdownTimer
-                      key={latestRound?.started_at || "inactive"} // Force re-render on start time change
-                      startTime={latestRound?.started_at || null}
-                      durationMinutes={tournament.round_length}
-                      soundNotifications={tournament.sound_notifications ?? false}
-                    />
-                  )}
-              </div>
+              )}
+              {tournament?.has_ended && (
+                <span className="text-sm text-muted-foreground italic">
+                  Tournament has ended
+                </span>
+              )}
             </div>
           )}
           <TournamentTabs

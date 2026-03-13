@@ -57,11 +57,11 @@ export function GameToastContainer() {
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             transition={{ duration: 0.2 }}
             style={{
-              background: '#2a1f12',
-              border: '1px solid #6b4e27',
+              background: 'var(--gf-bg)',
+              border: '1px solid var(--gf-border)',
               borderRadius: 6,
               padding: '8px 16px',
-              color: '#e8d5a3',
+              color: 'var(--gf-text-bright)',
               fontSize: 13,
               fontFamily: 'var(--font-cinzel), Georgia, serif',
               boxShadow: '0 4px 16px rgba(0,0,0,0.5)',

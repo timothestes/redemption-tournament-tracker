@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useGame } from '../state/GameContext';
 import { PHASE_ORDER, GamePhase } from '../types';
@@ -84,15 +85,17 @@ export function PhaseBar() {
         top: 0,
         left: 0,
         right: 0,
-        height: 40,
-        background: '#2a1f12',
-        borderBottom: '1px solid #6b4e27',
+        height: 'calc(40px + env(safe-area-inset-top, 0px))',
+        paddingTop: 'env(safe-area-inset-top, 0px)',
+        background: 'var(--gf-bg)',
+        borderBottom: '1px solid var(--gf-border)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 4,
         zIndex: 100,
-        padding: '0 16px',
+        paddingLeft: 'calc(16px + env(safe-area-inset-left, 0px))',
+        paddingRight: 'calc(16px + env(safe-area-inset-right, 0px))',
       }}
     >
       {/* Previous phase arrow */}
@@ -104,15 +107,15 @@ export function PhaseBar() {
           background: 'transparent',
           border: 'none',
           cursor: isFirstPhase ? 'default' : 'pointer',
-          color: isFirstPhase ? '#4a3520' : '#8b6532',
+          color: isFirstPhase ? 'var(--gf-border-dim)' : 'var(--gf-text-dim)',
           fontSize: 18,
           fontFamily: 'serif',
           padding: '2px 6px',
           transition: 'color 0.2s',
           lineHeight: 1,
         }}
-        onMouseEnter={(e) => { if (!isFirstPhase) e.currentTarget.style.color = '#e8d5a3'; }}
-        onMouseLeave={(e) => { if (!isFirstPhase) e.currentTarget.style.color = '#8b6532'; }}
+        onMouseEnter={(e) => { if (!isFirstPhase) e.currentTarget.style.color = 'var(--gf-text-bright)'; }}
+        onMouseLeave={(e) => { if (!isFirstPhase) e.currentTarget.style.color = 'var(--gf-text-dim)'; }}
       >
         &#x276E;
       </button>
@@ -134,7 +137,7 @@ export function PhaseBar() {
               fontSize: 12,
               letterSpacing: '0.08em',
               textTransform: 'uppercase',
-              color: isActive ? '#e8d5a3' : '#8b6532',
+              color: isActive ? 'var(--gf-text-bright)' : 'var(--gf-text-dim)',
               transition: 'color 0.2s',
             }}
           >
@@ -148,7 +151,7 @@ export function PhaseBar() {
                   left: '10%',
                   right: '10%',
                   height: 2,
-                  background: '#c4955a',
+                  background: 'var(--gf-accent)',
                   borderRadius: 1,
                   boxShadow: '0 0 8px rgba(196,149,90,0.5)',
                 }}
@@ -167,15 +170,15 @@ export function PhaseBar() {
           background: 'transparent',
           border: 'none',
           cursor: 'pointer',
-          color: '#8b6532',
+          color: 'var(--gf-text-dim)',
           fontSize: 18,
           fontFamily: 'serif',
           padding: '2px 6px',
           transition: 'color 0.2s',
           lineHeight: 1,
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.color = '#e8d5a3'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.color = '#8b6532'; }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--gf-text-bright)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--gf-text-dim)'; }}
       >
         &#x276F;
       </button>
@@ -186,14 +189,14 @@ export function PhaseBar() {
         style={{
           padding: '6px 16px',
           background: 'transparent',
-          border: '1px solid #6b4e27',
+          border: '1px solid var(--gf-border)',
           borderRadius: 4,
           cursor: 'pointer',
           fontFamily: 'var(--font-cinzel), Georgia, serif',
           fontSize: 11,
           letterSpacing: '0.06em',
           textTransform: 'uppercase',
-          color: '#c9b99a',
+          color: 'var(--gf-text)',
           marginLeft: 12,
         }}
       >
@@ -215,17 +218,13 @@ export function PhaseBar() {
           alignItems: 'center',
         }}
       >
-        <img
+        <Image
           src="/darkmode_redemptionccgapp.webp"
           alt="Back to deck"
-          style={{
-            height: 28,
-            width: 'auto',
-            opacity: 0.85,
-            transition: 'opacity 0.2s',
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.85'; }}
+          width={96}
+          height={28}
+          className="opacity-85 hover:opacity-100 transition-opacity duration-200"
+          style={{ width: 'auto', height: 28 }}
         />
       </button>
 
@@ -237,11 +236,11 @@ export function PhaseBar() {
           fontFamily: 'var(--font-cinzel), Georgia, serif',
           fontSize: 12,
           letterSpacing: '0.06em',
-          color: '#8b6532',
+          color: 'var(--gf-text-dim)',
         }}
       >
         Turn{' '}
-        <span style={{ color: '#e8d5a3', fontSize: 14, fontWeight: 'bold' }}>
+        <span style={{ color: 'var(--gf-text-bright)', fontSize: 14, fontWeight: 'bold' }}>
           {state.turn}
         </span>
       </span>

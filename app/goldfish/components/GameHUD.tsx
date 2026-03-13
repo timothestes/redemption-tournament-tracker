@@ -12,8 +12,8 @@ export function GameHUD() {
     <div
       style={{
         position: 'absolute',
-        top: 48,
-        left: 12,
+        top: 'calc(48px + env(safe-area-inset-top, 0px))',
+        left: 'calc(12px + env(safe-area-inset-left, 0px))',
         display: 'flex',
         gap: 20,
         zIndex: 100,
@@ -27,7 +27,7 @@ export function GameHUD() {
             fontSize: 9,
             letterSpacing: '0.12em',
             textTransform: 'uppercase',
-            color: '#8b6532',
+            color: 'var(--gf-text-dim)',
           }}
         >
           Turn
@@ -36,7 +36,7 @@ export function GameHUD() {
           style={{
             fontFamily: 'var(--font-cinzel), Georgia, serif',
             fontSize: 24,
-            color: '#e8d5a3',
+            color: 'var(--gf-text-bright)',
             lineHeight: 1,
           }}
         >
@@ -51,7 +51,7 @@ export function GameHUD() {
             fontSize: 9,
             letterSpacing: '0.12em',
             textTransform: 'uppercase',
-            color: '#8b6532',
+            color: 'var(--gf-text-dim)',
           }}
         >
           Souls
@@ -60,7 +60,7 @@ export function GameHUD() {
           style={{
             fontFamily: 'var(--font-cinzel), Georgia, serif',
             fontSize: 24,
-            color: '#f0c060',
+            color: 'var(--gf-gold)',
             lineHeight: 1,
           }}
         >

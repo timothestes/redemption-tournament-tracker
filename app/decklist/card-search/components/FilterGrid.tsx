@@ -184,10 +184,10 @@ export default function FilterGrid({
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 mb-4 items-start text-gray-900 dark:text-white p-3 md:p-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 mb-4 items-start text-foreground p-3 md:p-4">
       {/* Legality & Alignment — spans full width on mobile so Types/Brigades get their own column */}
       <div className="col-span-2 md:col-span-1">
-        <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Legality</p>
+        <p className="text-muted-foreground uppercase mb-1 text-sm">Legality</p>
         <div className="flex flex-wrap gap-1.5 mb-3">
           {['Rotation','Classic','Banned','Scrolls','Paragon'].map((mode) => (
             <button
@@ -195,8 +195,8 @@ export default function FilterGrid({
               className={clsx(
                 'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
                 legalityMode === mode
-                  ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
-                  : 'bg-gray-200 text-gray-900 hover:bg-blue-400 hover:text-blue-900 border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
+                  ? 'bg-primary/20 text-primary border-primary/30'
+                  : 'bg-muted text-foreground hover:bg-muted/80 border-border'
               )}
               onClick={() => setLegalityMode(mode as typeof legalityMode)}
             >
@@ -204,7 +204,7 @@ export default function FilterGrid({
             </button>
           ))}
         </div>
-        <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Alignment</p>
+        <p className="text-muted-foreground uppercase mb-1 text-sm">Alignment</p>
         <div className="flex flex-wrap gap-1.5 mb-3">
           {['Good','Evil','Neutral'].map((mode) => (
             <button
@@ -212,8 +212,8 @@ export default function FilterGrid({
               className={clsx(
                 'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
                 selectedAlignmentFilters.includes(mode)
-                  ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
-                  : 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
+                  ? 'bg-primary/20 text-primary border-primary/30'
+                  : 'bg-muted text-foreground hover:bg-muted/80 border-border'
               )}
               onClick={() => toggleAlignmentFilter(mode)}
             >
@@ -221,7 +221,7 @@ export default function FilterGrid({
             </button>
           ))}
         </div>
-        <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Rarity</p>
+        <p className="text-muted-foreground uppercase mb-1 text-sm">Rarity</p>
         <div className="flex flex-wrap gap-1.5 mb-3">
           {['Common','Promo','Rare','Ultra Rare'].map((rarity) => (
             <button
@@ -229,8 +229,8 @@ export default function FilterGrid({
               className={clsx(
                 'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
                 selectedRarityFilters.includes(rarity)
-                  ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
-                  : 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
+                  ? 'bg-primary/20 text-primary border-primary/30'
+                  : 'bg-muted text-foreground hover:bg-muted/80 border-border'
               )}
               onClick={() => toggleRarityFilter(rarity)}
             >
@@ -241,14 +241,14 @@ export default function FilterGrid({
         {/* Advanced Filters */}
         <div className="mb-4">
           <button
-            className="px-2.5 py-1 md:px-3 md:py-2 border rounded text-sm md:text-base mb-2 bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 dark:bg-gray-900 dark:text-white dark:hover:bg-gray-700 dark:hover:text-white font-semibold shadow"
+            className="px-2.5 py-1 md:px-3 md:py-2 border rounded text-sm md:text-base mb-2 bg-muted text-foreground hover:bg-muted/80 font-semibold shadow"
             onClick={() => setAdvancedOpen(!advancedOpen)}
           >
             Advanced Filters {advancedOpen ? '▲' : '▼'}
           </button>
           {advancedOpen && (
             <div className="p-2 border rounded space-y-2">
-              <p className="font-bold text-base md:text-lg text-gray-900 dark:text-white rounded px-2 py-1 inline-block shadow-none">Testament</p>
+              <p className="font-bold text-base md:text-lg text-foreground rounded px-2 py-1 inline-block shadow-none">Testament</p>
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {['OT','NT'].map((t) => {
                   const isActive = selectedTestaments.includes(t);
@@ -258,9 +258,9 @@ export default function FilterGrid({
                       key={t}
                       className={clsx(
                         'px-2.5 py-1 md:px-3 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
-                        isActive && !isNot && 'bg-yellow-200 text-yellow-900 border-yellow-400 dark:bg-yellow-600 dark:text-white dark:border-transparent',
-                        isActive && isNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
-                        !isActive && 'bg-gray-200 text-gray-900 border-gray-300 hover:bg-gray-400 hover:text-gray-900 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
+                        isActive && !isNot && 'bg-primary/20 text-primary border-primary/30',
+                        isActive && isNot && 'bg-destructive/20 text-destructive border-destructive/30',
+                        !isActive && 'bg-muted text-foreground hover:bg-muted/80 border-border'
                       )}
                       onClick={(e) => {
                         e.preventDefault();
@@ -291,9 +291,9 @@ export default function FilterGrid({
                 <button
                   className={clsx(
                     'px-2.5 py-1 md:px-3 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
-                    isGospel && !gospelNot && 'bg-yellow-300 text-yellow-900 border-yellow-500 dark:bg-yellow-700 dark:text-white dark:border-transparent',
-                    isGospel && gospelNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
-                    !isGospel && 'bg-gray-200 text-gray-900 border-gray-300 hover:bg-gray-400 hover:text-gray-900 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
+                    isGospel && !gospelNot && 'bg-primary/20 text-primary border-primary/30',
+                    isGospel && gospelNot && 'bg-destructive/20 text-destructive border-destructive/30',
+                    !isGospel && 'bg-muted text-foreground hover:bg-muted/80 border-border'
                   )}
                   onClick={(e) => {
                     e.preventDefault();
@@ -319,11 +319,11 @@ export default function FilterGrid({
               {/* Strength and Toughness Filters - Toughness now under Strength */}
               <div className="flex flex-col gap-4 mb-2 items-start">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-lg text-gray-900 dark:text-white rounded px-2 py-1 inline-block shadow-none">Strength</span>
+                  <span className="font-bold text-lg text-foreground rounded px-2 py-1 inline-block shadow-none">Strength</span>
                   <select
                     value={strengthOp}
                     onChange={e => setStrengthOp(e.target.value)}
-                    className="border rounded px-2 py-1 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-gray-400 dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                    className="border rounded px-2 py-1 bg-muted text-foreground border-border shadow-sm focus:ring-2 focus:ring-ring"
                   >
                     <option value="lt">&lt;</option>
                     <option value="lte">&le;</option>
@@ -334,7 +334,7 @@ export default function FilterGrid({
                   <select
                     value={strengthFilter === null ? '' : strengthFilter}
                     onChange={e => setStrengthFilter(e.target.value === '' ? null : Number(e.target.value))}
-                    className="border rounded px-2 py-1 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-gray-400 dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                    className="border rounded px-2 py-1 bg-muted text-foreground border-border shadow-sm focus:ring-2 focus:ring-ring"
                   >
                     <option value="">Any</option>
                     {[...Array(14).keys()].map(n => (
@@ -343,11 +343,11 @@ export default function FilterGrid({
                   </select>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-lg text-gray-900 dark:text-white rounded px-2 py-1 inline-block shadow-none">Toughness</span>
+                  <span className="font-bold text-lg text-foreground rounded px-2 py-1 inline-block shadow-none">Toughness</span>
                   <select
                     value={toughnessOp}
                     onChange={e => setToughnessOp(e.target.value)}
-                    className="border rounded px-2 py-1 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-gray-400 dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                    className="border rounded px-2 py-1 bg-muted text-foreground border-border shadow-sm focus:ring-2 focus:ring-ring"
                   >
                     <option value="lt">&lt;</option>
                     <option value="lte">&le;</option>
@@ -358,7 +358,7 @@ export default function FilterGrid({
                   <select
                     value={toughnessFilter === null ? '' : toughnessFilter}
                     onChange={e => setToughnessFilter(e.target.value === '' ? null : Number(e.target.value))}
-                    className="border rounded px-2 py-1 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-gray-400 dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                    className="border rounded px-2 py-1 bg-muted text-foreground border-border shadow-sm focus:ring-2 focus:ring-ring"
                   >
                     <option value="">Any</option>
                     {[...Array(14).keys()].map(n => (
@@ -367,14 +367,14 @@ export default function FilterGrid({
                   </select>
                 </div>
               </div>
-              <p className="font-bold text-lg rounded px-2 py-1 inline-block shadow-none mt-2 text-gray-900 dark:text-white">Misc</p>
+              <p className="font-bold text-lg rounded px-2 py-1 inline-block shadow-none mt-2 text-foreground">Misc</p>
               <div className="flex flex-wrap gap-2">
                 <button
                   className={clsx(
                     'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
                     noAltArt
-                      ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
-                      : 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
+                      ? 'bg-primary/20 text-primary border-primary/30'
+                      : 'bg-muted text-foreground hover:bg-muted/80 border-border'
                   )}
                   onClick={() => setnoAltArt(v => !v)}
                 >
@@ -384,8 +384,8 @@ export default function FilterGrid({
                   className={clsx(
                     'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
                     noFirstPrint
-                      ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
-                      : 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
+                      ? 'bg-primary/20 text-primary border-primary/30'
+                      : 'bg-muted text-foreground hover:bg-muted/80 border-border'
                   )}
                   onClick={() => setnoFirstPrint(v => !v)}
                 >
@@ -394,9 +394,9 @@ export default function FilterGrid({
                 <button
                   className={clsx(
                     'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
-                    nativityOnly && !nativityNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
-                    nativityOnly && nativityNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
-                    !nativityOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
+                    nativityOnly && !nativityNot && 'bg-primary/20 text-primary border-primary/30',
+                    nativityOnly && nativityNot && 'bg-destructive/20 text-destructive border-destructive/30',
+                    !nativityOnly && 'bg-muted text-foreground hover:bg-muted/80 border-border'
                   )}
                   onClick={(e) => {
                     e.preventDefault();
@@ -421,9 +421,9 @@ export default function FilterGrid({
                 <button
                   className={clsx(
                     'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
-                    hasStarOnly && !hasStarNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
-                    hasStarOnly && hasStarNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
-                    !hasStarOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
+                    hasStarOnly && !hasStarNot && 'bg-primary/20 text-primary border-primary/30',
+                    hasStarOnly && hasStarNot && 'bg-destructive/20 text-destructive border-destructive/30',
+                    !hasStarOnly && 'bg-muted text-foreground hover:bg-muted/80 border-border'
                   )}
                   onClick={(e) => {
                     e.preventDefault();
@@ -448,9 +448,9 @@ export default function FilterGrid({
                 <button
                   className={clsx(
                     'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
-                    cloudOnly && !cloudNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
-                    cloudOnly && cloudNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
-                    !cloudOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
+                    cloudOnly && !cloudNot && 'bg-primary/20 text-primary border-primary/30',
+                    cloudOnly && cloudNot && 'bg-destructive/20 text-destructive border-destructive/30',
+                    !cloudOnly && 'bg-muted text-foreground hover:bg-muted/80 border-border'
                   )}
                   onClick={(e) => {
                     e.preventDefault();
@@ -475,9 +475,9 @@ export default function FilterGrid({
                 <button
                   className={clsx(
                     'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
-                    angelOnly && !angelNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
-                    angelOnly && angelNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
-                    !angelOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
+                    angelOnly && !angelNot && 'bg-primary/20 text-primary border-primary/30',
+                    angelOnly && angelNot && 'bg-destructive/20 text-destructive border-destructive/30',
+                    !angelOnly && 'bg-muted text-foreground hover:bg-muted/80 border-border'
                   )}
                   onClick={(e) => {
                     e.preventDefault();
@@ -502,9 +502,9 @@ export default function FilterGrid({
                 <button
                   className={clsx(
                     'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
-                    demonOnly && !demonNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
-                    demonOnly && demonNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
-                    !demonOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
+                    demonOnly && !demonNot && 'bg-primary/20 text-primary border-primary/30',
+                    demonOnly && demonNot && 'bg-destructive/20 text-destructive border-destructive/30',
+                    !demonOnly && 'bg-muted text-foreground hover:bg-muted/80 border-border'
                   )}
                   onClick={(e) => {
                     e.preventDefault();
@@ -529,9 +529,9 @@ export default function FilterGrid({
                 <button
                   className={clsx(
                     'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
-                    danielOnly && !danielNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
-                    danielOnly && danielNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
-                    !danielOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
+                    danielOnly && !danielNot && 'bg-primary/20 text-primary border-primary/30',
+                    danielOnly && danielNot && 'bg-destructive/20 text-destructive border-destructive/30',
+                    !danielOnly && 'bg-muted text-foreground hover:bg-muted/80 border-border'
                   )}
                   onClick={(e) => {
                     e.preventDefault();
@@ -556,9 +556,9 @@ export default function FilterGrid({
                 <button
                   className={clsx(
                     'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
-                    postexilicOnly && !postexilicNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
-                    postexilicOnly && postexilicNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
-                    !postexilicOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
+                    postexilicOnly && !postexilicNot && 'bg-primary/20 text-primary border-primary/30',
+                    postexilicOnly && postexilicNot && 'bg-destructive/20 text-destructive border-destructive/30',
+                    !postexilicOnly && 'bg-muted text-foreground hover:bg-muted/80 border-border'
                   )}
                   onClick={(e) => {
                     e.preventDefault();
@@ -587,7 +587,7 @@ export default function FilterGrid({
       </div>
       {/* Types */}
       <div>
-        <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Types</p>
+        <p className="text-muted-foreground uppercase mb-1 text-sm">Types</p>
         <div className="flex flex-wrap gap-2 mb-4 justify-start">
           {typeIcons.map((t) => {
             const src = `/filter-icons/${encodeURIComponent(t)}.png`;
@@ -598,7 +598,7 @@ export default function FilterGrid({
                 alt={t}
                 className={clsx(
                   'h-8 w-8 md:h-10 md:w-auto cursor-pointer',
-                  selectedIconFilters.some(f => f.icon === t) && 'ring-2 ring-blue-500 dark:ring-blue-300'
+                  selectedIconFilters.some(f => f.icon === t) && 'ring-2 ring-primary'
                 )}
                 onClick={() => toggleIconFilter(t)}
                 style={{ minWidth: 32, minHeight: 32 }}
@@ -609,7 +609,7 @@ export default function FilterGrid({
         {/* Icon filter mode toggle moved below types icons */}
         <div className="mb-2 flex items-center gap-2">
           <span 
-            className="text-gray-500 dark:text-gray-400 text-sm cursor-help" 
+            className="text-muted-foreground text-sm cursor-help" 
             title="Controls how multiple icon filters combine: Click button to cycle through modes"
           >
             Icon Filter Mode:
@@ -617,7 +617,7 @@ export default function FilterGrid({
           <button
             className={clsx(
               'px-2 py-1 border rounded text-sm font-semibold transition',
-              'bg-gray-200 text-gray-900 border-gray-300 dark:bg-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-700'
+              'bg-muted text-foreground border-border hover:bg-muted/80'
             )}
             onClick={(e) => {
               e.preventDefault();
@@ -641,7 +641,7 @@ export default function FilterGrid({
           <button
             className={clsx(
               'px-2 py-1 border rounded text-sm transition opacity-70 hover:opacity-100',
-              'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700'
+              'bg-muted text-muted-foreground border-border hover:bg-muted/80'
             )}
             onClick={(e) => {
               e.preventDefault();
@@ -655,7 +655,7 @@ export default function FilterGrid({
       </div>
       {/* Brigades */}
       <div>
-        <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Good Brigades</p>
+        <p className="text-muted-foreground uppercase mb-1 text-sm">Good Brigades</p>
         <div className="flex flex-wrap gap-2 mb-2 justify-start">
           {goodBrigadeIcons.map((icon) => (
             <img
@@ -664,14 +664,14 @@ export default function FilterGrid({
               alt={icon}
               className={clsx(
                 "h-10 w-10 sm:h-8 sm:w-auto cursor-pointer",
-                selectedIconFilters.some(f => f.icon === icon) && "ring-2 ring-blue-500 dark:ring-blue-300"
+                selectedIconFilters.some(f => f.icon === icon) && "ring-2 ring-primary"
               )}
               onClick={() => toggleIconFilter(icon)}
               style={{ minWidth: 32, minHeight: 32 }}
             />
           ))}
         </div>
-        <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Evil Brigades</p>
+        <p className="text-muted-foreground uppercase mb-1 text-sm">Evil Brigades</p>
         <div className="flex flex-wrap gap-2 justify-start">
           {evilBrigadeIcons.map((icon) => (
             <img
@@ -680,7 +680,7 @@ export default function FilterGrid({
               alt={icon}
               className={clsx(
                 "h-10 w-10 sm:h-8 sm:w-auto cursor-pointer",
-                selectedIconFilters.some(f => f.icon === icon) && "ring-2 ring-blue-500 dark:ring-blue-300"
+                selectedIconFilters.some(f => f.icon === icon) && "ring-2 ring-primary"
               )}
               onClick={() => toggleIconFilter(icon)}
               style={{ minWidth: 32, minHeight: 32 }}

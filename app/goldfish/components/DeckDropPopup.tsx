@@ -40,7 +40,7 @@ export function DeckDropPopup({ x, y, onShuffleIn, onTopDeck, onBottomDeck, onEx
     background: 'transparent',
     border: 'none',
     cursor: 'pointer',
-    color: '#c9b99a',
+    color: 'var(--gf-text)',
     fontSize: 12,
     fontFamily: 'var(--font-cinzel), Georgia, serif',
     textAlign: 'left',
@@ -54,8 +54,8 @@ export function DeckDropPopup({ x, y, onShuffleIn, onTopDeck, onBottomDeck, onEx
         position: 'fixed',
         left: Math.min(x, window.innerWidth - 170),
         top: Math.min(y, window.innerHeight - 140),
-        background: '#2a1f12',
-        border: '1px solid #6b4e27',
+        background: 'var(--gf-bg)',
+        border: '1px solid var(--gf-border)',
         borderRadius: 6,
         padding: '4px 0',
         zIndex: 800,
@@ -65,7 +65,7 @@ export function DeckDropPopup({ x, y, onShuffleIn, onTopDeck, onBottomDeck, onEx
     >
       <div style={{
         padding: '3px 14px',
-        color: '#8b6532',
+        color: 'var(--gf-text-dim)',
         fontSize: 9,
         textTransform: 'uppercase',
         letterSpacing: '0.08em',
@@ -76,7 +76,7 @@ export function DeckDropPopup({ x, y, onShuffleIn, onTopDeck, onBottomDeck, onEx
       <button
         style={btnStyle}
         onClick={onShuffleIn}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(196,149,90,0.15)'; }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
         <Shuffle size={13} /> Shuffle In
@@ -84,7 +84,7 @@ export function DeckDropPopup({ x, y, onShuffleIn, onTopDeck, onBottomDeck, onEx
       <button
         style={btnStyle}
         onClick={onTopDeck}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(196,149,90,0.15)'; }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
         <ArrowUp size={13} /> Top of Deck
@@ -92,16 +92,16 @@ export function DeckDropPopup({ x, y, onShuffleIn, onTopDeck, onBottomDeck, onEx
       <button
         style={btnStyle}
         onClick={onBottomDeck}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(196,149,90,0.15)'; }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
         <ArrowDown size={13} /> Bottom of Deck
       </button>
-      <div style={{ height: 1, background: '#6b4e27', margin: '4px 8px', opacity: 0.5 }} />
+      <div style={{ height: 1, background: 'var(--gf-border)', margin: '4px 8px', opacity: 0.5 }} />
       <button
         style={btnStyle}
         onClick={onExchange}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(196,149,90,0.15)'; }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
         <ArrowLeftRight size={13} /> Exchange

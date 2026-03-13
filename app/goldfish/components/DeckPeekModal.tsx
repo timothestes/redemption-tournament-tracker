@@ -32,10 +32,10 @@ function PeekActionButton({ icon, label, onClick, style }: {
         alignItems: 'center',
         gap: 5,
         padding: '5px 12px',
-        background: '#2a1f12',
-        border: '1px solid #6b4e27',
+        background: 'var(--gf-bg)',
+        border: '1px solid var(--gf-border)',
         borderRadius: 5,
-        color: '#e8d5a3',
+        color: 'var(--gf-text-bright)',
         fontSize: 12,
         fontFamily: 'var(--font-cinzel), Georgia, serif',
         cursor: 'pointer',
@@ -44,11 +44,11 @@ function PeekActionButton({ icon, label, onClick, style }: {
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.background = '#3d2e1a';
-        e.currentTarget.style.borderColor = '#c4955a';
+        e.currentTarget.style.borderColor = 'var(--gf-accent)';
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = '#2a1f12';
-        e.currentTarget.style.borderColor = '#6b4e27';
+        e.currentTarget.style.background = 'var(--gf-bg)';
+        e.currentTarget.style.borderColor = 'var(--gf-border)';
       }}
     >
       {icon}
@@ -278,7 +278,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
         onPointerDown={handleContentPointerDown}
         style={{
           background: '#1e1610',
-          border: '1px solid #6b4e27',
+          border: '1px solid var(--gf-border)',
           borderRadius: 8,
           padding: 20,
           width: typeof maxWidth === 'string' ? maxWidth : undefined,
@@ -295,7 +295,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <h2 style={{
               fontFamily: 'var(--font-cinzel), Georgia, serif',
-              color: '#e8d5a3',
+              color: 'var(--gf-text-bright)',
               fontSize: 16,
               margin: 0,
             }}>
@@ -304,7 +304,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
             {selectedIds.size > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{
-                  color: '#c4955a',
+                  color: 'var(--gf-accent)',
                   fontSize: 12,
                   fontFamily: 'var(--font-cinzel), Georgia, serif',
                 }}>
@@ -314,9 +314,9 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
                   onClick={(e) => { e.stopPropagation(); setSelectedIds(new Set()); }}
                   style={{
                     background: 'transparent',
-                    border: '1px solid #6b4e27',
+                    border: '1px solid var(--gf-border)',
                     borderRadius: 4,
-                    color: '#8b6532',
+                    color: 'var(--gf-text-dim)',
                     fontSize: 10,
                     padding: '2px 6px',
                     cursor: 'pointer',
@@ -330,7 +330,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
           </div>
           <button
             onClick={() => handleCloseAction('top')}
-            style={{ background: 'none', border: 'none', color: '#c9b99a', cursor: 'pointer' }}
+            style={{ background: 'none', border: 'none', color: 'var(--gf-text)', cursor: 'pointer' }}
           >
             <X size={18} />
           </button>
@@ -338,7 +338,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
 
         <p style={{
           fontFamily: 'var(--font-cinzel), Georgia, serif',
-          color: '#8b6532',
+          color: 'var(--gf-text-dim)',
           fontSize: 11,
           marginBottom: 12,
         }}>
@@ -348,7 +348,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
         {peekedCards.length === 0 ? (
           <p style={{
             fontFamily: 'var(--font-cinzel), Georgia, serif',
-            color: '#6b4e27',
+            color: 'var(--gf-border)',
             fontSize: 13,
             textAlign: 'center',
             padding: 20,
@@ -393,7 +393,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
                         style={{
                           width: '100%',
                           borderRadius: 4,
-                          border: isSelected ? '2px solid #c4955a' : '1px solid #6b4e27',
+                          border: isSelected ? '2px solid var(--gf-accent)' : '1px solid var(--gf-border)',
                           boxShadow: glowStyle?.boxShadow ?? selectedShadow,
                           transition: 'border 0.1s ease',
                         }}
@@ -402,14 +402,14 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
                       <div style={{
                         width: '100%',
                         aspectRatio: '2.5/3.5',
-                        background: '#2a1f12',
-                        border: isSelected ? '2px solid #c4955a' : '1px solid #6b4e27',
+                        background: 'var(--gf-bg)',
+                        border: isSelected ? '2px solid var(--gf-accent)' : '1px solid var(--gf-border)',
                         boxShadow: glowStyle?.boxShadow ?? selectedShadow,
                         borderRadius: 4,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: '#c9b99a',
+                        color: 'var(--gf-text)',
                         fontSize: 11,
                         fontFamily: 'var(--font-cinzel), Georgia, serif',
                         textAlign: 'center',
@@ -433,7 +433,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
                   top: lassoRect.y,
                   width: lassoRect.w,
                   height: lassoRect.h,
-                  border: '1px dashed #c4955a',
+                  border: '1px dashed var(--gf-accent)',
                   background: 'rgba(196,149,90,0.12)',
                   borderRadius: 2,
                   pointerEvents: 'none',
@@ -458,7 +458,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
             <>
               <span style={{
                 fontFamily: 'var(--font-cinzel), Georgia, serif',
-                color: '#6b4e27',
+                color: 'var(--gf-border)',
                 fontSize: 11,
                 marginRight: 4,
               }}>

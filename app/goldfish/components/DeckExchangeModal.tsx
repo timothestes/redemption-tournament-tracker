@@ -214,8 +214,8 @@ export function DeckExchangeModal({
         <div
           onClick={(e) => e.stopPropagation()}
           style={{
-            background: '#2a1f12',
-            border: '1px solid #6b4e27',
+            background: 'var(--gf-bg)',
+            border: '1px solid var(--gf-border)',
             borderRadius: 8,
             padding: 20,
             width: '80vw',
@@ -232,12 +232,12 @@ export function DeckExchangeModal({
           {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <ArrowLeftRight size={16} style={{ color: '#c4955a' }} />
+              <ArrowLeftRight size={16} style={{ color: 'var(--gf-accent)' }} />
               <h2
                 style={{
                   fontFamily: 'var(--font-cinzel), Georgia, serif',
                   fontSize: 16,
-                  color: '#e8d5a3',
+                  color: 'var(--gf-text-bright)',
                 }}
               >
                 Exchange — Pick {needCount} card{needCount > 1 ? 's' : ''} from Deck
@@ -245,7 +245,7 @@ export function DeckExchangeModal({
             </div>
             <button
               onClick={onCancel}
-              style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#8b6532' }}
+              style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--gf-text-dim)' }}
             >
               <X size={18} />
             </button>
@@ -258,26 +258,26 @@ export function DeckExchangeModal({
             gap: 8,
             padding: '8px 12px',
             background: 'rgba(196, 149, 90, 0.1)',
-            border: '1px solid rgba(196, 149, 90, 0.25)',
+            border: '1px solid var(--gf-hover-strong)',
             borderRadius: 6,
             marginBottom: 12,
           }}>
-            <span style={{ color: '#c9b99a', fontSize: 12, fontFamily: 'var(--font-cinzel), Georgia, serif' }}>
+            <span style={{ color: 'var(--gf-text)', fontSize: 12, fontFamily: 'var(--font-cinzel), Georgia, serif' }}>
               Sending to deck:
             </span>
             {exchangeCards.map(c => (
               <span key={c.instanceId} style={{
-                color: '#e8d5a3',
+                color: 'var(--gf-text-bright)',
                 fontSize: 12,
                 fontFamily: 'var(--font-cinzel), Georgia, serif',
-                background: 'rgba(196, 149, 90, 0.15)',
+                background: 'var(--gf-hover)',
                 padding: '2px 8px',
                 borderRadius: 4,
               }}>
                 {c.cardName}
               </span>
             ))}
-            <span style={{ color: '#8b6532', fontSize: 11, marginLeft: 'auto' }}>
+            <span style={{ color: 'var(--gf-text-dim)', fontSize: 11, marginLeft: 'auto' }}>
               {selectedIds.size}/{needCount} selected
             </span>
           </div>
@@ -293,9 +293,9 @@ export function DeckExchangeModal({
                   WebkitAppearance: 'none',
                   padding: '8px 28px 8px 10px',
                   background: '#1e1610',
-                  border: '1px solid #6b4e27',
+                  border: '1px solid var(--gf-border)',
                   borderRadius: 4,
-                  color: '#c9b99a',
+                  color: 'var(--gf-text)',
                   fontSize: 12,
                   fontFamily: 'var(--font-cinzel), Georgia, serif',
                   outline: 'none',
@@ -312,7 +312,7 @@ export function DeckExchangeModal({
                 top: '50%',
                 transform: 'translateY(-50%)',
                 pointerEvents: 'none',
-                color: '#8b6532',
+                color: 'var(--gf-text-dim)',
                 fontSize: 10,
               }}>
                 ▼
@@ -326,7 +326,7 @@ export function DeckExchangeModal({
                   left: 10,
                   top: '50%',
                   transform: 'translateY(-50%)',
-                  color: '#8b6532',
+                  color: 'var(--gf-text-dim)',
                 }}
               />
               <input
@@ -339,9 +339,9 @@ export function DeckExchangeModal({
                   width: '100%',
                   padding: '8px 30px 8px 30px',
                   background: '#1e1610',
-                  border: '1px solid #6b4e27',
+                  border: '1px solid var(--gf-border)',
                   borderRadius: 4,
-                  color: '#c9b99a',
+                  color: 'var(--gf-text)',
                   fontSize: 13,
                   outline: 'none',
                 }}
@@ -357,7 +357,7 @@ export function DeckExchangeModal({
                     background: 'transparent',
                     border: 'none',
                     cursor: 'pointer',
-                    color: '#8b6532',
+                    color: 'var(--gf-text-dim)',
                     padding: 2,
                     display: 'flex',
                     alignItems: 'center',
@@ -371,7 +371,7 @@ export function DeckExchangeModal({
 
           {/* Hint */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <span style={{ color: '#6b4e27', fontSize: 10 }}>
+            <span style={{ color: 'var(--gf-border)', fontSize: 10 }}>
               Click to select · Drag to a zone to exchange · Hover to enlarge
             </span>
           </div>
@@ -379,7 +379,7 @@ export function DeckExchangeModal({
           {/* Card grid */}
           <div style={{ overflow: 'auto', flex: 1 }}>
             {filtered.length === 0 ? (
-              <p style={{ color: '#8b6532', fontStyle: 'italic', textAlign: 'center', padding: 20 }}>
+              <p style={{ color: 'var(--gf-text-dim)', fontStyle: 'italic', textAlign: 'center', padding: 20 }}>
                 {search ? 'No cards match your search' : 'Deck is empty'}
               </p>
             ) : (
@@ -416,7 +416,7 @@ export function DeckExchangeModal({
                             style={{
                               width: '100%',
                               borderRadius: 4,
-                              border: isSelected ? '2px solid #c4955a' : '1px solid #6b4e27',
+                              border: isSelected ? '2px solid var(--gf-accent)' : '1px solid var(--gf-border)',
                               boxShadow: glowStyle?.boxShadow ?? selectedShadow,
                               transition: 'border 0.1s ease',
                             }}
@@ -427,13 +427,13 @@ export function DeckExchangeModal({
                               width: '100%',
                               aspectRatio: '1/1.4',
                               background: '#1e1610',
-                              border: isSelected ? '2px solid #c4955a' : '1px solid #6b4e27',
+                              border: isSelected ? '2px solid var(--gf-accent)' : '1px solid var(--gf-border)',
                               boxShadow: glowStyle?.boxShadow ?? selectedShadow,
                               borderRadius: 4,
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              color: '#6b4e27',
+                              color: 'var(--gf-border)',
                               fontSize: 11,
                               padding: 4,
                               textAlign: 'center',
@@ -446,7 +446,7 @@ export function DeckExchangeModal({
                       })()}
                       <p style={{
                         fontSize: 10,
-                        color: '#8b6532',
+                        color: 'var(--gf-text-dim)',
                         marginTop: 2,
                         textAlign: 'center',
                         overflow: 'hidden',
@@ -477,9 +477,9 @@ export function DeckExchangeModal({
               style={{
                 padding: '8px 16px',
                 background: 'transparent',
-                border: '1px solid #6b4e27',
+                border: '1px solid var(--gf-border)',
                 borderRadius: 6,
-                color: '#8b6532',
+                color: 'var(--gf-text-dim)',
                 fontSize: 12,
                 fontFamily: 'var(--font-cinzel), Georgia, serif',
                 cursor: 'pointer',
@@ -492,10 +492,10 @@ export function DeckExchangeModal({
               disabled={selectedIds.size !== needCount}
               style={{
                 padding: '8px 20px',
-                background: selectedIds.size === needCount ? 'rgba(196, 149, 90, 0.25)' : 'rgba(107, 78, 39, 0.15)',
-                border: `1px solid ${selectedIds.size === needCount ? '#c4955a' : '#6b4e27'}`,
+                background: selectedIds.size === needCount ? 'var(--gf-hover-strong)' : 'rgba(107, 78, 39, 0.15)',
+                border: `1px solid ${selectedIds.size === needCount ? 'var(--gf-accent)' : 'var(--gf-border)'}`,
                 borderRadius: 6,
-                color: selectedIds.size === needCount ? '#e8d5a3' : '#6b4e27',
+                color: selectedIds.size === needCount ? 'var(--gf-text-bright)' : 'var(--gf-border)',
                 fontSize: 12,
                 fontFamily: 'var(--font-cinzel), Georgia, serif',
                 cursor: selectedIds.size === needCount ? 'pointer' : 'not-allowed',

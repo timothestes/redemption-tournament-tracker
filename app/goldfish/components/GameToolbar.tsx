@@ -51,7 +51,7 @@ export function GameToolbar() {
         gap: 4,
         padding: '6px 12px',
         background: 'rgba(30,22,16,0.92)',
-        border: '1px solid #6b4e27',
+        border: '1px solid var(--gf-border)',
         borderRadius: 8,
         zIndex: 200,
       }}
@@ -70,17 +70,17 @@ export function GameToolbar() {
             background: 'transparent',
             border: 'none',
             cursor: 'pointer',
-            color: '#c9b99a',
+            color: 'var(--gf-text)',
             borderRadius: 4,
             transition: 'background 0.15s, color 0.15s',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(196,149,90,0.15)';
-            e.currentTarget.style.color = '#e8d5a3';
+            e.currentTarget.style.background = 'var(--gf-hover)';
+            e.currentTarget.style.color = 'var(--gf-text-bright)';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.background = 'transparent';
-            e.currentTarget.style.color = '#c9b99a';
+            e.currentTarget.style.color = 'var(--gf-text)';
           }}
         >
           <Icon size={18} />

@@ -111,3 +111,6 @@ Deck Check PDF screen: ability to select one of your decks
 Add Iron Man checkbox to side event
 Add sort options for card search
 Cactus tournament data pipeline
+tournament tracker mobile ux support
+Better top nav (could probably remove report a bug)
+Remove description from stats in deckbuilder

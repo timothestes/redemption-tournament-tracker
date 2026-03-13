@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 interface FolderModalProps {
   mode: "create" | "rename";
@@ -12,18 +19,6 @@ interface FolderModalProps {
 export default function FolderModal({ mode, initialName = "", onConfirm, onClose }: FolderModalProps) {
   const [name, setName] = useState(initialName);
 
-  // Handle ESC key to close modal
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [onClose]);
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim()) {
@@ -33,22 +28,14 @@ export default function FolderModal({ mode, initialName = "", onConfirm, onClose
   };
 
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div 
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+    <Dialog open={true} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent size="md">
+        <DialogHeader>
+          <DialogTitle>
             {mode === "create" ? "Create New Folder" : "Rename Folder"}
-          </h3>
-        </div>
+          </DialogTitle>
+        </DialogHeader>
 
-        {/* Body */}
         <form onSubmit={handleSubmit}>
           <div className="px-6 py-4">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -68,8 +55,7 @@ export default function FolderModal({ mode, initialName = "", onConfirm, onClose
             </p>
           </div>
 
-          {/* Footer */}
-          <div className="bg-gray-50 dark:bg-gray-900/50 px-6 py-4 flex gap-3 justify-end border-t border-gray-200 dark:border-gray-700">
+          <DialogFooter className="bg-gray-50 dark:bg-gray-900/50 justify-end">
             <button
               type="button"
               onClick={onClose}
@@ -87,9 +73,9 @@ export default function FolderModal({ mode, initialName = "", onConfirm, onClose
               </svg>
               {mode === "create" ? "Create Folder" : "Rename"}
             </button>
-          </div>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
