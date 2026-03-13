@@ -949,6 +949,7 @@ function FolderItem({
             e.stopPropagation();
             setShowMenu(!showMenu);
           }}
+          aria-label="Folder menu"
           className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
         >
           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">

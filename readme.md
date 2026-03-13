@@ -99,15 +99,25 @@ We will want to let the host print it out easily
 
 # Backlog
 
-Wiki-style Card Rulings section
-Collection Tracker
+## short term
 YTG Sponsorship
 Google Auth Options
-Play Redemption Online with Matchmaking
 Spawn Lost Soul Tokens
-Comprehensive Deck Legality Validation
 Paragon Deck Check PDF support
 Deck Check PDF screen: ability to select one of your decks
 Add Iron Man checkbox to side event
 Add sort options for card search
-Cactus tournament data pipeline
+add animations to goldfish mode
+
+## long term
+Wiki-style Card Rulings section
+Collection Tracker
+Play Redemption Online with Matchmaking
+Comprehensive Deck Legality Validation
+Attaching private decklists to Tournament tracker players
+misc tournament tracker improvements
+Making Tournament results public
+Joining a tournament via QR code
+metagame snapshot
+tournament tracker mobile ux support
+Cactus tournament data pipeline.

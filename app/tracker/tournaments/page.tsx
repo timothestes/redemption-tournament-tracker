@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Breadcrumb from "../../../components/ui/breadcrumb";
 import { createClient } from "../../../utils/supabase/client";
 import ToastNotification from "../../../components/ui/toast-notification";
-import { Table, Button } from "flowbite-react";
+import { Button } from "../../../components/ui/button";
 import { HiPencil, HiTrash, HiPlus } from "react-icons/hi";
 import { useRouter } from "next/navigation";
 import TournamentFormModal from "../../../components/ui/tournament-form-modal";
@@ -102,9 +102,7 @@ export default function TournamentsPage() {
           <h1 className="text-2xl font-bold mr-8 mt-2">Your Tournaments</h1>
           <Button
             onClick={() => setisAddTournamentModalOpen(true)}
-            className="flex items-center gap-3 mt-2"
-            outline
-            gradientDuoTone="greenToBlue"
+            className="flex items-center gap-3 mt-2 bg-emerald-700 dark:bg-emerald-800 text-white hover:bg-emerald-700/90 dark:hover:bg-emerald-800/90"
           >
             <div className="flex items-center gap-1">
               <HiPlus className="w-4 h-4" />
@@ -120,33 +118,32 @@ export default function TournamentsPage() {
         {loading ? (
           <p>Loading tournaments...</p>
         ) : tournaments.length === 0 ? (
-          <div className="space-y-2">
-            <p>No tournaments found.</p>
-            <p>Get started by clicking <strong>Host A Tournament</strong></p>
-          </div>
+          <p className="text-muted-foreground">No tournaments found.</p>
         ) : (
           <div className="overflow-x-auto">
-            <Table hoverable>
-              <Table.Head>
-                <Table.HeadCell>Name</Table.HeadCell>
-                <Table.HeadCell>Created At</Table.HeadCell>
-                <Table.HeadCell>
-                  <span className="sr-only">Actions</span>
-                </Table.HeadCell>
-              </Table.Head>
-              <Table.Body className="divide-y w-full overflow-x-auto rounded-lg">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs uppercase bg-muted text-muted-foreground">
+                <tr>
+                  <th className="px-6 py-3">Name</th>
+                  <th className="px-6 py-3">Created At</th>
+                  <th className="px-6 py-3">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
                 {tournaments.map((tournament) => (
-                  <Table.Row
+                  <tr
                     key={tournament.id}
-                    className="bg-white dark:border-gray-700 dark:bg-gray-800 cursor-pointer hover:bg-gray-100"
+                    className="bg-card cursor-pointer hover:bg-muted"
                     onClick={() =>
                       router.push(`/tracker/tournaments/${tournament.id}`)
                     }
                   >
-                    <Table.Cell className="whitespace-nowrap font-medium text-gray-900 dark:text-white">
+                    <td className="px-6 py-4 whitespace-nowrap font-medium text-foreground">
                       {tournament.name}
-                    </Table.Cell>
-                    <Table.Cell className="whitespace-nowrap min-w-[160px]">
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap min-w-[160px] text-muted-foreground">
                       {new Intl.DateTimeFormat("en-US", {
                         year: "numeric",
                         month: "long",
@@ -154,29 +151,33 @@ export default function TournamentsPage() {
                         hour: "2-digit",
                         minute: "2-digit",
                       }).format(new Date(tournament.created_at))}
-                    </Table.Cell>
-                    <Table.Cell className="flex items-center justify-end space-x-4">
-                      <HiPencil
+                    </td>
+                    <td className="px-6 py-4 flex items-center justify-end space-x-2">
+                      <button
                         onClick={(e) => {
                           e.stopPropagation();
                           router.push(`/tracker/tournaments/${tournament.id}`);
                         }}
-                        className="text-blue-500 cursor-pointer hover:text-blue-600 w-6 h-6"
+                        className="p-2 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
                         aria-label="Edit"
-                      />
-                      <HiTrash
+                      >
+                        <HiPencil className="w-5 h-5" />
+                      </button>
+                      <button
                         onClick={(e) => {
                           e.stopPropagation();
                           deleteTournament(tournament.id);
                         }}
-                        className="text-red-500 cursor-pointer hover:text-red-700 w-6 h-6"
+                        className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                         aria-label="Delete"
-                      />
-                    </Table.Cell>
-                  </Table.Row>
+                      >
+                        <HiTrash className="w-5 h-5" />
+                      </button>
+                    </td>
+                  </tr>
                 ))}
-              </Table.Body>
-            </Table>
+              </tbody>
+            </table>
           </div>
         )}
         <ToastNotification

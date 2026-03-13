@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback } from 'react';
-import { useTheme } from 'next-themes';
 
 interface CountdownTimerProps {
   startTime: string | null;
@@ -13,30 +12,24 @@ interface CountdownTimerProps {
 export default function CountdownTimer({ startTime, durationMinutes, soundNotifications = false }: CountdownTimerProps) {
   const [remainingSeconds, setRemainingSeconds] = useState<number>(durationMinutes * 60);
   const [soundPlayed, setSoundPlayed] = useState<boolean>(false);
-  const { theme, resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const playNotificationSound = useCallback(() => {
     if (!soundNotifications || soundPlayed) return;
-    
+
     try {
       // Play MP3 notification sound
       const audio = new Audio('/notification-alert.mp3');
       audio.volume = 0.5; // Set volume to 50%
-      
+
       // Ensure we only play once
       audio.addEventListener('loadstart', () => {
         setSoundPlayed(true);
       });
-      
+
       audio.play().catch((error) => {
         console.warn('Could not play notification sound:', error);
       });
-      
+
     } catch (error) {
       console.warn('Could not play notification sound:', error);
     }
@@ -58,7 +51,7 @@ export default function CountdownTimer({ startTime, durationMinutes, soundNotifi
     // Immediately set initial time
     const initialTime = calculateRemainingTime();
     setRemainingSeconds(initialTime);
-    
+
     // Reset sound played state when timer restarts
     setSoundPlayed(false);
 
@@ -70,9 +63,9 @@ export default function CountdownTimer({ startTime, durationMinutes, soundNotifi
     const intervalId = setInterval(() => {
       const currentTime = calculateRemainingTime();
       const previousTime = remainingSeconds;
-      
+
       setRemainingSeconds(currentTime);
-      
+
       // Play sound only when timer transitions from 1 to 0 (not when it stays at 0)
       if (previousTime > 0 && currentTime === 0 && !soundPlayed) {
         playNotificationSound();
@@ -89,15 +82,30 @@ export default function CountdownTimer({ startTime, durationMinutes, soundNotifi
 
   const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
-  // Don't render theme-specific styling until client-side to avoid hydration mismatch
-  const currentTheme = mounted ? (theme === 'system' ? resolvedTheme : theme) : 'dark';
-  const isLightTheme = currentTheme === 'light';
+  // Color states based on remaining time
+  const totalSeconds = durationMinutes * 60;
+  const percentRemaining = totalSeconds > 0 ? remainingSeconds / totalSeconds : 0;
+  const isExpired = remainingSeconds === 0;
+  const isWarning = !isExpired && percentRemaining <= 0.1; // last 10%
+  const isUrgent = !isExpired && !isWarning && percentRemaining <= 0.25; // last 25%
+
+  const timerColorClass = isExpired
+    ? "text-destructive border-destructive/30 bg-destructive/5"
+    : isWarning
+      ? "text-red-500 dark:text-red-400 border-red-500/30 bg-red-500/5"
+      : isUrgent
+        ? "text-amber-500 dark:text-amber-400 border-amber-500/30 bg-amber-500/5"
+        : "text-foreground border-border bg-muted/50";
 
   return (
-    <div className="flex flex-col items-center">
-      <div className={`text-sm ${isLightTheme ? 'text-gray-600' : 'text-gray-500'} mb-2`}>Current Round Timer</div>
-      <div className={`text-4xl font-mono font-bold ${isLightTheme ? 'bg-gray-100 text-gray-800 border border-gray-300' : 'bg-gray-800 text-white'} px-6 py-3 rounded-lg shadow-lg`}>
-        {timeString}
+    <div className="w-full">
+      <div className={`flex items-center justify-between rounded-lg border px-5 py-3 ${timerColorClass}`}>
+        <span className="text-sm font-medium text-muted-foreground">
+          {isExpired ? "Time's Up" : "Round Timer"}
+        </span>
+        <span className={`text-4xl sm:text-5xl font-mono font-bold tracking-tight tabular-nums ${isExpired ? "text-destructive" : ""}`}>
+          {timeString}
+        </span>
       </div>
     </div>
   );

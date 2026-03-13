@@ -65,7 +65,7 @@ function CardContextPopup({
     background: 'transparent',
     border: 'none',
     cursor: 'pointer',
-    color: '#c9b99a',
+    color: 'var(--gf-text)',
     fontSize: 11,
     textAlign: 'left',
     fontFamily: 'var(--font-cinzel), Georgia, serif',
@@ -82,8 +82,8 @@ function CardContextPopup({
         position: 'fixed',
         left: Math.min(x, window.innerWidth - 160),
         top: Math.min(y, window.innerHeight - 300),
-        background: '#2a1f12',
-        border: '1px solid #6b4e27',
+        background: 'var(--gf-bg)',
+        border: '1px solid var(--gf-border)',
         borderRadius: 6,
         padding: '4px 0',
         zIndex: 600,
@@ -91,7 +91,7 @@ function CardContextPopup({
         boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
       }}
     >
-      <div style={{ ...itemStyle, color: '#8b6532', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', cursor: 'default', padding: '3px 12px' }}>
+      <div style={{ ...itemStyle, color: 'var(--gf-text-dim)', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', cursor: 'default', padding: '3px 12px' }}>
         {label}
       </div>
       {filteredZones.map(({ id, label: zoneLabel }) => (
@@ -99,17 +99,17 @@ function CardContextPopup({
           key={id}
           style={itemStyle}
           onClick={() => { onMove(id); onClose(); }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(196,149,90,0.15)'; }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
         >
           {zoneLabel}
         </button>
       ))}
-      <div style={{ height: 1, background: '#6b4e27', margin: '4px 8px', opacity: 0.5 }} />
+      <div style={{ height: 1, background: 'var(--gf-border)', margin: '4px 8px', opacity: 0.5 }} />
       <button
         style={itemStyle}
         onClick={() => { onMoveToTop(); onClose(); }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(196,149,90,0.15)'; }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
         Top of Deck
@@ -117,7 +117,7 @@ function CardContextPopup({
       <button
         style={itemStyle}
         onClick={() => { onMoveToBottom(); onClose(); }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(196,149,90,0.15)'; }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
         Bottom of Deck
@@ -125,7 +125,7 @@ function CardContextPopup({
       <button
         style={itemStyle}
         onClick={() => { onShuffleIntoDeck(); onClose(); }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(196,149,90,0.15)'; }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
         Shuffle into Deck
@@ -367,8 +367,8 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
         onClick={(e) => { e.stopPropagation(); setContextCard(null); }}
         onPointerDown={handleContentPointerDown}
         style={{
-          background: '#2a1f12',
-          border: '1px solid #6b4e27',
+          background: 'var(--gf-bg)',
+          border: '1px solid var(--gf-border)',
           borderRadius: 8,
           padding: 20,
           maxWidth: 850,
@@ -387,7 +387,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
               style={{
                 fontFamily: 'var(--font-cinzel), Georgia, serif',
                 fontSize: 16,
-                color: '#e8d5a3',
+                color: 'var(--gf-text-bright)',
               }}
             >
               {ZONE_LABELS[zoneId]} ({cards.length})
@@ -395,7 +395,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
             {selectedIds.size > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{
-                  color: '#c4955a',
+                  color: 'var(--gf-accent)',
                   fontSize: 12,
                   fontFamily: 'var(--font-cinzel), Georgia, serif',
                 }}>
@@ -405,9 +405,9 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
                   onClick={(e) => { e.stopPropagation(); setSelectedIds(new Set()); }}
                   style={{
                     background: 'transparent',
-                    border: '1px solid #6b4e27',
+                    border: '1px solid var(--gf-border)',
                     borderRadius: 4,
-                    color: '#8b6532',
+                    color: 'var(--gf-text-dim)',
                     fontSize: 10,
                     padding: '2px 6px',
                     cursor: 'pointer',
@@ -421,14 +421,14 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
           </div>
           <button
             onClick={onClose}
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#8b6532' }}
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--gf-text-dim)' }}
           >
             <X size={18} />
           </button>
         </div>
 
         {cards.length === 0 ? (
-          <p style={{ color: '#8b6532', fontStyle: 'italic' }}>Empty</p>
+          <p style={{ color: 'var(--gf-text-dim)', fontStyle: 'italic' }}>Empty</p>
         ) : (
           <div
             ref={gridRef}
@@ -468,7 +468,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
                         style={{
                           width: '100%',
                           borderRadius: 4,
-                          border: isSelected ? '2px solid #c4955a' : '1px solid #6b4e27',
+                          border: isSelected ? '2px solid var(--gf-accent)' : '1px solid var(--gf-border)',
                           boxShadow: glowStyle?.boxShadow ?? selectedShadow,
                           transition: 'border 0.1s ease',
                         }}
@@ -479,13 +479,13 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
                           width: '100%',
                           aspectRatio: '1/1.4',
                           background: '#1e1610',
-                          border: isSelected ? '2px solid #c4955a' : '1px solid #6b4e27',
+                          border: isSelected ? '2px solid var(--gf-accent)' : '1px solid var(--gf-border)',
                           boxShadow: glowStyle?.boxShadow ?? selectedShadow,
                           borderRadius: 4,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          color: '#8b6532',
+                          color: 'var(--gf-text-dim)',
                           fontSize: 10,
                           transition: 'border 0.1s ease',
                         }}
@@ -507,7 +507,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
                   top: lassoRect.y,
                   width: lassoRect.w,
                   height: lassoRect.h,
-                  border: '1px dashed #c4955a',
+                  border: '1px dashed var(--gf-accent)',
                   background: 'rgba(196,149,90,0.12)',
                   borderRadius: 2,
                   pointerEvents: 'none',

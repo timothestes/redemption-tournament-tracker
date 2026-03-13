@@ -132,6 +132,9 @@ export default function DeckBuilderPanel({
   const [showValidationTooltip, setShowValidationTooltip] = useState(false);
   const [showViewDropdown, setShowViewDropdown] = useState(false);
   const viewDropdownBtnRef = useRef<HTMLButtonElement>(null);
+  const tabBarRef = useRef<HTMLDivElement>(null);
+  const tabRefs = useRef<Record<TabType, HTMLButtonElement | null>>({ main: null, reserve: null, info: null, cover: null });
+  const [tabIndicator, setTabIndicator] = useState({ left: 0, width: 0 });
   const [showMobileFullDeckView, setShowMobileFullDeckView] = useState(false);
   const [fullViewPreviewCard, setFullViewPreviewCard] = useState<Card | null>(null);
   const [showParagonDropdown, setShowParagonDropdown] = useState(false);
@@ -145,6 +148,17 @@ export default function DeckBuilderPanel({
   const [coverPickerSlot, setCoverPickerSlot] = useState<1 | 2 | null>(null);
   const [coverPickerSort, setCoverPickerSort] = useState<"default" | "name" | "type" | "brigade">("type");
   const [coverPickerSearch, setCoverPickerSearch] = useState("");
+
+  // Measure active tab position for sliding indicator
+  useEffect(() => {
+    const tab = tabRefs.current[activeTab];
+    const bar = tabBarRef.current;
+    if (tab && bar) {
+      const barRect = bar.getBoundingClientRect();
+      const tabRect = tab.getBoundingClientRect();
+      setTabIndicator({ left: tabRect.left - barRect.left, width: tabRect.width });
+    }
+  }, [activeTab]);
 
   // Close cover picker on Escape
   useEffect(() => {
@@ -273,6 +287,10 @@ export default function DeckBuilderPanel({
 
   // View options
   const [viewLayout, setViewLayout] = useState<'grid' | 'list'>('grid');
+
+  // Swipe-to-dismiss for mobile bottom sheet
+  const sheetTouchRef = useRef<{ startY: number; currentY: number } | null>(null);
+  const [sheetTranslateY, setSheetTranslateY] = useState(0);
 
   const [groupBy, setGroupBy] = useState<'type' | 'alignment'>('type');
 
@@ -603,7 +621,7 @@ export default function DeckBuilderPanel({
   };
 
   return (
-    <div className="w-full h-full flex flex-col bg-gray-50 dark:bg-gray-900">
+    <div className="w-full h-full flex flex-col bg-card">
       {/* Header */}
       <div className="flex-shrink-0 px-3 py-2 md:p-4 border-b border-gray-200/60 dark:border-gray-700/60 overflow-visible relative z-30">
         {/* Deck Name + Counts Row */}
@@ -1465,12 +1483,22 @@ export default function DeckBuilderPanel({
       {/* ...existing code... */}
       {/* Tabs - Hide when expanded (full screen view) */}
       {!isExpanded && (
-      <div className="flex-shrink-0 flex items-center border-b border-gray-200/60 dark:border-gray-700/60 bg-white dark:bg-gray-800 relative z-20">
+      <div ref={tabBarRef} className="flex-shrink-0 flex items-center border-b border-gray-200/60 dark:border-gray-700/60 bg-white dark:bg-gray-800 relative z-20">
+        {/* Sliding tab indicator */}
+        <div
+          className="absolute bottom-0 h-0.5 bg-blue-600 dark:bg-blue-500 transition-all duration-200"
+          style={{
+            transitionTimingFunction: 'var(--ease-out-quart)',
+            width: tabIndicator.width,
+            transform: `translateX(${tabIndicator.left}px)`,
+          }}
+        />
         <button
+          ref={(el) => { tabRefs.current.main = el; }}
           onClick={() => handleTabChange("main")}
-          className={`flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors whitespace-nowrap text-center ${
+          className={`flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
             activeTab === "main"
-              ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
+              ? "text-blue-600 dark:text-blue-400"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
           }`}
         >
@@ -1478,10 +1506,11 @@ export default function DeckBuilderPanel({
           <span className="hidden md:inline">Main ({mainDeckCount})</span>
         </button>
         <button
+          ref={(el) => { tabRefs.current.reserve = el; }}
           onClick={() => handleTabChange("reserve")}
-          className={`flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors whitespace-nowrap text-center ${
+          className={`flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
             activeTab === "reserve"
-              ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
+              ? "text-blue-600 dark:text-blue-400"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
           }`}
         >
@@ -1489,12 +1518,13 @@ export default function DeckBuilderPanel({
           <span className="hidden md:inline">Reserve ({reserveCount})</span>
         </button>
         <button
+          ref={(el) => { tabRefs.current.info = el; }}
           onClick={() => handleTabChange("info")}
           onMouseEnter={() => setShowValidationTooltip(true)}
           onMouseLeave={() => setShowValidationTooltip(false)}
-          className={`relative flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors whitespace-nowrap text-center ${
+          className={`relative flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
             activeTab === "info"
-              ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
+              ? "text-blue-600 dark:text-blue-400"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
           }`}
         >
@@ -1563,10 +1593,11 @@ export default function DeckBuilderPanel({
 
         {/* Details Tab (Cover Cards + Description) */}
         <button
+          ref={(el) => { tabRefs.current.cover = el; }}
           onClick={() => handleTabChange("cover")}
-          className={`flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors whitespace-nowrap text-center ${
+          className={`flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
             activeTab === "cover"
-              ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500"
+              ? "text-blue-600 dark:text-blue-400"
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
           }`}
         >
@@ -1601,11 +1632,37 @@ export default function DeckBuilderPanel({
                 onClick={() => setShowViewDropdown(false)}
               />
               {/* Mobile: bottom sheet */}
-              <div className="
-                md:hidden
-                fixed bottom-14 left-0 right-0 pb-[env(safe-area-inset-bottom)] rounded-t-2xl max-h-[70vh] overflow-y-auto
-                bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl py-2 z-[70]
-              ">
+              <div
+                className="
+                  md:hidden
+                  fixed bottom-14 left-0 right-0 pb-[env(safe-area-inset-bottom)] rounded-t-2xl max-h-[70vh] overflow-y-auto
+                  bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl py-2 z-[70]
+                "
+                style={{
+                  transform: sheetTranslateY > 0 ? `translateY(${sheetTranslateY}px)` : undefined,
+                  transition: sheetTranslateY === 0 ? 'transform 0.2s ease-out' : undefined,
+                }}
+                onTouchStart={(e) => {
+                  sheetTouchRef.current = { startY: e.touches[0].clientY, currentY: e.touches[0].clientY };
+                }}
+                onTouchMove={(e) => {
+                  if (!sheetTouchRef.current) return;
+                  sheetTouchRef.current.currentY = e.touches[0].clientY;
+                  const delta = sheetTouchRef.current.currentY - sheetTouchRef.current.startY;
+                  if (delta > 0) {
+                    setSheetTranslateY(delta);
+                  }
+                }}
+                onTouchEnd={() => {
+                  if (!sheetTouchRef.current) return;
+                  const delta = sheetTouchRef.current.currentY - sheetTouchRef.current.startY;
+                  if (delta > 80) {
+                    setShowViewDropdown(false);
+                  }
+                  setSheetTranslateY(0);
+                  sheetTouchRef.current = null;
+                }}
+              >
                 {/* Drag handle */}
                 <div className="flex justify-center py-2">
                   <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
@@ -1736,7 +1793,7 @@ export default function DeckBuilderPanel({
                   <Switch
                     checked={!disableHoverPreview}
                     onChange={() => setDisableHoverPreview((v) => !v)}
-                    className={`${!disableHoverPreview ? 'bg-green-700' : 'bg-gray-300 dark:bg-gray-700'} relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none`}
+                    className={`${!disableHoverPreview ? 'bg-green-700' : 'bg-gray-300 dark:bg-gray-700'} relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2`}
                   >
                     <span
                       className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${!disableHoverPreview ? 'translate-x-5' : 'translate-x-1'}`}
@@ -1801,11 +1858,11 @@ export default function DeckBuilderPanel({
       )}
 
       {/* Content */}
-      <div className={`flex-1 overflow-y-auto ${isExpanded ? '' : 'p-4'}`} data-deck-grid>
+      <div className={`flex-1 overflow-y-auto overflow-x-hidden ${isExpanded ? '' : 'p-4'}`} data-deck-grid>
         {/* Paragon Requirements (only show for Paragon format with a selected Paragon) */}
-        {deckType === 'Paragon' && deck.paragon && validation.paragonStats && (
+        {deckType === 'Paragon' && deck.paragon && validation.paragonStats && (activeTab === 'main' || activeTab === 'reserve') && (
           <div className="mb-4">
-            <div className="p-4 bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-2 border-purple-300 dark:border-purple-600 rounded-xl shadow-md">
+            <div className="p-3 md:p-4 bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-2 border-purple-300 dark:border-purple-600 rounded-xl shadow-md overflow-hidden">
               {/* Mobile: stack vertically. Desktop: side by side */}
               <div className="flex flex-col md:flex-row md:items-start gap-3 md:gap-4">
                 {/* Paragon Card Artwork - Click to Expand */}
@@ -2033,7 +2090,7 @@ export default function DeckBuilderPanel({
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  Paste from Clipboard
+                  Import or Paste from Clipboard
                 </button>
               </div>
             )}
@@ -2713,17 +2770,6 @@ export default function DeckBuilderPanel({
               </div>
             </div>
 
-            {deck.description && (
-              <div>
-                <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  Description
-                </h3>
-                <p className="text-gray-600 dark:text-gray-400 text-sm">
-                  {deck.description}
-                </p>
-              </div>
-            )}
-
             <div className="text-xs text-gray-500 dark:text-gray-500">
               <div>Created: {deck.createdAt.toLocaleDateString()}</div>
               <div>Updated: {deck.updatedAt.toLocaleString()}</div>
@@ -2927,6 +2973,7 @@ export default function DeckBuilderPanel({
               <div className="relative max-w-[300px] w-full" onClick={(e) => e.stopPropagation()}>
                 <button
                   onClick={() => setFullViewPreviewCard(null)}
+                  aria-label="Close card preview"
                   className="absolute -top-3 -right-3 z-10 w-8 h-8 rounded-full bg-gray-800 border border-gray-600 text-white flex items-center justify-center hover:bg-gray-700 transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>

@@ -55,8 +55,8 @@ export function CardContextMenu({ card: initialCard, x, y, onClose, onExchange }
     position: 'absolute',
     left: Math.min(x, window.innerWidth - 200),
     top: Math.min(y, window.innerHeight - 400),
-    background: '#2a1f12',
-    border: '1px solid #6b4e27',
+    background: 'var(--gf-bg)',
+    border: '1px solid var(--gf-border)',
     borderRadius: 6,
     padding: '4px 0',
     zIndex: 500,
@@ -69,11 +69,12 @@ export function CardContextMenu({ card: initialCard, x, y, onClose, onExchange }
   const itemStyle: React.CSSProperties = {
     display: 'block',
     width: '100%',
-    padding: '8px 16px',
+    padding: '10px 16px',
+    minHeight: 44,
     background: 'transparent',
     border: 'none',
     cursor: 'pointer',
-    color: '#c9b99a',
+    color: 'var(--gf-text)',
     fontSize: 13,
     textAlign: 'left',
     fontFamily: 'var(--font-cinzel), Georgia, serif',
@@ -81,14 +82,14 @@ export function CardContextMenu({ card: initialCard, x, y, onClose, onExchange }
 
   const separatorStyle: React.CSSProperties = {
     height: 1,
-    background: '#6b4e27',
+    background: 'var(--gf-border)',
     margin: '4px 8px',
     opacity: 0.5,
   };
 
   const labelStyle: React.CSSProperties = {
     ...itemStyle,
-    color: '#8b6532',
+    color: 'var(--gf-text-dim)',
     fontSize: 10,
     textTransform: 'uppercase' as const,
     letterSpacing: '0.08em',
@@ -131,8 +132,8 @@ export function CardContextMenu({ card: initialCard, x, y, onClose, onExchange }
                     if (count > 0) removeCounter(card.instanceId, color.id);
                   }}
                   style={{
-                    width: 30,
-                    height: 30,
+                    width: 44,
+                    height: 44,
                     borderRadius: '50%',
                     background: color.hex,
                     border: count > 0 ? '2px solid rgba(255,255,255,0.8)' : '2px solid rgba(255,255,255,0.2)',
@@ -154,7 +155,7 @@ export function CardContextMenu({ card: initialCard, x, y, onClose, onExchange }
               );
             })}
           </div>
-          <div style={{ padding: '0 16px 4px', fontSize: 9, color: '#6b4e27', fontFamily: 'var(--font-cinzel), Georgia, serif' }}>
+          <div style={{ padding: '0 16px 4px', fontSize: 9, color: 'var(--gf-border)', fontFamily: 'var(--font-cinzel), Georgia, serif' }}>
             Left-click +1 · Right-click -1
           </div>
         </>
@@ -163,7 +164,7 @@ export function CardContextMenu({ card: initialCard, x, y, onClose, onExchange }
       <button
         style={itemStyle}
         onClick={() => doAction(() => card.isMeek ? unmeekCard(card.instanceId) : meekCard(card.instanceId))}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(196,149,90,0.15)'; }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
         {card.isMeek ? 'Unmeek' : 'Make Meek'}
@@ -172,7 +173,7 @@ export function CardContextMenu({ card: initialCard, x, y, onClose, onExchange }
       <button
         style={itemStyle}
         onClick={() => doAction(() => flipCard(card.instanceId))}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(196,149,90,0.15)'; }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
         {card.isFlipped ? 'Turn Face-Up' : 'Turn Face-Down'}
@@ -185,7 +186,7 @@ export function CardContextMenu({ card: initialCard, x, y, onClose, onExchange }
       <button
         style={itemStyle}
         onClick={() => doAction(() => moveCardToTopOfDeck(card.instanceId))}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(196,149,90,0.15)'; }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
         Top of Deck
@@ -193,7 +194,7 @@ export function CardContextMenu({ card: initialCard, x, y, onClose, onExchange }
       <button
         style={itemStyle}
         onClick={() => doAction(() => moveCardToBottomOfDeck(card.instanceId))}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(196,149,90,0.15)'; }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
         Bottom of Deck
@@ -201,7 +202,7 @@ export function CardContextMenu({ card: initialCard, x, y, onClose, onExchange }
       <button
         style={itemStyle}
         onClick={() => doAction(() => shuffleCardIntoDeck(card.instanceId))}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(196,149,90,0.15)'; }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
         Shuffle into Deck
@@ -210,7 +211,7 @@ export function CardContextMenu({ card: initialCard, x, y, onClose, onExchange }
         <button
           style={itemStyle}
           onClick={() => { onClose(); onExchange([card.instanceId]); }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(196,149,90,0.15)'; }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
         >
           Exchange with Deck
@@ -227,7 +228,7 @@ export function CardContextMenu({ card: initialCard, x, y, onClose, onExchange }
             key={zoneId}
             style={itemStyle}
             onClick={() => doAction(() => moveCard(card.instanceId, zoneId))}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(196,149,90,0.15)'; }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
           >
             {ZONE_LABELS[zoneId]}

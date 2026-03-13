@@ -52,7 +52,7 @@ export function LoadingScreen({ progress }: { progress: number }) {
         width: '100vw',
         height: '100vh',
         overflow: 'hidden',
-        background: '#0d0905',
+        background: 'var(--gf-bg-dark)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -89,7 +89,7 @@ export function LoadingScreen({ progress }: { progress: number }) {
         <p
           className="font-cinzel"
           style={{
-            color: '#c9b99a',
+            color: 'var(--gf-text)',
             fontSize: 20,
             letterSpacing: '0.05em',
             marginBottom: 24,
@@ -101,9 +101,9 @@ export function LoadingScreen({ progress }: { progress: number }) {
         {/* Progress bar */}
         <div
           style={{
-            width: 320,
+            width: 'min(320px, 80vw)',
             height: 8,
-            background: '#2a1f12',
+            background: 'var(--gf-bg)',
             borderRadius: 2,
             overflow: 'hidden',
             margin: '0 auto',
@@ -113,7 +113,7 @@ export function LoadingScreen({ progress }: { progress: number }) {
             style={{
               width: `${percent}%`,
               height: '100%',
-              background: '#8b6532',
+              background: 'var(--gf-text-dim)',
               transition: 'width 0.2s ease',
             }}
           />
@@ -121,7 +121,7 @@ export function LoadingScreen({ progress }: { progress: number }) {
 
         <p
           style={{
-            color: '#8b6532',
+            color: 'var(--gf-text-dim)',
             fontSize: 14,
             marginTop: 12,
             fontFamily: 'monospace',

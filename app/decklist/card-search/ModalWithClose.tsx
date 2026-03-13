@@ -1,5 +1,5 @@
 import React from "react";
-import { Button } from "flowbite-react";
+
 import { openYTGSearchPage } from "./ytgUtils";
 import { useCardImageUrl } from "./hooks/useCardImageUrl";
 import { useCardPrices } from "./hooks/useCardPrices";
@@ -27,7 +27,7 @@ function Attribute({ label, value }: { label: string; value: string | boolean })
       displayValue = '';
     }
   }
-  return <p className="text-sm text-gray-900 dark:text-white"><strong>{label}:</strong> {displayValue}</p>;
+  return <p className="text-sm text-foreground"><strong>{label}:</strong> {displayValue}</p>;
 }
 
 function prettifyFieldName(key: string): string {
@@ -64,6 +64,28 @@ export default function ModalWithClose({
   const { getImageUrl } = useCardImageUrl();
   const { getPrice, getProductUrl } = useCardPrices();
   const [showMenu, setShowMenu] = React.useState(false);
+  const [isVisible, setIsVisible] = React.useState(false);
+  const [isClosing, setIsClosing] = React.useState(false);
+
+  // Animate in on mount
+  React.useEffect(() => {
+    if (modalCard) {
+      requestAnimationFrame(() => setIsVisible(true));
+      setIsClosing(false);
+    } else {
+      setIsVisible(false);
+    }
+  }, [modalCard]);
+
+  // Wrap setModalCard to animate out before unmounting
+  const closeModal = React.useCallback(() => {
+    setIsClosing(true);
+    setIsVisible(false);
+    setTimeout(() => {
+      setIsClosing(false);
+      setModalCard(null);
+    }, 200);
+  }, [setModalCard]);
 
   // Swipe/carousel state
   const touchStartRef = React.useRef<{ x: number; y: number; time: number } | null>(null);
@@ -92,7 +114,7 @@ export default function ModalWithClose({
         if (showMenu) {
           setShowMenu(false);
         } else {
-          setModalCard(null);
+          closeModal();
         }
       } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
         if (!visibleCards || visibleCards.length <= 1) return;
@@ -123,7 +145,7 @@ export default function ModalWithClose({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [setModalCard, modalCard, visibleCards, showMenu, onAddCard, onRemoveCard, activeDeckTab]);
+  }, [setModalCard, closeModal, modalCard, visibleCards, showMenu, onAddCard, onRemoveCard, activeDeckTab]);
 
   // Get adjacent card for preview during swipe
   const getAdjacentCard = React.useCallback((direction: 'left' | 'right') => {
@@ -257,36 +279,32 @@ export default function ModalWithClose({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-50 md:p-4"
-      onClick={() => setModalCard(null)}
+      className={`fixed inset-0 z-[60] flex items-center justify-center md:p-4 transition-colors duration-200 ${isVisible && !isClosing ? 'bg-black/50' : 'bg-black/0'}`}
+      onClick={() => closeModal()}
     >
       {/* Mobile: full-screen layout, with bottom padding for MobileBottomNav */}
       <div
-        className={`md:hidden bg-white dark:bg-gray-900 text-gray-900 dark:text-white w-full h-full flex flex-col relative ${onAddCard ? 'pb-14' : ''}`}
+        className={`md:hidden bg-card text-foreground w-full h-full flex flex-col relative pb-[calc(3.5rem+env(safe-area-inset-bottom))] transition-all duration-200 ${isVisible && !isClosing ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
         onClick={e => e.stopPropagation()}
       >
         {/* Mobile Header - compact */}
-        <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+        <div className="flex items-center justify-between px-3 py-2 border-b border-border flex-shrink-0">
           <div className="flex-1 min-w-0 mr-2">
             <div className="font-semibold text-base truncate">{modalCard.name}</div>
             <div className="flex items-center gap-2">
-              {(() => {
-                const cardKey = `${modalCard.name}|${modalCard.set}|${modalCard.imgFile}`;
-                const priceInfo = getPrice(cardKey);
-                return priceInfo ? (
-                  <span className="text-xs font-medium text-green-600 dark:text-green-400">${priceInfo.price.toFixed(2)}</span>
-                ) : null;
-              })()}
               {hasNavigation && (
-                <span className="text-[10px] text-gray-400">{currentIndex + 1} of {visibleCards.length}</span>
+                <span className="text-[10px] text-muted-foreground">{currentIndex + 1} of {visibleCards.length}</span>
+              )}
+              {modalCard.officialSet && (
+                <span className="text-[10px] text-muted-foreground">{modalCard.officialSet}</span>
               )}
             </div>
           </div>
           {/* Quantity badges */}
-          {(quantityInDeck > 0 || quantityInReserve > 0) && (
+          {onAddCard && (quantityInDeck > 0 || quantityInReserve > 0) && (
             <div className="flex items-center gap-1 mr-2 flex-shrink-0">
               {quantityInDeck > 0 && (
-                <span className="bg-blue-600 text-white px-1.5 py-0.5 rounded text-xs font-bold">
+                <span className="bg-primary text-white px-1.5 py-0.5 rounded text-xs font-bold">
                   ×{quantityInDeck}
                 </span>
               )}
@@ -298,11 +316,11 @@ export default function ModalWithClose({
             </div>
           )}
           <button
-            className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-red-600 hover:bg-red-700 rounded-full text-white"
+            className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full text-muted-foreground active:bg-muted"
             aria-label="Close modal"
-            onClick={() => setModalCard(null)}
+            onClick={() => closeModal()}
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -311,7 +329,7 @@ export default function ModalWithClose({
         {/* Mobile Card Image - carousel swipe */}
         <div
           ref={containerRef}
-          className="flex-1 overflow-hidden relative bg-black/5 dark:bg-black/20 touch-pan-y"
+          className="flex-1 overflow-hidden relative bg-black/5 dark:bg-black/20 touch-pan-y pb-12"
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -375,26 +393,31 @@ export default function ModalWithClose({
           </div>
         </div>
 
-        {/* Mobile Footer */}
-        <div className="flex-shrink-0 px-3 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+        {/* Mobile Footer — pinned above bottom nav */}
+        <div className="absolute bottom-[calc(3.5rem+env(safe-area-inset-bottom))] left-0 right-0 px-3 py-2.5 border-t border-border bg-card/95 backdrop-blur-sm">
           <div className="flex items-center gap-2">
             {/* Deck builder: add/remove controls */}
             {onAddCard && onRemoveCard && getCardQuantity && (
               <>
-                {/* Main deck group */}
+                {/* Main deck group — minus only shows when card is in main */}
                 <div className="flex flex-shrink-0">
-                  <button
-                    onClick={() => onRemoveCard(modalCard.name, modalCard.set, false)}
-                    disabled={getCardQuantity(modalCard.name, modalCard.set, false) === 0}
-                    className="h-9 w-8 flex items-center justify-center rounded-l-lg bg-green-700 active:bg-green-800 text-white/80 disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
-                    </svg>
-                  </button>
+                  {getCardQuantity(modalCard.name, modalCard.set, false) > 0 && (
+                    <button
+                      onClick={() => onRemoveCard(modalCard.name, modalCard.set, false)}
+                      className="h-10 w-9 flex items-center justify-center rounded-l-lg bg-green-700 active:bg-green-800 text-white"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
+                      </svg>
+                    </button>
+                  )}
                   <button
                     onClick={() => onAddCard(modalCard, false)}
-                    className="h-9 px-2.5 bg-green-600 active:bg-green-700 text-white rounded-r-lg flex items-center gap-1 font-medium text-sm transition-colors border-l border-green-500/30"
+                    className={`h-10 px-3 bg-green-600 active:bg-green-700 text-white flex items-center gap-1.5 font-medium text-sm transition-colors ${
+                      getCardQuantity(modalCard.name, modalCard.set, false) > 0
+                        ? 'rounded-r-lg border-l border-green-500/30'
+                        : 'rounded-lg'
+                    }`}
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -403,25 +426,30 @@ export default function ModalWithClose({
                     {(() => {
                       const qty = getCardQuantity(modalCard.name, modalCard.set, false);
                       return qty > 0 ? (
-                        <span className="bg-white/25 px-1 rounded text-xs font-bold">{qty}</span>
+                        <span className="bg-white/25 px-1.5 rounded text-xs font-bold">{qty}</span>
                       ) : null;
                     })()}
                   </button>
                 </div>
-                {/* Reserve group */}
+                {/* Reserve group — minus only shows when card is in reserve */}
                 <div className="flex flex-shrink-0">
-                  <button
-                    onClick={() => onRemoveCard(modalCard.name, modalCard.set, true)}
-                    disabled={getCardQuantity(modalCard.name, modalCard.set, true) === 0}
-                    className="h-9 w-8 flex items-center justify-center rounded-l-lg bg-amber-700 active:bg-amber-800 text-white/80 disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
-                    </svg>
-                  </button>
+                  {getCardQuantity(modalCard.name, modalCard.set, true) > 0 && (
+                    <button
+                      onClick={() => onRemoveCard(modalCard.name, modalCard.set, true)}
+                      className="h-10 w-9 flex items-center justify-center rounded-l-lg bg-amber-700 active:bg-amber-800 text-white"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
+                      </svg>
+                    </button>
+                  )}
                   <button
                     onClick={() => onAddCard(modalCard, true)}
-                    className="h-9 px-2.5 bg-amber-600 active:bg-amber-700 text-white rounded-r-lg flex items-center gap-1 font-medium text-sm transition-colors border-l border-amber-500/30"
+                    className={`h-10 px-3 bg-amber-600 active:bg-amber-700 text-white flex items-center gap-1.5 font-medium text-sm transition-colors ${
+                      getCardQuantity(modalCard.name, modalCard.set, true) > 0
+                        ? 'rounded-r-lg border-l border-amber-500/30'
+                        : 'rounded-lg'
+                    }`}
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -430,22 +458,35 @@ export default function ModalWithClose({
                     {(() => {
                       const qty = getCardQuantity(modalCard.name, modalCard.set, true);
                       return qty > 0 ? (
-                        <span className="bg-white/25 px-1 rounded text-xs font-bold">{qty}</span>
+                        <span className="bg-white/25 px-1.5 rounded text-xs font-bold">{qty}</span>
                       ) : null;
                     })()}
                   </button>
                 </div>
               </>
             )}
-            {/* Public view: card details */}
+            {/* Public view: card metadata */}
             {!(onAddCard && onRemoveCard && getCardQuantity) && (
-              <div className="flex-1 min-w-0 h-9 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-gray-500 dark:text-gray-400 overflow-hidden">
-                {modalCard.type && <span>{modalCard.type}</span>}
-                {modalCard.brigade && <span>{modalCard.brigade}</span>}
-                {modalCard.strength && modalCard.toughness && <span>{modalCard.strength}/{modalCard.toughness}</span>}
-                {modalCard.officialSet && <span>{modalCard.officialSet}</span>}
-                {modalCard.rarity && <span>{modalCard.rarity}</span>}
-                {modalCard.identifier && <span className="italic">{modalCard.identifier}</span>}
+              <div className="flex-1 min-w-0 flex items-center gap-1.5 text-xs text-muted-foreground overflow-hidden">
+                {modalCard.type && <span className="truncate">{modalCard.type}</span>}
+                {modalCard.brigade && (
+                  <>
+                    <span className="text-border">·</span>
+                    <span className="truncate">{modalCard.brigade}</span>
+                  </>
+                )}
+                {modalCard.strength && modalCard.toughness && (
+                  <>
+                    <span className="text-border">·</span>
+                    <span className="flex-shrink-0">{modalCard.strength}/{modalCard.toughness}</span>
+                  </>
+                )}
+                {modalCard.rarity && (
+                  <>
+                    <span className="text-border">·</span>
+                    <span className="flex-shrink-0">{modalCard.rarity}</span>
+                  </>
+                )}
               </div>
             )}
             {/* Spacer */}
@@ -463,19 +504,19 @@ export default function ModalWithClose({
                       ? window.open(productUrl, '_blank', 'noopener,noreferrer')
                       : openYTGSearchPage(modalCard.name)
                   }
-                  className={`h-9 px-3 flex-shrink-0 text-white rounded-lg flex items-center gap-1.5 font-medium text-sm ${isFundraiser ? 'bg-gradient-to-r from-green-600 to-emerald-600' : 'bg-gradient-to-r from-blue-600 to-purple-600'}`}
+                  className="h-10 px-3.5 flex-shrink-0 rounded-lg flex items-center gap-2 font-semibold text-sm border border-green-600/30 dark:border-green-500/25 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 active:translate-y-[1px] transition-all duration-100"
                 >
                   {priceInfo ? (
                     <>
                       <span>{isFundraiser ? `$${priceInfo.price.toFixed(0)}` : `$${priceInfo.price.toFixed(2)}`}</span>
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      <svg className="w-3.5 h-3.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
                       </svg>
                     </>
                   ) : (
                     <>
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd"/>
+                      <svg className="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
                       </svg>
                       Shop
                     </>
@@ -489,19 +530,18 @@ export default function ModalWithClose({
 
       {/* Desktop: centered modal (unchanged) */}
       <div
-        className="hidden md:flex bg-white dark:bg-gray-900 text-gray-900 dark:text-white rounded shadow-lg max-w-2xl w-full max-h-[90vh] overflow-hidden relative flex-col"
+        className={`hidden md:flex bg-card text-foreground rounded shadow-lg max-w-2xl w-full max-h-[90vh] overflow-hidden relative flex-col transition-all duration-200 ${isVisible && !isClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
         onClick={e => e.stopPropagation()}
       >
         {/* X close button */}
         <button
-          className="absolute top-2 right-2 flex items-center justify-center bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800 shadow-lg rounded-full w-14 h-14 border-4 border-white dark:border-gray-900 focus:outline-none z-20 transition-all duration-150"
+          className="absolute top-2 right-2 flex items-center justify-center rounded-full w-9 h-9 text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none z-20 transition-all duration-150"
           aria-label="Close modal"
-          onClick={() => setModalCard(null)}
+          onClick={() => closeModal()}
         >
-          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="16" cy="16" r="16" fill="none" />
-            <line x1="10" y1="10" x2="22" y2="22" stroke="white" strokeWidth="3.5" strokeLinecap="round" />
-            <line x1="22" y1="10" x2="10" y2="22" stroke="white" strokeWidth="3.5" strokeLinecap="round" />
+          <svg width="20" height="20" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <line x1="10" y1="10" x2="22" y2="22" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+            <line x1="22" y1="10" x2="10" y2="22" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
           </svg>
         </button>
         <div className="px-4 pt-4 pb-2 border-b font-semibold text-lg text-center">
@@ -539,24 +579,25 @@ export default function ModalWithClose({
             </div>
           </div>
         </div>
-        <div className="px-4 pb-4 pt-2 border-t bg-gray-50 dark:bg-gray-800">
+        <div className="px-4 pb-4 pt-2 border-t bg-muted">
           {hasNavigation && (
-            <div className="text-xs text-gray-500 dark:text-gray-400 text-center mb-2">
+            <div className="text-xs text-muted-foreground text-center mb-2">
               Use ← → to navigate{onAddCard && onRemoveCard && ' • ↑ to add • ↓ to remove'} • {currentIndex + 1} of {visibleCards.length}
             </div>
           )}
-          <div className="flex justify-center gap-2 items-center">
-            {hasNavigation && (
+          <div className="flex items-center gap-2">
+            {hasNavigation ? (
               <button
                 onClick={() => navigateToCard('left')}
-                className="px-3 h-10 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium transition-colors flex items-center"
+                className="w-10 h-10 shrink-0 text-muted-foreground hover:text-foreground hover:bg-card rounded-lg transition-colors flex items-center justify-center"
                 title="Previous card (Left arrow)"
               >
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
               </button>
-            )}
+            ) : null}
+            <div className="flex-1 flex justify-center gap-2 items-center min-w-0">
             {onAddCard && onRemoveCard && getCardQuantity && (
               <div className="relative">
                 <div className="flex gap-0 h-10">
@@ -566,7 +607,7 @@ export default function ModalWithClose({
                       const isReserve = activeDeckTab === "reserve";
                       onAddCard(modalCard, isReserve);
                     }}
-                    className="px-4 h-10 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-l-lg flex items-center gap-1.5 font-medium transition-colors text-sm whitespace-nowrap"
+                    className="px-4 h-10 bg-green-700 hover:bg-green-800 text-white rounded-l-lg flex items-center gap-1.5 font-semibold transition-colors text-sm whitespace-nowrap"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -576,7 +617,7 @@ export default function ModalWithClose({
                       const isReserve = activeDeckTab === "reserve";
                       const quantity = getCardQuantity(modalCard.name, modalCard.set, isReserve);
                       return quantity > 0 && (
-                        <span className="bg-black/75 backdrop-blur-sm text-white px-2.5 py-1 rounded-md font-bold text-sm shadow-lg">
+                        <span className="bg-white/20 text-white px-2 py-0.5 rounded-md font-bold text-xs">
                           ×{quantity}
                         </span>
                       );
@@ -588,7 +629,7 @@ export default function ModalWithClose({
                       e.stopPropagation();
                       setShowMenu(!showMenu);
                     }}
-                    className="px-2.5 h-10 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-r-lg border-l border-gray-300 dark:border-gray-600 transition-colors"
+                    className="px-2.5 h-10 bg-green-700 hover:bg-green-800 text-white rounded-r-lg border-l border-green-600/30 transition-colors"
                   >
                     <svg className={`w-4 h-4 transition-transform ${showMenu ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -596,13 +637,13 @@ export default function ModalWithClose({
                   </button>
                 </div>
                 {showMenu && (
-                  <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-[200px] z-50">
+                  <div className="absolute bottom-full mb-2 left-0 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[200px] z-50">
                     <button
                       onClick={() => {
                         onAddCard(modalCard, false);
                         setShowMenu(false);
                       }}
-                      className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white"
+                      className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-foreground"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -614,7 +655,7 @@ export default function ModalWithClose({
                         onAddCard(modalCard, true);
                         setShowMenu(false);
                       }}
-                      className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white"
+                      className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-foreground"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -623,14 +664,14 @@ export default function ModalWithClose({
                     </button>
                     {(getCardQuantity(modalCard.name, modalCard.set, false) > 0 || getCardQuantity(modalCard.name, modalCard.set, true) > 0) && (
                       <>
-                        <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+                        <div className="border-t border-border my-1"></div>
                         {getCardQuantity(modalCard.name, modalCard.set, false) > 0 && (
                           <button
                             onClick={() => {
                               onRemoveCard(modalCard.name, modalCard.set, false);
                               setShowMenu(false);
                             }}
-                            className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-red-600 dark:text-red-400"
+                            className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-red-600 dark:text-red-400"
                           >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
@@ -644,7 +685,7 @@ export default function ModalWithClose({
                               onRemoveCard(modalCard.name, modalCard.set, true);
                               setShowMenu(false);
                             }}
-                            className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-red-600 dark:text-red-400"
+                            className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-red-600 dark:text-red-400"
                           >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
@@ -659,10 +700,9 @@ export default function ModalWithClose({
               </div>
             )}
             {isFundraiser ? (
-              <Button
+              <button
                 onClick={() => window.open('https://cactus-game-design-inc.square.site/s/shop', '_blank')}
-                className="px-4 h-10 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg flex items-center gap-1.5 font-semibold transition-colors text-sm whitespace-nowrap"
-                size="sm"
+                className="px-4 h-10 border border-border text-muted-foreground hover:text-foreground hover:bg-card rounded-lg flex items-center gap-1.5 font-medium transition-colors text-sm whitespace-nowrap"
               >
                 {(() => {
                   const cardKey = `${modalCard.name}|${modalCard.set}|${modalCard.imgFile}`;
@@ -673,56 +713,55 @@ export default function ModalWithClose({
                   <path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/>
                 </svg>
                 Fundraiser
-              </Button>
+              </button>
             ) : (() => {
               const cardKey = `${modalCard.name}|${modalCard.set}|${modalCard.imgFile}`;
               const priceInfo = getPrice(cardKey);
               const productUrl = getProductUrl(cardKey);
               return (
-                <Button
+                <button
                   onClick={() => productUrl
                     ? window.open(productUrl, '_blank', 'noopener,noreferrer')
                     : openYTGSearchPage(modalCard.name)
                   }
-                  className="px-4 h-10 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg flex items-center gap-1.5 font-semibold transition-colors text-sm whitespace-nowrap"
-                  size="sm"
+                  className="px-4 h-10 border border-emerald-600/30 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 rounded-lg flex items-center gap-1.5 font-medium transition-colors text-sm whitespace-nowrap active:translate-y-[1px]"
                 >
                   {priceInfo ? (
                     <>
-                      <span>${priceInfo.price.toFixed(2)}</span>
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      <span className="font-semibold">${priceInfo.price.toFixed(2)}</span>
+                      <svg className="w-3.5 h-3.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
                       </svg>
                     </>
                   ) : (
                     <>
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                        <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd"/>
+                      <svg className="w-3.5 h-3.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
                       </svg>
-                      Search YTG
+                      <span>Shop</span>
                     </>
                   )}
-                </Button>
+                </button>
               );
             })()}
-            <Button
-              onClick={() => setModalCard(null)}
-              className="px-4 h-10 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-900 dark:hover:text-red-300 rounded-lg font-medium transition-colors text-sm whitespace-nowrap"
-              size="sm"
+            <button
+              onClick={() => closeModal()}
+              className="px-4 h-10 border border-border text-muted-foreground hover:bg-muted hover:text-foreground rounded-lg font-medium transition-colors text-sm whitespace-nowrap"
             >
               Close
-            </Button>
-            {hasNavigation && (
+            </button>
+            </div>
+            {hasNavigation ? (
               <button
                 onClick={() => navigateToCard('right')}
-                className="px-3 h-10 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium transition-colors flex items-center"
+                className="w-10 h-10 shrink-0 text-muted-foreground hover:text-foreground hover:bg-card rounded-lg transition-colors flex items-center justify-center"
                 title="Next card (Right arrow)"
               >
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
                 </svg>
               </button>
-            )}
+            ) : null}
           </div>
         </div>
       </div>

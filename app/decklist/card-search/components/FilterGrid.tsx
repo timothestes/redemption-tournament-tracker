@@ -184,510 +184,495 @@ export default function FilterGrid({
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 mb-4 items-start text-gray-900 dark:text-white p-3 md:p-4">
-      {/* Legality & Alignment — spans full width on mobile so Types/Brigades get their own column */}
-      <div className="col-span-2 md:col-span-1">
-        <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Legality</p>
-        <div className="flex flex-wrap gap-1.5 mb-3">
-          {['Rotation','Classic','Banned','Scrolls','Paragon'].map((mode) => (
-            <button
-              key={mode}
-              className={clsx(
-                'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
-                legalityMode === mode
-                  ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
-                  : 'bg-gray-200 text-gray-900 hover:bg-blue-400 hover:text-blue-900 border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
-              )}
-              onClick={() => setLegalityMode(mode as typeof legalityMode)}
-            >
-              {mode}
-            </button>
-          ))}
+    <div className="flex flex-col gap-2 md:gap-3 mb-4 text-foreground p-3 md:p-4">
+      {/* Band 1: Quick text filters — stacked on mobile, inline on desktop */}
+      <div className="flex flex-wrap items-start gap-x-6 gap-y-1.5">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-1.5">
+          <span className="text-muted-foreground uppercase text-xs font-medium shrink-0">Legality</span>
+          <div className="flex flex-wrap gap-1">
+            {['Rotation','Classic','Banned','Scrolls','Paragon'].map((mode) => (
+              <button
+                key={mode}
+                className={clsx(
+                  'px-2 py-0.5 md:px-3 md:py-1.5 border rounded text-sm font-semibold transition-colors duration-150',
+                  legalityMode === mode
+                    ? 'bg-primary/20 text-primary border-primary/30'
+                    : 'bg-muted text-foreground hover:bg-muted/80 border-border'
+                )}
+                onClick={() => setLegalityMode(mode as typeof legalityMode)}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
         </div>
-        <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Alignment</p>
-        <div className="flex flex-wrap gap-1.5 mb-3">
-          {['Good','Evil','Neutral'].map((mode) => (
-            <button
-              key={mode}
-              className={clsx(
-                'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
-                selectedAlignmentFilters.includes(mode)
-                  ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
-                  : 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
-              )}
-              onClick={() => toggleAlignmentFilter(mode)}
-            >
-              {mode}
-            </button>
-          ))}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-1.5">
+          <span className="text-muted-foreground uppercase text-xs font-medium shrink-0">Alignment</span>
+          <div className="flex flex-wrap gap-1">
+            {['Good','Evil','Neutral'].map((mode) => (
+              <button
+                key={mode}
+                className={clsx(
+                  'px-2 py-0.5 md:px-3 md:py-1.5 border rounded text-sm font-semibold transition-colors duration-150',
+                  selectedAlignmentFilters.includes(mode)
+                    ? 'bg-primary/20 text-primary border-primary/30'
+                    : 'bg-muted text-foreground hover:bg-muted/80 border-border'
+                )}
+                onClick={() => toggleAlignmentFilter(mode)}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
         </div>
-        <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Rarity</p>
-        <div className="flex flex-wrap gap-1.5 mb-3">
-          {['Common','Promo','Rare','Ultra Rare'].map((rarity) => (
-            <button
-              key={rarity}
-              className={clsx(
-                'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
-                selectedRarityFilters.includes(rarity)
-                  ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
-                  : 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
-              )}
-              onClick={() => toggleRarityFilter(rarity)}
-            >
-              {rarity}
-            </button>
-          ))}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-1.5">
+          <span className="text-muted-foreground uppercase text-xs font-medium shrink-0">Rarity</span>
+          <div className="flex flex-wrap gap-1">
+            {['Common','Promo','Rare','Ultra Rare'].map((rarity) => (
+              <button
+                key={rarity}
+                className={clsx(
+                  'px-2 py-0.5 md:px-3 md:py-1.5 border rounded text-sm font-semibold transition-colors duration-150',
+                  selectedRarityFilters.includes(rarity)
+                    ? 'bg-primary/20 text-primary border-primary/30'
+                    : 'bg-muted text-foreground hover:bg-muted/80 border-border'
+                )}
+                onClick={() => toggleRarityFilter(rarity)}
+              >
+                {rarity}
+              </button>
+            ))}
+          </div>
         </div>
-        {/* Advanced Filters */}
-        <div className="mb-4">
-          <button
-            className="px-2.5 py-1 md:px-3 md:py-2 border rounded text-sm md:text-base mb-2 bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 dark:bg-gray-900 dark:text-white dark:hover:bg-gray-700 dark:hover:text-white font-semibold shadow"
-            onClick={() => setAdvancedOpen(!advancedOpen)}
-          >
-            Advanced Filters {advancedOpen ? '▲' : '▼'}
-          </button>
-          {advancedOpen && (
-            <div className="p-2 border rounded space-y-2">
-              <p className="font-bold text-base md:text-lg text-gray-900 dark:text-white rounded px-2 py-1 inline-block shadow-none">Testament</p>
-              <div className="flex flex-wrap gap-1.5 mb-2">
-                {['OT','NT'].map((t) => {
-                  const isActive = selectedTestaments.includes(t);
-                  const isNot = testamentNots[t] || false;
-                  return (
-                    <button
-                      key={t}
-                      className={clsx(
-                        'px-2.5 py-1 md:px-3 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
-                        isActive && !isNot && 'bg-yellow-200 text-yellow-900 border-yellow-400 dark:bg-yellow-600 dark:text-white dark:border-transparent',
-                        isActive && isNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
-                        !isActive && 'bg-gray-200 text-gray-900 border-gray-300 hover:bg-gray-400 hover:text-gray-900 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
-                      )}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        // Cycle through: OFF → ON (include) → NOT (exclude) → OFF
-                        if (!isActive) {
-                          // OFF → ON (include)
-                          setSelectedTestaments(prev => [...prev, t]);
-                          setTestamentNots(prev => ({ ...prev, [t]: false }));
-                        } else if (isActive && !isNot) {
-                          // ON (include) → NOT (exclude)
-                          setTestamentNots(prev => ({ ...prev, [t]: true }));
-                        } else {
-                          // NOT (exclude) → OFF
-                          setSelectedTestaments(prev => prev.filter(x => x !== t));
-                          setTestamentNots(prev => {
-                            const newNots = { ...prev };
-                            delete newNots[t];
-                            return newNots;
-                          });
-                        }
-                      }}
-                      title="Click to cycle: Include → Exclude → Off"
-                    >
-                      {isNot ? 'NOT ' : ''}{t}
-                    </button>
-                  );
-                })}
+      </div>
+
+      {/* Divider between text and icon bands */}
+      <div className="h-px bg-border" />
+
+      {/* Band 2: Icon filters — full width, types + brigades */}
+      <div className="flex flex-wrap items-start gap-x-6 gap-y-2">
+        {/* Types */}
+        <div>
+          <p className="text-muted-foreground uppercase mb-1 text-xs font-medium">Types</p>
+          <div className="flex flex-wrap gap-1">
+            {typeIcons.map((t) => {
+              const src = `/filter-icons/${encodeURIComponent(t)}.png`;
+              return (
+                <img
+                  key={t}
+                  src={src}
+                  alt={t}
+                  className={clsx(
+                    'h-8 w-auto md:h-10 cursor-pointer rounded transition-transform duration-150',
+                    selectedIconFilters.some(f => f.icon === t)
+                      ? 'ring-2 ring-blue-400 scale-110'
+                      : 'opacity-80 hover:opacity-100'
+                  )}
+                  onClick={() => toggleIconFilter(t)}
+                  style={{ minWidth: 28, minHeight: 28 }}
+                />
+              );
+            })}
+          </div>
+        </div>
+        {/* Good Brigades */}
+        <div>
+          <p className="text-muted-foreground uppercase mb-1 text-xs font-medium">Good Brigades</p>
+          <div className="flex flex-wrap gap-1">
+            {goodBrigadeIcons.map((icon) => (
+              <img
+                key={icon}
+                src={`/filter-icons/Color=${encodeURIComponent(icon)}.png`}
+                alt={icon}
+                className={clsx(
+                  "h-8 w-auto md:h-9 cursor-pointer rounded-md transition-transform duration-150",
+                  selectedIconFilters.some(f => f.icon === icon)
+                    ? "ring-2 ring-blue-400 scale-110"
+                    : "opacity-80 hover:opacity-100"
+                )}
+                onClick={() => toggleIconFilter(icon)}
+                style={{ minWidth: 28, minHeight: 28 }}
+              />
+            ))}
+          </div>
+        </div>
+        {/* Evil Brigades */}
+        <div>
+          <p className="text-muted-foreground uppercase mb-1 text-xs font-medium">Evil Brigades</p>
+          <div className="flex flex-wrap gap-1">
+            {evilBrigadeIcons.map((icon) => (
+              <img
+                key={icon}
+                src={`/filter-icons/Color=${encodeURIComponent(icon)}.png`}
+                alt={icon}
+                className={clsx(
+                  "h-8 w-auto md:h-9 cursor-pointer rounded-md transition-transform duration-150",
+                  selectedIconFilters.some(f => f.icon === icon)
+                    ? "ring-2 ring-blue-400 scale-110"
+                    : "opacity-80 hover:opacity-100"
+                )}
+                onClick={() => toggleIconFilter(icon)}
+                style={{ minWidth: 28, minHeight: 28 }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Utility bar: Advanced Filters + Icon Filter Mode + dice */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          className="px-2.5 py-1 md:px-3 md:py-1.5 border rounded text-sm bg-muted text-foreground hover:bg-muted/80 font-semibold"
+          onClick={() => setAdvancedOpen(!advancedOpen)}
+        >
+          Advanced Filters {advancedOpen ? '▲' : '▼'}
+        </button>
+        <span className="text-border select-none">|</span>
+        <span
+          className="text-muted-foreground text-sm cursor-help"
+          title="Controls how multiple icon filters combine: Click button to cycle through modes"
+        >
+          Icon Filter Mode:
+        </span>
+        <button
+          className={clsx(
+            'px-2 py-1 border rounded text-sm font-semibold transition',
+            'bg-muted text-foreground border-border hover:bg-muted/80'
+          )}
+          onClick={(e) => {
+            e.preventDefault();
+            let newMode: 'AND' | 'OR' | 'AND NOT';
+            if (iconFilterMode === 'AND') {
+              newMode = 'OR';
+            } else if (iconFilterMode === 'OR') {
+              newMode = 'AND NOT';
+            } else {
+              newMode = 'AND';
+            }
+            setIconFilterMode(newMode);
+            updateAllIconFilterOperators(newMode);
+          }}
+          title="Click to cycle: AND → OR → AND NOT (applies to all active filters)"
+        >
+          {iconFilterMode}
+        </button>
+        <button
+          className={clsx(
+            'px-2 py-1 border rounded text-sm transition opacity-70 hover:opacity-100',
+            'bg-muted text-muted-foreground border-border hover:bg-muted/80'
+          )}
+          onClick={(e) => {
+            e.preventDefault();
+            router.push('/decklist/card-search/random');
+          }}
+          title="I'm feeling lucky"
+        >
+          🎲
+        </button>
+      </div>
+
+      {/* Advanced Filters panel — full width when open */}
+      {advancedOpen && (
+        <div className="p-2 border rounded space-y-2">
+          <p className="font-bold text-base md:text-lg text-foreground rounded px-2 py-1 inline-block shadow-none">Testament</p>
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {['OT','NT'].map((t) => {
+              const isActive = selectedTestaments.includes(t);
+              const isNot = testamentNots[t] || false;
+              return (
                 <button
+                  key={t}
                   className={clsx(
                     'px-2.5 py-1 md:px-3 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
-                    isGospel && !gospelNot && 'bg-yellow-300 text-yellow-900 border-yellow-500 dark:bg-yellow-700 dark:text-white dark:border-transparent',
-                    isGospel && gospelNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
-                    !isGospel && 'bg-gray-200 text-gray-900 border-gray-300 hover:bg-gray-400 hover:text-gray-900 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
+                    isActive && !isNot && 'bg-primary/20 text-primary border-primary/30',
+                    isActive && isNot && 'bg-destructive/20 text-destructive border-destructive/30',
+                    !isActive && 'bg-muted text-foreground hover:bg-muted/80 border-border'
                   )}
                   onClick={(e) => {
                     e.preventDefault();
-                    // Cycle through: OFF → ON (include) → NOT (exclude) → OFF
-                    if (!isGospel) {
-                      // OFF → ON (include)
-                      setIsGospel(true);
-                      setGospelNot(false);
-                    } else if (isGospel && !gospelNot) {
-                      // ON (include) → NOT (exclude)
-                      setGospelNot(true);
+                    if (!isActive) {
+                      setSelectedTestaments(prev => [...prev, t]);
+                      setTestamentNots(prev => ({ ...prev, [t]: false }));
+                    } else if (isActive && !isNot) {
+                      setTestamentNots(prev => ({ ...prev, [t]: true }));
                     } else {
-                      // NOT (exclude) → OFF
-                      setIsGospel(false);
-                      setGospelNot(false);
+                      setSelectedTestaments(prev => prev.filter(x => x !== t));
+                      setTestamentNots(prev => {
+                        const newNots = { ...prev };
+                        delete newNots[t];
+                        return newNots;
+                      });
                     }
                   }}
                   title="Click to cycle: Include → Exclude → Off"
                 >
-                  {gospelNot ? 'NOT ' : ''}Gospel
+                  {isNot ? 'NOT ' : ''}{t}
                 </button>
-              </div>
-              {/* Strength and Toughness Filters - Toughness now under Strength */}
-              <div className="flex flex-col gap-4 mb-2 items-start">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-lg text-gray-900 dark:text-white rounded px-2 py-1 inline-block shadow-none">Strength</span>
-                  <select
-                    value={strengthOp}
-                    onChange={e => setStrengthOp(e.target.value)}
-                    className="border rounded px-2 py-1 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-gray-400 dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                  >
-                    <option value="lt">&lt;</option>
-                    <option value="lte">&le;</option>
-                    <option value="eq">=</option>
-                    <option value="gt">&gt;</option>
-                    <option value="gte">&ge;</option>
-                  </select>
-                  <select
-                    value={strengthFilter === null ? '' : strengthFilter}
-                    onChange={e => setStrengthFilter(e.target.value === '' ? null : Number(e.target.value))}
-                    className="border rounded px-2 py-1 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-gray-400 dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                  >
-                    <option value="">Any</option>
-                    {[...Array(14).keys()].map(n => (
-                      <option key={n} value={n}>{n}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-lg text-gray-900 dark:text-white rounded px-2 py-1 inline-block shadow-none">Toughness</span>
-                  <select
-                    value={toughnessOp}
-                    onChange={e => setToughnessOp(e.target.value)}
-                    className="border rounded px-2 py-1 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-gray-400 dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                  >
-                    <option value="lt">&lt;</option>
-                    <option value="lte">&le;</option>
-                    <option value="eq">=</option>
-                    <option value="gt">&gt;</option>
-                    <option value="gte">&ge;</option>
-                  </select>
-                  <select
-                    value={toughnessFilter === null ? '' : toughnessFilter}
-                    onChange={e => setToughnessFilter(e.target.value === '' ? null : Number(e.target.value))}
-                    className="border rounded px-2 py-1 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-gray-400 dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                  >
-                    <option value="">Any</option>
-                    {[...Array(14).keys()].map(n => (
-                      <option key={n} value={n}>{n}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <p className="font-bold text-lg rounded px-2 py-1 inline-block shadow-none mt-2 text-gray-900 dark:text-white">Misc</p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  className={clsx(
-                    'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
-                    noAltArt
-                      ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
-                      : 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
-                  )}
-                  onClick={() => setnoAltArt(v => !v)}
-                >
-                  No AB Versions
-                </button>
-                <button
-                  className={clsx(
-                    'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
-                    noFirstPrint
-                      ? 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent'
-                      : 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
-                  )}
-                  onClick={() => setnoFirstPrint(v => !v)}
-                >
-                  No 1st Print K/L Starters
-                </button>
-                <button
-                  className={clsx(
-                    'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
-                    nativityOnly && !nativityNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
-                    nativityOnly && nativityNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
-                    !nativityOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
-                  )}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    // Cycle through: OFF → ON (include) → NOT (exclude) → OFF
-                    if (!nativityOnly) {
-                      // OFF → ON (include)
-                      setNativityOnly(true);
-                      setNativityNot(false);
-                    } else if (nativityOnly && !nativityNot) {
-                      // ON (include) → NOT (exclude)
-                      setNativityNot(true);
-                    } else {
-                      // NOT (exclude) → OFF
-                      setNativityOnly(false);
-                      setNativityNot(false);
-                    }
-                  }}
-                  title="Click to cycle: Include → Exclude → Off"
-                >
-                  {nativityOnly && nativityNot ? 'NOT ' : ''}Nativity
-                </button>
-                <button
-                  className={clsx(
-                    'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
-                    hasStarOnly && !hasStarNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
-                    hasStarOnly && hasStarNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
-                    !hasStarOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
-                  )}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    // Cycle through: OFF → ON (include) → NOT (exclude) → OFF
-                    if (!hasStarOnly) {
-                      // OFF → ON (include)
-                      setHasStarOnly(true);
-                      setHasStarNot(false);
-                    } else if (hasStarOnly && !hasStarNot) {
-                      // ON (include) → NOT (exclude)
-                      setHasStarNot(true);
-                    } else {
-                      // NOT (exclude) → OFF
-                      setHasStarOnly(false);
-                      setHasStarNot(false);
-                    }
-                  }}
-                  title="Click to cycle: Include → Exclude → Off"
-                >
-                  {hasStarOnly && hasStarNot ? 'NOT ' : ''}Has Star
-                </button>
-                <button
-                  className={clsx(
-                    'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
-                    cloudOnly && !cloudNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
-                    cloudOnly && cloudNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
-                    !cloudOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
-                  )}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    // Cycle through: OFF → ON (include) → NOT (exclude) → OFF
-                    if (!cloudOnly) {
-                      // OFF → ON (include)
-                      setCloudOnly(true);
-                      setCloudNot(false);
-                    } else if (cloudOnly && !cloudNot) {
-                      // ON (include) → NOT (exclude)
-                      setCloudNot(true);
-                    } else {
-                      // NOT (exclude) → OFF
-                      setCloudOnly(false);
-                      setCloudNot(false);
-                    }
-                  }}
-                  title="Click to cycle: Include → Exclude → Off"
-                >
-                  {cloudOnly && cloudNot ? 'NOT ' : ''}Cloud
-                </button>
-                <button
-                  className={clsx(
-                    'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
-                    angelOnly && !angelNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
-                    angelOnly && angelNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
-                    !angelOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
-                  )}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    // Cycle through: OFF → ON (include) → NOT (exclude) → OFF
-                    if (!angelOnly) {
-                      // OFF → ON (include)
-                      setAngelOnly(true);
-                      setAngelNot(false);
-                    } else if (angelOnly && !angelNot) {
-                      // ON (include) → NOT (exclude)
-                      setAngelNot(true);
-                    } else {
-                      // NOT (exclude) → OFF
-                      setAngelOnly(false);
-                      setAngelNot(false);
-                    }
-                  }}
-                  title="Click to cycle: Include → Exclude → Off"
-                >
-                  {angelOnly && angelNot ? 'NOT ' : ''}Angel
-                </button>
-                <button
-                  className={clsx(
-                    'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
-                    demonOnly && !demonNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
-                    demonOnly && demonNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
-                    !demonOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
-                  )}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    // Cycle through: OFF → ON (include) → NOT (exclude) → OFF
-                    if (!demonOnly) {
-                      // OFF → ON (include)
-                      setDemonOnly(true);
-                      setDemonNot(false);
-                    } else if (demonOnly && !demonNot) {
-                      // ON (include) → NOT (exclude)
-                      setDemonNot(true);
-                    } else {
-                      // NOT (exclude) → OFF
-                      setDemonOnly(false);
-                      setDemonNot(false);
-                    }
-                  }}
-                  title="Click to cycle: Include → Exclude → Off"
-                >
-                  {demonOnly && demonNot ? 'NOT ' : ''}Demon
-                </button>
-                <button
-                  className={clsx(
-                    'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
-                    danielOnly && !danielNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
-                    danielOnly && danielNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
-                    !danielOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
-                  )}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    // Cycle through: OFF → ON (include) → NOT (exclude) → OFF
-                    if (!danielOnly) {
-                      // OFF → ON (include)
-                      setDanielOnly(true);
-                      setDanielNot(false);
-                    } else if (danielOnly && !danielNot) {
-                      // ON (include) → NOT (exclude)
-                      setDanielNot(true);
-                    } else {
-                      // NOT (exclude) → OFF
-                      setDanielOnly(false);
-                      setDanielNot(false);
-                    }
-                  }}
-                  title="Click to cycle: Include → Exclude → Off"
-                >
-                  {danielOnly && danielNot ? 'NOT ' : ''}Daniel
-                </button>
-                <button
-                  className={clsx(
-                    'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
-                    postexilicOnly && !postexilicNot && 'bg-blue-300 text-blue-900 border-blue-300 dark:bg-blue-800 dark:text-white dark:border-transparent',
-                    postexilicOnly && postexilicNot && 'bg-red-300 text-red-900 border-red-300 dark:bg-red-800 dark:text-white dark:border-transparent',
-                    !postexilicOnly && 'bg-gray-200 text-gray-900 hover:bg-green-800 hover:text-white border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
-                  )}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    // Cycle through: OFF → ON (include) → NOT (exclude) → OFF
-                    if (!postexilicOnly) {
-                      // OFF → ON (include)
-                      setPostexilicOnly(true);
-                      setPostexilicNot(false);
-                    } else if (postexilicOnly && !postexilicNot) {
-                      // ON (include) → NOT (exclude)
-                      setPostexilicNot(true);
-                    } else {
-                      // NOT (exclude) → OFF
-                      setPostexilicOnly(false);
-                      setPostexilicNot(false);
-                    }
-                  }}
-                  title="Click to cycle: Include → Exclude → Off"
-                >
-                  {postexilicOnly && postexilicNot ? 'NOT ' : ''}Postexilic
-                </button>
-              </div>
+              );
+            })}
+            <button
+              className={clsx(
+                'px-2.5 py-1 md:px-3 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
+                isGospel && !gospelNot && 'bg-primary/20 text-primary border-primary/30',
+                isGospel && gospelNot && 'bg-destructive/20 text-destructive border-destructive/30',
+                !isGospel && 'bg-muted text-foreground hover:bg-muted/80 border-border'
+              )}
+              onClick={(e) => {
+                e.preventDefault();
+                if (!isGospel) {
+                  setIsGospel(true);
+                  setGospelNot(false);
+                } else if (isGospel && !gospelNot) {
+                  setGospelNot(true);
+                } else {
+                  setIsGospel(false);
+                  setGospelNot(false);
+                }
+              }}
+              title="Click to cycle: Include → Exclude → Off"
+            >
+              {gospelNot ? 'NOT ' : ''}Gospel
+            </button>
+          </div>
+          {/* Strength and Toughness Filters */}
+          <div className="flex flex-wrap gap-4 mb-2 items-start">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-lg text-foreground rounded px-2 py-1 inline-block shadow-none">Strength</span>
+              <select
+                value={strengthOp}
+                onChange={e => setStrengthOp(e.target.value)}
+                className="border rounded px-2 py-1 bg-muted text-foreground border-border shadow-sm focus:ring-2 focus:ring-ring"
+              >
+                <option value="lt">&lt;</option>
+                <option value="lte">&le;</option>
+                <option value="eq">=</option>
+                <option value="gt">&gt;</option>
+                <option value="gte">&ge;</option>
+              </select>
+              <select
+                value={strengthFilter === null ? '' : strengthFilter}
+                onChange={e => setStrengthFilter(e.target.value === '' ? null : Number(e.target.value))}
+                className="border rounded px-2 py-1 bg-muted text-foreground border-border shadow-sm focus:ring-2 focus:ring-ring"
+              >
+                <option value="">Any</option>
+                {[...Array(14).keys()].map(n => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
             </div>
-          )}
-        </div>
-      </div>
-      {/* Types */}
-      <div>
-        <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Types</p>
-        <div className="flex flex-wrap gap-2 mb-4 justify-start">
-          {typeIcons.map((t) => {
-            const src = `/filter-icons/${encodeURIComponent(t)}.png`;
-            return (
-              <img
-                key={t}
-                src={src}
-                alt={t}
-                className={clsx(
-                  'h-8 w-8 md:h-10 md:w-auto cursor-pointer',
-                  selectedIconFilters.some(f => f.icon === t) && 'ring-2 ring-blue-500 dark:ring-blue-300'
-                )}
-                onClick={() => toggleIconFilter(t)}
-                style={{ minWidth: 32, minHeight: 32 }}
-              />
-            );
-          })}
-        </div>
-        {/* Icon filter mode toggle moved below types icons */}
-        <div className="mb-2 flex items-center gap-2">
-          <span 
-            className="text-gray-500 dark:text-gray-400 text-sm cursor-help" 
-            title="Controls how multiple icon filters combine: Click button to cycle through modes"
-          >
-            Icon Filter Mode:
-          </span>
-          <button
-            className={clsx(
-              'px-2 py-1 border rounded text-sm font-semibold transition',
-              'bg-gray-200 text-gray-900 border-gray-300 dark:bg-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-700'
-            )}
-            onClick={(e) => {
-              e.preventDefault();
-              // Click: cycle through AND → OR → AND NOT → AND
-              let newMode: 'AND' | 'OR' | 'AND NOT';
-              if (iconFilterMode === 'AND') {
-                newMode = 'OR';
-              } else if (iconFilterMode === 'OR') {
-                newMode = 'AND NOT';
-              } else {
-                newMode = 'AND';
-              }
-              setIconFilterMode(newMode);
-              // Update all currently active icon filters to the new mode
-              updateAllIconFilterOperators(newMode);
-            }}
-            title="Click to cycle: AND → OR → AND NOT (applies to all active filters)"
-          >
-            {iconFilterMode}
-          </button>
-          <button
-            className={clsx(
-              'px-2 py-1 border rounded text-sm transition opacity-70 hover:opacity-100',
-              'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700'
-            )}
-            onClick={(e) => {
-              e.preventDefault();
-              router.push('/decklist/card-search/random');
-            }}
-            title="I'm feeling lucky"
-          >
-            🎲
-          </button>
-        </div>
-      </div>
-      {/* Brigades */}
-      <div>
-        <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Good Brigades</p>
-        <div className="flex flex-wrap gap-2 mb-2 justify-start">
-          {goodBrigadeIcons.map((icon) => (
-            <img
-              key={icon}
-              src={`/filter-icons/Color=${encodeURIComponent(icon)}.png`}
-              alt={icon}
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-lg text-foreground rounded px-2 py-1 inline-block shadow-none">Toughness</span>
+              <select
+                value={toughnessOp}
+                onChange={e => setToughnessOp(e.target.value)}
+                className="border rounded px-2 py-1 bg-muted text-foreground border-border shadow-sm focus:ring-2 focus:ring-ring"
+              >
+                <option value="lt">&lt;</option>
+                <option value="lte">&le;</option>
+                <option value="eq">=</option>
+                <option value="gt">&gt;</option>
+                <option value="gte">&ge;</option>
+              </select>
+              <select
+                value={toughnessFilter === null ? '' : toughnessFilter}
+                onChange={e => setToughnessFilter(e.target.value === '' ? null : Number(e.target.value))}
+                className="border rounded px-2 py-1 bg-muted text-foreground border-border shadow-sm focus:ring-2 focus:ring-ring"
+              >
+                <option value="">Any</option>
+                {[...Array(14).keys()].map(n => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <p className="font-bold text-lg rounded px-2 py-1 inline-block shadow-none mt-2 text-foreground">Misc</p>
+          <div className="flex flex-wrap gap-2">
+            <button
               className={clsx(
-                "h-10 w-10 sm:h-8 sm:w-auto cursor-pointer",
-                selectedIconFilters.some(f => f.icon === icon) && "ring-2 ring-blue-500 dark:ring-blue-300"
+                'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
+                noAltArt
+                  ? 'bg-primary/20 text-primary border-primary/30'
+                  : 'bg-muted text-foreground hover:bg-muted/80 border-border'
               )}
-              onClick={() => toggleIconFilter(icon)}
-              style={{ minWidth: 32, minHeight: 32 }}
-            />
-          ))}
-        </div>
-        <p className="text-gray-500 dark:text-gray-400 uppercase mb-1 text-sm">Evil Brigades</p>
-        <div className="flex flex-wrap gap-2 justify-start">
-          {evilBrigadeIcons.map((icon) => (
-            <img
-              key={icon}
-              src={`/filter-icons/Color=${encodeURIComponent(icon)}.png`}
-              alt={icon}
+              onClick={() => setnoAltArt(v => !v)}
+            >
+              No AB Versions
+            </button>
+            <button
               className={clsx(
-                "h-10 w-10 sm:h-8 sm:w-auto cursor-pointer",
-                selectedIconFilters.some(f => f.icon === icon) && "ring-2 ring-blue-500 dark:ring-blue-300"
+                'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
+                noFirstPrint
+                  ? 'bg-primary/20 text-primary border-primary/30'
+                  : 'bg-muted text-foreground hover:bg-muted/80 border-border'
               )}
-              onClick={() => toggleIconFilter(icon)}
-              style={{ minWidth: 32, minHeight: 32 }}
-            />
-          ))}
+              onClick={() => setnoFirstPrint(v => !v)}
+            >
+              No 1st Print K/L Starters
+            </button>
+            <button
+              className={clsx(
+                'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
+                nativityOnly && !nativityNot && 'bg-primary/20 text-primary border-primary/30',
+                nativityOnly && nativityNot && 'bg-destructive/20 text-destructive border-destructive/30',
+                !nativityOnly && 'bg-muted text-foreground hover:bg-muted/80 border-border'
+              )}
+              onClick={(e) => {
+                e.preventDefault();
+                if (!nativityOnly) {
+                  setNativityOnly(true);
+                  setNativityNot(false);
+                } else if (nativityOnly && !nativityNot) {
+                  setNativityNot(true);
+                } else {
+                  setNativityOnly(false);
+                  setNativityNot(false);
+                }
+              }}
+              title="Click to cycle: Include → Exclude → Off"
+            >
+              {nativityOnly && nativityNot ? 'NOT ' : ''}Nativity
+            </button>
+            <button
+              className={clsx(
+                'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
+                hasStarOnly && !hasStarNot && 'bg-primary/20 text-primary border-primary/30',
+                hasStarOnly && hasStarNot && 'bg-destructive/20 text-destructive border-destructive/30',
+                !hasStarOnly && 'bg-muted text-foreground hover:bg-muted/80 border-border'
+              )}
+              onClick={(e) => {
+                e.preventDefault();
+                if (!hasStarOnly) {
+                  setHasStarOnly(true);
+                  setHasStarNot(false);
+                } else if (hasStarOnly && !hasStarNot) {
+                  setHasStarNot(true);
+                } else {
+                  setHasStarOnly(false);
+                  setHasStarNot(false);
+                }
+              }}
+              title="Click to cycle: Include → Exclude → Off"
+            >
+              {hasStarOnly && hasStarNot ? 'NOT ' : ''}Has Star
+            </button>
+            <button
+              className={clsx(
+                'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
+                cloudOnly && !cloudNot && 'bg-primary/20 text-primary border-primary/30',
+                cloudOnly && cloudNot && 'bg-destructive/20 text-destructive border-destructive/30',
+                !cloudOnly && 'bg-muted text-foreground hover:bg-muted/80 border-border'
+              )}
+              onClick={(e) => {
+                e.preventDefault();
+                if (!cloudOnly) {
+                  setCloudOnly(true);
+                  setCloudNot(false);
+                } else if (cloudOnly && !cloudNot) {
+                  setCloudNot(true);
+                } else {
+                  setCloudOnly(false);
+                  setCloudNot(false);
+                }
+              }}
+              title="Click to cycle: Include → Exclude → Off"
+            >
+              {cloudOnly && cloudNot ? 'NOT ' : ''}Cloud
+            </button>
+            <button
+              className={clsx(
+                'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
+                angelOnly && !angelNot && 'bg-primary/20 text-primary border-primary/30',
+                angelOnly && angelNot && 'bg-destructive/20 text-destructive border-destructive/30',
+                !angelOnly && 'bg-muted text-foreground hover:bg-muted/80 border-border'
+              )}
+              onClick={(e) => {
+                e.preventDefault();
+                if (!angelOnly) {
+                  setAngelOnly(true);
+                  setAngelNot(false);
+                } else if (angelOnly && !angelNot) {
+                  setAngelNot(true);
+                } else {
+                  setAngelOnly(false);
+                  setAngelNot(false);
+                }
+              }}
+              title="Click to cycle: Include → Exclude → Off"
+            >
+              {angelOnly && angelNot ? 'NOT ' : ''}Angel
+            </button>
+            <button
+              className={clsx(
+                'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
+                demonOnly && !demonNot && 'bg-primary/20 text-primary border-primary/30',
+                demonOnly && demonNot && 'bg-destructive/20 text-destructive border-destructive/30',
+                !demonOnly && 'bg-muted text-foreground hover:bg-muted/80 border-border'
+              )}
+              onClick={(e) => {
+                e.preventDefault();
+                if (!demonOnly) {
+                  setDemonOnly(true);
+                  setDemonNot(false);
+                } else if (demonOnly && !demonNot) {
+                  setDemonNot(true);
+                } else {
+                  setDemonOnly(false);
+                  setDemonNot(false);
+                }
+              }}
+              title="Click to cycle: Include → Exclude → Off"
+            >
+              {demonOnly && demonNot ? 'NOT ' : ''}Demon
+            </button>
+            <button
+              className={clsx(
+                'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
+                danielOnly && !danielNot && 'bg-primary/20 text-primary border-primary/30',
+                danielOnly && danielNot && 'bg-destructive/20 text-destructive border-destructive/30',
+                !danielOnly && 'bg-muted text-foreground hover:bg-muted/80 border-border'
+              )}
+              onClick={(e) => {
+                e.preventDefault();
+                if (!danielOnly) {
+                  setDanielOnly(true);
+                  setDanielNot(false);
+                } else if (danielOnly && !danielNot) {
+                  setDanielNot(true);
+                } else {
+                  setDanielOnly(false);
+                  setDanielNot(false);
+                }
+              }}
+              title="Click to cycle: Include → Exclude → Off"
+            >
+              {danielOnly && danielNot ? 'NOT ' : ''}Daniel
+            </button>
+            <button
+              className={clsx(
+                'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
+                postexilicOnly && !postexilicNot && 'bg-primary/20 text-primary border-primary/30',
+                postexilicOnly && postexilicNot && 'bg-destructive/20 text-destructive border-destructive/30',
+                !postexilicOnly && 'bg-muted text-foreground hover:bg-muted/80 border-border'
+              )}
+              onClick={(e) => {
+                e.preventDefault();
+                if (!postexilicOnly) {
+                  setPostexilicOnly(true);
+                  setPostexilicNot(false);
+                } else if (postexilicOnly && !postexilicNot) {
+                  setPostexilicNot(true);
+                } else {
+                  setPostexilicOnly(false);
+                  setPostexilicNot(false);
+                }
+              }}
+              title="Click to cycle: Include → Exclude → Off"
+            >
+              {postexilicOnly && postexilicNot ? 'NOT ' : ''}Postexilic
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

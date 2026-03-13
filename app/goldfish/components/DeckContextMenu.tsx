@@ -46,7 +46,7 @@ const ITEM_STYLE: React.CSSProperties = {
   background: 'transparent',
   border: 'none',
   cursor: 'pointer',
-  color: '#c9b99a',
+  color: 'var(--gf-text)',
   fontSize: 13,
   textAlign: 'left',
   fontFamily: 'var(--font-cinzel), Georgia, serif',
@@ -54,21 +54,21 @@ const ITEM_STYLE: React.CSSProperties = {
 
 const SEPARATOR_STYLE: React.CSSProperties = {
   height: 1,
-  background: '#6b4e27',
+  background: 'var(--gf-border)',
   margin: '4px 8px',
   opacity: 0.5,
 };
 
 const STEPPER_BTN_STYLE: React.CSSProperties = {
-  width: 24,
-  height: 24,
+  width: 36,
+  height: 36,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  background: 'rgba(196,149,90,0.15)',
-  border: '1px solid #6b4e27',
+  background: 'var(--gf-hover)',
+  border: '1px solid var(--gf-border)',
   borderRadius: 4,
-  color: '#e8d5a3',
+  color: 'var(--gf-text-bright)',
   fontSize: 14,
   fontWeight: 'bold',
   fontFamily: 'var(--font-cinzel), Georgia, serif',
@@ -77,10 +77,10 @@ const STEPPER_BTN_STYLE: React.CSSProperties = {
 
 const GO_BTN_STYLE: React.CSSProperties = {
   padding: '4px 10px',
-  background: 'rgba(196,149,90,0.25)',
-  border: '1px solid #6b4e27',
+  background: 'var(--gf-hover-strong)',
+  border: '1px solid var(--gf-border)',
   borderRadius: 4,
-  color: '#e8d5a3',
+  color: 'var(--gf-text-bright)',
   fontSize: 10,
   fontFamily: 'var(--font-cinzel), Georgia, serif',
   cursor: 'pointer',
@@ -93,8 +93,8 @@ const SUBMENU_STYLE: React.CSSProperties = {
   right: '100%',
   top: -4,
   marginRight: -2,
-  background: '#2a1f12',
-  border: '1px solid #6b4e27',
+  background: 'var(--gf-bg)',
+  border: '1px solid var(--gf-border)',
   borderRadius: 6,
   padding: '4px 0',
   boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
@@ -102,25 +102,25 @@ const SUBMENU_STYLE: React.CSSProperties = {
 };
 
 function hoverEnter(e: React.MouseEvent<HTMLButtonElement | HTMLDivElement>) {
-  e.currentTarget.style.background = 'rgba(196,149,90,0.15)';
-  e.currentTarget.style.color = '#e8d5a3';
+  e.currentTarget.style.background = 'var(--gf-hover)';
+  e.currentTarget.style.color = 'var(--gf-text-bright)';
 }
 
 function hoverLeave(e: React.MouseEvent<HTMLButtonElement | HTMLDivElement>) {
   e.currentTarget.style.background = 'transparent';
-  e.currentTarget.style.color = '#c9b99a';
+  e.currentTarget.style.color = 'var(--gf-text)';
 }
 
 const QUICK_COUNT_STYLE: React.CSSProperties = {
-  width: 26,
-  height: 24,
+  width: 36,
+  height: 36,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   background: 'rgba(196,149,90,0.12)',
-  border: '1px solid #6b4e27',
+  border: '1px solid var(--gf-border)',
   borderRadius: 4,
-  color: '#c9b99a',
+  color: 'var(--gf-text)',
   fontSize: 11,
   fontWeight: 'bold',
   fontFamily: 'var(--font-cinzel), Georgia, serif',
@@ -159,7 +159,7 @@ function SubMenuActionRow({
     <>
       <div
         style={{ display: 'flex', alignItems: 'center', margin: '0 4px', borderRadius: 6 }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(196,149,90,0.15)'; }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
         {max >= 3 && (
@@ -168,11 +168,11 @@ function SubMenuActionRow({
             onClick={() => onAction(3)}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = 'rgba(196,149,90,0.35)';
-              e.currentTarget.style.borderColor = '#c4955a';
+              e.currentTarget.style.borderColor = 'var(--gf-accent)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.background = 'rgba(196,149,90,0.12)';
-              e.currentTarget.style.borderColor = '#6b4e27';
+              e.currentTarget.style.borderColor = 'var(--gf-border)';
             }}
             title={`${label} 3`}
           >
@@ -185,11 +185,11 @@ function SubMenuActionRow({
             onClick={() => onAction(6)}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = 'rgba(196,149,90,0.35)';
-              e.currentTarget.style.borderColor = '#c4955a';
+              e.currentTarget.style.borderColor = 'var(--gf-accent)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.background = 'rgba(196,149,90,0.12)';
-              e.currentTarget.style.borderColor = '#6b4e27';
+              e.currentTarget.style.borderColor = 'var(--gf-border)';
             }}
             title={`${label} 6`}
           >
@@ -200,16 +200,16 @@ function SubMenuActionRow({
           onClick={toggleExpanded}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = 'rgba(196,149,90,0.35)';
-            e.currentTarget.style.borderColor = '#c4955a';
+            e.currentTarget.style.borderColor = 'var(--gf-accent)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = expanded ? 'rgba(196,149,90,0.25)' : 'rgba(196,149,90,0.12)';
-            e.currentTarget.style.borderColor = '#6b4e27';
+            e.currentTarget.style.background = expanded ? 'var(--gf-hover-strong)' : 'rgba(196,149,90,0.12)';
+            e.currentTarget.style.borderColor = 'var(--gf-border)';
           }}
           style={{
             ...QUICK_COUNT_STYLE,
             marginLeft: 2,
-            background: expanded ? 'rgba(196,149,90,0.25)' : 'rgba(196,149,90,0.12)',
+            background: expanded ? 'var(--gf-hover-strong)' : 'rgba(196,149,90,0.12)',
             fontSize: 9,
             letterSpacing: '0.05em',
           }}
@@ -236,7 +236,7 @@ function SubMenuActionRow({
           <span style={{
             width: 24,
             textAlign: 'center',
-            color: '#e8d5a3',
+            color: 'var(--gf-text-bright)',
             fontSize: 13,
             fontWeight: 'bold',
             fontFamily: 'var(--font-cinzel), Georgia, serif',
@@ -371,8 +371,8 @@ export function DeckContextMenu({
         position: 'absolute',
         left: menuLeft,
         top: Math.min(y, window.innerHeight - 300),
-        background: '#2a1f12',
-        border: '1px solid #6b4e27',
+        background: 'var(--gf-bg)',
+        border: '1px solid var(--gf-border)',
         borderRadius: 6,
         padding: '4px 0',
         zIndex: 500,
@@ -400,7 +400,7 @@ export function DeckContextMenu({
           >
             &minus;
           </button>
-          <span style={{ width: 24, textAlign: 'center', color: '#e8d5a3', fontSize: 13, fontWeight: 'bold', fontFamily: 'var(--font-cinzel), Georgia, serif' }}>
+          <span style={{ width: 24, textAlign: 'center', color: 'var(--gf-text-bright)', fontSize: 13, fontWeight: 'bold', fontFamily: 'var(--font-cinzel), Georgia, serif' }}>
             {drawXCount}
           </span>
           <button

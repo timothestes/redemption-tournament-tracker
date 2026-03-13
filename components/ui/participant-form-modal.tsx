@@ -1,6 +1,13 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Button, Label, TextInput } from "flowbite-react";
-import { useTheme } from "next-themes";
+import React, { useEffect, useRef } from "react";
+import { Button } from "./button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogBody,
+  DialogFooter,
+} from "./dialog";
 
 interface ParticipantFormModalProps {
   isOpen: boolean;
@@ -15,27 +22,8 @@ const ParticipantFormModal: React.FC<ParticipantFormModalProps> = ({
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
-  const { theme, resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  
-  // Handle ESC key to close modal
-  useEffect(() => {
-    if (!isOpen) return;
-    
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
 
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [isOpen, onClose]);
-  
-  // Only run on client to avoid hydration mismatch
   useEffect(() => {
-    setMounted(true);
-    
     if (isOpen && inputRef.current) {
       inputRef.current.focus();
     }
@@ -50,20 +38,16 @@ const ParticipantFormModal: React.FC<ParticipantFormModalProps> = ({
     }
   };
 
-  if (!isOpen) return null;
-  
-  // Don't render theme-specific styling until client-side to avoid hydration mismatch
-  const currentTheme = mounted ? (theme === 'system' ? resolvedTheme : theme) : 'dark';
-  const isLightTheme = currentTheme === 'light';
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
-      <div className={`${isLightTheme ? 'bg-white border-gray-200' : 'bg-[#1F2937] border-zinc-300/10'} border-2 py-6 px-6 rounded-lg shadow-lg max-w-sm w-full`}>
-        <h2 className={`text-xl font-bold mb-4 ${isLightTheme ? 'text-gray-800' : 'text-white'}`}>Add Participant</h2>
-        <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="mb-2 block space-y-1">
-            <Label htmlFor="name" value="Participant Name" className={isLightTheme ? 'text-gray-700' : ''} />
-            <TextInput
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent size="sm">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-bold">Add Participant</DialogTitle>
+        </DialogHeader>
+        <form ref={formRef} onSubmit={handleSubmit}>
+          <DialogBody className="space-y-1">
+            <label htmlFor="name" className="text-sm font-medium text-foreground">Participant Name</label>
+            <input
               id="name"
               name="name"
               type="text"
@@ -71,30 +55,20 @@ const ParticipantFormModal: React.FC<ParticipantFormModalProps> = ({
               ref={inputRef}
               maxLength={35}
               placeholder="Max 35 characters"
-              className={isLightTheme ? 'bg-gray-50 border-gray-300' : ''}
+              className="w-full rounded-lg border border-gray-300 dark:border-zinc-600 bg-gray-50 dark:bg-zinc-800 text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:outline-none"
             />
-          </div>
-          <div className="flex justify-end gap-3">
-            <Button 
-              type="submit" 
-              outline 
-              gradientDuoTone="greenToBlue"
-            >
+          </DialogBody>
+          <DialogFooter className="justify-end">
+            <Button type="submit" variant="success">
               Add
             </Button>
-            <Button 
-              type="button" 
-              outline 
-              gradientDuoTone="pinkToOrange" 
-              onClick={onClose}
-              className="border-red-500 hover:bg-red-500/10"
-            >
+            <Button type="button" variant="cancel" onClick={onClose}>
               Cancel
             </Button>
-          </div>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 
