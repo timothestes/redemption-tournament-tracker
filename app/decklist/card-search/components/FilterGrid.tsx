@@ -184,17 +184,17 @@ export default function FilterGrid({
   ];
 
   return (
-    <div className="flex flex-col gap-3 mb-4 text-foreground p-3 md:p-4">
-      {/* Band 1: Quick text filters — inline groups flowing horizontally */}
-      <div className="flex flex-wrap items-start gap-x-6 gap-y-2">
-        <div className="flex items-center gap-1.5">
+    <div className="flex flex-col gap-2 md:gap-3 mb-4 text-foreground p-3 md:p-4">
+      {/* Band 1: Quick text filters — stacked on mobile, inline on desktop */}
+      <div className="flex flex-wrap items-start gap-x-6 gap-y-1.5">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-1.5">
           <span className="text-muted-foreground uppercase text-xs font-medium shrink-0">Legality</span>
           <div className="flex flex-wrap gap-1">
             {['Rotation','Classic','Banned','Scrolls','Paragon'].map((mode) => (
               <button
                 key={mode}
                 className={clsx(
-                  'px-2.5 py-1 md:px-3 md:py-1.5 border rounded text-sm font-semibold shadow transition-colors duration-150',
+                  'px-2 py-0.5 md:px-3 md:py-1.5 border rounded text-sm font-semibold transition-colors duration-150',
                   legalityMode === mode
                     ? 'bg-primary/20 text-primary border-primary/30'
                     : 'bg-muted text-foreground hover:bg-muted/80 border-border'
@@ -206,14 +206,14 @@ export default function FilterGrid({
             ))}
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-1.5">
           <span className="text-muted-foreground uppercase text-xs font-medium shrink-0">Alignment</span>
           <div className="flex flex-wrap gap-1">
             {['Good','Evil','Neutral'].map((mode) => (
               <button
                 key={mode}
                 className={clsx(
-                  'px-2.5 py-1 md:px-3 md:py-1.5 border rounded text-sm font-semibold shadow transition-colors duration-150',
+                  'px-2 py-0.5 md:px-3 md:py-1.5 border rounded text-sm font-semibold transition-colors duration-150',
                   selectedAlignmentFilters.includes(mode)
                     ? 'bg-primary/20 text-primary border-primary/30'
                     : 'bg-muted text-foreground hover:bg-muted/80 border-border'
@@ -225,14 +225,14 @@ export default function FilterGrid({
             ))}
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-1.5">
           <span className="text-muted-foreground uppercase text-xs font-medium shrink-0">Rarity</span>
           <div className="flex flex-wrap gap-1">
             {['Common','Promo','Rare','Ultra Rare'].map((rarity) => (
               <button
                 key={rarity}
                 className={clsx(
-                  'px-2.5 py-1 md:px-3 md:py-1.5 border rounded text-sm font-semibold shadow transition-colors duration-150',
+                  'px-2 py-0.5 md:px-3 md:py-1.5 border rounded text-sm font-semibold transition-colors duration-150',
                   selectedRarityFilters.includes(rarity)
                     ? 'bg-primary/20 text-primary border-primary/30'
                     : 'bg-muted text-foreground hover:bg-muted/80 border-border'
@@ -246,12 +246,15 @@ export default function FilterGrid({
         </div>
       </div>
 
-      {/* Band 2: Icon filters — full width, types + brigades side by side */}
-      <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
+      {/* Divider between text and icon bands */}
+      <div className="h-px bg-border" />
+
+      {/* Band 2: Icon filters — full width, types + brigades */}
+      <div className="flex flex-wrap items-start gap-x-6 gap-y-2">
         {/* Types */}
         <div>
           <p className="text-muted-foreground uppercase mb-1 text-xs font-medium">Types</p>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1">
             {typeIcons.map((t) => {
               const src = `/filter-icons/${encodeURIComponent(t)}.png`;
               return (
@@ -260,11 +263,13 @@ export default function FilterGrid({
                   src={src}
                   alt={t}
                   className={clsx(
-                    'h-8 w-auto md:h-10 cursor-pointer',
-                    selectedIconFilters.some(f => f.icon === t) && 'ring-2 ring-white/80'
+                    'h-8 w-auto md:h-10 cursor-pointer rounded transition-transform duration-150',
+                    selectedIconFilters.some(f => f.icon === t)
+                      ? 'ring-2 ring-blue-400 scale-110'
+                      : 'opacity-80 hover:opacity-100'
                   )}
                   onClick={() => toggleIconFilter(t)}
-                  style={{ minWidth: 32, minHeight: 32 }}
+                  style={{ minWidth: 28, minHeight: 28 }}
                 />
               );
             })}
@@ -273,18 +278,20 @@ export default function FilterGrid({
         {/* Good Brigades */}
         <div>
           <p className="text-muted-foreground uppercase mb-1 text-xs font-medium">Good Brigades</p>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1">
             {goodBrigadeIcons.map((icon) => (
               <img
                 key={icon}
                 src={`/filter-icons/Color=${encodeURIComponent(icon)}.png`}
                 alt={icon}
                 className={clsx(
-                  "h-10 w-auto sm:h-8 cursor-pointer rounded-lg transition-all duration-150",
-                  selectedIconFilters.some(f => f.icon === icon) && "ring-[2.5px] ring-blue-400 dark:ring-blue-400 scale-110"
+                  "h-8 w-auto md:h-9 cursor-pointer rounded-md transition-transform duration-150",
+                  selectedIconFilters.some(f => f.icon === icon)
+                    ? "ring-2 ring-blue-400 scale-110"
+                    : "opacity-80 hover:opacity-100"
                 )}
                 onClick={() => toggleIconFilter(icon)}
-                style={{ minWidth: 32, minHeight: 32 }}
+                style={{ minWidth: 28, minHeight: 28 }}
               />
             ))}
           </div>
@@ -292,28 +299,30 @@ export default function FilterGrid({
         {/* Evil Brigades */}
         <div>
           <p className="text-muted-foreground uppercase mb-1 text-xs font-medium">Evil Brigades</p>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1">
             {evilBrigadeIcons.map((icon) => (
               <img
                 key={icon}
                 src={`/filter-icons/Color=${encodeURIComponent(icon)}.png`}
                 alt={icon}
                 className={clsx(
-                  "h-10 w-auto sm:h-8 cursor-pointer rounded-lg transition-all duration-150",
-                  selectedIconFilters.some(f => f.icon === icon) && "ring-[2.5px] ring-blue-400 dark:ring-blue-400 scale-110"
+                  "h-8 w-auto md:h-9 cursor-pointer rounded-md transition-transform duration-150",
+                  selectedIconFilters.some(f => f.icon === icon)
+                    ? "ring-2 ring-blue-400 scale-110"
+                    : "opacity-80 hover:opacity-100"
                 )}
                 onClick={() => toggleIconFilter(icon)}
-                style={{ minWidth: 32, minHeight: 32 }}
+                style={{ minWidth: 28, minHeight: 28 }}
               />
             ))}
           </div>
         </div>
       </div>
 
-      {/* Utility bar: Icon Filter Mode + Advanced Filters + dice */}
+      {/* Utility bar: Advanced Filters + Icon Filter Mode + dice */}
       <div className="flex items-center gap-2 flex-wrap">
         <button
-          className="px-2.5 py-1 md:px-3 md:py-1.5 border rounded text-sm bg-muted text-foreground hover:bg-muted/80 font-semibold shadow"
+          className="px-2.5 py-1 md:px-3 md:py-1.5 border rounded text-sm bg-muted text-foreground hover:bg-muted/80 font-semibold"
           onClick={() => setAdvancedOpen(!advancedOpen)}
         >
           Advanced Filters {advancedOpen ? '▲' : '▼'}
