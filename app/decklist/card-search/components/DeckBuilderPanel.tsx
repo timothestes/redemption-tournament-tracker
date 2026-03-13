@@ -274,6 +274,10 @@ export default function DeckBuilderPanel({
   // View options
   const [viewLayout, setViewLayout] = useState<'grid' | 'list'>('grid');
 
+  // Swipe-to-dismiss for mobile bottom sheet
+  const sheetTouchRef = useRef<{ startY: number; currentY: number } | null>(null);
+  const [sheetTranslateY, setSheetTranslateY] = useState(0);
+
   const [groupBy, setGroupBy] = useState<'type' | 'alignment'>('type');
 
   // Expanded (FullDeckView) view options
@@ -1601,11 +1605,37 @@ export default function DeckBuilderPanel({
                 onClick={() => setShowViewDropdown(false)}
               />
               {/* Mobile: bottom sheet */}
-              <div className="
-                md:hidden
-                fixed bottom-14 left-0 right-0 pb-[env(safe-area-inset-bottom)] rounded-t-2xl max-h-[70vh] overflow-y-auto
-                bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl py-2 z-[70]
-              ">
+              <div
+                className="
+                  md:hidden
+                  fixed bottom-14 left-0 right-0 pb-[env(safe-area-inset-bottom)] rounded-t-2xl max-h-[70vh] overflow-y-auto
+                  bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl py-2 z-[70]
+                "
+                style={{
+                  transform: sheetTranslateY > 0 ? `translateY(${sheetTranslateY}px)` : undefined,
+                  transition: sheetTranslateY === 0 ? 'transform 0.2s ease-out' : undefined,
+                }}
+                onTouchStart={(e) => {
+                  sheetTouchRef.current = { startY: e.touches[0].clientY, currentY: e.touches[0].clientY };
+                }}
+                onTouchMove={(e) => {
+                  if (!sheetTouchRef.current) return;
+                  sheetTouchRef.current.currentY = e.touches[0].clientY;
+                  const delta = sheetTouchRef.current.currentY - sheetTouchRef.current.startY;
+                  if (delta > 0) {
+                    setSheetTranslateY(delta);
+                  }
+                }}
+                onTouchEnd={() => {
+                  if (!sheetTouchRef.current) return;
+                  const delta = sheetTouchRef.current.currentY - sheetTouchRef.current.startY;
+                  if (delta > 80) {
+                    setShowViewDropdown(false);
+                  }
+                  setSheetTranslateY(0);
+                  sheetTouchRef.current = null;
+                }}
+              >
                 {/* Drag handle */}
                 <div className="flex justify-center py-2">
                   <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
@@ -1801,11 +1831,11 @@ export default function DeckBuilderPanel({
       )}
 
       {/* Content */}
-      <div className={`flex-1 overflow-y-auto ${isExpanded ? '' : 'p-4'}`} data-deck-grid>
+      <div className={`flex-1 overflow-y-auto overflow-x-hidden ${isExpanded ? '' : 'p-4'}`} data-deck-grid>
         {/* Paragon Requirements (only show for Paragon format with a selected Paragon) */}
-        {deckType === 'Paragon' && deck.paragon && validation.paragonStats && (
+        {deckType === 'Paragon' && deck.paragon && validation.paragonStats && (activeTab === 'main' || activeTab === 'reserve') && (
           <div className="mb-4">
-            <div className="p-4 bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-2 border-purple-300 dark:border-purple-600 rounded-xl shadow-md">
+            <div className="p-3 md:p-4 bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-2 border-purple-300 dark:border-purple-600 rounded-xl shadow-md overflow-hidden">
               {/* Mobile: stack vertically. Desktop: side by side */}
               <div className="flex flex-col md:flex-row md:items-start gap-3 md:gap-4">
                 {/* Paragon Card Artwork - Click to Expand */}
@@ -2712,17 +2742,6 @@ export default function DeckBuilderPanel({
                 </div>
               </div>
             </div>
-
-            {deck.description && (
-              <div>
-                <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  Description
-                </h3>
-                <p className="text-gray-600 dark:text-gray-400 text-sm">
-                  {deck.description}
-                </p>
-              </div>
-            )}
 
             <div className="text-xs text-gray-500 dark:text-gray-500">
               <div>Created: {deck.createdAt.toLocaleDateString()}</div>

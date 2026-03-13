@@ -1396,7 +1396,7 @@ export default function CardSearchClient() {
                     ref={el => { inputRefs.current[index] = el; }}
                     type="text"
                     placeholder={index === 0 ? "Search" : `Search ${index + 1}`}
-                    className="flex-1 min-w-0 px-2 sm:px-3 h-9 sm:h-11 border rounded text-base focus:ring-2 focus:ring-ring text-foreground bg-card border-border"
+                    className="flex-1 min-w-0 px-2 sm:px-3 h-9 sm:h-11 border rounded text-base focus:outline-none focus:ring-2 focus:ring-ring text-foreground bg-card border-border"
                     value={queryObj.text}
                     onChange={(e) => updateQuery(index, e.target.value)}
                     maxLength={64}
@@ -1407,7 +1407,7 @@ export default function CardSearchClient() {
                     <button
                       type="button"
                       onClick={() => removeQuery(index)}
-                      className="p-1.5 sm:p-2 text-destructive hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
+                      className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center text-destructive/70 hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors text-lg font-bold"
                       title="Remove this query"
                     >
                       ×
@@ -1495,11 +1495,10 @@ export default function CardSearchClient() {
           </div>
         </div>
       </div>
-      {/* Active Filters Summary Bar — only render when there are active filter pills */}
-      {hasActiveFilters && (
-      <div className="w-full transition-all duration-300 md:sticky md:top-[64px] z-30 bg-card text-foreground border-b border-border flex items-center">
+      {/* Active Filters Summary Bar — always visible on desktop to prevent layout jump, hidden on mobile when empty */}
+      <div className={`w-full transition-all duration-300 md:sticky md:top-[64px] z-30 bg-card text-foreground border-b border-border ${hasActiveFilters ? 'flex' : 'hidden md:flex'} items-center`}>
         {/* Scrollable pills area */}
-        <div className="flex-1 overflow-x-auto flex flex-nowrap sm:flex-wrap gap-1.5 sm:gap-2 items-center sm:justify-center px-2 sm:px-4 py-1.5 sm:py-2 sm:overflow-visible">
+        <div className="flex-1 overflow-x-auto flex flex-nowrap sm:flex-wrap gap-1.5 sm:gap-2 items-center sm:justify-center px-2 sm:px-4 py-1.5 sm:py-2 sm:overflow-visible min-h-[44px]">
         {/* Query Pills */}
         {queries.map((queryObj, originalIndex) => {
           if (!queryObj.text.trim()) return null;
@@ -1521,7 +1520,7 @@ export default function CardSearchClient() {
           return (
             <span
               key={originalIndex}
-              className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer"
+              className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap"
               onClick={() => updateQuery(originalIndex, "")}
               tabIndex={0}
               role="button"
@@ -1542,7 +1541,7 @@ export default function CardSearchClient() {
         })}
         {/* Legality */}
         {legalityMode !== 'Rotation' && (
-          <span className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setLegalityMode('Rotation')} tabIndex={0} role="button" aria-label="Remove Legality filter">
+          <span className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => setLegalityMode('Rotation')} tabIndex={0} role="button" aria-label="Remove Legality filter">
             {legalityMode}
             <span className="ml-1">×</span>
           </span>
@@ -1551,7 +1550,7 @@ export default function CardSearchClient() {
         {selectedAlignmentFilters.map(mode => (
           <span
             key={mode}
-            className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer"
+            className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap"
             onClick={() => setSelectedAlignmentFilters(selectedAlignmentFilters.filter(m => m !== mode))}
             tabIndex={0}
             role="button"
@@ -1565,7 +1564,7 @@ export default function CardSearchClient() {
         {selectedRarityFilters.map(rarity => (
           <span
             key={rarity}
-            className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer"
+            className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap"
             onClick={() => setSelectedRarityFilters(selectedRarityFilters.filter(r => r !== rarity))}
             tabIndex={0}
             role="button"
@@ -1577,7 +1576,7 @@ export default function CardSearchClient() {
         ))}
         {/* Icon Filters */}
         {selectedIconFilters.map((filter, idx) => {
-          const pillClass = 'bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer';
+          const pillClass = 'bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap';
           return (
             <React.Fragment key={filter.icon}>
               <span className={pillClass} onClick={() => setSelectedIconFilters(selectedIconFilters.filter(f => f.icon !== filter.icon))} tabIndex={0} role="button" aria-label={`Remove ${filter.icon} filter`}>
@@ -1625,14 +1624,14 @@ export default function CardSearchClient() {
         })}
         {/* Testament */}
         {selectedTestaments.map(t => (
-          <span key={t} className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setSelectedTestaments(selectedTestaments.filter(x => x !== t)); setTestamentNots(prev => { const newNots = { ...prev }; delete newNots[t]; return newNots; }); }} tabIndex={0} role="button" aria-label={`Remove ${t} testament filter`}>
+          <span key={t} className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setSelectedTestaments(selectedTestaments.filter(x => x !== t)); setTestamentNots(prev => { const newNots = { ...prev }; delete newNots[t]; return newNots; }); }} tabIndex={0} role="button" aria-label={`Remove ${t} testament filter`}>
             {testamentNots[t] ? 'NOT ' : ''}{t}
             <span className="ml-1">×</span>
           </span>
         ))}
         {/* Gospel */}
         {isGospel && (
-          <span className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setIsGospel(false); setGospelNot(false); }} tabIndex={0} role="button" aria-label="Remove Gospel filter">
+          <span className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setIsGospel(false); setGospelNot(false); }} tabIndex={0} role="button" aria-label="Remove Gospel filter">
             {gospelNot ? 'NOT ' : ''}Gospel
             <span className="ml-1">×</span>
           </span>
@@ -1653,67 +1652,66 @@ export default function CardSearchClient() {
         )}
         {/* Misc */}
         {noAltArt === false && (
-          <span className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setnoAltArt(true)} tabIndex={0} role="button" aria-label="Remove AB Versions filter">
+          <span className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => setnoAltArt(true)} tabIndex={0} role="button" aria-label="Remove AB Versions filter">
             AB Versions
             <span className="ml-1">×</span>
           </span>
         )}
         {noFirstPrint === false && (
-          <span className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setnoFirstPrint(true)} tabIndex={0} role="button" aria-label="Remove 1st Print K/L Starters filter">
+          <span className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => setnoFirstPrint(true)} tabIndex={0} role="button" aria-label="Remove 1st Print K/L Starters filter">
             1st Print K/L Starters
             <span className="ml-1">×</span>
           </span>
         )}
         {nativityOnly && (
-          <span className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setNativityOnly(false); setNativityNot(false); }} tabIndex={0} role="button" aria-label="Remove Nativity filter">
+          <span className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setNativityOnly(false); setNativityNot(false); }} tabIndex={0} role="button" aria-label="Remove Nativity filter">
             {nativityNot ? 'NOT ' : ''}Nativity
             <span className="ml-1">×</span>
           </span>
         )}
         {hasStarOnly && (
-          <span className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setHasStarOnly(false); setHasStarNot(false); }} tabIndex={0} role="button" aria-label="Remove Has Star filter">
+          <span className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setHasStarOnly(false); setHasStarNot(false); }} tabIndex={0} role="button" aria-label="Remove Has Star filter">
             {hasStarNot ? 'NOT ' : ''}Has Star
             <span className="ml-1">×</span>
           </span>
         )}
         {cloudOnly && (
-          <span className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setCloudOnly(false); setCloudNot(false); }} tabIndex={0} role="button" aria-label="Remove Cloud filter">
+          <span className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setCloudOnly(false); setCloudNot(false); }} tabIndex={0} role="button" aria-label="Remove Cloud filter">
             {cloudNot ? 'NOT ' : ''}Cloud
             <span className="ml-1">×</span>
           </span>
         )}
         {angelOnly && (
-          <span className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setAngelOnly(false); setAngelNot(false); }} tabIndex={0} role="button" aria-label="Remove Angel filter">
+          <span className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setAngelOnly(false); setAngelNot(false); }} tabIndex={0} role="button" aria-label="Remove Angel filter">
             {angelNot ? 'NOT ' : ''}Angel
             <span className="ml-1">×</span>
           </span>
         )}
         {demonOnly && (
-          <span className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setDemonOnly(false); setDemonNot(false); }} tabIndex={0} role="button" aria-label="Remove Demon filter">
+          <span className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setDemonOnly(false); setDemonNot(false); }} tabIndex={0} role="button" aria-label="Remove Demon filter">
             {demonNot ? 'NOT ' : ''}Demon
             <span className="ml-1">×</span>
           </span>
         )}
         {danielOnly && (
-          <span className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setDanielOnly(false); setDanielNot(false); }} tabIndex={0} role="button" aria-label="Remove Daniel filter">
+          <span className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setDanielOnly(false); setDanielNot(false); }} tabIndex={0} role="button" aria-label="Remove Daniel filter">
             {danielNot ? 'NOT ' : ''}Daniel
             <span className="ml-1">×</span>
           </span>
         )}
         {postexilicOnly && (
-          <span className="bg-primary/15 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setPostexilicOnly(false); setPostexilicNot(false); }} tabIndex={0} role="button" aria-label="Remove Postexilic filter">
+          <span className="bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setPostexilicOnly(false); setPostexilicNot(false); }} tabIndex={0} role="button" aria-label="Remove Postexilic filter">
             {postexilicNot ? 'NOT ' : ''}Postexilic
             <span className="ml-1">×</span>
           </span>
         )}
         </div>
       </div>
-      )}
       {/* Collapse/Expand Filter Grid Button — mobile only (on desktop it's in the search header) */}
       <div className={`flex-shrink-0 ${!filterGridCollapsed ? 'sticky top-0 z-30' : ''} flex md:hidden flex-row items-center justify-center px-3 py-1.5 bg-card border-b border-border`}>
         <button
           aria-label="Toggle filter grid"
-          className={`w-full flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-semibold transition ${
+          className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full border text-xs font-semibold transition ${
             filterGridCollapsed
               ? 'bg-primary/15 text-primary border-primary/30'
               : 'bg-muted text-muted-foreground border-border'

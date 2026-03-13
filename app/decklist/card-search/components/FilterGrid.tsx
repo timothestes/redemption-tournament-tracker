@@ -598,7 +598,7 @@ export default function FilterGrid({
                 alt={t}
                 className={clsx(
                   'h-8 w-8 md:h-10 md:w-auto cursor-pointer',
-                  selectedIconFilters.some(f => f.icon === t) && 'ring-2 ring-primary'
+                  selectedIconFilters.some(f => f.icon === t) && 'ring-2 ring-white/80'
                 )}
                 onClick={() => toggleIconFilter(t)}
                 style={{ minWidth: 32, minHeight: 32 }}
@@ -664,7 +664,7 @@ export default function FilterGrid({
               alt={icon}
               className={clsx(
                 "h-10 w-10 sm:h-8 sm:w-auto cursor-pointer",
-                selectedIconFilters.some(f => f.icon === icon) && "ring-2 ring-primary"
+                selectedIconFilters.some(f => f.icon === icon) && "ring-2 ring-white/80"
               )}
               onClick={() => toggleIconFilter(icon)}
               style={{ minWidth: 32, minHeight: 32 }}
@@ -680,7 +680,7 @@ export default function FilterGrid({
               alt={icon}
               className={clsx(
                 "h-10 w-10 sm:h-8 sm:w-auto cursor-pointer",
-                selectedIconFilters.some(f => f.icon === icon) && "ring-2 ring-primary"
+                selectedIconFilters.some(f => f.icon === icon) && "ring-2 ring-white/80"
               )}
               onClick={() => toggleIconFilter(icon)}
               style={{ minWidth: 32, minHeight: 32 }}

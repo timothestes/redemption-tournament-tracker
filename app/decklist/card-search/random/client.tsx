@@ -1,137 +1,184 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { CARD_DATA_URL, CARD_IMAGE_PROXY_URL } from "../constants";
+import { CARD_DATA_URL } from "../constants";
 import { Card, sanitizeImgFile, normalizeBrigadeField } from "../utils";
+import { useCardImageUrl } from "../hooks/useCardImageUrl";
+import { useCardPrices } from "../hooks/useCardPrices";
+import { openYTGSearchPage } from "../ytgUtils";
 
 export default function RandomCardClient() {
   const router = useRouter();
+  const { getImageUrl } = useCardImageUrl();
+  const { getPrice, getProductUrl } = useCardPrices();
   const [card, setCard] = useState<Card | null>(null);
+  const [allCards, setAllCards] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isRevealing, setIsRevealing] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
+  // Load card data once, then pick randomly from it
   useEffect(() => {
-    fetchRandomCard();
+    (async () => {
+      try {
+        const response = await fetch(CARD_DATA_URL);
+        const text = await response.text();
+        const lines = text.split("\n");
+        const dataLines = lines.slice(1).filter((l) => l.trim());
+        if (dataLines.length === 0) {
+          setError("No cards found");
+          setLoading(false);
+          return;
+        }
+        setAllCards(dataLines);
+        // Initial load: pick a card directly without reveal animation
+        const randomIndex = Math.floor(Math.random() * dataLines.length);
+        const parsed = parseCard(dataLines[randomIndex]);
+        setCard(parsed);
+        setLoading(false);
+      } catch {
+        setError("Failed to load card data");
+        setLoading(false);
+      }
+    })();
   }, []);
 
-  const fetchRandomCard = async () => {
-    // Don't show loading state if we already have a card - just transition
-    if (card) {
-      setIsTransitioning(true);
-    } else {
-      setLoading(true);
+  const parseCard = useCallback((line: string): Card => {
+    const cols = line.split("\t");
+    const cardName = cols[0] || "";
+    const cardSet = cols[1] || "";
+    const imgFile = sanitizeImgFile(cols[2] || "");
+    const reference = cols[12] || "";
+    const alignment = cols[14] || "";
+    const rawBrigade = cols[5] || "";
+
+    // Parse testament
+    let references: string[] = [];
+    for (let refGroup of reference.split(";")) {
+      refGroup = refGroup.trim();
+      if (refGroup.includes("(") && refGroup.includes(")")) {
+        const mainRef = refGroup.split("(")[0].trim();
+        if (mainRef) references.push(mainRef);
+        const parenContent = refGroup.substring(refGroup.indexOf("(") + 1, refGroup.indexOf(")"));
+        const parenRefs = parenContent.split(",").map(pr => pr.trim()).filter(Boolean);
+        references.push(...parenRefs);
+      } else {
+        if (refGroup) references.push(refGroup);
+      }
     }
-    setError(null);
-    
+
+    const referencesLower = references.map(r => r.toLowerCase());
+    const gospelBooksLower = ['matthew', 'mark', 'luke', 'john'];
+    const isGospel = referencesLower.some(ref => gospelBooksLower.some(b => ref.startsWith(b)));
+
+    const foundTestaments = new Set<string>();
+    const OT_BOOKS = ['genesis', 'exodus', 'leviticus', 'numbers', 'deuteronomy', 'joshua', 'judges', 'ruth', 'samuel', 'kings', 'chronicles', 'ezra', 'nehemiah', 'esther', 'job', 'psalms', 'proverbs', 'ecclesiastes', 'song of solomon', 'isaiah', 'jeremiah', 'lamentations', 'ezekiel', 'daniel', 'hosea', 'joel', 'amos', 'obadiah', 'jonah', 'micah', 'nahum', 'habakkuk', 'zephaniah', 'haggai', 'zechariah', 'malachi'];
+    const NT_BOOKS = ['matthew', 'mark', 'luke', 'john', 'acts', 'romans', 'corinthians', 'galatians', 'ephesians', 'philippians', 'colossians', 'thessalonians', 'timothy', 'titus', 'philemon', 'hebrews', 'james', 'peter', 'john', 'jude', 'revelation'];
+
+    const normalizeBookName = (ref: string) => ref.replace(/^(i{1,3}|1|2|3|4|one|two|three|four)\s+/i, '').trim();
+
+    for (const ref of referencesLower) {
+      const book = ref.split(' ')[0];
+      const normalizedBook = normalizeBookName(ref).split(' ')[0];
+      if (NT_BOOKS.some(b => book === b.toLowerCase() || normalizedBook === b.toLowerCase())) foundTestaments.add('NT');
+      if (OT_BOOKS.some(b => book === b.toLowerCase() || normalizedBook === b.toLowerCase())) foundTestaments.add('OT');
+    }
+
+    let testament: string | string[] = '';
+    if (foundTestaments.size === 1) {
+      testament = Array.from(foundTestaments)[0];
+    } else if (foundTestaments.size > 1) {
+      testament = Array.from(foundTestaments);
+    }
+
+    let normalizedBrigades: string[] = [];
     try {
-      const response = await fetch(CARD_DATA_URL);
-      const text = await response.text();
-      const lines = text.split("\n");
-      const dataLines = lines.slice(1).filter((l) => l.trim());
-      
-      if (dataLines.length === 0) {
-        setError("No cards found in database");
-        setLoading(false);
-        return;
-      }
-
-      // Get random card
-      const randomIndex = Math.floor(Math.random() * dataLines.length);
-      const line = dataLines[randomIndex];
-      const cols = line.split("\t");
-      
-      // Parse card data (same logic as in card-search/client.tsx)
-      const cardName = cols[0] || "";
-      const cardSet = cols[1] || "";
-      const imgFile = sanitizeImgFile(cols[2] || "");
-      const reference = cols[12] || "";
-      const alignment = cols[14] || "";
-      const rawBrigade = cols[5] || "";
-      
-      // Parse testament
-      let references: string[] = [];
-      for (let refGroup of reference.split(";")) {
-        refGroup = refGroup.trim();
-        if (refGroup.includes("(") && refGroup.includes(")")) {
-          const mainRef = refGroup.split("(")[0].trim();
-          if (mainRef) references.push(mainRef);
-          const parenContent = refGroup.substring(refGroup.indexOf("(") + 1, refGroup.indexOf(")"));
-          const parenRefs = parenContent.split(",").map(pr => pr.trim()).filter(Boolean);
-          references.push(...parenRefs);
-        } else {
-          if (refGroup) references.push(refGroup);
-        }
-      }
-
-      const referencesLower = references.map(r => r.toLowerCase());
-      const gospelBooksLower = ['matthew', 'mark', 'luke', 'john'];
-      const isGospel = referencesLower.some(ref => gospelBooksLower.some(b => ref.startsWith(b)));
-
-      const foundTestaments = new Set<string>();
-      const OT_BOOKS = ['genesis', 'exodus', 'leviticus', 'numbers', 'deuteronomy', 'joshua', 'judges', 'ruth', 'samuel', 'kings', 'chronicles', 'ezra', 'nehemiah', 'esther', 'job', 'psalms', 'proverbs', 'ecclesiastes', 'song of solomon', 'isaiah', 'jeremiah', 'lamentations', 'ezekiel', 'daniel', 'hosea', 'joel', 'amos', 'obadiah', 'jonah', 'micah', 'nahum', 'habakkuk', 'zephaniah', 'haggai', 'zechariah', 'malachi'];
-      const NT_BOOKS = ['matthew', 'mark', 'luke', 'john', 'acts', 'romans', 'corinthians', 'galatians', 'ephesians', 'philippians', 'colossians', 'thessalonians', 'timothy', 'titus', 'philemon', 'hebrews', 'james', 'peter', 'john', 'jude', 'revelation'];
-
-      const normalizeBookName = (ref: string) => ref.replace(/^(i{1,3}|1|2|3|4|one|two|three|four)\s+/i, '').trim();
-
-      for (const ref of referencesLower) {
-        const book = ref.split(' ')[0];
-        const normalizedBook = normalizeBookName(ref).split(' ')[0];
-        if (NT_BOOKS.some(b => book === b.toLowerCase() || normalizedBook === b.toLowerCase())) foundTestaments.add('NT');
-        if (OT_BOOKS.some(b => book === b.toLowerCase() || normalizedBook === b.toLowerCase())) foundTestaments.add('OT');
-      }
-
-      let testament: string | string[] = '';
-      if (foundTestaments.size === 1) {
-        testament = Array.from(foundTestaments)[0];
-      } else if (foundTestaments.size > 1) {
-        testament = Array.from(foundTestaments);
-      }
-
-      let normalizedBrigades: string[] = [];
-      try {
-        normalizedBrigades = normalizeBrigadeField(rawBrigade, alignment, cardName);
-      } catch (e) {
-        normalizedBrigades = rawBrigade ? [rawBrigade] : [];
-      }
-
-      const randomCard: Card = {
-        dataLine: line,
-        name: cardName,
-        set: cardSet,
-        imgFile: imgFile,
-        officialSet: cols[3] || "",
-        type: cols[4] || "",
-        brigade: normalizedBrigades.join("/"),
-        strength: cols[6] || "",
-        toughness: cols[7] || "",
-        class: cols[8] || "",
-        identifier: cols[9] || "",
-        specialAbility: cols[10] || "",
-        rarity: cols[11] || "",
-        reference: reference,
-        alignment: alignment,
-        legality: cols[15] || "",
-        testament: Array.isArray(testament) ? testament.join("/") : testament,
-        isGospel: isGospel,
-      };
-
-      setIsTransitioning(false);
-      setCard(randomCard);
-    } catch (err) {
-      setError("Failed to fetch random card");
-      console.error(err);
-    } finally {
-      setLoading(false);
+      normalizedBrigades = normalizeBrigadeField(rawBrigade, alignment, cardName);
+    } catch {
+      normalizedBrigades = rawBrigade ? [rawBrigade] : [];
     }
-  };
+
+    return {
+      dataLine: line,
+      name: cardName,
+      set: cardSet,
+      imgFile,
+      officialSet: cols[3] || "",
+      type: cols[4] || "",
+      brigade: normalizedBrigades.join("/"),
+      strength: cols[6] || "",
+      toughness: cols[7] || "",
+      class: cols[8] || "",
+      identifier: cols[9] || "",
+      specialAbility: cols[10] || "",
+      rarity: cols[11] || "",
+      reference,
+      alignment,
+      legality: cols[15] || "",
+      testament: Array.isArray(testament) ? testament.join("/") : testament,
+      isGospel,
+    };
+  }, []);
+
+  const pickRandomCard = useCallback((cards: string[] = allCards) => {
+    if (cards.length === 0) return;
+    setIsRevealing(true);
+
+    // Pick a new card and preload its image before swapping
+    const randomIndex = Math.floor(Math.random() * cards.length);
+    const parsed = parseCard(cards[randomIndex]);
+    const imgUrl = getImageUrl(parsed.imgFile);
+
+    const img = new Image();
+    img.src = imgUrl;
+
+    const swap = () => {
+      setCard(parsed);
+      setImageError(false);
+      setImageLoaded(true);
+      // Small delay so the fade-out completes before fade-in
+      requestAnimationFrame(() => {
+        setIsRevealing(false);
+        setLoading(false);
+      });
+    };
+
+    const swapWithError = () => {
+      setCard(parsed);
+      setImageLoaded(false);
+      setImageError(true);
+      requestAnimationFrame(() => {
+        setIsRevealing(false);
+        setLoading(false);
+      });
+    };
+
+    img.onload = () => {
+      // Wait for fade-out to finish (300ms transition), then swap
+      setTimeout(swap, 200);
+    };
+    img.onerror = () => {
+      setTimeout(swapWithError, 200);
+    };
+
+    // Safety timeout — swap after 3s even if image hasn't loaded
+    setTimeout(() => {
+      if (isRevealing) {
+        img.onload = null;
+        img.onerror = null;
+        swap();
+      }
+    }, 3000);
+  }, [allCards, parseCard, getImageUrl]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-700 dark:text-gray-300">Loading random card...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-muted-foreground border-t-primary mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">Drawing a card...</p>
         </div>
       </div>
     );
@@ -139,12 +186,12 @@ export default function RandomCardClient() {
 
   if (error || !card) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
         <div className="text-center">
-          <p className="text-red-500 mb-4">{error || "No card found"}</p>
+          <p className="text-destructive mb-4 text-sm">{error || "No card found"}</p>
           <button
-            onClick={fetchRandomCard}
-            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+            onClick={() => pickRandomCard()}
+            className="px-4 py-2.5 bg-primary text-white rounded-lg font-medium text-sm active:translate-y-[1px] transition-transform"
           >
             Try Again
           </button>
@@ -154,121 +201,85 @@ export default function RandomCardClient() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex items-center justify-center p-4">
-      <div className={`bg-white dark:bg-gray-900 text-gray-900 dark:text-white rounded-lg shadow-2xl max-w-lg w-full h-[75vh] overflow-hidden relative flex flex-col transition-opacity duration-300 ${isTransitioning ? 'opacity-50' : 'opacity-100'}`}>
-        {/* Header with card name */}
-        <div className="px-2 pt-2 pb-1.5 border-b border-gray-200 dark:border-gray-800 font-semibold text-sm text-center">
-          <div className="truncate">{card.name}</div>
-        </div>
-
-        {/* Main content area */}
-        <div className="px-2 py-1.5 flex flex-col items-center relative flex-1 overflow-hidden">
-          {/* Card Image */}
-          <div className="relative w-full flex justify-center mb-2">
-            <img
-              src={`${CARD_IMAGE_PROXY_URL}${encodeURIComponent(card.imgFile)}.jpg`}
-              alt={card.name}
-              className="w-full max-w-[280px] h-auto max-h-[45vh] object-contain mx-auto rounded shadow-lg"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='280'%3E%3Crect width='200' height='280' fill='%23ddd'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%23666'%3ENo Image%3C/text%3E%3C/svg%3E";
-              }}
-            />
-          </div>
-
-          {/* Card Details */}
-          <div className="w-full flex-1 overflow-y-auto px-1 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent">
-            <div className="space-y-0.5 pb-1">
-              <p className="text-xs text-gray-900 dark:text-white">
-                <strong>Set:</strong> {card.set}
-              </p>
-              {card.officialSet && card.officialSet !== card.set && (
-                <p className="text-xs text-gray-900 dark:text-white">
-                  <strong>Official Set:</strong> {card.officialSet}
-                </p>
-              )}
-              {card.type && (
-                <p className="text-xs text-gray-900 dark:text-white">
-                  <strong>Type:</strong> {card.type}
-                </p>
-              )}
-              {card.brigade && (
-                <p className="text-xs text-gray-900 dark:text-white">
-                  <strong>Brigade:</strong> {card.brigade}
-                </p>
-              )}
-              {card.alignment && (
-                <p className="text-xs text-gray-900 dark:text-white">
-                  <strong>Alignment:</strong> {card.alignment}
-                </p>
-              )}
-              {(card.strength || card.toughness) && (
-                <p className="text-xs text-gray-900 dark:text-white">
-                  <strong>Strength:</strong> {card.strength || "-"}
-                </p>
-              )}
-              {(card.strength || card.toughness) && (
-                <p className="text-xs text-gray-900 dark:text-white">
-                  <strong>Toughness:</strong> {card.toughness || "-"}
-                </p>
-              )}
-              {card.class && (
-                <p className="text-xs text-gray-900 dark:text-white">
-                  <strong>Class:</strong> {card.class}
-                </p>
-              )}
-              {card.specialAbility && (
-                <p className="text-xs text-gray-900 dark:text-white">
-                  <strong>Special Ability:</strong> {card.specialAbility}
-                </p>
-              )}
-              {card.rarity && (
-                <p className="text-xs text-gray-900 dark:text-white">
-                  <strong>Rarity:</strong> {card.rarity}
-                </p>
-              )}
-              {card.reference && (
-                <p className="text-xs text-gray-900 dark:text-white">
-                  <strong>Reference:</strong> {card.reference}
-                </p>
-              )}
-              {card.testament && (
-                <p className="text-xs text-gray-900 dark:text-white">
-                  <strong>Testament:</strong> {card.testament}
-                </p>
-              )}
-              {card.legality && (
-                <p className="text-xs text-gray-900 dark:text-white">
-                  <strong>Legality:</strong> {card.legality}
-                </p>
-              )}
-              {card.identifier && (
-                <p className="text-xs text-gray-900 dark:text-white">
-                  <strong>Identifier:</strong> {card.identifier}
-                </p>
-              )}
+    <div className="min-h-screen bg-background flex items-center justify-center p-4 pb-[calc(3.5rem+env(safe-area-inset-bottom))]">
+      <div className="flex flex-col items-center w-full max-w-xs md:max-w-sm">
+        {/* Card image — fixed aspect ratio so buttons never move */}
+        <div
+          className={`w-full aspect-[5/7] relative rounded-lg overflow-hidden transition-all duration-300 ease-out ${
+            isRevealing ? 'scale-95 opacity-0' : 'scale-100 opacity-100'
+          }`}
+        >
+          {!imageLoaded && !imageError && (
+            <div className="absolute inset-0 bg-muted animate-pulse rounded-lg" />
+          )}
+          {imageError && (
+            <div className="absolute inset-0 bg-muted flex items-center justify-center rounded-lg">
+              <span className="text-muted-foreground text-sm">No image available</span>
             </div>
-          </div>
+          )}
+          <img
+            src={getImageUrl(card.imgFile)}
+            alt={card.name}
+            className={`absolute inset-0 w-full h-full object-contain rounded-lg shadow-2xl ${imageLoaded ? 'block' : 'hidden'}`}
+            onLoad={() => setImageLoaded(true)}
+            onError={() => { setImageError(true); setImageLoaded(false); }}
+            draggable={false}
+          />
         </div>
 
-        {/* Footer with buttons */}
-        <div className="px-2 pb-2 pt-1.5 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800">
-          <div className="flex justify-center gap-1.5 items-center flex-wrap">
-            <button
-              onClick={() => router.push("/decklist/card-search")}
-              className="px-2 h-7 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 rounded font-medium transition-colors text-xs whitespace-nowrap"
-            >
-              ← Back
-            </button>
-            <button
-              onClick={fetchRandomCard}
-              className="px-2 h-7 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 rounded flex items-center gap-1 font-medium transition-colors text-xs whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isTransitioning}
-            >
-              <span className="text-xs">🎲</span>
-              {isTransitioning ? 'Loading...' : 'Random'}
-            </button>
-          </div>
+        {/* Card name + price */}
+        <div className="mt-3 flex items-center justify-center gap-2 w-full h-7">
+          <h1 className="text-base md:text-lg font-semibold text-foreground truncate">{card.name}</h1>
+          {(() => {
+            const cardKey = `${card.name}|${card.set}|${card.imgFile}`;
+            const priceInfo = getPrice(cardKey);
+            const productUrl = getProductUrl(cardKey);
+            return (
+              <button
+                onClick={() => productUrl
+                  ? window.open(productUrl, '_blank', 'noopener,noreferrer')
+                  : openYTGSearchPage(card.name)
+                }
+                className="flex-shrink-0 h-7 px-2.5 rounded-md flex items-center gap-1.5 text-xs font-semibold border border-green-600/30 dark:border-green-500/25 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 active:translate-y-[1px] transition-all duration-100"
+              >
+                {priceInfo ? (
+                  <>
+                    <span>${priceInfo.price.toFixed(2)}</span>
+                    <svg className="w-3 h-3 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                    </svg>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-3 h-3 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                    </svg>
+                    <span>Shop</span>
+                  </>
+                )}
+              </button>
+            );
+          })()}
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-2 w-full mt-4">
+          <button
+            onClick={() => router.push("/decklist/card-search")}
+            className="h-11 px-4 flex-shrink-0 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted active:bg-muted font-medium text-sm transition-colors"
+          >
+            Back
+          </button>
+          <button
+            onClick={() => pickRandomCard()}
+            disabled={isRevealing}
+            className="h-11 flex-1 rounded-lg bg-primary text-white font-semibold text-sm flex items-center justify-center gap-2 hover:bg-primary/90 active:translate-y-[1px] transition-all duration-100 disabled:opacity-60"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 00-3.7-3.7 48.678 48.678 0 00-7.324 0 4.006 4.006 0 00-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3l-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 003.7 3.7 48.656 48.656 0 007.324 0 4.006 4.006 0 003.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3l-3 3" />
+            </svg>
+            {isRevealing ? 'Drawing...' : 'Random Card'}
+          </button>
         </div>
       </div>
     </div>
