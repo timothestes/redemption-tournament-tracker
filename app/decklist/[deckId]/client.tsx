@@ -14,6 +14,7 @@ import { Card } from "../card-search/utils";
 import ModalWithClose from "../card-search/ModalWithClose";
 import { GoldfishButton } from "../../goldfish/components/GoldfishButton";
 import { useCardPrices } from "../card-search/hooks/useCardPrices";
+import BuyDeckModal from "../card-search/components/BuyDeckModal";
 
 interface PublicDeckData {
   id: string;
@@ -150,6 +151,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   const [hoveredCard, setHoveredCard] = useState<{ name: string; imgFile: string; set?: string; type?: string } | null>(null);
   const [showPreview, setShowPreview] = useState(true);
   const [showStats, setShowStats] = useState(false);
+  const [showBuyDeckModal, setShowBuyDeckModal] = useState(false);
 
   // Card prices
   const { getPrice, getProductUrl } = useCardPrices();
@@ -542,7 +544,16 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
               <span className="text-sm text-gray-500 dark:text-gray-400">
                 {mainDeckCount} cards{reserveCount > 0 && ` + ${reserveCount} reserve`}
                 {totalDeckPrice !== null && (
-                  <span className="text-green-600 dark:text-green-400 font-medium"> · ${totalDeckPrice.toFixed(2)}</span>
+                  <button
+                    onClick={() => setShowBuyDeckModal(true)}
+                    className="text-green-600 dark:text-green-400 font-medium hover:underline inline-flex items-center gap-1"
+                    title="Buy deck on YTG"
+                  >
+                    {" · "}
+                    <img src="/sponsors/ytg-dark.png" alt="" className="h-3 w-3 object-contain hidden dark:block" />
+                    <img src="/sponsors/ytg-light.png" alt="" className="h-3 w-3 object-contain dark:hidden" />
+                    ${totalDeckPrice.toFixed(2)}
+                  </button>
                 )}
               </span>
               <span className="text-sm text-gray-400 dark:text-gray-500">
@@ -1186,10 +1197,17 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                     </span>
                   </div>
                   {totalDeckPrice !== null && (
-                    <div className="flex justify-between">
-                      <span>Est. Price:</span>
-                      <span className="font-medium text-green-600 dark:text-green-400">${totalDeckPrice.toFixed(2)}</span>
-                    </div>
+                    <button
+                      onClick={() => setShowBuyDeckModal(true)}
+                      className="flex justify-between w-full text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 -mx-1 px-1 py-0.5 rounded transition-colors group"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <img src="/sponsors/ytg-dark.png" alt="" className="h-3.5 w-3.5 object-contain hidden dark:block" />
+                        <img src="/sponsors/ytg-light.png" alt="" className="h-3.5 w-3.5 object-contain dark:hidden" />
+                        Est. Price:
+                      </span>
+                      <span className="font-medium text-green-600 dark:text-green-400 group-hover:underline">${totalDeckPrice.toFixed(2)}</span>
+                    </button>
                   )}
                 </div>
               </div>
@@ -1474,6 +1492,18 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
       )}
       </div>}
 
+      {/* Buy Deck Modal */}
+      {showBuyDeckModal && (
+        <BuyDeckModal
+          cards={enrichedCards.map(c => ({
+            card_name: c.card_name,
+            card_key: `${c.card_name}|${c.card_set}|${sanitizeImgFile(c.card_img_file || "")}`,
+            quantity: c.quantity,
+            isReserve: c.is_reserve,
+          }))}
+          onClose={() => setShowBuyDeckModal(false)}
+        />
+      )}
     </div>
   );
 }

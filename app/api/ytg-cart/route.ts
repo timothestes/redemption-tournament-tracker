@@ -13,6 +13,7 @@ interface MatchedCard {
   card_key: string;
   quantity: number;
   price: number;
+  variant_id: string;
 }
 
 interface UnmatchedCard {
@@ -92,7 +93,7 @@ export async function POST(request: NextRequest) {
       Array.from(cardLookup.values()).map(v => v.shopify_product_id)
     )];
 
-    let liveInventory: Map<string, { variantId: string; inventory: number }> | null = null;
+    let liveInventory: Map<string, { variantId: string; inventory: number; tracked: boolean }> | null = null;
     try {
       const token = await getShopifyAccessToken();
       liveInventory = await fetchProductInventory(token, productIds);
@@ -121,7 +122,7 @@ export async function POST(request: NextRequest) {
       // Check live inventory if available
       if (liveInventory) {
         const live = liveInventory.get(info.shopify_product_id);
-        if (live && live.inventory <= 0) {
+        if (live && live.tracked && live.inventory <= 0) {
           unmatched.push({
             card_name: card.card_name,
             card_key: card.card_key,
@@ -141,6 +142,7 @@ export async function POST(request: NextRequest) {
         card_key: card.card_key,
         quantity: card.quantity,
         price: info.price,
+        variant_id: info.cached_variant_id,
       });
       cartParts.push(`${info.cached_variant_id}:${card.quantity}`);
     }

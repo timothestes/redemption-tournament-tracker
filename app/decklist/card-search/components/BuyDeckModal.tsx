@@ -1,11 +1,19 @@
 import React, { useState, useCallback } from "react";
-import { Deck } from "../types/deck";
+
+/** Generic card item that both Deck and PublicDeck formats can provide */
+export interface BuyDeckCard {
+  card_name: string;
+  card_key: string;
+  quantity: number;
+  isReserve: boolean;
+}
 
 interface MatchedCard {
   card_name: string;
   card_key: string;
   quantity: number;
   price: number;
+  variant_id: string;
 }
 
 interface UnmatchedCard {
@@ -26,32 +34,34 @@ interface CartResult {
 type BuyScope = "all" | "main" | "reserve";
 
 interface BuyDeckModalProps {
-  deck: Deck;
+  cards: BuyDeckCard[];
   onClose: () => void;
 }
 
-export default function BuyDeckModal({ deck, onClose }: BuyDeckModalProps) {
+export default function BuyDeckModal({ cards: allCards, onClose }: BuyDeckModalProps) {
   const [scope, setScope] = useState<BuyScope>("all");
   const [result, setResult] = useState<CartResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showUnavailable, setShowUnavailable] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [excludedKeys, setExcludedKeys] = useState<Set<string>>(new Set());
 
-  const mainCards = deck.cards.filter(dc => !dc.isReserve);
-  const reserveCards = deck.cards.filter(dc => dc.isReserve);
+  const mainCards = allCards.filter(c => !c.isReserve);
+  const reserveCards = allCards.filter(c => c.isReserve);
   const hasReserve = reserveCards.length > 0;
 
-  const scopedCards = scope === "main" ? mainCards : scope === "reserve" ? reserveCards : deck.cards;
+  const scopedCards = scope === "main" ? mainCards : scope === "reserve" ? reserveCards : allCards;
 
   const fetchCart = useCallback(async () => {
     setLoading(true);
     setError(null);
     setShowUnavailable(false);
     try {
-      const cards = scopedCards.map(dc => ({
-        card_key: `${dc.card.name}|${dc.card.set}|${dc.card.imgFile}`,
-        card_name: dc.card.name,
-        quantity: dc.quantity,
+      const cards = scopedCards.map(c => ({
+        card_key: c.card_key,
+        card_name: c.card_name,
+        quantity: c.quantity,
       }));
 
       const res = await fetch("/api/ytg-cart", {
@@ -79,6 +89,8 @@ export default function BuyDeckModal({ deck, onClose }: BuyDeckModalProps) {
   const handleScopeChange = (newScope: BuyScope) => {
     setScope(newScope);
     setResult(null);
+    setExcludedKeys(new Set());
+    setShowEdit(false);
   };
 
   React.useEffect(() => {
@@ -87,9 +99,34 @@ export default function BuyDeckModal({ deck, onClose }: BuyDeckModalProps) {
     }
   }, [scope]);
 
-  const matchedPrice = result?.matched.reduce((sum, m) => sum + m.price * m.quantity, 0) ?? 0;
+  // Derived: selected cards (matched minus excluded)
+  const selectedMatched = result?.matched.filter(m => !excludedKeys.has(m.card_key)) ?? [];
+  const selectedPrice = selectedMatched.reduce((sum, m) => sum + m.price * m.quantity, 0);
+  const selectedCount = selectedMatched.reduce((sum, m) => sum + m.quantity, 0);
+  // Build cart URL client-side from selected cards
+  const selectedCartUrl = selectedMatched.length > 0
+    ? `https://www.yourturngames.biz/cart/${selectedMatched.map(m => `${m.variant_id}:${m.quantity}`).join(',')}`
+    : null;
+
   const soldOut = result?.unmatched.filter(c => c.reason === 'sold_out') ?? [];
   const noMatch = result?.unmatched.filter(c => c.reason === 'no_match') ?? [];
+
+  const hasExclusions = excludedKeys.size > 0;
+
+  const toggleCard = (cardKey: string) => {
+    setExcludedKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(cardKey)) next.delete(cardKey);
+      else next.add(cardKey);
+      return next;
+    });
+  };
+
+  const selectAll = () => setExcludedKeys(new Set());
+  const deselectAll = () => {
+    if (!result) return;
+    setExcludedKeys(new Set(result.matched.map(m => m.card_key)));
+  };
 
   return (
     <>
@@ -97,7 +134,7 @@ export default function BuyDeckModal({ deck, onClose }: BuyDeckModalProps) {
       <div className="fixed inset-0 z-[60] bg-black/50" onClick={onClose} />
 
       {/* Modal */}
-      <div className="fixed inset-x-4 top-1/2 -translate-y-1/2 z-[61] mx-auto max-w-md bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden md:inset-x-auto md:w-full">
+      <div className="fixed inset-x-4 top-1/2 -translate-y-1/2 z-[61] mx-auto max-w-md bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden md:inset-x-0">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2">
@@ -155,17 +192,95 @@ export default function BuyDeckModal({ deck, onClose }: BuyDeckModalProps) {
               {/* Summary stats */}
               <div className="flex items-baseline justify-between mb-3">
                 <span className="text-sm text-gray-600 dark:text-gray-400">
-                  <span className="font-semibold text-gray-900 dark:text-white">{result.matchedTotal}</span>
-                  {" of "}
-                  <span className="font-semibold text-gray-900 dark:text-white">{result.matchedTotal + result.unmatchedTotal}</span>
-                  {" cards in stock"}
+                  {hasExclusions ? (
+                    <>
+                      <span className="font-semibold text-gray-900 dark:text-white">{selectedCount}</span>
+                      {" of "}
+                      <span className="font-semibold text-gray-900 dark:text-white">{result.matchedTotal}</span>
+                      {" selected"}
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-semibold text-gray-900 dark:text-white">{result.matchedTotal}</span>
+                      {" of "}
+                      <span className="font-semibold text-gray-900 dark:text-white">{result.matchedTotal + result.unmatchedTotal}</span>
+                      {" cards in stock"}
+                    </>
+                  )}
                 </span>
-                {matchedPrice > 0 && (
+                {selectedPrice > 0 && (
                   <span className="text-sm font-semibold text-green-600 dark:text-green-400">
-                    ${matchedPrice.toFixed(2)}
+                    ${selectedPrice.toFixed(2)}
                   </span>
                 )}
               </div>
+
+              {/* Edit selection toggle */}
+              {result.matched.length > 1 && (
+                <button
+                  onClick={() => setShowEdit(!showEdit)}
+                  className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 mb-2 flex items-center gap-1"
+                >
+                  <svg className={`w-3 h-3 transition-transform ${showEdit ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                  {showEdit ? "Hide card list" : hasExclusions ? `Edit selection (${excludedKeys.size} removed)` : "Edit selection"}
+                </button>
+              )}
+
+              {/* Editable card list */}
+              {showEdit && (
+                <div className="mb-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
+                      In Stock
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={selectAll}
+                        className="text-[10px] font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                      >
+                        All
+                      </button>
+                      <button
+                        onClick={deselectAll}
+                        className="text-[10px] font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                      >
+                        None
+                      </button>
+                    </div>
+                  </div>
+                  <div className="max-h-52 overflow-y-auto -mx-1 px-1">
+                    {result.matched.map((card) => {
+                      const isSelected = !excludedKeys.has(card.card_key);
+                      return (
+                        <label
+                          key={card.card_key}
+                          className="flex items-center gap-2 py-1 cursor-pointer min-h-[32px]"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleCard(card.card_key)}
+                            className="h-3.5 w-3.5 rounded border-gray-300 dark:border-gray-600 text-green-600 flex-shrink-0"
+                          />
+                          <span className={`text-xs truncate flex-1 ${isSelected ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500 line-through'}`}>
+                            {card.card_name}
+                          </span>
+                          {card.quantity > 1 && (
+                            <span className={`text-xs flex-shrink-0 ${isSelected ? 'text-gray-500 dark:text-gray-400' : 'text-gray-300 dark:text-gray-600'}`}>
+                              x{card.quantity}
+                            </span>
+                          )}
+                          <span className={`text-xs flex-shrink-0 tabular-nums ${isSelected ? 'text-gray-500 dark:text-gray-400' : 'text-gray-300 dark:text-gray-600'}`}>
+                            ${(card.price * card.quantity).toFixed(2)}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Unavailable cards */}
               {result.unmatched.length > 0 && (
@@ -220,9 +335,9 @@ export default function BuyDeckModal({ deck, onClose }: BuyDeckModalProps) {
               </p>
 
               {/* Open cart button */}
-              {result.cartUrl ? (
+              {selectedCartUrl ? (
                 <a
-                  href={result.cartUrl}
+                  href={selectedCartUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition-colors"
@@ -231,11 +346,11 @@ export default function BuyDeckModal({ deck, onClose }: BuyDeckModalProps) {
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
                   </svg>
-                  Open YTG Cart
+                  Open YTG Cart{hasExclusions ? ` (${selectedCount})` : ''}
                 </a>
               ) : (
                 <div className="text-center py-2 text-sm text-gray-500 dark:text-gray-400">
-                  No cards currently in stock on YTG
+                  {hasExclusions ? "No cards selected" : "No cards currently in stock on YTG"}
                 </div>
               )}
             </>

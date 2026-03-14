@@ -22,7 +22,7 @@ import { useCardPrices } from "../hooks/useCardPrices";
 import ParagonRequirements from "./ParagonRequirements";
 import { useCardImageUrl } from "../hooks/useCardImageUrl";
 import ReactMarkdown from "react-markdown";
-import BuyDeckModal from "./BuyDeckModal";
+import BuyDeckModal, { BuyDeckCard } from "./BuyDeckModal";
 
 function getTagContrastColor(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -2856,7 +2856,12 @@ export default function DeckBuilderPanel({
       {/* Buy Deck Modal */}
       {showBuyDeckModal && (
         <BuyDeckModal
-          deck={deck}
+          cards={deck.cards.map(dc => ({
+            card_name: dc.card.name,
+            card_key: `${dc.card.name}|${dc.card.set}|${dc.card.imgFile}`,
+            quantity: dc.quantity,
+            isReserve: dc.isReserve,
+          }))}
           onClose={() => setShowBuyDeckModal(false)}
         />
       )}

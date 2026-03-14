@@ -107,8 +107,8 @@ export async function fetchAllShopifyProducts(
 export async function fetchProductInventory(
   token: string,
   productIds: string[]
-): Promise<Map<string, { variantId: string; inventory: number }>> {
-  const result = new Map<string, { variantId: string; inventory: number }>();
+): Promise<Map<string, { variantId: string; inventory: number; tracked: boolean }>> {
+  const result = new Map<string, { variantId: string; inventory: number; tracked: boolean }>();
   if (productIds.length === 0) return result;
 
   const headers = { 'X-Shopify-Access-Token': token };
@@ -140,6 +140,7 @@ export async function fetchProductInventory(
         result.set(pid, {
           variantId: String(variant.id),
           inventory: variant.inventory_quantity ?? 0,
+          tracked: variant.inventory_management === 'shopify',
         });
       }
     }
