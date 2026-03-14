@@ -86,6 +86,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const result = findAndRemoveCard(zones, cardInstanceId);
       if (!result) return state;
 
+      // Tokens dropped into reserve/banish/discard/hand/deck are removed entirely
+      const TOKEN_REMOVE_ZONES: ZoneId[] = ['reserve', 'banish', 'discard', 'hand', 'deck'];
+      if (result.card.ownerId === 'player2' && TOKEN_REMOVE_ZONES.includes(toZone)) {
+        return { ...state, zones, history };
+      }
+
       // Flip face-up only when the card is actually leaving the deck
       if (result.fromZone === 'deck' && toZone !== 'deck') {
         result.card.isFlipped = false;
@@ -180,7 +186,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (!cardInstanceId) return state;
       const result = findAndRemoveCard(zones, cardInstanceId);
       if (!result) return state;
-      // Shuffle remaining deck cards, then place this card on top
+      if (result.card.ownerId === 'player2') return { ...state, zones, history };
       zones.deck = shuffleArray(zones.deck);
       result.card.zone = 'deck';
       zones.deck.unshift(result.card);
@@ -192,7 +198,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (!cardInstanceId) return state;
       const result = findAndRemoveCard(zones, cardInstanceId);
       if (!result) return state;
-      // Shuffle remaining deck cards, then place this card on bottom
+      if (result.card.ownerId === 'player2') return { ...state, zones, history };
       zones.deck = shuffleArray(zones.deck);
       result.card.zone = 'deck';
       zones.deck.push(result.card);
@@ -351,24 +357,33 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case 'ADD_OPPONENT_LOST_SOUL': {
+      const testament = (action.payload.value as string) === 'OT' ? 'OT' : 'NT';
+      const cardName = testament === 'NT'
+        ? 'Lost Soul Token "Harvest" [John 4:35]'
+        : 'Lost Soul Token "Lost Souls" [Proverbs 2:16-17]';
+      const cardImgFile = testament === 'NT'
+        ? '/gameplay/nt_soul_token.png'
+        : '/gameplay/ot_lost_soul.png';
       const opponentSoul: GameCard = {
         instanceId: crypto.randomUUID(),
-        cardName: 'Lost Soul (Opponent)',
-        cardSet: '',
-        cardImgFile: '',
+        cardName,
+        cardSet: testament === 'NT' ? 'GoC' : 'RR',
+        cardImgFile,
         type: 'LS',
         brigade: '',
         strength: '',
         toughness: '',
         specialAbility: '',
-        identifier: '',
+        identifier: testament,
         alignment: 'Neutral',
         isMeek: false,
         counters: [],
-        isFlipped: true,
+        isFlipped: false,
         zone: 'land-of-bondage',
         ownerId: 'player2',
         notes: '',
+        posX: action.payload.posX,
+        posY: action.payload.posY,
       };
       zones['land-of-bondage'].push(opponentSoul);
       return { ...state, zones, history };

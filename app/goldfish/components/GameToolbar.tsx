@@ -7,6 +7,7 @@ import {
   Undo2,
   RotateCcw,
   PanelBottomOpen,
+  Dices,
 } from 'lucide-react';
 import { showGameToast } from './GameToast';
 
@@ -31,8 +32,15 @@ export function GameToolbar() {
     drawCard();
   }, [drawCard, state.zones.hand.length, state.zones.deck.length]);
 
+  const handleRollDice = useCallback(() => {
+    const result = Math.floor(Math.random() * 6) + 1;
+    const pips = ['', '\u2680', '\u2681', '\u2682', '\u2683', '\u2684', '\u2685'];
+    showGameToast(`${pips[result]}  Rolled a ${result}`);
+  }, []);
+
   const buttons = [
     { icon: Play, label: 'Draw', onClick: handleDraw, shortcut: 'D' },
+    { icon: Dices, label: 'Roll', onClick: handleRollDice, shortcut: 'R' },
     { icon: Undo2, label: 'Undo', onClick: undo, shortcut: '⌘Z' },
     { icon: PanelBottomOpen, label: state.isSpreadHand ? 'Fan' : 'Unfan', onClick: toggleSpreadHand, shortcut: 'H' },
     { icon: RotateCcw, label: 'New Game', onClick: newGame, shortcut: '' },

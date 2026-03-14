@@ -79,8 +79,8 @@ export const actions = {
     return createAction('ADD_NOTE', { cardInstanceId, value: note });
   },
 
-  addOpponentLostSoul(): GameAction {
-    return createAction('ADD_OPPONENT_LOST_SOUL');
+  addOpponentLostSoul(testament: 'NT' | 'OT' = 'NT', posX?: number, posY?: number): GameAction {
+    return createAction('ADD_OPPONENT_LOST_SOUL', { value: testament, posX, posY });
   },
 
   removeOpponentToken(cardInstanceId: string): GameAction {

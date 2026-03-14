@@ -39,6 +39,13 @@ export function useKeyboardShortcuts() {
             shuffleDeck();
           }
           break;
+        case 'r': {
+          e.preventDefault();
+          const result = Math.floor(Math.random() * 6) + 1;
+          const pips = ['', '\u2680', '\u2681', '\u2682', '\u2683', '\u2684', '\u2685'];
+          showGameToast(`${pips[result]}  Rolled a ${result}`);
+          break;
+        }
         case 'h':
           e.preventDefault();
           toggleSpreadHand();

@@ -10,10 +10,15 @@ interface Toast {
 
 let toastId = 0;
 const listeners: ((toast: Toast) => void)[] = [];
+const clearListeners: (() => void)[] = [];
 
 export function showGameToast(message: string) {
   const toast: Toast = { id: ++toastId, message };
   listeners.forEach(fn => fn(toast));
+}
+
+export function clearGameToasts() {
+  clearListeners.forEach(fn => fn());
 }
 
 export function GameToastContainer() {
@@ -26,10 +31,14 @@ export function GameToastContainer() {
         setToasts(prev => prev.filter(t => t.id !== toast.id));
       }, 2500);
     };
+    const clearHandler = () => setToasts([]);
     listeners.push(handler);
+    clearListeners.push(clearHandler);
     return () => {
       const idx = listeners.indexOf(handler);
       if (idx >= 0) listeners.splice(idx, 1);
+      const cidx = clearListeners.indexOf(clearHandler);
+      if (cidx >= 0) clearListeners.splice(cidx, 1);
     };
   }, []);
 

@@ -4,6 +4,10 @@ import { useEffect, useRef, useMemo } from 'react';
 import { useGame } from '../state/GameContext';
 import { GameCard, ZoneId, ZONE_LABELS, COUNTER_COLORS, CounterColorId } from '../types';
 
+function isOpponentToken(card: GameCard): boolean {
+  return card.ownerId === 'player2';
+}
+
 const MOVE_TARGETS: ZoneId[] = [
   'territory',
   'discard', 'reserve',
@@ -21,7 +25,7 @@ export function CardContextMenu({ card: initialCard, x, y, onClose, onExchange }
   const {
     state, moveCard, moveCardToTopOfDeck, moveCardToBottomOfDeck,
     shuffleCardIntoDeck, addCounter, removeCounter,
-    meekCard, unmeekCard, flipCard, addNote,
+    meekCard, unmeekCard, flipCard, addNote, removeOpponentToken,
   } = useGame();
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -69,8 +73,7 @@ export function CardContextMenu({ card: initialCard, x, y, onClose, onExchange }
   const itemStyle: React.CSSProperties = {
     display: 'block',
     width: '100%',
-    padding: '10px 16px',
-    minHeight: 44,
+    padding: '6px 14px',
     background: 'transparent',
     border: 'none',
     cursor: 'pointer',
@@ -108,6 +111,32 @@ export function CardContextMenu({ card: initialCard, x, y, onClose, onExchange }
     return c?.count ?? 0;
   };
 
+  // Opponent tokens get a simplified menu
+  if (isOpponentToken(card)) {
+    return (
+      <div ref={menuRef} style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
+        <div style={labelStyle}>{card.cardName}</div>
+        <button
+          style={itemStyle}
+          onClick={() => doAction(() => moveCard(card.instanceId, 'land-of-redemption'))}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+        >
+          Rescue to L.O.R.
+        </button>
+        <div style={separatorStyle} />
+        <button
+          style={{ ...itemStyle, color: '#8b4a4a' }}
+          onClick={() => doAction(() => removeOpponentToken(card.instanceId))}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+        >
+          Remove Token
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div ref={menuRef} style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
 
@@ -132,8 +161,8 @@ export function CardContextMenu({ card: initialCard, x, y, onClose, onExchange }
                     if (count > 0) removeCounter(card.instanceId, color.id);
                   }}
                   style={{
-                    width: 44,
-                    height: 44,
+                    width: 32,
+                    height: 32,
                     borderRadius: '50%',
                     background: color.hex,
                     border: count > 0 ? '2px solid rgba(255,255,255,0.8)' : '2px solid rgba(255,255,255,0.2)',

@@ -42,7 +42,7 @@ const ITEM_STYLE: React.CSSProperties = {
   alignItems: 'center',
   gap: 8,
   width: '100%',
-  padding: '10px 16px',
+  padding: '6px 14px',
   background: 'transparent',
   border: 'none',
   cursor: 'pointer',

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, useCallback, useEffect, useMemo, memo } from 'react';
-import { Stage, Layer, Rect, Text, Image as KonvaImage, Group, Circle, Line } from 'react-konva';
+import { Stage, Layer, Rect, Text, Image as KonvaImage, Group, Circle } from 'react-konva';
 import type Konva from 'konva';
 import KonvaLib from 'konva';
 import { useGame } from '../state/GameContext';
@@ -18,6 +18,7 @@ import { DeckContextMenu } from './DeckContextMenu';
 import { DeckPeekModal } from './DeckPeekModal';
 import { DeckDropPopup } from './DeckDropPopup';
 import { DeckExchangeModal } from './DeckExchangeModal';
+import { ZoneContextMenu } from './ZoneContextMenu';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useModalCardDrag } from '../hooks/useModalCardDrag';
 import { useSelectionState, type CardBound } from '../hooks/useSelectionState';
@@ -32,6 +33,7 @@ function sanitizeImgFile(f: string): string {
 
 function getCardImageUrl(imgFile: string): string {
   if (!imgFile) return '';
+  if (imgFile.startsWith('/')) return imgFile;
   return `${BLOB_BASE_URL}/card-images/${sanitizeImgFile(imgFile)}.jpg`;
 }
 
@@ -113,6 +115,7 @@ const GameCardNode = memo(function GameCardNode({
   onMouseEnter: (card: GameCard, e: Konva.KonvaEventObject<MouseEvent>) => void;
   onMouseLeave: () => void;
 }) {
+  const isToken = card.ownerId === 'player2';
   const showFace = !card.isFlipped && image;
 
   const groupRefCb = useCallback((node: Konva.Group | null) => {
@@ -179,6 +182,7 @@ const GameCardNode = memo(function GameCardNode({
         x={card.isMeek ? cardWidth / 2 : 0}
         y={card.isMeek ? cardHeight / 2 : 0}
       >
+        {/* Token or regular card rendering */}
         {showFace ? (
           <KonvaImage
             image={image}
@@ -188,6 +192,43 @@ const GameCardNode = memo(function GameCardNode({
           />
         ) : (
           <CardBackShape width={cardWidth} height={cardHeight} />
+        )}
+
+        {/* Token overlay — dashed border + badge to distinguish from player's cards */}
+        {isToken && (
+          <>
+            <Rect
+              width={cardWidth}
+              height={cardHeight}
+              fill="transparent"
+              stroke="#c4955a"
+              strokeWidth={1.5}
+              cornerRadius={4}
+              dash={[5, 3]}
+            />
+            {/* "TOKEN" badge at bottom */}
+            <Rect
+              x={cardWidth * 0.1}
+              y={cardHeight - Math.max(14, cardHeight * 0.1)}
+              width={cardWidth * 0.8}
+              height={Math.max(12, cardHeight * 0.08)}
+              fill="rgba(26,21,16,0.85)"
+              cornerRadius={2}
+            />
+            <Text
+              x={cardWidth * 0.1}
+              y={cardHeight - Math.max(14, cardHeight * 0.1)}
+              width={cardWidth * 0.8}
+              height={Math.max(12, cardHeight * 0.08)}
+              text="TOKEN"
+              fontSize={Math.max(6, Math.min(9, cardWidth * 0.1))}
+              fontFamily="Cinzel, Georgia, serif"
+              fill="#c4955a"
+              align="center"
+              verticalAlign="middle"
+              letterSpacing={2}
+            />
+          </>
         )}
 
         {/* Counter badges — top-right, stacked down the side */}
@@ -232,7 +273,7 @@ interface GoldfishCanvasProps {
 }
 
 export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
-  const { state, dispatch, drawCard, drawMultiple, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleDeck, meekCard, unmeekCard } = useGame();
+  const { state, dispatch, drawCard, drawMultiple, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleDeck, meekCard, unmeekCard, removeOpponentToken } = useGame();
   const stageRef = useRef<Konva.Stage>(null);
 
   // Prevent browser-native drag on the canvas container.
@@ -310,6 +351,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
   const [multiCardContextMenu, setMultiCardContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [batchDeckDropIds, setBatchDeckDropIds] = useState<string[] | null>(null);
   const [exchangeCardIds, setExchangeCardIds] = useState<string[] | null>(null);
+  const [zoneMenu, setZoneMenu] = useState<{ x: number; y: number; spawnX: number; spawnY: number } | null>(null);
   const [cardRenderKey, setCardRenderKey] = useState(0);
 
   // Card node ref map for imperative multi-card drag
@@ -459,8 +501,15 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
 
   // Shared handler: when a card is dropped on the deck zone, show popup
   const handleDeckDrop = useCallback((cardInstanceId: string, screenX: number, screenY: number) => {
+    // Tokens dragged onto deck are silently removed
+    const allCards = Object.values(state.zones).flat();
+    const card = allCards.find(c => c.instanceId === cardInstanceId);
+    if (card?.ownerId === 'player2') {
+      removeOpponentToken(cardInstanceId);
+      return;
+    }
     setDeckDropPopup({ cardInstanceId, x: screenX, y: screenY });
-  }, []);
+  }, [state.zones, removeOpponentToken]);
 
   // Batch deck drop handler for multi-card modal drags
   const handleBatchDeckDrop = useCallback((cardInstanceIds: string[]) => {
@@ -1098,6 +1147,19 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                 }}
                 onContextMenu={(e) => {
                   if (zoneId === 'deck') handleDeckContextMenu(e);
+                  if (zoneId === 'land-of-bondage') {
+                    e.evt.preventDefault();
+                    const stage = stageRef.current;
+                    if (!stage) return;
+                    const container = stage.container().getBoundingClientRect();
+                    const pointer = stage.getPointerPosition();
+                    setZoneMenu({
+                      x: e.evt.clientX - container.left,
+                      y: e.evt.clientY - container.top,
+                      spawnX: pointer?.x ?? e.evt.clientX - container.left,
+                      spawnY: pointer?.y ?? e.evt.clientY - container.top,
+                    });
+                  }
                 }}
               >
                 <Rect
@@ -1622,6 +1684,16 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
           onClose={() => setMultiCardContextMenu(null)}
           onClearSelection={() => { clearSelection(); setMultiCardContextMenu(null); }}
           onExchange={(ids) => setExchangeCardIds(ids)}
+        />
+      )}
+
+      {zoneMenu && (
+        <ZoneContextMenu
+          x={zoneMenu.x}
+          y={zoneMenu.y}
+          spawnX={zoneMenu.spawnX}
+          spawnY={zoneMenu.spawnY}
+          onClose={() => setZoneMenu(null)}
         />
       )}
 

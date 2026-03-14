@@ -5,6 +5,7 @@ import { GameState, GameAction, ZoneId, DeckDataForGoldfish, GoldfishOptions, Co
 import { gameReducer, undoAction } from './gameReducer';
 import { buildInitialGameState } from './gameInitializer';
 import { actions } from './gameActions';
+import { clearGameToasts } from '../components/GameToast';
 
 interface GameContextValue {
   state: GameState;
@@ -27,7 +28,7 @@ interface GameContextValue {
   unmeekCard: (cardInstanceId: string) => void;
   flipCard: (cardInstanceId: string) => void;
   addNote: (cardInstanceId: string, note: string) => void;
-  addOpponentLostSoul: () => void;
+  addOpponentLostSoul: (testament?: 'NT' | 'OT', posX?: number, posY?: number) => void;
   removeOpponentToken: (cardInstanceId: string) => void;
   moveCardsBatch: (cardInstanceIds: string[], toZone: ZoneId, positions?: Record<string, { posX: number; posY: number }>) => void;
   toggleSpreadHand: () => void;
@@ -92,7 +93,7 @@ export function GameProvider({ children, deck, optionsOverrides }: GameProviderP
   }, []);
 
   const newGame = useCallback(() => {
-    // Re-initialize the game from scratch — replace the reducer state
+    clearGameToasts();
     const freshState = buildInitialGameState(deck, optionsOverrides);
     baseDispatch({
       id: crypto.randomUUID(),
@@ -116,7 +117,7 @@ export function GameProvider({ children, deck, optionsOverrides }: GameProviderP
     [dispatch]
   );
   const addOpponentLostSoul = useCallback(
-    () => dispatch(actions.addOpponentLostSoul()),
+    (testament?: 'NT' | 'OT', posX?: number, posY?: number) => dispatch(actions.addOpponentLostSoul(testament, posX, posY)),
     [dispatch]
   );
   const removeOpponentToken = useCallback(

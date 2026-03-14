@@ -23,6 +23,7 @@ export function MultiCardContextMenu({ selectedIds, x, y, onClose, onClearSelect
     state, moveCardsBatch, shuffleDeck,
     meekCard, unmeekCard, flipCard,
     moveCardToTopOfDeck, moveCardToBottomOfDeck,
+    removeOpponentToken,
   } = useGame();
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number; ready: boolean }>({ left: x, top: y, ready: false });
@@ -129,11 +130,38 @@ export function MultiCardContextMenu({ selectedIds, x, y, onClose, onClearSelect
 
   const meekCount = selectedCards.filter(c => c.isMeek).length;
   const flippedCount = selectedCards.filter(c => c.isFlipped).length;
+  const allTokens = selectedCards.length > 0 && selectedCards.every(c => c.ownerId === 'player2');
 
   const hoverHandlers = {
     onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.background = 'var(--gf-hover)'; },
     onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.background = 'transparent'; },
   };
+
+  if (allTokens) {
+    return (
+      <div ref={menuRef} style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
+        <div style={{ ...labelStyle, color: 'var(--gf-text-bright)', fontSize: 11 }}>
+          {selectedIds.length} tokens selected
+        </div>
+        <div style={separatorStyle} />
+        <button
+          style={itemStyle}
+          onClick={() => doAction(() => moveCardsBatch(selectedIds, 'land-of-redemption'))}
+          {...hoverHandlers}
+        >
+          Rescue to L.O.R.
+        </button>
+        <div style={separatorStyle} />
+        <button
+          style={{ ...itemStyle, color: '#8b4a4a' }}
+          onClick={() => doAction(() => { for (const id of selectedIds) removeOpponentToken(id); })}
+          {...hoverHandlers}
+        >
+          Remove Tokens
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div ref={menuRef} style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
