@@ -86,6 +86,13 @@
   html {
     --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
   }
+  /* Suppress browser focus rings globally — use border/shadow changes instead */
+  input, textarea, select, button, [role="button"] {
+    @apply outline-none ring-0;
+  }
+  input:focus, textarea:focus, select:focus, button:focus, [role="button"]:focus {
+    @apply outline-none ring-0;
+  }
 }
 
 /* Deck builder animations */
