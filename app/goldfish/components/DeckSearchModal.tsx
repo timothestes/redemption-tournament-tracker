@@ -557,6 +557,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
                 type="checkbox"
                 checked={leaveOpen}
                 onChange={(e) => setLeaveOpen(e.target.checked)}
+                className="focus:outline-none focus:ring-0"
               />
               Leave open
             </label>
@@ -574,6 +575,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
                 type="checkbox"
                 checked={autoShuffle}
                 onChange={(e) => setAutoShuffle(e.target.checked)}
+                className="focus:outline-none focus:ring-0"
               />
               Shuffle on close
             </label>

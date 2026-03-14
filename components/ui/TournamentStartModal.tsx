@@ -230,7 +230,7 @@ export default function TournamentStartModal({
                         type="checkbox"
                         checked={soundNotifications}
                         onChange={(e) => setSoundNotifications(e.target.checked)}
-                        className="mr-3 h-4 w-4 rounded border-2 border-gray-300 dark:border-gray-600 text-blue-600 dark:text-blue-500 dark:bg-gray-800 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-2 focus:ring-offset-0"
+                        className="mr-3 h-4 w-4 rounded border-2 border-gray-300 dark:border-gray-600 text-blue-600 dark:text-blue-500 dark:bg-gray-800 focus:outline-none focus:ring-0"
                       />
                       <div>
                         <span className="text-sm text-foreground">

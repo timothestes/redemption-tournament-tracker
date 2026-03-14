@@ -232,7 +232,7 @@ export default function TournamentSettings({
                             }));
                           }
                         }}
-                        className="mr-3 h-4 w-4 rounded border-2 border-input text-primary focus:ring-ring focus:ring-2 focus:ring-offset-0"
+                        className="mr-3 h-4 w-4 rounded border-2 border-input text-primary focus:outline-none focus:ring-0"
                       />
                       <div>
                         <p className="text-sm font-medium text-foreground">
