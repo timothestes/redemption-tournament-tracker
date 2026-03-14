@@ -105,12 +105,13 @@ Spawn Lost Soul Tokens
 Paragon Deck Check PDF support
 Deck Check PDF screen: ability to select one of your decks
 Add Iron Man checkbox to side event
-Add sort options for card search
 add animations to goldfish mode
+add maybeboard
 
 ## long term
 Wiki-style Card Rulings section
 Collection Tracker
+add wishlist
 Play Redemption Online with Matchmaking
 Comprehensive Deck Legality Validation
 Attaching private decklists to Tournament tracker players

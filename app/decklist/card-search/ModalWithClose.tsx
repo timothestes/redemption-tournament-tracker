@@ -402,7 +402,7 @@ export default function ModalWithClose({
 
         {/* Mobile Footer — pinned above bottom nav */}
         <div className="absolute bottom-[calc(3.5rem+env(safe-area-inset-bottom))] left-0 right-0 px-3 py-2.5 border-t border-border bg-card/95 backdrop-blur-sm">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {/* Deck builder: add/remove controls */}
             {onAddCard && onRemoveCard && getCardQuantity && (
               <>
@@ -496,9 +496,9 @@ export default function ModalWithClose({
                 )}
               </div>
             )}
-            {/* Spacer */}
-            <div className="flex-1" />
-            {/* Shop button with price */}
+            {/* Spacer — collapses when space is tight */}
+            <div className="flex-1 min-w-0" />
+            {/* Shop button with price + YTG logo */}
             {(() => {
               const cardKey = `${modalCard.name}|${modalCard.set}|${modalCard.imgFile}`;
               const priceInfo = getPrice(cardKey);
@@ -511,8 +511,10 @@ export default function ModalWithClose({
                       ? window.open(productUrl, '_blank', 'noopener,noreferrer')
                       : openYTGSearchPage(modalCard.name)
                   }
-                  className="h-10 px-3.5 flex-shrink-0 rounded-lg flex items-center gap-2 font-semibold text-sm border border-green-600/30 dark:border-green-500/25 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 active:translate-y-[1px] transition-all duration-100"
+                  className="h-10 px-3 flex-shrink-0 rounded-lg flex items-center gap-1.5 font-semibold text-sm border border-green-600/30 dark:border-green-500/25 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 active:translate-y-[1px] transition-all duration-100"
                 >
+                  <img src="/sponsors/ytg-dark.png" alt="YTG" className="h-4 w-4 object-contain hidden dark:block" />
+                  <img src="/sponsors/ytg-light.png" alt="YTG" className="h-4 w-4 object-contain dark:hidden" />
                   {priceInfo ? (
                     <>
                       <span>{isFundraiser ? `$${priceInfo.price.toFixed(0)}` : `$${priceInfo.price.toFixed(2)}`}</span>
@@ -521,12 +523,7 @@ export default function ModalWithClose({
                       </svg>
                     </>
                   ) : (
-                    <>
-                      <svg className="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-                      </svg>
-                      Shop
-                    </>
+                    <span>Shop</span>
                   )}
                 </button>
               );
@@ -733,6 +730,8 @@ export default function ModalWithClose({
                   }
                   className="px-4 h-10 border border-emerald-600/30 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 rounded-lg flex items-center gap-1.5 font-medium transition-colors text-sm whitespace-nowrap active:translate-y-[1px]"
                 >
+                  <img src="/sponsors/ytg-dark.png" alt="YTG" className="h-[18px] w-[18px] object-contain hidden dark:block" />
+                  <img src="/sponsors/ytg-light.png" alt="YTG" className="h-[18px] w-[18px] object-contain dark:hidden" />
                   {priceInfo ? (
                     <>
                       <span className="font-semibold">${priceInfo.price.toFixed(2)}</span>
@@ -741,12 +740,7 @@ export default function ModalWithClose({
                       </svg>
                     </>
                   ) : (
-                    <>
-                      <svg className="w-3.5 h-3.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-                      </svg>
-                      <span>Shop</span>
-                    </>
+                    <span>Shop</span>
                   )}
                 </button>
               );

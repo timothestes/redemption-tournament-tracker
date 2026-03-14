@@ -30,8 +30,18 @@ const TopNav: React.FC = () => {
   const pathname = usePathname();
   const supabase = createClient();
 
+  const closeMobileMenu = () => {
+    setIsMobileMenuOpen(false);
+    setIsDecksOpen(false);
+    setIsResourcesOpen(false);
+  };
+
   const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
+    if (isMobileMenuOpen) {
+      closeMobileMenu();
+    } else {
+      setIsMobileMenuOpen(true);
+    }
   };
 
   const toggleResources = () => {
@@ -387,7 +397,7 @@ const TopNav: React.FC = () => {
           {/* Mobile menu button */}
           <button
             onClick={toggleMobileMenu}
-            className="lg:hidden p-2 rounded-md text-muted-foreground hover:bg-muted"
+            className="lg:hidden min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
           >
             {isMobileMenuOpen ? <IoClose size={24} /> : <HiMenu size={24} />}
           </button>
@@ -406,7 +416,7 @@ const TopNav: React.FC = () => {
                 <Link
                   key={link.href}
                   href={link.href}
-                  onClick={() => setIsMobileMenuOpen(false)}
+                  onClick={closeMobileMenu}
                   className={`flex items-center gap-3 px-3 py-2 rounded-md text-base font-medium transition-colors
                     ${isHighlight
                       ? 'border-2 border-primary text-primary hover:bg-primary/10'
@@ -428,7 +438,7 @@ const TopNav: React.FC = () => {
                 <Link
                   key={link.href}
                   href={link.href}
-                  onClick={() => setIsMobileMenuOpen(false)}
+                  onClick={closeMobileMenu}
                   className={`flex items-center gap-3 px-3 py-2 rounded-md text-base font-medium transition-colors
                     ${isActive(link.href)
                       ? 'bg-muted text-foreground'
@@ -449,7 +459,7 @@ const TopNav: React.FC = () => {
                 <Link
                   key={link.href}
                   href={link.href}
-                  onClick={() => setIsMobileMenuOpen(false)}
+                  onClick={closeMobileMenu}
                   className={`flex items-center gap-3 px-3 py-2 rounded-md text-base font-medium transition-colors
                     ${isHighlight
                       ? 'border-2 border-primary text-primary hover:bg-primary/10'
@@ -492,7 +502,7 @@ const TopNav: React.FC = () => {
                       <Link
                         key={link.href}
                         href={link.href}
-                        onClick={() => setIsMobileMenuOpen(false)}
+                        onClick={closeMobileMenu}
                         className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
                       >
                         <Icon className="w-4 h-4" />
@@ -584,7 +594,7 @@ const TopNav: React.FC = () => {
                   <div className="border-t border-border mt-2 pt-2">
                     <Link
                       href="/tracker/bug"
-                      onClick={() => setIsMobileMenuOpen(false)}
+                      onClick={closeMobileMenu}
                       className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
                     >
                       <HiArrowSmRight className="w-4 h-4" />

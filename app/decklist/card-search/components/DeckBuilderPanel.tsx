@@ -22,6 +22,7 @@ import { useCardPrices } from "../hooks/useCardPrices";
 import ParagonRequirements from "./ParagonRequirements";
 import { useCardImageUrl } from "../hooks/useCardImageUrl";
 import ReactMarkdown from "react-markdown";
+import BuyDeckModal from "./BuyDeckModal";
 
 function getTagContrastColor(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -129,6 +130,7 @@ export default function DeckBuilderPanel({
   const [showGenerateImageModal, setShowGenerateImageModal] = useState(false);
   const [showDeleteDeckModal, setShowDeleteDeckModal] = useState(false);
   const [showLoadDeckModal, setShowLoadDeckModal] = useState(false);
+  const [showBuyDeckModal, setShowBuyDeckModal] = useState(false);
   const [showValidationTooltip, setShowValidationTooltip] = useState(false);
   const [showViewDropdown, setShowViewDropdown] = useState(false);
   const viewDropdownBtnRef = useRef<HTMLButtonElement>(null);
@@ -658,9 +660,15 @@ export default function DeckBuilderPanel({
               </span>
             )}
             {totalDeckPrice !== null && (
-              <span className="md:hidden flex-shrink-0 text-sm font-semibold text-green-600 dark:text-green-400">
+              <button
+                onClick={() => setShowBuyDeckModal(true)}
+                className="md:hidden flex-shrink-0 text-sm font-semibold text-green-600 dark:text-green-400 flex items-center gap-1 hover:underline"
+                title="Buy deck on YTG"
+              >
+                <img src="/sponsors/ytg-dark.png" alt="" className="h-3.5 w-3.5 object-contain hidden dark:block" />
+                <img src="/sponsors/ytg-light.png" alt="" className="h-3.5 w-3.5 object-contain dark:hidden" />
                 ${totalDeckPrice.toFixed(2)}
-              </span>
+              </button>
             )}
             <span className="hidden md:flex items-center gap-1 text-xs whitespace-nowrap ml-auto flex-shrink-0" suppressHydrationWarning>
               <span className="text-gray-500 dark:text-gray-400">{mainDeckCount}</span>
@@ -675,7 +683,15 @@ export default function DeckBuilderPanel({
               {totalDeckPrice !== null && (
                 <>
                   <span className="text-gray-400 dark:text-gray-600 ml-1">·</span>
-                  <span className="text-green-600 dark:text-green-400 font-medium">${totalDeckPrice.toFixed(2)}</span>
+                  <button
+                    onClick={() => setShowBuyDeckModal(true)}
+                    className="text-green-600 dark:text-green-400 font-medium hover:underline inline-flex items-center gap-0.5"
+                    title="Buy deck on YTG"
+                  >
+                    <img src="/sponsors/ytg-dark.png" alt="" className="h-3 w-3 object-contain hidden dark:block" />
+                    <img src="/sponsors/ytg-light.png" alt="" className="h-3 w-3 object-contain dark:hidden" />
+                    ${totalDeckPrice.toFixed(2)}
+                  </button>
                 </>
               )}
             </span>
@@ -945,6 +961,17 @@ export default function DeckBuilderPanel({
                     </svg>
                     Generate Image
                   </button>
+                  <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+                  {totalDeckPrice !== null && (
+                    <button
+                      onClick={() => { setShowBuyDeckModal(true); setShowMenu(false); }}
+                      className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-gray-900 dark:text-white text-sm"
+                    >
+                      <img src="/sponsors/ytg-dark.png" alt="" className="w-4 h-4 object-contain hidden dark:block" />
+                      <img src="/sponsors/ytg-light.png" alt="" className="w-4 h-4 object-contain dark:hidden" />
+                      Buy on YTG
+                    </button>
+                  )}
                   {isAuthenticated && (
                     <>
                       <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
@@ -1455,7 +1482,18 @@ export default function DeckBuilderPanel({
                 </svg>
                 Generate Image
               </button>
-              
+              <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+              {totalDeckPrice !== null && (
+                <button
+                  onClick={() => { setShowBuyDeckModal(true); setShowMenu(false); }}
+                  className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
+                >
+                  <img src="/sponsors/ytg-dark.png" alt="" className="w-4 h-4 object-contain hidden dark:block" />
+                  <img src="/sponsors/ytg-light.png" alt="" className="w-4 h-4 object-contain dark:hidden" />
+                  Buy on YTG
+                </button>
+              )}
+
               {isAuthenticated && (
                 <>
                   <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
@@ -2726,10 +2764,17 @@ export default function DeckBuilderPanel({
                 {/* Deck Price */}
                 {totalDeckPrice !== null && (
                   <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
-                    <div className="flex justify-between">
-                      <span>Est. Price:</span>
-                      <span className="font-medium text-green-600 dark:text-green-400">${totalDeckPrice.toFixed(2)}</span>
-                    </div>
+                    <button
+                      onClick={() => setShowBuyDeckModal(true)}
+                      className="flex justify-between w-full text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 -mx-1 px-1 py-0.5 rounded transition-colors group"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <img src="/sponsors/ytg-dark.png" alt="" className="h-3.5 w-3.5 object-contain hidden dark:block" />
+                        <img src="/sponsors/ytg-light.png" alt="" className="h-3.5 w-3.5 object-contain dark:hidden" />
+                        Est. Price:
+                      </span>
+                      <span className="font-medium text-green-600 dark:text-green-400 group-hover:underline">${totalDeckPrice.toFixed(2)}</span>
+                    </button>
                   </div>
                 )}
 
@@ -2805,6 +2850,14 @@ export default function DeckBuilderPanel({
             setShowDeleteDeckModal(false);
           }}
           onClose={() => setShowDeleteDeckModal(false)}
+        />
+      )}
+
+      {/* Buy Deck Modal */}
+      {showBuyDeckModal && (
+        <BuyDeckModal
+          deck={deck}
+          onClose={() => setShowBuyDeckModal(false)}
         />
       )}
 
