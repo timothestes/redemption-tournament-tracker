@@ -113,6 +113,7 @@ Wiki-style Card Rulings section
 Collection Tracker
 add wishlist
 Play Redemption Online with Matchmaking
+Teaching new players how to play
 Comprehensive Deck Legality Validation
 Attaching private decklists to Tournament tracker players
 misc tournament tracker improvements

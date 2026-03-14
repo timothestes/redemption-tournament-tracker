@@ -735,26 +735,27 @@ export default function CardSearchClient() {
           // Start with the first query's result
           let result: boolean;
           const firstQuery = activeQueries[0];
+          const norm = (s: string) => s.toLowerCase().replace(/[\u2018\u2019\u201B\u2032\u0060]/g, "'");
           const firstMatches = (queryObj: QueryWithOp): boolean => {
-            const q = queryObj.text.toLowerCase();
+            const q = norm(queryObj.text);
             const searchField = queryObj.field;
             switch (searchField) {
               case 'name':
-                return c.name.toLowerCase().includes(q);
+                return norm(c.name).includes(q);
               case 'type':
-                return c.type.toLowerCase().includes(q);
+                return norm(c.type).includes(q);
               case 'brigade':
-                return c.brigade.toLowerCase().includes(q);
+                return norm(c.brigade).includes(q);
               case 'specialAbility':
-                return c.specialAbility.toLowerCase().includes(q);
+                return norm(c.specialAbility).includes(q);
               case 'setName':
-                return c.officialSet.toLowerCase().includes(q) || c.set.toLowerCase().includes(q);
+                return norm(c.officialSet).includes(q) || norm(c.set).includes(q);
               case 'identifier':
-                return c.identifier.toLowerCase().includes(q);
+                return norm(c.identifier).includes(q);
               case 'reference':
-                return c.reference.toLowerCase().includes(q);
+                return norm(c.reference).includes(q);
               default:
-                return Object.values(c).join(" ").toLowerCase().includes(q);
+                return norm(Object.values(c).join(" ")).includes(q);
             }
           };
           
