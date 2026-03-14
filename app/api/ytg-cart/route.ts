@@ -39,8 +39,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No cards provided' }, { status: 400 });
     }
 
+    if (cards.length > 200) {
+      return NextResponse.json({ error: 'Too many cards (max 200)' }, { status: 400 });
+    }
+
     const supabase = getSupabaseAdmin();
-    const cardKeys = cards.map(c => c.card_key);
+    const cardKeys = cards.map(c => String(c.card_key).slice(0, 200));
 
     // Query card_price_mappings joined with shopify_products
     const { data: mappings, error } = await supabase
@@ -58,7 +62,8 @@ export async function POST(request: NextRequest) {
       .not('shopify_product_id', 'is', null);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error('[ytg-cart] DB query failed:', error.message);
+      return NextResponse.json({ error: 'Failed to look up cards' }, { status: 500 });
     }
 
     // Build lookup: card_key -> { shopify_product_id, cached_variant_id, price }
