@@ -122,3 +122,4 @@ metagame snapshot
 tournament tracker mobile ux support
 Cactus tournament data pipeline.
 Deck upvoting
+intallable app on phone
