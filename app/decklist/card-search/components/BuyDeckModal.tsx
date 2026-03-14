@@ -262,7 +262,7 @@ export default function BuyDeckModal({ cards: allCards, onClose }: BuyDeckModalP
                             type="checkbox"
                             checked={isSelected}
                             onChange={() => toggleCard(card.card_key)}
-                            className="h-3.5 w-3.5 rounded border-gray-300 dark:border-gray-600 text-green-600 flex-shrink-0"
+                            className="h-3.5 w-3.5 rounded border-gray-300 dark:border-gray-600 text-green-600 flex-shrink-0 focus:outline-none focus:ring-0"
                           />
                           <span className={`text-xs truncate flex-1 ${isSelected ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500 line-through'}`}>
                             {card.card_name}
