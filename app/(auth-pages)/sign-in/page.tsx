@@ -1,5 +1,6 @@
 import { signInAction } from "../../../app/actions";
 import { FormMessage, Message } from "../../../components/form-message";
+import { GoogleSignInButton } from "../../../components/google-sign-in-button";
 import { SubmitButton } from "../../../components/submit-button";
 import { Input } from "../../../components/ui/input";
 import { Label } from "../../../components/ui/label";
@@ -32,6 +33,17 @@ export default async function Login({
         </Link>
       </p>
       
+      <GoogleSignInButton />
+
+      <div className="relative my-6">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-border" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-background px-2 text-muted-foreground">or</span>
+        </div>
+      </div>
+
       <form className="flex flex-col w-full">
         <div className="space-y-6 mb-8">
           <div className="space-y-3">
