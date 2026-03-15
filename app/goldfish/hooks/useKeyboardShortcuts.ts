@@ -3,6 +3,7 @@
 import { useEffect, useCallback } from 'react';
 import { useGame } from '../state/GameContext';
 import { showGameToast } from '../components/GameToast';
+import { triggerDiceRoll } from '../components/DiceRollOverlay';
 
 export function useKeyboardShortcuts() {
   const { state, drawCard, shuffleDeck, undo, newGame, advancePhase, endTurn, toggleSpreadHand } = useGame();
@@ -41,9 +42,7 @@ export function useKeyboardShortcuts() {
           break;
         case 'r': {
           e.preventDefault();
-          const result = Math.floor(Math.random() * 6) + 1;
-          const pips = ['', '\u2680', '\u2681', '\u2682', '\u2683', '\u2684', '\u2685'];
-          showGameToast(`${pips[result]}  Rolled a ${result}`);
+          triggerDiceRoll();
           break;
         }
         case 'h':

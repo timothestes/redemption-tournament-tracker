@@ -10,6 +10,7 @@ import {
   Dices,
 } from 'lucide-react';
 import { showGameToast } from './GameToast';
+import { triggerDiceRoll } from './DiceRollOverlay';
 
 export function GameToolbar() {
   const {
@@ -33,9 +34,7 @@ export function GameToolbar() {
   }, [drawCard, state.zones.hand.length, state.zones.deck.length]);
 
   const handleRollDice = useCallback(() => {
-    const result = Math.floor(Math.random() * 6) + 1;
-    const pips = ['', '\u2680', '\u2681', '\u2682', '\u2683', '\u2684', '\u2685'];
-    showGameToast(`${pips[result]}  Rolled a ${result}`);
+    triggerDiceRoll();
   }, []);
 
   const buttons = [

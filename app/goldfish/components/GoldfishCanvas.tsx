@@ -24,6 +24,7 @@ import { useModalCardDrag } from '../hooks/useModalCardDrag';
 import { useSelectionState, type CardBound } from '../hooks/useSelectionState';
 import { MultiCardContextMenu } from './MultiCardContextMenu';
 import { GameToastContainer, showGameToast } from './GameToast';
+import { DiceRollOverlay } from './DiceRollOverlay';
 
 const BLOB_BASE_URL = process.env.NEXT_PUBLIC_BLOB_BASE_URL || '';
 
@@ -776,7 +777,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
       // If the card moved zones, it's no longer under the cursor and mouseLeave
       // won't fire, so the preview would get stuck.
       const movedZones = targetZone && targetZone !== card.zone;
-      if (!card.isFlipped && !movedZones) {
+      if (!movedZones) {
         if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
         hoverTimerRef.current = setTimeout(() => {
           if (isDraggingRef.current || contextMenuRef.current) return;
@@ -852,7 +853,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
 
   const handleCardMouseEnter = useCallback(
     (card: GameCard, e: Konva.KonvaEventObject<MouseEvent>) => {
-      if (card.isFlipped || isDraggingRef.current || contextMenuRef.current) return;
+      if (isDraggingRef.current || contextMenuRef.current) return;
       setHoveredInstanceId(card.instanceId);
       startHoverAnimation();
       if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
@@ -2065,6 +2066,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
       )}
 
       <GameToastContainer />
+      <DiceRollOverlay />
     </>
   );
 }

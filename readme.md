@@ -101,14 +101,14 @@ We will want to let the host print it out easily
 
 ## short term
 Google Auth Options
-Spawn Lost Soul Tokens
-Paragon Deck Check PDF support
-Deck Check PDF screen: ability to select one of your decks
 Add Iron Man checkbox to side event
-add animations to goldfish mode
-add maybeboard
+allow hover preview for face down cards in goldfish mode
+add preview card modal to goldfish mode
 
 ## long term
+add maybeboard
+add animations to goldfish mode
+Spoiler Central
 Wiki-style Card Rulings section
 Collection Tracker
 add wishlist
