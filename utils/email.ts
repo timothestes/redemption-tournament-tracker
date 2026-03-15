@@ -86,7 +86,7 @@ export function wrapEmailInTemplate(bodyHtml: string): string {
               <td style="padding:24px 30px;border-top:1px solid #2a2a2e;text-align:center;">
                 <p style="margin:0 0 4px 0;color:#71717a;font-size:13px;">${NATIONALS_CONFIG.displayName} &bull; ${NATIONALS_CONFIG.dates}</p>
                 <p style="margin:0;color:#71717a;font-size:13px;">
-                  <a href="https://landofredemption.com" style="color:#a1a1aa;text-decoration:none;">landofredemption.com</a>
+                  <a href="https://redemptionccg.app" style="color:#a1a1aa;text-decoration:none;">redemptionccg.app</a>
                 </p>
               </td>
             </tr>
