@@ -74,7 +74,7 @@ export function MultiCardContextMenu({ selectedIds, x, y, onClose, onClearSelect
     border: '1px solid var(--gf-border)',
     borderRadius: 6,
     padding: '4px 0',
-    zIndex: 500,
+    zIndex: 600,
     minWidth: 180,
     maxHeight: '80vh',
     overflowY: 'auto',

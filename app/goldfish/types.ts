@@ -89,7 +89,8 @@ export type ActionType =
   | 'REMOVE_OPPONENT_TOKEN'
   | 'SHUFFLE_AND_MOVE_TO_TOP'
   | 'SHUFFLE_AND_MOVE_TO_BOTTOM'
-  | 'MOVE_CARDS_BATCH';
+  | 'MOVE_CARDS_BATCH'
+  | 'ADD_PLAYER_LOST_SOUL';
 
 export interface GameAction {
   id: string;

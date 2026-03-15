@@ -6,6 +6,7 @@ import { useGame } from '../state/GameContext';
 import { GameCard } from '../types';
 import { X, Search, ArrowLeftRight } from 'lucide-react';
 import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './ModalCardHoverPreview';
+import { useCardPreview } from '../state/CardPreviewContext';
 
 const BLOB_BASE_URL = process.env.NEXT_PUBLIC_BLOB_BASE_URL || '';
 
@@ -15,6 +16,7 @@ function sanitizeImgFile(f: string): string {
 
 function getCardImageUrl(imgFile: string): string {
   if (!imgFile) return '';
+  if (imgFile.startsWith('/')) return imgFile;
   return `${BLOB_BASE_URL}/card-images/${sanitizeImgFile(imgFile)}.jpg`;
 }
 
@@ -41,7 +43,8 @@ export function DeckExchangeModal({
   const [search, setSearch] = useState('');
   const [searchField, setSearchField] = useState<'all' | 'type' | 'name' | 'brigade' | 'alignment' | 'ability' | 'identifier'>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave } = useModalCardHover(800);
+  const { setPreviewCard, isLoupeVisible } = useCardPreview();
+  const { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave } = useModalCardHover(350, { setPreviewCard, isLoupeVisible });
 
   // Track pointer down card to distinguish click from drag
   const pointerDownCardRef = useRef<string | null>(null);

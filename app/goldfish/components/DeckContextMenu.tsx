@@ -375,7 +375,7 @@ export function DeckContextMenu({
         border: '1px solid var(--gf-border)',
         borderRadius: 6,
         padding: '4px 0',
-        zIndex: 500,
+        zIndex: 600,
         boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
         whiteSpace: 'nowrap',
       }}

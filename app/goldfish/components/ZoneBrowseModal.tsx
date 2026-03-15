@@ -6,6 +6,7 @@ import { useGame } from '../state/GameContext';
 import { ZoneId, ZONE_LABELS, GameCard } from '../types';
 import { X } from 'lucide-react';
 import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './ModalCardHoverPreview';
+import { useCardPreview } from '../state/CardPreviewContext';
 
 const BLOB_BASE_URL = process.env.NEXT_PUBLIC_BLOB_BASE_URL || '';
 
@@ -15,6 +16,7 @@ function sanitizeImgFile(f: string): string {
 
 function getCardImageUrl(imgFile: string): string {
   if (!imgFile) return '';
+  if (imgFile.startsWith('/')) return imgFile;
   return `${BLOB_BASE_URL}/card-images/${sanitizeImgFile(imgFile)}.jpg`;
 }
 
@@ -154,7 +156,8 @@ interface ZoneBrowseModalProps {
 export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive }: ZoneBrowseModalProps) {
   const { state, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck } = useGame();
   const cards = state.zones[zoneId];
-  const { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave } = useModalCardHover();
+  const { setPreviewCard, isLoupeVisible } = useCardPreview();
+  const { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave } = useModalCardHover(200, { setPreviewCard, isLoupeVisible });
   const [contextCard, setContextCard] = useState<{ card: GameCard; x: number; y: number } | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -199,6 +202,8 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
     e.preventDefault();
     onCardMouseLeave();
     setContextCard({ card, x: e.clientX, y: e.clientY });
+    // Re-set the loupe preview so it keeps showing the right-clicked card
+    setPreviewCard({ cardName: card.cardName, cardImgFile: card.cardImgFile, isMeek: card.isMeek });
   };
 
   // Track pointer down card to distinguish click from drag on pointer up

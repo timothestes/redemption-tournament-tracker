@@ -6,6 +6,7 @@ import { useGame } from '../state/GameContext';
 import { GameCard, ZoneId, ZONE_LABELS } from '../types';
 import { X, Search } from 'lucide-react';
 import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './ModalCardHoverPreview';
+import { useCardPreview } from '../state/CardPreviewContext';
 
 const BLOB_BASE_URL = process.env.NEXT_PUBLIC_BLOB_BASE_URL || '';
 
@@ -15,6 +16,7 @@ function sanitizeImgFile(f: string): string {
 
 function getCardImageUrl(imgFile: string): string {
   if (!imgFile) return '';
+  if (imgFile.startsWith('/')) return imgFile;
   return `${BLOB_BASE_URL}/card-images/${sanitizeImgFile(imgFile)}.jpg`;
 }
 
@@ -143,7 +145,8 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
   const [autoShuffle, setAutoShuffle] = useState(true);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [contextCard, setContextCard] = useState<{ card: GameCard; x: number; y: number } | null>(null);
-  const { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave } = useModalCardHover(800);
+  const { setPreviewCard, isLoupeVisible } = useCardPreview();
+  const { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave } = useModalCardHover(350, { setPreviewCard, isLoupeVisible });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Refs for card DOM elements (for lasso hit-testing)
@@ -234,6 +237,8 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
     e.preventDefault();
     onCardMouseLeave();
     setContextCard({ card, x: e.clientX, y: e.clientY });
+    // Re-set the loupe preview so it keeps showing the right-clicked card
+    setPreviewCard({ cardName: card.cardName, cardImgFile: card.cardImgFile, isMeek: card.isMeek });
   };
 
   // Track pointer down card to distinguish click from drag on pointer up
@@ -608,7 +613,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
                     ref={(el) => registerCardEl(card.instanceId, el)}
                     data-card-id={card.instanceId}
                     style={{ position: 'relative', cursor: 'grab' }}
-                    onContextMenu={(e) => { onCardMouseLeave(); handleCardContextMenu(card, e); }}
+                    onContextMenu={(e) => handleCardContextMenu(card, e)}
                     onPointerDown={(e) => { e.stopPropagation(); handlePointerDown(card, imageUrl, e); }}
                     onPointerUp={() => handlePointerUp(card)}
                     onClick={(e) => e.stopPropagation()}

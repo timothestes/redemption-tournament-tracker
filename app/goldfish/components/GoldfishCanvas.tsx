@@ -19,12 +19,14 @@ import { DeckPeekModal } from './DeckPeekModal';
 import { DeckDropPopup } from './DeckDropPopup';
 import { DeckExchangeModal } from './DeckExchangeModal';
 import { ZoneContextMenu } from './ZoneContextMenu';
+import { LorContextMenu } from './LorContextMenu';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useModalCardDrag } from '../hooks/useModalCardDrag';
 import { useSelectionState, type CardBound } from '../hooks/useSelectionState';
 import { MultiCardContextMenu } from './MultiCardContextMenu';
 import { GameToastContainer, showGameToast } from './GameToast';
 import { DiceRollOverlay } from './DiceRollOverlay';
+import { useCardPreview } from '../state/CardPreviewContext';
 
 const BLOB_BASE_URL = process.env.NEXT_PUBLIC_BLOB_BASE_URL || '';
 
@@ -274,7 +276,8 @@ interface GoldfishCanvasProps {
 }
 
 export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
-  const { state, dispatch, drawCard, drawMultiple, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleDeck, meekCard, unmeekCard, removeOpponentToken } = useGame();
+  const { state, dispatch, drawCard, drawMultiple, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleDeck, meekCard, unmeekCard, removeOpponentToken, addPlayerLostSoul } = useGame();
+  const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const stageRef = useRef<Konva.Stage>(null);
 
   // Prevent browser-native drag on the canvas container.
@@ -353,6 +356,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
   const [batchDeckDropIds, setBatchDeckDropIds] = useState<string[] | null>(null);
   const [exchangeCardIds, setExchangeCardIds] = useState<string[] | null>(null);
   const [zoneMenu, setZoneMenu] = useState<{ x: number; y: number; spawnX: number; spawnY: number } | null>(null);
+  const [lorMenu, setLorMenu] = useState<{ x: number; y: number } | null>(null);
   const [cardRenderKey, setCardRenderKey] = useState(0);
 
   // Card node ref map for imperative multi-card drag
@@ -828,12 +832,21 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
   const contextMenuRef = useRef(contextMenu);
   contextMenuRef.current = contextMenu;
 
+  // When loupe is visible, tooltip delay is irrelevant (loupe shows instantly).
+  // When loupe is hidden, use a shorter delay for the fallback tooltip.
+  const TOOLTIP_DELAY = 250;
+
+  const isLoupeVisibleRef = useRef(isLoupeVisible);
+  isLoupeVisibleRef.current = isLoupeVisible;
+
   const startHoverAnimation = useCallback(() => {
+    // Skip glow animation when loupe is active — preview is instant
+    if (isLoupeVisibleRef.current) return;
     if (hoverAnimFrameRef.current) cancelAnimationFrame(hoverAnimFrameRef.current);
     hoverStartTimeRef.current = performance.now();
     const animate = () => {
       const elapsed = performance.now() - hoverStartTimeRef.current!;
-      const progress = Math.min(elapsed / 700, 1);
+      const progress = Math.min(elapsed / TOOLTIP_DELAY, 1);
       setHoverProgress(progress);
       if (progress < 1) {
         hoverAnimFrameRef.current = requestAnimationFrame(animate);
@@ -854,7 +867,19 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
   const handleCardMouseEnter = useCallback(
     (card: GameCard, e: Konva.KonvaEventObject<MouseEvent>) => {
       if (isDraggingRef.current || contextMenuRef.current) return;
+
+      // Always update the loupe panel instantly
+      setPreviewCard({
+        cardName: card.cardName,
+        cardImgFile: card.cardImgFile,
+        isMeek: card.isMeek,
+      });
+
       setHoveredInstanceId(card.instanceId);
+
+      // When loupe is visible, skip the delayed tooltip entirely
+      if (isLoupeVisibleRef.current) return;
+
       startHoverAnimation();
       if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
       hoverTimerRef.current = setTimeout(() => {
@@ -870,20 +895,21 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
           x: e.evt.clientX,
           y: e.evt.clientY,
         });
-      }, 700);
+      }, TOOLTIP_DELAY);
     },
-    [startHoverAnimation, stopHoverAnimation]
+    [startHoverAnimation, setPreviewCard]
   );
 
   const handleCardMouseLeave = useCallback(() => {
     setHoveredInstanceId(null);
+    setPreviewCard(null);
     stopHoverAnimation();
     if (hoverTimerRef.current) {
       clearTimeout(hoverTimerRef.current);
       hoverTimerRef.current = null;
     }
     setHoverCard(null);
-  }, [stopHoverAnimation]);
+  }, [stopHoverAnimation, setPreviewCard]);
 
   const handleCardDblClick = useCallback(
     (card: GameCard) => {
@@ -1137,8 +1163,8 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
             return (
               <Group
                 key={zoneId}
-                onClick={() => {
-                  if (zoneId !== 'deck') handleZoneClick(zoneId);
+                onClick={(e) => {
+                  if (e.evt.button === 0 && zoneId !== 'deck') handleZoneClick(zoneId);
                 }}
                 onDblClick={(e) => {
                   if (zoneId === 'deck' && e.evt.button === 0) drawCard();
@@ -1159,6 +1185,16 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                       y: e.evt.clientY - container.top,
                       spawnX: pointer?.x ?? e.evt.clientX - container.left,
                       spawnY: pointer?.y ?? e.evt.clientY - container.top,
+                    });
+                  }
+                  if (zoneId === 'land-of-redemption') {
+                    e.evt.preventDefault();
+                    const stage = stageRef.current;
+                    if (!stage) return;
+                    const container = stage.container().getBoundingClientRect();
+                    setLorMenu({
+                      x: e.evt.clientX - container.left,
+                      y: e.evt.clientY - container.top,
                     });
                   }
                 }}
@@ -1695,6 +1731,15 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
           spawnX={zoneMenu.spawnX}
           spawnY={zoneMenu.spawnY}
           onClose={() => setZoneMenu(null)}
+        />
+      )}
+
+      {lorMenu && (
+        <LorContextMenu
+          x={lorMenu.x}
+          y={lorMenu.y}
+          onAddSoul={() => { addPlayerLostSoul(); setLorMenu(null); }}
+          onClose={() => setLorMenu(null)}
         />
       )}
 

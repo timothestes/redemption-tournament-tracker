@@ -100,8 +100,6 @@ We will want to let the host print it out easily
 # Backlog
 
 ## short term
-Add Iron Man checkbox to side event
-add preview card modal to goldfish mode
 
 ## long term
 add maybeboard

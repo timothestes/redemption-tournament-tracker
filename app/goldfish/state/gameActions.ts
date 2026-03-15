@@ -90,4 +90,8 @@ export const actions = {
   moveCardsBatch(cardInstanceIds: string[], toZone: ZoneId, positions?: Record<string, { posX: number; posY: number }>): GameAction {
     return createAction('MOVE_CARDS_BATCH', { cardInstanceIds, toZone, positions });
   },
+
+  addPlayerLostSoul(): GameAction {
+    return createAction('ADD_PLAYER_LOST_SOUL');
+  },
 };

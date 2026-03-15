@@ -389,6 +389,30 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return { ...state, zones, history };
     }
 
+    case 'ADD_PLAYER_LOST_SOUL': {
+      const soul: GameCard = {
+        instanceId: crypto.randomUUID(),
+        cardName: 'Lost Soul Token "Lost Souls" [Proverbs 2:16-17]',
+        cardSet: 'RR',
+        cardImgFile: '/gameplay/ot_lost_soul.png',
+        type: 'LS',
+        brigade: '',
+        strength: '',
+        toughness: '',
+        specialAbility: '',
+        identifier: 'OT',
+        alignment: 'Neutral',
+        isMeek: false,
+        counters: [],
+        isFlipped: false,
+        zone: 'land-of-redemption',
+        ownerId: 'player1',
+        notes: '',
+      };
+      zones['land-of-redemption'].push(soul);
+      return { ...state, zones, history };
+    }
+
     case 'REMOVE_OPPONENT_TOKEN': {
       const { cardInstanceId } = action.payload;
       if (!cardInstanceId) return state;

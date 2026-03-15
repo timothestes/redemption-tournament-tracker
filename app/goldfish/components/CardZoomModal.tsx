@@ -14,6 +14,7 @@ function sanitizeImgFile(f: string): string {
 
 function getCardImageUrl(imgFile: string): string {
   if (!imgFile) return '';
+  if (imgFile.startsWith('/')) return imgFile;
   return `${BLOB_BASE_URL}/card-images/${sanitizeImgFile(imgFile)}.jpg`;
 }
 

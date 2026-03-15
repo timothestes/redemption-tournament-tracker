@@ -6,6 +6,7 @@ import { GameCard } from '../types';
 import { X, ArrowUp, ArrowDown, Shuffle } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './ModalCardHoverPreview';
+import { useCardPreview } from '../state/CardPreviewContext';
 
 const BLOB_BASE_URL = process.env.NEXT_PUBLIC_BLOB_BASE_URL || '';
 
@@ -15,6 +16,7 @@ function sanitizeImgFile(f: string): string {
 
 function getCardImageUrl(imgFile: string): string {
   if (!imgFile) return '';
+  if (imgFile.startsWith('/')) return imgFile;
   return `${BLOB_BASE_URL}/card-images/${sanitizeImgFile(imgFile)}.jpg`;
 }
 
@@ -77,7 +79,8 @@ interface DeckPeekModalProps {
 
 export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive }: DeckPeekModalProps) {
   const { state, moveCardsBatch, shuffleDeck } = useGame();
-  const { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave } = useModalCardHover();
+  const { setPreviewCard, isLoupeVisible } = useCardPreview();
+  const { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave } = useModalCardHover(200, { setPreviewCard, isLoupeVisible });
 
   // Guard against stray click events closing the modal immediately after mount
   const [readyForClose, setReadyForClose] = useState(false);

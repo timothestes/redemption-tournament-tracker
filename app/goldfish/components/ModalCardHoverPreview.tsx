@@ -11,6 +11,7 @@ function sanitizeImgFile(f: string): string {
 
 function getCardImageUrl(imgFile: string): string {
   if (!imgFile) return '';
+  if (imgFile.startsWith('/')) return imgFile;
   return `${BLOB_BASE_URL}/card-images/${sanitizeImgFile(imgFile)}.jpg`;
 }
 
@@ -21,7 +22,14 @@ interface HoverState {
   y: number;
 }
 
-export function useModalCardHover(delay = 400) {
+interface ModalCardHoverOptions {
+  /** Callback to update the loupe preview panel instantly */
+  setPreviewCard?: (card: { cardName: string; cardImgFile: string; isMeek?: boolean } | null) => void;
+  /** When true, skip the delayed tooltip (loupe handles it) */
+  isLoupeVisible?: boolean;
+}
+
+export function useModalCardHover(delay = 400, options?: ModalCardHoverOptions) {
   const [hover, setHover] = useState<HoverState | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [hoverProgress, setHoverProgress] = useState(0);
@@ -30,6 +38,8 @@ export function useModalCardHover(delay = 400) {
   const hoverStartRef = useRef<number | null>(null);
   const delayRef = useRef(delay);
   delayRef.current = delay;
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
 
   const stopAnimation = useCallback(() => {
     if (animFrameRef.current) {
@@ -59,6 +69,13 @@ export function useModalCardHover(delay = 400) {
     const x = e.clientX;
     const y = e.clientY;
     setHoveredCardId(instanceId ?? imgFile);
+
+    // Always update the loupe panel instantly
+    optionsRef.current?.setPreviewCard?.({ cardName, cardImgFile: imgFile });
+
+    // When loupe is visible, skip the delayed tooltip entirely
+    if (optionsRef.current?.isLoupeVisible) return;
+
     startAnimation();
     timerRef.current = setTimeout(() => {
       // Stop the rAF loop but keep progress at 1 so glow stays while preview is showing
@@ -82,6 +99,9 @@ export function useModalCardHover(delay = 400) {
     setHover(null);
     setHoveredCardId(null);
     stopAnimation();
+
+    // Clear the loupe panel
+    optionsRef.current?.setPreviewCard?.(null);
   }, [stopAnimation]);
 
   return { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave };
