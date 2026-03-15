@@ -100,7 +100,6 @@ We will want to let the host print it out easily
 # Backlog
 
 ## short term
-Google Auth Options
 Add Iron Man checkbox to side event
 add preview card modal to goldfish mode
 

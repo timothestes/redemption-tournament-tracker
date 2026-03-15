@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createClient } from "@/utils/supabase/client";
 import { setUsernameAction, checkUsernameAvailableAction } from "../actions";
 import {
   Dialog,
@@ -22,6 +23,26 @@ export default function UsernameModal({ onSuccess, onClose }: UsernameModalProps
   const [checking, setChecking] = useState(false);
   const [available, setAvailable] = useState<boolean | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Prefill username from OAuth provider metadata (e.g. Discord username)
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user || username) return;
+      const meta = user.user_metadata;
+      const suggested = meta?.custom_claims?.global_name
+        || meta?.full_name
+        || meta?.name
+        || meta?.user_name
+        || meta?.preferred_username;
+      if (suggested) {
+        const sanitized = suggested.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 24);
+        if (sanitized.length >= 3) {
+          setUsername(sanitized);
+        }
+      }
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debounced availability check
   useEffect(() => {
