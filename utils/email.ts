@@ -47,6 +47,57 @@ export async function sendEmail({ to, subject, html }: EmailOptions) {
   }
 }
 
+/**
+ * Wraps arbitrary HTML content in a branded email template with the logo,
+ * header, and footer. Used for bulk emails sent from the admin panel.
+ */
+export function wrapEmailInTemplate(bodyHtml: string): string {
+  const baseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : process.env.NEXT_PUBLIC_SITE_URL || "https://redemptionccg.app";
+
+  const logoUrl = `${baseUrl}/darkmode_redemptionccgapp.png`;
+
+  return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  </head>
+  <body style="margin:0;padding:0;background-color:#111113;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#111113;">
+      <tr>
+        <td align="center" style="padding:40px 16px;">
+          <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#1a1a1e;border-radius:12px;overflow:hidden;">
+            <!-- Logo header -->
+            <tr>
+              <td align="center" style="padding:32px 30px 24px 30px;border-bottom:1px solid #2a2a2e;">
+                <img src="${logoUrl}" alt="Redemption CCG App" width="200" style="display:block;max-width:200px;height:auto;" />
+              </td>
+            </tr>
+            <!-- Body content -->
+            <tr>
+              <td style="padding:32px 30px;color:#e4e4e7;font-size:16px;line-height:1.7;">
+                ${bodyHtml}
+              </td>
+            </tr>
+            <!-- Footer -->
+            <tr>
+              <td style="padding:24px 30px;border-top:1px solid #2a2a2e;text-align:center;">
+                <p style="margin:0 0 4px 0;color:#71717a;font-size:13px;">${NATIONALS_CONFIG.displayName} &bull; ${NATIONALS_CONFIG.dates}</p>
+                <p style="margin:0;color:#71717a;font-size:13px;">
+                  <a href="https://landofredemption.com" style="color:#a1a1aa;text-decoration:none;">landofredemption.com</a>
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
 export function getRegistrationConfirmationEmail(
   firstName: string,
   lastName: string,

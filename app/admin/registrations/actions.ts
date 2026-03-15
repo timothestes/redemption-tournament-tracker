@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "../../../utils/supabase/server";
-import { sendEmail } from "../../../utils/email";
+import { sendEmail, wrapEmailInTemplate } from "../../../utils/email";
 import { redirect } from "next/navigation";
 import { isRegistrationAdmin, requireRegistrationAdmin } from "../../../utils/adminUtils";
 
@@ -91,6 +91,7 @@ export async function updateRegistration(id: string, data: {
   first_nationals?: boolean;
   needs_airport_transportation?: boolean;
   needs_hotel_transportation?: boolean;
+  iron_man_interest?: boolean;
   staying_overnight?: boolean;
   overnight_stay_nights?: string[];
   photo_url?: string | null;
@@ -117,6 +118,7 @@ export async function updateRegistration(id: string, data: {
   if (data.first_nationals !== undefined) updateData.first_nationals = data.first_nationals;
   if (data.needs_airport_transportation !== undefined) updateData.needs_airport_transportation = data.needs_airport_transportation;
   if (data.needs_hotel_transportation !== undefined) updateData.needs_hotel_transportation = data.needs_hotel_transportation;
+  if (data.iron_man_interest !== undefined) updateData.iron_man_interest = data.iron_man_interest;
   if (data.staying_overnight !== undefined) updateData.staying_overnight = data.staying_overnight;
   if (data.overnight_stay_nights !== undefined) updateData.overnight_stay_nights = data.overnight_stay_nights;
   if (data.photo_url !== undefined) updateData.photo_url = data.photo_url;
@@ -162,16 +164,26 @@ export async function sendBulkEmail(
 
   // Send emails
   for (const recipient of recipients) {
-    // Personalize the email with recipient name
-    const personalizedHtml = htmlContent
+    // Personalize the email with recipient name and convert plain-text
+    // line breaks to <br> if content doesn't already contain HTML tags
+    let processedContent = htmlContent;
+    const hasHtmlTags = /<[a-z][\s\S]*>/i.test(processedContent);
+    if (!hasHtmlTags) {
+      processedContent = processedContent.replace(/\n/g, "<br>");
+    }
+
+    const personalizedHtml = processedContent
       .replace(/\{firstName\}/g, recipient.first_name)
       .replace(/\{lastName\}/g, recipient.last_name)
       .replace(/\{fullName\}/g, `${recipient.first_name} ${recipient.last_name}`);
 
+    // Wrap in branded template
+    const wrappedHtml = wrapEmailInTemplate(personalizedHtml);
+
     const result = await sendEmail({
       to: recipient.email,
       subject,
-      html: personalizedHtml,
+      html: wrappedHtml,
     });
 
     if (result.success) {

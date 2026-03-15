@@ -43,6 +43,7 @@ export default function RegistrationPage() {
     firstNationals: false,
     needsAirportTransportation: false,
     needsHotelTransportation: false,
+    ironManInterest: false,
     stayingOvernight: false,
     overnightStayNights: [] as string[],
   });
@@ -74,6 +75,7 @@ export default function RegistrationPage() {
           firstNationals: false,
           needsAirportTransportation: false,
           needsHotelTransportation: false,
+          ironManInterest: false,
           stayingOvernight: false,
           overnightStayNights: [],
         });
@@ -305,6 +307,7 @@ export default function RegistrationPage() {
                       firstNationals: false,
                       needsAirportTransportation: false,
                       needsHotelTransportation: false,
+                      ironManInterest: false,
                       stayingOvernight: false,
                       overnightStayNights: [],
                     });
@@ -572,6 +575,44 @@ export default function RegistrationPage() {
               </h2>
 
               <div className="space-y-4">
+                <label className="flex items-center space-x-3 cursor-pointer">
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={formData.firstNationals}
+                    onClick={() => setFormData({...formData, firstNationals: !formData.firstNationals})}
+                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${formData.firstNationals ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
+                  >
+                    {formData.firstNationals && (
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+                  <span className="text-sm font-normal text-foreground">
+                    Is this your first National tournament?
+                  </span>
+                </label>
+
+                <label className="flex items-center space-x-3 cursor-pointer">
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={formData.ironManInterest}
+                    onClick={() => setFormData({...formData, ironManInterest: !formData.ironManInterest})}
+                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${formData.ironManInterest ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
+                  >
+                    {formData.ironManInterest && (
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+                  <span className="text-sm font-normal text-foreground">
+                    Will you be playing in the Iron Man side event?
+                  </span>
+                </label>
+
                 <label className="flex items-start space-x-3 cursor-pointer">
                   <button
                     type="button"
@@ -596,25 +637,6 @@ export default function RegistrationPage() {
                       a box of the new set even if they are not drafted
                     </p>
                   </div>
-                </label>
-
-                <label className="flex items-center space-x-3 cursor-pointer">
-                  <button
-                    type="button"
-                    role="checkbox"
-                    aria-checked={formData.firstNationals}
-                    onClick={() => setFormData({...formData, firstNationals: !formData.firstNationals})}
-                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${formData.firstNationals ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
-                  >
-                    {formData.firstNationals && (
-                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
-                  </button>
-                  <span className="text-sm font-normal text-foreground">
-                    Is this your first National tournament?
-                  </span>
                 </label>
 
                 <label className="flex items-start space-x-3 cursor-pointer">

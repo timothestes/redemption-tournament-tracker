@@ -102,7 +102,6 @@ We will want to let the host print it out easily
 ## short term
 Google Auth Options
 Add Iron Man checkbox to side event
-allow hover preview for face down cards in goldfish mode
 add preview card modal to goldfish mode
 
 ## long term
