@@ -161,6 +161,7 @@ export async function sendBulkEmail(
 
   let sentCount = 0;
   let failedCount = 0;
+  let lastError = "";
 
   // Send emails
   for (const recipient of recipients) {
@@ -190,14 +191,16 @@ export async function sendBulkEmail(
       sentCount++;
     } else {
       failedCount++;
+      lastError = result.error || "Unknown error";
     }
   }
 
-  return { 
-    success: failedCount === 0, 
-    sentCount, 
+  return {
+    success: failedCount === 0,
+    sentCount,
     failedCount,
-    message: `Sent ${sentCount} email(s). ${failedCount > 0 ? `Failed: ${failedCount}` : ""}`
+    error: lastError || undefined,
+    message: `Sent ${sentCount} email(s).${failedCount > 0 ? ` Failed: ${failedCount}. Error: ${lastError}` : ""}`
   };
 }
 
