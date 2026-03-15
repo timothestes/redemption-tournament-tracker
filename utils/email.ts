@@ -12,7 +12,7 @@ interface EmailOptions {
 
 export async function sendEmail({ to, subject, html }: EmailOptions) {
   const resendApiKey = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.FROM_EMAIL || "noreply@yourdomain.com";
+  const fromEmail = process.env.FROM_EMAIL || "RedemptionCCG.app <noreply@landofredemption.com>";
 
   if (!resendApiKey) {
     console.warn("RESEND_API_KEY not configured. Email not sent.");
