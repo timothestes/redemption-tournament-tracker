@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { HiMenu, HiDocumentText, HiArrowSmRight, HiUserAdd, HiShieldCheck, HiGlobeAlt } from "react-icons/hi";
+import { HiMenu, HiDocumentText, HiArrowSmRight, HiUserAdd, HiShieldCheck, HiGlobeAlt, HiSparkles } from "react-icons/hi";
 import { IoClose } from "react-icons/io5";
 import { FaTrophy, FaBookOpen } from "react-icons/fa6";
 import { PiPencilLineBold } from "react-icons/pi";
@@ -26,14 +26,20 @@ const TopNav: React.FC = () => {
   const [logoSrc, setLogoSrc] = useState('/darkmode_redemptionccgapp.webp');
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const { isAdmin } = useIsAdmin();
+  const { isAdmin, permissions, loading: adminLoading } = useIsAdmin();
   const pathname = usePathname();
   const supabase = createClient();
+
+  // Nav is "ready" when both auth and admin checks have resolved
+  const navReady = !authLoading && !adminLoading;
+
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
 
   const closeMobileMenu = () => {
     setIsMobileMenuOpen(false);
     setIsDecksOpen(false);
     setIsResourcesOpen(false);
+    setIsAdminOpen(false);
   };
 
   const toggleMobileMenu = () => {
@@ -47,10 +53,18 @@ const TopNav: React.FC = () => {
   const toggleResources = () => {
     setIsResourcesOpen(!isResourcesOpen);
     setIsDecksOpen(false);
+    setIsAdminOpen(false);
   };
 
   const toggleDecks = () => {
     setIsDecksOpen(!isDecksOpen);
+    setIsResourcesOpen(false);
+    setIsAdminOpen(false);
+  };
+
+  const toggleAdmin = () => {
+    setIsAdminOpen(!isAdminOpen);
+    setIsDecksOpen(false);
     setIsResourcesOpen(false);
   };
 
@@ -79,8 +93,9 @@ const TopNav: React.FC = () => {
     const handleClickOutside = () => {
       setIsDecksOpen(false);
       setIsResourcesOpen(false);
+      setIsAdminOpen(false);
     };
-    if (isDecksOpen || isResourcesOpen) {
+    if (isDecksOpen || isResourcesOpen || isAdminOpen) {
       // Use a slight delay so the toggle click doesn't immediately re-close
       const timer = setTimeout(() => {
         document.addEventListener('click', handleClickOutside, { once: true });
@@ -90,7 +105,7 @@ const TopNav: React.FC = () => {
         document.removeEventListener('click', handleClickOutside);
       };
     }
-  }, [isDecksOpen, isResourcesOpen]);
+  }, [isDecksOpen, isResourcesOpen, isAdminOpen]);
 
   const isActive = (path: string) => pathname?.startsWith(path);
 
@@ -98,16 +113,13 @@ const TopNav: React.FC = () => {
     { href: "/register", label: NATIONALS_CONFIG.adminOnly ? `${NATIONALS_CONFIG.displayName} (Admin Only)` : `${NATIONALS_CONFIG.displayName}`, icon: HiUserAdd, highlight: true },
     { href: "/tracker/tournaments", label: "Tournaments", icon: FaTrophy, authRequired: true },
     { href: "/decklist/card-search?new=true", label: "Deck Builder", icon: TbSearch },
+    { href: "/spoilers", label: "Spoilers", icon: HiSparkles },
   ];
 
   const deckLinks = [
     { href: "/decklist/community", label: "Community Decks", icon: HiGlobeAlt, isNew: true },
     { href: "/decklist/my-decks", label: "My Decks", icon: TbCardsFilled, authRequired: true },
     { href: "/decklist/generate", label: "Deck Check PDF", icon: TbCardsFilled },
-  ];
-
-  const adminLinks = [
-    { href: "/admin/registrations", label: "Admin", icon: HiShieldCheck },
   ];
 
   const tournamentResources = [
@@ -147,14 +159,15 @@ const TopNav: React.FC = () => {
                 alt="RedemptionCCG App Logo"
                 width={120}
                 height={32}
-                style={{ width: "auto", height: "auto", maxHeight: "32px", opacity: mounted ? 1 : 0 }}
+                style={{ width: "auto", height: "auto", maxHeight: "32px" }}
+                className={`transition-opacity duration-150 ${navReady ? 'opacity-100' : 'opacity-0'}`}
                 priority
               />
             </div>
           </Link>
 
           {/* Desktop Navigation - Center */}
-          <div className="hidden lg:flex lg:items-center lg:space-x-1 flex-1 justify-center">
+          <div className={`hidden lg:flex lg:items-center lg:space-x-1 flex-1 justify-center transition-opacity duration-150 ${navReady ? 'opacity-100' : 'opacity-0'}`}>
             {navLinks.slice(0, 1).map((link) => {
               const Icon = link.icon;
               const isHighlight = link.highlight;
@@ -176,24 +189,65 @@ const TopNav: React.FC = () => {
               );
             })}
 
-            {/* Admin Links - Only for admins (right after Nationals) */}
-            {isAdmin && adminLinks.map((link) => {
-              const Icon = link.icon;
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
+            {/* Admin Dropdown - Only for admins */}
+            {isAdmin && (
+              <div className="relative">
+                <button
+                  onClick={toggleAdmin}
                   className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors
-                    ${isActive(link.href)
+                    ${isAdminOpen || isActive('/admin')
                       ? 'bg-muted text-foreground'
                       : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                     }`}
                 >
-                  <Icon className="w-4 h-4" />
-                  {link.label}
-                </Link>
-              );
-            })}
+                  <HiShieldCheck className="w-4 h-4" />
+                  Admin
+                  <svg
+                    className={`w-4 h-4 transition-transform ${isAdminOpen ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {isAdminOpen && (
+                  <div className="absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-card ring-1 ring-black ring-opacity-5">
+                    <div className="py-2">
+                      <Link
+                        href="/admin/registrations"
+                        onClick={() => setIsAdminOpen(false)}
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
+                      >
+                        <HiUserAdd className="w-4 h-4" />
+                        Registrations
+                      </Link>
+                      {permissions.includes('manage_tags') && (
+                        <Link
+                          href="/admin/tags"
+                          onClick={() => setIsAdminOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
+                        >
+                          <TbCardsFilled className="w-4 h-4" />
+                          Manage Tags
+                        </Link>
+                      )}
+                      {permissions.includes('manage_spoilers') && (
+                        <Link
+                          href="/admin/spoilers"
+                          onClick={() => setIsAdminOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
+                        >
+                          <HiSparkles className="w-4 h-4" />
+                          Manage Spoilers
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Rest of nav links */}
             {navLinks.slice(1).map((link) => {
@@ -363,15 +417,9 @@ const TopNav: React.FC = () => {
           </div>
 
           {/* Auth Section - Right Side */}
-          <div className="hidden lg:flex lg:items-center lg:gap-3">
+          <div className={`hidden lg:flex lg:items-center lg:gap-3 transition-opacity duration-150 ${navReady ? 'opacity-100' : 'opacity-0'}`}>
             <ThemeSwitcher />
-            {authLoading ? (
-              // Invisible placeholder matching the logged-out button sizes so layout doesn't shift
-              <div className="flex items-center gap-3 invisible" aria-hidden>
-                <Button size="sm" variant="outline">Sign in</Button>
-                <Button size="sm" variant="default">Sign up</Button>
-              </div>
-            ) : user ? (
+            {user ? (
               <>
                 <span className="text-sm text-muted-foreground">
                   {user.email}
@@ -431,25 +479,61 @@ const TopNav: React.FC = () => {
               );
             })}
 
-            {/* Admin Links - Only for admins (right after Nationals) */}
-            {isAdmin && adminLinks.map((link) => {
-              const Icon = link.icon;
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  onClick={closeMobileMenu}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-md text-base font-medium transition-colors
-                    ${isActive(link.href)
-                      ? 'bg-muted text-foreground'
-                      : 'text-muted-foreground hover:bg-muted'
-                    }`}
+            {/* Admin Dropdown - Only for admins */}
+            {isAdmin && (
+              <div className="pt-2">
+                <button
+                  onClick={toggleAdmin}
+                  className="flex items-center justify-between w-full px-3 py-2 rounded-md text-base font-medium text-muted-foreground hover:bg-muted"
                 >
-                  <Icon className="w-5 h-5" />
-                  {link.label}
-                </Link>
-              );
-            })}
+                  <div className="flex items-center gap-3">
+                    <HiShieldCheck className="w-5 h-5" />
+                    Admin
+                  </div>
+                  <svg
+                    className={`w-4 h-4 transition-transform ${isAdminOpen ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {isAdminOpen && (
+                  <div className="mt-2 ml-8 space-y-1">
+                    <Link
+                      href="/admin/registrations"
+                      onClick={closeMobileMenu}
+                      className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
+                    >
+                      <HiUserAdd className="w-4 h-4" />
+                      Registrations
+                    </Link>
+                    {permissions.includes('manage_tags') && (
+                      <Link
+                        href="/admin/tags"
+                        onClick={closeMobileMenu}
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
+                      >
+                        <TbCardsFilled className="w-4 h-4" />
+                        Manage Tags
+                      </Link>
+                    )}
+                    {permissions.includes('manage_spoilers') && (
+                      <Link
+                        href="/admin/spoilers"
+                        onClick={closeMobileMenu}
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
+                      >
+                        <HiSparkles className="w-4 h-4" />
+                        Manage Spoilers
+                      </Link>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Rest of nav links */}
             {navLinks.slice(1).map((link) => {

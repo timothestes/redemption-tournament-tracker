@@ -104,7 +104,6 @@ We will want to let the host print it out easily
 ## long term
 add maybeboard
 add animations to goldfish mode
-Spoiler Central
 Wiki-style Card Rulings section
 Collection Tracker
 add wishlist
