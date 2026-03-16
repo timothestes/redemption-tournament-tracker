@@ -106,8 +106,10 @@ function Lightbox({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/85 flex flex-col items-center justify-center"
+      className="fixed inset-0 z-50 bg-black/85 flex flex-col items-center justify-center touch-none"
       onClick={onClose}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
     >
       {/* Close button */}
       <button
@@ -162,8 +164,6 @@ function Lightbox({
           transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
           className="flex flex-col items-center"
           onClick={(e) => e.stopPropagation()}
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
         >
           {/* Fixed-size container so all cards display at the same size */}
           <div className="relative w-[min(70vw,400px)] sm:w-[min(60vw,420px)] aspect-[5/7] rounded-lg overflow-hidden">
