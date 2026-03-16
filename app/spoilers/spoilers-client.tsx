@@ -173,7 +173,7 @@ function Lightbox({
               fill
               sizes="(max-width: 640px) 90vw, 420px"
               className="object-contain"
-              priority
+              unoptimized
             />
             {/* Mobile: tap left/right half of card to navigate */}
             <div className="absolute inset-0 z-10 flex sm:hidden">
