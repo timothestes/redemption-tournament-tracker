@@ -206,6 +206,17 @@ export default function RegistrationPage() {
           </h1>
           <p className="text-muted-foreground mb-6">
             Register for the {NATIONALS_CONFIG.year} National Redemption Tournament
+            {" \u00B7 "}
+            {NATIONALS_CONFIG.dates}
+            {" \u00B7 "}
+            <a
+              href="https://landofredemption.com/2026-redemption-national-tournament-wilmore-ky/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              Learn more
+            </a>
           </p>
 
           {showThankYou ? (

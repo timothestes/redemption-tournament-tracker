@@ -106,7 +106,7 @@ function Lightbox({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/85 flex flex-col items-center justify-center touch-none"
+      className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center touch-none"
       onClick={onClose}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
@@ -130,7 +130,7 @@ function Lightbox({
             navigate(currentIndex - 1);
           }}
           aria-label="Previous card"
-          className="absolute left-1 sm:left-3 top-1/2 -translate-y-1/2 z-10 min-w-[44px] min-h-[44px] flex items-center justify-center text-white/60 hover:text-white transition-colors"
+          className="absolute left-3 top-1/2 -translate-y-1/2 z-10 min-w-[44px] min-h-[44px] hidden sm:flex items-center justify-center text-white/60 hover:text-white transition-colors"
         >
           <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -144,7 +144,7 @@ function Lightbox({
             navigate(currentIndex + 1);
           }}
           aria-label="Next card"
-          className="absolute right-1 sm:right-3 top-1/2 -translate-y-1/2 z-10 min-w-[44px] min-h-[44px] flex items-center justify-center text-white/60 hover:text-white transition-colors"
+          className="absolute right-3 top-1/2 -translate-y-1/2 z-10 min-w-[44px] min-h-[44px] hidden sm:flex items-center justify-center text-white/60 hover:text-white transition-colors"
         >
           <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -165,16 +165,31 @@ function Lightbox({
           className="flex flex-col items-center"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Fixed-size container so all cards display at the same size */}
-          <div className="relative w-[min(70vw,400px)] sm:w-[min(60vw,420px)] aspect-[5/7] rounded-lg overflow-hidden">
+          {/* Fixed-size container — nearly full width on mobile, constrained on desktop */}
+          <div className="relative w-[min(90vw,400px)] sm:w-[min(60vw,420px)] aspect-[5/7] rounded-lg overflow-hidden">
             <Image
               src={spoiler.image_url}
               alt={spoiler.card_name}
               fill
-              sizes="(max-width: 640px) 70vw, 420px"
+              sizes="(max-width: 640px) 90vw, 420px"
               className="object-contain"
               priority
             />
+            {/* Mobile: tap left/right half of card to navigate */}
+            <div className="absolute inset-0 z-10 flex sm:hidden">
+              <button
+                className="w-1/2 h-full"
+                onClick={() => currentIndex > 0 && navigate(currentIndex - 1)}
+                aria-label="Previous card"
+              />
+              <button
+                className="w-1/2 h-full"
+                onClick={() =>
+                  currentIndex < spoilers.length - 1 && navigate(currentIndex + 1)
+                }
+                aria-label="Next card"
+              />
+            </div>
           </div>
 
           {/* Caption */}
