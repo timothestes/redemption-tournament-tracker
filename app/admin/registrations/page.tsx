@@ -72,15 +72,16 @@ export default function AdminRegistrationsPage() {
   const router = useRouter();
   const supabase = createClient();
 
-  const { isAdmin, loading: adminLoading } = useIsAdmin();
+  const { isAdmin, permissions, loading: adminLoading } = useIsAdmin();
+  const canManageRegistrations = isAdmin && permissions.includes('manage_registrations');
 
   useEffect(() => {
     const checkAccess = async () => {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       setUser(currentUser);
 
-      // Check if user is admin (wait for admin loading to complete)
-      if (!adminLoading && (!currentUser || !isAdmin)) {
+      // Check if user has manage_registrations permission
+      if (!adminLoading && (!currentUser || !canManageRegistrations)) {
         router.push("/");
         return;
       }
@@ -95,7 +96,7 @@ export default function AdminRegistrationsPage() {
     if (dismissed === 'true') {
       setShowEmailLimitsInfo(false);
     }
-  }, [adminLoading, isAdmin]);
+  }, [adminLoading, canManageRegistrations]);
 
   const loadRegistrations = async () => {
     // Only show loading spinner on initial load
@@ -523,7 +524,7 @@ export default function AdminRegistrationsPage() {
     return selectedWithPhotos;
   };
 
-  if (!isAdmin) {
+  if (!canManageRegistrations) {
     return null;
   }
 

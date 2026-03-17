@@ -232,14 +232,16 @@ const TopNav: React.FC = () => {
                 {isAdminOpen && (
                   <div className="absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-card ring-1 ring-black ring-opacity-5">
                     <div className="py-2">
-                      <Link
-                        href="/admin/registrations"
-                        onClick={() => setIsAdminOpen(false)}
-                        className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
-                      >
-                        <HiUserAdd className="w-4 h-4" />
-                        Registrations
-                      </Link>
+                      {permissions.includes('manage_registrations') && (
+                        <Link
+                          href="/admin/registrations"
+                          onClick={() => setIsAdminOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
+                        >
+                          <HiUserAdd className="w-4 h-4" />
+                          Registrations
+                        </Link>
+                      )}
                       {permissions.includes('manage_tags') && (
                         <Link
                           href="/admin/tags"
@@ -428,6 +430,16 @@ const TopNav: React.FC = () => {
                       );
                     })}
 
+                    {/* Card Rulings */}
+                    <Link
+                      href="/rulings"
+                      onClick={() => setIsResourcesOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
+                    >
+                      <FaBookOpen className="w-4 h-4" />
+                      Card Rulings
+                    </Link>
+
                     {/* Paragon Resources */}
                     <div className="px-4 py-2 mt-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-t border-border">
                       Paragon Resources
@@ -564,14 +576,16 @@ const TopNav: React.FC = () => {
 
                 {isAdminOpen && (
                   <div className="mt-2 ml-8 space-y-1">
-                    <Link
-                      href="/admin/registrations"
-                      onClick={closeMobileMenu}
-                      className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
-                    >
-                      <HiUserAdd className="w-4 h-4" />
-                      Registrations
-                    </Link>
+                    {permissions.includes('manage_registrations') && (
+                      <Link
+                        href="/admin/registrations"
+                        onClick={closeMobileMenu}
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
+                      >
+                        <HiUserAdd className="w-4 h-4" />
+                        Registrations
+                      </Link>
+                    )}
                     {permissions.includes('manage_tags') && (
                       <Link
                         href="/admin/tags"
@@ -746,6 +760,16 @@ const TopNav: React.FC = () => {
                       </a>
                     );
                   })}
+
+                  {/* Card Rulings */}
+                  <Link
+                    href="/rulings"
+                    onClick={closeMobileMenu}
+                    className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
+                  >
+                    <FaBookOpen className="w-4 h-4" />
+                    Card Rulings
+                  </Link>
 
                   <div className="px-3 py-1 mt-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-t border-border pt-2">
                     Paragon Resources

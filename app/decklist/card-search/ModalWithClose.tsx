@@ -3,6 +3,342 @@ import React from "react";
 import { openYTGSearchPage } from "./ytgUtils";
 import { useCardImageUrl } from "./hooks/useCardImageUrl";
 import { useCardPrices } from "./hooks/useCardPrices";
+import { useCardRulings, type CardRuling } from "./hooks/useCardRulings";
+import { useIsAdmin } from "../../../hooks/useIsAdmin";
+import { createRuling, updateRuling, deleteRuling } from "../../admin/rulings/actions";
+
+/* ------------------------------------------------------------------ */
+/*  Inline Edit Ruling (replaces a ruling's text with editable fields) */
+/* ------------------------------------------------------------------ */
+
+function EditRulingInline({ ruling, onSaved, onCancel }: { ruling: CardRuling; onSaved: () => void; onCancel: () => void }) {
+  const [question, setQuestion] = React.useState(ruling.question);
+  const [answer, setAnswer] = React.useState(ruling.answer);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const handleSave = async () => {
+    if (!question.trim() || !answer.trim()) return;
+    setSubmitting(true);
+    setError(null);
+
+    const result = await updateRuling(ruling.id, {
+      question: question.trim(),
+      answer: answer.trim(),
+    });
+
+    if (result.error) {
+      setError(result.error);
+      setSubmitting(false);
+    } else {
+      setSubmitting(false);
+      onSaved();
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <textarea
+        value={question}
+        onChange={(e) => setQuestion(e.target.value)}
+        className="w-full border border-border rounded-md px-2.5 py-1.5 text-sm bg-background text-foreground resize-y min-h-[60px]"
+        autoFocus
+      />
+      <textarea
+        value={answer}
+        onChange={(e) => setAnswer(e.target.value)}
+        className="w-full border border-border rounded-md px-2.5 py-1.5 text-sm bg-background text-foreground resize-y min-h-[60px]"
+      />
+      {error && <p className="text-xs text-red-500">{error}</p>}
+      <div className="flex gap-2">
+        <button
+          onClick={handleSave}
+          disabled={submitting || !question.trim() || !answer.trim()}
+          className="px-3 py-1 rounded text-xs font-medium bg-foreground text-background hover:opacity-90 disabled:opacity-40 transition-opacity"
+        >
+          {submitting ? "Saving..." : "Save"}
+        </button>
+        <button
+          onClick={onCancel}
+          className="px-3 py-1 rounded text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Inline Add Ruling Form (inside card modal)                         */
+/* ------------------------------------------------------------------ */
+
+function AddRulingInline({ cardName, onSaved, onCancel }: { cardName: string; onSaved: () => void; onCancel: () => void }) {
+  const [question, setQuestion] = React.useState("");
+  const [answer, setAnswer] = React.useState("");
+  const [source, setSource] = React.useState("manual");
+  const [rulingDate, setRulingDate] = React.useState("");
+  const [submitting, setSubmitting] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const handleSubmit = async () => {
+    if (!question.trim() || !answer.trim()) return;
+    setSubmitting(true);
+    setError(null);
+
+    const result = await createRuling({
+      card_name: cardName,
+      question: question.trim(),
+      answer: answer.trim(),
+      source,
+      ruling_date: rulingDate || undefined,
+    });
+
+    if (result.error) {
+      setError(result.error);
+      setSubmitting(false);
+    } else {
+      setQuestion("");
+      setAnswer("");
+      setRulingDate("");
+      setSubmitting(false);
+      onSaved();
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold text-foreground">Add Ruling for {cardName}</p>
+        <button
+          onClick={onCancel}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Cancel
+        </button>
+      </div>
+      <div>
+        <label className="text-xs font-medium text-muted-foreground mb-1 block">Question / Scenario</label>
+        <textarea
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          placeholder="What is the question or scenario?"
+          className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background text-foreground resize-y min-h-[100px]"
+          autoFocus
+        />
+      </div>
+      <div>
+        <label className="text-xs font-medium text-muted-foreground mb-1 block">Answer / Ruling</label>
+        <textarea
+          value={answer}
+          onChange={(e) => setAnswer(e.target.value)}
+          placeholder="The official ruling or answer"
+          className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background text-foreground resize-y min-h-[100px]"
+        />
+      </div>
+      <div className="flex gap-2">
+        <select
+          value={source}
+          onChange={(e) => setSource(e.target.value)}
+          className="border border-border rounded-md px-2 py-1.5 text-xs bg-background text-foreground"
+        >
+          <option value="manual">Manual</option>
+          <option value="discord">Discord</option>
+          <option value="official_faq">Official FAQ</option>
+          <option value="reg">REG</option>
+          <option value="ordir">ORDIR</option>
+        </select>
+        <input
+          type="date"
+          value={rulingDate}
+          onChange={(e) => setRulingDate(e.target.value)}
+          className="border border-border rounded-md px-2 py-1.5 text-xs bg-background text-foreground"
+        />
+      </div>
+      {error && <p className="text-xs text-red-500">{error}</p>}
+      <button
+        onClick={handleSubmit}
+        disabled={submitting || !question.trim() || !answer.trim()}
+        className="w-full py-2 rounded-md text-sm font-medium bg-foreground text-background hover:opacity-90 disabled:opacity-40 transition-opacity"
+      >
+        {submitting ? "Saving..." : "Add Ruling"}
+      </button>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Rulings Bottom Sheet (mobile)                                      */
+/* ------------------------------------------------------------------ */
+
+function MobileRulingsSheet({
+  rulings,
+  open,
+  onClose,
+  cardName,
+  canManageRulings,
+  onAddRuling,
+  editingRulingId,
+  setEditingRulingId,
+  deletingRulingId,
+  setDeletingRulingId,
+  refetchRulings,
+}: {
+  rulings: CardRuling[];
+  open: boolean;
+  onClose: () => void;
+  cardName: string;
+  canManageRulings: boolean;
+  onAddRuling: () => void;
+  editingRulingId: string | null;
+  setEditingRulingId: (id: string | null) => void;
+  deletingRulingId: string | null;
+  setDeletingRulingId: (id: string | null) => void;
+  refetchRulings: () => void;
+}) {
+  const sheetRef = React.useRef<HTMLDivElement>(null);
+  const dragStartRef = React.useRef<{ y: number; sheetY: number } | null>(null);
+  const [dragOffset, setDragOffset] = React.useState(0);
+
+  // Reset drag when opening/closing
+  React.useEffect(() => {
+    if (open) setDragOffset(0);
+  }, [open]);
+
+  const handleDragStart = React.useCallback((e: React.TouchEvent) => {
+    const sheet = sheetRef.current;
+    if (!sheet) return;
+    // Only start drag from the handle area (top 40px)
+    const rect = sheet.getBoundingClientRect();
+    const touchY = e.touches[0].clientY;
+    if (touchY - rect.top > 48) return;
+    dragStartRef.current = { y: e.touches[0].clientY, sheetY: 0 };
+  }, []);
+
+  const handleDragMove = React.useCallback((e: React.TouchEvent) => {
+    if (!dragStartRef.current) return;
+    const delta = e.touches[0].clientY - dragStartRef.current.y;
+    // Only allow dragging downward
+    setDragOffset(Math.max(0, delta));
+  }, []);
+
+  const handleDragEnd = React.useCallback(() => {
+    if (!dragStartRef.current) return;
+    // Dismiss if dragged more than 80px down
+    if (dragOffset > 80) {
+      onClose();
+    }
+    setDragOffset(0);
+    dragStartRef.current = null;
+  }, [dragOffset, onClose]);
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className={`absolute inset-0 bg-black/40 z-10 transition-opacity duration-200 ${open ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        onClick={onClose}
+      />
+      {/* Sheet */}
+      <div
+        ref={sheetRef}
+        className={`absolute left-0 right-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 bg-card rounded-t-xl shadow-lg transition-transform duration-300 ease-out ${open ? '' : 'translate-y-full'}`}
+        style={{
+          maxHeight: '70vh',
+          transform: open ? `translateY(${dragOffset}px)` : undefined,
+          transition: dragOffset > 0 ? 'none' : undefined,
+        }}
+        onTouchStart={handleDragStart}
+        onTouchMove={handleDragMove}
+        onTouchEnd={handleDragEnd}
+      >
+        {/* Drag handle */}
+        <div className="flex justify-center pt-2.5 pb-1 cursor-grab">
+          <div className="w-8 h-1 rounded-full bg-muted-foreground/30" />
+        </div>
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 pb-2 border-b border-border">
+          <span className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+            <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+            </svg>
+            Rulings ({rulings.length})
+          </span>
+          <button onClick={onClose} className="p-1.5 -mr-1 text-muted-foreground active:text-foreground">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        {/* Rulings list */}
+        <div className="overflow-y-auto px-4 py-3 space-y-3" style={{ maxHeight: 'calc(70vh - 5rem)' }}>
+          {rulings.map((ruling) => (
+            <div key={ruling.id}>
+              {editingRulingId === ruling.id ? (
+                <EditRulingInline
+                  ruling={ruling}
+                  onSaved={() => { refetchRulings(); setEditingRulingId(null); }}
+                  onCancel={() => setEditingRulingId(null)}
+                />
+              ) : (
+                <div className="text-sm border-l-2 border-muted-foreground/20 pl-3">
+                  <p className="text-foreground">
+                    <span className="font-semibold text-muted-foreground">Q:</span> {ruling.question}
+                  </p>
+                  <p className="text-muted-foreground mt-0.5">
+                    <span className="font-semibold">A:</span> {ruling.answer}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    {ruling.ruling_date && (
+                      <span className="text-xs text-muted-foreground/60">{ruling.ruling_date}</span>
+                    )}
+                    {/* Admin controls — always visible on mobile (no hover) */}
+                    {canManageRulings && (
+                      <span className="flex items-center gap-1 ml-auto">
+                        <button
+                          onClick={() => setEditingRulingId(ruling.id)}
+                          className="p-1.5 rounded text-muted-foreground/50 active:text-foreground transition-colors"
+                          title="Edit ruling"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={async () => {
+                            setDeletingRulingId(ruling.id);
+                            await deleteRuling(ruling.id);
+                            refetchRulings();
+                            setDeletingRulingId(null);
+                          }}
+                          disabled={deletingRulingId === ruling.id}
+                          className="p-1.5 rounded text-muted-foreground/50 active:text-red-500 transition-colors disabled:opacity-40"
+                          title="Delete ruling"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                          </svg>
+                        </button>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+          {canManageRulings && (
+            <button
+              onClick={onAddRuling}
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground active:text-foreground transition-colors"
+            >
+              + Add ruling
+            </button>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
 
 function Attribute({ label, value }: { label: string; value: string | boolean }) {
   // Prettify testament display if it's an array
@@ -63,9 +399,23 @@ export default function ModalWithClose({
 }) {
   const { getImageUrl } = useCardImageUrl();
   const { getPrice, getProductUrl } = useCardPrices();
+  const { rulings, refetch: refetchRulings } = useCardRulings(modalCard?.name ?? null);
+  const { isAdmin, permissions } = useIsAdmin();
+  const canManageRulings = isAdmin && permissions.includes('manage_rulings');
   const [showMenu, setShowMenu] = React.useState(false);
   const [isVisible, setIsVisible] = React.useState(false);
   const [isClosing, setIsClosing] = React.useState(false);
+  const [rulingsSheetOpen, setRulingsSheetOpen] = React.useState(false);
+  const [addRulingMode, setAddRulingMode] = React.useState(false);
+  const [editingRulingId, setEditingRulingId] = React.useState<string | null>(null);
+  const [deletingRulingId, setDeletingRulingId] = React.useState<string | null>(null);
+
+  // Reset rulings state when card changes
+  React.useEffect(() => {
+    setRulingsSheetOpen(false);
+    setAddRulingMode(false);
+    setEditingRulingId(null);
+  }, [modalCard?.name]);
 
   // Animate in on mount
   React.useEffect(() => {
@@ -336,7 +686,7 @@ export default function ModalWithClose({
         {/* Mobile Card Image - carousel swipe */}
         <div
           ref={containerRef}
-          className="flex-1 overflow-hidden relative bg-black/5 dark:bg-black/20 touch-pan-y pb-12"
+          className="flex-1 overflow-hidden relative bg-black/5 dark:bg-black/20 touch-pan-y pb-[5.5rem]"
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -398,7 +748,42 @@ export default function ModalWithClose({
               })()}
             </div>
           </div>
+
         </div>
+
+        {/* Mobile Rulings Bottom Sheet */}
+        <MobileRulingsSheet
+          rulings={rulings}
+          open={rulingsSheetOpen && !addRulingMode}
+          onClose={() => setRulingsSheetOpen(false)}
+          cardName={modalCard?.name ?? ""}
+          canManageRulings={canManageRulings}
+          onAddRuling={() => { setRulingsSheetOpen(false); setAddRulingMode(true); }}
+          editingRulingId={editingRulingId}
+          setEditingRulingId={setEditingRulingId}
+          deletingRulingId={deletingRulingId}
+          setDeletingRulingId={setDeletingRulingId}
+          refetchRulings={refetchRulings}
+        />
+
+        {/* Mobile Add Ruling Form — bottom sheet style */}
+        {addRulingMode && (
+          <>
+            <div className="absolute inset-0 bg-black/40 z-10" onClick={() => setAddRulingMode(false)} />
+            <div className="absolute left-0 right-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 bg-card rounded-t-xl shadow-lg" style={{ maxHeight: '75vh' }}>
+              <div className="flex justify-center pt-2.5 pb-1">
+                <div className="w-8 h-1 rounded-full bg-muted-foreground/30" />
+              </div>
+              <div className="overflow-y-auto px-4 py-3" style={{ maxHeight: 'calc(75vh - 2rem)' }}>
+                <AddRulingInline
+                  cardName={modalCard?.name ?? ""}
+                  onSaved={() => { refetchRulings(); setAddRulingMode(false); }}
+                  onCancel={() => setAddRulingMode(false)}
+                />
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Mobile Footer — pinned above bottom nav */}
         <div className="absolute bottom-[calc(3.5rem+env(safe-area-inset-bottom))] left-0 right-0 px-3 py-2.5 border-t border-border bg-card/95 backdrop-blur-sm">
@@ -496,6 +881,27 @@ export default function ModalWithClose({
                 )}
               </div>
             )}
+            {/* Rulings button */}
+            {rulings.length > 0 && !addRulingMode && (
+              <button
+                onClick={() => setRulingsSheetOpen(true)}
+                className="h-10 px-3 flex-shrink-0 rounded-lg flex items-center gap-1.5 text-sm font-medium border border-border bg-muted/50 text-foreground active:bg-muted transition-colors"
+              >
+                <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+                </svg>
+                {rulings.length}
+              </button>
+            )}
+            {/* Admin: add ruling when none exist */}
+            {rulings.length === 0 && canManageRulings && !addRulingMode && (
+              <button
+                onClick={() => setAddRulingMode(true)}
+                className="h-10 px-3 flex-shrink-0 rounded-lg flex items-center gap-1 text-xs border border-border bg-muted/50 text-muted-foreground active:bg-muted transition-colors"
+              >
+                + Ruling
+              </button>
+            )}
             {/* Spacer — collapses when space is tight */}
             <div className="flex-1 min-w-0" />
             {/* Shop button with price + YTG logo */}
@@ -534,7 +940,7 @@ export default function ModalWithClose({
 
       {/* Desktop: centered modal (unchanged) */}
       <div
-        className={`hidden md:flex bg-card text-foreground rounded shadow-lg max-w-2xl w-full max-h-[90vh] overflow-hidden relative flex-col transition-all duration-200 ${isVisible && !isClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
+        className={`hidden md:flex bg-card text-foreground rounded shadow-lg max-w-4xl w-full h-[80vh] overflow-hidden relative flex-col transition-all duration-200 ${isVisible && !isClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
         onClick={e => e.stopPropagation()}
       >
         {/* X close button */}
@@ -560,29 +966,139 @@ export default function ModalWithClose({
             ) : null;
           })()}
         </div>
-        <div className="px-4 py-2 flex flex-col items-center relative flex-1 overflow-hidden">
-          <div className="relative w-full flex justify-center mb-4">
-            <img
-              src={getImageUrl(modalCard.imgFile)}
-              alt={modalCard.name}
-              className="w-full max-w-md h-auto max-h-[60vh] object-contain mx-auto rounded shadow-lg"
-            />
-          </div>
-          <div className="w-full flex-1 overflow-auto px-2">
-            <div className="space-y-1">
-              {Object.entries(modalCard)
-                .filter(([key, value]) => {
-                  // Only render 'Is Gospel' if isGospel is true
-                  if (key === 'isGospel') return modalCard.isGospel === true;
-                  // Always render other fields except dataLine and imgFile
-                  return key !== "dataLine" && key !== "imgFile";
-              })
-              .map(([key, value]) => (
-                <Attribute key={key} label={prettifyFieldName(key)} value={value as string} />
-              ))}
+        {addRulingMode ? (
+          /* Side-by-side layout: card image left, form right */
+          <div className="px-4 py-4 flex gap-6 flex-1 overflow-hidden">
+            <div className="w-2/5 flex-shrink-0 flex flex-col items-start overflow-hidden">
+              <img
+                src={getImageUrl(modalCard.imgFile)}
+                alt={modalCard.name}
+                className="max-w-full max-h-full object-contain rounded shadow-lg flex-shrink"
+              />
+              {/* Show ability text below image for reference */}
+              {modalCard.ability && (
+                <p className="mt-3 text-xs text-muted-foreground leading-relaxed flex-shrink-0">{modalCard.ability}</p>
+              )}
+            </div>
+            <div className="flex-1 overflow-auto">
+              <AddRulingInline
+                cardName={modalCard?.name ?? ""}
+                onSaved={() => { refetchRulings(); setAddRulingMode(false); }}
+                onCancel={() => setAddRulingMode(false)}
+              />
+              {/* Show existing rulings below the form for context */}
+              {rulings.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-border">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Existing Rulings ({rulings.length})</p>
+                  <div className="space-y-2">
+                    {rulings.map((ruling) => (
+                      <div key={ruling.id} className="text-xs border-l-2 border-muted-foreground/20 pl-2.5">
+                        <p className="text-foreground"><span className="font-semibold text-muted-foreground">Q:</span> {ruling.question}</p>
+                        <p className="text-muted-foreground mt-0.5"><span className="font-semibold">A:</span> {ruling.answer}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-        </div>
+        ) : (
+          /* Normal side-by-side layout: image left, details + rulings right */
+          <div className="px-4 py-4 flex gap-6 flex-1 overflow-hidden">
+            <div className="w-2/5 flex-shrink-0 flex items-start overflow-hidden">
+              <img
+                src={getImageUrl(modalCard.imgFile)}
+                alt={modalCard.name}
+                className="max-w-full max-h-full object-contain rounded shadow-lg"
+              />
+            </div>
+            <div className="flex-1 overflow-auto pr-1">
+              <div className="space-y-1">
+                {Object.entries(modalCard)
+                  .filter(([key]) => {
+                    if (key === 'isGospel') return modalCard.isGospel === true;
+                    return key !== "dataLine" && key !== "imgFile";
+                })
+                .map(([key, value]) => (
+                  <Attribute key={key} label={prettifyFieldName(key)} value={value as string} />
+                ))}
+              </div>
+              {/* Desktop Rulings */}
+              {(rulings.length > 0 || canManageRulings) && (
+                <div className="mt-3 pt-3 border-t border-border">
+                  <p className="text-sm font-semibold text-foreground mb-2 flex items-center gap-1.5">
+                    <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+                    </svg>
+                    Rulings {rulings.length > 0 && `(${rulings.length})`}
+                  </p>
+                  <div className="space-y-2.5">
+                    {rulings.map((ruling) => (
+                      <div key={ruling.id}>
+                        {editingRulingId === ruling.id ? (
+                          <EditRulingInline
+                            ruling={ruling}
+                            onSaved={() => { refetchRulings(); setEditingRulingId(null); }}
+                            onCancel={() => setEditingRulingId(null)}
+                          />
+                        ) : (
+                          <div className="group text-sm border-l-2 border-muted-foreground/20 pl-3 relative">
+                            <p className="text-foreground">
+                              <span className="font-semibold text-muted-foreground">Q:</span> {ruling.question}
+                            </p>
+                            <p className="text-muted-foreground mt-0.5">
+                              <span className="font-semibold">A:</span> {ruling.answer}
+                            </p>
+                            {ruling.ruling_date && (
+                              <p className="text-[10px] text-muted-foreground/60 mt-0.5">{ruling.ruling_date}</p>
+                            )}
+                            {/* Admin edit/delete — hover-reveal */}
+                            {canManageRulings && (
+                              <span className="absolute top-0 right-0 hidden group-hover:flex items-center gap-1">
+                                <button
+                                  onClick={() => setEditingRulingId(ruling.id)}
+                                  className="p-1 rounded text-muted-foreground/50 hover:text-foreground transition-colors"
+                                  title="Edit ruling"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    setDeletingRulingId(ruling.id);
+                                    await deleteRuling(ruling.id);
+                                    refetchRulings();
+                                    setDeletingRulingId(null);
+                                  }}
+                                  disabled={deletingRulingId === ruling.id}
+                                  className="p-1 rounded text-muted-foreground/50 hover:text-red-500 transition-colors disabled:opacity-40"
+                                  title="Delete ruling"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                                  </svg>
+                                </button>
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {canManageRulings && (
+                      <button
+                        onClick={() => setAddRulingMode(true)}
+                        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        + Add ruling
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         <div className="px-4 pb-4 pt-2 border-t bg-muted">
           {hasNavigation && (
             <div className="text-xs text-muted-foreground text-center mb-2">

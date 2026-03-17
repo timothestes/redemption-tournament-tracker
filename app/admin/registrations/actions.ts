@@ -3,14 +3,14 @@
 import { createClient } from "../../../utils/supabase/server";
 import { sendEmail, wrapEmailInTemplate } from "../../../utils/email";
 import { redirect } from "next/navigation";
-import { isRegistrationAdmin, requireRegistrationAdmin } from "../../../utils/adminUtils";
+import { hasPermission } from "../../../utils/adminUtils";
 
 export async function checkAdminAccess() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const isAdmin = await isRegistrationAdmin();
+  const canManage = await hasPermission("manage_registrations");
 
-  if (!user || !isAdmin) {
+  if (!user || !canManage) {
     return { isAdmin: false, user: null };
   }
 
