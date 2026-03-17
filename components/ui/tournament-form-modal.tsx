@@ -13,20 +13,25 @@ interface TournamentFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (name: string) => void;
+  defaultName?: string;
 }
 
 const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
+  defaultName,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen && inputRef.current) {
       inputRef.current.focus();
+      if (defaultName && !inputRef.current.value) {
+        inputRef.current.value = defaultName;
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, defaultName]);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

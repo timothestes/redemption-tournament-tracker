@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
     "@gsap/react": "^2.1.2",
     "@headlessui/react": "^2.2.9",
     "@number-flow/react": "^0.5.14",
@@ -33,7 +34,6 @@
     "use-sound": "^5.0.0"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.78.0",
     "@types/node": "22.9.0",
     "@types/react": "^19.0.0",
     "dotenv": "^17.3.1",

@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { loadSpoilerByIdAction } from "../actions";
 import TopNav from "../../../components/top-nav";
+import SponsorFooter from "../../../components/sponsor-footer";
 import ShareButton from "./share-button";
 
 interface PageProps {
@@ -81,9 +82,9 @@ export default async function SpoilerCardPage({ params }: PageProps) {
   const isNew = new Date(spoiler.spoil_date).getTime() >= threeDaysAgo;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex flex-col min-h-screen bg-background">
       <TopNav />
-      <div className="max-w-3xl mx-auto px-4 py-6 sm:py-8">
+      <div className="flex-1 max-w-3xl mx-auto px-4 py-6 sm:py-8 w-full">
         {/* Back link */}
         <Link
           href="/spoilers"
@@ -180,6 +181,7 @@ export default async function SpoilerCardPage({ params }: PageProps) {
           </div>
         )}
       </div>
+      <SponsorFooter />
     </div>
   );
 }

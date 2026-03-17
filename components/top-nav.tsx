@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { HiMenu, HiDocumentText, HiArrowSmRight, HiUserAdd, HiShieldCheck, HiGlobeAlt, HiSparkles } from "react-icons/hi";
+import { HiMenu, HiDocumentText, HiArrowSmRight, HiUserAdd, HiShieldCheck, HiGlobeAlt, HiSparkles, HiCalendar } from "react-icons/hi";
 import { IoClose } from "react-icons/io5";
 import { FaTrophy, FaBookOpen } from "react-icons/fa6";
 import { PiPencilLineBold } from "react-icons/pi";
@@ -21,6 +21,7 @@ const TopNav: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isResourcesOpen, setIsResourcesOpen] = useState(false);
   const [isDecksOpen, setIsDecksOpen] = useState(false);
+  const [isTournamentsOpen, setIsTournamentsOpen] = useState(false);
   const { theme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [logoSrc, setLogoSrc] = useState('/darkmode_redemptionccgapp.webp');
@@ -40,6 +41,7 @@ const TopNav: React.FC = () => {
     setIsDecksOpen(false);
     setIsResourcesOpen(false);
     setIsAdminOpen(false);
+    setIsTournamentsOpen(false);
   };
 
   const toggleMobileMenu = () => {
@@ -50,22 +52,35 @@ const TopNav: React.FC = () => {
     }
   };
 
-  const toggleResources = () => {
-    setIsResourcesOpen(!isResourcesOpen);
+  const closeAllDropdowns = () => {
+    setIsResourcesOpen(false);
     setIsDecksOpen(false);
     setIsAdminOpen(false);
+    setIsTournamentsOpen(false);
+  };
+
+  const toggleResources = () => {
+    const next = !isResourcesOpen;
+    closeAllDropdowns();
+    setIsResourcesOpen(next);
   };
 
   const toggleDecks = () => {
-    setIsDecksOpen(!isDecksOpen);
-    setIsResourcesOpen(false);
-    setIsAdminOpen(false);
+    const next = !isDecksOpen;
+    closeAllDropdowns();
+    setIsDecksOpen(next);
   };
 
   const toggleAdmin = () => {
-    setIsAdminOpen(!isAdminOpen);
-    setIsDecksOpen(false);
-    setIsResourcesOpen(false);
+    const next = !isAdminOpen;
+    closeAllDropdowns();
+    setIsAdminOpen(next);
+  };
+
+  const toggleTournaments = () => {
+    const next = !isTournamentsOpen;
+    closeAllDropdowns();
+    setIsTournamentsOpen(next);
   };
 
   useEffect(() => {
@@ -91,11 +106,9 @@ const TopNav: React.FC = () => {
   // Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = () => {
-      setIsDecksOpen(false);
-      setIsResourcesOpen(false);
-      setIsAdminOpen(false);
+      closeAllDropdowns();
     };
-    if (isDecksOpen || isResourcesOpen || isAdminOpen) {
+    if (isDecksOpen || isResourcesOpen || isAdminOpen || isTournamentsOpen) {
       // Use a slight delay so the toggle click doesn't immediately re-close
       const timer = setTimeout(() => {
         document.addEventListener('click', handleClickOutside, { once: true });
@@ -105,15 +118,19 @@ const TopNav: React.FC = () => {
         document.removeEventListener('click', handleClickOutside);
       };
     }
-  }, [isDecksOpen, isResourcesOpen, isAdminOpen]);
+  }, [isDecksOpen, isResourcesOpen, isAdminOpen, isTournamentsOpen]);
 
   const isActive = (path: string) => pathname?.startsWith(path);
 
   const navLinks = [
     { href: "/register", label: NATIONALS_CONFIG.adminOnly ? `${NATIONALS_CONFIG.displayName} (Admin Only)` : `${NATIONALS_CONFIG.displayName}`, icon: HiUserAdd, highlight: true },
-    { href: "/tracker/tournaments", label: "Tournaments", icon: FaTrophy, authRequired: true },
     { href: "/decklist/card-search?new=true", label: "Deck Builder", icon: TbSearch },
     { href: "/spoilers", label: "Spoilers", icon: HiSparkles },
+  ];
+
+  const tournamentLinks = [
+    { href: "/tournaments", label: "Upcoming Events", icon: HiCalendar },
+    { href: "/tracker/tournaments", label: "My Tournaments", icon: FaTrophy, authRequired: true },
   ];
 
   const deckLinks = [
@@ -248,6 +265,51 @@ const TopNav: React.FC = () => {
                 )}
               </div>
             )}
+
+            {/* Tournaments Dropdown */}
+            <div className="relative">
+              <button
+                onClick={toggleTournaments}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
+                  ${isTournamentsOpen || isActive('/tournaments') || isActive('/tracker/tournaments')
+                    ? 'bg-muted text-foreground'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  }`}
+              >
+                <FaTrophy className="w-4 h-4" />
+                Tournaments
+                <svg
+                  className={`w-4 h-4 transition-transform ${isTournamentsOpen ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {isTournamentsOpen && (
+                <div className="absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-card ring-1 ring-black ring-opacity-5">
+                  <div className="py-2">
+                    {tournamentLinks.map((link) => {
+                      if (link.authRequired && !user) return null;
+                      const Icon = link.icon;
+                      return (
+                        <Link
+                          key={link.href}
+                          href={link.href}
+                          onClick={() => setIsTournamentsOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
+                        >
+                          <Icon className="w-4 h-4" />
+                          {link.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Rest of nav links */}
             {navLinks.slice(1).map((link) => {
@@ -534,6 +596,47 @@ const TopNav: React.FC = () => {
                 )}
               </div>
             )}
+
+            {/* Mobile Tournaments Section */}
+            <div className="pt-2">
+              <button
+                onClick={toggleTournaments}
+                className="flex items-center justify-between w-full px-3 py-2 rounded-md text-base font-medium text-muted-foreground hover:bg-muted"
+              >
+                <div className="flex items-center gap-3">
+                  <FaTrophy className="w-5 h-5" />
+                  Tournaments
+                </div>
+                <svg
+                  className={`w-4 h-4 transition-transform ${isTournamentsOpen ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {isTournamentsOpen && (
+                <div className="mt-2 ml-8 space-y-1">
+                  {tournamentLinks.map((link) => {
+                    if (link.authRequired && !user) return null;
+                    const Icon = link.icon;
+                    return (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        onClick={closeMobileMenu}
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
+                      >
+                        <Icon className="w-4 h-4" />
+                        {link.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
             {/* Rest of nav links */}
             {navLinks.slice(1).map((link) => {

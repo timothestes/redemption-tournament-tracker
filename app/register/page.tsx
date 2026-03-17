@@ -6,6 +6,7 @@ import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { submitRegistration } from "./actions";
 import TopNav from "../../components/top-nav";
+import SponsorFooter from "../../components/sponsor-footer";
 import { createClient } from "../../utils/supabase/client";
 import { NATIONALS_CONFIG } from "../config/nationals";
 import { useIsAdmin } from "../../hooks/useIsAdmin";
@@ -832,6 +833,7 @@ export default function RegistrationPage() {
           )}
         </div>
       </div>
+      <SponsorFooter />
     </div>
   );
 }

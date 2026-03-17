@@ -6,7 +6,7 @@ import { createClient } from "../../../utils/supabase/client";
 import ToastNotification from "../../../components/ui/toast-notification";
 import { Button } from "../../../components/ui/button";
 import { HiPencil, HiTrash, HiPlus } from "react-icons/hi";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import TournamentFormModal from "../../../components/ui/tournament-form-modal";
 
 const supabase = createClient();
@@ -20,13 +20,25 @@ export default function TournamentsPage() {
     useState(false);
   const [currentTournament, setCurrentTournament] = useState(null);
   const [newTournamentName, setNewTournamentName] = useState("");
+  const [prefillName, setPrefillName] = useState("");
+  const [fromListingId, setFromListingId] = useState<string | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     fetchTournaments();
     // Reset document title when viewing tournaments list
     document.title = "RedemptionCCG App";
-  }, []);
+
+    // Auto-open modal if coming from "Host This Event" on /tournaments
+    const listingId = searchParams.get("from_listing");
+    const name = searchParams.get("name");
+    if (listingId && name) {
+      setPrefillName(name);
+      setFromListingId(listingId);
+      setisAddTournamentModalOpen(true);
+    }
+  }, [searchParams]);
 
   const handleAddTournament = async (name: string) => {
     try {
@@ -40,12 +52,25 @@ export default function TournamentsPage() {
         return;
       }
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("tournaments")
-        .insert([{ name, host_id: user.id }]);
+        .insert([{ name, host_id: user.id }])
+        .select("id")
+        .single();
       if (error) {
         console.error("Error adding tournament:", error);
       } else {
+        // If created from a listing, link the tournament to the listing
+        if (fromListingId && data?.id) {
+          await supabase
+            .from("tournament_listings")
+            .update({ linked_tournament_id: data.id })
+            .eq("id", fromListingId);
+          setFromListingId(null);
+          setPrefillName("");
+          // Clean up URL params
+          router.replace("/tracker/tournaments", { scroll: false });
+        }
         fetchTournaments();
         setisAddTournamentModalOpen(false);
       }
@@ -111,8 +136,16 @@ export default function TournamentsPage() {
           </Button>
           <TournamentFormModal
             isOpen={isAddTournamentModalOpen}
-            onClose={() => setisAddTournamentModalOpen(false)}
+            onClose={() => {
+              setisAddTournamentModalOpen(false);
+              if (fromListingId) {
+                setFromListingId(null);
+                setPrefillName("");
+                router.replace("/tracker/tournaments", { scroll: false });
+              }
+            }}
             onSubmit={handleAddTournament}
+            defaultName={prefillName}
           />
         </div>
         {loading ? (
