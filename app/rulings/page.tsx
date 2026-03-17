@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import TopNav from "../../components/top-nav";
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
@@ -292,8 +293,12 @@ function DiscordMessageCard({
 /* ------------------------------------------------------------------ */
 
 export default function RulingsPage() {
-  const [tab, setTab] = useState<Tab>("rulings");
-  const [search, setSearch] = useState("");
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab") === "discord" ? "discord" : "rulings";
+  const initialQuery = searchParams.get("q") || "";
+
+  const [tab, setTab] = useState<Tab>(initialTab);
+  const [search, setSearch] = useState(initialQuery);
   const [rulings, setRulings] = useState<CardRuling[]>([]);
   const [discordMessages, setDiscordMessages] = useState<DiscordMsg[]>([]);
   const [loading, setLoading] = useState(true);

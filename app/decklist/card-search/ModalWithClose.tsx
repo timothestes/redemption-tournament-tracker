@@ -163,6 +163,17 @@ function AddRulingInline({ cardName, onSaved, onCancel }: { cardName: string; on
       >
         {submitting ? "Saving..." : "Add Ruling"}
       </button>
+      <a
+        href={`/rulings?tab=discord&q=${encodeURIComponent(cardName)}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+        </svg>
+        Search Discord for &ldquo;{cardName}&rdquo;
+      </a>
     </div>
   );
 }
