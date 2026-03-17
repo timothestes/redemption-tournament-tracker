@@ -316,6 +316,12 @@ function RulingsPageContent() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
 
+  // Discord pagination + sort
+  const [discordPage, setDiscordPage] = useState(1);
+  const [discordTotalPages, setDiscordTotalPages] = useState(1);
+  const [discordTotal, setDiscordTotal] = useState(0);
+  const [discordSort, setDiscordSort] = useState<"newest" | "oldest">("newest");
+
   const isSearching = search.trim().length >= 2;
   const searchRef = useRef(search);
   searchRef.current = search;
@@ -358,11 +364,13 @@ function RulingsPageContent() {
           }
         }
       } else {
-        const res = await fetch(`/api/rulings?discord=${encodeURIComponent(query)}`);
+        const res = await fetch(`/api/rulings?discord=${encodeURIComponent(query)}&page=${discordPage}&sort=${discordSort}`);
         if (res.ok) {
           const data = await res.json();
           if (searchRef.current === query) {
             setDiscordMessages(data.messages || []);
+            setDiscordTotalPages(data.totalPages || 1);
+            setDiscordTotal(data.total || 0);
           }
         }
       }
@@ -371,7 +379,7 @@ function RulingsPageContent() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [discordPage, discordSort]);
 
   // Debounced search
   useEffect(() => {
@@ -390,7 +398,7 @@ function RulingsPageContent() {
       doSearch(search, tab);
     }, 300);
     return () => clearTimeout(timeout);
-  }, [search, tab, isSearching, doSearch, loadRecent, page]);
+  }, [search, tab, isSearching, doSearch, loadRecent, page, discordPage, discordSort]);
 
   // Handle tab switch
   const switchTab = (newTab: Tab) => {
@@ -398,12 +406,27 @@ function RulingsPageContent() {
     setSearch("");
     setDiscordMessages([]);
     setPage(1);
+    setDiscordPage(1);
+    setDiscordTotal(0);
+    setDiscordTotalPages(1);
     if (newTab === "rulings") {
       loadRecent(1);
     } else {
       setRulings([]);
       setLoading(false);
     }
+  };
+
+  // Handle discord page change
+  const goToDiscordPage = (p: number) => {
+    setDiscordPage(p);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Handle discord sort change
+  const toggleDiscordSort = () => {
+    setDiscordSort(s => s === "newest" ? "oldest" : "newest");
+    setDiscordPage(1);
   };
 
   // Handle page change
@@ -458,7 +481,7 @@ function RulingsPageContent() {
         <div className="mb-6">
           <Input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setDiscordPage(1); }}
             placeholder={tab === "rulings"
               ? "Search by card name, question, or keyword..."
               : "Search by card name, mechanic, or rules term..."
@@ -582,7 +605,8 @@ function RulingsPageContent() {
                     <p className="text-lg font-medium mb-1">Search community discussions</p>
                     <p className="text-sm max-w-md mx-auto">
                       Browse past discussions from the Redemption rulings Discord channel.
-                      These are community conversations, not official rulings.
+                      These are community conversations, and not garunteed to be official rulings,
+                      (Unless the message is from RedemptionAggie.)
                     </p>
                   </div>
                 )}
@@ -598,17 +622,48 @@ function RulingsPageContent() {
                 {/* Discord results */}
                 {discordMessages.length > 0 && (
                   <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground">
-                      {discordMessages.length} result{discordMessages.length !== 1 ? "s" : ""}
-                      {" from the rulings Discord channel"}
-                    </p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">
+                        {discordTotal} result{discordTotal !== 1 ? "s" : ""}
+                        {" from the rulings Discord channel"}
+                      </p>
+                      <button
+                        onClick={toggleDiscordSort}
+                        className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                      >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 7.5L7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" />
+                        </svg>
+                        {discordSort === "newest" ? "Newest first" : "Oldest first"}
+                      </button>
+                    </div>
                     {discordMessages.map((msg) => (
                       <DiscordMessageCard key={msg.id} msg={msg} search={search} />
                     ))}
-                    {discordMessages.length >= SEARCH_LIMIT && (
-                      <p className="text-xs text-muted-foreground text-center">
-                        Showing first {SEARCH_LIMIT} results. Try a more specific search to narrow down.
-                      </p>
+
+                    {/* Discord pagination */}
+                    {discordTotalPages > 1 && (
+                      <div className="flex items-center justify-center gap-2 pt-4">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => goToDiscordPage(discordPage - 1)}
+                          disabled={discordPage <= 1}
+                        >
+                          Previous
+                        </Button>
+                        <span className="text-sm text-muted-foreground px-2">
+                          Page {discordPage} of {discordTotalPages}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => goToDiscordPage(discordPage + 1)}
+                          disabled={discordPage >= discordTotalPages}
+                        >
+                          Next
+                        </Button>
+                      </div>
                     )}
                   </div>
                 )}

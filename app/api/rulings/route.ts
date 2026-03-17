@@ -55,18 +55,36 @@ export async function GET(request: NextRequest) {
   }
 
   if (discord && discord.trim().length >= 2) {
-    const { data, error } = await supabase
-      .from('discord_ruling_messages')
-      .select('id, author_name, content, message_date')
-      .ilike('content', `%${discord}%`)
-      .order('message_date', { ascending: false })
-      .limit(50);
+    const discordPage = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+    const discordPerPage = 20;
+    const sort = searchParams.get('sort') === 'oldest' ? 'oldest' : 'newest';
+    const from = (discordPage - 1) * discordPerPage;
+    const to = from + discordPerPage - 1;
 
-    if (error) {
-      return NextResponse.json({ messages: [], error: error.message }, { status: 500 });
+    const [{ data, error }, { count, error: countError }] = await Promise.all([
+      supabase
+        .from('discord_ruling_messages')
+        .select('id, author_name, content, message_date')
+        .ilike('content', `%${discord}%`)
+        .order('message_date', { ascending: sort === 'oldest' })
+        .range(from, to),
+      supabase
+        .from('discord_ruling_messages')
+        .select('*', { count: 'exact', head: true })
+        .ilike('content', `%${discord}%`),
+    ]);
+
+    if (error || countError) {
+      return NextResponse.json({ messages: [], error: (error || countError)?.message }, { status: 500 });
     }
 
-    return NextResponse.json({ messages: data || [] });
+    return NextResponse.json({
+      messages: data || [],
+      total: count || 0,
+      page: discordPage,
+      perPage: discordPerPage,
+      totalPages: Math.ceil((count || 0) / discordPerPage),
+    });
   }
 
   if (discordContext) {
