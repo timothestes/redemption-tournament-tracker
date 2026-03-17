@@ -638,6 +638,10 @@ export default function ModalWithClose({
   const quantityInDeck = getCardQuantity ? getCardQuantity(modalCard.name, modalCard.set, false) : 0;
   const quantityInReserve = getCardQuantity ? getCardQuantity(modalCard.name, modalCard.set, true) : 0;
 
+  // Mobile footer needs row 2 when: has rulings, is admin, or minus buttons are showing (cards in deck)
+  const hasMinusButtons = quantityInDeck > 0 || quantityInReserve > 0;
+  const needsFooterRow2 = ((rulings.length > 0 || canManageRulings) && !addRulingMode) || hasMinusButtons;
+
   return (
     <div
       className={`fixed inset-0 z-[60] flex items-center justify-center md:p-4 transition-colors duration-200 ${isVisible && !isClosing ? 'bg-black/50' : 'bg-black/0'}`}
@@ -697,7 +701,7 @@ export default function ModalWithClose({
         {/* Mobile Card Image - carousel swipe */}
         <div
           ref={containerRef}
-          className="flex-1 overflow-hidden relative bg-black/5 dark:bg-black/20 touch-pan-y pb-[6.5rem]"
+          className={`flex-1 overflow-hidden relative bg-black/5 dark:bg-black/20 touch-pan-y ${needsFooterRow2 ? 'pb-[6.5rem]' : 'pb-[4rem]'}`}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -892,63 +896,98 @@ export default function ModalWithClose({
                 )}
               </div>
             )}
-          </div>
-          {/* Row 2: Rulings + Shop — always present, fixed position */}
-          <div className="flex items-center justify-between mt-1.5">
-            <div className="flex items-center gap-2">
-              {/* Rulings button */}
-              {rulings.length > 0 && !addRulingMode && (
-                <button
-                  onClick={() => setRulingsSheetOpen(true)}
-                  className="h-9 px-3 rounded-lg flex items-center gap-1.5 text-sm font-medium border border-border bg-muted/50 text-foreground active:bg-muted transition-colors"
-                >
-                  <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
-                  </svg>
-                  {rulings.length}
-                </button>
-              )}
-              {/* Admin: add ruling when none exist */}
-              {rulings.length === 0 && canManageRulings && !addRulingMode && (
-                <button
-                  onClick={() => setAddRulingMode(true)}
-                  className="h-9 px-3 rounded-lg flex items-center gap-1 text-xs border border-border bg-muted/50 text-muted-foreground active:bg-muted transition-colors"
-                >
-                  + Ruling
-                </button>
-              )}
-            </div>
-            {/* Shop button with price + YTG logo */}
-            {(() => {
+            {/* Shop button — inline in row 1 when no row 2 content */}
+            {!needsFooterRow2 && (() => {
               const cardKey = `${modalCard.name}|${modalCard.set}|${modalCard.imgFile}`;
               const priceInfo = getPrice(cardKey);
               const productUrl = getProductUrl(cardKey);
               return (
-                <button
-                  onClick={() => isFundraiser
-                    ? window.open('https://cactus-game-design-inc.square.site/s/shop', '_blank')
-                    : productUrl
-                      ? window.open(productUrl, '_blank', 'noopener,noreferrer')
-                      : openYTGSearchPage(modalCard.name)
-                  }
-                  className="h-9 px-3 rounded-lg flex items-center gap-1.5 font-semibold text-sm border border-green-600/30 dark:border-green-500/25 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 active:translate-y-[1px] transition-all duration-100"
-                >
-                  <img src="/sponsors/ytg-dark.png" alt="YTG" className="h-4 w-4 object-contain hidden dark:block" />
-                  <img src="/sponsors/ytg-light.png" alt="YTG" className="h-4 w-4 object-contain dark:hidden" />
-                  {priceInfo ? (
-                    <>
-                      <span>{isFundraiser ? `$${priceInfo.price.toFixed(0)}` : `$${priceInfo.price.toFixed(2)}`}</span>
-                      <svg className="w-3.5 h-3.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                      </svg>
-                    </>
-                  ) : (
-                    <span>Shop</span>
-                  )}
-                </button>
+                <>
+                  <div className="flex-1 min-w-0" />
+                  <button
+                    onClick={() => isFundraiser
+                      ? window.open('https://cactus-game-design-inc.square.site/s/shop', '_blank')
+                      : productUrl
+                        ? window.open(productUrl, '_blank', 'noopener,noreferrer')
+                        : openYTGSearchPage(modalCard.name)
+                    }
+                    className="h-10 px-3 flex-shrink-0 rounded-lg flex items-center gap-1.5 font-semibold text-sm border border-green-600/30 dark:border-green-500/25 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 active:translate-y-[1px] transition-all duration-100"
+                  >
+                    <img src="/sponsors/ytg-dark.png" alt="YTG" className="h-4 w-4 object-contain hidden dark:block" />
+                    <img src="/sponsors/ytg-light.png" alt="YTG" className="h-4 w-4 object-contain dark:hidden" />
+                    {priceInfo ? (
+                      <>
+                        <span>{isFundraiser ? `$${priceInfo.price.toFixed(0)}` : `$${priceInfo.price.toFixed(2)}`}</span>
+                        <svg className="w-3.5 h-3.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                        </svg>
+                      </>
+                    ) : (
+                      <span>Shop</span>
+                    )}
+                  </button>
+                </>
               );
             })()}
           </div>
+          {/* Row 2: Rulings + Shop — when rulings/admin exist or minus buttons need space */}
+          {needsFooterRow2 && (
+            <div className="flex items-center justify-between mt-1.5">
+              <div className="flex items-center gap-2">
+                {/* Rulings button */}
+                {rulings.length > 0 && (
+                  <button
+                    onClick={() => setRulingsSheetOpen(true)}
+                    className="h-9 px-3 rounded-lg flex items-center gap-1.5 text-sm font-medium border border-border bg-muted/50 text-foreground active:bg-muted transition-colors"
+                  >
+                    <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+                    </svg>
+                    {rulings.length}
+                  </button>
+                )}
+                {/* Admin: add ruling when none exist */}
+                {rulings.length === 0 && canManageRulings && (
+                  <button
+                    onClick={() => setAddRulingMode(true)}
+                    className="h-9 px-3 rounded-lg flex items-center gap-1 text-xs border border-border bg-muted/50 text-muted-foreground active:bg-muted transition-colors"
+                  >
+                    + Ruling
+                  </button>
+                )}
+              </div>
+              {/* Shop button */}
+              {(() => {
+                const cardKey = `${modalCard.name}|${modalCard.set}|${modalCard.imgFile}`;
+                const priceInfo = getPrice(cardKey);
+                const productUrl = getProductUrl(cardKey);
+                return (
+                  <button
+                    onClick={() => isFundraiser
+                      ? window.open('https://cactus-game-design-inc.square.site/s/shop', '_blank')
+                      : productUrl
+                        ? window.open(productUrl, '_blank', 'noopener,noreferrer')
+                        : openYTGSearchPage(modalCard.name)
+                    }
+                    className="h-9 px-3 rounded-lg flex items-center gap-1.5 font-semibold text-sm border border-green-600/30 dark:border-green-500/25 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 active:translate-y-[1px] transition-all duration-100"
+                  >
+                    <img src="/sponsors/ytg-dark.png" alt="YTG" className="h-4 w-4 object-contain hidden dark:block" />
+                    <img src="/sponsors/ytg-light.png" alt="YTG" className="h-4 w-4 object-contain dark:hidden" />
+                    {priceInfo ? (
+                      <>
+                        <span>{isFundraiser ? `$${priceInfo.price.toFixed(0)}` : `$${priceInfo.price.toFixed(2)}`}</span>
+                        <svg className="w-3.5 h-3.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                        </svg>
+                      </>
+                    ) : (
+                      <span>Shop</span>
+                    )}
+                  </button>
+                );
+              })()}
+            </div>
+          )}
         </div>
       </div>
 
