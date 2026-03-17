@@ -77,7 +77,7 @@ function AddRulingInline({ cardName, onSaved, onCancel }: { cardName: string; on
   const [question, setQuestion] = React.useState("");
   const [answer, setAnswer] = React.useState("");
   const [source, setSource] = React.useState("manual");
-  const [rulingDate, setRulingDate] = React.useState("");
+  const [rulingDate, setRulingDate] = React.useState(() => new Date().toISOString().split('T')[0]);
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -697,7 +697,7 @@ export default function ModalWithClose({
         {/* Mobile Card Image - carousel swipe */}
         <div
           ref={containerRef}
-          className="flex-1 overflow-hidden relative bg-black/5 dark:bg-black/20 touch-pan-y pb-[5.5rem]"
+          className="flex-1 overflow-hidden relative bg-black/5 dark:bg-black/20 touch-pan-y pb-[6.5rem]"
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -796,18 +796,18 @@ export default function ModalWithClose({
           </>
         )}
 
-        {/* Mobile Footer — pinned above bottom nav */}
-        <div className="absolute bottom-[calc(3.5rem+env(safe-area-inset-bottom))] left-0 right-0 px-3 py-2.5 border-t border-border bg-card/95 backdrop-blur-sm">
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Deck builder: add/remove controls */}
+        {/* Mobile Footer — pinned above bottom nav, fixed 2-row layout */}
+        <div className="absolute bottom-[calc(3.5rem+env(safe-area-inset-bottom))] left-0 right-0 px-3 py-2 border-t border-border bg-card/95 backdrop-blur-sm">
+          {/* Row 1: Deck controls or public metadata */}
+          <div className="flex items-center gap-2">
             {onAddCard && onRemoveCard && getCardQuantity && (
               <>
-                {/* Main deck group — minus only shows when card is in main */}
+                {/* Main deck group */}
                 <div className="flex flex-shrink-0">
                   {getCardQuantity(modalCard.name, modalCard.set, false) > 0 && (
                     <button
                       onClick={() => onRemoveCard(modalCard.name, modalCard.set, false)}
-                      className="h-10 w-9 flex items-center justify-center rounded-l-lg bg-green-700 active:bg-green-800 text-white"
+                      className="h-10 w-8 flex items-center justify-center rounded-l-lg bg-green-700 active:bg-green-800 text-white"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
@@ -834,12 +834,12 @@ export default function ModalWithClose({
                     })()}
                   </button>
                 </div>
-                {/* Reserve group — minus only shows when card is in reserve */}
+                {/* Reserve group */}
                 <div className="flex flex-shrink-0">
                   {getCardQuantity(modalCard.name, modalCard.set, true) > 0 && (
                     <button
                       onClick={() => onRemoveCard(modalCard.name, modalCard.set, true)}
-                      className="h-10 w-9 flex items-center justify-center rounded-l-lg bg-amber-700 active:bg-amber-800 text-white"
+                      className="h-10 w-8 flex items-center justify-center rounded-l-lg bg-amber-700 active:bg-amber-800 text-white"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
@@ -892,29 +892,32 @@ export default function ModalWithClose({
                 )}
               </div>
             )}
-            {/* Rulings button */}
-            {rulings.length > 0 && !addRulingMode && (
-              <button
-                onClick={() => setRulingsSheetOpen(true)}
-                className="h-10 px-3 flex-shrink-0 rounded-lg flex items-center gap-1.5 text-sm font-medium border border-border bg-muted/50 text-foreground active:bg-muted transition-colors"
-              >
-                <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
-                </svg>
-                {rulings.length}
-              </button>
-            )}
-            {/* Admin: add ruling when none exist */}
-            {rulings.length === 0 && canManageRulings && !addRulingMode && (
-              <button
-                onClick={() => setAddRulingMode(true)}
-                className="h-10 px-3 flex-shrink-0 rounded-lg flex items-center gap-1 text-xs border border-border bg-muted/50 text-muted-foreground active:bg-muted transition-colors"
-              >
-                + Ruling
-              </button>
-            )}
-            {/* Spacer — collapses when space is tight */}
-            <div className="flex-1 min-w-0" />
+          </div>
+          {/* Row 2: Rulings + Shop — always present, fixed position */}
+          <div className="flex items-center justify-between mt-1.5">
+            <div className="flex items-center gap-2">
+              {/* Rulings button */}
+              {rulings.length > 0 && !addRulingMode && (
+                <button
+                  onClick={() => setRulingsSheetOpen(true)}
+                  className="h-9 px-3 rounded-lg flex items-center gap-1.5 text-sm font-medium border border-border bg-muted/50 text-foreground active:bg-muted transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+                  </svg>
+                  {rulings.length}
+                </button>
+              )}
+              {/* Admin: add ruling when none exist */}
+              {rulings.length === 0 && canManageRulings && !addRulingMode && (
+                <button
+                  onClick={() => setAddRulingMode(true)}
+                  className="h-9 px-3 rounded-lg flex items-center gap-1 text-xs border border-border bg-muted/50 text-muted-foreground active:bg-muted transition-colors"
+                >
+                  + Ruling
+                </button>
+              )}
+            </div>
             {/* Shop button with price + YTG logo */}
             {(() => {
               const cardKey = `${modalCard.name}|${modalCard.set}|${modalCard.imgFile}`;
@@ -928,7 +931,7 @@ export default function ModalWithClose({
                       ? window.open(productUrl, '_blank', 'noopener,noreferrer')
                       : openYTGSearchPage(modalCard.name)
                   }
-                  className="h-10 px-3 flex-shrink-0 rounded-lg flex items-center gap-1.5 font-semibold text-sm border border-green-600/30 dark:border-green-500/25 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 active:translate-y-[1px] transition-all duration-100"
+                  className="h-9 px-3 rounded-lg flex items-center gap-1.5 font-semibold text-sm border border-green-600/30 dark:border-green-500/25 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 active:translate-y-[1px] transition-all duration-100"
                 >
                   <img src="/sponsors/ytg-dark.png" alt="YTG" className="h-4 w-4 object-contain hidden dark:block" />
                   <img src="/sponsors/ytg-light.png" alt="YTG" className="h-4 w-4 object-contain dark:hidden" />

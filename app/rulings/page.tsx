@@ -504,7 +504,7 @@ function RulingsPageContent() {
                         <div className="px-4 py-2.5 bg-muted/50 border-b border-border flex items-center justify-between">
                           <h2 className="font-semibold text-sm">{highlightMatch(cardName, search)}</h2>
                           <Link
-                            href={`/decklist/card-search?query=${encodeURIComponent(cardName)}`}
+                            href={`/decklist/card-search?q=${encodeURIComponent(cardName)}&field=name`}
                             className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
                           >
                             View Card
