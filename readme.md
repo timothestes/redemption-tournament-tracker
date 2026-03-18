@@ -104,7 +104,6 @@ We will want to let the host print it out easily
 ## long term
 add maybeboard
 add animations to goldfish mode
-Wiki-style Card Rulings section
 Collection Tracker
 add wishlist
 Play Redemption Online with Matchmaking
@@ -116,6 +115,5 @@ Making Tournament results public
 Joining a tournament via QR code
 metagame snapshot
 tournament tracker mobile ux support
-Cactus tournament data pipeline.
 Deck upvoting
 intallable app on phone

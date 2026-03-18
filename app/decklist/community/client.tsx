@@ -8,6 +8,13 @@ import { GoldfishButton } from "../../goldfish/components/GoldfishButton";
 
 interface DeckTag { id: string; name: string; color: string; }
 
+interface TournamentInfo {
+  tournament_name: string;
+  placement: number | null;
+  deck_format: string | null;
+  participant_count: number;
+}
+
 interface PublicDeck {
   id: string;
   name: string;
@@ -24,6 +31,7 @@ interface PublicDeck {
   updated_at: string;
   tags?: DeckTag[];
   total_price?: number | null;
+  tournament?: TournamentInfo | null;
 }
 
 function getContrastColor(hex: string): string {
@@ -67,6 +75,13 @@ function timeAgo(dateString: string): string {
   if (diffDays < 365) return `${months} ${months === 1 ? "month" : "months"} ago`;
   const years = Math.floor(diffDays / 365);
   return `${years} ${years === 1 ? "year" : "years"} ago`;
+}
+
+function getPlacementLabel(place: number): string {
+  if (place === 1) return "1st Place";
+  if (place === 2) return "2nd Place";
+  if (place === 3) return "3rd Place";
+  return `${place}th Place`;
 }
 
 const PAGE_SIZE = 24;
@@ -529,6 +544,22 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
 
         <div className="p-4">
           <h3 className="font-semibold text-lg truncate mb-1">{deck.name}</h3>
+
+          {/* Tournament placement badge */}
+          {deck.tournament && deck.tournament.placement != null && (
+            <div className="flex items-center gap-1.5 mb-2 px-2 py-1 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded text-xs">
+              <span className="font-semibold text-amber-700 dark:text-amber-300">
+                {getPlacementLabel(deck.tournament.placement)}
+              </span>
+              <span className="text-amber-600/70 dark:text-amber-400/70 truncate">
+                {deck.tournament.tournament_name}
+                {deck.tournament.participant_count > 0 && (
+                  <> ({deck.tournament.participant_count} players)</>
+                )}
+              </span>
+            </div>
+          )}
+
           <div className="flex items-center justify-between mb-2">
             {deck.username && (
               <p className="text-sm text-gray-500 dark:text-gray-400">

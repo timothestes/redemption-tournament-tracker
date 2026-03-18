@@ -1254,12 +1254,71 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
       }
     }
 
-    const decksWithUsername = (decks || []).map((d: any) => ({
-      ...d,
-      username: usernameMap.get(d.user_id) || null,
-      tags: tagsMap.get(d.id) || [],
-      total_price: priceMap.get(d.id) || null,
-    }));
+    // Batch-fetch tournament placement data for returned decks
+    let tournamentMap = new Map<string, { tournament_name: string; placement: number | null; deck_format: string | null; participant_count: number }>();
+    if (deckIds.length > 0) {
+      const { data: tdRows } = await supabase
+        .from("tournament_decklists")
+        .select(`
+          deck_id,
+          participant_id,
+          tournaments!inner (
+            id,
+            name,
+            decklists_published,
+            deck_format
+          ),
+          participants!inner (
+            place,
+            tournament_id
+          )
+        `)
+        .in("deck_id", deckIds);
+
+      if (tdRows && tdRows.length > 0) {
+        // Get unique tournament IDs that are published
+        const publishedRows = (tdRows as any[]).filter((r: any) => r.tournaments?.decklists_published);
+        const tournamentIds = [...new Set(publishedRows.map((r: any) => r.tournaments?.id).filter(Boolean))];
+
+        // Fetch participant counts in parallel (one query per tournament, all concurrent)
+        const countMap = new Map<string, number>();
+        if (tournamentIds.length > 0) {
+          const countResults = await Promise.all(
+            tournamentIds.map((tid) =>
+              supabase
+                .from("participants")
+                .select("id", { count: "exact", head: true })
+                .eq("tournament_id", tid)
+                .then(({ count }) => ({ tid, count: count || 0 }))
+            )
+          );
+          for (const { tid, count } of countResults) {
+            countMap.set(tid, count);
+          }
+        }
+
+        for (const row of publishedRows) {
+          const tid = row.tournaments?.id;
+          tournamentMap.set(row.deck_id, {
+            tournament_name: row.tournaments?.name || "Tournament",
+            placement: row.participants?.place ?? null,
+            deck_format: row.tournaments?.deck_format || null,
+            participant_count: countMap.get(tid) || 0,
+          });
+        }
+      }
+    }
+
+    const decksWithUsername = (decks || []).map((d: any) => {
+      const tournament = tournamentMap.get(d.id);
+      return {
+        ...d,
+        username: usernameMap.get(d.user_id) || null,
+        tags: tagsMap.get(d.id) || [],
+        total_price: priceMap.get(d.id) || null,
+        tournament: tournament || null,
+      };
+    });
 
     return { success: true, decks: decksWithUsername, totalCount: count || 0 };
   } catch (error) {
