@@ -476,9 +476,11 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
-            <img
+            <Image
               src={`/paragons/Paragon ${deck.paragon}.png`}
               alt={deck.paragon}
+              width={800}
+              height={1120}
               className="w-full h-auto rounded-lg shadow-2xl"
             />
           </div>
@@ -1046,9 +1048,11 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
           </button>
           {paragonVisible && (
             <div className="max-w-xs">
-              <img
+              <Image
                 src={`/paragons/Paragon ${deck.paragon}.png`}
                 alt={deck.paragon}
+                width={320}
+                height={448}
                 className="w-full rounded-lg shadow-md cursor-pointer hover:scale-105 hover:shadow-xl transition-all"
                 onClick={() => setShowParagonModal(true)}
                 title="Click to view full size"

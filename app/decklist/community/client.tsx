@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { loadPublicDecksAction, loadGlobalTagsAction, copyPublicDeckAction, loadPublicDeckAction, LoadPublicDecksParams } from "../actions";
 import { GoldfishButton } from "../../goldfish/components/GoldfishButton";
@@ -582,7 +583,7 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
         {/* Card preview */}
         {formatDeckType(deck.format) === "Paragon" && deck.paragon ? (
           <div className="h-36 overflow-hidden">
-            <img src={`/paragons/Paragon ${deck.paragon}.png`} alt={deck.paragon} className="w-full h-full object-cover object-top group-hover:brightness-90 transition-[filter]" />
+            <Image src={`/paragons/Paragon ${deck.paragon}.png`} alt={deck.paragon} width={400} height={560} className="w-full h-full object-cover object-top group-hover:brightness-90 transition-[filter]" />
           </div>
         ) : hasPreview ? (
           <div className="h-36 overflow-hidden bg-gray-100 dark:bg-gray-900 flex items-center justify-center gap-1 px-2 py-2 group-hover:bg-gray-200 dark:group-hover:bg-gray-800 transition-colors">

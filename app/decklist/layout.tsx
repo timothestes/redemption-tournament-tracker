@@ -1,13 +1,9 @@
 import HeaderServer from "../../components/header-server";
 import TopNav from "../../components/top-nav";
 import SponsorFooter from "../../components/sponsor-footer";
-import { createClient } from "../../utils/supabase/server";
 import { Suspense } from "react";
 
-export default async function DecklistLayout({ children }) {
-  const supabase = await createClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  const isAuthenticated = !!session;
+export default function DecklistLayout({ children }) {
 
   return (
     <div className="flex flex-col min-h-screen">
