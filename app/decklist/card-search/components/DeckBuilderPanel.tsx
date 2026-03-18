@@ -1914,13 +1914,10 @@ export default function DeckBuilderPanel({
                     <Image
                       src={`/paragons/Paragon ${deck.paragon}.png`}
                       alt={deck.paragon}
-                      fill
-                      sizes="(min-width: 768px) 128px, 80px"
-                      className="object-cover object-[1%_center]"
-                      onError={(e) => {
-                        // Hide container if image doesn't exist
-                        (e.currentTarget.parentElement as HTMLElement).style.display = 'none';
-                      }}
+                      width={128}
+                      height={180}
+                      className="w-full h-full object-cover object-[1%_center]"
+                      unoptimized
                     />
                     {/* Click Indicator Icon - Bottom Left */}
                     <div className="absolute bottom-1 left-1 md:bottom-2 md:left-2 bg-white/90 dark:bg-purple-600/90 rounded-full p-1 md:p-1.5 shadow-lg">

@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/sync-card-images",
-      "schedule": "0 * * * *"
+      "schedule": "0 6 * * *"
     },
     {
       "path": "/api/cron/sync-prices",
