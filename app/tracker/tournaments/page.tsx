@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Breadcrumb from "../../../components/ui/breadcrumb";
 import { createClient } from "../../../utils/supabase/client";
 import ToastNotification from "../../../components/ui/toast-notification";
@@ -11,7 +11,7 @@ import TournamentFormModal from "../../../components/ui/tournament-form-modal";
 
 const supabase = createClient();
 
-export default function TournamentsPage() {
+function TournamentsPageInner() {
   const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDeleteToast, setShowDeleteToast] = useState(false);
@@ -221,5 +221,13 @@ export default function TournamentsPage() {
         />
       </div>
     </div>
+  );
+}
+
+export default function TournamentsPage() {
+  return (
+    <Suspense>
+      <TournamentsPageInner />
+    </Suspense>
   );
 }

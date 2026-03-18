@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import Image from "next/image";
 import { createPortal } from "react-dom";
 import { Deck } from "../types/deck";
 import { SyncStatus } from "../hooks/useDeckState";
@@ -1910,14 +1911,13 @@ export default function DeckBuilderPanel({
                     onClick={() => setShowParagonModal(true)}
                     title="Click to view full card"
                   >
-                    <img
+                    <Image
                       src={`/paragons/Paragon ${deck.paragon}.png`}
                       alt={deck.paragon}
+                      width={128}
+                      height={180}
                       className="w-full h-full object-cover object-[1%_center]"
-                      onError={(e) => {
-                        // Hide container if image doesn't exist
-                        e.currentTarget.parentElement!.style.display = 'none';
-                      }}
+                      unoptimized
                     />
                     {/* Click Indicator Icon - Bottom Left */}
                     <div className="absolute bottom-1 left-1 md:bottom-2 md:left-2 bg-white/90 dark:bg-purple-600/90 rounded-full p-1 md:p-1.5 shadow-lg">
@@ -2896,9 +2896,11 @@ export default function DeckBuilderPanel({
             </button>
             
             {/* Paragon Card Image - Full Size */}
-            <img 
+            <Image
               src={`/paragons/Paragon ${deck.paragon}.png`}
               alt={deck.paragon}
+              width={800}
+              height={1120}
               className="w-full h-auto rounded-lg shadow-2xl"
               onError={(e) => {
                 e.currentTarget.style.display = 'none';

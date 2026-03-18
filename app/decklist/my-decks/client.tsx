@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   loadUserDecksAction,
   deleteDeckAction,
@@ -1030,9 +1031,11 @@ function DeckCard({
       {/* Image Header */}
       {formatDeckType(deck.format) === "Paragon" && deck.paragon ? (
         <div className="h-32 overflow-hidden rounded-t-lg cursor-pointer" onClick={() => onEdit(deck.id!)}>
-          <img
+          <Image
             src={`/paragons/Paragon ${deck.paragon}.png`}
             alt={deck.paragon}
+            width={400}
+            height={560}
             className="w-full h-full object-cover object-top"
           />
         </div>

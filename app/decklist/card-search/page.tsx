@@ -1,4 +1,5 @@
 import { Metadata } from "next";
+import { Suspense } from "react";
 import CardSearchClient from "./client";
 
 export const metadata: Metadata = {
@@ -7,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function Page() {
-  return <CardSearchClient />;
+  return (
+    <Suspense>
+      <CardSearchClient />
+    </Suspense>
+  );
 }
