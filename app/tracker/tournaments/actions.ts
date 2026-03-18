@@ -43,7 +43,7 @@ export async function loadTournamentDecklistsAction(tournamentId: string) {
       tournament_id,
       participant_id,
       deck_id,
-      decks (
+      decks!tournament_decklists_deck_id_fkey (
         name,
         format,
         card_count,
@@ -234,6 +234,7 @@ export async function publishTournamentDecklistsAction(
     .select(`
       id,
       deck_id,
+      published_deck_id,
       participant_id,
       participants!inner ( name )
     `)
@@ -270,7 +271,42 @@ export async function publishTournamentDecklistsAction(
     }
   }
 
-  // For each decklist, copy the deck + cards under the LandOfRedemption user
+  // Check if copies already exist (previous publish that was unpublished)
+  const existingPublishedIds = (decklists as any[])
+    .map((dl: any) => dl.published_deck_id)
+    .filter(Boolean);
+
+  if (existingPublishedIds.length > 0) {
+    const { data: existingCopies } = await admin
+      .from("decks")
+      .select("id")
+      .in("id", existingPublishedIds)
+      .eq("user_id", REDEMPTIONCCG_USER_ID);
+
+    if (existingCopies && existingCopies.length === existingPublishedIds.length) {
+      // All copies still exist — just make them public again
+      await admin
+        .from("decks")
+        .update({ is_public: true })
+        .in("id", existingPublishedIds)
+        .eq("user_id", REDEMPTIONCCG_USER_ID);
+
+      // Mark tournament as published
+      const { error: updateError } = await supabase
+        .from("tournaments")
+        .update({ decklists_published: true, deck_format: deckFormat })
+        .eq("id", tournamentId);
+
+      if (updateError) {
+        console.error("Error publishing tournament:", updateError);
+        return { success: false, error: updateError.message };
+      }
+
+      return { success: true };
+    }
+  }
+
+  // No existing copies — create them fresh
   for (const dl of decklists as any[]) {
     const participantName = dl.participants?.name || "Unknown";
 
@@ -326,10 +362,10 @@ export async function publishTournamentDecklistsAction(
       await admin.from("deck_cards").insert(cardRows);
     }
 
-    // Update the tournament_decklists row to point to the new copy
+    // Store published copy ID separately — deck_id stays as the user's original
     await admin
       .from("tournament_decklists")
-      .update({ deck_id: newDeck.id })
+      .update({ published_deck_id: newDeck.id })
       .eq("id", dl.id);
   }
 
@@ -354,9 +390,39 @@ export async function publishTournamentDecklistsAction(
 
 export async function unpublishTournamentDecklistsAction(tournamentId: string) {
   const supabase = await createClient();
+  const admin = getSupabaseAdmin();
 
-  // Note: we don't make the decks private again — the admin may have
-  // independently made them public. We only toggle the tournament flag.
+  // Find published copy IDs
+  const { data: tdRows } = await supabase
+    .from("tournament_decklists")
+    .select("id, published_deck_id")
+    .eq("tournament_id", tournamentId);
+
+  const publishedDeckIds = (tdRows || [])
+    .map((r: any) => r.published_deck_id)
+    .filter(Boolean);
+
+  // Delete the published copies (cards first for FK constraint)
+  if (publishedDeckIds.length > 0) {
+    await admin
+      .from("deck_cards")
+      .delete()
+      .in("deck_id", publishedDeckIds);
+
+    // Clear the published_deck_id references before deleting decks
+    await admin
+      .from("tournament_decklists")
+      .update({ published_deck_id: null })
+      .eq("tournament_id", tournamentId);
+
+    await admin
+      .from("decks")
+      .delete()
+      .in("id", publishedDeckIds)
+      .eq("user_id", REDEMPTIONCCG_USER_ID);
+  }
+
+  // Toggle the tournament flag — deck_id links to original decks are untouched
   const { error } = await supabase
     .from("tournaments")
     .update({ decklists_published: false })

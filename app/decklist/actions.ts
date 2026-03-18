@@ -1109,6 +1109,7 @@ export interface LoadPublicDecksParams {
   search?: string;
   username?: string;
   tagIds?: string[];
+  tournamentOnly?: boolean;
 }
 
 export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) {
@@ -1122,9 +1123,24 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
       search,
       username,
       tagIds,
+      tournamentOnly,
     } = params;
 
     const offset = (page - 1) * pageSize;
+
+    // If tournament-only filter, resolve published deck IDs first
+    let tournamentDeckIds: string[] | null = null;
+    if (tournamentOnly) {
+      const { data: tdRows } = await supabase
+        .from("tournament_decklists")
+        .select("published_deck_id, tournaments!inner(decklists_published)")
+        .eq("tournaments.decklists_published", true)
+        .not("published_deck_id", "is", null);
+      tournamentDeckIds = [...new Set((tdRows || []).map((r: any) => r.published_deck_id).filter(Boolean))];
+      if (tournamentDeckIds.length === 0) {
+        return { success: true, decks: [], totalCount: 0 };
+      }
+    }
 
     // If tag filtering is requested, resolve the matching deck IDs first
     let tagFilteredDeckIds: string[] | null = null;
@@ -1147,6 +1163,10 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
 
     if (tagFilteredDeckIds) {
       query = query.in("id", tagFilteredDeckIds);
+    }
+
+    if (tournamentDeckIds) {
+      query = query.in("id", tournamentDeckIds);
     }
 
     if (format) {
@@ -1173,7 +1193,7 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
       }
     }
 
-    // Search by deck name or username
+    // Search by deck name, username, or tournament name
     if (search && search.trim()) {
       const term = search.trim();
       // Find user IDs matching the search term
@@ -1183,11 +1203,23 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
         .ilike("username", `%${term}%`);
       const matchingUserIds = (matchingProfiles || []).map((p: any) => p.id);
 
+      // Find published deck IDs from tournaments matching the search term
+      const { data: tournamentDeckRows } = await supabase
+        .from("tournament_decklists")
+        .select("published_deck_id, tournaments!inner(name, decklists_published)")
+        .eq("tournaments.decklists_published", true)
+        .not("published_deck_id", "is", null)
+        .ilike("tournaments.name", `%${term}%`);
+      const tournamentDeckIds = [...new Set((tournamentDeckRows || []).map((r: any) => r.published_deck_id).filter(Boolean))];
+
+      const orClauses: string[] = [`name.ilike.%${term}%`];
       if (matchingUserIds.length > 0) {
-        query = query.or(`name.ilike.%${term}%,user_id.in.(${matchingUserIds.join(",")})`);
-      } else {
-        query = query.ilike("name", `%${term}%`);
+        orClauses.push(`user_id.in.(${matchingUserIds.join(",")})`);
       }
+      if (tournamentDeckIds.length > 0) {
+        orClauses.push(`id.in.(${tournamentDeckIds.join(",")})`);
+      }
+      query = query.or(orClauses.join(","));
     }
 
     switch (sort) {
@@ -1261,6 +1293,7 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
         .from("tournament_decklists")
         .select(`
           deck_id,
+          published_deck_id,
           participant_id,
           tournaments!inner (
             id,
@@ -1273,7 +1306,7 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
             tournament_id
           )
         `)
-        .in("deck_id", deckIds);
+        .in("published_deck_id", deckIds);
 
       if (tdRows && tdRows.length > 0) {
         // Get unique tournament IDs that are published
@@ -1299,7 +1332,8 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
 
         for (const row of publishedRows) {
           const tid = row.tournaments?.id;
-          tournamentMap.set(row.deck_id, {
+          // Map by published_deck_id since that's the public deck visible on community page
+          tournamentMap.set(row.published_deck_id, {
             tournament_name: row.tournaments?.name || "Tournament",
             placement: row.participants?.place ?? null,
             deck_format: row.tournaments?.deck_format || null,

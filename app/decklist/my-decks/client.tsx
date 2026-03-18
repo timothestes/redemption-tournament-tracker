@@ -1275,17 +1275,53 @@ function DropdownMenu({
   const [isOpen, setIsOpen] = useState(false);
   const [showMoveMenu, setShowMoveMenu] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
-  const [openUpward, setOpenUpward] = useState(false);
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   function handleToggle() {
     if (!isOpen && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
       const spaceBelow = window.innerHeight - rect.bottom;
-      setOpenUpward(spaceBelow < 350);
+      const menuHeight = 400; // conservative estimate for full menu
+      const openUp = spaceBelow < menuHeight && rect.top > spaceBelow;
+
+      setMenuStyle({
+        position: "fixed" as const,
+        right: window.innerWidth - rect.right,
+        ...(openUp
+          ? { bottom: window.innerHeight - rect.top + 4 }
+          : { top: rect.bottom + 4 }),
+        zIndex: 50,
+      });
     }
     setIsOpen(!isOpen);
   }
+
+  // Reposition on scroll/resize while open
+  useEffect(() => {
+    if (!isOpen || !buttonRef.current) return;
+    function reposition() {
+      if (!buttonRef.current) return;
+      const rect = buttonRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const openUp = spaceBelow < 400 && rect.top > spaceBelow;
+      setMenuStyle({
+        position: "fixed" as const,
+        right: window.innerWidth - rect.right,
+        ...(openUp
+          ? { bottom: window.innerHeight - rect.top + 4 }
+          : { top: rect.bottom + 4 }),
+        zIndex: 50,
+      });
+    }
+    window.addEventListener("scroll", reposition, true);
+    window.addEventListener("resize", reposition);
+    return () => {
+      window.removeEventListener("scroll", reposition, true);
+      window.removeEventListener("resize", reposition);
+    };
+  }, [isOpen]);
 
   return (
     <div className="relative">
@@ -1302,15 +1338,17 @@ function DropdownMenu({
       {isOpen && (
         <>
           <div
-            className="fixed inset-0 z-10"
+            className="fixed inset-0 z-40"
             onClick={() => {
               setIsOpen(false);
               setShowMoveMenu(false);
             }}
           />
-          <div className={`absolute right-0 w-52 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 z-20 ${
-            openUpward ? "bottom-full mb-2" : "mt-2"
-          }`}>
+          <div
+            ref={menuRef}
+            style={menuStyle}
+            className="w-52 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700"
+          >
             <button
               onClick={() => {
                 onEdit();
