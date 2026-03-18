@@ -109,11 +109,9 @@ add wishlist
 Play Redemption Online with Matchmaking
 Teaching new players how to play
 Comprehensive Deck Legality Validation
-Attaching private decklists to Tournament tracker players
 misc tournament tracker improvements
-Making Tournament results public
 Joining a tournament via QR code
 metagame snapshot
 tournament tracker mobile ux support
 Deck upvoting
-intallable app on phone
+intallable app on phone (Progressive Web app with offline capabilities)

@@ -1,11 +1,20 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
+// Routes that require server-side auth check + redirect in middleware.
+// Admin routes handle their own auth client-side via useIsAdmin().
+const PROTECTED_PREFIXES = ["/tracker"];
+
+// Public pages nested under protected prefixes
+const AUTH_EXEMPT = ["/tracker/reset-password", "/tracker/bug"];
+
+function needsAuth(pathname: string): boolean {
+  if (AUTH_EXEMPT.some((exempt) => pathname.startsWith(exempt))) return false;
+  return PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
+
 export const updateSession = async (request: NextRequest) => {
-  // This `try/catch` block is only here for the interactive tutorial.
-  // Feel free to remove once you have Supabase connected.
   try {
-    // Create an unmodified response
     let response = NextResponse.next({
       request: {
         headers: request.headers,
@@ -35,28 +44,29 @@ export const updateSession = async (request: NextRequest) => {
       },
     );
 
-    // This will refresh session if expired - required for Server Components
-    // https://supabase.com/docs/guides/auth/server-side/nextjs
-    const user = await supabase.auth.getUser();
+    const pathname = request.nextUrl.pathname;
 
-    // tracker routes — reset-password is exempt so recovery tokens can be processed client-side
-    if (
-      request.nextUrl.pathname.startsWith("/tracker") &&
-      !request.nextUrl.pathname.startsWith("/tracker/reset-password") &&
-      user.error
-    ) {
-      return NextResponse.redirect(new URL("/sign-in", request.url));
-    }
+    // Only call getUser() for protected routes and root redirect.
+    // Public pages skip the Supabase network call entirely.
+    if (needsAuth(pathname) || pathname === "/") {
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser();
 
-    if (request.nextUrl.pathname === "/" && !user.error) {
-      return NextResponse.redirect(new URL("/tracker", request.url));
+      // Protected routes: redirect to sign-in if no session
+      if (needsAuth(pathname) && !user && error) {
+        return NextResponse.redirect(new URL("/sign-in", request.url));
+      }
+
+      // Logged-in users hitting root get sent to the tracker
+      if (pathname === "/" && user) {
+        return NextResponse.redirect(new URL("/tracker", request.url));
+      }
     }
 
     return response;
   } catch (e) {
-    // If you are here, a Supabase client could not be created!
-    // This is likely because you have not set up environment variables.
-    // Check out http://localhost:3000 for Next Steps.
     return NextResponse.next({
       request: {
         headers: request.headers,
