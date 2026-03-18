@@ -3,6 +3,8 @@ import { getSupabaseAdmin } from '@/lib/pricing/supabase-admin';
 import { getShopifyAccessToken, fetchAllShopifyProducts } from '@/lib/pricing/shopify';
 import { runMatchingPipeline, regenerateCardPrices } from '@/lib/pricing/matching';
 
+export const maxDuration = 60;
+
 export async function GET(request: NextRequest) {
   // Verify this is a legitimate Vercel cron call
   const authHeader = request.headers.get('authorization');
