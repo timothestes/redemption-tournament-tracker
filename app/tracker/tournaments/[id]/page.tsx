@@ -13,6 +13,8 @@ import ToastNotification from "../../../../components/ui/toast-notification";
 import { createClient } from "../../../../utils/supabase/client";
 import { suggestNumberOfRounds } from "../../../../utils/tournamentUtils";
 import { createPairing } from "../../../../utils/tournament/pairingUtilsV2";
+import { loadTournamentDecklistsAction, type TournamentDecklistRow } from "../actions";
+import PublishDecklistsSection from "../../../../components/ui/PublishDecklistsSection";
 
 const supabase = createClient();
 
@@ -52,6 +54,7 @@ export default function TournamentPage({
 
   const [latestRound, setLatestRound] = useState<any>(null);
   const [showPairingNotice, setShowPairingNotice] = useState(true);
+  const [decklists, setDecklists] = useState<TournamentDecklistRow[]>([]);
 
   const showToast = (
     message: string,
@@ -521,11 +524,19 @@ export default function TournamentPage({
     }
   }, [tournament]);
 
+  const fetchDecklists = useCallback(async () => {
+    if (!id) return;
+    const res = await loadTournamentDecklistsAction(id);
+    if (res.success) {
+      setDecklists(res.decklists);
+    }
+  }, [id]);
+
   useEffect(() => {
     if (id) {
       fetchTournamentDetails();
       fetchParticipants();
-
+      fetchDecklists();
     }
   }, [id]);
 
@@ -672,6 +683,21 @@ export default function TournamentPage({
                   Tournament has ended
                 </span>
               )}
+
+              {/* Publish decklists section */}
+              {tournament?.has_ended && (
+                <PublishDecklistsSection
+                  tournamentId={tournament.id}
+                  tournamentEnded={tournament.has_ended}
+                  decklistCount={decklists.length}
+                  isPublished={tournament.decklists_published || false}
+                  currentFormat={tournament.deck_format || null}
+                  onPublishChange={() => {
+                    fetchTournamentDetails();
+                    fetchDecklists();
+                  }}
+                />
+              )}
             </div>
           )}
           <TournamentTabs
@@ -708,6 +734,8 @@ export default function TournamentPage({
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             fetchParticipants={fetchParticipants}
+            decklists={decklists}
+            onDecklistsChange={fetchDecklists}
           />
         </div>
         <EditParticipantModal

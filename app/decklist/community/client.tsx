@@ -8,6 +8,13 @@ import { GoldfishButton } from "../../goldfish/components/GoldfishButton";
 
 interface DeckTag { id: string; name: string; color: string; }
 
+interface TournamentInfo {
+  tournament_name: string;
+  placement: number | null;
+  deck_format: string | null;
+  participant_count: number;
+}
+
 interface PublicDeck {
   id: string;
   name: string;
@@ -24,6 +31,7 @@ interface PublicDeck {
   updated_at: string;
   tags?: DeckTag[];
   total_price?: number | null;
+  tournament?: TournamentInfo | null;
 }
 
 function getContrastColor(hex: string): string {
@@ -69,6 +77,53 @@ function timeAgo(dateString: string): string {
   return `${years} ${years === 1 ? "year" : "years"} ago`;
 }
 
+function getPlacementLabel(place: number): string {
+  if (place === 1) return "1st Place";
+  if (place === 2) return "2nd Place";
+  if (place === 3) return "3rd Place";
+  return `${place}th Place`;
+}
+
+function TrophyIcon({ place, className }: { place: number; className?: string }) {
+  if (place === 1) {
+    return (
+      <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M6 2h12v6a6 6 0 01-12 0V2z" fill="#FFD700" stroke="#B8860B" strokeWidth="1.5"/>
+        <path d="M6 4H3a1 1 0 00-1 1v1a4 4 0 004 4" stroke="#B8860B" strokeWidth="1.5" fill="#FFD700"/>
+        <path d="M18 4h3a1 1 0 011 1v1a4 4 0 01-4 4" stroke="#B8860B" strokeWidth="1.5" fill="#FFD700"/>
+        <path d="M9 14h6v2H9z" fill="#B8860B"/>
+        <path d="M8 16h8v1a1 1 0 01-1 1H9a1 1 0 01-1-1v-1z" fill="#FFD700" stroke="#B8860B" strokeWidth="1"/>
+        <path d="M7 19h10v2a1 1 0 01-1 1H8a1 1 0 01-1-1v-2z" fill="#B8860B"/>
+      </svg>
+    );
+  }
+  if (place === 2) {
+    return (
+      <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M6 2h12v6a6 6 0 01-12 0V2z" fill="#C0C0C0" stroke="#808080" strokeWidth="1.5"/>
+        <path d="M6 4H3a1 1 0 00-1 1v1a4 4 0 004 4" stroke="#808080" strokeWidth="1.5" fill="#C0C0C0"/>
+        <path d="M18 4h3a1 1 0 011 1v1a4 4 0 01-4 4" stroke="#808080" strokeWidth="1.5" fill="#C0C0C0"/>
+        <path d="M9 14h6v2H9z" fill="#808080"/>
+        <path d="M8 16h8v1a1 1 0 01-1 1H9a1 1 0 01-1-1v-1z" fill="#C0C0C0" stroke="#808080" strokeWidth="1"/>
+        <path d="M7 19h10v2a1 1 0 01-1 1H8a1 1 0 01-1-1v-2z" fill="#808080"/>
+      </svg>
+    );
+  }
+  if (place === 3) {
+    return (
+      <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M6 2h12v6a6 6 0 01-12 0V2z" fill="#CD7F32" stroke="#8B5A2B" strokeWidth="1.5"/>
+        <path d="M6 4H3a1 1 0 00-1 1v1a4 4 0 004 4" stroke="#8B5A2B" strokeWidth="1.5" fill="#CD7F32"/>
+        <path d="M18 4h3a1 1 0 011 1v1a4 4 0 01-4 4" stroke="#8B5A2B" strokeWidth="1.5" fill="#CD7F32"/>
+        <path d="M9 14h6v2H9z" fill="#8B5A2B"/>
+        <path d="M8 16h8v1a1 1 0 01-1 1H9a1 1 0 01-1-1v-1z" fill="#CD7F32" stroke="#8B5A2B" strokeWidth="1"/>
+        <path d="M7 19h10v2a1 1 0 01-1 1H8a1 1 0 01-1-1v-2z" fill="#8B5A2B"/>
+      </svg>
+    );
+  }
+  return null;
+}
+
 const PAGE_SIZE = 24;
 
 interface Props {
@@ -91,6 +146,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [usernameFilter, setUsernameFilter] = useState(initialUsername);
+  const [tournamentOnly, setTournamentOnly] = useState(false);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [globalTags, setGlobalTags] = useState<DeckTag[]>([]);
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
@@ -141,6 +197,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
       search: search || undefined,
       username: usernameFilter || undefined,
       tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
+      tournamentOnly: tournamentOnly || undefined,
     };
     const result = await loadPublicDecksAction(params);
     if (result.success) {
@@ -148,7 +205,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
       setTotalCount(result.totalCount);
     }
     setLoading(false);
-  }, [page, sort, format, search, usernameFilter, selectedTagIds]);
+  }, [page, sort, format, search, usernameFilter, selectedTagIds, tournamentOnly]);
 
   useEffect(() => {
     // Skip the initial fetch if we already have server-provided data (no username filter)
@@ -208,7 +265,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            placeholder="Search decks..."
+            placeholder="Search decks, players, or tournaments..."
             className="flex-1 min-w-0 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm"
           />
           <button
@@ -251,6 +308,19 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
             <option value="most_viewed">Most Viewed</option>
             <option value="name">Name A-Z</option>
           </select>
+
+          {/* Tournament Results toggle */}
+          <button
+            onClick={() => { setTournamentOnly((v) => !v); setPage(1); }}
+            className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm transition-colors ${
+              tournamentOnly
+                ? "border-amber-500 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300"
+                : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+            }`}
+          >
+            <TrophyIcon place={1} className="w-3.5 h-3.5" />
+            Tournament Results
+          </button>
 
           {/* Tags dropdown */}
           {globalTags.length > 0 && (
@@ -529,6 +599,41 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
 
         <div className="p-4">
           <h3 className="font-semibold text-lg truncate mb-1">{deck.name}</h3>
+
+          {/* Tournament placement badge */}
+          {deck.tournament && deck.tournament.placement != null && (
+            <div className={`flex items-center gap-1.5 mb-2 px-2.5 py-1.5 rounded text-xs border ${
+              deck.tournament.placement === 1
+                ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-700/60"
+                : deck.tournament.placement === 2
+                ? "bg-gray-50 dark:bg-gray-700/30 border-gray-300 dark:border-gray-600"
+                : deck.tournament.placement === 3
+                ? "bg-orange-50 dark:bg-orange-900/15 border-orange-300 dark:border-orange-800/50"
+                : "bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700"
+            }`}>
+              {deck.tournament.placement <= 3 && (
+                <TrophyIcon place={deck.tournament.placement} className="w-4 h-4 flex-shrink-0" />
+              )}
+              <span className={`font-semibold ${
+                deck.tournament.placement === 1
+                  ? "text-yellow-700 dark:text-yellow-300"
+                  : deck.tournament.placement === 2
+                  ? "text-gray-600 dark:text-gray-300"
+                  : deck.tournament.placement === 3
+                  ? "text-orange-700 dark:text-orange-300"
+                  : "text-gray-600 dark:text-gray-400"
+              }`}>
+                {getPlacementLabel(deck.tournament.placement)}
+              </span>
+              <span className="text-gray-500 dark:text-gray-400 truncate">
+                {deck.tournament.tournament_name}
+                {deck.tournament.participant_count > 0 && (
+                  <> ({deck.tournament.participant_count} players)</>
+                )}
+              </span>
+            </div>
+          )}
+
           <div className="flex items-center justify-between mb-2">
             {deck.username && (
               <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -560,9 +665,9 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
             )}
           </div>
 
-          <div className="flex flex-wrap gap-1">
-            {deck.tags && deck.tags.length > 0 ? (
-              deck.tags.slice(0, 6).map((tag) => (
+          {deck.tags && deck.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {deck.tags.slice(0, 6).map((tag) => (
                 <span
                   key={tag.id}
                   className="px-2 py-0.5 rounded-full text-xs font-medium"
@@ -570,11 +675,9 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
                 >
                   {tag.name}
                 </span>
-              ))
-            ) : (
-              <span className="text-xs text-gray-400 dark:text-gray-500 italic">No tags yet</span>
-            )}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </Link>
 

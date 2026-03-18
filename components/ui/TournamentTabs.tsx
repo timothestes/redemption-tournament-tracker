@@ -14,6 +14,7 @@ import { HiPlus } from "react-icons/hi";
 import { GiCardPickup } from "react-icons/gi";
 import { printFinalStandings } from "../../utils/printUtils";
 import { Button } from "./button";
+import type { TournamentDecklistRow } from "../../app/tracker/tournaments/actions";
 
 interface TournamentTabsProps {
   participants: any[];
@@ -41,6 +42,8 @@ interface TournamentTabsProps {
   activeTab: number;
   setActiveTab: Dispatch<SetStateAction<number>>;
   fetchParticipants: () => void;
+  decklists: TournamentDecklistRow[];
+  onDecklistsChange: () => void;
 }
 
 export default function TournamentTabs({
@@ -65,6 +68,8 @@ export default function TournamentTabs({
   activeTab,
   setActiveTab,
   fetchParticipants,
+  decklists,
+  onDecklistsChange,
 }: TournamentTabsProps) {
   // state for booster draft pods
   const [showPodsModal, setShowPodsModal] = useState(false);
@@ -180,6 +185,9 @@ export default function TournamentTabs({
               onDelete={onDelete}
               onDropOut={onDropOut}
               onDropIn={onDropIn}
+              tournamentId={tournamentId}
+              decklists={decklists}
+              onDecklistsChange={onDecklistsChange}
             />
           </div>
         )}

@@ -1109,6 +1109,7 @@ export interface LoadPublicDecksParams {
   search?: string;
   username?: string;
   tagIds?: string[];
+  tournamentOnly?: boolean;
 }
 
 export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) {
@@ -1122,9 +1123,24 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
       search,
       username,
       tagIds,
+      tournamentOnly,
     } = params;
 
     const offset = (page - 1) * pageSize;
+
+    // If tournament-only filter, resolve published deck IDs first
+    let tournamentDeckIds: string[] | null = null;
+    if (tournamentOnly) {
+      const { data: tdRows } = await supabase
+        .from("tournament_decklists")
+        .select("published_deck_id, tournaments!inner(decklists_published)")
+        .eq("tournaments.decklists_published", true)
+        .not("published_deck_id", "is", null);
+      tournamentDeckIds = [...new Set((tdRows || []).map((r: any) => r.published_deck_id).filter(Boolean))];
+      if (tournamentDeckIds.length === 0) {
+        return { success: true, decks: [], totalCount: 0 };
+      }
+    }
 
     // If tag filtering is requested, resolve the matching deck IDs first
     let tagFilteredDeckIds: string[] | null = null;
@@ -1147,6 +1163,10 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
 
     if (tagFilteredDeckIds) {
       query = query.in("id", tagFilteredDeckIds);
+    }
+
+    if (tournamentDeckIds) {
+      query = query.in("id", tournamentDeckIds);
     }
 
     if (format) {
@@ -1173,7 +1193,7 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
       }
     }
 
-    // Search by deck name or username
+    // Search by deck name, username, or tournament name
     if (search && search.trim()) {
       const term = search.trim();
       // Find user IDs matching the search term
@@ -1183,11 +1203,23 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
         .ilike("username", `%${term}%`);
       const matchingUserIds = (matchingProfiles || []).map((p: any) => p.id);
 
+      // Find published deck IDs from tournaments matching the search term
+      const { data: tournamentDeckRows } = await supabase
+        .from("tournament_decklists")
+        .select("published_deck_id, tournaments!inner(name, decklists_published)")
+        .eq("tournaments.decklists_published", true)
+        .not("published_deck_id", "is", null)
+        .ilike("tournaments.name", `%${term}%`);
+      const tournamentDeckIds = [...new Set((tournamentDeckRows || []).map((r: any) => r.published_deck_id).filter(Boolean))];
+
+      const orClauses: string[] = [`name.ilike.%${term}%`];
       if (matchingUserIds.length > 0) {
-        query = query.or(`name.ilike.%${term}%,user_id.in.(${matchingUserIds.join(",")})`);
-      } else {
-        query = query.ilike("name", `%${term}%`);
+        orClauses.push(`user_id.in.(${matchingUserIds.join(",")})`);
       }
+      if (tournamentDeckIds.length > 0) {
+        orClauses.push(`id.in.(${tournamentDeckIds.join(",")})`);
+      }
+      query = query.or(orClauses.join(","));
     }
 
     switch (sort) {
@@ -1254,12 +1286,73 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
       }
     }
 
-    const decksWithUsername = (decks || []).map((d: any) => ({
-      ...d,
-      username: usernameMap.get(d.user_id) || null,
-      tags: tagsMap.get(d.id) || [],
-      total_price: priceMap.get(d.id) || null,
-    }));
+    // Batch-fetch tournament placement data for returned decks
+    let tournamentMap = new Map<string, { tournament_name: string; placement: number | null; deck_format: string | null; participant_count: number }>();
+    if (deckIds.length > 0) {
+      const { data: tdRows } = await supabase
+        .from("tournament_decklists")
+        .select(`
+          deck_id,
+          published_deck_id,
+          participant_id,
+          tournaments!inner (
+            id,
+            name,
+            decklists_published,
+            deck_format
+          ),
+          participants!inner (
+            place,
+            tournament_id
+          )
+        `)
+        .in("published_deck_id", deckIds);
+
+      if (tdRows && tdRows.length > 0) {
+        // Get unique tournament IDs that are published
+        const publishedRows = (tdRows as any[]).filter((r: any) => r.tournaments?.decklists_published);
+        const tournamentIds = [...new Set(publishedRows.map((r: any) => r.tournaments?.id).filter(Boolean))];
+
+        // Fetch participant counts in parallel (one query per tournament, all concurrent)
+        const countMap = new Map<string, number>();
+        if (tournamentIds.length > 0) {
+          const countResults = await Promise.all(
+            tournamentIds.map((tid) =>
+              supabase
+                .from("participants")
+                .select("id", { count: "exact", head: true })
+                .eq("tournament_id", tid)
+                .then(({ count }) => ({ tid, count: count || 0 }))
+            )
+          );
+          for (const { tid, count } of countResults) {
+            countMap.set(tid, count);
+          }
+        }
+
+        for (const row of publishedRows) {
+          const tid = row.tournaments?.id;
+          // Map by published_deck_id since that's the public deck visible on community page
+          tournamentMap.set(row.published_deck_id, {
+            tournament_name: row.tournaments?.name || "Tournament",
+            placement: row.participants?.place ?? null,
+            deck_format: row.tournaments?.deck_format || null,
+            participant_count: countMap.get(tid) || 0,
+          });
+        }
+      }
+    }
+
+    const decksWithUsername = (decks || []).map((d: any) => {
+      const tournament = tournamentMap.get(d.id);
+      return {
+        ...d,
+        username: usernameMap.get(d.user_id) || null,
+        tags: tagsMap.get(d.id) || [],
+        total_price: priceMap.get(d.id) || null,
+        tournament: tournament || null,
+      };
+    });
 
     return { success: true, decks: decksWithUsername, totalCount: count || 0 };
   } catch (error) {
