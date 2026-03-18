@@ -609,7 +609,7 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
                 ? "bg-gray-50 dark:bg-gray-700/30 border-gray-300 dark:border-gray-600"
                 : deck.tournament.placement === 3
                 ? "bg-orange-50 dark:bg-orange-900/15 border-orange-300 dark:border-orange-800/50"
-                : "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/50"
+                : "bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700"
             }`}>
               {deck.tournament.placement <= 3 && (
                 <TrophyIcon place={deck.tournament.placement} className="w-4 h-4 flex-shrink-0" />
@@ -621,7 +621,7 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
                   ? "text-gray-600 dark:text-gray-300"
                   : deck.tournament.placement === 3
                   ? "text-orange-700 dark:text-orange-300"
-                  : "text-amber-700 dark:text-amber-300"
+                  : "text-gray-600 dark:text-gray-400"
               }`}>
                 {getPlacementLabel(deck.tournament.placement)}
               </span>
