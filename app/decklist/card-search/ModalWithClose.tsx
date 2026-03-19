@@ -4,8 +4,11 @@ import { openYTGSearchPage } from "./ytgUtils";
 import { useCardImageUrl } from "./hooks/useCardImageUrl";
 import { useCardPrices } from "./hooks/useCardPrices";
 import { useCardRulings, type CardRuling } from "./hooks/useCardRulings";
+import { useDuplicateCards } from "./hooks/useDuplicateCards";
 import { useIsAdmin } from "../../../hooks/useIsAdmin";
 import { createRuling, updateRuling, deleteRuling } from "../../admin/rulings/actions";
+import { DuplicateCards, DuplicateCardsMobile } from "./components/DuplicateCards";
+import type { Card } from "./utils";
 
 /* ------------------------------------------------------------------ */
 /*  Inline Edit Ruling (replaces a ruling's text with editable fields) */
@@ -406,24 +409,41 @@ export default function ModalWithClose({
   onAddCard,
   onRemoveCard,
   getCardQuantity,
-  activeDeckTab = "main" // Default to main if not provided
+  activeDeckTab = "main", // Default to main if not provided
+  legalityFilter = null,
+  allCards,
+}: {
+  modalCard: Card | null;
+  setModalCard: (card: Card | null) => void;
+  visibleCards: Card[];
+  onAddCard: ((card: Card, isReserve: boolean) => void) | null;
+  onRemoveCard: ((name: string, set: string, isReserve: boolean) => void) | null;
+  getCardQuantity: ((name: string, set: string, isReserve: boolean) => number) | null;
+  activeDeckTab?: string;
+  /** Current legality filter for duplicate cards. null = show all. */
+  legalityFilter?: string | null;
+  /** Full unfiltered card list for legality checking of duplicates */
+  allCards?: Card[];
 }) {
   const { getImageUrl } = useCardImageUrl();
   const { getPrice, getProductUrl } = useCardPrices();
   const { rulings, refetch: refetchRulings } = useCardRulings(modalCard?.name ?? null);
+  const { siblings: duplicateSiblings } = useDuplicateCards(modalCard?.name ?? null);
   const { isAdmin, permissions } = useIsAdmin();
   const canManageRulings = isAdmin && permissions.includes('manage_rulings');
   const [showMenu, setShowMenu] = React.useState(false);
   const [isVisible, setIsVisible] = React.useState(false);
   const [isClosing, setIsClosing] = React.useState(false);
   const [rulingsSheetOpen, setRulingsSheetOpen] = React.useState(false);
+  const [versionsSheetOpen, setVersionsSheetOpen] = React.useState(false);
   const [addRulingMode, setAddRulingMode] = React.useState(false);
   const [editingRulingId, setEditingRulingId] = React.useState<string | null>(null);
   const [deletingRulingId, setDeletingRulingId] = React.useState<string | null>(null);
 
-  // Reset rulings state when card changes
+  // Reset rulings/versions state when card changes
   React.useEffect(() => {
     setRulingsSheetOpen(false);
+    setVersionsSheetOpen(false);
     setAddRulingMode(false);
     setEditingRulingId(null);
   }, [modalCard?.name]);
@@ -638,9 +658,10 @@ export default function ModalWithClose({
   const quantityInDeck = getCardQuantity ? getCardQuantity(modalCard.name, modalCard.set, false) : 0;
   const quantityInReserve = getCardQuantity ? getCardQuantity(modalCard.name, modalCard.set, true) : 0;
 
-  // Mobile footer needs row 2 when: has rulings, is admin, or minus buttons are showing (cards in deck)
+  // Mobile footer needs row 2 when: has rulings, is admin, minus buttons showing, or has duplicates
   const hasMinusButtons = quantityInDeck > 0 || quantityInReserve > 0;
-  const needsFooterRow2 = ((rulings.length > 0 || canManageRulings) && !addRulingMode) || hasMinusButtons;
+  const hasDuplicates = duplicateSiblings && duplicateSiblings.length > 0;
+  const needsFooterRow2 = ((rulings.length > 0 || canManageRulings) && !addRulingMode) || hasMinusButtons || hasDuplicates;
 
   return (
     <div
@@ -780,6 +801,35 @@ export default function ModalWithClose({
           setDeletingRulingId={setDeletingRulingId}
           refetchRulings={refetchRulings}
         />
+
+        {/* Mobile Versions Bottom Sheet */}
+        {versionsSheetOpen && hasDuplicates && (
+          <>
+            <div className="absolute inset-0 bg-black/40 z-10" onClick={() => setVersionsSheetOpen(false)} />
+            <div className="absolute left-0 right-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 bg-card rounded-t-xl shadow-lg" style={{ maxHeight: '60vh' }}>
+              <div className="flex justify-center pt-2.5 pb-1">
+                <div className="w-8 h-1 rounded-full bg-muted-foreground/30" />
+              </div>
+              <p className="px-4 pb-2 text-sm font-semibold text-foreground flex items-center gap-1.5">
+                <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                </svg>
+                Also Known As
+              </p>
+              <div className="overflow-y-auto" style={{ maxHeight: 'calc(60vh - 3.5rem)' }}>
+                <DuplicateCardsMobile
+                  siblings={duplicateSiblings!}
+                  visibleCards={visibleCards}
+                  allCards={allCards}
+                  onNavigate={(card) => {
+                    setVersionsSheetOpen(false);
+                    setModalCard(card);
+                  }}
+                />
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Mobile Add Ruling Form — bottom sheet style */}
         {addRulingMode && (
@@ -955,6 +1005,18 @@ export default function ModalWithClose({
                     + Ruling
                   </button>
                 )}
+                {/* Versions button */}
+                {hasDuplicates && (
+                  <button
+                    onClick={() => setVersionsSheetOpen(true)}
+                    className="h-9 px-3 rounded-lg flex items-center gap-1.5 text-sm font-medium border border-border bg-muted/50 text-foreground active:bg-muted transition-colors"
+                  >
+                    <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                    </svg>
+                    {duplicateSiblings!.length} {duplicateSiblings!.length === 1 ? 'version' : 'versions'}
+                  </button>
+                )}
               </div>
               {/* Shop button */}
               {(() => {
@@ -1029,8 +1091,8 @@ export default function ModalWithClose({
                 className="max-w-full max-h-full object-contain rounded shadow-lg flex-shrink"
               />
               {/* Show ability text below image for reference */}
-              {modalCard.ability && (
-                <p className="mt-3 text-xs text-muted-foreground leading-relaxed flex-shrink-0">{modalCard.ability}</p>
+              {(modalCard as any).ability && (
+                <p className="mt-3 text-xs text-muted-foreground leading-relaxed flex-shrink-0">{(modalCard as any).ability}</p>
               )}
             </div>
             <div className="flex-1 overflow-auto">
@@ -1076,6 +1138,16 @@ export default function ModalWithClose({
                   <Attribute key={key} label={prettifyFieldName(key)} value={value as string} />
                 ))}
               </div>
+              {/* Desktop Duplicate Cards (Also Known As) */}
+              {duplicateSiblings && duplicateSiblings.length > 0 && (
+                <DuplicateCards
+                  siblings={duplicateSiblings}
+                  visibleCards={visibleCards}
+                  allCards={allCards}
+                  legalityFilter={legalityFilter}
+                  onNavigate={(card) => setModalCard(card)}
+                />
+              )}
               {/* Desktop Rulings */}
               {(rulings.length > 0 || canManageRulings) && (
                 <div className="mt-3 pt-3 border-t border-border">

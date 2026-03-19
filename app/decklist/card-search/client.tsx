@@ -1365,6 +1365,8 @@ export default function CardSearchClient() {
           onRemoveCard={removeCard}
           getCardQuantity={getCardQuantity}
           activeDeckTab={activeDeckTab}
+          legalityFilter={legalityMode}
+          allCards={cards}
         />
       )}
       

@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GameCard } from '../types';
 import { X } from 'lucide-react';
+import { useDuplicateCards } from '../../decklist/card-search/hooks/useDuplicateCards';
 
 const BLOB_BASE_URL = process.env.NEXT_PUBLIC_BLOB_BASE_URL || '';
 
@@ -24,6 +25,8 @@ interface CardZoomModalProps {
 }
 
 export function CardZoomModal({ card, onClose }: CardZoomModalProps) {
+  const { siblings } = useDuplicateCards(card.cardName);
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -155,6 +158,23 @@ export function CardZoomModal({ card, onClose }: CardZoomModalProps) {
                 <div style={{ marginTop: 8 }}>
                   <span style={{ color: 'var(--gf-text-dim)' }}>Notes: </span>
                   <p style={{ marginTop: 2, fontStyle: 'italic' }}>{card.notes}</p>
+                </div>
+              )}
+              {siblings && siblings.length > 0 && (
+                <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--gf-border)' }}>
+                  <span style={{ color: 'var(--gf-text-dim)' }}>Also Known As:</span>
+                  <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {siblings.map((sib, i) => (
+                      <span key={i} style={{ color: 'var(--gf-text)' }}>
+                        {sib.cardName}
+                        {sib.ordirSets && (
+                          <span style={{ color: 'var(--gf-text-dim)', marginLeft: 4, fontSize: 9 }}>
+                            {sib.ordirSets.split(',').map(s => s.trim()).join(' · ')}
+                          </span>
+                        )}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
