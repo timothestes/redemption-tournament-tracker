@@ -224,7 +224,7 @@ export default function TournamentPage({
 
       if (byeError) throw byeError;
 
-      handleEndRound(data, setMatchErrorIndex, byeData, latestRound.round_number);
+      await handleEndRound(data, setMatchErrorIndex, byeData, latestRound.round_number);
     }
     try {
       const { data, error } = await supabase
@@ -251,6 +251,31 @@ export default function TournamentPage({
     let matchErrorIndexArr = [];
 
     const now = new Date().toISOString();
+
+    // Auto-handle matches where a player has dropped mid-round
+    for (const match of matches) {
+      if (match.player1_score !== null && match.player2_score !== null) continue;
+      const [{ data: p1Status }, { data: p2Status }] = await Promise.all([
+        client.from("participants").select("dropped_out").eq("id", match.player1_id.id).single(),
+        client.from("participants").select("dropped_out").eq("id", match.player2_id.id).single(),
+      ]);
+      if (p1Status?.dropped_out || p2Status?.dropped_out) {
+        if (p1Status?.dropped_out && p2Status?.dropped_out) {
+          match.player1_score = 0;
+          match.player2_score = 0;
+        } else if (p1Status?.dropped_out) {
+          match.player1_score = 0;
+          match.player2_score = tournament.max_score;
+        } else {
+          match.player1_score = tournament.max_score;
+          match.player2_score = 0;
+        }
+        await client.from("matches").update({
+          player1_score: match.player1_score,
+          player2_score: match.player2_score,
+        }).eq("id", match.id);
+      }
+    }
 
     // Checking if the user has not added the score
     matches.forEach((match, index) => {
@@ -287,16 +312,16 @@ export default function TournamentPage({
         if (participant2SelectError) throw participant2SelectError;
 
         if (match.player2_score === match.player1_score) {
-          // Draw: Both get 1.5 points
+          // Draw: Both get 1.5 points, differential unchanged (tie = 0 diff)
           await Promise.all([
             client.from("participants").update({
               match_points: (participant1.match_points || 0) + 1.5,
-              differential: (match.differential || 0) + (participant1.differential || 0),
+              differential: (participant1.differential || 0),
             }).eq("id", match.player1_id.id),
 
             client.from("participants").update({
               match_points: (participant2.match_points || 0) + 1.5,
-              differential: (match.differential2 || 0) + (participant2.differential || 0),
+              differential: (participant2.differential || 0),
             }).eq("id", match.player2_id.id),
           ]);
 
@@ -360,14 +385,13 @@ export default function TournamentPage({
 
       // Updating byes
       if (byes && byes.length > 0) {
-        byes.forEach(async (bye) => {
-          // Updating the participant match_points
+        for (const bye of byes) {
           const { error: participantUpdateError } = await client.from("participants").update({
             match_points: (bye.match_points ?? 0),
             differential: (bye.differential ?? 0),
           }).eq("id", bye.participant_id.id);
           if (participantUpdateError) console.log(participantUpdateError);
-        })
+        }
       }
 
       // Update the database
@@ -419,7 +443,7 @@ export default function TournamentPage({
     } catch (error) {
       console.error("Error ending round:", error);
     }
-  }, []);
+  }, [tournament]);
 
   const handleStartTournament = async (
     numberOfRounds: number,
