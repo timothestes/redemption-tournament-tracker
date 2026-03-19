@@ -8,6 +8,16 @@ import { getSupabaseAdmin } from '@/lib/pricing/supabase-admin';
 
 const DISCORD_API_BASE = 'https://discord.com/api/v10';
 const BATCH_SIZE = 100; // Discord max per request
+const SYNC_DAYS = 3; // Only fetch messages from the last N days
+
+/** Convert a Date to a Discord snowflake ID (for use as `after` cursor) */
+function dateToSnowflake(date: Date): string {
+  // Discord epoch: 2015-01-01T00:00:00.000Z = 1420070400000
+  const discordEpoch = 1420070400000;
+  const timestamp = date.getTime() - discordEpoch;
+  // Snowflake = (timestamp << 22) — use multiply since BigInt literals need ES2020+
+  return String(timestamp * 4194304);
+}
 
 interface DiscordMessage {
   id: string;
@@ -121,7 +131,13 @@ export async function syncDiscordRulings(): Promise<SyncResult> {
   const supabase = getSupabaseAdmin();
   const result: SyncResult = { fetched: 0, newMessages: 0, skipped: 0, errors: [] };
 
-  // Find the newest and oldest discord_message_id we've already stored
+  // Use a cutoff: only fetch messages from the last SYNC_DAYS days.
+  // On the first run this backfills 30 days; on subsequent runs it picks up
+  // anything new since the last sync. Much faster than paging the full history.
+  const cutoffDate = new Date(Date.now() - SYNC_DAYS * 24 * 60 * 60 * 1000);
+  const cutoffSnowflake = dateToSnowflake(cutoffDate);
+
+  // Find the newest discord_message_id we've already stored
   const { data: latest } = await supabase
     .from('discord_ruling_messages')
     .select('discord_message_id')
@@ -129,46 +145,26 @@ export async function syncDiscordRulings(): Promise<SyncResult> {
     .limit(1)
     .single();
 
-  const { data: oldest } = await supabase
-    .from('discord_ruling_messages')
-    .select('discord_message_id')
-    .order('message_date', { ascending: true })
-    .limit(1)
-    .single();
+  // Start from whichever is more recent: the last synced message or the cutoff
+  const afterId = latest?.discord_message_id
+    ? (BigInt(latest.discord_message_id) > BigInt(cutoffSnowflake)
+        ? latest.discord_message_id
+        : cutoffSnowflake)
+    : cutoffSnowflake;
 
-  // --- Forward sync: fetch newer messages ---
-  const afterId = latest?.discord_message_id || undefined;
-  let forwardCursor = afterId;
+  let cursor: string | undefined = afterId;
   // eslint-disable-next-line no-constant-condition
   while (true) {
-    const page = await fetchDiscordPage(channelId, token, 'after', forwardCursor);
+    const page = await fetchDiscordPage(channelId, token, 'after', cursor);
     if (page.length === 0) break;
 
     result.fetched += page.length;
     await upsertBatch(supabase, messagesToRows(page), result);
 
     if (page.length < BATCH_SIZE) break;
-    forwardCursor = page.reduce((max, m) =>
+    cursor = page.reduce((max, m) =>
       BigInt(m.id) > BigInt(max) ? m.id : max, page[0].id
     );
-  }
-
-  // --- Backfill: fetch older messages, inserting each page immediately ---
-  if (oldest?.discord_message_id) {
-    let backCursor: string | undefined = oldest.discord_message_id;
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const page = await fetchDiscordPage(channelId, token, 'before', backCursor);
-      if (page.length === 0) break;
-
-      result.fetched += page.length;
-      await upsertBatch(supabase, messagesToRows(page), result);
-
-      if (page.length < BATCH_SIZE) break;
-      backCursor = page.reduce((min, m) =>
-        BigInt(m.id) < BigInt(min) ? m.id : min, page[0].id
-      );
-    }
   }
 
   return result;

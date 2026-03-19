@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { syncDiscordRulings } from '@/lib/rulings/discord-sync';
 
-export const maxDuration = 60;
+export const maxDuration = 90;
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization');

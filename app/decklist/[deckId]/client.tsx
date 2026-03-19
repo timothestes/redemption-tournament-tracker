@@ -454,6 +454,8 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
           onAddCard={null}
           onRemoveCard={null}
           getCardQuantity={null}
+          legalityFilter={null}
+          allCards={allCardsForNav}
         />
       )}
 
