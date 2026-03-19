@@ -165,18 +165,27 @@ export function DuplicateCards({
     ? enrichedSiblings.filter((s) => s.passesLegality)
     : enrichedSiblings;
 
+  const [expanded, setExpanded] = React.useState(false);
+
   if (displaySiblings.length === 0) return null;
 
   return (
     <div className="mt-3 pt-3 border-t border-border">
-      <p className="text-sm font-semibold text-foreground mb-2 flex items-center gap-1.5">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="w-full text-left text-sm font-semibold text-foreground mb-2 flex items-center gap-1.5 hover:text-primary transition-colors"
+      >
         <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
         </svg>
         Also Known As
         <span className="text-xs font-normal text-muted-foreground">({displaySiblings.length})</span>
-      </p>
-      <div className="space-y-0">
+        <svg className={`w-3.5 h-3.5 text-muted-foreground ml-auto transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+        </svg>
+      </button>
+      <div className={`space-y-0 ${expanded ? '' : 'hidden'}`}>
         {displaySiblings.map((sib, i) => {
           const isNavigable = !!sib.navigableCard && !!onNavigate;
           const isDimmed = !sib.passesLegality;
