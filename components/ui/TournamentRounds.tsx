@@ -250,6 +250,31 @@ export default function TournamentRounds({
 
     let matchErrorIndexArr = [];
 
+    // Auto-handle matches where a player has dropped mid-round
+    for (const match of matches) {
+      if (match.player1_score !== null && match.player2_score !== null) continue;
+      const [{ data: p1Status }, { data: p2Status }] = await Promise.all([
+        client.from("participants").select("dropped_out").eq("id", match.player1_id.id).single(),
+        client.from("participants").select("dropped_out").eq("id", match.player2_id.id).single(),
+      ]);
+      if (p1Status?.dropped_out || p2Status?.dropped_out) {
+        if (p1Status?.dropped_out && p2Status?.dropped_out) {
+          match.player1_score = 0;
+          match.player2_score = 0;
+        } else if (p1Status?.dropped_out) {
+          match.player1_score = 0;
+          match.player2_score = tournamentInfo.max_score;
+        } else {
+          match.player1_score = tournamentInfo.max_score;
+          match.player2_score = 0;
+        }
+        await client.from("matches").update({
+          player1_score: match.player1_score,
+          player2_score: match.player2_score,
+        }).eq("id", match.id);
+      }
+    }
+
     matches.forEach((match, index) => {
       if (match.player1_score === null || match.player2_score === null) {
         setMatchErrorIndex((matchErrorIndex) => [...matchErrorIndex, index]);
@@ -349,13 +374,13 @@ export default function TournamentRounds({
       }
 
       if (byes && byes.length > 0) {
-        byes.forEach(async (bye) => {
+        for (const bye of byes) {
           const { error: participantUpdateError } = await client.from("participants").update({
             match_points: (bye.match_points ?? 0),
             differential: (bye.differential ?? 0),
           }).eq("id", bye.participant_id.id);
           if (participantUpdateError) console.log(participantUpdateError);
-        });
+        }
       }
 
       const { error: roundError, data: roundData } = await client
@@ -414,7 +439,7 @@ export default function TournamentRounds({
       console.error("Error ending round:", error);
       setMatchEnding(false);
     }
-  }, [matches]);
+  }, [matches, tournamentInfo, byes]);
 
   const handleRepairClick = (match: any, isPlayer2 = false) => {
     if (repairMode) {

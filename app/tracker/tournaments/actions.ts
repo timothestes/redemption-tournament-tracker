@@ -258,6 +258,8 @@ export async function publishTournamentDecklistsAction(
 
   if (!partError && participants) {
     const sorted = [...participants].sort((a, b) => {
+      // Dropped players always rank after active players
+      if (a.dropped_out !== b.dropped_out) return a.dropped_out ? 1 : -1;
       const mpDiff = (b.match_points || 0) - (a.match_points || 0);
       if (mpDiff !== 0) return mpDiff;
       return (b.differential || 0) - (a.differential || 0);
