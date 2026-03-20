@@ -39,12 +39,12 @@ function NewDeckRenameForm({
 
   return (
     <>
-      <p className="text-gray-600 dark:text-gray-300 mb-4 leading-relaxed">
-        Your deck is still named <strong>"Untitled Deck"</strong>. Would you like to give it a name before saving?
+      <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
+        Your deck is still named <strong className="text-foreground">&quot;Untitled Deck&quot;</strong>. Give it a name before saving?
       </p>
-      
+
       <div className="mb-5">
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        <label className="block text-sm font-medium text-foreground mb-1.5">
           Deck Name
         </label>
         <input
@@ -52,7 +52,7 @@ function NewDeckRenameForm({
           value={deckName}
           onChange={(e) => setDeckName(e.target.value)}
           placeholder="Enter deck name..."
-          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-ring focus:border-transparent"
+          className="w-full px-3.5 py-2.5 rounded-lg bg-muted text-foreground placeholder:text-muted-foreground text-sm"
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               onSubmit(deckName.trim() || "Untitled Deck");
@@ -62,32 +62,24 @@ function NewDeckRenameForm({
         />
       </div>
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2.5">
         <button
           onClick={() => onSubmit(deckName.trim() || "Untitled Deck")}
-          className="w-full px-6 py-3 bg-white dark:bg-gray-800 rounded-lg transition-all font-semibold flex items-center justify-center gap-2 border-2 hover:bg-green-50 dark:hover:bg-green-950/20"
-          style={{
-            borderImage: 'linear-gradient(to right, rgb(34 197 94), rgb(59 130 246)) 1',
-          }}
+          className="w-full px-5 py-2.5 bg-primary/85 text-primary-foreground rounded-lg transition-all font-semibold text-sm hover:bg-primary"
         >
-          <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-          </svg>
-          <span className="text-gray-900 dark:text-white">
-            Save & Create New Deck
-          </span>
+          Save & Create New
         </button>
 
         <button
           onClick={onDiscard}
-          className="w-full px-6 py-3 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg transition-all font-semibold flex items-center justify-center gap-2 border-2 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+          className="w-full px-5 py-2.5 rounded-lg transition-all text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
         >
-          Discard & Create New Deck
+          Don&apos;t Save
         </button>
 
         <button
           onClick={onCancel}
-          className="w-full px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+          className="w-full px-4 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           Cancel
         </button>
@@ -1457,7 +1449,7 @@ export default function CardSearchClient() {
               </span>
             </button>
             <button
-              className="px-3 flex-1 shrink-0 rounded bg-muted text-muted-foreground hover:bg-muted/80 border border-border transition font-medium shadow-sm text-center relative text-xs h-8"
+              className="px-3 flex-1 shrink-0 rounded bg-primary/15 text-primary hover:bg-primary/25 border border-primary/30 transition font-medium shadow-sm text-center relative text-xs h-8"
               onClick={addNewQuery}
               title="Add new query"
             >
@@ -1467,7 +1459,7 @@ export default function CardSearchClient() {
             {/* Desktop: centered buttons with filters right-aligned */}
             <div className="hidden sm:flex flex-row gap-2 w-full items-center justify-center relative">
             <button
-              className="px-4 shrink-0 rounded bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground border border-border transition font-medium shadow-sm text-center relative h-9 sm:h-11"
+              className="px-4 shrink-0 rounded bg-primary/15 text-primary hover:bg-primary/25 border border-primary/30 transition font-medium shadow-sm text-center relative h-9 sm:h-11"
               onClick={addNewQuery}
               title="Add new query"
             >
@@ -2520,57 +2512,24 @@ export default function CardSearchClient() {
       
       {/* New Deck Confirmation Modal */}
       {showNewDeckModal && (
-        <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-150"
           onClick={() => setShowNewDeckModal(false)}
         >
-          <div 
-            className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden animate-in zoom-in-95 duration-200"
+          <div
+            className="bg-card text-card-foreground rounded-xl w-full max-w-md animate-in zoom-in-95 duration-200"
+            style={{ boxShadow: '0 16px 40px rgba(0, 20, 80, 0.15)' }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
-            <div className="bg-gradient-to-r from-amber-600 to-orange-600 dark:from-amber-700 dark:to-orange-800 px-6 py-5">
-              <div className="flex items-start gap-4">
-                <div className="flex-shrink-0 w-12 h-12 bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                  <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-xl font-bold text-white mb-1">Create New Deck?</h3>
-                  {!user && <p className="text-sm text-amber-50">Your current deck will be discarded</p>}
-                </div>
-              </div>
-            </div>
-            
-            {/* Content */}
-            <div className="px-6 py-6">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-foreground mb-3">
+                {!user ? 'Create New Deck?' : hasUnsavedChanges ? 'Unsaved Changes' : 'Create New Deck?'}
+              </h3>
+
               {!user ? (
-                <>
-                  <div className="mb-5 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                    <div className="flex items-start gap-3">
-                      <svg className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                      </svg>
-                      <div>
-                        <p className="text-sm font-semibold text-red-900 dark:text-red-100 mb-1">
-                          You are not signed in
-                        </p>
-                        <p className="text-sm text-red-700 dark:text-red-300">
-                          Creating a new deck will discard your current deck. Your deck is saved locally on this device only. 
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mb-5 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                    <p className="text-sm text-blue-700 dark:text-blue-300 flex items-start gap-2">
-                      <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <span>💡 Users that are signed in can save multiple decks to the cloud</span>
-                    </p>
-                  </div>
-                </>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Your current deck will be lost — it&apos;s only saved locally on this device. Sign in to save multiple decks to the cloud.
+                </p>
               ) : hasUnsavedChanges && deck.name === "Untitled Deck" ? (
                 <NewDeckRenameForm
                   onSubmit={(newName) => proceedWithNewDeck(true, newName)}
@@ -2580,92 +2539,75 @@ export default function CardSearchClient() {
                 />
               ) : hasUnsavedChanges ? (
                 <>
-                  <p className="text-gray-600 dark:text-gray-300 mb-5 leading-relaxed">
-                    You have unsaved changes to <strong>{deck.name}</strong>. Would you like to save it before creating a new deck?
+                  <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
+                    Save changes to <strong className="text-foreground">{deck.name}</strong> before creating a new deck?
                   </p>
-                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/50 dark:to-gray-900/30 rounded-xl p-4 border border-gray-200 dark:border-gray-700 shadow-sm">
+                  <div className="bg-muted/60 rounded-lg p-3.5">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-green-600/10 dark:bg-green-600/20 rounded-lg flex items-center justify-center">
-                        <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                      <div className="w-9 h-9 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                         </svg>
                       </div>
                       <div>
-                        <div className="font-semibold text-gray-900 dark:text-white text-base">
-                          {deck.name}
-                        </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
-                          <span>{getDeckStats().mainDeckCount + getDeckStats().reserveCount} cards</span>
-                          <span className="text-gray-400 dark:text-gray-600"></span>
-                          <span>{deck.format || "Type 1"}</span>
+                        <div className="font-medium text-foreground text-sm">{deck.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {getDeckStats().mainDeckCount + getDeckStats().reserveCount} cards · {deck.format || "Type 1"}
                         </div>
                       </div>
                     </div>
                   </div>
                 </>
               ) : (
-                <p className="text-gray-600 dark:text-gray-300 mb-5 leading-relaxed">
-                  Are you sure you want to create a new deck?
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Start a fresh deck?
                 </p>
               )}
-            </div>
-            
-            {/* Actions */}
-            {(!user || !hasUnsavedChanges || deck.name !== "Untitled Deck") && (
-              <div className="px-6 py-5 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-700">
-                <div className="flex flex-col gap-3">
+
+              {/* Actions */}
+              {(!user || !hasUnsavedChanges || deck.name !== "Untitled Deck") && (
+                <div className="mt-5 flex flex-col gap-2.5">
                   {user && hasUnsavedChanges && (
                     <button
                       onClick={() => proceedWithNewDeck(true)}
-                      className="w-full px-6 py-3 bg-white dark:bg-gray-800 rounded-lg transition-all font-semibold flex items-center justify-center gap-2 border-2 hover:bg-green-50 dark:hover:bg-green-950/20"
-                      style={{
-                        borderImage: 'linear-gradient(to right, rgb(34 197 94), rgb(59 130 246)) 1',
-                      }}
+                      className="w-full px-5 py-2.5 bg-primary/85 text-primary-foreground rounded-lg transition-all font-semibold text-sm hover:bg-primary"
                     >
-                      <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                      </svg>
-                      <span className="text-gray-900 dark:text-white">
-                        Save & Create New Deck
-                      </span>
+                      Save & Create New
                     </button>
                   )}
 
                   {!user && (
                     <button
                       onClick={() => {
-                        // Close modal and navigate to sign in
                         setShowNewDeckModal(false);
                         router.push('/sign-in');
                       }}
-                      className="w-full px-6 py-3 bg-green-700 dark:bg-green-800 text-white rounded-lg transition-all font-semibold flex items-center justify-center gap-2 hover:bg-green-800 dark:hover:bg-green-700 border-2 border-green-700 dark:border-green-800"
+                      className="w-full px-5 py-2.5 bg-primary/85 text-primary-foreground rounded-lg transition-all font-semibold text-sm hover:bg-primary"
                     >
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                      </svg>
                       Sign In to Save Decks
                     </button>
                   )}
 
                   <button
                     onClick={() => proceedWithNewDeck(false)}
-                    className="w-full px-6 py-3 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg transition-all font-semibold flex items-center justify-center gap-2 border-2 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    className={`w-full px-5 py-2.5 rounded-lg transition-all text-sm ${
+                      (user && hasUnsavedChanges) || !user
+                        ? 'font-medium text-muted-foreground hover:bg-muted hover:text-foreground'
+                        : 'bg-primary/85 text-primary-foreground font-semibold hover:bg-primary'
+                    }`}
                   >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    Discard Any Changes & Create New Deck
+                    {user && hasUnsavedChanges ? "Don\u2019t Save" : !user ? "Discard & Start New" : "Create New Deck"}
                   </button>
 
                   <button
                     onClick={() => setShowNewDeckModal(false)}
-                    className="w-full px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+                    className="w-full px-4 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
                   >
                     Cancel
                   </button>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       )}
