@@ -114,4 +114,4 @@ Joining a tournament via QR code
 metagame snapshot
 tournament tracker mobile ux support
 Deck upvoting
-intallable app on phone (Progressive Web app with offline capabilities)
+Offline intallable app on phone (Progressive Web app with offline capabilities)
