@@ -518,9 +518,18 @@ async function syncToSupabase(
 
   console.log("\nSyncing to Supabase...");
 
-  // Clear existing data
-  await supabase.from("duplicate_card_group_members").delete().neq("id", 0);
-  await supabase.from("duplicate_card_groups").delete().neq("id", 0);
+  // Clear only ORDIR-sourced data (preserve manually-created groups)
+  const { data: ordirGroups } = await supabase
+    .from("duplicate_card_groups")
+    .select("id")
+    .eq("source", "ordir");
+
+  if (ordirGroups && ordirGroups.length > 0) {
+    const ordirGroupIds = ordirGroups.map((g) => g.id);
+    await supabase.from("duplicate_card_group_members").delete().in("group_id", ordirGroupIds);
+    await supabase.from("duplicate_card_groups").delete().in("id", ordirGroupIds);
+    console.log(`  Cleared ${ordirGroupIds.length} existing ORDIR groups`);
+  }
 
   let groupCount = 0;
   let memberCount = 0;
@@ -529,7 +538,7 @@ async function syncToSupabase(
     // Insert group
     const { data: groupData, error: groupError } = await supabase
       .from("duplicate_card_groups")
-      .insert({ canonical_name: group.canonicalName })
+      .insert({ canonical_name: group.canonicalName, source: "ordir" })
       .select("id")
       .single();
 

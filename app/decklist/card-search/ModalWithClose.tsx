@@ -545,6 +545,16 @@ export default function ModalWithClose({
     }
   }, [modalCard]);
 
+  // Lock body scroll when modal is open
+  React.useEffect(() => {
+    if (!modalCard) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [modalCard]);
+
   // Wrap setModalCard to animate out before unmounting
   const closeModal = React.useCallback(() => {
     setIsClosing(true);

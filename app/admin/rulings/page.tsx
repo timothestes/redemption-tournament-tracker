@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from "react";
 import TopNav from "../../../components/top-nav";
 import { useIsAdmin } from "../../../hooks/useIsAdmin";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -15,6 +15,7 @@ import {
   updateRuling,
   deleteRuling,
   searchDiscordMessages,
+  getDiscordContext,
   type CardRuling,
 } from "./actions";
 
@@ -23,6 +24,8 @@ import {
 /* ------------------------------------------------------------------ */
 
 type Tab = "rulings" | "add" | "discord";
+
+type DiscordMsg = { id: string; author_name: string | null; content: string; message_date: string };
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-US", {
@@ -208,6 +211,131 @@ function useCardLookup() {
   return lookup;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Card name typeahead                                                */
+/* ------------------------------------------------------------------ */
+
+function CardNameTypeahead({
+  value,
+  onChange,
+  placeholder = "e.g. Son of God",
+}: {
+  value: string;
+  onChange: (name: string) => void;
+  placeholder?: string;
+}) {
+  const [allCards, setAllCards] = useState<string[]>([]);
+  const [results, setResults] = useState<string[]>([]);
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetch(CARD_DATA_URL)
+      .then((res) => res.text())
+      .then((text) => {
+        const lines = text.split("\n").slice(1).filter((l) => l.trim());
+        const seen = new Set<string>();
+        const names: string[] = [];
+        for (const line of lines) {
+          const name = line.split("\t")[0]?.trim();
+          if (name && !seen.has(name.toLowerCase())) {
+            seen.add(name.toLowerCase());
+            names.push(name);
+          }
+        }
+        setAllCards(names);
+      });
+  }, []);
+
+  useEffect(() => {
+    if (value.length < 2) {
+      setResults([]);
+      setIsOpen(false);
+      return;
+    }
+    const timeout = setTimeout(() => {
+      const q = value.toLowerCase();
+      const found: string[] = [];
+      for (const name of allCards) {
+        if (name.toLowerCase().includes(q)) {
+          found.push(name);
+          if (found.length >= 12) break;
+        }
+      }
+      setResults(found);
+      setIsOpen(found.length > 0);
+      setActiveIndex(-1);
+    }, 100);
+    return () => clearTimeout(timeout);
+  }, [value, allCards]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const handleSelect = (name: string) => {
+    onChange(name);
+    setIsOpen(false);
+    inputRef.current?.focus();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!isOpen) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIndex((prev) => Math.min(prev + 1, results.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex((prev) => Math.max(prev - 1, 0));
+    } else if (e.key === "Enter" && activeIndex >= 0) {
+      e.preventDefault();
+      handleSelect(results[activeIndex]);
+    } else if (e.key === "Escape") {
+      setIsOpen(false);
+    }
+  };
+
+  return (
+    <div ref={containerRef} className="relative">
+      <Input
+        ref={inputRef}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onFocus={() => results.length > 0 && setIsOpen(true)}
+        placeholder={placeholder}
+      />
+      {isOpen && (
+        <div className="absolute z-50 mt-1 w-full rounded-lg bg-popover/95 backdrop-blur-xl shadow-[0px_12px_32px_0px_rgba(0,40,142,0.08)] dark:shadow-[0px_20px_40px_rgba(6,14,32,0.6)] overflow-hidden">
+          <div className="max-h-60 overflow-y-auto py-1">
+            {results.map((name, i) => (
+              <button
+                key={name}
+                onClick={() => handleSelect(name)}
+                className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                  i === activeIndex
+                    ? "bg-accent text-accent-foreground"
+                    : "text-foreground hover:bg-muted/60"
+                }`}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CardPreview({ cardName }: { cardName: string }) {
   const lookupCard = useCardLookup();
   const card = lookupCard(cardName);
@@ -245,6 +373,170 @@ function CardPreview({ cardName }: { cardName: string }) {
       <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
         <span>{card.type}</span>
         {card.identifier && <span>&middot; {card.identifier}</span>}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Discord message with expandable context                            */
+/* ------------------------------------------------------------------ */
+
+function DiscordMessageRow({
+  msg,
+  isHighlighted = false,
+  compact = false,
+}: {
+  msg: DiscordMsg;
+  isHighlighted?: boolean;
+  compact?: boolean;
+}) {
+  return (
+    <div className={`${compact ? "px-3 py-1.5" : "px-4 py-2"} ${isHighlighted ? "bg-primary/5 dark:bg-primary/10" : ""}`}>
+      <div className="flex items-center gap-2 mb-0.5">
+        {msg.author_name && (
+          <span className={`font-medium text-foreground ${compact ? "text-[11px]" : "text-xs"}`}>
+            {msg.author_name}
+          </span>
+        )}
+        <span className={`text-muted-foreground font-mono ${compact ? "text-[10px]" : "text-xs"}`}>
+          {formatDate(msg.message_date)}
+        </span>
+      </div>
+      <p className={`text-muted-foreground whitespace-pre-wrap leading-relaxed ${compact ? "text-xs" : "text-sm"}`}>
+        {msg.content}
+      </p>
+    </div>
+  );
+}
+
+function DiscordThread({
+  message,
+  compact = false,
+}: {
+  message: DiscordMsg;
+  compact?: boolean;
+}) {
+  const [beforeMsgs, setBeforeMsgs] = useState<DiscordMsg[]>([]);
+  const [afterMsgs, setAfterMsgs] = useState<DiscordMsg[]>([]);
+  const [loadingBefore, setLoadingBefore] = useState(false);
+  const [loadingAfter, setLoadingAfter] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [hasMoreBefore, setHasMoreBefore] = useState(true);
+  const [hasMoreAfter, setHasMoreAfter] = useState(true);
+
+  const loadBefore = async () => {
+    setLoadingBefore(true);
+    const earliest = beforeMsgs.length > 0 ? beforeMsgs[0].message_date : message.message_date;
+    const result = await getDiscordContext(earliest, "before", 10);
+    if (result.messages.length < 10) setHasMoreBefore(false);
+    if (result.messages.length > 0) {
+      setBeforeMsgs((prev) => [...result.messages, ...prev]);
+    } else {
+      setHasMoreBefore(false);
+    }
+    setLoadingBefore(false);
+  };
+
+  const loadAfter = async () => {
+    setLoadingAfter(true);
+    const latest = afterMsgs.length > 0 ? afterMsgs[afterMsgs.length - 1].message_date : message.message_date;
+    const result = await getDiscordContext(latest, "after", 10);
+    if (result.messages.length < 10) setHasMoreAfter(false);
+    if (result.messages.length > 0) {
+      setAfterMsgs((prev) => [...prev, ...result.messages]);
+    } else {
+      setHasMoreAfter(false);
+    }
+    setLoadingAfter(false);
+  };
+
+  const handleExpand = async () => {
+    if (!expanded) {
+      setExpanded(true);
+      // Load initial context in both directions
+      const [before, after] = await Promise.all([
+        getDiscordContext(message.message_date, "before", 5),
+        getDiscordContext(message.message_date, "after", 5),
+      ]);
+      setBeforeMsgs(before.messages);
+      setAfterMsgs(after.messages);
+      if (before.messages.length < 5) setHasMoreBefore(false);
+      if (after.messages.length < 5) setHasMoreAfter(false);
+    } else {
+      setExpanded(false);
+      setBeforeMsgs([]);
+      setAfterMsgs([]);
+      setHasMoreBefore(true);
+      setHasMoreAfter(true);
+    }
+  };
+
+  if (!expanded) {
+    return (
+      <div>
+        <DiscordMessageRow msg={message} compact={compact} />
+        <div className={compact ? "px-3 pb-1.5" : "px-4 pb-2"}>
+          <button
+            onClick={handleExpand}
+            className="text-[11px] text-primary hover:text-primary/80 transition-colors"
+          >
+            Show context
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Load more before */}
+      {hasMoreBefore && (
+        <div className={compact ? "px-3 py-1" : "px-4 py-1.5"}>
+          <button
+            onClick={loadBefore}
+            disabled={loadingBefore}
+            className="text-[11px] text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
+          >
+            {loadingBefore ? "Loading..." : "Load older messages"}
+          </button>
+        </div>
+      )}
+
+      {/* Before messages */}
+      {beforeMsgs.map((msg) => (
+        <DiscordMessageRow key={msg.id} msg={msg} compact={compact} />
+      ))}
+
+      {/* The matched message (highlighted) */}
+      <DiscordMessageRow msg={message} isHighlighted compact={compact} />
+
+      {/* After messages */}
+      {afterMsgs.map((msg) => (
+        <DiscordMessageRow key={msg.id} msg={msg} compact={compact} />
+      ))}
+
+      {/* Load more after */}
+      {hasMoreAfter && (
+        <div className={compact ? "px-3 py-1" : "px-4 py-1.5"}>
+          <button
+            onClick={loadAfter}
+            disabled={loadingAfter}
+            className="text-[11px] text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
+          >
+            {loadingAfter ? "Loading..." : "Load newer messages"}
+          </button>
+        </div>
+      )}
+
+      {/* Collapse */}
+      <div className={compact ? "px-3 pb-1.5" : "px-4 pb-2"}>
+        <button
+          onClick={handleExpand}
+          className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Hide context
+        </button>
       </div>
     </div>
   );
@@ -296,19 +588,9 @@ function DiscordReference() {
         <div className="px-3 py-4 text-center text-xs text-muted-foreground">No messages found.</div>
       )}
       {!loading && messages.length > 0 && (
-        <div className="max-h-64 overflow-y-auto divide-y divide-border">
+        <div className="max-h-80 overflow-y-auto divide-y divide-border">
           {messages.map((msg) => (
-            <div key={msg.id} className="px-3 py-2">
-              <div className="flex items-center gap-2 mb-0.5">
-                {msg.author_name && (
-                  <span className="text-[11px] font-medium text-foreground">{msg.author_name}</span>
-                )}
-                <span className="text-[10px] text-muted-foreground font-mono">
-                  {formatDate(msg.message_date)}
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-            </div>
+            <DiscordThread key={msg.id} message={msg} compact />
           ))}
           {messages.length >= 50 && (
             <div className="px-3 py-2 text-[10px] text-muted-foreground text-center">
@@ -391,10 +673,9 @@ function AddRulingForm({
         <div className="space-y-4">
           <div>
             <label className="text-sm font-medium text-foreground mb-1.5 block">Card Name</label>
-            <Input
+            <CardNameTypeahead
               value={cardName}
-              onChange={(e) => { setCardName(e.target.value); setSuccessMsg(null); }}
-              placeholder="e.g. Son of God"
+              onChange={(name) => { setCardName(name); setSuccessMsg(null); }}
             />
           </div>
 
@@ -556,16 +837,8 @@ function DiscordArchive() {
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground">{messages.length} result{messages.length !== 1 ? "s" : ""}</p>
             {messages.map((msg) => (
-              <div key={msg.id} className="border border-border rounded-lg px-4 py-3">
-                <div className="flex items-center gap-2 mb-1">
-                  {msg.author_name && (
-                    <span className="text-xs font-medium text-foreground">{msg.author_name}</span>
-                  )}
-                  <span className="text-xs text-muted-foreground font-mono">
-                    {formatDate(msg.message_date)}
-                  </span>
-                </div>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{msg.content}</p>
+              <div key={msg.id} className="border border-border rounded-lg overflow-hidden">
+                <DiscordThread message={msg} />
               </div>
             ))}
             {messages.length >= 50 && (

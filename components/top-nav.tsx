@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { HiMenu, HiDocumentText, HiArrowSmRight, HiUserAdd, HiShieldCheck, HiGlobeAlt, HiSparkles, HiCalendar } from "react-icons/hi";
+import { HiMenu, HiDocumentText, HiArrowSmRight, HiUserAdd, HiShieldCheck, HiGlobeAlt, HiSparkles, HiCalendar, HiCollection } from "react-icons/hi";
 import { IoClose } from "react-icons/io5";
 import { FaTrophy, FaBookOpen } from "react-icons/fa6";
 import { PiPencilLineBold } from "react-icons/pi";
@@ -260,6 +260,26 @@ const TopNav: React.FC = () => {
                         >
                           <HiSparkles className="w-4 h-4" />
                           Manage Spoilers
+                        </Link>
+                      )}
+                      {permissions.includes('manage_cards') && (
+                        <Link
+                          href="/admin/cards"
+                          onClick={() => setIsAdminOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
+                        >
+                          <HiCollection className="w-4 h-4" />
+                          Manage Cards
+                        </Link>
+                      )}
+                      {permissions.includes('manage_rulings') && (
+                        <Link
+                          href="/admin/rulings"
+                          onClick={() => setIsAdminOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
+                        >
+                          <HiDocumentText className="w-4 h-4" />
+                          Manage Rulings
                         </Link>
                       )}
                     </div>
@@ -604,6 +624,26 @@ const TopNav: React.FC = () => {
                       >
                         <HiSparkles className="w-4 h-4" />
                         Manage Spoilers
+                      </Link>
+                    )}
+                    {permissions.includes('manage_cards') && (
+                      <Link
+                        href="/admin/cards"
+                        onClick={closeMobileMenu}
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
+                      >
+                        <HiCollection className="w-4 h-4" />
+                        Manage Cards
+                      </Link>
+                    )}
+                    {permissions.includes('manage_rulings') && (
+                      <Link
+                        href="/admin/rulings"
+                        onClick={closeMobileMenu}
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
+                      >
+                        <HiDocumentText className="w-4 h-4" />
+                        Manage Rulings
                       </Link>
                     )}
                   </div>

@@ -154,6 +154,31 @@ export async function searchDiscordMessages(search: string, limit = 50) {
   return { messages: (data || []) as Pick<DiscordMessage, "id" | "author_name" | "content" | "message_date">[], error: null };
 }
 
+export async function getDiscordContext(
+  messageDate: string,
+  direction: "before" | "after",
+  limit = 10
+) {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("discord_ruling_messages")
+    .select("id, author_name, content, message_date")
+    .order("message_date", { ascending: direction === "after" })
+    [direction === "before" ? "lt" : "gt"]("message_date", messageDate)
+    .limit(limit);
+
+  if (error) {
+    console.error("Error fetching discord context:", error);
+    return { messages: [], error: error.message };
+  }
+
+  // Always return in chronological order
+  const messages = (data || []) as Pick<DiscordMessage, "id" | "author_name" | "content" | "message_date">[];
+  if (direction === "before") messages.reverse();
+  return { messages, error: null };
+}
+
 // ─── Search (public, used by rulings page and admin) ────────────
 
 export async function searchRulingsPublic(search: string) {
