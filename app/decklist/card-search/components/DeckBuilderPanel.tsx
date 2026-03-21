@@ -24,6 +24,8 @@ import ParagonRequirements from "./ParagonRequirements";
 import { useCardImageUrl } from "../hooks/useCardImageUrl";
 import ReactMarkdown from "react-markdown";
 import BuyDeckModal, { BuyDeckCard } from "./BuyDeckModal";
+import DeckLegalityChecklist from "./DeckLegalityChecklist";
+import type { DeckCheckResult } from "@/utils/deckcheck/types";
 
 function getTagContrastColor(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -89,6 +91,10 @@ interface DeckBuilderPanelProps {
   forceDisableHoverPreview?: boolean;
   /** Default tab to show when panel mounts (persists across mobile drawer open/close) */
   defaultTab?: TabType;
+  /** Server-side deck check result */
+  deckCheckResult?: DeckCheckResult | null;
+  /** Whether a deck check is currently in progress */
+  isDeckChecking?: boolean;
 }
 
 /**
@@ -122,6 +128,8 @@ export default function DeckBuilderPanel({
   onDescriptionChange,
   forceDisableHoverPreview = false,
   defaultTab,
+  deckCheckResult,
+  isDeckChecking,
 }: DeckBuilderPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>(defaultTab ?? "main");
   const [isEditingName, setIsEditingName] = useState(false);
@@ -360,9 +368,12 @@ export default function DeckBuilderPanel({
   };
 
   // Notify parent when tab changes
+  const contentRef = useRef<HTMLDivElement>(null);
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
     onActiveTabChange?.(tab);
+    // Scroll content area to top when switching tabs
+    contentRef.current?.scrollTo(0, 0);
   };
 
   // Close menu when clicking outside
@@ -1570,64 +1581,81 @@ export default function DeckBuilderPanel({
           <span className="flex items-center justify-center gap-1.5">
             Stats
             {validation.stats.totalCards > 0 && (
-              <span
-                className={`hidden md:inline-flex items-center justify-center w-4 h-4 text-xs rounded-full ${
-                  validation.isValid
-                    ? "bg-green-500 text-white"
-                    : "bg-red-500 text-white"
-                }`}
-              >
-                {validation.isValid ? "✓" : "!"}
-              </span>
+              isDeckChecking ? (
+                <span className="hidden md:inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-500">
+                  <svg className="w-2.5 h-2.5 text-white animate-spin" viewBox="0 0 12 12" fill="none">
+                    <circle cx="6" cy="6" r="5" stroke="currentColor" strokeOpacity="0.3" strokeWidth="1.5" />
+                    <path d="M11 6a5 5 0 00-5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </span>
+              ) : (
+                <span
+                  className={`hidden md:inline-flex items-center justify-center w-4 h-4 text-xs rounded-full ${
+                    (deckCheckResult?.valid ?? validation.isValid)
+                      ? "bg-green-500 text-white"
+                      : "bg-red-500 text-white"
+                  }`}
+                >
+                  {(deckCheckResult?.valid ?? validation.isValid) ? "✓" : "!"}
+                </span>
+              )
             )}
           </span>
 
-          {/* Validation Tooltip */}
-          {showValidationTooltip && validation.stats.totalCards > 0 && (
-            <div className={`hidden md:block absolute right-0 top-full mt-2 w-72 p-4 rounded-lg shadow-xl z-50 pointer-events-none ${
-              validation.isValid
-                ? "bg-green-50 dark:bg-green-900/90 border-2 border-green-300 dark:border-green-600"
-                : "bg-red-50 dark:bg-red-900/90 border-2 border-red-300 dark:border-red-600"
-            }`}>
-              {/* Arrow */}
-              <div className={`absolute right-6 bottom-full w-0 h-0 border-l-8 border-r-8 border-b-8 border-l-transparent border-r-transparent ${
-                validation.isValid
-                  ? "border-b-green-300 dark:border-b-green-600"
-                  : "border-b-red-300 dark:border-b-red-600"
-              }`}></div>
+          {/* Validation Tooltip — compact pill, details live in Stats tab */}
+          {showValidationTooltip && validation.stats.totalCards > 0 && (() => {
+            const valid = deckCheckResult?.valid ?? validation.isValid;
+            const errCount = deckCheckResult
+              ? deckCheckResult.issues.filter(i => i.type === "error").length
+              : validation.issues.filter(i => i.type === "error").length;
+            const isT2Fmt = deck.format?.toLowerCase().includes("type 2") || deck.format?.toLowerCase().includes("multi");
+            const label = valid
+              ? "Tournament Legal"
+              : `${errCount} issue${errCount !== 1 ? "s" : ""} found`;
+            const bg = isDeckChecking
+              ? "bg-gray-800 text-gray-300 border-b-gray-800"
+              : valid
+                ? "bg-green-950 text-green-300 border-b-green-950"
+                : "bg-red-950 text-red-300 border-b-red-950";
 
-              {/* Content */}
-              <div className={`font-semibold mb-3 text-base ${
-                validation.isValid
-                  ? "text-green-800 dark:text-green-200"
-                  : "text-red-800 dark:text-red-200"
-              }`}>
-                {validation.isValid ? "✓ Passed Basic Checks" : `✗ ${validation.issues.filter(i => i.type === "error").length} Error${validation.issues.filter(i => i.type === "error").length !== 1 ? "s" : ""}`}
+            // For T2: compute good/evil balance counts for the tooltip
+            let balanceLine: string | null = null;
+            if (isT2Fmt && !isDeckChecking) {
+              const counts = { mainGood: 0, mainEvil: 0, resGood: 0, resEvil: 0 };
+              for (const dc of deck.cards) {
+                const a = dc.card.alignment || "";
+                let side: "good" | "evil" | null = null;
+                if (a.includes("Good") && a.includes("Evil")) side = null; // neutral
+                else if (a.includes("Good") && a.includes("Neutral")) side = "good";
+                else if (a.includes("Evil") && a.includes("Neutral")) side = "evil";
+                else if (a.includes("Good")) side = "good";
+                else if (a.includes("Evil")) side = "evil";
+                if (!side) continue;
+                if (dc.isReserve) {
+                  if (side === "good") counts.resGood += dc.quantity;
+                  else counts.resEvil += dc.quantity;
+                } else {
+                  if (side === "good") counts.mainGood += dc.quantity;
+                  else counts.mainEvil += dc.quantity;
+                }
+              }
+              const resCount = deck.cards.filter(c => c.isReserve).reduce((s, c) => s + c.quantity, 0);
+              balanceLine = `Main: ${counts.mainGood}G · ${counts.mainEvil}E`;
+              if (resCount > 0) {
+                balanceLine += `  |  Res: ${counts.resGood}G · ${counts.resEvil}E`;
+              }
+            }
+
+            return (
+              <div className={`hidden md:block absolute left-1/2 -translate-x-1/2 top-full mt-1.5 px-3 py-1.5 rounded-md shadow-lg z-50 pointer-events-none text-center text-xs font-medium whitespace-nowrap ${bg.split(" ").slice(0, 2).join(" ")}`}>
+                <div className={`absolute left-1/2 -translate-x-1/2 bottom-full w-0 h-0 border-l-[5px] border-r-[5px] border-b-[5px] border-l-transparent border-r-transparent ${bg.split(" ")[2]}`} />
+                {label}
+                {balanceLine && (
+                  <div className="text-[10px] opacity-70 mt-0.5">{balanceLine}</div>
+                )}
               </div>
-
-              {validation.issues.length > 0 && (
-                <div className="space-y-2">
-                  {validation.issues.map((issue, idx) => (
-                    <div
-                      key={idx}
-                      className={`text-sm flex items-start gap-2 ${
-                        issue.type === "error"
-                          ? "text-red-700 dark:text-red-300"
-                          : issue.type === "warning"
-                          ? "text-yellow-700 dark:text-yellow-300"
-                          : "text-blue-700 dark:text-blue-300"
-                      }`}
-                    >
-                      <span className="mt-0.5 flex-shrink-0">
-                        {issue.type === "error" ? "⚠" : issue.type === "warning" ? "⚠" : "ℹ"}
-                      </span>
-                      <span className="flex-1">{issue.message}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+            );
+          })()}
         </button>
 
         {/* Details Tab (Cover Cards + Description) */}
@@ -1897,7 +1925,7 @@ export default function DeckBuilderPanel({
       )}
 
       {/* Content */}
-      <div className={`flex-1 overflow-y-auto overflow-x-hidden ${isExpanded ? '' : 'p-4'}`} data-deck-grid>
+      <div ref={contentRef} className={`flex-1 overflow-y-auto overflow-x-hidden ${isExpanded ? '' : 'p-4'}`} data-deck-grid>
         {/* Paragon Requirements (only show for Paragon format with a selected Paragon) */}
         {deckType === 'Paragon' && deck.paragon && validation.paragonStats && (activeTab === 'main' || activeTab === 'reserve') && (
           <div className="mb-4">
@@ -2547,29 +2575,6 @@ export default function DeckBuilderPanel({
         ) : (
           // Stats Tab
           <div className="space-y-4 text-sm">
-            {/* Disclaimer - Hide for Paragon format */}
-            {deckType !== 'Paragon' && (
-              <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-                <div className="flex items-start gap-2">
-                  <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                  </svg>
-                  <p className="text-xs text-blue-800 dark:text-blue-200">
-                    Not all deckbuilding checks are implemented, just the basic ones. Please refer to the{' '}
-                    <a 
-                      href="https://landofredemption.com/wp-content/uploads/2026/03/Deck_Building_Rules_1.3.pdf"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-semibold underline hover:text-blue-600 dark:hover:text-blue-300 transition-colors"
-                    >
-                      official deck building rules
-                    </a>
-                    {' '}to ensure the legality of your deck.
-                  </p>
-                </div>
-              </div>
-            )}
-
             {/* Paragon Resources - Only show for Paragon format */}
             {deckType === 'Paragon' && (
               <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
@@ -2621,52 +2626,13 @@ export default function DeckBuilderPanel({
             )}
             
             {/* Validation Status */}
-            <div>
-              <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                Deck Validation
-              </h3>
-              <div className={`p-3 rounded-lg ${
-                validation.isValid && validation.stats.totalCards > 0
-                  ? "bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800"
-                  : validation.stats.totalCards === 0
-                  ? "bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
-                  : "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800"
-              }`}>
-                <div className="font-medium mb-2">
-                  {validation.isValid && validation.stats.totalCards > 0 ? (
-                    <span className="text-green-700 dark:text-green-400">✓ Passed Basic Checks</span>
-                  ) : validation.stats.totalCards === 0 ? (
-                    <span className="text-gray-600 dark:text-gray-400">Empty Deck</span>
-                  ) : (
-                    <span className="text-red-700 dark:text-red-400">
-                      ✗ {validation.issues.filter(i => i.type === "error").length} Error{validation.issues.filter(i => i.type === "error").length !== 1 ? "s" : ""}
-                    </span>
-                  )}
-                </div>
-                
-                {validation.issues.length > 0 && (
-                  <div className="space-y-1">
-                    {validation.issues.map((issue, idx) => (
-                      <div
-                        key={idx}
-                        className={`text-xs flex items-start gap-1 ${
-                          issue.type === "error"
-                            ? "text-red-700 dark:text-red-400"
-                            : issue.type === "warning"
-                            ? "text-yellow-700 dark:text-yellow-400"
-                            : "text-blue-700 dark:text-blue-400"
-                        }`}
-                      >
-                        <span className="mt-0.5">
-                          {issue.type === "error" ? "⚠" : issue.type === "warning" ? "⚠" : "ℹ"}
-                        </span>
-                        <span>{issue.message}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+            <DeckLegalityChecklist
+              clientValidation={validation}
+              serverResult={deckCheckResult ?? null}
+              isChecking={isDeckChecking ?? false}
+              totalCards={validation.stats.totalCards}
+              format={deck.format}
+            />
 
             {/* Alignment Breakdown */}
             <div>
@@ -2675,10 +2641,11 @@ export default function DeckBuilderPanel({
               </h3>
               <div className="grid grid-cols-2 gap-3">
                 {(() => {
-                  // Calculate alignment counts
+                  const isT2Format = deck.format?.toLowerCase().includes("type 2") || deck.format?.toLowerCase().includes("multi");
+
+                  // Calculate raw alignment counts (all cards)
                   const alignmentCounts = deck.cards.reduce((acc, deckCard) => {
                     let alignment = deckCard.card.alignment || "Neutral";
-                    // Treat "Good/Evil" cards as Neutral
                     if (alignment.includes("Good/Evil")) {
                       alignment = "Neutral";
                     }
@@ -2688,19 +2655,37 @@ export default function DeckBuilderPanel({
                     acc[alignment] += deckCard.quantity;
                     return acc;
                   }, {} as Record<string, number>);
-                  
-                  // Define order and styling for alignments
+
+                  // For T2: calculate deck-building balance counts (with dual-alignment resolution)
+                  // to show as a subtitle when they differ from raw counts
+                  let balanceGood = 0;
+                  let balanceEvil = 0;
+                  if (isT2Format) {
+                    for (const dc of deck.cards.filter(c => !c.isReserve)) {
+                      const a = dc.card.alignment || "";
+                      if (a.includes("Good") && a.includes("Evil")) continue; // Good/Evil = neutral
+                      if (a.includes("Good") && a.includes("Neutral")) { balanceGood += dc.quantity; continue; }
+                      if (a.includes("Evil") && a.includes("Neutral")) { balanceEvil += dc.quantity; continue; }
+                      if (a.includes("Good")) balanceGood += dc.quantity;
+                      else if (a.includes("Evil")) balanceEvil += dc.quantity;
+                    }
+                  }
+
                   const alignmentConfig = [
                     { name: 'Good', color: 'bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-800 dark:text-blue-200' },
                     { name: 'Evil', color: 'bg-red-100 dark:bg-red-900/30 border-red-300 dark:border-red-700 text-red-800 dark:text-red-200' },
                     { name: 'Neutral', color: 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200' },
                     { name: 'Dual', color: 'bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700 text-purple-800 dark:text-purple-200' },
                   ];
-                  
+
                   return alignmentConfig.map(({ name, color }) => {
                     const count = alignmentCounts[name] || 0;
-                    if (count === 0 && name === 'Dual') return null; // Hide Dual if 0
-                    
+                    if (count === 0 && name === 'Dual') return null;
+
+                    // Show deck-building count subtitle for T2 when it differs from raw count
+                    const balanceCount = name === 'Good' ? balanceGood : name === 'Evil' ? balanceEvil : null;
+                    const showBalance = isT2Format && balanceCount !== null && balanceCount !== count;
+
                     return (
                       <div
                         key={name}
@@ -2712,6 +2697,11 @@ export default function DeckBuilderPanel({
                         <div className="text-2xl font-bold">
                           {count}
                         </div>
+                        {showBalance && (
+                          <div className={`text-[10px] mt-0.5 ${balanceGood !== balanceEvil ? 'text-red-400' : 'opacity-60'}`}>
+                            {balanceCount} in main deck
+                          </div>
+                        )}
                       </div>
                     );
                   });
@@ -2830,6 +2820,7 @@ export default function DeckBuilderPanel({
         <GeneratePDFModal
           deck={deck}
           onClose={() => setShowGeneratePDFModal(false)}
+          isLegal={deckCheckResult?.valid ?? null}
         />
       )}
 
@@ -2838,6 +2829,7 @@ export default function DeckBuilderPanel({
         <GenerateDeckImageModal
           deck={deck}
           onClose={() => setShowGenerateImageModal(false)}
+          isLegal={deckCheckResult?.valid ?? null}
         />
       )}
 

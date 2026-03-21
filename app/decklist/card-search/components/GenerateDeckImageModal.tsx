@@ -13,9 +13,10 @@ import {
 interface GenerateDeckImageModalProps {
   deck: Deck;
   onClose: () => void;
+  isLegal?: boolean | null;
 }
 
-export default function GenerateDeckImageModal({ deck, onClose }: GenerateDeckImageModalProps) {
+export default function GenerateDeckImageModal({ deck, onClose, isLegal }: GenerateDeckImageModalProps) {
   const deckType = deck.format?.toLowerCase().includes("paragon")
     ? "paragon"
     : deck.format?.toLowerCase().includes("type 2") || deck.format?.toLowerCase().includes("multi")
@@ -48,6 +49,8 @@ export default function GenerateDeckImageModal({ deck, onClose }: GenerateDeckIm
           n_card_columns: nCardColumns,
           m_count: mCount,
           aod_count: aodCount,
+          ...(deck.id ? { deck_id: deck.id } : {}),
+          ...(isLegal != null ? { is_legal: isLegal } : {}),
         }),
       });
 

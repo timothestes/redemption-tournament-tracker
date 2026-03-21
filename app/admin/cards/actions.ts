@@ -38,17 +38,18 @@ export async function getDuplicateGroupStats(): Promise<DuplicateGroupStats> {
   await requirePermission("manage_cards");
   const supabase = await createClient();
 
-  const [groupCounts, memberCount] = await Promise.all([
-    supabase.from("duplicate_card_groups").select("source"),
+  const [totalCount, ordirCount, manualCount, memberCount] = await Promise.all([
+    supabase.from("duplicate_card_groups").select("id", { count: "exact", head: true }),
+    supabase.from("duplicate_card_groups").select("id", { count: "exact", head: true }).eq("source", "ordir"),
+    supabase.from("duplicate_card_groups").select("id", { count: "exact", head: true }).eq("source", "manual"),
     supabase.from("duplicate_card_group_members").select("id", { count: "exact", head: true }),
   ]);
 
-  const groups = groupCounts.data || [];
   return {
-    totalGroups: groups.length,
+    totalGroups: totalCount.count || 0,
     totalCards: memberCount.count || 0,
-    ordirGroups: groups.filter((g) => g.source === "ordir").length,
-    manualGroups: groups.filter((g) => g.source === "manual").length,
+    ordirGroups: ordirCount.count || 0,
+    manualGroups: manualCount.count || 0,
   };
 }
 
@@ -149,8 +150,10 @@ export async function createDuplicateGroup(params: {
   await requirePermission("manage_cards");
   const supabase = await createClient();
 
-  // Create the group
-  const { data: group, error: groupError } = await supabase
+  // Create the group (or find existing by canonical_name)
+  let group: { id: number; canonical_name: string } | null = null;
+
+  const { data: inserted, error: insertError } = await supabase
     .from("duplicate_card_groups")
     .insert({
       canonical_name: params.canonical_name.trim(),
@@ -161,23 +164,39 @@ export async function createDuplicateGroup(params: {
     .select()
     .single();
 
-  if (groupError) {
-    console.error("Error creating duplicate group:", groupError);
-    return { group: null, error: groupError.message };
+  if (insertError) {
+    // If it already exists, look it up and add members to the existing group
+    if (insertError.code === "23505") {
+      const { data: existing } = await supabase
+        .from("duplicate_card_groups")
+        .select("id, canonical_name")
+        .eq("canonical_name", params.canonical_name.trim())
+        .single();
+
+      if (!existing) {
+        return { group: null, error: "Group exists but could not be found" };
+      }
+      group = existing;
+    } else {
+      console.error("Error creating duplicate group:", insertError);
+      return { group: null, error: insertError.message };
+    }
+  } else {
+    group = inserted;
   }
 
-  // Add members
+  // Add members (upsert to skip any that already exist)
   if (params.member_names.length > 0) {
     const members = params.member_names.map((name) => ({
-      group_id: group.id,
+      group_id: group!.id,
       card_name: name.trim(),
       ordir_sets: null,
-      matched: true, // Manual entries are considered matched
+      matched: true,
     }));
 
     const { error: memberError } = await supabase
       .from("duplicate_card_group_members")
-      .insert(members);
+      .upsert(members, { onConflict: "group_id,card_name", ignoreDuplicates: true });
 
     if (memberError) {
       console.error("Error adding members:", memberError);
@@ -259,16 +278,17 @@ export async function addGroupMember(groupId: number, cardName: string) {
 
   const { data, error } = await supabase
     .from("duplicate_card_group_members")
-    .insert({
+    .upsert({
       group_id: groupId,
       card_name: cardName.trim(),
       ordir_sets: null,
       matched: true,
-    })
+    }, { onConflict: "group_id,card_name", ignoreDuplicates: true })
     .select()
     .single();
 
-  if (error) {
+  if (error && error.code !== "PGRST116") {
+    // PGRST116 = "no rows returned" which happens when ignoreDuplicates skips the row
     console.error("Error adding member:", error);
     return { member: null, error: error.message };
   }
@@ -328,34 +348,61 @@ export async function bulkApproveSuggestions(suggestions: Suggestion[]) {
 
   // Batch create new groups
   if (newGroups.length > 0) {
-    // Insert all groups at once
-    // Use upsert to skip groups that already exist
-    const { data: groupRows, error: groupError } = await supabase
-      .from("duplicate_card_groups")
-      .upsert(
-        newGroups.map((s) => ({
-          canonical_name: s.baseName,
-          source: "manual",
-          card_type: s.cardType.toLowerCase() || null,
-        })),
-        { onConflict: "canonical_name", ignoreDuplicates: true }
-      )
-      .select("id, canonical_name");
-
-    if (groupError) {
-      console.error("Error bulk creating groups:", groupError);
-      return { error: groupError.message, created: 0, added: 0 };
+    // Deduplicate suggestions by canonical name
+    const deduped = new Map<string, SuggestedGroup>();
+    for (const s of newGroups) {
+      const key = s.baseName.toLowerCase();
+      if (deduped.has(key)) {
+        const existing = deduped.get(key)!;
+        for (const name of s.cardNames) {
+          if (!existing.cardNames.includes(name)) {
+            existing.cardNames.push(name);
+          }
+        }
+      } else {
+        deduped.set(key, { ...s, cardNames: [...s.cardNames] });
+      }
     }
+    const uniqueGroups = Array.from(deduped.values());
 
-    // Build a map of canonical_name → id for the newly created groups
+    // Process in chunks of 50 to avoid payload/timeout issues
+    const CHUNK_SIZE = 50;
     const groupIdMap = new Map<string, number>();
-    for (const row of groupRows || []) {
-      groupIdMap.set(row.canonical_name, row.id);
+
+    for (let i = 0; i < uniqueGroups.length; i += CHUNK_SIZE) {
+      const chunk = uniqueGroups.slice(i, i + CHUNK_SIZE);
+
+      // Insert groups, skipping any that already exist
+      const { error: groupError } = await supabase
+        .from("duplicate_card_groups")
+        .upsert(
+          chunk.map((s) => ({
+            canonical_name: s.baseName,
+            source: "manual",
+            card_type: s.cardType.toLowerCase() || null,
+          })),
+          { onConflict: "canonical_name", ignoreDuplicates: true }
+        );
+
+      if (groupError) {
+        console.error("Error bulk creating groups (chunk):", groupError);
+        return { error: groupError.message, created: 0, added: 0 };
+      }
+
+      // Look up IDs for all groups in this chunk
+      const { data: rows } = await supabase
+        .from("duplicate_card_groups")
+        .select("id, canonical_name")
+        .in("canonical_name", chunk.map((s) => s.baseName));
+
+      for (const row of rows || []) {
+        groupIdMap.set(row.canonical_name, row.id);
+      }
     }
 
     // Insert all members for new groups in one batch
     const allMembers: { group_id: number; card_name: string; ordir_sets: null; matched: boolean }[] = [];
-    for (const s of newGroups) {
+    for (const s of uniqueGroups) {
       const groupId = groupIdMap.get(s.baseName);
       if (!groupId) continue;
       for (const name of s.cardNames) {
@@ -368,17 +415,19 @@ export async function bulkApproveSuggestions(suggestions: Suggestion[]) {
       }
     }
 
-    if (allMembers.length > 0) {
+    // Insert members in chunks
+    for (let i = 0; i < allMembers.length; i += CHUNK_SIZE) {
+      const chunk = allMembers.slice(i, i + CHUNK_SIZE);
       const { error: memberError } = await supabase
         .from("duplicate_card_group_members")
-        .insert(allMembers);
+        .upsert(chunk, { onConflict: "group_id,card_name", ignoreDuplicates: true });
 
       if (memberError) {
-        console.error("Error bulk inserting members:", memberError);
+        console.error("Error bulk inserting members (chunk):", memberError);
       }
     }
 
-    created = newGroups.length;
+    created = uniqueGroups.length;
   }
 
   // Batch add missing members to existing groups
@@ -395,13 +444,16 @@ export async function bulkApproveSuggestions(suggestions: Suggestion[]) {
       }
     }
 
-    if (allAdditions.length > 0) {
+    // Insert additions in chunks, using upsert to skip duplicates
+    const ADD_CHUNK = 50;
+    for (let i = 0; i < allAdditions.length; i += ADD_CHUNK) {
+      const chunk = allAdditions.slice(i, i + ADD_CHUNK);
       const { error: addError } = await supabase
         .from("duplicate_card_group_members")
-        .insert(allAdditions);
+        .upsert(chunk, { onConflict: "group_id,card_name", ignoreDuplicates: true });
 
       if (addError) {
-        console.error("Error bulk adding members:", addError);
+        console.error("Error bulk adding members (chunk):", addError);
       }
     }
 
@@ -437,22 +489,55 @@ export async function detectPotentialDuplicates(): Promise<{
   await requirePermission("manage_cards");
   const supabase = await createClient();
 
-  // Fetch all existing groups with their members
-  const { data: groupsWithMembers } = await supabase
-    .from("duplicate_card_groups")
-    .select(`
-      id,
-      canonical_name,
-      card_type,
-      members:duplicate_card_group_members(card_name)
-    `);
+  // Fetch all existing groups — paginate to avoid the 1000-row default
+  const allGroups: { id: number; canonical_name: string; card_type: string | null }[] = [];
+  let groupOffset = 0;
+  const PAGE = 1000;
+  while (true) {
+    const { data } = await supabase
+      .from("duplicate_card_groups")
+      .select("id, canonical_name, card_type")
+      .range(groupOffset, groupOffset + PAGE - 1);
+    if (!data || data.length === 0) break;
+    allGroups.push(...data);
+    if (data.length < PAGE) break;
+    groupOffset += PAGE;
+  }
+  const groups = allGroups;
+
+  // Fetch all members separately — paginate
+  const allMembers: { group_id: number; card_name: string }[] = [];
+  let memberOffset = 0;
+  while (true) {
+    const { data } = await supabase
+      .from("duplicate_card_group_members")
+      .select("group_id, card_name")
+      .range(memberOffset, memberOffset + PAGE - 1);
+    if (!data || data.length === 0) break;
+    allMembers.push(...data);
+    if (data.length < PAGE) break;
+    memberOffset += PAGE;
+  }
+  const members = allMembers;
+
+  // Rebuild the grouped structure
+  const membersByGroup = new Map<number, { card_name: string }[]>();
+  for (const m of members || []) {
+    if (!membersByGroup.has(m.group_id)) membersByGroup.set(m.group_id, []);
+    membersByGroup.get(m.group_id)!.push({ card_name: m.card_name });
+  }
+
+  const groupsWithMembers = (groups || []).map((g) => ({
+    ...g,
+    members: membersByGroup.get(g.id) || [],
+  }));
 
   // Build a set of all known member card names
   const existingMemberSet = new Set<string>();
   const existingCanonicalSet = new Set<string>();
-  for (const g of groupsWithMembers || []) {
+  for (const g of groupsWithMembers) {
     existingCanonicalSet.add(g.canonical_name.toLowerCase());
-    for (const m of (g.members as { card_name: string }[])) {
+    for (const m of g.members) {
       existingMemberSet.add(m.card_name.toLowerCase());
     }
   }
@@ -473,13 +558,16 @@ export async function detectPotentialDuplicates(): Promise<{
   const lines = text.split("\n").slice(1).filter((l) => l.trim());
 
   // Parse all cards from carddata
-  const allCards: { name: string; type: string }[] = [];
+  const allCards: { name: string; type: string; reference: string; specialAbility: string; identifier: string }[] = [];
   for (const line of lines) {
     const cols = line.split("\t");
     const name = cols[0]?.trim();
     const type = cols[4]?.trim() || "";
+    const specialAbility = cols[10]?.trim() || "";
+    const reference = cols[12]?.trim() || "";
+    const identifier = cols[9]?.trim() || "";
     if (!name) continue;
-    allCards.push({ name, type });
+    allCards.push({ name, type, reference, specialAbility, identifier });
   }
 
   // ─── Pass 1: New group suggestions ────────────────────────────
@@ -570,6 +658,9 @@ export async function detectPotentialDuplicates(): Promise<{
     const group = groupsByCanonical.get(baseName.toLowerCase());
     if (!group) continue;
 
+    // Skip if card type doesn't match the group's card type
+    if (group.card_type && card.type.toLowerCase() !== group.card_type.toLowerCase()) continue;
+
     // Check the card isn't already a member (by exact name)
     if (group.memberNames.has(card.name.toLowerCase())) continue;
 
@@ -586,6 +677,149 @@ export async function detectPotentialDuplicates(): Promise<{
       groupName: group.canonical_name,
       cardNames: cards,
       cardType: group.card_type || "",
+    });
+  }
+
+  // ─── Pass 3: Lost Soul grouping by reference ─────────────────
+  // Per Deck Building Rules v1.3: "Lost Souls with the same reference
+  // have the same name" — so they are the same card for deck building.
+  // Exception: Jeremiah 22:3 has two different LS (Foreigner and Orphans).
+  // Also handles same-name-different-reference cases from the rules:
+  //   Hopper: II Chronicles 28:13 and Matthew 18:12
+  //   Lost Souls: Proverbs 2:16-17 and Proverbs 22:14
+  //   Revealer: John 3:20 and Romans 3:23
+
+  const lostSouls = allCards.filter((c) => {
+    if (!c.type.toLowerCase().includes("lost soul")) return false;
+    // Include LS with a special ability text
+    if (c.specialAbility.trim() !== "") return true;
+    // Also include older LS cards where the ability is in the identifier field
+    // (e.g., old Hopper: "Lost Soul II Chronicles 28:13 (Hopper)" has empty specialAbility
+    // but the identifier contains the ability text)
+    if (c.identifier && c.identifier.toLowerCase().includes("does not count")) return true;
+    return false;
+  });
+
+  // Group LS by reference — same reference = same card
+  const lsByReference = new Map<string, typeof lostSouls>();
+  for (const ls of lostSouls) {
+    if (!ls.reference) continue;
+    const ref = ls.reference.trim();
+    if (!lsByReference.has(ref)) {
+      lsByReference.set(ref, []);
+    }
+    lsByReference.get(ref)!.push(ls);
+  }
+
+  // Exception: Jeremiah 22:3 has two different LS — split by identifier
+  const jer223 = lsByReference.get("Jeremiah 22:3");
+  if (jer223 && jer223.length > 1) {
+    lsByReference.delete("Jeremiah 22:3");
+    // Split into subgroups by identifier (Foreigner vs Orphans)
+    const subgroups = new Map<string, typeof lostSouls>();
+    for (const ls of jer223) {
+      const id = ls.identifier.toLowerCase();
+      const key = id.includes("foreigner") ? "Foreigner" : id.includes("orphan") ? "Orphans" : ls.name;
+      if (!subgroups.has(key)) subgroups.set(key, []);
+      subgroups.get(key)!.push(ls);
+    }
+    for (const [, group] of subgroups) {
+      if (group.length >= 2) {
+        lsByReference.set(`Jeremiah 22:3 (${group[0].identifier})`, group);
+      }
+    }
+  }
+
+  // Also group LS that share the same Lost Soul "name" but different references
+  // (Hopper, Lost Souls, Revealer per the rules)
+  const lsByLsName = new Map<string, typeof lostSouls>();
+  for (const ls of lostSouls) {
+    // Extract the LS name from the identifier field (e.g., ["Distressed"], ["Hopper"])
+    const idMatch = ls.identifier.match(/\["?([^"\]]+)"?\]/);
+    let lsName = idMatch ? idMatch[1].trim() : null;
+    // Fallback: extract from card name — e.g., "Lost Soul II Chronicles 28:13 (Hopper)"
+    if (!lsName) {
+      const nameMatch = ls.name.match(/\(([^)]+)\)\s*$/);
+      lsName = nameMatch ? nameMatch[1].trim() : null;
+    }
+    // Also try: Lost Soul "Name" pattern in card name
+    if (!lsName) {
+      const quoteMatch = ls.name.match(/Lost Soul\s+"([^"]+)"/);
+      lsName = quoteMatch ? quoteMatch[1].trim() : null;
+    }
+    if (!lsName) continue;
+
+    const key = lsName.toLowerCase();
+    if (!lsByLsName.has(key)) {
+      lsByLsName.set(key, []);
+    }
+    lsByLsName.get(key)!.push(ls);
+  }
+
+  // Merge: for each LS name group that spans multiple references, create a single group
+  // with all cards from all references
+  const lsMergedGroups = new Map<string, { canonicalName: string; cards: typeof lostSouls }>();
+
+  // First, add all reference-based groups
+  for (const [ref, cards] of lsByReference) {
+    if (cards.length < 2) continue;
+    // Derive canonical name — try identifier, then card name, then reference
+    let lsName: string | null = null;
+    for (const c of cards) {
+      const idMatch = c.identifier.match(/\["?([^"\]]+)"?\]/);
+      if (idMatch) { lsName = idMatch[1].trim(); break; }
+      const nameMatch = c.name.match(/\(([^)]+)\)\s*$/);
+      if (nameMatch) { lsName = nameMatch[1].trim(); break; }
+      const quoteMatch = c.name.match(/Lost Soul\s+"([^"]+)"/);
+      if (quoteMatch) { lsName = quoteMatch[1].trim(); break; }
+    }
+    if (!lsName) lsName = ref;
+    const key = lsName.toLowerCase();
+
+    if (lsMergedGroups.has(key)) {
+      // Merge into existing
+      const existing = lsMergedGroups.get(key)!;
+      for (const c of cards) {
+        if (!existing.cards.some((ec) => ec.name === c.name)) {
+          existing.cards.push(c);
+        }
+      }
+    } else {
+      lsMergedGroups.set(key, { canonicalName: `Lost Soul "${lsName}"`, cards: [...cards] });
+    }
+  }
+
+  // Then, add LS name groups that span different references (Hopper, Revealer, etc.)
+  for (const [lsName, cards] of lsByLsName) {
+    if (cards.length < 2) continue;
+    // Check if all cards share the same reference — if so, already handled above
+    const uniqueRefs = new Set(cards.map((c) => c.reference));
+    if (uniqueRefs.size <= 1) continue;
+
+    if (lsMergedGroups.has(lsName)) {
+      const existing = lsMergedGroups.get(lsName)!;
+      for (const c of cards) {
+        if (!existing.cards.some((ec) => ec.name === c.name)) {
+          existing.cards.push(c);
+        }
+      }
+    } else {
+      const displayName = lsName.charAt(0).toUpperCase() + lsName.slice(1);
+      lsMergedGroups.set(lsName, { canonicalName: `Lost Soul "${displayName}"`, cards: [...cards] });
+    }
+  }
+
+  // Emit suggestions for LS groups not already tracked
+  for (const [, { canonicalName, cards }] of lsMergedGroups) {
+    // Filter to only cards not already in a group
+    const untracked = cards.filter((c) => !existingSet.has(c.name.toLowerCase()));
+    if (untracked.length < 2) continue;
+
+    suggestions.push({
+      kind: "new_group",
+      baseName: canonicalName,
+      cardNames: untracked.map((c) => c.name),
+      cardType: "lost soul",
     });
   }
 

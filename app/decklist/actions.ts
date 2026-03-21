@@ -2,6 +2,8 @@
 
 import { createClient } from "../../utils/supabase/server";
 import { revalidatePath } from "next/cache";
+import { checkDeck } from "@/utils/deckcheck";
+import type { DeckCheckCard, DeckCheckResult } from "@/utils/deckcheck/types";
 
 // Types matching the database schema
 export interface DeckData {
@@ -137,6 +139,30 @@ export async function saveDeckAction(params: SaveDeckParams) {
         }
       }
 
+      // Run comprehensive deck legality check
+      let deckCheckResult: DeckCheckResult | null = null;
+      try {
+        const mainCards: DeckCheckCard[] = cards
+          .filter(c => !c.is_reserve)
+          .map(c => ({ name: c.card_name, set: c.card_set || "", quantity: c.quantity }));
+        const reserveCards: DeckCheckCard[] = cards
+          .filter(c => c.is_reserve)
+          .map(c => ({ name: c.card_name, set: c.card_set || "", quantity: c.quantity }));
+
+        deckCheckResult = await checkDeck(mainCards, reserveCards, params.format);
+
+        await supabase
+          .from("decks")
+          .update({
+            is_legal: deckCheckResult.valid,
+            deckcheck_issues: deckCheckResult.issues,
+          })
+          .eq("id", deckId);
+      } catch (e) {
+        // Deckcheck failure should not block save
+        console.error("Deckcheck failed:", e);
+      }
+
       revalidatePath("/decklist/my-decks");
       revalidatePath(`/decklist/card-search`);
 
@@ -144,6 +170,7 @@ export async function saveDeckAction(params: SaveDeckParams) {
         success: true,
         deckId: deck.id,
         message: "Deck updated successfully",
+        deckCheckResult,
       };
     } else {
       // Create new deck
@@ -197,12 +224,37 @@ export async function saveDeckAction(params: SaveDeckParams) {
         }
       }
 
+      // Run comprehensive deck legality check
+      let deckCheckResult: DeckCheckResult | null = null;
+      try {
+        const mainCards: DeckCheckCard[] = cards
+          .filter(c => !c.is_reserve)
+          .map(c => ({ name: c.card_name, set: c.card_set || "", quantity: c.quantity }));
+        const reserveCards: DeckCheckCard[] = cards
+          .filter(c => c.is_reserve)
+          .map(c => ({ name: c.card_name, set: c.card_set || "", quantity: c.quantity }));
+
+        deckCheckResult = await checkDeck(mainCards, reserveCards, params.format);
+
+        await supabase
+          .from("decks")
+          .update({
+            is_legal: deckCheckResult.valid,
+            deckcheck_issues: deckCheckResult.issues,
+          })
+          .eq("id", deck.id);
+      } catch (e) {
+        // Deckcheck failure should not block save
+        console.error("Deckcheck failed:", e);
+      }
+
       revalidatePath("/decklist/my-decks");
 
       return {
         success: true,
         deckId: deck.id,
         message: "Deck created successfully",
+        deckCheckResult,
       };
     }
   } catch (error) {
@@ -1158,7 +1210,7 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
 
     let query = supabase
       .from("decks")
-      .select("id, name, description, format, paragon, card_count, view_count, preview_card_1, preview_card_2, user_id, created_at, updated_at", { count: "exact" })
+      .select("id, name, description, format, paragon, card_count, view_count, preview_card_1, preview_card_2, user_id, created_at, updated_at, is_legal", { count: "exact" })
       .eq("is_public", true);
 
     if (tagFilteredDeckIds) {

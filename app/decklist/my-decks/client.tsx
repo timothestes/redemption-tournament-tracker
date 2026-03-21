@@ -26,6 +26,7 @@ import DeleteDeckModal from "./DeleteDeckModal";
 import FolderModal from "./FolderModal";
 import UsernameModal from "./UsernameModal";
 import GeneratePDFModal from "../card-search/components/GeneratePDFModal";
+import GenerateDeckImageModal from "../card-search/components/GenerateDeckImageModal";
 import { Deck } from "../card-search/types/deck";
 import { Card } from "../card-search/utils";
 
@@ -94,6 +95,9 @@ export default function MyDecksClient() {
   const [folderModal, setFolderModal] = useState<{ mode: "create" | "rename"; folderId?: string; initialName?: string } | null>(null);
   const [folderToDelete, setFolderToDelete] = useState<{ id: string; name: string } | null>(null);
   const [pdfDeck, setPdfDeck] = useState<Deck | null>(null); // For PDF generation modal
+  const [pdfDeckLegal, setPdfDeckLegal] = useState<boolean | null>(null);
+  const [imageDeck, setImageDeck] = useState<Deck | null>(null); // For image generation modal
+  const [imageDeckLegal, setImageDeckLegal] = useState<boolean | null>(null);
   const [usernameModalDeckId, setUsernameModalDeckId] = useState<string | null>(null);
   const [coverPickerDeckId, setCoverPickerDeckId] = useState<string | null>(null);
 
@@ -259,13 +263,10 @@ export default function MyDecksClient() {
     router.push(`/decklist/${deckId}`);
   }
 
-  async function handleGeneratePDF(deckId: string) {
-    // Load full deck data including cards
+  async function loadDeckForModal(deckId: string): Promise<{ deck: Deck; isLegal: boolean | null } | null> {
     const result = await loadDeckByIdAction(deckId);
     if (result.success && result.deck) {
       const cloudDeck = result.deck;
-      
-      // Convert to Deck format for PDF modal
       const deck: Deck = {
         id: cloudDeck.id,
         name: cloudDeck.name,
@@ -277,22 +278,10 @@ export default function MyDecksClient() {
             name: dbCard.card_name,
             set: dbCard.card_set,
             imgFile: dbCard.card_img_file,
-            // Minimal card data for PDF generation (just needs name for decklist)
-            dataLine: "",
-            officialSet: "",
-            type: "",
-            brigade: "",
-            strength: "",
-            toughness: "",
-            class: "",
-            identifier: "",
-            specialAbility: "",
-            rarity: "",
-            reference: "",
-            alignment: "",
-            legality: "",
-            testament: "",
-            isGospel: false,
+            dataLine: "", officialSet: "", type: "", brigade: "",
+            strength: "", toughness: "", class: "", identifier: "",
+            specialAbility: "", rarity: "", reference: "", alignment: "",
+            legality: "", testament: "", isGospel: false,
           } as Card,
           quantity: dbCard.quantity,
           isReserve: dbCard.is_reserve,
@@ -300,10 +289,25 @@ export default function MyDecksClient() {
         createdAt: new Date(cloudDeck.created_at),
         updatedAt: new Date(cloudDeck.updated_at),
       };
-      
-      setPdfDeck(deck);
-    } else {
-      alert(result.error || "Failed to load deck");
+      return { deck, isLegal: cloudDeck.is_legal ?? null };
+    }
+    alert(result.error || "Failed to load deck");
+    return null;
+  }
+
+  async function handleGeneratePDF(deckId: string) {
+    const loaded = await loadDeckForModal(deckId);
+    if (loaded) {
+      setPdfDeck(loaded.deck);
+      setPdfDeckLegal(loaded.isLegal);
+    }
+  }
+
+  async function handleGenerateImage(deckId: string) {
+    const loaded = await loadDeckForModal(deckId);
+    if (loaded) {
+      setImageDeck(loaded.deck);
+      setImageDeckLegal(loaded.isLegal);
     }
   }
 
@@ -811,6 +815,7 @@ export default function MyDecksClient() {
                   onDuplicate={handleDuplicateDeck}
                   onMove={handleMoveDeck}
                   onGeneratePDF={handleGeneratePDF}
+                  onGenerateImage={handleGenerateImage}
                   onDownload={handleDownload}
                   onTogglePublic={handleTogglePublic}
                   onCopyLink={handleCopyLink}
@@ -831,6 +836,7 @@ export default function MyDecksClient() {
                   onDuplicate={handleDuplicateDeck}
                   onMove={handleMoveDeck}
                   onGeneratePDF={handleGeneratePDF}
+                  onGenerateImage={handleGenerateImage}
                   onDownload={handleDownload}
                   onTogglePublic={handleTogglePublic}
                   onCopyLink={handleCopyLink}
@@ -880,7 +886,17 @@ export default function MyDecksClient() {
       {pdfDeck && (
         <GeneratePDFModal
           deck={pdfDeck}
-          onClose={() => setPdfDeck(null)}
+          onClose={() => { setPdfDeck(null); setPdfDeckLegal(null); }}
+          isLegal={pdfDeckLegal}
+        />
+      )}
+
+      {/* Generate Image Modal */}
+      {imageDeck && (
+        <GenerateDeckImageModal
+          deck={imageDeck}
+          onClose={() => { setImageDeck(null); setImageDeckLegal(null); }}
+          isLegal={imageDeckLegal}
         />
       )}
 
@@ -1005,6 +1021,7 @@ function DeckCard({
   onDuplicate,
   onMove,
   onGeneratePDF,
+  onGenerateImage,
   onDownload,
   onTogglePublic,
   onCopyLink,
@@ -1018,6 +1035,7 @@ function DeckCard({
   onDuplicate: (id: string) => void;
   onMove: (deckId: string, folderId: string | null) => void;
   onGeneratePDF: (deckId: string) => void;
+  onGenerateImage: (deckId: string) => void;
   onDownload: (deckId: string) => void;
   onTogglePublic: (deckId: string, currentlyPublic: boolean) => void;
   onCopyLink: (deckId: string) => void;
@@ -1089,6 +1107,7 @@ function DeckCard({
             onDuplicate={() => onDuplicate(deck.id!)}
             onMove={(folderId) => onMove(deck.id!, folderId)}
             onGeneratePDF={() => onGeneratePDF(deck.id!)}
+            onGenerateImage={() => onGenerateImage(deck.id!)}
             onDownload={() => onDownload(deck.id!)}
             onTogglePublic={() => onTogglePublic(deck.id!, !!deck.is_public)}
             onCopyLink={() => onCopyLink(deck.id!)}
@@ -1155,6 +1174,7 @@ function DeckListItem({
   onDuplicate,
   onMove,
   onGeneratePDF,
+  onGenerateImage,
   onDownload,
   onTogglePublic,
   onCopyLink,
@@ -1167,6 +1187,7 @@ function DeckListItem({
   onDuplicate: (id: string) => void;
   onMove: (deckId: string, folderId: string | null) => void;
   onGeneratePDF: (deckId: string) => void;
+  onGenerateImage: (deckId: string) => void;
   onDownload: (deckId: string) => void;
   onTogglePublic: (deckId: string, currentlyPublic: boolean) => void;
   onCopyLink: (deckId: string) => void;
@@ -1236,6 +1257,7 @@ function DeckListItem({
             onDuplicate={() => onDuplicate(deck.id!)}
             onMove={(folderId) => onMove(deck.id!, folderId)}
             onGeneratePDF={() => onGeneratePDF(deck.id!)}
+            onGenerateImage={() => onGenerateImage(deck.id!)}
             onDownload={() => onDownload(deck.id!)}
             onTogglePublic={() => onTogglePublic(deck.id!, !!deck.is_public)}
             onCopyLink={() => onCopyLink(deck.id!)}
@@ -1257,6 +1279,7 @@ function DropdownMenu({
   onDuplicate,
   onMove,
   onGeneratePDF,
+  onGenerateImage,
   onDownload,
   onTogglePublic,
   onCopyLink,
@@ -1270,6 +1293,7 @@ function DropdownMenu({
   onDuplicate: () => void;
   onMove: (folderId: string | null) => void;
   onGeneratePDF: () => void;
+  onGenerateImage: () => void;
   onDownload: () => void;
   onTogglePublic: () => void;
   onCopyLink: () => void;
@@ -1387,6 +1411,18 @@ function DropdownMenu({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
               </svg>
               Generate PDF
+            </button>
+            <button
+              onClick={() => {
+                onGenerateImage();
+                setIsOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+            >
+              <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Generate Image
             </button>
             <button
               onClick={() => {

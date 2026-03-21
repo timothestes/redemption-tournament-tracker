@@ -452,41 +452,57 @@ function GroupRow({
   };
 
   return (
-    <div className="rounded-lg bg-card transition-colors overflow-hidden">
+    <div className="rounded-lg bg-card overflow-hidden">
       {/* Header row */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className={`w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-muted/40 transition-colors ${
-          expanded ? "rounded-t-lg" : "rounded-lg"
-        }`}
+        className="w-full text-left px-4 py-3 hover:bg-muted/40 transition-colors"
       >
-        <svg
-          className={`w-4 h-4 text-muted-foreground flex-shrink-0 transition-transform ${
-            expanded ? "rotate-90" : ""
-          }`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-        </svg>
+        <div className="flex items-center gap-3">
+          <svg
+            className={`w-3.5 h-3.5 text-muted-foreground flex-shrink-0 transition-transform duration-150 ${
+              expanded ? "rotate-90" : ""
+            }`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
 
-        <span className="font-semibold text-sm text-foreground flex-1 truncate">
-          {group.canonical_name}
-        </span>
-
-        <span className="text-xs text-muted-foreground tabular-nums">
-          {group.members.length} card{group.members.length !== 1 ? "s" : ""}
-        </span>
-
-        {group.card_type && (
-          <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-wider">
-            {group.card_type}
+          <span className="font-semibold text-sm text-foreground flex-1 truncate">
+            {group.canonical_name}
           </span>
-        )}
 
-        <SourceBadge source={group.source} />
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {group.members.length} card{group.members.length !== 1 ? "s" : ""}
+          </span>
+
+          {group.card_type && (
+            <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-wider">
+              {group.card_type}
+            </span>
+          )}
+
+          <SourceBadge source={group.source} />
+        </div>
+
+        {/* Collapsed: compact member preview */}
+        {!expanded && (
+          <div className="flex flex-wrap gap-1 mt-1.5 ml-[26px]">
+            {group.members.slice(0, 6).map((m) => (
+              <span key={m.id} className="text-[10px] text-muted-foreground/60 bg-muted/30 rounded px-1.5 py-0.5 truncate max-w-[180px]">
+                {m.card_name}
+              </span>
+            ))}
+            {group.members.length > 6 && (
+              <span className="text-[10px] text-muted-foreground/40">
+                +{group.members.length - 6} more
+              </span>
+            )}
+          </div>
+        )}
       </button>
 
       {/* Expanded detail */}
@@ -800,8 +816,9 @@ function AddGroupForm({
 /*  Suggestions tab                                                    */
 /* ------------------------------------------------------------------ */
 
-function suggestionKey(s: Suggestion): string {
-  return s.kind === "new_group" ? `new::${s.baseName}` : `add::${s.groupId}`;
+function suggestionKey(s: Suggestion, index?: number): string {
+  const suffix = index != null ? `::${index}` : "";
+  return s.kind === "new_group" ? `new::${s.baseName}${suffix}` : `add::${s.groupId}${suffix}`;
 }
 
 function SuggestionsTab({ onGroupCreated }: { onGroupCreated: () => void }) {
@@ -867,13 +884,25 @@ function SuggestionsTab({ onGroupCreated }: { onGroupCreated: () => void }) {
   const handleApproveAll = async () => {
     setApprovingAll(true);
     setBulkError(null);
-    const result = await bulkApproveSuggestions(filtered);
-    if (result.error) {
-      setBulkError(result.error);
-    } else {
-      const filteredKeys = new Set(filtered.map(suggestionKey));
-      setSuggestions((prev) => prev.filter((s) => !filteredKeys.has(suggestionKey(s))));
-      onGroupCreated();
+    try {
+      const result = await bulkApproveSuggestions(filtered);
+      if (result.error) {
+        setBulkError(result.error);
+      } else {
+        // Clear all suggestions that were in the filtered set
+        // Use a Set of baseName/groupId for identity (not the render key which has index)
+        const approvedIdentities = new Set(
+          filtered.map((s) => s.kind === "new_group" ? `new::${s.baseName}` : `add::${s.groupId}`)
+        );
+        setSuggestions((prev) => prev.filter((s) => {
+          const identity = s.kind === "new_group" ? `new::${s.baseName}` : `add::${s.groupId}`;
+          return !approvedIdentities.has(identity);
+        }));
+        onGroupCreated();
+      }
+    } catch (e) {
+      console.error("[ApproveAll] Caught error:", e);
+      setBulkError(String(e));
     }
     setApprovingAll(false);
   };
@@ -948,8 +977,8 @@ function SuggestionsTab({ onGroupCreated }: { onGroupCreated: () => void }) {
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Add to existing groups
           </p>
-          {missingMembers.map((s) => {
-            const key = suggestionKey(s);
+          {missingMembers.map((s, idx) => {
+            const key = suggestionKey(s, idx);
             return (
               <div
                 key={key}
@@ -967,9 +996,9 @@ function SuggestionsTab({ onGroupCreated }: { onGroupCreated: () => void }) {
                     )}
                   </div>
                   <div className="flex flex-wrap gap-1">
-                    {s.cardNames.map((name) => (
+                    {s.cardNames.map((name, i) => (
                       <MemberChip
-                        key={name}
+                        key={`${name}-${i}`}
                         member={{ card_name: name } as DuplicateGroupMemberRow}
                         compact
                       />
@@ -1003,8 +1032,8 @@ function SuggestionsTab({ onGroupCreated }: { onGroupCreated: () => void }) {
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             New groups
           </p>
-          {newGroups.map((s) => {
-            const key = suggestionKey(s);
+          {newGroups.map((s, idx) => {
+            const key = suggestionKey(s, idx);
             return (
               <div
                 key={key}
@@ -1020,9 +1049,9 @@ function SuggestionsTab({ onGroupCreated }: { onGroupCreated: () => void }) {
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-1">
-                    {s.cardNames.map((name) => (
+                    {s.cardNames.map((name, i) => (
                       <MemberChip
-                        key={name}
+                        key={`${name}-${i}`}
                         member={{ card_name: name } as DuplicateGroupMemberRow}
                         compact
                       />
