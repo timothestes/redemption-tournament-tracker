@@ -6,6 +6,10 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { loadPublicDecksAction, loadGlobalTagsAction, copyPublicDeckAction, loadPublicDeckAction, LoadPublicDecksParams } from "../actions";
 import { GoldfishButton } from "../../goldfish/components/GoldfishButton";
+import GeneratePDFModal from "../card-search/components/GeneratePDFModal";
+import GenerateDeckImageModal from "../card-search/components/GenerateDeckImageModal";
+import { Deck } from "../card-search/types/deck";
+import { Card } from "../card-search/utils";
 
 interface DeckTag { id: string; name: string; color: string; }
 
@@ -536,6 +540,10 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
   const isOwner = !!currentUserId && deck.user_id === currentUserId;
   const [copying, setCopying] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [generateDeck, setGenerateDeck] = useState<Deck | null>(null);
+  const [generateMode, setGenerateMode] = useState<"pdf" | "image" | null>(null);
+  const [loadingGenerate, setLoadingGenerate] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   async function handleDownload(e: React.MouseEvent) {
     e.preventDefault();
@@ -575,6 +583,37 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
       router.push("/sign-in");
     }
     setCopying(false);
+  }
+
+  async function handleGenerate(mode: "pdf" | "image") {
+    setLoadingGenerate(true);
+    const result = await loadPublicDeckAction(deck.id);
+    setLoadingGenerate(false);
+    if (!result.success || !result.deck) return;
+    const cloudDeck = result.deck as any;
+    const deckForModal: Deck = {
+      id: cloudDeck.id,
+      name: cloudDeck.name || deck.name,
+      description: cloudDeck.description || "",
+      format: cloudDeck.format || deck.format,
+      cards: (cloudDeck.cards || []).map((c: any) => ({
+        card: {
+          name: c.card_name,
+          set: c.card_set || "",
+          imgFile: c.card_img_file || "",
+          dataLine: "", officialSet: "", type: "", brigade: "",
+          strength: "", toughness: "", class: "", identifier: "",
+          specialAbility: "", rarity: "", reference: "", alignment: "",
+          legality: "", testament: "", isGospel: false,
+        } as Card,
+        quantity: c.quantity,
+        isReserve: c.is_reserve,
+      })),
+      createdAt: new Date(cloudDeck.created_at || deck.created_at),
+      updatedAt: new Date(cloudDeck.updated_at || deck.updated_at),
+    };
+    setGenerateDeck(deckForModal);
+    setGenerateMode(mode);
   }
 
   return (
@@ -731,21 +770,72 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
 
         <GoldfishButton deckId={deck.id} deckName={deck.name} format={deck.format} iconOnly />
 
-        <button
-          onClick={handleDownload}
-          disabled={downloading}
-          title="Download .txt"
-          className="flex items-center justify-center px-2.5 self-stretch border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 flex-shrink-0"
-        >
-          {downloading ? (
-            <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
+        {/* Export dropdown — PDF, Image, Download */}
+        <div className="relative flex-shrink-0">
+          <button
+            onClick={() => setShowExportMenu(!showExportMenu)}
+            title="Export"
+            className="flex items-center justify-center px-2.5 h-full border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          >
+            {loadingGenerate || downloading ? (
+              <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+              </svg>
+            )}
+          </button>
+          {showExportMenu && (
+            <div className="absolute right-0 bottom-full mb-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50 min-w-[140px]">
+              <button
+                onClick={() => { handleGenerate("pdf"); setShowExportMenu(false); }}
+                disabled={loadingGenerate}
+                className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+              >
+                <svg className="w-3.5 h-3.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+                Generate PDF
+              </button>
+              <button
+                onClick={() => { handleGenerate("image"); setShowExportMenu(false); }}
+                disabled={loadingGenerate}
+                className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+              >
+                <svg className="w-3.5 h-3.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Generate Image
+              </button>
+              <button
+                onClick={() => { handleDownload(new MouseEvent("click") as any); setShowExportMenu(false); }}
+                disabled={downloading}
+                className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+              >
+                <svg className="w-3.5 h-3.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Download .txt
+              </button>
+            </div>
           )}
-        </button>
+        </div>
       </div>
+
+      {generateDeck && generateMode === "pdf" && (
+        <GeneratePDFModal
+          deck={generateDeck}
+          onClose={() => { setGenerateDeck(null); setGenerateMode(null); }}
+          isLegal={deck.is_legal ?? null}
+        />
+      )}
+      {generateDeck && generateMode === "image" && (
+        <GenerateDeckImageModal
+          deck={generateDeck}
+          onClose={() => { setGenerateDeck(null); setGenerateMode(null); }}
+          isLegal={deck.is_legal ?? null}
+        />
+      )}
     </div>
   );
 }

@@ -15,6 +15,9 @@ import ModalWithClose from "../card-search/ModalWithClose";
 import { GoldfishButton } from "../../goldfish/components/GoldfishButton";
 import { useCardPrices } from "../card-search/hooks/useCardPrices";
 import BuyDeckModal from "../card-search/components/BuyDeckModal";
+import GeneratePDFModal from "../card-search/components/GeneratePDFModal";
+import GenerateDeckImageModal from "../card-search/components/GenerateDeckImageModal";
+import { Deck as DeckType } from "../card-search/types/deck";
 
 interface PublicDeckData {
   id: string;
@@ -152,6 +155,9 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   const [showPreview, setShowPreview] = useState(true);
   const [showStats, setShowStats] = useState(false);
   const [showBuyDeckModal, setShowBuyDeckModal] = useState(false);
+  const [showPDFModal, setShowPDFModal] = useState(false);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   // Card prices
   const { getPrice, getProductUrl } = useCardPrices();
@@ -348,6 +354,29 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
       };
     });
   }, [deck.cards, cardDatabase]);
+
+  // Build Deck object for PDF/Image modals
+  const deckForModal: DeckType = useMemo(() => ({
+    id: deck.id,
+    name: deck.name,
+    description: deck.description || "",
+    format: deck.format,
+    cards: enrichedCards.map((c) => ({
+      card: c.fullCard || ({
+        name: c.card_name,
+        set: c.card_set || "",
+        imgFile: c.card_img_file || "",
+        dataLine: "", officialSet: "", type: "", brigade: "",
+        strength: "", toughness: "", class: "", identifier: "",
+        specialAbility: "", rarity: "", reference: "", alignment: "",
+        legality: "", testament: "", isGospel: false,
+      } as Card),
+      quantity: c.quantity,
+      isReserve: c.is_reserve,
+    })),
+    createdAt: new Date(deck.created_at),
+    updatedAt: new Date(deck.updated_at),
+  }), [deck, enrichedCards]);
 
   const mainCards = enrichedCards.filter((c) => !c.is_reserve);
   const reserveCards = enrichedCards.filter((c) => c.is_reserve);
@@ -787,16 +816,52 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
 
             <GoldfishButton deckId={deck.id} deckName={deck.name} format={deck.format} />
 
-            <button
-              onClick={handleDownloadTxt}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2"
-              title="Download deck as .txt file"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              Download .txt
-            </button>
+            {/* Export dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Export
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {showExportMenu && (
+                <div className="absolute left-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50 min-w-[160px]">
+                  <button
+                    onClick={() => { setShowPDFModal(true); setShowExportMenu(false); }}
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    Generate PDF
+                  </button>
+                  <button
+                    onClick={() => { setShowImageModal(true); setShowExportMenu(false); }}
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    Generate Image
+                  </button>
+                  <button
+                    onClick={() => { handleDownloadTxt(); setShowExportMenu(false); }}
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Download .txt
+                  </button>
+                </div>
+              )}
+            </div>
 
             {!isOwner && isLoggedIn && (
               <button
@@ -1508,6 +1573,24 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
             isReserve: c.is_reserve,
           }))}
           onClose={() => setShowBuyDeckModal(false)}
+        />
+      )}
+
+      {/* Generate PDF Modal */}
+      {showPDFModal && (
+        <GeneratePDFModal
+          deck={deckForModal}
+          onClose={() => setShowPDFModal(false)}
+          isLegal={null}
+        />
+      )}
+
+      {/* Generate Image Modal */}
+      {showImageModal && (
+        <GenerateDeckImageModal
+          deck={deckForModal}
+          onClose={() => setShowImageModal(false)}
+          isLegal={null}
         />
       )}
     </div>
