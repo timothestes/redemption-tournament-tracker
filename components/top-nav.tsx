@@ -147,7 +147,7 @@ const TopNav: React.FC = () => {
 
   const paragonResources = [
     { href: "https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Paragons-v1.pdf", label: "Paragon Cards" },
-    { href: "https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Rules-v1.pdf", label: "Paragon Rules" },
+    { href: "https://landofredemption.com/wp-content/uploads/2026/03/Redemption-Paragon-Format-Rules-v1-1.pdf", label: "Paragon Rules" },
     { href: "https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Lost-Souls-Color-v1.pdf", label: "Lost Souls (Color)" },
     { href: "https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Lost-Souls-BW-v1.pdf", label: "Lost Souls (B&W)" },
   ];

@@ -6,6 +6,12 @@ import { getSupabaseAdmin } from "../../../lib/pricing/supabase-admin";
 // System user that owns published tournament deck copies
 const REDEMPTIONCCG_USER_ID = "a0a8e980-f372-4ebd-be25-d2f26507e98f";
 
+function ordinal(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
 // ─── Types ──────────────────────────────────────────────────────────
 
 export interface TournamentDecklistRow {
@@ -250,6 +256,7 @@ export async function publishTournamentDecklistsAction(
   }
 
   // Calculate and persist placements first
+  const placementMap = new Map<string, number>(); // participant_id → place
   const { data: participants, error: partError } = await supabase
     .from("participants")
     .select("id, match_points, differential, dropped_out")
@@ -266,6 +273,7 @@ export async function publishTournamentDecklistsAction(
     });
 
     for (let i = 0; i < sorted.length; i++) {
+      placementMap.set(sorted[i].id, i + 1);
       await supabase
         .from("participants")
         .update({ place: i + 1 })
@@ -328,7 +336,9 @@ export async function publishTournamentDecklistsAction(
       .eq("deck_id", dl.deck_id);
 
     // Create copy owned by RedemptionCCG.app
-    const deckName = `${participantName} - ${tournament.name}`;
+    const place = placementMap.get(dl.participant_id);
+    const placeStr = place ? `${ordinal(place)} Place - ` : "";
+    const deckName = `${participantName} - ${placeStr}${tournament.name}`;
     const { data: newDeck, error: createError } = await admin
       .from("decks")
       .insert({
