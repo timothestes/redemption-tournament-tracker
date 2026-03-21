@@ -1,7 +1,63 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { createClient as createServerClient } from "@/utils/supabase/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { checkDeck } from "@/utils/deckcheck";
 import { DeckCheckCard } from "@/utils/deckcheck/types";
+
+/**
+ * Create a Supabase client that bypasses RLS for the deckcheck API.
+ * Uses the service role key so we can look up any deck (public or private).
+ * Falls back to the regular server client if service role key is not set.
+ */
+async function createDeckcheckClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (url && serviceKey) {
+    return createSupabaseClient(url, serviceKey);
+  }
+  return createServerClient();
+}
+
+/**
+ * Parse raw decklist text (tab-separated: "quantity\tname") into DeckCheckCard arrays.
+ * Expects a "Reserve:" line separating main deck from reserve.
+ */
+function parseDecklistText(text: string): { mainCards: DeckCheckCard[]; reserveCards: DeckCheckCard[] } {
+  const mainCards: DeckCheckCard[] = [];
+  const reserveCards: DeckCheckCard[] = [];
+  let inReserve = false;
+
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    if (trimmed.toLowerCase() === "reserve:" || trimmed.toLowerCase() === "reserve") {
+      inReserve = true;
+      continue;
+    }
+
+    // Skip token lines
+    if (trimmed.toLowerCase() === "tokens:" || trimmed.toLowerCase() === "tokens") break;
+
+    // Parse "quantity\tname" or "quantity name"
+    const match = trimmed.match(/^(\d+)\s+(.+)/);
+    if (!match) continue;
+
+    const quantity = parseInt(match[1], 10);
+    const name = match[2].trim();
+    if (!quantity || !name) continue;
+
+    const card: DeckCheckCard = { name, set: "", quantity };
+
+    if (inReserve) {
+      reserveCards.push(card);
+    } else {
+      mainCards.push(card);
+    }
+  }
+
+  return { mainCards, reserveCards };
+}
 
 function verifyAuth(request: NextRequest): boolean {
   const authHeader = request.headers.get("authorization");
@@ -40,24 +96,43 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { deckId, cards, reserve, format } = body as {
+  const rawBody = body as {
     deckId?: string;
+    deck_id?: string;
     cards?: DeckCheckCard[];
     reserve?: DeckCheckCard[];
     format?: string;
+    decklist?: string;
+    decklist_type?: string;
   };
 
-  // Validate that we have either a deckId or a cards array
-  if (!deckId && !cards) {
+  // Accept both camelCase and snake_case for deck ID
+  const deckId = rawBody.deckId || rawBody.deck_id;
+  const { cards, reserve, format, decklist, decklist_type } = rawBody;
+
+  // Validate that we have at least one input method
+  if (!deckId && !cards && !decklist) {
     return NextResponse.json(
-      { error: "Request must include either 'deckId' or 'cards'" },
+      { error: "Request must include 'deckId', 'cards', or 'decklist' text" },
       { status: 400 }
     );
   }
 
   try {
+    // Option C: Raw decklist text — parse into cards
+    if (!deckId && !cards && decklist) {
+      const { mainCards, reserveCards } = parseDecklistText(decklist);
+      const fmt = decklist_type === "type_2" ? "Type 2" : format || "Type 1";
+      const result = await checkDeck(mainCards, reserveCards, fmt);
+      return NextResponse.json(result);
+    }
+
     if (deckId) {
-      const supabase = await createClient();
+      // Bearer token = trusted caller (downstream API) → bypass RLS
+      // No token = browser user → RLS enforces ownership/public access
+      const supabase = verifyAuth(request)
+        ? await createDeckcheckClient()
+        : await createServerClient();
 
       // Fetch the deck
       const { data: deck, error: deckError } = await supabase

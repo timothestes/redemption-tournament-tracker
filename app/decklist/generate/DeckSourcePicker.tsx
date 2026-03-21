@@ -61,8 +61,8 @@ interface DeckSourcePickerProps {
   value: string;
   /** Called when the user types in the textarea */
   onChange: (value: string) => void;
-  /** Called when a saved deck is selected (text, deckName, deckType) */
-  onDeckSelected: (text: string, deckName: string, deckType: string | null) => void;
+  /** Called when a saved deck is selected (text, deckName, deckType, deckId) */
+  onDeckSelected: (text: string, deckName: string, deckType: string | null, deckId?: string) => void;
   /** Currently loaded deck name */
   loadedDeckName?: string | null;
   /** Clear the loaded deck indicator */
@@ -139,7 +139,7 @@ export default function DeckSourcePicker({
       if (result.success && result.deck) {
         const text = deckCardsToLackeyText(result.deck.cards || []);
         const deckType = formatToDeckType(deck.format);
-        onDeckSelected(text, deck.name, deckType);
+        onDeckSelected(text, deck.name, deckType, deck.id);
         setMode("paste");
       } else {
         setError(result.error || "Failed to load deck");

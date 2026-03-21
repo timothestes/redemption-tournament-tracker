@@ -282,13 +282,11 @@ export function getSiblings(
   const group = findGroup(cardName, index);
   if (!group) return null;
 
-  // Build set of names that refer to the current card (to exclude from siblings)
-  const selfKeys = new Set(generateKeys(cardName).map(normalize));
+  // Exclude only the exact card name (normalized) from siblings
+  const selfNorm = normalize(cardName);
 
-  // Return siblings whose normalized names don't overlap with self
   const siblings = group.members.filter((m) => {
-    const memberNorm = normalize(m.cardName);
-    return !selfKeys.has(memberNorm);
+    return normalize(m.cardName) !== selfNorm;
   });
 
   return siblings.length > 0 ? siblings : null;

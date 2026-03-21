@@ -9,11 +9,13 @@ import { findCard } from "./cardDatabase";
 import { resolveCardIdentity } from "./sameCard";
 import {
   validateT1Rules,
+  validateT2Rules,
   isLostSoul,
   isDominant,
   isSiteOrCity,
   isHopperLostSoul,
   getRequiredLostSouls,
+  getT2RequiredLostSouls,
 } from "./rules";
 
 // Re-export types for convenience
@@ -178,8 +180,11 @@ export async function checkDeck(
   const allResolvedCards = [...mainDeckCards, ...reserveCards];
   const cardGroups = buildCardGroups(allResolvedCards);
 
-  // Step 4: Run T1 rules
-  const ruleIssues = validateT1Rules(mainDeckCards, reserveCards, cardGroups);
+  // Step 4: Run rules based on format
+  const isT2 = resolvedFormat.toLowerCase().includes("type 2") || resolvedFormat.toLowerCase().includes("multi");
+  const ruleIssues = isT2
+    ? validateT2Rules(mainDeckCards, reserveCards, cardGroups)
+    : validateT1Rules(mainDeckCards, reserveCards, cardGroups);
   issues.push(...ruleIssues);
 
   // Step 5: Build stats
@@ -190,7 +195,9 @@ export async function checkDeck(
     .filter((c) => isLostSoul(c))
     .reduce((sum, c) => sum + c.quantity, 0);
 
-  const requiredLostSouls = getRequiredLostSouls(mainDeckSize);
+  const requiredLostSouls = isT2
+    ? getT2RequiredLostSouls(mainDeckSize)
+    : getRequiredLostSouls(mainDeckSize);
 
   const dominantCount = allResolvedCards
     .filter((c) => isDominant(c))

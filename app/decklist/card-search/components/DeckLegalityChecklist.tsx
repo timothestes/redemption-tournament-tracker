@@ -8,9 +8,10 @@ interface DeckLegalityChecklistProps {
   serverResult: DeckCheckResult | null;
   isChecking: boolean;
   totalCards: number;
+  format?: string;
 }
 
-const RULE_CATEGORIES = [
+const T1_RULE_CATEGORIES = [
   {
     id: "structure",
     label: "Deck Structure",
@@ -36,6 +37,53 @@ const RULE_CATEGORIES = [
       "t1-quantity-vanilla",
       "t1-special-card",
     ],
+  },
+  {
+    id: "banned",
+    label: "Banned Cards",
+    ruleIds: ["t1-banned-card"],
+  },
+  {
+    id: "sites-cities",
+    label: "Sites & Cities",
+    ruleIds: ["t1-sites-cities"],
+  },
+];
+
+const T2_RULE_CATEGORIES = [
+  {
+    id: "structure",
+    label: "Deck Structure",
+    ruleIds: ["t2-deck-size", "t2-reserve-size", "t1-reserve-contents"],
+  },
+  {
+    id: "lost-souls",
+    label: "Lost Souls",
+    ruleIds: ["t2-lost-soul-count"],
+  },
+  {
+    id: "dominants",
+    label: "Dominants",
+    ruleIds: ["t1-dominant-limit", "t1-dominant-unique", "t1-mutual-exclusion"],
+  },
+  {
+    id: "quantities",
+    label: "Card Quantities",
+    ruleIds: [
+      "t2-quantity-3plus-brigade",
+      "t2-quantity-2-brigade",
+      "t2-quantity-ls-ability",
+      "t2-quantity-sa-site-city",
+      "t2-quantity-artifact-fortress",
+      "t2-quantity-character-enhancement",
+      "t2-quantity-vanilla-site",
+      "t1-special-card",
+    ],
+  },
+  {
+    id: "balance",
+    label: "Good/Evil Balance",
+    ruleIds: ["t2-good-evil-balance"],
   },
   {
     id: "banned",
@@ -99,7 +147,11 @@ export default function DeckLegalityChecklist({
   serverResult,
   isChecking,
   totalCards,
+  format,
 }: DeckLegalityChecklistProps) {
+  const isT2 = format?.toLowerCase().includes("type 2") || format?.toLowerCase().includes("multi");
+  const categories = isT2 ? T2_RULE_CATEGORIES : T1_RULE_CATEGORIES;
+
   if (totalCards === 0) {
     return (
       <div className="rounded-lg bg-gray-800/30 px-4 py-3">
@@ -118,7 +170,7 @@ export default function DeckLegalityChecklist({
   const errorCount = errorIssues.length;
 
   // Group errors by category for the error detail section
-  const failedCategories = RULE_CATEGORIES.map((cat) => {
+  const failedCategories = categories.map((cat) => {
     const catErrors = getIssuesForCategory(errorIssues, cat.ruleIds);
     return { ...cat, errors: catErrors };
   }).filter((cat) => cat.errors.length > 0);
@@ -170,7 +222,7 @@ export default function DeckLegalityChecklist({
 
         {/* Category checklist — compact row */}
         <div className="grid grid-cols-3 gap-x-3 gap-y-1 mt-2.5">
-          {RULE_CATEGORIES.map((category) => {
+          {categories.map((category) => {
             const hasFailed = getIssuesForCategory(errorIssues, category.ruleIds).length > 0;
             return (
               <div key={category.id} className="flex items-center gap-1">

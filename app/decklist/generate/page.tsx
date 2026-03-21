@@ -5,6 +5,30 @@ import { Button } from "flowbite-react";
 import ToastNotification from "../../../components/ui/toast-notification";
 import DeckSourcePicker from "./DeckSourcePicker";
 
+async function checkLegality(decklist: string, deckType: string, deckId?: string | null): Promise<boolean | null> {
+  try {
+    const body: Record<string, unknown> = deckId
+      ? { deckId }
+      : { decklist, decklist_type: deckType };
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    const res = await fetch("/api/deckcheck", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!res.ok) return null;
+    const result = await res.json();
+    return result.valid ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export default function GenerateDeckList() {
   const [decklist, setDecklist] = useState("");
   const [deckType, setDeckType] = useState("type_1");
@@ -21,12 +45,14 @@ export default function GenerateDeckList() {
   const [mCount, setMCount] = useState(false);
   const [aodCount, setAodCount] = useState(false);
   const [loadedDeckName, setLoadedDeckName] = useState<string | null>(null);
+  const [loadedDeckId, setLoadedDeckId] = useState<string | null>(null);
   const successRef = useRef<HTMLDivElement>(null);
   const screenshotSuccessRef = useRef<HTMLDivElement>(null);
 
-  const handleDeckSelected = useCallback((text: string, deckName: string, deckTypeValue: string | null) => {
+  const handleDeckSelected = useCallback((text: string, deckName: string, deckTypeValue: string | null, deckId?: string) => {
     setDecklist(text);
     setLoadedDeckName(deckName);
+    setLoadedDeckId(deckId || null);
     if (deckTypeValue) {
       setDeckType(deckTypeValue);
     }
@@ -104,6 +130,8 @@ export default function GenerateDeckList() {
 
     setLoading(true);
     try {
+      const isLegal = await checkLegality(decklist, deckType, loadedDeckId);
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_TOURNAMENT_API_ENDPOINT}/v1/generate-decklist`, {
         method: "POST",
         headers: {
@@ -117,6 +145,8 @@ export default function GenerateDeckList() {
           show_alignment: showAlignment,
           m_count: mCount,
           aod_count: aodCount,
+          ...(loadedDeckId ? { deck_id: loadedDeckId } : {}),
+          ...(isLegal != null ? { is_legal: isLegal } : {}),
         }),
       });
 
@@ -149,6 +179,8 @@ export default function GenerateDeckList() {
     setScreenshotLoading(true);
 
     try {
+      const isLegal = await checkLegality(decklist, deckType, loadedDeckId);
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_TOURNAMENT_API_ENDPOINT}/v1/generate-decklist-image`, {
         method: 'POST',
         headers: {
@@ -160,6 +192,8 @@ export default function GenerateDeckList() {
           n_card_columns: nCardColumns,
           m_count: mCount,
           aod_count: aodCount,
+          ...(loadedDeckId ? { deck_id: loadedDeckId } : {}),
+          ...(isLegal != null ? { is_legal: isLegal } : {}),
         }),
       });
 

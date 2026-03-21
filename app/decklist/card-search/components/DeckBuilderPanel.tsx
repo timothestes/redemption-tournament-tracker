@@ -1581,42 +1581,81 @@ export default function DeckBuilderPanel({
           <span className="flex items-center justify-center gap-1.5">
             Stats
             {validation.stats.totalCards > 0 && (
-              <span
-                className={`hidden md:inline-flex items-center justify-center w-4 h-4 text-xs rounded-full ${
-                  (deckCheckResult?.valid ?? validation.isValid)
-                    ? "bg-green-500 text-white"
-                    : "bg-red-500 text-white"
-                }`}
-              >
-                {(deckCheckResult?.valid ?? validation.isValid) ? "✓" : "!"}
-              </span>
+              isDeckChecking ? (
+                <span className="hidden md:inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-500">
+                  <svg className="w-2.5 h-2.5 text-white animate-spin" viewBox="0 0 12 12" fill="none">
+                    <circle cx="6" cy="6" r="5" stroke="currentColor" strokeOpacity="0.3" strokeWidth="1.5" />
+                    <path d="M11 6a5 5 0 00-5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </span>
+              ) : (
+                <span
+                  className={`hidden md:inline-flex items-center justify-center w-4 h-4 text-xs rounded-full ${
+                    (deckCheckResult?.valid ?? validation.isValid)
+                      ? "bg-green-500 text-white"
+                      : "bg-red-500 text-white"
+                  }`}
+                >
+                  {(deckCheckResult?.valid ?? validation.isValid) ? "✓" : "!"}
+                </span>
+              )
             )}
           </span>
 
-          {/* Validation Tooltip — compact summary only, details are in Stats tab */}
-          {showValidationTooltip && validation.stats.totalCards > 0 && (
-            <div className={`hidden md:block absolute left-1/2 -translate-x-1/2 top-full mt-1.5 px-3 py-1.5 rounded-md shadow-lg z-50 pointer-events-none whitespace-nowrap text-xs font-medium ${
-              isDeckChecking
-                ? "bg-gray-800 text-gray-300"
-                : (deckCheckResult?.valid ?? validation.isValid)
-                  ? "bg-green-950 text-green-300"
-                  : "bg-red-950 text-red-300"
-            }`}>
-              <div className={`absolute left-1/2 -translate-x-1/2 bottom-full w-0 h-0 border-l-[5px] border-r-[5px] border-b-[5px] border-l-transparent border-r-transparent ${
-                isDeckChecking
-                  ? "border-b-gray-800"
-                  : (deckCheckResult?.valid ?? validation.isValid)
-                    ? "border-b-green-950"
-                    : "border-b-red-950"
-              }`} />
-              {isDeckChecking
-                ? "Checking legality..."
-                : (deckCheckResult?.valid ?? validation.isValid)
-                  ? "Tournament Legal"
-                  : `${(deckCheckResult?.issues ?? validation.issues).filter(i => i.type === "error").length} issue${(deckCheckResult?.issues ?? validation.issues).filter(i => i.type === "error").length !== 1 ? "s" : ""} found`
+          {/* Validation Tooltip — compact pill, details live in Stats tab */}
+          {showValidationTooltip && validation.stats.totalCards > 0 && (() => {
+            const valid = deckCheckResult?.valid ?? validation.isValid;
+            const errCount = deckCheckResult
+              ? deckCheckResult.issues.filter(i => i.type === "error").length
+              : validation.issues.filter(i => i.type === "error").length;
+            const isT2Fmt = deck.format?.toLowerCase().includes("type 2") || deck.format?.toLowerCase().includes("multi");
+            const label = valid
+              ? "Tournament Legal"
+              : `${errCount} issue${errCount !== 1 ? "s" : ""} found`;
+            const bg = isDeckChecking
+              ? "bg-gray-800 text-gray-300 border-b-gray-800"
+              : valid
+                ? "bg-green-950 text-green-300 border-b-green-950"
+                : "bg-red-950 text-red-300 border-b-red-950";
+
+            // For T2: compute good/evil balance counts for the tooltip
+            let balanceLine: string | null = null;
+            if (isT2Fmt && !isDeckChecking) {
+              const counts = { mainGood: 0, mainEvil: 0, resGood: 0, resEvil: 0 };
+              for (const dc of deck.cards) {
+                const a = dc.card.alignment || "";
+                let side: "good" | "evil" | null = null;
+                if (a.includes("Good") && a.includes("Evil")) side = null; // neutral
+                else if (a.includes("Good") && a.includes("Neutral")) side = "good";
+                else if (a.includes("Evil") && a.includes("Neutral")) side = "evil";
+                else if (a.includes("Good")) side = "good";
+                else if (a.includes("Evil")) side = "evil";
+                if (!side) continue;
+                if (dc.isReserve) {
+                  if (side === "good") counts.resGood += dc.quantity;
+                  else counts.resEvil += dc.quantity;
+                } else {
+                  if (side === "good") counts.mainGood += dc.quantity;
+                  else counts.mainEvil += dc.quantity;
+                }
               }
-            </div>
-          )}
+              const resCount = deck.cards.filter(c => c.isReserve).reduce((s, c) => s + c.quantity, 0);
+              balanceLine = `Main: ${counts.mainGood}G · ${counts.mainEvil}E`;
+              if (resCount > 0) {
+                balanceLine += `  |  Res: ${counts.resGood}G · ${counts.resEvil}E`;
+              }
+            }
+
+            return (
+              <div className={`hidden md:block absolute left-1/2 -translate-x-1/2 top-full mt-1.5 px-3 py-1.5 rounded-md shadow-lg z-50 pointer-events-none text-center text-xs font-medium whitespace-nowrap ${bg.split(" ").slice(0, 2).join(" ")}`}>
+                <div className={`absolute left-1/2 -translate-x-1/2 bottom-full w-0 h-0 border-l-[5px] border-r-[5px] border-b-[5px] border-l-transparent border-r-transparent ${bg.split(" ")[2]}`} />
+                {label}
+                {balanceLine && (
+                  <div className="text-[10px] opacity-70 mt-0.5">{balanceLine}</div>
+                )}
+              </div>
+            );
+          })()}
         </button>
 
         {/* Details Tab (Cover Cards + Description) */}
@@ -2592,6 +2631,7 @@ export default function DeckBuilderPanel({
               serverResult={deckCheckResult ?? null}
               isChecking={isDeckChecking ?? false}
               totalCards={validation.stats.totalCards}
+              format={deck.format}
             />
 
             {/* Alignment Breakdown */}
@@ -2601,10 +2641,11 @@ export default function DeckBuilderPanel({
               </h3>
               <div className="grid grid-cols-2 gap-3">
                 {(() => {
-                  // Calculate alignment counts
+                  const isT2Format = deck.format?.toLowerCase().includes("type 2") || deck.format?.toLowerCase().includes("multi");
+
+                  // Calculate raw alignment counts (all cards)
                   const alignmentCounts = deck.cards.reduce((acc, deckCard) => {
                     let alignment = deckCard.card.alignment || "Neutral";
-                    // Treat "Good/Evil" cards as Neutral
                     if (alignment.includes("Good/Evil")) {
                       alignment = "Neutral";
                     }
@@ -2614,19 +2655,37 @@ export default function DeckBuilderPanel({
                     acc[alignment] += deckCard.quantity;
                     return acc;
                   }, {} as Record<string, number>);
-                  
-                  // Define order and styling for alignments
+
+                  // For T2: calculate deck-building balance counts (with dual-alignment resolution)
+                  // to show as a subtitle when they differ from raw counts
+                  let balanceGood = 0;
+                  let balanceEvil = 0;
+                  if (isT2Format) {
+                    for (const dc of deck.cards.filter(c => !c.isReserve)) {
+                      const a = dc.card.alignment || "";
+                      if (a.includes("Good") && a.includes("Evil")) continue; // Good/Evil = neutral
+                      if (a.includes("Good") && a.includes("Neutral")) { balanceGood += dc.quantity; continue; }
+                      if (a.includes("Evil") && a.includes("Neutral")) { balanceEvil += dc.quantity; continue; }
+                      if (a.includes("Good")) balanceGood += dc.quantity;
+                      else if (a.includes("Evil")) balanceEvil += dc.quantity;
+                    }
+                  }
+
                   const alignmentConfig = [
                     { name: 'Good', color: 'bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-800 dark:text-blue-200' },
                     { name: 'Evil', color: 'bg-red-100 dark:bg-red-900/30 border-red-300 dark:border-red-700 text-red-800 dark:text-red-200' },
                     { name: 'Neutral', color: 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200' },
                     { name: 'Dual', color: 'bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700 text-purple-800 dark:text-purple-200' },
                   ];
-                  
+
                   return alignmentConfig.map(({ name, color }) => {
                     const count = alignmentCounts[name] || 0;
-                    if (count === 0 && name === 'Dual') return null; // Hide Dual if 0
-                    
+                    if (count === 0 && name === 'Dual') return null;
+
+                    // Show deck-building count subtitle for T2 when it differs from raw count
+                    const balanceCount = name === 'Good' ? balanceGood : name === 'Evil' ? balanceEvil : null;
+                    const showBalance = isT2Format && balanceCount !== null && balanceCount !== count;
+
                     return (
                       <div
                         key={name}
@@ -2638,6 +2697,11 @@ export default function DeckBuilderPanel({
                         <div className="text-2xl font-bold">
                           {count}
                         </div>
+                        {showBalance && (
+                          <div className={`text-[10px] mt-0.5 ${balanceGood !== balanceEvil ? 'text-red-400' : 'opacity-60'}`}>
+                            {balanceCount} in main deck
+                          </div>
+                        )}
                       </div>
                     );
                   });
@@ -2756,6 +2820,7 @@ export default function DeckBuilderPanel({
         <GeneratePDFModal
           deck={deck}
           onClose={() => setShowGeneratePDFModal(false)}
+          isLegal={deckCheckResult?.valid ?? null}
         />
       )}
 
@@ -2764,6 +2829,7 @@ export default function DeckBuilderPanel({
         <GenerateDeckImageModal
           deck={deck}
           onClose={() => setShowGenerateImageModal(false)}
+          isLegal={deckCheckResult?.valid ?? null}
         />
       )}
 

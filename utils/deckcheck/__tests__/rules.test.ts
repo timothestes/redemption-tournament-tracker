@@ -385,9 +385,12 @@ describe("Helper predicates", () => {
       expect(isSiteOrCity(makeCard({ type: "Enhancement" }))).toBe(false);
     });
 
-    it("returns false for type containing 'Site' as substring", () => {
-      // The implementation uses strict equality, so 'Site (special)' should be false
-      expect(isSiteOrCity(makeCard({ type: "Site (special)" }))).toBe(false);
+    it("returns true for dual-type Site/Hero", () => {
+      expect(isSiteOrCity(makeCard({ type: "Site/Hero" }))).toBe(true);
+    });
+
+    it("returns true for dual-type Site/Evil Character", () => {
+      expect(isSiteOrCity(makeCard({ type: "Site/Evil Character" }))).toBe(true);
     });
   });
 });
@@ -1659,7 +1662,7 @@ describe("Rule: checkSpecialCards (t1-special-card)", () => {
     it("matches set abbreviation 'RJ'", () => {
       const card = makeCard({
         name: "Faithful Witness",
-        set: "RJ",
+        set: "RoJ",
         type: "Hero",
         specialAbility: "Some ability",
         quantity: 5,

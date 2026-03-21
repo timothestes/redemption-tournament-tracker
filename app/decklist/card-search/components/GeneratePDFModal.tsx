@@ -13,9 +13,10 @@ import {
 interface GeneratePDFModalProps {
   deck: Deck;
   onClose: () => void;
+  isLegal?: boolean | null;
 }
 
-export default function GeneratePDFModal({ deck, onClose }: GeneratePDFModalProps) {
+export default function GeneratePDFModal({ deck, onClose, isLegal }: GeneratePDFModalProps) {
   const initialDeckType = deck.format?.toLowerCase().includes("paragon")
     ? "paragon"
     : deck.format?.toLowerCase().includes("type 2") || deck.format?.toLowerCase().includes("multi")
@@ -28,7 +29,7 @@ export default function GeneratePDFModal({ deck, onClose }: GeneratePDFModalProp
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<{ url: string } | null>(null);
-  const [showAlignment, setShowAlignment] = useState(false);
+  const [showAlignment, setShowAlignment] = useState(initialDeckType === "type_2");
   const [mCount, setMCount] = useState(false);
   const [aodCount, setAodCount] = useState(false);
 
@@ -61,6 +62,8 @@ export default function GeneratePDFModal({ deck, onClose }: GeneratePDFModalProp
           show_alignment: showAlignment,
           m_count: mCount,
           aod_count: aodCount,
+          ...(deck.id ? { deck_id: deck.id } : {}),
+          ...(isLegal != null ? { is_legal: isLegal } : {}),
         }),
       });
 

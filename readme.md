@@ -108,7 +108,7 @@ Collection Tracker
 add wishlist
 Play Redemption Online with Matchmaking
 Teaching new players how to play
-Comprehensive Deck Legality Validation
+Comprehensive Deck Legality Validation (Type 1 complete with 14 rules and 206 tests; Type 2 in progress)
 misc tournament tracker improvements
 Joining a tournament via QR code
 metagame snapshot
