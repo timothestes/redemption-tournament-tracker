@@ -51,6 +51,27 @@ export default function GeneratePDFModal({ deck, onClose, isLegal }: GeneratePDF
 
     setLoading(true);
     try {
+      // If we don't have legality yet, check it now
+      let legalityResult = isLegal;
+      if (legalityResult == null) {
+        try {
+          const checkBody = deck.id
+            ? { deckId: deck.id }
+            : { decklist, decklist_type: deckType };
+          const checkRes = await fetch("/api/deckcheck", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(checkBody),
+          });
+          if (checkRes.ok) {
+            const checkData = await checkRes.json();
+            legalityResult = checkData.valid ?? null;
+          }
+        } catch {
+          // Deckcheck failed — proceed without legality
+        }
+      }
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_TOURNAMENT_API_ENDPOINT}/v1/generate-decklist`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -63,7 +84,7 @@ export default function GeneratePDFModal({ deck, onClose, isLegal }: GeneratePDF
           m_count: mCount,
           aod_count: aodCount,
           ...(deck.id ? { deck_id: deck.id } : {}),
-          ...(isLegal != null ? { is_legal: isLegal } : {}),
+          ...(legalityResult != null ? { is_legal: legalityResult } : {}),
         }),
       });
 
