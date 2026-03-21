@@ -120,17 +120,32 @@ function addToMultiMap<T>(
 export async function fetchDuplicateGroups(): Promise<DuplicateGroupIndex> {
   const supabase = createClient();
 
-  const { data, error } = await supabase
-    .from("duplicate_card_group_members")
-    .select(
+  // Paginate to fetch ALL members (Supabase default limit is 1000)
+  const PAGE = 1000;
+  const allData: any[] = [];
+  let offset = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from("duplicate_card_group_members")
+      .select(
+        `
+        card_name,
+        ordir_sets,
+        matched,
+        group:duplicate_card_groups!inner(id, canonical_name)
       `
-      card_name,
-      ordir_sets,
-      matched,
-      group:duplicate_card_groups!inner(id, canonical_name)
-    `
-    )
-    .order("id", { ascending: true });
+      )
+      .range(offset, offset + PAGE - 1)
+      .order("id", { ascending: true });
+
+    if (error || !data || data.length === 0) {
+      if (error) console.error("Failed to fetch duplicate groups:", error);
+      break;
+    }
+    allData.push(...data);
+    if (data.length < PAGE) break;
+    offset += PAGE;
+  }
 
   const empty: DuplicateGroupIndex = {
     groups: [],
@@ -138,10 +153,11 @@ export async function fetchDuplicateGroups(): Promise<DuplicateGroupIndex> {
     byNormalized: new Map(),
   };
 
-  if (error || !data) {
-    console.error("Failed to fetch duplicate groups:", error);
+  if (allData.length === 0) {
     return empty;
   }
+
+  const data = allData;
 
   // Group by group id
   const groupsById = new Map<

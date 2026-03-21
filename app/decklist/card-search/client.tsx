@@ -16,6 +16,7 @@ import {
   normalizeBrigadeField 
 } from "./utils";
 import { useDeckState } from "./hooks/useDeckState";
+import { useDeckCheck } from "./hooks/useDeckCheck";
 import { parseDeckText, generateDeckText, downloadDeckAsFile, copyDeckToClipboard } from "./utils/deckImportExport";
 import { createClient } from "../../../utils/supabase/client";
 import type { User } from "@supabase/supabase-js";
@@ -325,6 +326,8 @@ export default function CardSearchClient() {
     clearUnsavedChanges,
   } = useDeckState(deckIdFromUrl, folderIdFromUrl, isNewDeck);
 
+  const { result: deckCheckResult, isChecking: isDeckChecking, setResult: setDeckCheckResult } = useDeckCheck(deck);
+
   const { getPrice } = useCardPrices();
 
   // Refs for input fields to enable auto-focus
@@ -585,7 +588,11 @@ export default function CardSearchClient() {
         e.preventDefault();
         const stats = getDeckStats();
         if (user && !syncStatus?.isSaving && (stats.mainDeckCount + stats.reserveCount) > 0) {
-          saveDeckToCloud();
+          saveDeckToCloud().then((result) => {
+            if (result?.deckCheckResult) {
+              setDeckCheckResult(result.deckCheckResult);
+            }
+          });
         }
       }
       
@@ -1279,12 +1286,16 @@ export default function CardSearchClient() {
     if (shouldSave && user) {
       try {
         // Update name if provided, and pass it directly to save
+        let saveResult;
         if (newName && newName !== deck.name) {
           setDeckName(newName);
           // Pass the new name directly to saveDeckToCloud to avoid closure issues
-          await saveDeckToCloud(newName);
+          saveResult = await saveDeckToCloud(newName);
         } else {
-          await saveDeckToCloud();
+          saveResult = await saveDeckToCloud();
+        }
+        if (saveResult?.deckCheckResult) {
+          setDeckCheckResult(saveResult.deckCheckResult);
         }
         setNotification({ message: 'Deck saved successfully!', type: 'success' });
         setTimeout(() => setNotification(null), 3000);
@@ -2141,6 +2152,8 @@ export default function CardSearchClient() {
             hasUnsavedChanges={hasUnsavedChanges}
             isAuthenticated={!!user}
             isExpanded={!showSearch}
+            deckCheckResult={deckCheckResult}
+            isDeckChecking={isDeckChecking}
             onToggleExpand={() => setShowSearch(prev => !prev)}
             onDeckNameChange={setDeckName}
             onDeckFormatChange={handleDeckFormatChange}
@@ -2227,6 +2240,8 @@ export default function CardSearchClient() {
               isAuthenticated={!!user}
               isExpanded={false}
               forceDisableHoverPreview
+              deckCheckResult={deckCheckResult}
+              isDeckChecking={isDeckChecking}
               onDeckNameChange={setDeckName}
               onDeckFormatChange={handleDeckFormatChange}
               onParagonChange={setDeckParagon}
@@ -2437,10 +2452,13 @@ export default function CardSearchClient() {
                   onClick={async () => {
                     if (user) {
                       try {
-                        await saveDeckToCloud();
+                        const saveResult = await saveDeckToCloud();
+                        if (saveResult?.deckCheckResult) {
+                          setDeckCheckResult(saveResult.deckCheckResult);
+                        }
                         setNotification({ message: 'Deck saved successfully!', type: 'success' });
                         setTimeout(() => setNotification(null), 3000);
-                        
+
                         // Wait a bit for save to complete, then navigate
                         setTimeout(() => {
                           if (pendingNavigation) {
