@@ -20,6 +20,7 @@ import {
   removeGroupMember,
   detectPotentialDuplicates,
   bulkApproveSuggestions,
+  dismissSuggestion,
   type DuplicateGroupRow,
   type DuplicateGroupMemberRow,
   type Suggestion,
@@ -873,8 +874,11 @@ function SuggestionsTab({ onGroupCreated }: { onGroupCreated: () => void }) {
     setProcessingKey(null);
   };
 
-  const handleDismiss = (s: Suggestion) => {
+  const handleDismiss = async (s: Suggestion) => {
     setDismissedSet((prev) => new Set([...prev, suggestionKey(s)]));
+    // Persist dismissal so it doesn't reappear on reload
+    const baseName = s.kind === "new_group" ? s.baseName : s.groupName;
+    await dismissSuggestion(baseName, s.cardType);
   };
 
   const [approvingAll, setApprovingAll] = useState(false);

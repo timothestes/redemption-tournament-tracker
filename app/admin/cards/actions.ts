@@ -463,6 +463,23 @@ export async function bulkApproveSuggestions(suggestions: Suggestion[]) {
   return { error: null, created, added };
 }
 
+/**
+ * Persist a suggestion dismissal so it doesn't reappear.
+ */
+export async function dismissSuggestion(baseName: string, cardType: string) {
+  await requirePermission("manage_cards");
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("dismissed_duplicate_suggestions")
+    .upsert({ base_name: baseName, card_type: cardType }, { onConflict: "base_name" });
+
+  if (error) {
+    return { error: error.message };
+  }
+  return { error: null };
+}
+
 // ─── Suggestions: detect potential duplicates from carddata ─────
 
 export interface SuggestedGroup {
@@ -545,6 +562,17 @@ export async function detectPotentialDuplicates(): Promise<{
   // Combined set for quick "is this card tracked?" checks
   const existingSet = new Set([...existingMemberSet, ...existingCanonicalSet]);
 
+  // Fetch dismissed suggestions (base names that should never be suggested)
+  const dismissedBaseNames = new Set<string>();
+  const { data: dismissedRows } = await supabase
+    .from("dismissed_duplicate_suggestions")
+    .select("base_name");
+  if (dismissedRows) {
+    for (const row of dismissedRows) {
+      dismissedBaseNames.add(row.base_name.toLowerCase());
+    }
+  }
+
   // Fetch carddata.txt
   const CARD_DATA_URL =
     "https://raw.githubusercontent.com/jalstad/RedemptionLackeyCCG/master/RedemptionQuick/sets/carddata.txt";
@@ -607,6 +635,7 @@ export async function detectPotentialDuplicates(): Promise<{
 
     if (allVariants.length < 2) continue;
     if (existingSet.has(baseName.toLowerCase())) continue;
+    if (dismissedBaseNames.has(baseName.toLowerCase())) continue;
 
     const untracked = allVariants.filter(
       (v) => !existingSet.has(v.name.toLowerCase())
