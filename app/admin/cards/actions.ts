@@ -573,7 +573,7 @@ export async function detectPotentialDuplicates(): Promise<{
   // ─── Pass 1: New group suggestions ────────────────────────────
   // Cards sharing baseName + type that aren't in any existing group
 
-  const baseNameMap = new Map<string, { name: string; type: string }[]>();
+  const baseNameMap = new Map<string, { name: string; type: string; specialAbility: string }[]>();
 
   for (const card of allCards) {
     const baseName = stripToBaseName(card.name);
@@ -588,9 +588,9 @@ export async function detectPotentialDuplicates(): Promise<{
     baseNameMap.get(key)!.push(card);
   }
 
-  const cardByName = new Map<string, string>();
+  const cardByName = new Map<string, { type: string; specialAbility: string }>();
   for (const c of allCards) {
-    if (!cardByName.has(c.name)) cardByName.set(c.name, c.type);
+    if (!cardByName.has(c.name)) cardByName.set(c.name, { type: c.type, specialAbility: c.specialAbility });
   }
 
   const suggestions: Suggestion[] = [];
@@ -599,10 +599,10 @@ export async function detectPotentialDuplicates(): Promise<{
     const baseName = stripToBaseName(variants[0].name);
     const groupType = variants[0].type;
 
-    const baseCardType = cardByName.get(baseName);
-    const baseMatchesType = baseCardType?.toLowerCase() === groupType.toLowerCase();
+    const baseCardData = cardByName.get(baseName);
+    const baseMatchesType = baseCardData?.type.toLowerCase() === groupType.toLowerCase();
     const allVariants = baseMatchesType
-      ? [{ name: baseName, type: groupType }, ...variants]
+      ? [{ name: baseName, type: groupType, specialAbility: baseCardData!.specialAbility }, ...variants]
       : variants;
 
     if (allVariants.length < 2) continue;
@@ -612,6 +612,12 @@ export async function detectPotentialDuplicates(): Promise<{
       (v) => !existingSet.has(v.name.toLowerCase())
     );
     if (untracked.length < 2) continue;
+
+    // Skip if all variants have different special abilities — they're
+    // genuinely different cards sharing a base name (e.g., art variants
+    // like "Servants of the King [Sky]" vs "[River]" with distinct abilities)
+    const abilities = new Set(untracked.map((v) => v.specialAbility.trim().toLowerCase()));
+    if (abilities.size === untracked.length && abilities.size > 1) continue;
 
     suggestions.push({
       kind: "new_group",
