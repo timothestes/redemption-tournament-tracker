@@ -40,18 +40,32 @@ function toKey(card: BudgetCard): string {
 }
 
 /**
+ * Hardcoded ability overrides for cards with equivalent effects but different wording.
+ * Key: normalized ability text → canonical form.
+ */
+const ABILITY_OVERRIDES: Record<string, string> = {
+  // Lost Soul "Humble" — three printings with same effect, different wording
+  "during battle, while opponent has hand advantage, your cards cannot be prevented by opponents' cards.":
+    "during battle, while opponent has more cards in hand than you, your cards cannot be prevented by opponents' cards.",
+  "during battle, if opponent has more cards in hand than you, your cards cannot be prevented by opponents' cards.":
+    "during battle, while opponent has more cards in hand than you, your cards cannot be prevented by opponents' cards.",
+};
+
+/**
  * Normalize special ability text for comparison.
  * Lowercase, normalize smart quotes (single → ', double → "),
  * em/en dashes → -, collapse whitespace, trim.
  */
 export function normalizeAbility(ability: string): string {
-  return ability
+  const text = ability
     .replace(/[\u2018\u2019]/g, "'")   // smart single quotes → '
     .replace(/[\u201c\u201d]/g, '"')   // smart double quotes → "
     .replace(/[\u2013\u2014]/g, '-')   // en dash / em dash → -
     .toLowerCase()
     .replace(/\s+/g, ' ')
     .trim();
+
+  return ABILITY_OVERRIDES[text] ?? text;
 }
 
 // ---------------------------------------------------------------------------
