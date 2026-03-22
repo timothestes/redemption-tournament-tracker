@@ -50,8 +50,9 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
   const [result, setResult] = useState<CartResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showUnavailable, setShowUnavailable] = useState(true);
-  const [showEdit, setShowEdit] = useState(true);
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const [showUnavailable, setShowUnavailable] = useState(!isMobile);
+  const [showEdit, setShowEdit] = useState(!isMobile);
   const [excludedKeys, setExcludedKeys] = useState<Set<string>>(new Set());
 
   // Lock body scroll when modal is open
