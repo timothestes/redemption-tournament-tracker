@@ -203,7 +203,7 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
                     : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
                 }`}
               >
-                {m === "exact" ? "Exact Cards" : "Budget Versions"}
+                {m === "exact" ? "Exact Cards" : "Cheapest Versions"}
               </button>
             ))}
           </div>
