@@ -262,7 +262,7 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
                   <svg className={`w-3 h-3 transition-transform ${showEdit ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
-                  {showEdit ? "Hide card list" : hasExclusions ? `Edit selection (${excludedKeys.size} removed)` : "Edit selection"}
+                  {showEdit ? "Hide card list" : "Edit selection"}
                 </button>
               )}
 

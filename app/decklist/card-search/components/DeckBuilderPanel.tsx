@@ -694,9 +694,9 @@ export default function DeckBuilderPanel({
               <button
                 onClick={() => { setBuyModalMode("budget"); setShowBuyDeckModal(true); }}
                 className="md:hidden flex-shrink-0 text-xs text-muted-foreground hover:underline"
-                title={`Save $${savings.toFixed(2)} with budget alternatives`}
+                title={`Save $${savings.toFixed(2)} with cheapest versions`}
               >
-                Budget: <span className="text-green-600 dark:text-green-400">${budgetTotal.toFixed(2)}</span>
+                Cheapest: <span className="text-green-600 dark:text-green-400">${budgetTotal.toFixed(2)}</span>
               </button>
             )}
             <span className="hidden md:flex items-center gap-1 text-xs whitespace-nowrap ml-auto flex-shrink-0" suppressHydrationWarning>
@@ -729,9 +729,9 @@ export default function DeckBuilderPanel({
                   <button
                     onClick={() => { setBuyModalMode("budget"); setShowBuyDeckModal(true); }}
                     className="text-xs text-muted-foreground whitespace-nowrap hover:underline"
-                    title={`Save $${savings.toFixed(2)} with budget alternatives`}
+                    title={`Save $${savings.toFixed(2)} with cheapest versions`}
                   >
-                    Budget: <span className="text-green-600 dark:text-green-400">${budgetTotal.toFixed(2)}</span>
+                    Cheapest: <span className="text-green-600 dark:text-green-400">${budgetTotal.toFixed(2)}</span>
                   </button>
                 </>
               )}
@@ -2803,7 +2803,7 @@ export default function DeckBuilderPanel({
                   >
                     <span className="text-xs text-muted-foreground flex items-center gap-1.5">
                       <span className="w-3.5" />
-                      Budget:
+                      Cheapest:
                     </span>
                     <span className="text-xs">
                       <span className="text-green-600 dark:text-green-400 group-hover:underline">${budgetTotal.toFixed(2)}</span>
