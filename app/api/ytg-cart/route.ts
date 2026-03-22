@@ -207,29 +207,37 @@ export async function POST(request: NextRequest) {
     const cardKeys = cards.map(c => String(c.card_key).slice(0, 200));
 
     // Step 1: Query card_price_mappings for the requested card_keys
-    const { data: mappings, error } = await supabase
-      .from('card_price_mappings')
-      .select(`
-        card_key,
-        shopify_product_id,
-        shopify_products!inner (
-          id,
-          price,
-          raw_json
-        )
-      `)
-      .in('card_key', cardKeys)
-      .not('shopify_product_id', 'is', null);
+    // Chunk into batches of 40 to avoid PostgREST URL length limits
+    // (card_keys can be ~100 chars each; 40 * 100 ≈ 4KB, well within limits)
+    const CHUNK_SIZE = 40;
+    const allMappings: any[] = [];
+    for (let i = 0; i < cardKeys.length; i += CHUNK_SIZE) {
+      const chunk = cardKeys.slice(i, i + CHUNK_SIZE);
+      const { data, error } = await supabase
+        .from('card_price_mappings')
+        .select(`
+          card_key,
+          shopify_product_id,
+          shopify_products!inner (
+            id,
+            price,
+            raw_json
+          )
+        `)
+        .in('card_key', chunk)
+        .not('shopify_product_id', 'is', null);
 
-    if (error) {
-      console.error('[ytg-cart] DB query failed:', error.message);
-      return NextResponse.json({ error: 'Failed to look up cards' }, { status: 500 });
+      if (error) {
+        console.error('[ytg-cart] DB query failed:', error.message);
+        return NextResponse.json({ error: 'Failed to look up cards' }, { status: 500 });
+      }
+      allMappings.push(...(data ?? []));
     }
 
     // Build lookup: card_key -> { shopify_product_id, cached_variant_id, price }
     const cardLookup = new Map<string, CardLookupEntry>();
 
-    for (const mapping of (mappings ?? [])) {
+    for (const mapping of allMappings) {
       const product = mapping.shopify_products;
       if (!product?.raw_json?.variants?.length) continue;
 
