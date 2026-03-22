@@ -304,7 +304,14 @@ export default function DeckBuilderPanel({
 
   // View options
   const [viewLayout, setViewLayout] = useState<'grid' | 'list'>('grid');
-  const [showPrices, setShowPrices] = useState(false);
+  const [showPrices, setShowPricesRaw] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('deck-show-prices') === 'true';
+  });
+  const setShowPrices = (val: boolean) => {
+    setShowPricesRaw(val);
+    localStorage.setItem('deck-show-prices', String(val));
+  };
 
   // Swipe-to-dismiss for mobile bottom sheet
   const sheetTouchRef = useRef<{ startY: number; currentY: number } | null>(null);
