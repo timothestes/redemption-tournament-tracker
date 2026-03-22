@@ -410,6 +410,7 @@ export async function POST(request: NextRequest) {
         if (substitute.found) {
           const originalInfo = cardLookup.get(card.card_key);
           const isSubstitution = substitute.card_key !== card.card_key;
+          const hasSavings = isSubstitution && originalInfo && substitute.price < originalInfo.price;
 
           const matchedCard: MatchedCard = {
             card_name: substitute.card_name,
@@ -419,13 +420,11 @@ export async function POST(request: NextRequest) {
             variant_id: substitute.variant_id,
           };
 
-          if (isSubstitution) {
+          // Only show substitution info when there are actual savings
+          if (hasSavings) {
             matchedCard.original_card_name = card.card_name;
             matchedCard.original_card_key = card.card_key;
-            // Only include savings amount if we know the original price
-            if (originalInfo && substitute.price < originalInfo.price) {
-              matchedCard.original_price = originalInfo.price;
-            }
+            matchedCard.original_price = originalInfo.price;
           }
 
           matched.push(matchedCard);
