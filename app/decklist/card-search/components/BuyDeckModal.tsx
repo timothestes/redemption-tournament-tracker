@@ -153,8 +153,13 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
       {/* Backdrop */}
       <div className="fixed inset-0 z-[60] bg-black/50" onClick={onClose} />
 
-      {/* Modal */}
-      <div className="fixed inset-x-4 top-1/2 -translate-y-1/2 z-[61] mx-auto max-w-md bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden md:inset-x-0">
+      {/* Modal — bottom sheet on mobile, centered on desktop */}
+      <div className="fixed inset-x-0 bottom-0 z-[61] max-h-[85vh] flex flex-col bg-white dark:bg-gray-800 rounded-t-xl shadow-2xl border border-gray-200 dark:border-gray-700 md:inset-x-auto md:bottom-auto md:top-1/2 md:-translate-y-1/2 md:mx-auto md:max-w-md md:rounded-xl md:max-h-[80vh] md:inset-x-4 lg:inset-x-0">
+        {/* Mobile drag handle */}
+        <div className="flex justify-center pt-2 pb-0 md:hidden">
+          <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
+        </div>
+
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2">
@@ -173,7 +178,7 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
         </div>
 
         {/* Controls row: scope (if reserve exists) + exact/budget toggle */}
-        <div className="px-4 pt-3 flex items-center gap-3">
+        <div className="px-4 pt-3 flex flex-wrap items-center gap-2">
           {hasReserve && (
             <div className="flex gap-1">
               {(["all", "main", "reserve"] as BuyScope[]).map((s) => (
@@ -209,8 +214,8 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
           </div>
         </div>
 
-        {/* Body */}
-        <div className="px-4 py-3">
+        {/* Body — scrollable */}
+        <div className="px-4 py-3 overflow-y-auto flex-1 min-h-0">
           {loading && (
             <div className="flex items-center justify-center py-8 gap-2 text-sm text-gray-500 dark:text-gray-400">
               <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -281,7 +286,7 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
                       {excludedKeys.size === 0 ? 'Deselect all' : excludedKeys.size === result?.matched.length ? 'Select all' : `${selectedCount} of ${result?.matchedTotal} selected`}
                     </span>
                   </label>
-                  <div className="max-h-72 overflow-y-auto -mx-1 px-1">
+                  <div className="-mx-1 px-1">
                     {result.matched.map((card) => {
                       const isSelected = !excludedKeys.has(card.card_key);
                       return (
@@ -365,33 +370,36 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
                 </div>
               )}
 
-              {/* Cart warning */}
-              <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-3">
-                This will replace your current YTG cart.
-              </p>
-
-              {/* Open cart button */}
-              {selectedCartUrl ? (
-                <a
-                  href={selectedCartUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition-colors"
-                  onClick={onClose}
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
-                  </svg>
-                  Open YTG Cart{hasExclusions ? ` (${selectedCount})` : ''}
-                </a>
-              ) : (
-                <div className="text-center py-2 text-sm text-gray-500 dark:text-gray-400">
-                  {hasExclusions ? "No cards selected" : "No cards currently in stock on YTG"}
-                </div>
-              )}
             </>
           )}
         </div>
+
+        {/* Sticky footer — cart warning + CTA */}
+        {result && !loading && (
+          <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+            <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-2">
+              This will replace your current YTG cart.
+            </p>
+            {selectedCartUrl ? (
+              <a
+                href={selectedCartUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition-colors"
+                onClick={onClose}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
+                </svg>
+                Open YTG Cart{hasExclusions ? ` (${selectedCount})` : ''}
+              </a>
+            ) : (
+              <div className="text-center py-2 text-sm text-gray-500 dark:text-gray-400">
+                {hasExclusions ? "No cards selected" : "No cards currently in stock on YTG"}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </>
   );
