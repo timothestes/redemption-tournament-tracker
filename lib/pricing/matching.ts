@@ -943,13 +943,15 @@ export async function regenerateCardPrices(): Promise<void> {
     return;
   }
 
-  const rows = allData.map((row: any) => ({
-    card_key: row.card_key,
-    price: row.shopify_products.price,
-    shopify_handle: row.shopify_products.handle,
-    shopify_title: row.shopify_products.title,
-    updated_at: new Date().toISOString(),
-  }));
+  const rows = allData
+    .filter((row: any) => parseFloat(row.shopify_products.price) > 0) // Skip $0 delisted products
+    .map((row: any) => ({
+      card_key: row.card_key,
+      price: row.shopify_products.price,
+      shopify_handle: row.shopify_products.handle,
+      shopify_title: row.shopify_products.title,
+      updated_at: new Date().toISOString(),
+    }));
 
   const batchSize = 500;
   for (let i = 0; i < rows.length; i += batchSize) {
