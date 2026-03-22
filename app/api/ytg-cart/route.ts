@@ -117,7 +117,7 @@ function findBudgetSubstitute(
   cardNameIndex: Map<string, CardRow[]>,
   dupIndex: DuplicateGroupIndex,
   cardLookup: Map<string, CardLookupEntry>,
-  liveInventory: Map<string, { variantId: string; inventory: number; tracked: boolean }> | null,
+  liveInventory: Map<string, { variantId: string; inventory: number; tracked: boolean; continueSellingWhenOutOfStock: boolean }> | null,
 ): { card_key: string; card_name: string; price: number; variant_id: string } | null {
   // Find the source card in carddata to get its special ability
   const sourceCard = cardData.find(c => c.card_key === cardKey);
@@ -166,7 +166,9 @@ function findBudgetSubstitute(
     let variantId = info.cached_variant_id;
     if (liveInventory) {
       const live = liveInventory.get(info.shopify_product_id);
-      if (live && live.tracked && live.inventory <= 0) continue; // out of stock
+      if (live && live.tracked && live.inventory <= 0 && !live.continueSellingWhenOutOfStock) {
+        continue;
+      }
       if (live) variantId = live.variantId;
     }
 
@@ -207,23 +209,21 @@ export async function POST(request: NextRequest) {
     const cardKeys = cards.map(c => String(c.card_key).slice(0, 200));
 
     // Step 1: Query card_price_mappings for the requested card_keys
-    // Chunk into batches of 40 to avoid PostgREST URL length limits
-    // (card_keys can be ~100 chars each; 40 * 100 ≈ 4KB, well within limits)
-    const CHUNK_SIZE = 40;
+    // PostgREST's .in() breaks on values containing double quotes (e.g. Lost Soul "Orphans"),
+    // so we split: keys without quotes go through batched .in(), keys with quotes use individual .eq()
+    const MAPPING_SELECT = `card_key, shopify_product_id, shopify_products!inner (id, price, raw_json)`;
+    const safeKeys = cardKeys.filter(k => !k.includes('"'));
+    const quotedKeys = cardKeys.filter(k => k.includes('"'));
+
     const allMappings: any[] = [];
-    for (let i = 0; i < cardKeys.length; i += CHUNK_SIZE) {
-      const chunk = cardKeys.slice(i, i + CHUNK_SIZE);
+
+    // Batch query for safe keys (no double quotes)
+    const CHUNK_SIZE = 40;
+    for (let i = 0; i < safeKeys.length; i += CHUNK_SIZE) {
+      const chunk = safeKeys.slice(i, i + CHUNK_SIZE);
       const { data, error } = await supabase
         .from('card_price_mappings')
-        .select(`
-          card_key,
-          shopify_product_id,
-          shopify_products!inner (
-            id,
-            price,
-            raw_json
-          )
-        `)
+        .select(MAPPING_SELECT)
         .in('card_key', chunk)
         .not('shopify_product_id', 'is', null);
 
@@ -232,6 +232,24 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to look up cards' }, { status: 500 });
       }
       allMappings.push(...(data ?? []));
+    }
+
+    // Individual .eq() queries for keys containing double quotes
+    // (PostgREST .in() mangles double quotes in URL encoding)
+    if (quotedKeys.length > 0) {
+      const results = await Promise.all(
+        quotedKeys.map(key =>
+          supabase
+            .from('card_price_mappings')
+            .select(MAPPING_SELECT)
+            .eq('card_key', key)
+            .not('shopify_product_id', 'is', null)
+            .maybeSingle()
+        )
+      );
+      for (const { data } of results) {
+        if (data) allMappings.push(data);
+      }
     }
 
     // Build lookup: card_key -> { shopify_product_id, cached_variant_id, price }
@@ -296,20 +314,15 @@ export async function POST(request: NextRequest) {
       // Batch-query card_price_mappings for all sibling card_keys
       if (siblingCardKeys.size > 0) {
         const siblingKeysArr = [...siblingCardKeys];
-        // Supabase .in() has a practical limit; batch in chunks of 500
-        for (let i = 0; i < siblingKeysArr.length; i += 500) {
-          const chunk = siblingKeysArr.slice(i, i + 500);
+        const safeSiblings = siblingKeysArr.filter(k => !k.includes('"'));
+        const quotedSiblings = siblingKeysArr.filter(k => k.includes('"'));
+
+        // Batch .in() for safe keys
+        for (let i = 0; i < safeSiblings.length; i += 500) {
+          const chunk = safeSiblings.slice(i, i + 500);
           const { data: siblingMappings, error: sibErr } = await supabase
             .from('card_price_mappings')
-            .select(`
-              card_key,
-              shopify_product_id,
-              shopify_products!inner (
-                id,
-                price,
-                raw_json
-              )
-            `)
+            .select(MAPPING_SELECT)
             .in('card_key', chunk)
             .not('shopify_product_id', 'is', null);
 
@@ -317,20 +330,39 @@ export async function POST(request: NextRequest) {
             console.warn('[ytg-cart] Sibling query failed:', sibErr.message);
             continue;
           }
+          allMappings.push(...(siblingMappings ?? []));
+        }
 
-          for (const mapping of (siblingMappings ?? [])) {
-            const product = mapping.shopify_products;
-            if (!product?.raw_json?.variants?.length) continue;
-
-            const variant = product.raw_json.variants[0];
-            if (!variant?.id) continue;
-
-            cardLookup.set(mapping.card_key, {
-              shopify_product_id: product.id,
-              cached_variant_id: String(variant.id),
-              price: parseFloat(product.price) || 0,
-            });
+        // Individual .eq() for quoted keys
+        if (quotedSiblings.length > 0) {
+          const results = await Promise.all(
+            quotedSiblings.map(key =>
+              supabase
+                .from('card_price_mappings')
+                .select(MAPPING_SELECT)
+                .eq('card_key', key)
+                .not('shopify_product_id', 'is', null)
+                .maybeSingle()
+            )
+          );
+          for (const { data } of results) {
+            if (data) allMappings.push(data);
           }
+        }
+
+        // Process all sibling mappings into cardLookup
+        for (const mapping of allMappings.filter(m => siblingCardKeys.has(m.card_key))) {
+          const product = mapping.shopify_products;
+          if (!product?.raw_json?.variants?.length) continue;
+
+          const variant = product.raw_json.variants[0];
+          if (!variant?.id) continue;
+
+          cardLookup.set(mapping.card_key, {
+            shopify_product_id: product.id,
+            cached_variant_id: String(variant.id),
+            price: parseFloat(product.price) || 0,
+          });
         }
       }
     }
@@ -341,7 +373,7 @@ export async function POST(request: NextRequest) {
     )];
 
     // Step 4: Real-time inventory check via Shopify Admin API
-    let liveInventory: Map<string, { variantId: string; inventory: number; tracked: boolean }> | null = null;
+    let liveInventory: Map<string, { variantId: string; inventory: number; tracked: boolean; continueSellingWhenOutOfStock: boolean }> | null = null;
     try {
       const token = await getShopifyAccessToken();
       liveInventory = await fetchProductInventory(token, productIds);
@@ -417,7 +449,7 @@ export async function POST(request: NextRequest) {
       // Check live inventory if available
       if (liveInventory) {
         const live = liveInventory.get(info.shopify_product_id);
-        if (live && live.tracked && live.inventory <= 0) {
+        if (live && live.tracked && live.inventory <= 0 && !live.continueSellingWhenOutOfStock) {
           unmatched.push({
             card_name: card.card_name,
             card_key: card.card_key,
