@@ -1061,6 +1061,9 @@ export async function buildDuplicateGroupIndex(): Promise<DuplicateGroupIndex> {
 export async function computeCheapestPrices(): Promise<void> {
   const supabase = getSupabaseAdmin();
 
+  // Reset all cheapest_price values first so stale data is cleared
+  await supabase.from('card_prices').update({ cheapest_price: null }).not('cheapest_price', 'is', null);
+
   // Load all data in parallel
   const [carddata, dupIndex, cardPrices] = await Promise.all([
     loadCardData(),
