@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 
 /** Generic card item that both Deck and PublicDeck formats can provide */
 export interface BuyDeckCard {
@@ -53,6 +53,39 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
   const [showUnavailable, setShowUnavailable] = useState(true);
   const [showEdit, setShowEdit] = useState(true);
   const [excludedKeys, setExcludedKeys] = useState<Set<string>>(new Set());
+
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    const original = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = original; };
+  }, []);
+
+  // Swipe-to-dismiss state for mobile bottom sheet
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const [dragY, setDragY] = useState(0);
+  const dragStartY = useRef<number | null>(null);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    dragStartY.current = e.touches[0].clientY;
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (dragStartY.current === null) return;
+    const dy = e.touches[0].clientY - dragStartY.current;
+    if (dy > 0) { // Only allow dragging down
+      setDragY(dy);
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (dragY > 100) {
+      onClose(); // Dismiss if dragged more than 100px
+    } else {
+      setDragY(0); // Snap back
+    }
+    dragStartY.current = null;
+  }, [dragY, onClose]);
 
   const mainCards = allCards.filter(c => !c.isReserve);
   const reserveCards = allCards.filter(c => c.isReserve);
@@ -154,9 +187,18 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
       <div className="fixed inset-0 z-[60] bg-black/50" onClick={onClose} />
 
       {/* Modal — bottom sheet on mobile, centered on desktop */}
-      <div className="fixed inset-x-0 bottom-0 z-[61] max-h-[85vh] flex flex-col bg-white dark:bg-gray-800 rounded-t-xl shadow-2xl border border-gray-200 dark:border-gray-700 md:inset-x-auto md:bottom-auto md:top-1/2 md:-translate-y-1/2 md:mx-auto md:max-w-md md:rounded-xl md:max-h-[80vh] md:inset-x-4 lg:inset-x-0">
-        {/* Mobile drag handle */}
-        <div className="flex justify-center pt-2 pb-0 md:hidden">
+      <div
+        ref={sheetRef}
+        className="fixed inset-x-0 bottom-0 z-[61] max-h-[85vh] flex flex-col bg-white dark:bg-gray-800 rounded-t-xl shadow-2xl border border-gray-200 dark:border-gray-700 md:inset-x-auto md:bottom-auto md:top-1/2 md:-translate-y-1/2 md:mx-auto md:max-w-md md:rounded-xl md:max-h-[80vh] md:inset-x-4 lg:inset-x-0"
+        style={dragY > 0 ? { transform: `translateY(${dragY}px)`, transition: dragStartY.current !== null ? 'none' : 'transform 0.2s ease-out' } : undefined}
+      >
+        {/* Mobile drag handle — swipe down to dismiss */}
+        <div
+          className="flex justify-center pt-2 pb-0 md:hidden cursor-grab active:cursor-grabbing"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
           <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
         </div>
 
