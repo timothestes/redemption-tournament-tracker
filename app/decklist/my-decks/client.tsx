@@ -1126,6 +1126,11 @@ function DeckCard({
             {deck.total_price != null && deck.total_price > 0 && (
               <span className="text-green-600 dark:text-green-400">${deck.total_price.toFixed(2)}</span>
             )}
+            {deck.budget_price != null && deck.total_price != null && deck.budget_price < deck.total_price - 0.005 && (
+              <span className="text-[10px] text-muted-foreground" title={`Minimum price using cheapest available printings: $${deck.budget_price.toFixed(2)}`}>
+                min ${deck.budget_price.toFixed(2)}
+              </span>
+            )}
           </div>
         </div>
 
@@ -1217,6 +1222,11 @@ function DeckListItem({
             {deck.total_price != null && deck.total_price > 0 && (
               <span className="text-green-600 dark:text-green-400">${deck.total_price.toFixed(2)}</span>
             )}
+            {deck.budget_price != null && deck.total_price != null && deck.budget_price < deck.total_price - 0.005 && (
+              <span className="text-[10px] text-muted-foreground" title={`Minimum price using cheapest available printings: $${deck.budget_price.toFixed(2)}`}>
+                min ${deck.budget_price.toFixed(2)}
+              </span>
+            )}
           </div>
           {deck.tags && deck.tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1.5">
@@ -1237,6 +1247,11 @@ function DeckListItem({
           <span>{deck.card_count || 0} cards</span>
           {deck.total_price != null && deck.total_price > 0 && (
             <span className="text-green-600 dark:text-green-400">${deck.total_price.toFixed(2)}</span>
+          )}
+          {deck.budget_price != null && deck.total_price != null && deck.budget_price < deck.total_price - 0.005 && (
+            <span className="text-xs text-muted-foreground" title={`Minimum price using cheapest available printings: $${deck.budget_price.toFixed(2)}`}>
+              min ${deck.budget_price.toFixed(2)}
+            </span>
           )}
           <span className="text-xs">Updated {updatedDate}</span>
         </div>

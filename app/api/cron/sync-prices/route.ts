@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/pricing/supabase-admin';
 import { getShopifyAccessToken, fetchAllShopifyProducts } from '@/lib/pricing/shopify';
-import { runMatchingPipeline, regenerateCardPrices } from '@/lib/pricing/matching';
+import { runMatchingPipeline, regenerateCardPrices, computeCheapestPrices } from '@/lib/pricing/matching';
 
 export const maxDuration = 300;
 
@@ -50,6 +50,10 @@ export async function GET(request: NextRequest) {
     // 3. Regenerate card_prices
     console.log('[cron] Regenerating card_prices...');
     await regenerateCardPrices();
+
+    // 4. Compute cheapest equivalent prices
+    console.log('[cron] Computing cheapest prices...');
+    await computeCheapestPrices();
 
     console.log('[cron] Price sync complete');
     return NextResponse.json({ success: true, shopify_synced: products.length, matching: summary });

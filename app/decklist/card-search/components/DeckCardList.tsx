@@ -25,6 +25,8 @@ interface DeckCardListProps {
   viewLayout?: 'grid' | 'list';
   /** Optional: Disable card hover preview */
   disableHoverPreview?: boolean;
+  /** Whether to show prices below card images in grid view */
+  showPrices?: boolean;
 }
 
 /**
@@ -41,6 +43,7 @@ export default function DeckCardList({
   showTypeIcons = true,
   viewLayout = 'list',
   disableHoverPreview = false,
+  showPrices = false,
 }: DeckCardListProps) {
   const [openMenuCard, setOpenMenuCard] = React.useState<string | null>(null);
   const [previewCard, setPreviewCard] = React.useState<{ card: Card; x: number; y: number } | null>(null);
@@ -138,9 +141,9 @@ export default function DeckCardList({
           const cardKey = `${card.name}-${card.set}-${isReserve}`;
           
           return (
+            <div key={cardKey} className="deck-card-enter">
             <div
-              key={cardKey}
-              className="deck-card-enter relative group rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-200"
+              className="relative group rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-200"
               onMouseEnter={disableHoverPreview ? undefined : (e) => {
                 const pos = calculatePreviewPosition(e.currentTarget);
                 setPreviewCard({
@@ -298,6 +301,17 @@ export default function DeckCardList({
                   </div>
                 </div>
               </div>
+            </div>
+            {/* Price label below card */}
+            {showPrices && (() => {
+              const priceKey = `${card.name}|${card.set}|${card.imgFile}`;
+              const priceInfo = getPrice(priceKey);
+              return priceInfo ? (
+                <div className="text-[10px] text-green-600 dark:text-green-400 text-center mt-0.5 tabular-nums font-medium truncate">
+                  ${priceInfo.price.toFixed(2)}
+                </div>
+              ) : null;
+            })()}
             </div>
           );
         })}

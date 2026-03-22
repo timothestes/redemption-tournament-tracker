@@ -22,6 +22,7 @@ export interface DeckData {
   updated_at?: string;
   tags?: GlobalTag[];
   total_price?: number | null;
+  budget_price?: number | null;
 }
 
 export interface DeckCardData {
@@ -323,18 +324,30 @@ export async function loadUserDecksAction() {
       }
     }
 
-    // Batch-fetch total prices for all returned decks
+    // Batch-fetch total prices and budget prices for all returned decks
     let priceMap = new Map<string, number>();
+    let budgetPriceMap = new Map<string, number>();
     if (deckIds.length > 0) {
-      const { data: priceRows, error: priceError } = await supabase.rpc("get_deck_total_prices", {
-        deck_ids: deckIds,
-      });
-      if (priceError) {
-        console.error("Error fetching deck prices:", priceError);
+      const [priceResult, budgetResult] = await Promise.all([
+        supabase.rpc("get_deck_total_prices", { deck_ids: deckIds }),
+        supabase.rpc("get_deck_budget_prices", { deck_ids: deckIds }),
+      ]);
+
+      if (priceResult.error) {
+        console.error("Error fetching deck prices:", priceResult.error);
       }
-      for (const row of (priceRows || []) as any[]) {
+      for (const row of (priceResult.data || []) as any[]) {
         if (row.total_price > 0) {
           priceMap.set(row.deck_id, parseFloat(row.total_price));
+        }
+      }
+
+      if (budgetResult.error) {
+        console.error("Error fetching budget prices:", budgetResult.error);
+      }
+      for (const row of (budgetResult.data || []) as any[]) {
+        if (row.budget_price > 0) {
+          budgetPriceMap.set(row.deck_id, parseFloat(row.budget_price));
         }
       }
     }
@@ -350,6 +363,7 @@ export async function loadUserDecksAction() {
         deck_cards: undefined,
         tags: tagsMap.get(deck.id) || [],
         total_price: priceMap.get(deck.id) || null,
+        budget_price: budgetPriceMap.get(deck.id) || null,
       };
     });
 
@@ -991,6 +1005,22 @@ export async function loadPublicDeckAction(deckId: string) {
         .then(() => {});
     }
 
+    // Fetch total and budget prices
+    let totalPrice: number | null = null;
+    let budgetPrice: number | null = null;
+    {
+      const [priceResult, budgetResult] = await Promise.all([
+        supabase.rpc("get_deck_total_prices", { deck_ids: [deckId] }),
+        supabase.rpc("get_deck_budget_prices", { deck_ids: [deckId] }),
+      ]);
+      if (priceResult.data?.[0]?.total_price > 0) {
+        totalPrice = parseFloat(priceResult.data[0].total_price);
+      }
+      if (budgetResult.data?.[0]?.budget_price > 0) {
+        budgetPrice = parseFloat(budgetResult.data[0].budget_price);
+      }
+    }
+
     return {
       success: true,
       deck: {
@@ -998,6 +1028,8 @@ export async function loadPublicDeckAction(deckId: string) {
         username: profile?.username || null,
         cards: cards || [],
         tags,
+        total_price: totalPrice,
+        budget_price: budgetPrice,
       },
       isOwner,
     };
@@ -1322,18 +1354,30 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
       }
     }
 
-    // Batch-fetch total prices for all returned decks
+    // Batch-fetch total prices and budget prices for all returned decks
     let priceMap = new Map<string, number>();
+    let budgetPriceMap = new Map<string, number>();
     if (deckIds.length > 0) {
-      const { data: priceRows, error: priceError } = await supabase.rpc("get_deck_total_prices", {
-        deck_ids: deckIds,
-      });
-      if (priceError) {
-        console.error("Error fetching deck prices:", priceError);
+      const [priceResult, budgetResult] = await Promise.all([
+        supabase.rpc("get_deck_total_prices", { deck_ids: deckIds }),
+        supabase.rpc("get_deck_budget_prices", { deck_ids: deckIds }),
+      ]);
+
+      if (priceResult.error) {
+        console.error("Error fetching deck prices:", priceResult.error);
       }
-      for (const row of (priceRows || []) as any[]) {
+      for (const row of (priceResult.data || []) as any[]) {
         if (row.total_price > 0) {
           priceMap.set(row.deck_id, parseFloat(row.total_price));
+        }
+      }
+
+      if (budgetResult.error) {
+        console.error("Error fetching budget prices:", budgetResult.error);
+      }
+      for (const row of (budgetResult.data || []) as any[]) {
+        if (row.budget_price > 0) {
+          budgetPriceMap.set(row.deck_id, parseFloat(row.budget_price));
         }
       }
     }
@@ -1402,6 +1446,7 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
         username: usernameMap.get(d.user_id) || null,
         tags: tagsMap.get(d.id) || [],
         total_price: priceMap.get(d.id) || null,
+        budget_price: budgetPriceMap.get(d.id) || null,
         tournament: tournament || null,
       };
     });

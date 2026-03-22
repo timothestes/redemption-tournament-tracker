@@ -25,7 +25,7 @@ export interface DuplicateGroupIndex {
 }
 
 /** Normalize a name for fuzzy matching */
-function normalize(name: string): string {
+export function normalize(name: string): string {
   return name
     .toLowerCase()
     .replace(/[\u2018\u2019\u201c\u201d]/g, "'") // curly quotes → ascii
@@ -42,7 +42,7 @@ function normalize(name: string): string {
  * "David, Giant Slayer [K]" → "David, Giant Slayer"
  * "David, Heart After God / David, the Contrite (LoC)" → "David, Heart After God"
  */
-function stripSetSuffix(name: string): string {
+export function stripSetSuffix(name: string): string {
   // Strip bracket suffix: "[K]", "[2025 - Seasonal]", "[Fundraiser]"
   let stripped = name.replace(/\s*\[[^\]]+\]\s*$/, "");
   // Strip paren suffix: "(G)", "(LoC)", "(1st Print - K)", "(CoW AB)"
@@ -250,7 +250,7 @@ function disambiguate(
 /**
  * Look up a card's duplicate group using multiple matching strategies.
  */
-function findGroup(
+export function findGroup(
   cardName: string,
   index: DuplicateGroupIndex
 ): DuplicateGroup | null {

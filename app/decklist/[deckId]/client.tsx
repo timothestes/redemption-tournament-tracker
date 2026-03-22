@@ -35,6 +35,8 @@ interface PublicDeckData {
   updated_at: string;
   cards: DeckCardData[];
   tags?: GlobalTag[];
+  total_price?: number | null;
+  budget_price?: number | null;
 }
 
 function getContrastColor(hex: string): string {
@@ -155,6 +157,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   const [showPreview, setShowPreview] = useState(true);
   const [showStats, setShowStats] = useState(false);
   const [showBuyDeckModal, setShowBuyDeckModal] = useState(false);
+  const [buyModalMode, setBuyModalMode] = useState<"exact" | "budget">("exact");
   const [showPDFModal, setShowPDFModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -578,7 +581,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                 {mainDeckCount} cards{reserveCount > 0 && ` + ${reserveCount} reserve`}
                 {totalDeckPrice !== null && (
                   <button
-                    onClick={() => setShowBuyDeckModal(true)}
+                    onClick={() => { setBuyModalMode("exact"); setShowBuyDeckModal(true); }}
                     className="text-green-600 dark:text-green-400 font-medium hover:underline inline-flex items-center gap-1"
                     title="Buy deck on YTG"
                   >
@@ -586,6 +589,16 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                     <img src="/sponsors/ytg-dark.png" alt="" className="h-3 w-3 object-contain hidden dark:block" />
                     <img src="/sponsors/ytg-light.png" alt="" className="h-3 w-3 object-contain dark:hidden" />
                     ${totalDeckPrice.toFixed(2)}
+                  </button>
+                )}
+                {deck.budget_price != null && deck.total_price != null && deck.budget_price < deck.total_price - 0.005 && (
+                  <button
+                    onClick={() => { setBuyModalMode("budget"); setShowBuyDeckModal(true); }}
+                    className="text-muted-foreground font-normal hover:underline inline-flex items-center gap-0.5 text-xs"
+                    title={`Save $${(deck.total_price - deck.budget_price).toFixed(2)} with cheapest versions`}
+                  >
+                    {" · Min: "}
+                    <span className="text-green-600 dark:text-green-400">${deck.budget_price.toFixed(2)}</span>
                   </button>
                 )}
               </span>
@@ -1269,7 +1282,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                   </div>
                   {totalDeckPrice !== null && (
                     <button
-                      onClick={() => setShowBuyDeckModal(true)}
+                      onClick={() => { setBuyModalMode("exact"); setShowBuyDeckModal(true); }}
                       className="flex justify-between w-full text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 -mx-1 px-1 py-0.5 rounded transition-colors group"
                     >
                       <span className="flex items-center gap-1.5">
@@ -1278,6 +1291,21 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                         Est. Price:
                       </span>
                       <span className="font-medium text-green-600 dark:text-green-400 group-hover:underline">${totalDeckPrice.toFixed(2)}</span>
+                    </button>
+                  )}
+                  {deck.budget_price != null && deck.total_price != null && deck.budget_price < deck.total_price - 0.005 && (
+                    <button
+                      onClick={() => { setBuyModalMode("budget"); setShowBuyDeckModal(true); }}
+                      className="flex justify-between w-full text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 -mx-1 px-1 py-0.5 rounded transition-colors group"
+                    >
+                      <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                        <span className="w-3.5" />
+                        Min:
+                      </span>
+                      <span className="text-xs">
+                        <span className="text-green-600 dark:text-green-400 group-hover:underline">${deck.budget_price.toFixed(2)}</span>
+                        <span className="text-muted-foreground ml-1">(save ${(deck.total_price - deck.budget_price).toFixed(2)})</span>
+                      </span>
                     </button>
                   )}
                 </div>
@@ -1573,6 +1601,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
             isReserve: c.is_reserve,
           }))}
           onClose={() => setShowBuyDeckModal(false)}
+          initialMode={buyModalMode}
         />
       )}
 

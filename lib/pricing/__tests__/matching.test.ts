@@ -11,6 +11,7 @@ function makeCard(overrides: Partial<CardRow>): CardRow {
     type: '',
     brigade: '',
     rarity: '',
+    special_ability: '',
     card_key: '',
     ...overrides,
   };

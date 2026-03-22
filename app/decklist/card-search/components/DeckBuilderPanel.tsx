@@ -26,6 +26,8 @@ import ReactMarkdown from "react-markdown";
 import BuyDeckModal, { BuyDeckCard } from "./BuyDeckModal";
 import DeckLegalityChecklist from "./DeckLegalityChecklist";
 import type { DeckCheckResult } from "@/utils/deckcheck/types";
+import { useBudgetPricing } from '../hooks/useBudgetPricing';
+import type { BudgetCard } from '@/lib/pricing/budgetPricing';
 
 function getTagContrastColor(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -95,6 +97,8 @@ interface DeckBuilderPanelProps {
   deckCheckResult?: DeckCheckResult | null;
   /** Whether a deck check is currently in progress */
   isDeckChecking?: boolean;
+  /** Full card catalog for budget pricing */
+  allCards: BudgetCard[];
 }
 
 /**
@@ -130,6 +134,7 @@ export default function DeckBuilderPanel({
   defaultTab,
   deckCheckResult,
   isDeckChecking,
+  allCards,
 }: DeckBuilderPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>(defaultTab ?? "main");
   const [isEditingName, setIsEditingName] = useState(false);
@@ -140,6 +145,7 @@ export default function DeckBuilderPanel({
   const [showDeleteDeckModal, setShowDeleteDeckModal] = useState(false);
   const [showLoadDeckModal, setShowLoadDeckModal] = useState(false);
   const [showBuyDeckModal, setShowBuyDeckModal] = useState(false);
+  const [buyModalMode, setBuyModalMode] = useState<"exact" | "budget">("exact");
   const [showValidationTooltip, setShowValidationTooltip] = useState(false);
   const [showViewDropdown, setShowViewDropdown] = useState(false);
   const viewDropdownBtnRef = useRef<HTMLButtonElement>(null);
@@ -298,6 +304,14 @@ export default function DeckBuilderPanel({
 
   // View options
   const [viewLayout, setViewLayout] = useState<'grid' | 'list'>('grid');
+  const [showPrices, setShowPricesRaw] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('deck-show-prices') === 'true';
+  });
+  const setShowPrices = (val: boolean) => {
+    setShowPricesRaw(val);
+    localStorage.setItem('deck-show-prices', String(val));
+  };
 
   // Swipe-to-dismiss for mobile bottom sheet
   const sheetTouchRef = useRef<{ startY: number; currentY: number } | null>(null);
@@ -434,6 +448,8 @@ export default function DeckBuilderPanel({
     }
     return hasAnyPrice ? total : null;
   }, [deck.cards, getPrice]);
+
+  const { budgetTotal, savings } = useBudgetPricing(deck, allCards);
 
   const handleNameSubmit = () => {
     if (editedName.trim()) {
@@ -673,13 +689,22 @@ export default function DeckBuilderPanel({
             )}
             {totalDeckPrice !== null && (
               <button
-                onClick={() => setShowBuyDeckModal(true)}
+                onClick={() => { setBuyModalMode("exact"); setShowBuyDeckModal(true); }}
                 className="md:hidden flex-shrink-0 text-sm font-semibold text-green-600 dark:text-green-400 flex items-center gap-1 hover:underline"
                 title="Buy deck on YTG"
               >
                 <img src="/sponsors/ytg-dark.png" alt="" className="h-3.5 w-3.5 object-contain hidden dark:block" />
                 <img src="/sponsors/ytg-light.png" alt="" className="h-3.5 w-3.5 object-contain dark:hidden" />
                 ${totalDeckPrice.toFixed(2)}
+              </button>
+            )}
+            {savings !== null && budgetTotal !== null && (
+              <button
+                onClick={() => { setBuyModalMode("budget"); setShowBuyDeckModal(true); }}
+                className="md:hidden flex-shrink-0 text-xs text-muted-foreground hover:underline"
+                title={`Save $${savings.toFixed(2)} with cheapest versions`}
+              >
+                Min: <span className="text-green-600 dark:text-green-400">${budgetTotal.toFixed(2)}</span>
               </button>
             )}
             <span className="hidden md:flex items-center gap-1 text-xs whitespace-nowrap ml-auto flex-shrink-0" suppressHydrationWarning>
@@ -696,13 +721,25 @@ export default function DeckBuilderPanel({
                 <>
                   <span className="text-gray-400 dark:text-gray-600 ml-1">·</span>
                   <button
-                    onClick={() => setShowBuyDeckModal(true)}
+                    onClick={() => { setBuyModalMode("exact"); setShowBuyDeckModal(true); }}
                     className="text-green-600 dark:text-green-400 font-medium hover:underline inline-flex items-center gap-0.5"
                     title="Buy deck on YTG"
                   >
                     <img src="/sponsors/ytg-dark.png" alt="" className="h-3 w-3 object-contain hidden dark:block" />
                     <img src="/sponsors/ytg-light.png" alt="" className="h-3 w-3 object-contain dark:hidden" />
                     ${totalDeckPrice.toFixed(2)}
+                  </button>
+                </>
+              )}
+              {savings !== null && budgetTotal !== null && (
+                <>
+                  <span className="text-gray-400 dark:text-gray-600 ml-0.5">·</span>
+                  <button
+                    onClick={() => { setBuyModalMode("budget"); setShowBuyDeckModal(true); }}
+                    className="text-xs text-muted-foreground whitespace-nowrap hover:underline"
+                    title={`Save $${savings.toFixed(2)} with cheapest versions`}
+                  >
+                    Min: <span className="text-green-600 dark:text-green-400">${budgetTotal.toFixed(2)}</span>
                   </button>
                 </>
               )}
@@ -976,7 +1013,7 @@ export default function DeckBuilderPanel({
                   <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
                   {totalDeckPrice !== null && (
                     <button
-                      onClick={() => { setShowBuyDeckModal(true); setShowMenu(false); }}
+                      onClick={() => { setBuyModalMode("exact"); setShowBuyDeckModal(true); setShowMenu(false); }}
                       className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-gray-900 dark:text-white text-sm"
                     >
                       <img src="/sponsors/ytg-dark.png" alt="" className="w-4 h-4 object-contain hidden dark:block" />
@@ -1497,7 +1534,7 @@ export default function DeckBuilderPanel({
               <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
               {totalDeckPrice !== null && (
                 <button
-                  onClick={() => { setShowBuyDeckModal(true); setShowMenu(false); }}
+                  onClick={() => { setBuyModalMode("exact"); setShowBuyDeckModal(true); setShowMenu(false); }}
                   className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
                 >
                   <img src="/sponsors/ytg-dark.png" alt="" className="w-4 h-4 object-contain hidden dark:block" />
@@ -1797,6 +1834,17 @@ export default function DeckBuilderPanel({
                     </button>
                   </div>
                 </div>
+                <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
+                {/* Show Prices */}
+                <div className="px-3 py-2">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setShowPrices(!showPrices); }}
+                    className="w-full px-3 py-2 text-left text-sm rounded transition-colors flex items-center justify-between text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    <span>Show Prices</span>
+                    {showPrices && <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
+                  </button>
+                </div>
                 {/* Full Deck View (mobile only) */}
                 <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
                 <button
@@ -1895,6 +1943,17 @@ export default function DeckBuilderPanel({
                       {groupBy === 'alignment' && <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
                     </button>
                   </div>
+                </div>
+                <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
+                {/* Show Prices */}
+                <div className="px-3 py-2">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setShowPrices(!showPrices); }}
+                    className="w-full px-3 py-2 text-left text-sm rounded transition-colors flex items-center justify-between text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    <span>Show Prices</span>
+                    {showPrices && <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
+                  </button>
                 </div>
                 {/* Full Deck View */}
                 <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
@@ -2122,7 +2181,7 @@ export default function DeckBuilderPanel({
                     onMoveCard={handleMoveCard}
                     showTypeIcons={false}
                     viewLayout={viewLayout}
-
+                    showPrices={showPrices}
                     disableHoverPreview={disableHoverPreview}
                   />
                 </div>
@@ -2214,7 +2273,7 @@ export default function DeckBuilderPanel({
                     onMoveCard={handleMoveCard}
                     showTypeIcons={false}
                     viewLayout={viewLayout}
-
+                    showPrices={showPrices}
                     disableHoverPreview={disableHoverPreview}
                   />
                 </div>
@@ -2755,7 +2814,7 @@ export default function DeckBuilderPanel({
                 {totalDeckPrice !== null && (
                   <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
                     <button
-                      onClick={() => setShowBuyDeckModal(true)}
+                      onClick={() => { setBuyModalMode("exact"); setShowBuyDeckModal(true); }}
                       className="flex justify-between w-full text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 -mx-1 px-1 py-0.5 rounded transition-colors group"
                     >
                       <span className="flex items-center gap-1.5">
@@ -2766,6 +2825,21 @@ export default function DeckBuilderPanel({
                       <span className="font-medium text-green-600 dark:text-green-400 group-hover:underline">${totalDeckPrice.toFixed(2)}</span>
                     </button>
                   </div>
+                )}
+                {savings !== null && budgetTotal !== null && (
+                  <button
+                    onClick={() => { setBuyModalMode("budget"); setShowBuyDeckModal(true); }}
+                    className="flex justify-between w-full text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 -mx-1 px-1 py-0.5 rounded transition-colors group -mt-1 mb-1"
+                  >
+                    <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                      <span className="w-3.5" />
+                      Min:
+                    </span>
+                    <span className="text-xs">
+                      <span className="text-green-600 dark:text-green-400 group-hover:underline">${budgetTotal.toFixed(2)}</span>
+                      <span className="text-muted-foreground ml-1">(save ${savings.toFixed(2)})</span>
+                    </span>
+                  </button>
                 )}
 
                 {/* Card Type Breakdown */}
@@ -2855,6 +2929,7 @@ export default function DeckBuilderPanel({
             isReserve: dc.isReserve,
           }))}
           onClose={() => setShowBuyDeckModal(false)}
+          initialMode={buyModalMode}
         />
       )}
 
