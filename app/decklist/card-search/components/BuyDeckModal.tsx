@@ -24,6 +24,11 @@ interface UnmatchedCard {
   card_key: string;
   quantity: number;
   reason: 'no_match' | 'sold_out';
+  cheaper_alternative?: {
+    card_name: string;
+    price: number;
+    source: string;
+  };
 }
 
 interface CartResult {
@@ -370,9 +375,16 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
                             <div className="text-[10px] font-semibold text-red-500 dark:text-red-400 uppercase tracking-wide pt-1">Sold Out</div>
                           )}
                           {soldOut.map((card, i) => (
-                            <div key={`so-${i}`} className="flex items-center justify-between py-0.5 text-xs text-red-500 dark:text-red-400">
-                              <span className="truncate">{card.card_name}</span>
-                              {card.quantity > 1 && <span className="ml-2 flex-shrink-0">x{card.quantity}</span>}
+                            <div key={`so-${i}`} className="py-0.5 text-xs text-red-500 dark:text-red-400">
+                              <div className="flex items-center justify-between">
+                                <span className="truncate">{card.card_name}</span>
+                                {card.quantity > 1 && <span className="ml-2 flex-shrink-0">x{card.quantity}</span>}
+                              </div>
+                              {card.cheaper_alternative && (
+                                <div className="text-[10px] text-muted-foreground mt-0.5">
+                                  Available from {card.cheaper_alternative.source} for ${card.cheaper_alternative.price.toFixed(2)}
+                                </div>
+                              )}
                             </div>
                           ))}
                         </>
@@ -384,9 +396,16 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
                             <div className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide pt-1.5">Not Listed</div>
                           )}
                           {noMatch.map((card, i) => (
-                            <div key={`nm-${i}`} className="flex items-center justify-between py-0.5 text-xs text-gray-500 dark:text-gray-400">
-                              <span className="truncate">{card.card_name}</span>
-                              {card.quantity > 1 && <span className="ml-2 flex-shrink-0">x{card.quantity}</span>}
+                            <div key={`nm-${i}`} className="py-0.5 text-xs text-gray-500 dark:text-gray-400">
+                              <div className="flex items-center justify-between">
+                                <span className="truncate">{card.card_name}</span>
+                                {card.quantity > 1 && <span className="ml-2 flex-shrink-0">x{card.quantity}</span>}
+                              </div>
+                              {card.cheaper_alternative && (
+                                <div className="text-[10px] text-muted-foreground mt-0.5">
+                                  Available from {card.cheaper_alternative.source} for ${card.cheaper_alternative.price.toFixed(2)}
+                                </div>
+                              )}
                             </div>
                           ))}
                         </>

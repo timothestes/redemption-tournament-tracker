@@ -60,6 +60,12 @@ interface UnmatchedCard {
   card_key: string;
   quantity: number;
   reason: 'no_match' | 'sold_out';
+  /** When a cheaper version exists on another store (e.g. Fundraiser) */
+  cheaper_alternative?: {
+    card_name: string;
+    price: number;
+    source: string; // e.g. "Fundraiser"
+  };
 }
 
 interface CartResult {
@@ -195,6 +201,51 @@ function findBudgetSubstitute(
   return { found: true, ...best };
 }
 
+/**
+ * Find the cheapest non-YTG alternative (e.g. Fundraiser) for a card.
+ */
+function findCheaperAlternative(
+  cardKey: string,
+  cardData: CardRow[],
+  cardNameIndex: Map<string, CardRow[]>,
+  dupIndex: DuplicateGroupIndex,
+  nonYtgPrices: Map<string, { price: number; source: string }>,
+): UnmatchedCard['cheaper_alternative'] | undefined {
+  const sourceCard = cardData.find(c => c.card_key === cardKey);
+  if (!sourceCard) return undefined;
+
+  const group = findGroup(sourceCard.name, dupIndex);
+  if (!group) return undefined;
+
+  const targetAbility = normalizeAbility(sourceCard.special_ability);
+  const memberNormalized = new Set<string>();
+  for (const member of group.members) {
+    memberNormalized.add(normalize(member.cardName));
+    memberNormalized.add(normalize(stripSetSuffix(member.cardName)));
+  }
+
+  // Find ability-matched candidates
+  const seen = new Set<string>();
+  let cheapest: { card_name: string; price: number; source: string } | undefined;
+
+  for (const normName of memberNormalized) {
+    const bucket = cardNameIndex.get(normName);
+    if (!bucket) continue;
+    for (const c of bucket) {
+      if (seen.has(c.card_key)) continue;
+      seen.add(c.card_key);
+      if (normalizeAbility(c.special_ability) !== targetAbility) continue;
+
+      const alt = nonYtgPrices.get(c.card_key);
+      if (alt && (!cheapest || alt.price < cheapest.price)) {
+        cheapest = { card_name: c.name, price: alt.price, source: alt.source };
+      }
+    }
+  }
+
+  return cheapest;
+}
+
 // ---------------------------------------------------------------------------
 // POST handler
 // ---------------------------------------------------------------------------
@@ -282,11 +333,26 @@ export async function POST(request: NextRequest) {
     let dupIndex: DuplicateGroupIndex | null = null;
     let cardNameIndex: Map<string, CardRow[]> | null = null;
 
+    // Non-YTG prices (e.g. Fundraiser cards) — loaded for budget mode to show cheaper alternatives
+    let nonYtgPrices = new Map<string, { price: number; source: string }>();
+
     if (useBudget) {
       const cached = await getCachedData();
       cardData = cached.cardData;
       dupIndex = cached.dupIndex;
       cardNameIndex = buildCardRowNameIndex(cardData);
+
+      // Load card_prices entries that have no shopify_handle (Fundraiser, etc.)
+      const { data: nonYtgRows } = await supabase
+        .from('card_prices')
+        .select('card_key, price, shopify_title')
+        .is('shopify_handle', null);
+      for (const row of (nonYtgRows ?? [])) {
+        nonYtgPrices.set(row.card_key, {
+          price: parseFloat(row.price),
+          source: row.shopify_title || 'Other Store',
+        });
+      }
 
       // For each requested card, find its duplicate group and collect all sibling card_keys
       const siblingCardKeys = new Set<string>();
@@ -434,11 +500,15 @@ export async function POST(request: NextRequest) {
 
         // Budget substitute not found — use specific reason if available
         if (!substitute.found && 'reason' in substitute && substitute.reason === 'all_sold_out') {
+          const alt = dupIndex && cardNameIndex
+            ? findCheaperAlternative(card.card_key, cardData, cardNameIndex, dupIndex, nonYtgPrices)
+            : undefined;
           unmatched.push({
             card_name: card.card_name,
             card_key: card.card_key,
             quantity: card.quantity,
             reason: 'sold_out',
+            ...(alt && { cheaper_alternative: alt }),
           });
           continue;
         }
@@ -448,11 +518,15 @@ export async function POST(request: NextRequest) {
       // Regular matching (exact mode, or budget mode fallback)
       const info = cardLookup.get(card.card_key);
       if (!info) {
+        const alt = useBudget && dupIndex && cardNameIndex
+          ? findCheaperAlternative(card.card_key, cardData, cardNameIndex, dupIndex, nonYtgPrices)
+          : undefined;
         unmatched.push({
           card_name: card.card_name,
           card_key: card.card_key,
           quantity: card.quantity,
           reason: 'no_match',
+          ...(alt && { cheaper_alternative: alt }),
         });
         continue;
       }
