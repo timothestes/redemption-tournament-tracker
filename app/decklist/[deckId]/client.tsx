@@ -595,7 +595,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                     className="text-muted-foreground font-normal hover:underline inline-flex items-center gap-0.5 text-xs"
                     title={`Save $${(deck.total_price - deck.budget_price).toFixed(2)} with cheapest versions`}
                   >
-                    {" · Cheapest: "}
+                    {" · Min: "}
                     <span className="text-green-600 dark:text-green-400">${deck.budget_price.toFixed(2)}</span>
                   </button>
                 )}
@@ -1298,7 +1298,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                     >
                       <span className="text-xs text-muted-foreground flex items-center gap-1.5">
                         <span className="w-3.5" />
-                        Cheapest:
+                        Min:
                       </span>
                       <span className="text-xs">
                         <span className="text-green-600 dark:text-green-400 group-hover:underline">${deck.budget_price.toFixed(2)}</span>
