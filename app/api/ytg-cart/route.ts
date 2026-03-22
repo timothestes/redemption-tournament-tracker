@@ -388,8 +388,8 @@ export async function POST(request: NextRequest) {
     const cartParts: string[] = [];
 
     for (const card of cards) {
+      // Budget mode: try to find a cheaper in-stock equivalent first
       if (useBudget && dupIndex && cardNameIndex) {
-        // Budget mode: try to find cheapest in-stock equivalent
         const substitute = findBudgetSubstitute(
           card.card_key,
           cardData,
@@ -400,7 +400,11 @@ export async function POST(request: NextRequest) {
         );
 
         if (substitute) {
-          const isSubstitution = substitute.card_key !== card.card_key;
+          const originalInfo = cardLookup.get(card.card_key);
+          const hasSavings = substitute.card_key !== card.card_key
+            && originalInfo
+            && substitute.price < originalInfo.price;
+
           const matchedCard: MatchedCard = {
             card_name: substitute.card_name,
             card_key: substitute.card_key,
@@ -409,32 +413,20 @@ export async function POST(request: NextRequest) {
             variant_id: substitute.variant_id,
           };
 
-          if (isSubstitution) {
-            // Record original card info
-            const originalInfo = cardLookup.get(card.card_key);
+          if (hasSavings) {
             matchedCard.original_card_name = card.card_name;
             matchedCard.original_card_key = card.card_key;
-            matchedCard.original_price = originalInfo?.price;
+            matchedCard.original_price = originalInfo.price;
           }
 
           matched.push(matchedCard);
           cartParts.push(`${substitute.variant_id}:${card.quantity}`);
           continue;
         }
-
-        // No substitute found at all — card is unmatched
-        // Check if the original card exists but is sold out vs no match at all
-        const originalInfo = cardLookup.get(card.card_key);
-        unmatched.push({
-          card_name: card.card_name,
-          card_key: card.card_key,
-          quantity: card.quantity,
-          reason: originalInfo ? 'sold_out' : 'no_match',
-        });
-        continue;
+        // If no substitute found, fall through to regular matching below
       }
 
-      // Non-budget mode: original behavior
+      // Regular matching (exact mode, or budget mode fallback)
       const info = cardLookup.get(card.card_key);
       if (!info) {
         unmatched.push({
