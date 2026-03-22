@@ -8,6 +8,7 @@ export interface CardRow {
   type: string;
   brigade: string;
   rarity: string;
+  special_ability: string;
   card_key: string; // "name|set_code|img_file"
 }
 

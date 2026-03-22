@@ -2,6 +2,9 @@
 
 import { getSupabaseAdmin } from './supabase-admin';
 import { normalize, stripEmbeddedSet, stripShopifySuffixes, parseShopifyTags, UNSOLD_SETS } from './helpers';
+import { normalize as normalizeDup, stripSetSuffix, findGroup } from '@/lib/duplicateCards';
+import type { DuplicateGroupIndex, DuplicateGroup, DuplicateSibling } from '@/lib/duplicateCards';
+import { normalizeAbility } from '@/lib/pricing/budgetPricing';
 import type { CardRow, SetAlias, ShopifyProductRow, MatchResult, MatchingSummary } from './types';
 
 const CARD_DATA_URL =
@@ -50,6 +53,7 @@ export async function loadCardData(): Promise<CardRow[]> {
         type: cols[4]?.trim() ?? '',
         brigade: cols[5]?.trim() ?? '',
         rarity: cols[6]?.trim() ?? '',
+        special_ability: cols[10]?.trim() ?? '',
         card_key: `${name}|${set_code}|${img_file}`,
       };
     });
@@ -960,4 +964,248 @@ export async function regenerateCardPrices(): Promise<void> {
   }
 
   log(`Regenerated card_prices: ${rows.length} rows`);
+}
+
+/**
+ * Build a DuplicateGroupIndex from Supabase using the admin client.
+ * Server-side equivalent of fetchDuplicateGroups() in lib/duplicateCards.ts.
+ */
+async function buildDuplicateGroupIndex(): Promise<DuplicateGroupIndex> {
+  const supabase = getSupabaseAdmin();
+
+  const PAGE = 1000;
+  const allData: any[] = [];
+  let offset = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from('duplicate_card_group_members')
+      .select(`
+        card_name,
+        ordir_sets,
+        matched,
+        group:duplicate_card_groups!inner(id, canonical_name)
+      `)
+      .range(offset, offset + PAGE - 1)
+      .order('id', { ascending: true });
+
+    if (error || !data || data.length === 0) {
+      if (error) console.error('Failed to fetch duplicate groups:', error);
+      break;
+    }
+    allData.push(...data);
+    if (data.length < PAGE) break;
+    offset += PAGE;
+  }
+
+  const empty: DuplicateGroupIndex = {
+    groups: [],
+    byExact: new Map(),
+    byNormalized: new Map(),
+  };
+
+  if (allData.length === 0) return empty;
+
+  // Group by group id
+  const groupsById = new Map<number, { canonicalName: string; members: DuplicateSibling[] }>();
+
+  for (const row of allData as any[]) {
+    const groupId = row.group.id as number;
+    const canonicalName = row.group.canonical_name as string;
+
+    if (!groupsById.has(groupId)) {
+      groupsById.set(groupId, { canonicalName, members: [] });
+    }
+    groupsById.get(groupId)!.members.push({
+      cardName: row.card_name,
+      ordirSets: row.ordir_sets || '',
+      matched: row.matched,
+    });
+  }
+
+  // Build lookup indices
+  const byExact = new Map<string, DuplicateGroup[]>();
+  const byNormalized = new Map<string, DuplicateGroup[]>();
+  const groups: DuplicateGroup[] = [];
+
+  function addToMultiMap(map: Map<string, DuplicateGroup[]>, key: string, value: DuplicateGroup) {
+    const existing = map.get(key);
+    if (existing) {
+      if (!existing.includes(value)) existing.push(value);
+    } else {
+      map.set(key, [value]);
+    }
+  }
+
+  for (const group of groupsById.values()) {
+    groups.push(group);
+
+    addToMultiMap(byExact, group.canonicalName, group);
+    addToMultiMap(byNormalized, normalizeDup(group.canonicalName), group);
+
+    for (const member of group.members) {
+      addToMultiMap(byExact, member.cardName, group);
+      addToMultiMap(byNormalized, normalizeDup(member.cardName), group);
+    }
+  }
+
+  return { groups, byExact, byNormalized };
+}
+
+/**
+ * Compute cheapest equivalent prices for all cards in card_prices.
+ * For each card that belongs to a duplicate group, finds the cheapest
+ * sibling with the same special ability text and writes it to cheapest_price.
+ */
+export async function computeCheapestPrices(): Promise<void> {
+  const supabase = getSupabaseAdmin();
+
+  // Load all data in parallel
+  const [carddata, dupIndex, cardPrices] = await Promise.all([
+    loadCardData(),
+    buildDuplicateGroupIndex(),
+    (async () => {
+      const allPrices: { card_key: string; price: number }[] = [];
+      const pageSize = 1000;
+      let offset = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from('card_prices')
+          .select('card_key, price')
+          .range(offset, offset + pageSize - 1);
+        if (error) {
+          console.error('Error fetching card_prices:', error.message);
+          break;
+        }
+        allPrices.push(...(data ?? []));
+        if (!data || data.length < pageSize) break;
+        offset += pageSize;
+      }
+      return allPrices;
+    })(),
+  ]);
+
+  log(`Computing cheapest prices: ${carddata.length} cards, ${dupIndex.groups.length} dup groups, ${cardPrices.length} priced cards`);
+
+  // Build price-by-key map
+  const priceByKey = new Map<string, number>();
+  for (const cp of cardPrices) {
+    priceByKey.set(cp.card_key, cp.price);
+  }
+
+  // Build carddata-by-normalized-base-name map (for gathering candidates)
+  const cardsByNormName = new Map<string, CardRow[]>();
+  for (const card of carddata) {
+    const baseKey = normalizeDup(stripSetSuffix(card.name));
+    const existing = cardsByNormName.get(baseKey);
+    if (existing) {
+      existing.push(card);
+    } else {
+      cardsByNormName.set(baseKey, [card]);
+    }
+
+    // Also index by full normalized name
+    const fullKey = normalizeDup(card.name);
+    if (fullKey !== baseKey) {
+      const existingFull = cardsByNormName.get(fullKey);
+      if (existingFull) {
+        existingFull.push(card);
+      } else {
+        cardsByNormName.set(fullKey, [card]);
+      }
+    }
+  }
+
+  // Build a carddata lookup by card_key for quick ability lookups
+  const carddataByKey = new Map<string, CardRow>();
+  for (const card of carddata) {
+    carddataByKey.set(card.card_key, card);
+  }
+
+  // For each card in card_prices, find cheapest equivalent
+  const updates: { card_key: string; cheapest_price: number }[] = [];
+  let skippedNoGroup = 0;
+  let skippedNoSource = 0;
+  let cheaperFound = 0;
+
+  for (const cp of cardPrices) {
+    const sourceCard = carddataByKey.get(cp.card_key);
+    if (!sourceCard) {
+      skippedNoSource++;
+      continue;
+    }
+
+    // Find duplicate group
+    const group = findGroup(sourceCard.name, dupIndex);
+    if (!group) {
+      skippedNoGroup++;
+      continue;
+    }
+
+    // Gather normalized member names from the group
+    const memberNormNames = new Set<string>();
+    for (const member of group.members) {
+      memberNormNames.add(normalizeDup(member.cardName));
+      memberNormNames.add(normalizeDup(stripSetSuffix(member.cardName)));
+    }
+
+    // Gather candidate cards from carddata via the index
+    const seen = new Set<string>();
+    const candidates: CardRow[] = [];
+    for (const normName of memberNormNames) {
+      const bucket = cardsByNormName.get(normName);
+      if (bucket) {
+        for (const c of bucket) {
+          if (!seen.has(c.card_key)) {
+            seen.add(c.card_key);
+            candidates.push(c);
+          }
+        }
+      }
+    }
+
+    // Filter to same-ability candidates
+    const targetAbility = normalizeAbility(sourceCard.special_ability);
+    const equivalents = candidates.filter(
+      c => normalizeAbility(c.special_ability) === targetAbility
+    );
+
+    // Find cheapest price among equivalents
+    let cheapestPrice: number | null = null;
+    for (const equiv of equivalents) {
+      const price = priceByKey.get(equiv.card_key);
+      if (price !== undefined && price !== null && (cheapestPrice === null || price < cheapestPrice)) {
+        cheapestPrice = price;
+      }
+    }
+
+    // Record update if we found a cheaper (or equal) price from a sibling
+    if (cheapestPrice !== null) {
+      if (cheapestPrice < cp.price) {
+        cheaperFound++;
+      }
+      updates.push({ card_key: cp.card_key, cheapest_price: cheapestPrice });
+    }
+  }
+
+  log(`Cheapest price analysis: ${updates.length} cards to update, ${cheaperFound} have cheaper equivalents, ${skippedNoGroup} no group, ${skippedNoSource} no source card`);
+
+  // Batch update cheapest_price in card_prices
+  if (updates.length > 0) {
+    const batchSize = 500;
+    for (let i = 0; i < updates.length; i += batchSize) {
+      const batch = updates.slice(i, i + batchSize).map(u => ({
+        card_key: u.card_key,
+        cheapest_price: u.cheapest_price,
+      }));
+
+      const { error } = await supabase
+        .from('card_prices')
+        .upsert(batch, { onConflict: 'card_key' });
+
+      if (error) {
+        console.error(`Error updating cheapest_price batch ${i / batchSize + 1}:`, error.message);
+      }
+    }
+    log(`Updated cheapest_price for ${updates.length} cards`);
+  }
 }
