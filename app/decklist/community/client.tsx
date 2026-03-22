@@ -36,6 +36,7 @@ interface PublicDeck {
   updated_at: string;
   tags?: DeckTag[];
   total_price?: number | null;
+  budget_price?: number | null;
   tournament?: TournamentInfo | null;
   is_legal?: boolean | null;
 }
@@ -709,6 +710,11 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
             )}
             {deck.total_price != null && deck.total_price > 0 && (
               <span className="text-green-600 dark:text-green-400">${deck.total_price.toFixed(2)}</span>
+            )}
+            {deck.budget_price != null && deck.total_price != null && deck.budget_price < deck.total_price - 0.005 && (
+              <span className="text-xs text-muted-foreground" title={`Save $${(deck.total_price - deck.budget_price).toFixed(2)} with budget alternatives`}>
+                Budget: <span className="text-green-600 dark:text-green-400">${deck.budget_price.toFixed(2)}</span>
+              </span>
             )}
           </div>
 

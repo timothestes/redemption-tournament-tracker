@@ -22,6 +22,7 @@ export interface DeckData {
   updated_at?: string;
   tags?: GlobalTag[];
   total_price?: number | null;
+  budget_price?: number | null;
 }
 
 export interface DeckCardData {
