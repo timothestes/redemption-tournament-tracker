@@ -433,7 +433,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Budget substitute not found — use specific reason if available
-        if (substitute.reason === 'all_sold_out') {
+        if (!substitute.found && 'reason' in substitute && substitute.reason === 'all_sold_out') {
           unmatched.push({
             card_name: card.card_name,
             card_key: card.card_key,
