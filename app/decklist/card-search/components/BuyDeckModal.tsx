@@ -221,25 +221,7 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
         </div>
 
         {/* Controls */}
-        <div className="px-4 pt-3 space-y-2">
-          {/* Scope selector (only when deck has reserve) */}
-          {hasReserve && (
-            <div className="flex gap-1">
-              {(["all", "main", "reserve"] as BuyScope[]).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => handleScopeChange(s)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                    scope === s
-                      ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900"
-                      : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
-                  }`}
-                >
-                  {s === "all" ? "All" : s === "main" ? "Main Deck" : "Reserve"}
-                </button>
-              ))}
-            </div>
-          )}
+        <div className="px-4 pt-3">
           {/* Exact / Cheapest toggle */}
           <div className="flex gap-1">
             {(["exact", "budget"] as BuyMode[]).map((m) => (
