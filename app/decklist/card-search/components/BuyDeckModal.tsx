@@ -50,8 +50,8 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
   const [result, setResult] = useState<CartResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showUnavailable, setShowUnavailable] = useState(false);
-  const [showEdit, setShowEdit] = useState(false);
+  const [showUnavailable, setShowUnavailable] = useState(true);
+  const [showEdit, setShowEdit] = useState(true);
   const [excludedKeys, setExcludedKeys] = useState<Set<string>>(new Set());
 
   const mainCards = allCards.filter(c => !c.isReserve);
