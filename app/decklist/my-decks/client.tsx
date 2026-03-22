@@ -1127,8 +1127,8 @@ function DeckCard({
               <span className="text-green-600 dark:text-green-400">${deck.total_price.toFixed(2)}</span>
             )}
             {deck.budget_price != null && deck.total_price != null && deck.budget_price < deck.total_price - 0.005 && (
-              <span className="text-[10px] text-muted-foreground" title={`Budget: $${deck.budget_price.toFixed(2)} with cheaper printings`}>
-                ↓${(deck.total_price - deck.budget_price).toFixed(2)}
+              <span className="text-[10px] text-muted-foreground" title={`Minimum price using cheapest available printings: $${deck.budget_price.toFixed(2)}`}>
+                min ${deck.budget_price.toFixed(2)}
               </span>
             )}
           </div>
@@ -1223,8 +1223,8 @@ function DeckListItem({
               <span className="text-green-600 dark:text-green-400">${deck.total_price.toFixed(2)}</span>
             )}
             {deck.budget_price != null && deck.total_price != null && deck.budget_price < deck.total_price - 0.005 && (
-              <span className="text-[10px] text-muted-foreground" title={`Budget: $${deck.budget_price.toFixed(2)} with cheaper printings`}>
-                ↓${(deck.total_price - deck.budget_price).toFixed(2)}
+              <span className="text-[10px] text-muted-foreground" title={`Minimum price using cheapest available printings: $${deck.budget_price.toFixed(2)}`}>
+                min ${deck.budget_price.toFixed(2)}
               </span>
             )}
           </div>
@@ -1249,8 +1249,8 @@ function DeckListItem({
             <span className="text-green-600 dark:text-green-400">${deck.total_price.toFixed(2)}</span>
           )}
           {deck.budget_price != null && deck.total_price != null && deck.budget_price < deck.total_price - 0.005 && (
-            <span className="text-xs text-muted-foreground" title={`Budget: $${deck.budget_price.toFixed(2)} with cheaper printings`}>
-              ↓${(deck.total_price - deck.budget_price).toFixed(2)}
+            <span className="text-xs text-muted-foreground" title={`Minimum price using cheapest available printings: $${deck.budget_price.toFixed(2)}`}>
+              min ${deck.budget_price.toFixed(2)}
             </span>
           )}
           <span className="text-xs">Updated {updatedDate}</span>

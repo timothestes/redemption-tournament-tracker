@@ -702,9 +702,6 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
           <div className="flex items-center gap-3 text-sm mb-3">
             <span className={getDeckTypeBadgeClasses(deck.format)}>{formatDeckType(deck.format)}</span>
             <span className="text-gray-600 dark:text-gray-400">{deck.card_count || 0} cards</span>
-            {deck.is_legal === true && (
-              <span className="text-[10px] font-medium text-green-600 dark:text-green-400">Legal</span>
-            )}
             {deck.is_legal === false && (
               <span className="text-[10px] font-medium text-red-600 dark:text-red-400">Not Legal</span>
             )}
@@ -712,8 +709,8 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
               <span className="text-green-600 dark:text-green-400">${deck.total_price.toFixed(2)}</span>
             )}
             {deck.budget_price != null && deck.total_price != null && deck.budget_price < deck.total_price - 0.005 && (
-              <span className="text-[10px] text-muted-foreground" title={`Budget: $${deck.budget_price.toFixed(2)} with cheaper printings`}>
-                ↓${(deck.total_price - deck.budget_price).toFixed(2)}
+              <span className="text-[10px] text-muted-foreground" title={`Minimum price using cheapest available printings: $${deck.budget_price.toFixed(2)}`}>
+                min ${deck.budget_price.toFixed(2)}
               </span>
             )}
           </div>
