@@ -49,6 +49,9 @@ const ABILITY_OVERRIDES: Record<string, string> = {
     "during battle, while opponent has more cards in hand than you, your cards cannot be prevented by opponents' cards.",
   "during battle, if opponent has more cards in hand than you, your cards cannot be prevented by opponents' cards.":
     "during battle, while opponent has more cards in hand than you, your cards cannot be prevented by opponents' cards.",
+  // Lost Soul "Darkness" — 2019 promo reworded "search...for...and put it in hand or play" → "take or play...from"
+  "if put in play by an opponent's special ability (or if you have no evil characters in territory when drawn), you may take or play an evil character from deck or reserve.":
+    "if put in play by an opponent's special ability (or if you have no evil characters in territory when drawn), you may search deck or reserve for an evil character and put it in hand or play.",
 };
 
 /**
