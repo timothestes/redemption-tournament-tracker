@@ -714,6 +714,7 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
             {deck.budget_price != null && deck.total_price != null && deck.budget_price < deck.total_price - 0.005 && (
               <span className="text-xs text-muted-foreground" title={`Save $${(deck.total_price - deck.budget_price).toFixed(2)} with budget alternatives`}>
                 Budget: <span className="text-green-600 dark:text-green-400">${deck.budget_price.toFixed(2)}</span>
+                <span className="text-muted-foreground"> (save ${(deck.total_price - deck.budget_price).toFixed(2)})</span>
               </span>
             )}
           </div>

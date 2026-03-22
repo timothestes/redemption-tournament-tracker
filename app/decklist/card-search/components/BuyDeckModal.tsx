@@ -172,40 +172,41 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
           </button>
         </div>
 
-        {/* Scope selector */}
-        {hasReserve && (
-          <div className="px-4 pt-3 flex gap-1">
-            {(["all", "main", "reserve"] as BuyScope[]).map((s) => (
+        {/* Controls row: scope (if reserve exists) + exact/budget toggle */}
+        <div className="px-4 pt-3 flex items-center gap-3">
+          {hasReserve && (
+            <div className="flex gap-1">
+              {(["all", "main", "reserve"] as BuyScope[]).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => handleScopeChange(s)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                    scope === s
+                      ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900"
+                      : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                  }`}
+                >
+                  {s === "all" ? "All Cards" : s === "main" ? "Main Deck" : "Reserve"}
+                </button>
+              ))}
+            </div>
+          )}
+          {hasReserve && <div className="w-px h-4 bg-gray-200 dark:bg-gray-600" />}
+          <div className="flex gap-1">
+            {(["exact", "budget"] as BuyMode[]).map((m) => (
               <button
-                key={s}
-                onClick={() => handleScopeChange(s)}
+                key={m}
+                onClick={() => handleModeChange(m)}
                 className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                  scope === s
+                  mode === m
                     ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900"
                     : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
                 }`}
               >
-                {s === "all" ? "All Cards" : s === "main" ? "Main Deck" : "Reserve"}
+                {m === "exact" ? "Exact Cards" : "Budget Versions"}
               </button>
             ))}
           </div>
-        )}
-
-        {/* Exact / Budget toggle */}
-        <div className="px-4 pt-2 flex gap-1">
-          {(["exact", "budget"] as BuyMode[]).map((m) => (
-            <button
-              key={m}
-              onClick={() => handleModeChange(m)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                mode === m
-                  ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900"
-                  : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
-              }`}
-            >
-              {m === "exact" ? "Exact Cards" : "Budget Versions"}
-            </button>
-          ))}
         </div>
 
         {/* Body */}
@@ -305,7 +306,7 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
                             <span className="block truncate">{card.card_name}</span>
                             {card.original_card_name && (
                               <span className={`block text-[10px] ${isSelected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-300 dark:text-gray-600'}`}>
-                                was {card.original_card_name}{card.original_price !== undefined ? ` · save $${((card.original_price - card.price) * card.quantity).toFixed(2)}` : ""}
+                                was {card.original_card_name}{card.original_price !== undefined ? ` (save $${(card.original_price - card.price).toFixed(2)} ea)` : ""}
                               </span>
                             )}
                           </span>
