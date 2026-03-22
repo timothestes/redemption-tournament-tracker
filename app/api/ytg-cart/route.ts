@@ -107,9 +107,12 @@ function buildCardRowNameIndex(cardData: CardRow[]): Map<string, CardRow[]> {
   return index;
 }
 
+type BudgetSubstituteResult =
+  | { found: true; card_key: string; card_name: string; price: number; variant_id: string }
+  | { found: false; reason: 'no_carddata' | 'no_group' | 'no_equivalents' | 'all_sold_out' };
+
 /**
  * Find the cheapest in-stock equivalent for a card from its duplicate group.
- * Returns null if no substitute is available.
  */
 function findBudgetSubstitute(
   cardKey: string,
@@ -118,14 +121,14 @@ function findBudgetSubstitute(
   dupIndex: DuplicateGroupIndex,
   cardLookup: Map<string, CardLookupEntry>,
   liveInventory: Map<string, { variantId: string; inventory: number; tracked: boolean }> | null,
-): { card_key: string; card_name: string; price: number; variant_id: string } | null {
+): BudgetSubstituteResult {
   // Find the source card in carddata to get its special ability
   const sourceCard = cardData.find(c => c.card_key === cardKey);
-  if (!sourceCard) return null;
+  if (!sourceCard) return { found: false, reason: 'no_carddata' };
 
   // Find the duplicate group
   const group = findGroup(sourceCard.name, dupIndex);
-  if (!group) return null;
+  if (!group) return { found: false, reason: 'no_group' };
 
   // Collect normalized names of all group members
   const memberNormalized = new Set<string>();
@@ -157,16 +160,18 @@ function findBudgetSubstitute(
 
   // Build a list of priced, in-stock equivalents sorted by price ascending
   const pricedEquivalents: { card_key: string; card_name: string; price: number; variant_id: string }[] = [];
+  let hadPricedButSoldOut = false;
 
   for (const equiv of equivalents) {
     const info = cardLookup.get(equiv.card_key);
-    if (!info || info.price <= 0) continue; // Skip $0 prices (delisted/placeholder products)
+    if (!info || info.price <= 0) continue;
 
     // Determine variant_id (prefer live if available)
     let variantId = info.cached_variant_id;
     if (liveInventory) {
       const live = liveInventory.get(info.shopify_product_id);
       if (live && live.tracked && live.inventory <= 0) {
+        hadPricedButSoldOut = true;
         continue;
       }
       if (live) variantId = live.variantId;
@@ -180,11 +185,14 @@ function findBudgetSubstitute(
     });
   }
 
-  if (pricedEquivalents.length === 0) return null;
+  if (pricedEquivalents.length === 0) {
+    return { found: false, reason: hadPricedButSoldOut ? 'all_sold_out' : 'no_equivalents' };
+  }
 
   // Sort by price ascending, return cheapest
   pricedEquivalents.sort((a, b) => a.price - b.price);
-  return pricedEquivalents[0];
+  const best = pricedEquivalents[0];
+  return { found: true, ...best };
 }
 
 // ---------------------------------------------------------------------------
@@ -399,7 +407,7 @@ export async function POST(request: NextRequest) {
           liveInventory,
         );
 
-        if (substitute) {
+        if (substitute.found) {
           const originalInfo = cardLookup.get(card.card_key);
           const hasSavings = substitute.card_key !== card.card_key
             && originalInfo
@@ -423,7 +431,18 @@ export async function POST(request: NextRequest) {
           cartParts.push(`${substitute.variant_id}:${card.quantity}`);
           continue;
         }
-        // If no substitute found, fall through to regular matching below
+
+        // Budget substitute not found — use specific reason if available
+        if (substitute.reason === 'all_sold_out') {
+          unmatched.push({
+            card_name: card.card_name,
+            card_key: card.card_key,
+            quantity: card.quantity,
+            reason: 'sold_out',
+          });
+          continue;
+        }
+        // Otherwise fall through to regular matching below
       }
 
       // Regular matching (exact mode, or budget mode fallback)
