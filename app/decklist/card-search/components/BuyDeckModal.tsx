@@ -269,26 +269,19 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
               {/* Editable card list */}
               {showEdit && (
                 <div className="mb-3">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
-                      In Stock
+                  <label className="flex items-center gap-2 py-1.5 mb-1 cursor-pointer border-b border-gray-200 dark:border-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={excludedKeys.size === 0}
+                      ref={(el) => { if (el) el.indeterminate = excludedKeys.size > 0 && excludedKeys.size < (result?.matched.length ?? 0); }}
+                      onChange={() => excludedKeys.size === 0 ? deselectAll() : selectAll()}
+                      className="h-3.5 w-3.5 rounded border-gray-300 dark:border-gray-600 text-green-600 flex-shrink-0 focus:outline-none focus:ring-0"
+                    />
+                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                      {excludedKeys.size === 0 ? 'Deselect all' : excludedKeys.size === result?.matched.length ? 'Select all' : `${selectedCount} of ${result?.matchedTotal} selected`}
                     </span>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={selectAll}
-                        className="text-[10px] font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-                      >
-                        All
-                      </button>
-                      <button
-                        onClick={deselectAll}
-                        className="text-[10px] font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-                      >
-                        None
-                      </button>
-                    </div>
-                  </div>
-                  <div className="max-h-52 overflow-y-auto -mx-1 px-1">
+                  </label>
+                  <div className="max-h-72 overflow-y-auto -mx-1 px-1">
                     {result.matched.map((card) => {
                       const isSelected = !excludedKeys.has(card.card_key);
                       return (
