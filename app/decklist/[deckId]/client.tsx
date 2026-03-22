@@ -35,6 +35,8 @@ interface PublicDeckData {
   updated_at: string;
   cards: DeckCardData[];
   tags?: GlobalTag[];
+  total_price?: number | null;
+  budget_price?: number | null;
 }
 
 function getContrastColor(hex: string): string {
