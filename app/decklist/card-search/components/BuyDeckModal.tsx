@@ -220,8 +220,9 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
           </button>
         </div>
 
-        {/* Controls row: scope (if reserve exists) + exact/budget toggle */}
-        <div className="px-4 pt-3 flex flex-wrap items-center gap-2">
+        {/* Controls */}
+        <div className="px-4 pt-3 space-y-2">
+          {/* Scope selector (only when deck has reserve) */}
           {hasReserve && (
             <div className="flex gap-1">
               {(["all", "main", "reserve"] as BuyScope[]).map((s) => (
@@ -234,12 +235,12 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
                       : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
                   }`}
                 >
-                  {s === "all" ? "All Cards" : s === "main" ? "Main Deck" : "Reserve"}
+                  {s === "all" ? "All" : s === "main" ? "Main Deck" : "Reserve"}
                 </button>
               ))}
             </div>
           )}
-          {hasReserve && <div className="w-px h-4 bg-gray-200 dark:bg-gray-600" />}
+          {/* Exact / Cheapest toggle */}
           <div className="flex gap-1">
             {(["exact", "budget"] as BuyMode[]).map((m) => (
               <button
