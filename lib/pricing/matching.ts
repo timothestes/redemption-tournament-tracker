@@ -1173,7 +1173,7 @@ export async function computeCheapestPrices(): Promise<void> {
     let cheapestPrice: number | null = null;
     for (const equiv of equivalents) {
       const price = priceByKey.get(equiv.card_key);
-      if (price !== undefined && price !== null && (cheapestPrice === null || price < cheapestPrice)) {
+      if (price != null && price > 0 && (cheapestPrice === null || price < cheapestPrice)) {
         cheapestPrice = price;
       }
     }

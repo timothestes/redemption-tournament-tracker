@@ -160,7 +160,7 @@ function findBudgetSubstitute(
 
   for (const equiv of equivalents) {
     const info = cardLookup.get(equiv.card_key);
-    if (!info) continue;
+    if (!info || info.price <= 0) continue; // Skip $0 prices (delisted/placeholder products)
 
     // Determine variant_id (prefer live if available)
     let variantId = info.cached_variant_id;
