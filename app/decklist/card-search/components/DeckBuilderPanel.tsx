@@ -26,6 +26,8 @@ import ReactMarkdown from "react-markdown";
 import BuyDeckModal, { BuyDeckCard } from "./BuyDeckModal";
 import DeckLegalityChecklist from "./DeckLegalityChecklist";
 import type { DeckCheckResult } from "@/utils/deckcheck/types";
+import { useBudgetPricing } from '../hooks/useBudgetPricing';
+import type { BudgetCard } from '@/lib/pricing/budgetPricing';
 
 function getTagContrastColor(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -95,6 +97,8 @@ interface DeckBuilderPanelProps {
   deckCheckResult?: DeckCheckResult | null;
   /** Whether a deck check is currently in progress */
   isDeckChecking?: boolean;
+  /** Full card catalog for budget pricing */
+  allCards: BudgetCard[];
 }
 
 /**
@@ -130,6 +134,7 @@ export default function DeckBuilderPanel({
   defaultTab,
   deckCheckResult,
   isDeckChecking,
+  allCards,
 }: DeckBuilderPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>(defaultTab ?? "main");
   const [isEditingName, setIsEditingName] = useState(false);
@@ -435,6 +440,8 @@ export default function DeckBuilderPanel({
     return hasAnyPrice ? total : null;
   }, [deck.cards, getPrice]);
 
+  const { budgetTotal, savings } = useBudgetPricing(deck, allCards);
+
   const handleNameSubmit = () => {
     if (editedName.trim()) {
       onDeckNameChange(editedName.trim());
@@ -682,6 +689,11 @@ export default function DeckBuilderPanel({
                 ${totalDeckPrice.toFixed(2)}
               </button>
             )}
+            {savings !== null && budgetTotal !== null && (
+              <span className="md:hidden flex-shrink-0 text-xs text-muted-foreground">
+                Budget: <span className="text-green-600 dark:text-green-400">${budgetTotal.toFixed(2)}</span>
+              </span>
+            )}
             <span className="hidden md:flex items-center gap-1 text-xs whitespace-nowrap ml-auto flex-shrink-0" suppressHydrationWarning>
               <span className="text-gray-500 dark:text-gray-400">{mainDeckCount}</span>
               {reserveCount > 0 && (
@@ -704,6 +716,14 @@ export default function DeckBuilderPanel({
                     <img src="/sponsors/ytg-light.png" alt="" className="h-3 w-3 object-contain dark:hidden" />
                     ${totalDeckPrice.toFixed(2)}
                   </button>
+                </>
+              )}
+              {savings !== null && budgetTotal !== null && (
+                <>
+                  <span className="text-gray-400 dark:text-gray-600 ml-0.5">·</span>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap" title={`Save $${savings.toFixed(2)} with budget alternatives`}>
+                    Budget: <span className="text-green-600 dark:text-green-400">${budgetTotal.toFixed(2)}</span>
+                  </span>
                 </>
               )}
             </span>
@@ -2765,6 +2785,18 @@ export default function DeckBuilderPanel({
                       </span>
                       <span className="font-medium text-green-600 dark:text-green-400 group-hover:underline">${totalDeckPrice.toFixed(2)}</span>
                     </button>
+                  </div>
+                )}
+                {savings !== null && budgetTotal !== null && (
+                  <div className="flex justify-between items-center -mt-1 mb-1">
+                    <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                      <span className="w-3.5" />
+                      Budget:
+                    </span>
+                    <span className="text-xs">
+                      <span className="text-green-600 dark:text-green-400">${budgetTotal.toFixed(2)}</span>
+                      <span className="text-muted-foreground ml-1">(save ${savings.toFixed(2)})</span>
+                    </span>
                   </div>
                 )}
 

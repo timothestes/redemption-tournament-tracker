@@ -2154,6 +2154,7 @@ export default function CardSearchClient() {
             isExpanded={!showSearch}
             deckCheckResult={deckCheckResult}
             isDeckChecking={isDeckChecking}
+            allCards={cards}
             onToggleExpand={() => setShowSearch(prev => !prev)}
             onDeckNameChange={setDeckName}
             onDeckFormatChange={handleDeckFormatChange}
@@ -2242,6 +2243,7 @@ export default function CardSearchClient() {
               forceDisableHoverPreview
               deckCheckResult={deckCheckResult}
               isDeckChecking={isDeckChecking}
+              allCards={cards}
               onDeckNameChange={setDeckName}
               onDeckFormatChange={handleDeckFormatChange}
               onParagonChange={setDeckParagon}
