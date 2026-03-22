@@ -14,6 +14,9 @@ interface MatchedCard {
   quantity: number;
   price: number;
   variant_id: string;
+  original_card_name?: string;
+  original_card_key?: string;
+  original_price?: number;
 }
 
 interface UnmatchedCard {
@@ -33,13 +36,17 @@ interface CartResult {
 
 type BuyScope = "all" | "main" | "reserve";
 
+type BuyMode = "exact" | "budget";
+
 interface BuyDeckModalProps {
   cards: BuyDeckCard[];
   onClose: () => void;
+  initialMode?: BuyMode;
 }
 
-export default function BuyDeckModal({ cards: allCards, onClose }: BuyDeckModalProps) {
+export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: BuyDeckModalProps) {
   const [scope, setScope] = useState<BuyScope>("all");
+  const [mode, setMode] = useState<BuyMode>(initialMode ?? "exact");
   const [result, setResult] = useState<CartResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +74,7 @@ export default function BuyDeckModal({ cards: allCards, onClose }: BuyDeckModalP
       const res = await fetch("/api/ytg-cart", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cards }),
+        body: JSON.stringify({ cards, useBudget: mode === "budget" }),
       });
 
       if (!res.ok) throw new Error("Failed to build cart");
@@ -78,7 +85,7 @@ export default function BuyDeckModal({ cards: allCards, onClose }: BuyDeckModalP
     } finally {
       setLoading(false);
     }
-  }, [scopedCards]);
+  }, [scopedCards, mode]);
 
   // Fetch on first render
   React.useEffect(() => {
@@ -98,6 +105,19 @@ export default function BuyDeckModal({ cards: allCards, onClose }: BuyDeckModalP
       fetchCart();
     }
   }, [scope]);
+
+  const handleModeChange = (newMode: BuyMode) => {
+    setMode(newMode);
+    setResult(null);
+    setExcludedKeys(new Set());
+    setShowEdit(false);
+  };
+
+  React.useEffect(() => {
+    if (!result && !loading) {
+      fetchCart();
+    }
+  }, [mode]);
 
   // Derived: selected cards (matched minus excluded)
   const selectedMatched = result?.matched.filter(m => !excludedKeys.has(m.card_key)) ?? [];
@@ -170,6 +190,23 @@ export default function BuyDeckModal({ cards: allCards, onClose }: BuyDeckModalP
             ))}
           </div>
         )}
+
+        {/* Exact / Budget toggle */}
+        <div className="px-4 pt-2 flex gap-1">
+          {(["exact", "budget"] as BuyMode[]).map((m) => (
+            <button
+              key={m}
+              onClick={() => handleModeChange(m)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                mode === m
+                  ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900"
+                  : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+              }`}
+            >
+              {m === "exact" ? "Exact Cards" : "Budget Versions"}
+            </button>
+          ))}
+        </div>
 
         {/* Body */}
         <div className="px-4 py-3">
@@ -264,8 +301,13 @@ export default function BuyDeckModal({ cards: allCards, onClose }: BuyDeckModalP
                             onChange={() => toggleCard(card.card_key)}
                             className="h-3.5 w-3.5 rounded border-gray-300 dark:border-gray-600 text-green-600 flex-shrink-0 focus:outline-none focus:ring-0"
                           />
-                          <span className={`text-xs truncate flex-1 ${isSelected ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500 line-through'}`}>
-                            {card.card_name}
+                          <span className={`text-xs flex-1 min-w-0 ${isSelected ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500 line-through'}`}>
+                            <span className="block truncate">{card.card_name}</span>
+                            {card.original_card_name && (
+                              <span className={`block text-[10px] ${isSelected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-300 dark:text-gray-600'}`}>
+                                was {card.original_card_name}{card.original_price !== undefined ? ` · save $${((card.original_price - card.price) * card.quantity).toFixed(2)}` : ""}
+                              </span>
+                            )}
                           </span>
                           {card.quantity > 1 && (
                             <span className={`text-xs flex-shrink-0 ${isSelected ? 'text-gray-500 dark:text-gray-400' : 'text-gray-300 dark:text-gray-600'}`}>
