@@ -411,33 +411,26 @@ export async function POST(request: NextRequest) {
           const originalInfo = cardLookup.get(card.card_key);
           const isSubstitution = substitute.card_key !== card.card_key;
 
-          // If the original card isn't on YTG (no Shopify mapping) and we'd be
-          // substituting with a MORE expensive version, skip it — the user already
-          // owns this card and doesn't need to buy a pricier version.
-          if (isSubstitution && !originalInfo) {
-            // Original not on YTG — don't suggest buying a substitute
-            // Fall through to regular matching (which will show "Not Listed")
-          } else {
-            const hasSavings = isSubstitution && originalInfo && substitute.price < originalInfo.price;
+          const matchedCard: MatchedCard = {
+            card_name: substitute.card_name,
+            card_key: substitute.card_key,
+            quantity: card.quantity,
+            price: substitute.price,
+            variant_id: substitute.variant_id,
+          };
 
-            const matchedCard: MatchedCard = {
-              card_name: substitute.card_name,
-              card_key: substitute.card_key,
-              quantity: card.quantity,
-              price: substitute.price,
-              variant_id: substitute.variant_id,
-            };
-
-            if (hasSavings) {
-              matchedCard.original_card_name = card.card_name;
-              matchedCard.original_card_key = card.card_key;
+          if (isSubstitution) {
+            matchedCard.original_card_name = card.card_name;
+            matchedCard.original_card_key = card.card_key;
+            // Only include savings amount if we know the original price
+            if (originalInfo && substitute.price < originalInfo.price) {
               matchedCard.original_price = originalInfo.price;
             }
-
-            matched.push(matchedCard);
-            cartParts.push(`${substitute.variant_id}:${card.quantity}`);
-            continue;
           }
+
+          matched.push(matchedCard);
+          cartParts.push(`${substitute.variant_id}:${card.quantity}`);
+          continue;
         }
 
         // Budget substitute not found — use specific reason if available
