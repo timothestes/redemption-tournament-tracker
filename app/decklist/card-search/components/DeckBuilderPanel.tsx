@@ -145,6 +145,7 @@ export default function DeckBuilderPanel({
   const [showDeleteDeckModal, setShowDeleteDeckModal] = useState(false);
   const [showLoadDeckModal, setShowLoadDeckModal] = useState(false);
   const [showBuyDeckModal, setShowBuyDeckModal] = useState(false);
+  const [buyModalMode, setBuyModalMode] = useState<"exact" | "budget">("exact");
   const [showValidationTooltip, setShowValidationTooltip] = useState(false);
   const [showViewDropdown, setShowViewDropdown] = useState(false);
   const viewDropdownBtnRef = useRef<HTMLButtonElement>(null);
@@ -680,7 +681,7 @@ export default function DeckBuilderPanel({
             )}
             {totalDeckPrice !== null && (
               <button
-                onClick={() => setShowBuyDeckModal(true)}
+                onClick={() => { setBuyModalMode("exact"); setShowBuyDeckModal(true); }}
                 className="md:hidden flex-shrink-0 text-sm font-semibold text-green-600 dark:text-green-400 flex items-center gap-1 hover:underline"
                 title="Buy deck on YTG"
               >
@@ -690,9 +691,13 @@ export default function DeckBuilderPanel({
               </button>
             )}
             {savings !== null && budgetTotal !== null && (
-              <span className="md:hidden flex-shrink-0 text-xs text-muted-foreground">
+              <button
+                onClick={() => { setBuyModalMode("budget"); setShowBuyDeckModal(true); }}
+                className="md:hidden flex-shrink-0 text-xs text-muted-foreground hover:underline"
+                title={`Save $${savings.toFixed(2)} with budget alternatives`}
+              >
                 Budget: <span className="text-green-600 dark:text-green-400">${budgetTotal.toFixed(2)}</span>
-              </span>
+              </button>
             )}
             <span className="hidden md:flex items-center gap-1 text-xs whitespace-nowrap ml-auto flex-shrink-0" suppressHydrationWarning>
               <span className="text-gray-500 dark:text-gray-400">{mainDeckCount}</span>
@@ -708,7 +713,7 @@ export default function DeckBuilderPanel({
                 <>
                   <span className="text-gray-400 dark:text-gray-600 ml-1">·</span>
                   <button
-                    onClick={() => setShowBuyDeckModal(true)}
+                    onClick={() => { setBuyModalMode("exact"); setShowBuyDeckModal(true); }}
                     className="text-green-600 dark:text-green-400 font-medium hover:underline inline-flex items-center gap-0.5"
                     title="Buy deck on YTG"
                   >
@@ -721,9 +726,13 @@ export default function DeckBuilderPanel({
               {savings !== null && budgetTotal !== null && (
                 <>
                   <span className="text-gray-400 dark:text-gray-600 ml-0.5">·</span>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap" title={`Save $${savings.toFixed(2)} with budget alternatives`}>
+                  <button
+                    onClick={() => { setBuyModalMode("budget"); setShowBuyDeckModal(true); }}
+                    className="text-xs text-muted-foreground whitespace-nowrap hover:underline"
+                    title={`Save $${savings.toFixed(2)} with budget alternatives`}
+                  >
                     Budget: <span className="text-green-600 dark:text-green-400">${budgetTotal.toFixed(2)}</span>
-                  </span>
+                  </button>
                 </>
               )}
             </span>
@@ -996,7 +1005,7 @@ export default function DeckBuilderPanel({
                   <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
                   {totalDeckPrice !== null && (
                     <button
-                      onClick={() => { setShowBuyDeckModal(true); setShowMenu(false); }}
+                      onClick={() => { setBuyModalMode("exact"); setShowBuyDeckModal(true); setShowMenu(false); }}
                       className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-gray-900 dark:text-white text-sm"
                     >
                       <img src="/sponsors/ytg-dark.png" alt="" className="w-4 h-4 object-contain hidden dark:block" />
@@ -1517,7 +1526,7 @@ export default function DeckBuilderPanel({
               <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
               {totalDeckPrice !== null && (
                 <button
-                  onClick={() => { setShowBuyDeckModal(true); setShowMenu(false); }}
+                  onClick={() => { setBuyModalMode("exact"); setShowBuyDeckModal(true); setShowMenu(false); }}
                   className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
                 >
                   <img src="/sponsors/ytg-dark.png" alt="" className="w-4 h-4 object-contain hidden dark:block" />
@@ -2775,7 +2784,7 @@ export default function DeckBuilderPanel({
                 {totalDeckPrice !== null && (
                   <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
                     <button
-                      onClick={() => setShowBuyDeckModal(true)}
+                      onClick={() => { setBuyModalMode("exact"); setShowBuyDeckModal(true); }}
                       className="flex justify-between w-full text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 -mx-1 px-1 py-0.5 rounded transition-colors group"
                     >
                       <span className="flex items-center gap-1.5">
@@ -2788,16 +2797,19 @@ export default function DeckBuilderPanel({
                   </div>
                 )}
                 {savings !== null && budgetTotal !== null && (
-                  <div className="flex justify-between items-center -mt-1 mb-1">
+                  <button
+                    onClick={() => { setBuyModalMode("budget"); setShowBuyDeckModal(true); }}
+                    className="flex justify-between w-full text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 -mx-1 px-1 py-0.5 rounded transition-colors group -mt-1 mb-1"
+                  >
                     <span className="text-xs text-muted-foreground flex items-center gap-1.5">
                       <span className="w-3.5" />
                       Budget:
                     </span>
                     <span className="text-xs">
-                      <span className="text-green-600 dark:text-green-400">${budgetTotal.toFixed(2)}</span>
+                      <span className="text-green-600 dark:text-green-400 group-hover:underline">${budgetTotal.toFixed(2)}</span>
                       <span className="text-muted-foreground ml-1">(save ${savings.toFixed(2)})</span>
                     </span>
-                  </div>
+                  </button>
                 )}
 
                 {/* Card Type Breakdown */}
@@ -2887,6 +2899,7 @@ export default function DeckBuilderPanel({
             isReserve: dc.isReserve,
           }))}
           onClose={() => setShowBuyDeckModal(false)}
+          initialMode={buyModalMode}
         />
       )}
 
