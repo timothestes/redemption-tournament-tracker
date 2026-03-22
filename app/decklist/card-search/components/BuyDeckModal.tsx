@@ -17,6 +17,11 @@ interface MatchedCard {
   original_card_name?: string;
   original_card_key?: string;
   original_price?: number;
+  cheaper_alternative?: {
+    card_name: string;
+    price: number;
+    source: string;
+  };
 }
 
 interface UnmatchedCard {
@@ -336,6 +341,11 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
                             {card.original_card_name && (
                               <span className={`block text-[10px] ${isSelected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-300 dark:text-gray-600'}`}>
                                 was {card.original_card_name}{card.original_price !== undefined ? ` (save $${(card.original_price - card.price).toFixed(2)} ea)` : ""}
+                              </span>
+                            )}
+                            {card.cheaper_alternative && isSelected && (
+                              <span className="block text-[10px] text-muted-foreground">
+                                Cheaper from {card.cheaper_alternative.source}: ${card.cheaper_alternative.price.toFixed(2)}
                               </span>
                             )}
                           </span>

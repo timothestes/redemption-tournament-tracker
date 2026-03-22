@@ -53,6 +53,12 @@ interface MatchedCard {
   original_card_name?: string;
   original_card_key?: string;
   original_price?: number;
+  /** When a cheaper version exists on another store (e.g. Fundraiser) */
+  cheaper_alternative?: {
+    card_name: string;
+    price: number;
+    source: string;
+  };
 }
 
 interface UnmatchedCard {
@@ -491,6 +497,14 @@ export async function POST(request: NextRequest) {
             matchedCard.original_card_name = card.card_name;
             matchedCard.original_card_key = card.card_key;
             matchedCard.original_price = originalInfo.price;
+          }
+
+          // Check if there's an even cheaper non-YTG alternative (e.g. Fundraiser)
+          if (dupIndex && cardNameIndex) {
+            const alt = findCheaperAlternative(card.card_key, cardData, cardNameIndex, dupIndex, nonYtgPrices);
+            if (alt && alt.price < substitute.price) {
+              matchedCard.cheaper_alternative = alt;
+            }
           }
 
           matched.push(matchedCard);
