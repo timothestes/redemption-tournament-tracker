@@ -1005,6 +1005,22 @@ export async function loadPublicDeckAction(deckId: string) {
         .then(() => {});
     }
 
+    // Fetch total and budget prices
+    let totalPrice: number | null = null;
+    let budgetPrice: number | null = null;
+    {
+      const [priceResult, budgetResult] = await Promise.all([
+        supabase.rpc("get_deck_total_prices", { deck_ids: [deckId] }),
+        supabase.rpc("get_deck_budget_prices", { deck_ids: [deckId] }),
+      ]);
+      if (priceResult.data?.[0]?.total_price > 0) {
+        totalPrice = parseFloat(priceResult.data[0].total_price);
+      }
+      if (budgetResult.data?.[0]?.budget_price > 0) {
+        budgetPrice = parseFloat(budgetResult.data[0].budget_price);
+      }
+    }
+
     return {
       success: true,
       deck: {
@@ -1012,6 +1028,8 @@ export async function loadPublicDeckAction(deckId: string) {
         username: profile?.username || null,
         cards: cards || [],
         tags,
+        total_price: totalPrice,
+        budget_price: budgetPrice,
       },
       isOwner,
     };
