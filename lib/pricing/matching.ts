@@ -873,10 +873,21 @@ export async function runMatchingPipeline(options?: {
  */
 async function writeResults(results: MatchResult[]): Promise<void> {
   const supabase = getSupabaseAdmin();
+
+  // Load manually-protected keys to exclude from writes
+  const { data: manualRows } = await supabase
+    .from('card_price_mappings')
+    .select('card_key')
+    .eq('status', 'manual');
+  const manualKeys = new Set((manualRows ?? []).map((r: any) => r.card_key));
+
+  // Filter out any results that would overwrite manual entries
+  const filtered = results.filter(r => !manualKeys.has(r.card_key));
+
   const batchSize = 500;
 
-  for (let i = 0; i < results.length; i += batchSize) {
-    const batch = results.slice(i, i + batchSize).map(r => ({
+  for (let i = 0; i < filtered.length; i += batchSize) {
+    const batch = filtered.slice(i, i + batchSize).map(r => ({
       card_key: r.card_key,
       card_name: r.card_name,
       set_code: r.set_code,
