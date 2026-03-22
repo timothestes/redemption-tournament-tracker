@@ -970,7 +970,7 @@ export async function regenerateCardPrices(): Promise<void> {
  * Build a DuplicateGroupIndex from Supabase using the admin client.
  * Server-side equivalent of fetchDuplicateGroups() in lib/duplicateCards.ts.
  */
-async function buildDuplicateGroupIndex(): Promise<DuplicateGroupIndex> {
+export async function buildDuplicateGroupIndex(): Promise<DuplicateGroupIndex> {
   const supabase = getSupabaseAdmin();
 
   const PAGE = 1000;
