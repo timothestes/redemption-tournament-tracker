@@ -93,7 +93,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     if ((!isConnected && !isActive) || !conn || didSubscribe.current) return;
     didSubscribe.current = true;
     try {
-      conn.subscriptionBuilder().subscribeToAll();
+      conn.subscribeToAllTables();
     } catch (e) {
       console.error('Failed to subscribe:', e);
     }
