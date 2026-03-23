@@ -93,29 +93,16 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     if ((!isConnected && !isActive) || !conn || didSubscribe.current) return;
     didSubscribe.current = true;
     try {
-      // Debug: walk the prototype chain to find all methods
-      const proto = Object.getPrototypeOf(conn);
-      const proto2 = proto ? Object.getPrototypeOf(proto) : null;
-      const proto3 = proto2 ? Object.getPrototypeOf(proto2) : null;
-      console.log('conn proto names:', proto ? Object.getOwnPropertyNames(proto) : 'none');
-      console.log('conn proto2 names:', proto2 ? Object.getOwnPropertyNames(proto2) : 'none');
-      console.log('conn proto3 names:', proto3 ? Object.getOwnPropertyNames(proto3) : 'none');
-      console.log('conn.db:', conn.db);
-      console.log('conn.reducers:', conn.reducers);
-      console.log('isActive:', isActive);
-      console.log('spacetimeCtx keys:', Object.keys(spacetimeCtx));
-
-      // The connection is managed by the provider. Try using subscriptionBuilder from the generated DbConnection
-      if (typeof conn.subscriptionBuilder === 'function') {
-        conn.subscriptionBuilder().subscribeToAll();
-      } else if (typeof conn.subscribeToAllTables === 'function') {
-        conn.subscribeToAllTables();
-      } else if (typeof conn.subscribe === 'function') {
-        const tbl = ['game', 'player', 'card_instance', 'card_counter', 'game_action', 'chat_message', 'spectator', 'disconnect_timeout'];
-        conn.subscribe(tbl.map((t: string) => `SELECT * FROM ${t}`));
-      } else {
-        console.error('No subscribe method found. conn:', conn, 'proto:', proto ? Object.getOwnPropertyNames(proto) : 'none');
-      }
+      conn.subscriptionBuilder().subscribe([
+        'SELECT * FROM game',
+        'SELECT * FROM player',
+        'SELECT * FROM card_instance',
+        'SELECT * FROM card_counter',
+        'SELECT * FROM game_action',
+        'SELECT * FROM chat_message',
+        'SELECT * FROM spectator',
+        'SELECT * FROM disconnect_timeout',
+      ]);
     } catch (e) {
       console.error('Failed to subscribe:', e);
     }
