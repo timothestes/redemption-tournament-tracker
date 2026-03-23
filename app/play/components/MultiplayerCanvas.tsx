@@ -904,7 +904,7 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
   }
 
   return (
-    <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
+    <div ref={containerRef} style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
       <Stage
         ref={stageRef}
         width={width}
