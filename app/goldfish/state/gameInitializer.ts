@@ -39,6 +39,7 @@ function expandDeckCards(deck: DeckDataForGoldfish): { main: GameCard[]; reserve
         isFlipped: false,
         zone: dc.is_reserve ? 'reserve' : 'deck',
         ownerId: 'player1',
+        isToken: false,
         notes: '',
       };
 
