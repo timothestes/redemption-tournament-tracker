@@ -93,7 +93,18 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     if ((!isConnected && !isActive) || !conn || didSubscribe.current) return;
     didSubscribe.current = true;
     try {
-      conn.subscribeToAllTables();
+      // Debug: log what conn actually is
+      console.log('conn type:', typeof conn, 'keys:', conn ? Object.getOwnPropertyNames(Object.getPrototypeOf(conn)) : 'null');
+      console.log('conn methods:', conn ? Object.keys(conn) : 'null');
+      // Try various subscription API patterns
+      if (typeof conn.subscribeToAllTables === 'function') {
+        conn.subscribeToAllTables();
+      } else if (typeof conn.subscribe === 'function') {
+        const tables = ['game', 'player', 'card_instance', 'card_counter', 'game_action', 'chat_message', 'spectator', 'disconnect_timeout'];
+        conn.subscribe(tables.map((t: string) => `SELECT * FROM ${t}`));
+      } else {
+        console.error('No subscribe method found on conn:', conn);
+      }
     } catch (e) {
       console.error('Failed to subscribe:', e);
     }
