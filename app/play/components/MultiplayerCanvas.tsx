@@ -149,13 +149,14 @@ function isFreeFormZone(zone: string): boolean {
 
 interface MultiplayerCanvasProps {
   gameId: bigint;
+  onHoveredCardChange?: (card: GameCard | null) => void;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
+export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: MultiplayerCanvasProps) {
   // ---- Viewport sizing ----
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
@@ -240,6 +241,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
 
   // ---- Hover state ----
   const [hoveredInstanceId, setHoveredInstanceId] = useState<string | null>(null);
+  const [hoveredCard, setHoveredCard] = useState<GameCard | null>(null);
   const [hoverProgress, setHoverProgress] = useState(0);
   const hoverAnimFrameRef = useRef<number | null>(null);
   const hoverStartTimeRef = useRef<number | null>(null);
@@ -267,6 +269,11 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     hoverStartTimeRef.current = null;
     setHoverProgress(0);
   }, []);
+
+  // Propagate hoveredCard to parent component
+  useEffect(() => {
+    onHoveredCardChange?.(hoveredCard);
+  }, [hoveredCard, onHoveredCardChange]);
 
   // ---- Selection state (multi-select via marquee) ----
   const {
@@ -682,6 +689,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     (card: GameCard, _e: Konva.KonvaEventObject<MouseEvent>) => {
       if (isDraggingRef.current) return;
       setHoveredInstanceId(card.instanceId);
+      setHoveredCard(card);
       startHoverAnimation();
     },
     [startHoverAnimation],
@@ -852,62 +860,121 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
           {/* ================================================================
               Zone backgrounds — My zones
               ================================================================ */}
-          {Object.entries(myZones).map(([key, zone]) => (
-            <Group key={`my-${key}`}>
-              <Rect
-                x={zone.x}
-                y={zone.y}
-                width={zone.width}
-                height={zone.height}
-                fill="#1e1610"
-                stroke="#6b4e27"
-                strokeWidth={1}
-                cornerRadius={3}
-                opacity={0.35}
-              />
-              <Text
-                x={zone.x + 6}
-                y={zone.y + 4}
-                text={zone.label.toUpperCase()}
-                fontSize={11}
-                fontFamily="Cinzel, Georgia, serif"
-                fill="#e8d5a3"
-                letterSpacing={1}
-                width={zone.width - 12}
-                ellipsis
-              />
-            </Group>
-          ))}
+          {Object.entries(myZones).map(([key, zone]) => {
+            const isFreeForm = key === 'territory' || key === 'land-of-bondage';
+            const cardsInZone = myCards[key] ?? [];
+            // Approximate label width: ~7px per uppercase char at fontSize 11 + letterSpacing 1
+            const labelTextWidth = zone.label.toUpperCase().length * 7;
+            return (
+              <Group key={`my-${key}`}>
+                <Rect
+                  x={zone.x}
+                  y={zone.y}
+                  width={zone.width}
+                  height={zone.height}
+                  fill="#1e1610"
+                  stroke="#6b4e27"
+                  strokeWidth={1}
+                  cornerRadius={3}
+                  opacity={0.35}
+                />
+                <Text
+                  x={zone.x + 6}
+                  y={zone.y + 4}
+                  text={zone.label.toUpperCase()}
+                  fontSize={11}
+                  fontFamily="Cinzel, Georgia, serif"
+                  fill="#e8d5a3"
+                  letterSpacing={1}
+                  width={zone.width - 12}
+                  ellipsis
+                />
+                {/* Count badge for free-form zones */}
+                {isFreeForm && (
+                  <>
+                    <Rect
+                      x={zone.x + 6 + labelTextWidth + 8}
+                      y={zone.y + 4}
+                      width={24}
+                      height={18}
+                      fill="rgba(196, 149, 90, 0.25)"
+                      cornerRadius={4}
+                      stroke="rgba(196, 149, 90, 0.5)"
+                      strokeWidth={0.5}
+                    />
+                    <Text
+                      x={zone.x + 6 + labelTextWidth + 8}
+                      y={zone.y + 5}
+                      width={24}
+                      text={String(cardsInZone.length)}
+                      fontSize={11}
+                      fill="#e8d5a3"
+                      align="center"
+                    />
+                  </>
+                )}
+              </Group>
+            );
+          })}
 
           {/* ================================================================
               Zone backgrounds — Opponent zones
               ================================================================ */}
-          {Object.entries(opponentZones).map(([key, zone]) => (
-            <Group key={`opp-${key}`}>
-              <Rect
-                x={zone.x}
-                y={zone.y}
-                width={zone.width}
-                height={zone.height}
-                fill="#10141e"
-                stroke="#27456b"
-                strokeWidth={1}
-                cornerRadius={3}
-                opacity={0.35}
-              />
-              <Text
-                x={zone.x + 6}
-                y={zone.y + 4}
-                text={zone.label.toUpperCase()}
-                fontSize={11}
-                fontFamily="Cinzel, Georgia, serif"
-                fill="#a3c5e8"
-                letterSpacing={1}
-                width={zone.width - 12}
-                ellipsis
-              />
-            </Group>
-          ))}
+          {Object.entries(opponentZones).map(([key, zone]) => {
+            const isFreeForm = key === 'territory' || key === 'land-of-bondage';
+            const cardsInZone = opponentCards[key] ?? [];
+            const labelTextWidth = zone.label.toUpperCase().length * 7;
+            return (
+              <Group key={`opp-${key}`}>
+                <Rect
+                  x={zone.x}
+                  y={zone.y}
+                  width={zone.width}
+                  height={zone.height}
+                  fill="#10141e"
+                  stroke="#27456b"
+                  strokeWidth={1}
+                  cornerRadius={3}
+                  opacity={0.35}
+                />
+                <Text
+                  x={zone.x + 6}
+                  y={zone.y + 4}
+                  text={zone.label.toUpperCase()}
+                  fontSize={11}
+                  fontFamily="Cinzel, Georgia, serif"
+                  fill="#a3c5e8"
+                  letterSpacing={1}
+                  width={zone.width - 12}
+                  ellipsis
+                />
+                {/* Count badge for free-form zones */}
+                {isFreeForm && (
+                  <>
+                    <Rect
+                      x={zone.x + 6 + labelTextWidth + 8}
+                      y={zone.y + 4}
+                      width={24}
+                      height={18}
+                      fill="rgba(100, 149, 237, 0.25)"
+                      cornerRadius={4}
+                      stroke="rgba(100, 149, 237, 0.5)"
+                      strokeWidth={0.5}
+                    />
+                    <Text
+                      x={zone.x + 6 + labelTextWidth + 8}
+                      y={zone.y + 5}
+                      width={24}
+                      text={String(cardsInZone.length)}
+                      fontSize={11}
+                      fill="#a3c5e8"
+                      align="center"
+                    />
+                  </>
+                )}
+              </Group>
+            );
+          })}
 
           {/* ================================================================
               Hand zone backgrounds
