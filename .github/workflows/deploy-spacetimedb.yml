@@ -1,0 +1,48 @@
+name: Deploy SpacetimeDB Module
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'spacetimedb/**'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install SpacetimeDB CLI
+        run: curl -sSf https://install.spacetimedb.com | sh
+
+      - name: Add SpacetimeDB to PATH
+        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install module dependencies
+        run: cd spacetimedb && npm ci
+
+      - name: Authenticate
+        run: spacetime login --token ${{ secrets.SPACETIMEDB_TOKEN }}
+
+      - name: Publish module
+        run: spacetime publish redemption-multiplayer --module-path spacetimedb
+
+      - name: Generate client bindings
+        run: |
+          spacetime generate --lang typescript \
+            --out-dir lib/spacetimedb/module_bindings \
+            --module-path spacetimedb
+
+      - name: Commit bindings if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git diff --quiet lib/spacetimedb/module_bindings/ || {
+            git add lib/spacetimedb/module_bindings/
+            git commit -m "chore: regenerate SpacetimeDB client bindings"
+            git push
+          }
