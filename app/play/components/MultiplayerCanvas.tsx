@@ -159,14 +159,20 @@ interface MultiplayerCanvasProps {
 // ---------------------------------------------------------------------------
 
 export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: MultiplayerCanvasProps) {
-  // ---- Viewport sizing ----
+  // ---- Container sizing (respects flex layout) ----
+  const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
-    const update = () => setDimensions({ width: window.innerWidth, height: window.innerHeight });
+    const el = containerRef.current;
+    if (!el) return;
+    const update = () => {
+      setDimensions({ width: el.clientWidth, height: el.clientHeight });
+    };
     update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
   const { width, height } = dimensions;
@@ -898,7 +904,7 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
   }
 
   return (
-    <>
+    <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
       <Stage
         ref={stageRef}
         width={width}
@@ -1541,6 +1547,6 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
           onClose={() => setContextMenu(null)}
         />
       )}
-    </>
+    </div>
   );
 }
