@@ -14,7 +14,7 @@ export default async function PlayPage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/login');
+    redirect('/sign-in');
   }
 
   const { data: decks } = await supabase
