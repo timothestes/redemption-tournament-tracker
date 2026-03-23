@@ -238,16 +238,9 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     );
   }
 
-  if (lifecycle === 'playing' && gameState.isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="mb-4 h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" />
-          <p className="text-sm text-muted-foreground">Game starting...</p>
-        </div>
-      </div>
-    );
-  }
+  // Note: removed isLoading gate — subscribeApplied is unreliable for the host
+  // (tables that were empty at subscribe time may never flip to applied).
+  // The canvas handles missing data gracefully with fallbacks.
 
   // ---------------------------------------------------------------------------
   // Concede handler — shown during 'playing'
