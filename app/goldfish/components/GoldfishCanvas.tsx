@@ -11,20 +11,21 @@ import { GameCard, ZoneId, ZONE_LABELS } from '../types';
 import { GameCardNode, CardBackShape, cardBackListeners, cardBackLoaded } from '../../shared/components/GameCardNode';
 import { PhaseBar } from './PhaseBar';
 import { GameToolbar } from './GameToolbar';
-import { CardContextMenu } from './CardContextMenu';
+import { CardContextMenu } from '@/app/shared/components/CardContextMenu';
 import { CardHoverPreview } from './CardHoverPreview';
 import { ZoneBrowseModal } from './ZoneBrowseModal';
 import { DeckSearchModal } from './DeckSearchModal';
-import { DeckContextMenu } from './DeckContextMenu';
+import { DeckContextMenu } from '@/app/shared/components/DeckContextMenu';
 import { DeckPeekModal } from './DeckPeekModal';
 import { DeckDropPopup } from './DeckDropPopup';
 import { DeckExchangeModal } from './DeckExchangeModal';
-import { ZoneContextMenu } from './ZoneContextMenu';
+import { ZoneContextMenu } from '@/app/shared/components/ZoneContextMenu';
 import { LorContextMenu } from './LorContextMenu';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useModalCardDrag } from '../hooks/useModalCardDrag';
 import { useSelectionState, type CardBound } from '../hooks/useSelectionState';
-import { MultiCardContextMenu } from './MultiCardContextMenu';
+import { MultiCardContextMenu } from '@/app/shared/components/MultiCardContextMenu';
+import { GameActions } from '@/app/shared/types/gameActions';
 import { GameToastContainer, showGameToast } from './GameToast';
 import { DiceRollOverlay } from './DiceRollOverlay';
 import { useCardPreview } from '../state/CardPreviewContext';
@@ -47,9 +48,29 @@ interface GoldfishCanvasProps {
 }
 
 export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
-  const { state, dispatch, drawCard, drawMultiple, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleDeck, meekCard, unmeekCard, removeOpponentToken, addPlayerLostSoul } = useGame();
+  const { state, dispatch, drawCard, drawMultiple, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck, shuffleDeck, meekCard, unmeekCard, flipCard, addCounter, removeCounter, addNote, addOpponentLostSoul, removeOpponentToken, addPlayerLostSoul } = useGame();
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const stageRef = useRef<Konva.Stage>(null);
+
+  // Adapter: bridge goldfish game context to shared GameActions interface
+  const goldfishActions: GameActions = useMemo(() => ({
+    moveCard: (cardId, toZone, posX, posY) => moveCard(cardId, toZone as ZoneId, undefined, posX !== undefined ? Number(posX) : undefined, posY !== undefined ? Number(posY) : undefined),
+    moveCardsBatch: (cardIds, toZone) => moveCardsBatch(cardIds, toZone as ZoneId),
+    flipCard: (cardId) => flipCard(cardId),
+    meekCard: (cardId) => meekCard(cardId),
+    unmeekCard: (cardId) => unmeekCard(cardId),
+    addCounter: (cardId, color) => addCounter(cardId, color as any),
+    removeCounter: (cardId, color) => removeCounter(cardId, color as any),
+    shuffleCardIntoDeck: (cardId) => shuffleCardIntoDeck(cardId),
+    shuffleDeck: () => shuffleDeck(),
+    setNote: (cardId, text) => addNote(cardId, text),
+    exchangeCards: () => { /* handled via onExchange callback */ },
+    drawCard: () => drawCard(),
+    drawMultiple: (count) => drawMultiple(count),
+    moveCardToTopOfDeck: (cardId) => moveCardToTopOfDeck(cardId),
+    moveCardToBottomOfDeck: (cardId) => moveCardToBottomOfDeck(cardId),
+    removeOpponentToken: (cardId) => removeOpponentToken(cardId),
+  }), [moveCard, moveCardsBatch, flipCard, meekCard, unmeekCard, addCounter, removeCounter, shuffleCardIntoDeck, shuffleDeck, addNote, drawCard, drawMultiple, moveCardToTopOfDeck, moveCardToBottomOfDeck, removeOpponentToken]);
 
   // Prevent browser-native drag on the canvas container.
   // Without this, the browser can hijack card drags (especially multi-select)
@@ -1479,6 +1500,8 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
           card={contextMenu.card}
           x={contextMenu.x}
           y={contextMenu.y}
+          actions={goldfishActions}
+          zones={state.zones}
           onClose={() => setContextMenu(null)}
           onExchange={(ids) => setExchangeCardIds(ids)}
         />
@@ -1489,6 +1512,8 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
           selectedIds={Array.from(selectedIds)}
           x={multiCardContextMenu.x}
           y={multiCardContextMenu.y}
+          actions={goldfishActions}
+          zones={state.zones}
           onClose={() => setMultiCardContextMenu(null)}
           onClearSelection={() => { clearSelection(); setMultiCardContextMenu(null); }}
           onExchange={(ids) => setExchangeCardIds(ids)}
@@ -1502,6 +1527,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
           spawnX={zoneMenu.spawnX}
           spawnY={zoneMenu.spawnY}
           onClose={() => setZoneMenu(null)}
+          onAddOpponentLostSoul={(testament, posX, posY) => addOpponentLostSoul(testament, posX, posY)}
         />
       )}
 
