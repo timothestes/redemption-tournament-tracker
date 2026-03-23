@@ -643,20 +643,18 @@ Finished games remain in database for history/replay. Abandoned games cleaned up
 8. Basic game actions: draw, meek/unmeek, flip, counters, discard, move
 9. Chat between players
 10. Spectator mode (read-only subscription)
-11. Game action log (append-only, for future replay)
+11. Game action log (append-only, for future replay. Probably only want to log cards moving between zones instead of capturing all clicking and moving things around in territory etc)
 12. Deck search/peek/browse modals (client-side filtering at Level 1)
 13. Shared dice rolling (seeded PRNG, both players see result)
 14. Reconnection handling (SpacetimeDB native)
-15. Deck exchange/mulligan
-16. Card notes
-17. "Always start with" card tutoring at game start
+15. Conceding, starting new game, loading new deck flow.
 
 ---
 
 ## Dev Workflow
 
 ```bash
-# Start local SpacetimeDB server
+# Start local SpacetimeDB server (can also use spacetime dev I think?)
 spacetime start
 
 # Publish module (after schema/reducer changes)
