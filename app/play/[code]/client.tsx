@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useSpacetimeConnection } from '@/app/play/hooks/useSpacetimeConnection';
 import { SpacetimeProvider } from '@/app/play/lib/spacetimedb-provider';
 import { useGameState } from '@/app/play/hooks/useGameState';
 import { useSpacetimeDB } from 'spacetimedb/react';
+import GameOverOverlay from '@/app/play/components/GameOverOverlay';
 
 // Konva requires browser APIs — lazy-load to avoid SSR issues
 const MultiplayerCanvas = dynamic(
@@ -76,6 +78,7 @@ interface GameInnerProps {
 
 function GameInner({ code, isConnected }: GameInnerProps) {
   const { conn } = useSpacetimeDB() as any;
+  const router = useRouter();
 
   const [lifecycle, setLifecycle] = useState<LifecycleState>('creating');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -216,29 +219,95 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Concede handler — shown during 'playing'
+  // ---------------------------------------------------------------------------
+  function handleConcede() {
+    const confirmed = window.confirm('Are you sure you want to concede this game?');
+    if (confirmed) {
+      gameState.resignGame();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Return to lobby handler used by GameOverOverlay
+  // ---------------------------------------------------------------------------
+  function handleReturnToLobby() {
+    router.push('/play');
+  }
+
+  // lifecycle === 'finished' — show canvas (frozen) with GameOverOverlay on top,
+  // or render the overlay standalone if canvas data is unavailable.
   if (lifecycle === 'finished') {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <p className="text-lg font-semibold text-foreground">Game over</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Souls rescued — You: {gameState.soulsRescued.me} / Opponent: {gameState.soulsRescued.opponent}
-          </p>
-          <a
-            href="/play"
-            className="mt-4 inline-block rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            Back to lobby
-          </a>
+    // If we have full game state, show the overlay over the frozen canvas
+    if (gameId !== null && !gameState.isLoading) {
+      return (
+        <div className="h-screen w-screen overflow-hidden bg-background" style={{ pointerEvents: 'none' }}>
+          <MultiplayerCanvas gameId={gameId} />
+          <GameOverOverlay
+            game={gameState.game}
+            myPlayer={gameState.myPlayer}
+            opponentPlayer={gameState.opponentPlayer}
+            gameActions={gameState.gameActions}
+            onReturnToLobby={handleReturnToLobby}
+          />
         </div>
+      );
+    }
+    // Fallback — canvas not ready
+    return (
+      <div className="h-screen w-screen overflow-hidden bg-background">
+        <GameOverOverlay
+          game={gameState.game}
+          myPlayer={gameState.myPlayer}
+          opponentPlayer={gameState.opponentPlayer}
+          gameActions={gameState.gameActions}
+          onReturnToLobby={handleReturnToLobby}
+        />
       </div>
     );
   }
 
-  // lifecycle === 'playing' — render the multiplayer canvas
+  // lifecycle === 'playing' — render the multiplayer canvas with a Concede button overlay
   return (
     <div className="h-screen w-screen overflow-hidden bg-background">
       {gameId !== null && <MultiplayerCanvas gameId={gameId} />}
+
+      {/* Concede floating button — sits above the canvas, bottom-right */}
+      {lifecycle === 'playing' && (
+        <button
+          onClick={handleConcede}
+          style={{
+            position: 'fixed',
+            bottom: 60,   // above TurnIndicator bar (52px) with a small gap
+            right: 12,
+            zIndex: 300,
+            padding: '5px 12px',
+            background: 'rgba(30, 10, 10, 0.9)',
+            border: '1px solid rgba(180, 60, 60, 0.45)',
+            borderRadius: 4,
+            cursor: 'pointer',
+            fontFamily: 'var(--font-cinzel), Georgia, serif',
+            fontSize: 10,
+            letterSpacing: '0.07em',
+            textTransform: 'uppercase',
+            color: 'rgba(220, 120, 120, 0.75)',
+            transition: 'background 0.15s, border-color 0.15s, color 0.15s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(60, 10, 10, 0.95)';
+            e.currentTarget.style.borderColor = 'rgba(220, 80, 80, 0.7)';
+            e.currentTarget.style.color = 'rgba(240, 150, 150, 0.95)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(30, 10, 10, 0.9)';
+            e.currentTarget.style.borderColor = 'rgba(180, 60, 60, 0.45)';
+            e.currentTarget.style.color = 'rgba(220, 120, 120, 0.75)';
+          }}
+        >
+          Concede
+        </button>
+      )}
     </div>
   );
 }
