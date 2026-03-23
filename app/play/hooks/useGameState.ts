@@ -78,7 +78,9 @@ export interface GameState {
 
 export function useGameState(gameId: bigint): GameState {
   // Connection + identity from SpacetimeDB provider
-  const { conn, identity } = useSpacetimeDB() as any;
+  const spacetimeCtx = useSpacetimeDB() as any;
+  const conn = spacetimeCtx?.getConnection?.() ?? null;
+  const identity = spacetimeCtx?.identity;
 
   const identityHex: string | undefined = identity?.toHexString?.();
 

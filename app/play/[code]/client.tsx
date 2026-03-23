@@ -77,7 +77,9 @@ interface GameInnerProps {
 }
 
 function GameInner({ code, isConnected }: GameInnerProps) {
-  const { conn } = useSpacetimeDB() as any;
+  const spacetimeCtx = useSpacetimeDB() as any;
+  const conn = spacetimeCtx?.getConnection?.() ?? null;
+  const isActive = spacetimeCtx?.isActive ?? false;
   const router = useRouter();
 
   const [lifecycle, setLifecycle] = useState<LifecycleState>('creating');
@@ -98,7 +100,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
 
   // Once connected, call the appropriate reducer once
   useEffect(() => {
-    if (!isConnected || !conn || didCallReducer.current) return;
+    if ((!isConnected && !isActive) || !conn || didCallReducer.current) return;
     didCallReducer.current = true;
 
     if (!gameParams) {
@@ -133,7 +135,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       setErrorMessage(e instanceof Error ? e.message : 'Failed to initialize game');
       setLifecycle('error');
     }
-  }, [isConnected, conn, code, gameParams]);
+  }, [isConnected, isActive, conn, code, gameParams]);
 
   // Derive gameId once we have a connection — use the code index to find it
   // useGameState requires a gameId; we pass 0n until we know the real one
@@ -180,7 +182,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     );
   }
 
-  if (lifecycle === 'creating' || lifecycle === 'joining' || !isConnected) {
+  if (lifecycle === 'creating' || lifecycle === 'joining' || (!isConnected && !isActive)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
