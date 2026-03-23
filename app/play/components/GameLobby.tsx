@@ -61,13 +61,14 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
       const { deck, deckData } = await loadDeckForGame(createDeckId);
       const gameCode = Math.random().toString(36).slice(2, 6).toUpperCase();
       sessionStorage.setItem(
-        `game_${gameCode}`,
+        `stdb_game_params_${gameCode}`,
         JSON.stringify({
-          role: 'host',
+          role: 'create',
+          deckId: createDeckId,
           displayName: createDisplayName,
+          supabaseUserId: userId,
           format: createFormat,
-          deck,
-          deckData,
+          deckData: JSON.stringify(deckData),
         })
       );
       router.push(`/play/${gameCode}`);
@@ -92,12 +93,13 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
     try {
       const { deck, deckData } = await loadDeckForGame(joinDeckId);
       sessionStorage.setItem(
-        `game_${code}`,
+        `stdb_game_params_${code}`,
         JSON.stringify({
-          role: 'guest',
+          role: 'join',
+          deckId: joinDeckId,
           displayName,
-          deck,
-          deckData,
+          supabaseUserId: userId,
+          deckData: JSON.stringify(deckData),
         })
       );
       router.push(`/play/${code}`);
