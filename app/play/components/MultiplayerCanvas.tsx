@@ -24,6 +24,8 @@ import type {
   CardInstance,
   CardCounter,
 } from '@/lib/spacetimedb/module_bindings/types';
+import { CardContextMenu } from '@/app/shared/components/CardContextMenu';
+import type { GameActions } from '@/app/shared/types/gameActions';
 import TurnIndicator from './TurnIndicator';
 import DiceOverlay from './DiceOverlay';
 
@@ -318,6 +320,36 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
     },
     [],
   );
+
+  // ---- Context menu state ----
+  const [contextMenu, setContextMenu] = useState<{
+    card: GameCard; x: number; y: number;
+  } | null>(null);
+  const contextMenuRef = useRef(contextMenu);
+  contextMenuRef.current = contextMenu;
+
+  // ---- Multiplayer GameActions adapter ----
+  const multiplayerActions: GameActions = useMemo(() => ({
+    moveCard: (cardId, toZone, posX, posY) =>
+      gameState.moveCard(BigInt(cardId), toZone, undefined, posX, posY),
+    moveCardsBatch: (cardIds, toZone) =>
+      gameState.moveCardsBatch(cardIds.join(','), toZone),
+    flipCard: (cardId) => gameState.flipCard(BigInt(cardId)),
+    meekCard: (cardId) => gameState.meekCard(BigInt(cardId)),
+    unmeekCard: (cardId) => gameState.unmeekCard(BigInt(cardId)),
+    addCounter: (cardId, color) => gameState.addCounter(BigInt(cardId), color),
+    removeCounter: (cardId, color) => gameState.removeCounter(BigInt(cardId), color),
+    shuffleCardIntoDeck: (cardId) => gameState.shuffleCardIntoDeck(BigInt(cardId)),
+    shuffleDeck: () => gameState.shuffleDeck(),
+    setNote: (cardId, text) => gameState.setNote(BigInt(cardId), text),
+    exchangeCards: (cardIds) => gameState.exchangeCards(cardIds.join(',')),
+    drawCard: () => gameState.drawCard(),
+    drawMultiple: (count) => gameState.drawMultiple(BigInt(count)),
+    // Goldfish-only — not available in multiplayer
+    moveCardToTopOfDeck: undefined,
+    moveCardToBottomOfDeck: undefined,
+    removeOpponentToken: undefined,
+  }), [gameState]);
 
   // ---- Drag state ----
   const isDraggingRef = useRef(false);
@@ -679,9 +711,29 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
     (_card: GameCard, _e: Konva.KonvaEventObject<DragEvent>) => {},
     [],
   );
-  const noopContextMenu = useCallback(
+  const noopOpponentContextMenu = useCallback(
     (_card: GameCard, _e: Konva.KonvaEventObject<PointerEvent>) => {},
     [],
+  );
+
+  const handleCardContextMenu = useCallback(
+    (card: GameCard, e: Konva.KonvaEventObject<PointerEvent>) => {
+      e.evt.preventDefault();
+      const stage = stageRef.current;
+      if (!stage) return;
+      const container = stage.container().getBoundingClientRect();
+
+      // Clear hover state
+      setHoveredInstanceId(null);
+      stopHoverAnimation();
+
+      setContextMenu({
+        card,
+        x: e.evt.clientX - container.left,
+        y: e.evt.clientY - container.top,
+      });
+    },
+    [stopHoverAnimation],
   );
   const noopDblClick = useCallback((_card: GameCard) => {}, []);
 
@@ -1084,7 +1136,7 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
                       onDragStart={handleCardDragStart}
                       onDragMove={handleCardDragMove}
                       onDragEnd={handleCardDragEnd}
-                      onContextMenu={noopContextMenu}
+                      onContextMenu={handleCardContextMenu}
                       onDblClick={noopDblClick}
                       onMouseEnter={handleMouseEnter}
                       onMouseLeave={handleMouseLeave}
@@ -1123,7 +1175,7 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
                       onDragStart={noopCardDrag}
                       onDragMove={noopDrag}
                       onDragEnd={noopCardDragEnd}
-                      onContextMenu={noopContextMenu}
+                      onContextMenu={noopOpponentContextMenu}
                       onDblClick={noopDblClick}
                       onMouseEnter={handleMouseEnter}
                       onMouseLeave={handleMouseLeave}
@@ -1199,7 +1251,7 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
                               onDragStart={noopCardDrag}
                               onDragMove={noopDrag}
                               onDragEnd={noopCardDragEnd}
-                              onContextMenu={noopContextMenu}
+                              onContextMenu={handleCardContextMenu}
                               onDblClick={noopDblClick}
                               onMouseEnter={handleMouseEnter}
                               onMouseLeave={handleMouseLeave}
@@ -1275,7 +1327,7 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
                               onDragStart={noopCardDrag}
                               onDragMove={noopDrag}
                               onDragEnd={noopCardDragEnd}
-                              onContextMenu={noopContextMenu}
+                              onContextMenu={noopOpponentContextMenu}
                               onDblClick={noopDblClick}
                               onMouseEnter={handleMouseEnter}
                               onMouseLeave={handleMouseLeave}
@@ -1357,7 +1409,7 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
                       onDragStart={handleCardDragStart}
                       onDragMove={handleCardDragMove}
                       onDragEnd={handleCardDragEnd}
-                      onContextMenu={noopContextMenu}
+                      onContextMenu={handleCardContextMenu}
                       onDblClick={noopDblClick}
                       onMouseEnter={handleMouseEnter}
                       onMouseLeave={handleMouseLeave}
@@ -1475,6 +1527,19 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
             );
           })}
         </div>
+      )}
+
+      {/* ================================================================
+          Shared context menu — positioned relative to canvas container
+          ================================================================ */}
+      {contextMenu && (
+        <CardContextMenu
+          card={contextMenu.card}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          actions={multiplayerActions}
+          onClose={() => setContextMenu(null)}
+        />
       )}
     </>
   );
