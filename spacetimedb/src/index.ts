@@ -1,4 +1,5 @@
 import spacetimedb from './schema';
+export default spacetimedb;
 import { DisconnectTimeout, setDisconnectTimeoutReducer } from './schema';
 import { t, SenderError } from 'spacetimedb/server';
 import { ScheduleAt } from 'spacetimedb';
