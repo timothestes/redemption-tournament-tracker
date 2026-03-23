@@ -880,9 +880,13 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
     [endSelectionDrag, isSelectingRef],
   );
 
-  // ---- Don't render until we have dimensions and layout ----
+  // ---- Don't render canvas content until we have dimensions and layout ----
+  // NOTE: The container div MUST always render so the ref gets attached and
+  // ResizeObserver can measure it. Only the Stage content is gated.
   if (width === 0 || height === 0 || !layout) {
-    return null;
+    return (
+      <div ref={containerRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }} />
+    );
   }
 
   // Shorthand
