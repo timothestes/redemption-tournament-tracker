@@ -277,7 +277,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // ---------------------------------------------------------------------------
   const leftSidebar = (
     <div style={{
-      width: 'clamp(150px, 10vw, 220px)',
+      width: 'clamp(200px, 14vw, 280px)',
       flexShrink: 0,
       display: 'flex',
       flexDirection: 'column',

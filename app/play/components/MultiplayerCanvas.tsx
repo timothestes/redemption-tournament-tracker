@@ -198,6 +198,11 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
     [width],
   );
 
+  // Pile zone thumbnails at 60% of main card size to fit within sidebar slots
+  const pileCardScale = 0.6;
+  const pileCardWidth = Math.round(cardWidth * pileCardScale);
+  const pileCardHeight = Math.round(cardHeight * pileCardScale);
+
   // ---- Stage ref ----
   const stageRef = useRef<Konva.Stage>(null);
 
@@ -1200,7 +1205,7 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
             if (!zone) return null;
             const cards = myCards[zoneKey] ?? [];
             const count = cards.length;
-            const cx = zone.x + zone.width / 2 - cardWidth / 2;
+            const cx = zone.x + zone.width / 2 - pileCardWidth / 2;
             const cy = zone.y + 22;
 
             // For discard, show top card face-up; for everything else, card back
@@ -1230,7 +1235,7 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
                     {/* Shadow card for depth if multiple */}
                     {count > 1 && (
                       <Group x={-2} y={-2}>
-                        <CardBackShape width={cardWidth} height={cardHeight} />
+                        <CardBackShape width={pileCardWidth} height={pileCardHeight} />
                       </Group>
                     )}
                     {showFace && topCard ? (
@@ -1239,8 +1244,8 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
                         return img ? (
                           <Group>
                             <Rect
-                              width={cardWidth}
-                              height={cardHeight}
+                              width={pileCardWidth}
+                              height={pileCardHeight}
                               cornerRadius={4}
                             />
                             <GameCardNode
@@ -1248,8 +1253,8 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
                               x={0}
                               y={0}
                               rotation={0}
-                              cardWidth={cardWidth}
-                              cardHeight={cardHeight}
+                              cardWidth={pileCardWidth}
+                              cardHeight={pileCardHeight}
                               image={img}
                               isSelected={false}
                               isDraggable={false}
@@ -1264,11 +1269,11 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
                             />
                           </Group>
                         ) : (
-                          <CardBackShape width={cardWidth} height={cardHeight} />
+                          <CardBackShape width={pileCardWidth} height={pileCardHeight} />
                         );
                       })()
                     ) : (
-                      <CardBackShape width={cardWidth} height={cardHeight} />
+                      <CardBackShape width={pileCardWidth} height={pileCardHeight} />
                     )}
                   </Group>
                 )}
@@ -1284,7 +1289,7 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
             if (!zone) return null;
             const cards = opponentCards[zoneKey] ?? [];
             const count = cards.length;
-            const cx = zone.x + zone.width / 2 - cardWidth / 2;
+            const cx = zone.x + zone.width / 2 - pileCardWidth / 2;
             const cy = zone.y + 22;
 
             const topCard = cards[cards.length - 1];
@@ -1311,7 +1316,7 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
                   <Group x={cx} y={cy}>
                     {count > 1 && (
                       <Group x={-2} y={-2}>
-                        <CardBackShape width={cardWidth} height={cardHeight} />
+                        <CardBackShape width={pileCardWidth} height={pileCardHeight} />
                       </Group>
                     )}
                     {showFace && topCard ? (
@@ -1324,8 +1329,8 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
                               x={0}
                               y={0}
                               rotation={0}
-                              cardWidth={cardWidth}
-                              cardHeight={cardHeight}
+                              cardWidth={pileCardWidth}
+                              cardHeight={pileCardHeight}
                               image={img}
                               isSelected={false}
                               isDraggable={false}
@@ -1340,11 +1345,11 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
                             />
                           </Group>
                         ) : (
-                          <CardBackShape width={cardWidth} height={cardHeight} />
+                          <CardBackShape width={pileCardWidth} height={pileCardHeight} />
                         );
                       })()
                     ) : (
-                      <CardBackShape width={cardWidth} height={cardHeight} />
+                      <CardBackShape width={pileCardWidth} height={pileCardHeight} />
                     )}
                   </Group>
                 )}

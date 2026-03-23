@@ -89,6 +89,11 @@ function TestBoardCanvas() {
   const layout = calculateMirrorLayout(width, height);
   const { cardWidth, cardHeight } = getCardDimensions(width);
 
+  // Pile zone thumbnails at 60% of main card size to fit within sidebar slots
+  const pileCardScale = 0.6;
+  const pileCardWidth = Math.round(cardWidth * pileCardScale);
+  const pileCardHeight = Math.round(cardHeight * pileCardScale);
+
   // Render a single zone rectangle with label and count badge
   function renderZone(zone: { x: number; y: number; width: number; height: number; label: string }, key: string, isOpponent: boolean) {
     const count = ZONE_COUNTS[key] ?? 0;
@@ -159,10 +164,10 @@ function TestBoardCanvas() {
         {/* Sidebar pile — show a small card-back stack */}
         {isSidebar && count > 0 && (
           <Rect
-            x={zone.x + zone.width / 2 - cardWidth / 2}
-            y={zone.y + zone.height / 2 - cardHeight / 2}
-            width={cardWidth}
-            height={cardHeight}
+            x={zone.x + zone.width / 2 - pileCardWidth / 2}
+            y={zone.y + zone.height / 2 - pileCardHeight / 2}
+            width={pileCardWidth}
+            height={pileCardHeight}
             fill="rgba(42, 31, 20, 0.9)"
             stroke="rgba(196, 149, 90, 0.4)"
             strokeWidth={1}
@@ -289,7 +294,7 @@ export default function PlayTestPage() {
       {/* Left sidebar */}
       <div
         style={{
-          width: 'clamp(150px, 10vw, 220px)',
+          width: 'clamp(200px, 14vw, 280px)',
           flexShrink: 0,
           display: 'flex',
           flexDirection: 'column',

@@ -4,17 +4,17 @@
  * Visual structure (top = opponent, bottom = you):
  *
  * ┌──────────────────────────────────────┬───────────────────┐
- * │ Opponent Hand (~7%)                   (full width)       │
+ * │ Opponent Hand (~10%)                  (full width)       │
  * ├──────────────────────────────────────┬───────────────────┤
- * │ Opponent LOB (~25% of half)          │ Opp inline piles  │
+ * │ Opponent LOB (~30% of half)          │ Opp inline piles  │
  * ├──────────────────────────────────────┤ (Dis,Deck,Res,    │
- * │ Opponent Territory (~75% of half)    │  Ban,LOR) ~12%    │
+ * │ Opponent Territory (~70% of half)    │  Ban,LOR) ~15%    │
  * ├══════════════════════════════════════╪═══════════════════┤
- * │ Your Territory (~75% of half)        │ Your inline piles │
+ * │ Your Territory (~70% of half)        │ Your inline piles │
  * ├──────────────────────────────────────┤ (LOR,Ban,Res,     │
- * │ Your LOB (~25% of half)             │  Deck,Dis) ~12%   │
+ * │ Your LOB (~30% of half)             │  Deck,Dis) ~15%   │
  * ├──────────────────────────────────────┴───────────────────┤
- * │ Your Hand (~7%)                       (full width)       │
+ * │ Your Hand (~10%)                      (full width)       │
  * ├──────────────────────────────────────────────────────────┤
  * │ Phase Bar (~5%)                       (full width)       │
  * └──────────────────────────────────────────────────────────┘
@@ -44,7 +44,7 @@ export interface MirrorLayout {
 }
 
 /** Card dimensions as a proportion of stage width. */
-const CARD_WIDTH_RATIO = 0.052;
+const CARD_WIDTH_RATIO = 0.07;
 const CARD_ASPECT_RATIO = 1.4;
 
 /**
@@ -75,15 +75,15 @@ export function calculateMirrorLayout(
 ): MirrorLayout {
   // ── Row heights ──────────────────────────────────────────────────────
   const phaseBarHeight = Math.round(stageHeight * 0.05);
-  const handHeight = Math.round(stageHeight * 0.07);
+  const handHeight = Math.round(stageHeight * 0.10);
   const playAreaHeight = stageHeight - phaseBarHeight - handHeight * 2;
   const halfPlayHeight = Math.round(playAreaHeight / 2);
 
-  const lobHeight = Math.round(halfPlayHeight * 0.25);
+  const lobHeight = Math.round(halfPlayHeight * 0.30);
   const territoryHeight = halfPlayHeight - lobHeight;
 
   // ── Column widths ────────────────────────────────────────────────────
-  const pileColumnWidth = Math.round(stageWidth * 0.12);
+  const pileColumnWidth = Math.round(stageWidth * 0.15);
   const mainWidth = stageWidth - pileColumnWidth;
 
   // ── Y anchors — OPPONENT: Hand → LOB → Territory ────────────────────
