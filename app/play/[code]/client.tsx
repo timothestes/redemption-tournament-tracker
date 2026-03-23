@@ -309,7 +309,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       return (
         <div style={{ display: 'flex', width: '100vw', height: '100dvh' }}>
           {leftSidebar}
-          <div style={{ flex: 1, position: 'relative', pointerEvents: 'none' }}>
+          <div style={{ flex: 1, position: 'relative', overflow: 'hidden', pointerEvents: 'none' }}>
             <MultiplayerCanvas gameId={gameId} onHoveredCardChange={setHoveredCard} />
             <GameOverOverlay
               game={gameState.game}
@@ -326,7 +326,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     return (
       <div style={{ display: 'flex', width: '100vw', height: '100dvh' }}>
         {leftSidebar}
-        <div style={{ flex: 1, position: 'relative' }}>
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           <GameOverOverlay
             game={gameState.game}
             myPlayer={gameState.myPlayer}
@@ -345,7 +345,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       {leftSidebar}
 
       {/* Game canvas — takes remaining width */}
-      <div style={{ flex: 1, position: 'relative' }}>
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
         {gameId !== null && (
           <MultiplayerCanvas gameId={gameId} onHoveredCardChange={setHoveredCard} />
         )}
