@@ -139,43 +139,42 @@ export default function ChatPanel({
   };
 
   return (
-    <>
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      flex: 1,
+      overflow: 'hidden',
+      fontFamily: 'var(--font-geist-sans, system-ui, sans-serif)',
+    }}>
       {/* ================================================================
-          Toggle button — always visible at right edge of screen
+          Toggle button — horizontal row in the sidebar
           ================================================================ */}
       <button
         onClick={togglePanel}
         aria-label={isOpen ? 'Close chat panel' : 'Open chat panel'}
         style={{
-          position: 'fixed',
-          right: isOpen ? 322 : 0,
-          top: '50%',
-          transform: 'translateY(-50%)',
-          zIndex: 400,
-          background: 'rgba(15, 12, 8, 0.95)',
-          border: '1px solid rgba(107, 78, 39, 0.5)',
-          borderRight: isOpen ? '1px solid rgba(107, 78, 39, 0.5)' : 'none',
-          borderRadius: isOpen ? '6px 0 0 6px' : '6px 0 0 6px',
+          width: '100%',
+          padding: '8px 12px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          background: isOpen ? 'rgba(196, 149, 90, 0.08)' : 'transparent',
+          border: 'none',
+          borderBottom: '1px solid rgba(107, 78, 39, 0.2)',
           color: '#e8d5a3',
           cursor: 'pointer',
-          padding: '10px 8px',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 4,
-          transition: 'right 0.25s ease',
-          writingMode: 'vertical-rl',
           fontSize: 11,
           letterSpacing: '0.08em',
           textTransform: 'uppercase',
-          fontFamily: 'var(--font-geist-sans, system-ui, sans-serif)',
+          fontFamily: 'inherit',
+          flexShrink: 0,
         }}
       >
         {/* Chat bubble icon */}
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
+          width="14"
+          height="14"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -183,7 +182,7 @@ export default function ChatPanel({
           strokeLinecap="round"
           strokeLinejoin="round"
           aria-hidden="true"
-          style={{ flexShrink: 0, rotate: '90deg' }}
+          style={{ flexShrink: 0 }}
         >
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
         </svg>
@@ -204,342 +203,316 @@ export default function ChatPanel({
               alignItems: 'center',
               justifyContent: 'center',
               padding: '0 3px',
-              writingMode: 'horizontal-tb',
-              letterSpacing: 0,
+              marginLeft: 'auto',
             }}
           >
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
+        {/* Chevron indicator */}
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+          style={{
+            flexShrink: 0,
+            marginLeft: unreadCount > 0 ? 0 : 'auto',
+            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.15s ease',
+          }}
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
       </button>
 
       {/* ================================================================
-          Slide-out panel
+          Panel content — conditionally rendered when open
           ================================================================ */}
-      <div
-        role="complementary"
-        aria-label="Chat and game log panel"
-        style={{
-          position: 'fixed',
-          top: 0,
-          right: isOpen ? 0 : -320,
-          width: 320,
-          height: '100dvh',
-          zIndex: 399,
-          display: 'flex',
-          flexDirection: 'column',
-          background: 'rgba(10, 8, 5, 0.97)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          borderLeft: '1px solid rgba(107, 78, 39, 0.4)',
-          transition: 'right 0.25s ease',
-          fontFamily: 'var(--font-geist-sans, system-ui, sans-serif)',
-        }}
-      >
-        {/* ---- Header ---- */}
+      {isOpen && (
         <div
+          role="complementary"
+          aria-label="Chat and game log panel"
           style={{
+            flex: 1,
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '10px 12px',
-            borderBottom: '1px solid rgba(107, 78, 39, 0.3)',
-            flexShrink: 0,
+            flexDirection: 'column',
+            overflow: 'hidden',
+            background: 'rgba(10, 8, 5, 0.97)',
           }}
         >
-          {/* Tabs */}
-          <div style={{ display: 'flex', gap: 4 }}>
-            {(['chat', 'log'] as const).map((tab) => {
-              const isActive = activeTab === tab;
-              return (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  style={{
-                    padding: '4px 12px',
-                    background: isActive ? 'rgba(196, 149, 90, 0.12)' : 'transparent',
-                    border: `1px solid ${isActive ? 'rgba(196, 149, 90, 0.45)' : 'transparent'}`,
-                    borderRadius: 20,
-                    cursor: 'pointer',
-                    fontSize: 11,
-                    letterSpacing: '0.07em',
-                    textTransform: 'uppercase',
-                    color: isActive ? '#e8d5a3' : 'rgba(232, 213, 163, 0.4)',
-                    fontFamily: 'inherit',
-                    transition: 'color 0.15s, background 0.15s, border-color 0.15s',
-                  }}
-                >
-                  {tab === 'chat' ? 'Chat' : 'Game Log'}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Close button */}
-          <button
-            onClick={() => setIsOpen(false)}
-            aria-label="Close panel"
+          {/* ---- Header with tabs ---- */}
+          <div
             style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'rgba(232, 213, 163, 0.5)',
-              cursor: 'pointer',
-              padding: 4,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              borderRadius: 4,
-              transition: 'color 0.15s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = '#e8d5a3';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = 'rgba(232, 213, 163, 0.5)';
+              padding: '6px 8px',
+              borderBottom: '1px solid rgba(107, 78, 39, 0.3)',
+              flexShrink: 0,
             }}
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
+            {/* Tabs */}
+            <div style={{ display: 'flex', gap: 4 }}>
+              {(['chat', 'log'] as const).map((tab) => {
+                const isActive = activeTab === tab;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    style={{
+                      padding: '3px 10px',
+                      background: isActive ? 'rgba(196, 149, 90, 0.12)' : 'transparent',
+                      border: `1px solid ${isActive ? 'rgba(196, 149, 90, 0.45)' : 'transparent'}`,
+                      borderRadius: 20,
+                      cursor: 'pointer',
+                      fontSize: 10,
+                      letterSpacing: '0.07em',
+                      textTransform: 'uppercase',
+                      color: isActive ? '#e8d5a3' : 'rgba(232, 213, 163, 0.4)',
+                      fontFamily: 'inherit',
+                      transition: 'color 0.15s, background 0.15s, border-color 0.15s',
+                    }}
+                  >
+                    {tab === 'chat' ? 'Chat' : 'Log'}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-        {/* ---- Tab: Chat ---- */}
-        {activeTab === 'chat' && (
-          <>
-            {/* Message list */}
+          {/* ---- Tab: Chat ---- */}
+          {activeTab === 'chat' && (
+            <>
+              {/* Message list */}
+              <div
+                style={{
+                  flex: 1,
+                  overflowY: 'auto',
+                  padding: '8px 8px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                }}
+              >
+                {chatMessages.length === 0 && (
+                  <p
+                    style={{
+                      color: 'rgba(232, 213, 163, 0.3)',
+                      fontSize: 11,
+                      textAlign: 'center',
+                      marginTop: 16,
+                      fontStyle: 'italic',
+                    }}
+                  >
+                    No messages yet.
+                  </p>
+                )}
+                {chatMessages.map((msg) => {
+                  const isMe = msg.senderId === myPlayerId;
+                  const senderName =
+                    playerNames[msg.senderId.toString()] ??
+                    (isMe ? 'You' : `Player ${msg.senderId}`);
+                  const time = formatTimestamp(msg.sentAt.microsSinceUnixEpoch);
+
+                  return (
+                    <div
+                      key={msg.id.toString()}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: isMe ? 'flex-end' : 'flex-start',
+                      }}
+                    >
+                      {/* Sender + time */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: 4,
+                          alignItems: 'baseline',
+                          marginBottom: 2,
+                          flexDirection: isMe ? 'row-reverse' : 'row',
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontWeight: 700,
+                            fontSize: 10,
+                            color: isMe ? '#c4955a' : '#4a7ab5',
+                            letterSpacing: '0.02em',
+                          }}
+                        >
+                          {senderName}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 9,
+                            color: 'rgba(232, 213, 163, 0.3)',
+                            fontVariantNumeric: 'tabular-nums',
+                          }}
+                        >
+                          {time}
+                        </span>
+                      </div>
+
+                      {/* Bubble */}
+                      <div
+                        style={{
+                          maxWidth: '90%',
+                          padding: '4px 8px',
+                          borderRadius: isMe ? '10px 10px 3px 10px' : '10px 10px 10px 3px',
+                          background: isMe
+                            ? 'rgba(196, 149, 90, 0.14)'
+                            : 'rgba(255, 255, 255, 0.06)',
+                          border: isMe
+                            ? '1px solid rgba(196, 149, 90, 0.3)'
+                            : '1px solid rgba(255, 255, 255, 0.08)',
+                          fontSize: 12,
+                          color: '#e8d5a3',
+                          lineHeight: 1.4,
+                          wordBreak: 'break-word',
+                        }}
+                      >
+                        {msg.text}
+                      </div>
+                    </div>
+                  );
+                })}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Input row */}
+              <div
+                style={{
+                  padding: '6px 8px',
+                  borderTop: '1px solid rgba(107, 78, 39, 0.3)',
+                  display: 'flex',
+                  gap: 4,
+                  flexShrink: 0,
+                }}
+              >
+                <input
+                  type="text"
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Message..."
+                  maxLength={500}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid rgba(107, 78, 39, 0.35)',
+                    borderRadius: 4,
+                    padding: '5px 8px',
+                    color: '#e8d5a3',
+                    fontSize: 12,
+                    fontFamily: 'inherit',
+                    outline: 'none',
+                  }}
+                  aria-label="Chat message"
+                />
+                <button
+                  onClick={handleSend}
+                  disabled={!inputText.trim()}
+                  aria-label="Send message"
+                  style={{
+                    padding: '5px 8px',
+                    background:
+                      inputText.trim()
+                        ? 'rgba(196, 149, 90, 0.18)'
+                        : 'rgba(255, 255, 255, 0.04)',
+                    border: `1px solid ${inputText.trim() ? 'rgba(196, 149, 90, 0.5)' : 'rgba(107, 78, 39, 0.2)'}`,
+                    borderRadius: 4,
+                    color: inputText.trim() ? '#e8d5a3' : 'rgba(232, 213, 163, 0.3)',
+                    cursor: inputText.trim() ? 'pointer' : 'default',
+                    fontSize: 10,
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    fontFamily: 'inherit',
+                    transition: 'background 0.15s, color 0.15s, border-color 0.15s',
+                    flexShrink: 0,
+                  }}
+                >
+                  Send
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* ---- Tab: Game Log ---- */}
+          {activeTab === 'log' && (
             <div
               style={{
                 flex: 1,
                 overflowY: 'auto',
-                padding: '10px 12px',
+                padding: '8px 8px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 10,
+                gap: 4,
               }}
             >
-              {chatMessages.length === 0 && (
+              {gameActions.length === 0 && (
                 <p
                   style={{
                     color: 'rgba(232, 213, 163, 0.3)',
-                    fontSize: 12,
+                    fontSize: 11,
                     textAlign: 'center',
-                    marginTop: 24,
+                    marginTop: 16,
                     fontStyle: 'italic',
                   }}
                 >
-                  No messages yet.
+                  No actions yet.
                 </p>
               )}
-              {chatMessages.map((msg) => {
-                const isMe = msg.senderId === myPlayerId;
-                const senderName =
-                  playerNames[msg.senderId.toString()] ??
-                  (isMe ? 'You' : `Player ${msg.senderId}`);
-                const time = formatTimestamp(msg.sentAt.microsSinceUnixEpoch);
+              {gameActions.map((action) => {
+                const playerName =
+                  playerNames[action.playerId.toString()] ??
+                  `Player ${action.playerId}`;
+                const verb = formatActionType(action.actionType);
+                const time = formatTimestamp(action.timestamp.microsSinceUnixEpoch);
+                const turn = Number(action.turnNumber);
 
                 return (
                   <div
-                    key={msg.id.toString()}
+                    key={action.id.toString()}
                     style={{
                       display: 'flex',
                       flexDirection: 'column',
-                      alignItems: isMe ? 'flex-end' : 'flex-start',
+                      gap: 1,
+                      padding: '4px 6px',
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      borderRadius: 4,
+                      borderLeft: '2px solid rgba(107, 78, 39, 0.3)',
                     }}
                   >
-                    {/* Sender + time */}
-                    <div
+                    <span style={{ fontSize: 11, color: '#c8b882', lineHeight: 1.35 }}>
+                      <strong style={{ color: '#e8d5a3' }}>{playerName}</strong>{' '}
+                      {verb}
+                    </span>
+                    <span
                       style={{
-                        display: 'flex',
-                        gap: 6,
-                        alignItems: 'baseline',
-                        marginBottom: 3,
-                        flexDirection: isMe ? 'row-reverse' : 'row',
+                        fontSize: 9,
+                        color: 'rgba(232, 213, 163, 0.3)',
+                        fontVariantNumeric: 'tabular-nums',
                       }}
                     >
-                      <span
-                        style={{
-                          fontWeight: 700,
-                          fontSize: 11,
-                          color: isMe ? '#c4955a' : '#4a7ab5',
-                          letterSpacing: '0.02em',
-                        }}
-                      >
-                        {senderName}
-                      </span>
-                      <span
-                        style={{
-                          fontSize: 10,
-                          color: 'rgba(232, 213, 163, 0.3)',
-                          fontVariantNumeric: 'tabular-nums',
-                        }}
-                      >
-                        {time}
-                      </span>
-                    </div>
-
-                    {/* Bubble */}
-                    <div
-                      style={{
-                        maxWidth: '85%',
-                        padding: '6px 10px',
-                        borderRadius: isMe ? '12px 12px 4px 12px' : '12px 12px 12px 4px',
-                        background: isMe
-                          ? 'rgba(196, 149, 90, 0.14)'
-                          : 'rgba(255, 255, 255, 0.06)',
-                        border: isMe
-                          ? '1px solid rgba(196, 149, 90, 0.3)'
-                          : '1px solid rgba(255, 255, 255, 0.08)',
-                        fontSize: 13,
-                        color: '#e8d5a3',
-                        lineHeight: 1.45,
-                        wordBreak: 'break-word',
-                      }}
-                    >
-                      {msg.text}
-                    </div>
+                      T{turn} · {action.phase} · {time}
+                    </span>
                   </div>
                 );
               })}
-              <div ref={chatEndRef} />
+              <div ref={logEndRef} />
             </div>
-
-            {/* Input row */}
-            <div
-              style={{
-                padding: '10px 12px',
-                borderTop: '1px solid rgba(107, 78, 39, 0.3)',
-                display: 'flex',
-                gap: 8,
-                flexShrink: 0,
-              }}
-            >
-              <input
-                type="text"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Send a message…"
-                maxLength={500}
-                style={{
-                  flex: 1,
-                  background: 'rgba(255, 255, 255, 0.06)',
-                  border: '1px solid rgba(107, 78, 39, 0.35)',
-                  borderRadius: 6,
-                  padding: '7px 10px',
-                  color: '#e8d5a3',
-                  fontSize: 13,
-                  fontFamily: 'inherit',
-                  outline: 'none',
-                }}
-                aria-label="Chat message"
-              />
-              <button
-                onClick={handleSend}
-                disabled={!inputText.trim()}
-                aria-label="Send message"
-                style={{
-                  padding: '7px 12px',
-                  background:
-                    inputText.trim()
-                      ? 'rgba(196, 149, 90, 0.18)'
-                      : 'rgba(255, 255, 255, 0.04)',
-                  border: `1px solid ${inputText.trim() ? 'rgba(196, 149, 90, 0.5)' : 'rgba(107, 78, 39, 0.2)'}`,
-                  borderRadius: 6,
-                  color: inputText.trim() ? '#e8d5a3' : 'rgba(232, 213, 163, 0.3)',
-                  cursor: inputText.trim() ? 'pointer' : 'default',
-                  fontSize: 11,
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                  fontFamily: 'inherit',
-                  transition: 'background 0.15s, color 0.15s, border-color 0.15s',
-                  flexShrink: 0,
-                }}
-              >
-                Send
-              </button>
-            </div>
-          </>
-        )}
-
-        {/* ---- Tab: Game Log ---- */}
-        {activeTab === 'log' && (
-          <div
-            style={{
-              flex: 1,
-              overflowY: 'auto',
-              padding: '10px 12px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 6,
-            }}
-          >
-            {gameActions.length === 0 && (
-              <p
-                style={{
-                  color: 'rgba(232, 213, 163, 0.3)',
-                  fontSize: 12,
-                  textAlign: 'center',
-                  marginTop: 24,
-                  fontStyle: 'italic',
-                }}
-              >
-                No actions yet.
-              </p>
-            )}
-            {gameActions.map((action) => {
-              const playerName =
-                playerNames[action.playerId.toString()] ??
-                `Player ${action.playerId}`;
-              const verb = formatActionType(action.actionType);
-              const time = formatTimestamp(action.timestamp.microsSinceUnixEpoch);
-              const turn = Number(action.turnNumber);
-
-              return (
-                <div
-                  key={action.id.toString()}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 1,
-                    padding: '5px 8px',
-                    background: 'rgba(255, 255, 255, 0.03)',
-                    borderRadius: 5,
-                    borderLeft: '2px solid rgba(107, 78, 39, 0.3)',
-                  }}
-                >
-                  <span style={{ fontSize: 12, color: '#c8b882', lineHeight: 1.4 }}>
-                    <strong style={{ color: '#e8d5a3' }}>{playerName}</strong>{' '}
-                    {verb}
-                  </span>
-                  <span
-                    style={{
-                      fontSize: 10,
-                      color: 'rgba(232, 213, 163, 0.3)',
-                      fontVariantNumeric: 'tabular-nums',
-                    }}
-                  >
-                    Turn {turn} · {action.phase} · {time}
-                  </span>
-                </div>
-              );
-            })}
-            <div ref={logEndRef} />
-          </div>
-        )}
-      </div>
-    </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
