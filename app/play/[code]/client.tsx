@@ -1,10 +1,17 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useSpacetimeConnection } from '@/app/play/hooks/useSpacetimeConnection';
 import { SpacetimeProvider } from '@/app/play/lib/spacetimedb-provider';
 import { useGameState } from '@/app/play/hooks/useGameState';
 import { useSpacetimeDB } from 'spacetimedb/react';
+
+// Konva requires browser APIs — lazy-load to avoid SSR issues
+const MultiplayerCanvas = dynamic(
+  () => import('@/app/play/components/MultiplayerCanvas'),
+  { ssr: false },
+);
 
 // ---------------------------------------------------------------------------
 // Session storage key for lobby-provided game params
@@ -228,13 +235,10 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     );
   }
 
-  // lifecycle === 'playing' — game canvas placeholder (Task 14)
+  // lifecycle === 'playing' — render the multiplayer canvas
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="rounded-lg border border-border p-8 text-center">
-        <p className="font-mono text-xs text-muted-foreground mb-1">Code: {code}</p>
-        <p className="text-sm text-foreground">Game in progress - Canvas coming in Task 14</p>
-      </div>
+    <div className="h-screen w-screen overflow-hidden bg-background">
+      {gameId !== null && <MultiplayerCanvas gameId={gameId} />}
     </div>
   );
 }
