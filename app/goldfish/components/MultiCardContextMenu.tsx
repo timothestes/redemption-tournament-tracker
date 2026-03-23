@@ -130,7 +130,7 @@ export function MultiCardContextMenu({ selectedIds, x, y, onClose, onClearSelect
 
   const meekCount = selectedCards.filter(c => c.isMeek).length;
   const flippedCount = selectedCards.filter(c => c.isFlipped).length;
-  const allTokens = selectedCards.length > 0 && selectedCards.every(c => c.ownerId === 'player2');
+  const allTokens = selectedCards.length > 0 && selectedCards.every(c => c.isToken);
 
   const hoverHandlers = {
     onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.background = 'var(--gf-hover)'; },

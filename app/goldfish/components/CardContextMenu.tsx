@@ -5,7 +5,7 @@ import { useGame } from '../state/GameContext';
 import { GameCard, ZoneId, ZONE_LABELS, COUNTER_COLORS, CounterColorId } from '../types';
 
 function isOpponentToken(card: GameCard): boolean {
-  return card.ownerId === 'player2';
+  return card.isToken;
 }
 
 const MOVE_TARGETS: ZoneId[] = [

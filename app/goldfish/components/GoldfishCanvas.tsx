@@ -280,7 +280,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
     // Tokens dragged onto deck are silently removed
     const allCards = Object.values(state.zones).flat();
     const card = allCards.find(c => c.instanceId === cardInstanceId);
-    if (card?.ownerId === 'player2') {
+    if (card?.isToken) {
       removeOpponentToken(cardInstanceId);
       return;
     }
