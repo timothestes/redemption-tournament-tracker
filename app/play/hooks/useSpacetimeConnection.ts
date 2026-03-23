@@ -32,7 +32,7 @@ export function useSpacetimeConnection() {
       DbConnection.builder()
         .withUri(SPACETIMEDB_HOST)
         .withDatabaseName(SPACETIMEDB_DB_NAME)
-        .withToken(localStorage.getItem(TOKEN_KEY) || undefined)
+        .withToken((typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null) || undefined)
         .onConnect(onConnect)
         .onDisconnect(onDisconnect)
         .onConnectError(onConnectError),
