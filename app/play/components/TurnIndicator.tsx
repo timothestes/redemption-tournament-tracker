@@ -26,6 +26,7 @@ interface TurnIndicatorProps {
   onSetPhase: (phase: string) => void;
   onEndTurn: () => void;
   onDrawCard: () => void;
+  onRollDice: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -40,6 +41,7 @@ export default function TurnIndicator({
   onSetPhase,
   onEndTurn,
   onDrawCard,
+  onRollDice,
 }: TurnIndicatorProps) {
   const currentPhase: string = game?.currentPhase ?? 'draw';
   const turnNumber: number = game?.turnNumber ? Number(game.turnNumber) : 1;
@@ -210,6 +212,37 @@ export default function TurnIndicator({
           justifyContent: 'flex-end',
         }}
       >
+        {/* Roll Dice button — available to both players at any time */}
+        <button
+          onClick={onRollDice}
+          title="Roll d20 (shared with opponent)"
+          style={{
+            padding: '5px 10px',
+            background: 'transparent',
+            border: '1px solid rgba(107, 78, 39, 0.4)',
+            borderRadius: 4,
+            cursor: 'pointer',
+            fontFamily: 'var(--font-cinzel), Georgia, serif',
+            fontSize: 10,
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+            color: 'rgba(196, 149, 90, 0.6)',
+            transition: 'background 0.15s, color 0.15s, border-color 0.15s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(196, 149, 90, 0.1)';
+            e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.55)';
+            e.currentTarget.style.color = '#e8d5a3';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+            e.currentTarget.style.borderColor = 'rgba(107, 78, 39, 0.4)';
+            e.currentTarget.style.color = 'rgba(196, 149, 90, 0.6)';
+          }}
+        >
+          d20
+        </button>
+
         {/* Draw button */}
         <button
           onClick={isMyTurn ? onDrawCard : undefined}

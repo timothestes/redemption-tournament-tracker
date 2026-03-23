@@ -24,6 +24,8 @@ import type {
   CardInstance,
   CardCounter,
 } from '@/lib/spacetimedb/module_bindings/types';
+import TurnIndicator from './TurnIndicator';
+import DiceOverlay from './DiceOverlay';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -1315,6 +1317,30 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       {/* ================================================================
           Zone highlight overlay during drag
           ================================================================ */}
+      {/* ================================================================
+          Turn Indicator + game controls bar (fixed bottom overlay)
+          ================================================================ */}
+      <TurnIndicator
+        game={gameState.game}
+        myPlayer={gameState.myPlayer}
+        opponentPlayer={gameState.opponentPlayer}
+        isMyTurn={gameState.isMyTurn}
+        onSetPhase={gameState.setPhase}
+        onEndTurn={gameState.endTurn}
+        onDrawCard={gameState.drawCard}
+        onRollDice={() => gameState.rollDice(BigInt(20))}
+      />
+
+      {/* ================================================================
+          Dice roll overlay — synced via lastDiceRoll field from SpacetimeDB
+          ================================================================ */}
+      <DiceOverlay
+        lastDiceRoll={gameState.game?.lastDiceRoll ?? ''}
+        myPlayer={gameState.myPlayer}
+        opponentPlayer={gameState.opponentPlayer}
+        identityHex={gameState.identityHex}
+      />
+
       {dragHoverZone !== null && (
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 450 }}>
           {allZoneRects.map(({ key, rect, owner }) => {
