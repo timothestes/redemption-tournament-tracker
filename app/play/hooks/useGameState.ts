@@ -97,11 +97,8 @@ export function useGameState(gameId: bigint): GameState {
   const [allSpectators, spectatorsLoading] = useTable(tables.Spectator) as [SpectatorRow[], boolean];
 
   // useTable returns [rows, subscribeApplied] where subscribeApplied=true means data is ready
-  // So isLoading = NOT all applied yet
-  const isLoading = !(
-    gamesLoading && playersLoading && cardsLoading && countersLoading &&
-    chatLoading && actionsLoading && spectatorsLoading
-  );
+  // Only require core tables (game, player, cards) — chat/actions/spectators can load async
+  const isLoading = !(gamesLoading && playersLoading && cardsLoading);
 
   // ---------------------------------------------------------------------------
   // Derived state
