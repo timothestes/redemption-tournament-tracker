@@ -93,17 +93,28 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     if ((!isConnected && !isActive) || !conn || didSubscribe.current) return;
     didSubscribe.current = true;
     try {
-      // Debug: log what conn actually is
-      console.log('conn type:', typeof conn, 'keys:', conn ? Object.getOwnPropertyNames(Object.getPrototypeOf(conn)) : 'null');
-      console.log('conn methods:', conn ? Object.keys(conn) : 'null');
-      // Try various subscription API patterns
-      if (typeof conn.subscribeToAllTables === 'function') {
+      // Debug: walk the prototype chain to find all methods
+      const proto = Object.getPrototypeOf(conn);
+      const proto2 = proto ? Object.getPrototypeOf(proto) : null;
+      const proto3 = proto2 ? Object.getPrototypeOf(proto2) : null;
+      console.log('conn proto names:', proto ? Object.getOwnPropertyNames(proto) : 'none');
+      console.log('conn proto2 names:', proto2 ? Object.getOwnPropertyNames(proto2) : 'none');
+      console.log('conn proto3 names:', proto3 ? Object.getOwnPropertyNames(proto3) : 'none');
+      console.log('conn.db:', conn.db);
+      console.log('conn.reducers:', conn.reducers);
+      console.log('isActive:', isActive);
+      console.log('spacetimeCtx keys:', Object.keys(spacetimeCtx));
+
+      // The connection is managed by the provider. Try using subscriptionBuilder from the generated DbConnection
+      if (typeof conn.subscriptionBuilder === 'function') {
+        conn.subscriptionBuilder().subscribeToAll();
+      } else if (typeof conn.subscribeToAllTables === 'function') {
         conn.subscribeToAllTables();
       } else if (typeof conn.subscribe === 'function') {
-        const tables = ['game', 'player', 'card_instance', 'card_counter', 'game_action', 'chat_message', 'spectator', 'disconnect_timeout'];
-        conn.subscribe(tables.map((t: string) => `SELECT * FROM ${t}`));
+        const tbl = ['game', 'player', 'card_instance', 'card_counter', 'game_action', 'chat_message', 'spectator', 'disconnect_timeout'];
+        conn.subscribe(tbl.map((t: string) => `SELECT * FROM ${t}`));
       } else {
-        console.error('No subscribe method found on conn:', conn);
+        console.error('No subscribe method found. conn:', conn, 'proto:', proto ? Object.getOwnPropertyNames(proto) : 'none');
       }
     } catch (e) {
       console.error('Failed to subscribe:', e);
