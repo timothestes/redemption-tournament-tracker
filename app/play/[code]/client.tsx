@@ -86,6 +86,18 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [gameId, setGameId] = useState<bigint | null>(null);
   const didCallReducer = useRef(false);
+  const didSubscribe = useRef(false);
+
+  // Subscribe to all tables once connected
+  useEffect(() => {
+    if ((!isConnected && !isActive) || !conn || didSubscribe.current) return;
+    didSubscribe.current = true;
+    try {
+      conn.subscriptionBuilder().subscribeToAll();
+    } catch (e) {
+      console.error('Failed to subscribe:', e);
+    }
+  }, [isConnected, isActive, conn]);
 
   // Read session storage params set by the lobby page
   const [gameParams] = useState<GameParams | null>(() => {
