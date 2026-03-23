@@ -96,18 +96,12 @@ export function useGameState(gameId: bigint): GameState {
   const [allActions, actionsLoading] = useTable(tables.GameAction) as [GameActionRow[], boolean];
   const [allSpectators, spectatorsLoading] = useTable(tables.Spectator) as [SpectatorRow[], boolean];
 
-  // Debug: log what useTable actually returns
-  if (typeof window !== 'undefined') {
-    console.log('useTable raw returns:', {
-      games: [allGames?.length, gamesLoading],
-      players: [allPlayers?.length, playersLoading],
-      cards: [allCards?.length, cardsLoading],
-    });
-  }
-
-  const isLoading =
-    gamesLoading || playersLoading || cardsLoading || countersLoading ||
-    chatLoading || actionsLoading || spectatorsLoading;
+  // useTable returns [rows, subscribeApplied] where subscribeApplied=true means data is ready
+  // So isLoading = NOT all applied yet
+  const isLoading = !(
+    gamesLoading && playersLoading && cardsLoading && countersLoading &&
+    chatLoading && actionsLoading && spectatorsLoading
+  );
 
   // ---------------------------------------------------------------------------
   // Derived state
