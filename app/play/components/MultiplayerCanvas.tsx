@@ -198,10 +198,12 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
     [width],
   );
 
-  // Pile zone thumbnails at 60% of main card size to fit within sidebar slots
-  const pileCardScale = 0.6;
-  const pileCardWidth = Math.round(cardWidth * pileCardScale);
-  const pileCardHeight = Math.round(cardHeight * pileCardScale);
+  // Pile zone thumbnails — dynamically sized to fit within actual pile slot height
+  const samplePileZone = layout?.myZones?.['deck'];
+  const pileSlotHeight = samplePileZone?.height ?? 60;
+  // Leave 28px for count badge (18px) + padding above and below
+  const pileCardHeight = Math.min(Math.round(cardHeight * 0.6), Math.max(30, pileSlotHeight - 28));
+  const pileCardWidth = Math.round(pileCardHeight / 1.4);
 
   // ---- Stage ref ----
   const stageRef = useRef<Konva.Stage>(null);
@@ -1128,8 +1130,15 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
           {FREE_FORM_ZONES.map((zoneKey) => {
             const cards = myCards[zoneKey];
             if (!cards || cards.length === 0) return null;
+            const zone = myZones[zoneKey];
             return (
-              <Group key={`my-cards-${zoneKey}`}>
+              <Group
+                key={`my-cards-${zoneKey}`}
+                clipX={zone?.x ?? 0}
+                clipY={zone?.y ?? 0}
+                clipWidth={zone?.width ?? width}
+                clipHeight={zone?.height ?? height}
+              >
                 {cards.map((card) => {
                   const gameCard = adaptCard(card, 'player1');
                   const x = card.posX ? parseFloat(card.posX) : (myZones[zoneKey]?.x ?? 0) + 20;
@@ -1168,8 +1177,15 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
           {FREE_FORM_ZONES.map((zoneKey) => {
             const cards = opponentCards[zoneKey];
             if (!cards || cards.length === 0) return null;
+            const zone = opponentZones[zoneKey];
             return (
-              <Group key={`opp-cards-${zoneKey}`}>
+              <Group
+                key={`opp-cards-${zoneKey}`}
+                clipX={zone?.x ?? 0}
+                clipY={zone?.y ?? 0}
+                clipWidth={zone?.width ?? width}
+                clipHeight={zone?.height ?? height}
+              >
                 {cards.map((card) => {
                   const gameCard = adaptCard(card, 'player2');
                   const x = card.posX ? parseFloat(card.posX) : (opponentZones[zoneKey]?.x ?? 0) + 20;
@@ -1210,7 +1226,8 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
             const cards = myCards[zoneKey] ?? [];
             const count = cards.length;
             const cx = zone.x + zone.width / 2 - pileCardWidth / 2;
-            const cy = zone.y + 22;
+            // Center card vertically in remaining space after count badge (20px top)
+            const cy = zone.y + 20 + Math.max(0, (zone.height - 20 - pileCardHeight) / 2);
 
             // For discard, show top card face-up; for everything else, card back
             const topCard = cards[cards.length - 1];
@@ -1294,7 +1311,8 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
             const cards = opponentCards[zoneKey] ?? [];
             const count = cards.length;
             const cx = zone.x + zone.width / 2 - pileCardWidth / 2;
-            const cy = zone.y + 22;
+            // Center card vertically in remaining space after count badge (20px top)
+            const cy = zone.y + 20 + Math.max(0, (zone.height - 20 - pileCardHeight) / 2);
 
             const topCard = cards[cards.length - 1];
             const showFace = zoneKey === 'discard' && topCard && !topCard.isFlipped;

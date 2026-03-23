@@ -4,19 +4,19 @@
  * Visual structure (top = opponent, bottom = you):
  *
  * ┌──────────────────────────────────────┬───────────────────┐
- * │ Opponent Hand (~10%)                  (full width)       │
+ * │ Opponent Hand (~12%)                  (full width)       │
  * ├──────────────────────────────────────┬───────────────────┤
- * │ Opponent LOB (~30% of half)          │ Opp inline piles  │
+ * │ Opponent LOB (~25% of half)          │ Opp inline piles  │
  * ├──────────────────────────────────────┤ (Dis,Deck,Res,    │
- * │ Opponent Territory (~70% of half)    │  Ban,LOR) ~15%    │
+ * │ Opponent Territory (~75% of half)    │  Ban,LOR) ~15%    │
  * ├══════════════════════════════════════╪═══════════════════┤
- * │ Your Territory (~70% of half)        │ Your inline piles │
+ * │ Your Territory (~75% of half)        │ Your inline piles │
  * ├──────────────────────────────────────┤ (LOR,Ban,Res,     │
- * │ Your LOB (~30% of half)             │  Deck,Dis) ~15%   │
+ * │ Your LOB (~25% of half)             │  Deck,Dis) ~15%   │
  * ├──────────────────────────────────────┴───────────────────┤
- * │ Your Hand (~10%)                      (full width)       │
+ * │ Your Hand (~12%)                      (full width)       │
  * ├──────────────────────────────────────────────────────────┤
- * │ Phase Bar (~5%)                       (full width)       │
+ * │ Phase Bar (~7%)                       (full width)       │
  * └──────────────────────────────────────────────────────────┘
  *
  * Left sidebar (card preview + chat) is HTML outside this canvas.
@@ -74,12 +74,12 @@ export function calculateMirrorLayout(
   isParagon: boolean = false
 ): MirrorLayout {
   // ── Row heights ──────────────────────────────────────────────────────
-  const phaseBarHeight = Math.round(stageHeight * 0.05);
-  const handHeight = Math.round(stageHeight * 0.10);
+  const phaseBarHeight = Math.round(stageHeight * 0.07);
+  const handHeight = Math.round(stageHeight * 0.12);
   const playAreaHeight = stageHeight - phaseBarHeight - handHeight * 2;
   const halfPlayHeight = Math.round(playAreaHeight / 2);
 
-  const lobHeight = Math.round(halfPlayHeight * 0.30);
+  const lobHeight = Math.round(halfPlayHeight * 0.25);
   const territoryHeight = halfPlayHeight - lobHeight;
 
   // ── Column widths ────────────────────────────────────────────────────
