@@ -671,6 +671,122 @@ npm run dev
 
 ---
 
+## Authentication: Supabase ↔ SpacetimeDB Identity Bridge
+
+### The Problem
+
+The app uses Supabase Auth for user accounts (login, deck management, tournament registration). SpacetimeDB has its own identity system. We need to bridge them so a logged-in Supabase user maps to a stable SpacetimeDB identity.
+
+### The Solution: OIDC Provider
+
+SpacetimeDB supports any OIDC-compliant provider. Supabase Auth is OIDC-compliant — it issues JWTs with standard claims. The bridge works like this:
+
+1. **User logs into the app via Supabase Auth** (existing flow, unchanged)
+2. **Client connects to SpacetimeDB** with the Supabase JWT token via `.withToken(supabaseSession.access_token)`
+3. **SpacetimeDB derives a stable Identity** from the OIDC token — same user always gets the same Identity across sessions
+4. **The `player` table stores both** the SpacetimeDB `identity` (for reducer authorization) and the Supabase `user_id` (string, for linking back to decks, profiles, etc.)
+
+### Schema Addition
+
+Add to the `player` table:
+
+| Column | Type | Notes |
+|--------|------|-------|
+| supabase_user_id | string | Supabase Auth user UUID, for linking to decks/profiles |
+
+### How It Works in Practice
+
+```
+Supabase Auth login → JWT (access_token)
+  → SpacetimeDB connection: .withToken(access_token)
+  → SpacetimeDB derives Identity from JWT claims
+  → create_game / join_game reducers use ctx.sender (Identity)
+  → Player row stores both identity + supabase_user_id
+  → Deck loading: uses supabase_user_id to fetch from Supabase
+```
+
+### Key Benefits
+
+- **No duplicate auth system** — Supabase handles login, SpacetimeDB trusts its tokens
+- **Stable identity** — same Supabase user always maps to the same SpacetimeDB identity
+- **Deck ownership** — supabase_user_id on the player row links back to the user's saved decks
+- **No guest play** — users must be logged in (already required for deck access)
+
+### Investigation Needed
+
+- Confirm SpacetimeDB's TypeScript SDK supports passing a custom OIDC token (vs. only SpacetimeAuth tokens). The `.withToken()` method exists but we need to verify it accepts arbitrary JWTs.
+- Determine if SpacetimeDB needs OIDC discovery configuration (issuer URL, JWKS endpoint) pointed at Supabase's OIDC endpoints.
+- Fallback: if Supabase JWT isn't directly compatible, use SpacetimeAuth tokens and store a mapping between SpacetimeDB identity and Supabase user_id in a server table.
+
+---
+
+## CI/CD: SpacetimeDB Module Deployment
+
+### GitHub Actions Workflow
+
+On merge to `main`, a GitHub Action should:
+
+1. **Publish the SpacetimeDB module** to maincloud via CLI
+2. **Regenerate client bindings** and commit them if changed
+3. **Deploy the Next.js app** to Vercel (existing flow)
+
+### Proposed Workflow: `.github/workflows/deploy-spacetimedb.yml`
+
+```yaml
+name: Deploy SpacetimeDB Module
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'spacetimedb/**'  # Only trigger on server module changes
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SpacetimeDB CLI
+        run: curl -sSf https://install.spacetimedb.com | sh
+
+      - name: Authenticate
+        run: spacetime login --token ${{ secrets.SPACETIMEDB_TOKEN }}
+
+      - name: Publish module
+        run: spacetime publish <db-name> --module-path spacetimedb
+
+      - name: Generate client bindings
+        run: |
+          spacetime generate --lang typescript \
+            --out-dir lib/spacetimedb/module_bindings \
+            --module-path spacetimedb
+
+      - name: Commit bindings if changed
+        run: |
+          git diff --quiet lib/spacetimedb/module_bindings/ || {
+            git add lib/spacetimedb/module_bindings/
+            git commit -m "chore: regenerate SpacetimeDB client bindings"
+            git push
+          }
+```
+
+### Key Decisions
+
+- **Trigger on `spacetimedb/**` path changes only** — don't republish if only the Next.js app changed
+- **`--clear-database` is NOT used in CI** — only for local dev. Production publishes should migrate, not wipe.
+- **Client bindings committed to repo** — ensures the Next.js build always has matching bindings without needing SpacetimeDB CLI during Vercel build
+- **SPACETIMEDB_TOKEN** stored as a GitHub secret — obtained via `spacetime login` locally
+
+### Local Dev vs. CI
+
+| Action | Local Dev | CI (merge to main) |
+|--------|-----------|-------------------|
+| Publish | `spacetime publish <name> --clear-database -y --module-path spacetimedb` | `spacetime publish <name> --module-path spacetimedb` (no clear) |
+| Generate | Manual after publish | Automated, committed to repo |
+| Database | Local SpacetimeDB instance or dev database on maincloud | Production database on maincloud |
+
+---
+
 ## Migration Notes
 
 The existing SpacetimeDB chat prototype at `app/play/play/` should be removed. It was scaffolding for learning the SDK. The new module lives at `spacetimedb/` (project root level) and the game client is integrated into the Next.js app at `app/play/`.
