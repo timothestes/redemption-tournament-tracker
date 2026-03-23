@@ -54,6 +54,7 @@ export interface GameCardNodeProps {
   cardHeight: number;
   image: HTMLImageElement | undefined;
   isSelected?: boolean;
+  isDraggable?: boolean;
   hoverProgress?: number;
   nodeRef?: (instanceId: string, node: Konva.Group | null) => void;
   onDragStart: (card: GameCard) => void;
@@ -76,6 +77,7 @@ export const GameCardNode = memo(function GameCardNode({
   cardHeight,
   image,
   isSelected,
+  isDraggable = true,
   hoverProgress,
   nodeRef,
   onDragStart,
@@ -100,7 +102,7 @@ export const GameCardNode = memo(function GameCardNode({
       x={x}
       y={y}
       rotation={rotation}
-      draggable
+      draggable={isDraggable}
       onDragStart={() => onDragStart(card)}
       onDragMove={onDragMove}
       onDragEnd={(e) => onDragEnd(card, e)}
