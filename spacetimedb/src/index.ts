@@ -2,7 +2,7 @@ import spacetimedb from './schema';
 import { DisconnectTimeout, setDisconnectTimeoutReducer } from './schema';
 import { t, SenderError } from 'spacetimedb/server';
 import { ScheduleAt } from 'spacetimedb';
-import { makeSeed, seededShuffle, generateGameCode } from './utils';
+import { makeSeed, seededShuffle, seededDiceRoll, generateGameCode } from './utils';
 
 // ---------------------------------------------------------------------------
 // Helper: logAction
@@ -416,6 +416,638 @@ export const handle_disconnect_timeout = spacetimedb.reducer(
 
 // Wire the scheduled reducer to the schema's forward reference
 setDisconnectTimeoutReducer(handle_disconnect_timeout);
+
+// ===========================================================================
+// Turn / Phase reducers
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Reducer: set_phase
+// ---------------------------------------------------------------------------
+export const set_phase = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    phase: t.string(),
+  },
+  (ctx, { gameId, phase }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+
+    if (player.seat !== game.currentTurn) {
+      throw new SenderError('Not your turn');
+    }
+
+    const validPhases = ['draw', 'upkeep', 'preparation', 'battle', 'discard'];
+    if (!validPhases.includes(phase)) {
+      throw new SenderError('Invalid phase: ' + phase);
+    }
+
+    ctx.db.Game.id.update({ ...game, currentPhase: phase });
+
+    logAction(ctx, gameId, player.id, 'SET_PHASE', JSON.stringify({ phase }), game.turnNumber, phase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: end_turn
+// ---------------------------------------------------------------------------
+export const end_turn = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+  },
+  (ctx, { gameId }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+
+    if (player.seat !== game.currentTurn) {
+      throw new SenderError('Not your turn');
+    }
+
+    const nextSeat = game.currentTurn === 0n ? 1n : 0n;
+    const newTurnNumber = game.turnNumber + 1n;
+
+    ctx.db.Game.id.update({
+      ...game,
+      currentTurn: nextSeat,
+      currentPhase: 'draw',
+      turnNumber: newTurnNumber,
+    });
+
+    // Find the new active player
+    let newActivePlayer: any = null;
+    for (const p of ctx.db.Player.player_game_id.filter(gameId)) {
+      if (p.seat === nextSeat) {
+        newActivePlayer = p;
+        break;
+      }
+    }
+
+    if (newActivePlayer) {
+      const latestGame = ctx.db.Game.id.find(gameId);
+      drawCardsForPlayer(ctx, latestGame, newActivePlayer, 3);
+    }
+
+    logAction(ctx, gameId, player.id, 'END_TURN', JSON.stringify({ newTurn: newTurnNumber.toString() }), newTurnNumber, 'draw');
+  }
+);
+
+// ===========================================================================
+// Card action reducers
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Reducer: draw_card
+// ---------------------------------------------------------------------------
+export const draw_card = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+  },
+  (ctx, { gameId }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+
+    drawCardsForPlayer(ctx, game, player, 1);
+
+    logAction(ctx, gameId, player.id, 'DRAW', '', game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: draw_multiple
+// ---------------------------------------------------------------------------
+export const draw_multiple = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    count: t.u64(),
+  },
+  (ctx, { gameId, count }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+
+    drawCardsForPlayer(ctx, game, player, Number(count));
+
+    logAction(ctx, gameId, player.id, 'DRAW_MULTIPLE', JSON.stringify({ count: count.toString() }), game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: move_card
+// ---------------------------------------------------------------------------
+export const move_card = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardInstanceId: t.u64(),
+    toZone: t.string(),
+    zoneIndex: t.string(),
+    posX: t.string(),
+    posY: t.string(),
+  },
+  (ctx, { gameId, cardInstanceId, toZone, zoneIndex, posX, posY }) => {
+    const player = findPlayerBySender(ctx, gameId);
+
+    const card = ctx.db.CardInstance.id.find(cardInstanceId);
+    if (!card) throw new SenderError('Card not found');
+    if (card.ownerId !== player.id) throw new SenderError('Not your card');
+
+    const fromZone = card.zone;
+    const isFlipped = toZone === 'deck';
+
+    ctx.db.CardInstance.id.update({
+      ...card,
+      zone: toZone,
+      zoneIndex: zoneIndex ? BigInt(zoneIndex) : 0n,
+      posX,
+      posY,
+      isFlipped,
+    });
+
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+
+    logAction(ctx, gameId, player.id, 'MOVE_CARD', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), from: fromZone, to: toZone }), game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: move_cards_batch
+// ---------------------------------------------------------------------------
+export const move_cards_batch = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardInstanceIds: t.string(),
+    toZone: t.string(),
+    positions: t.string(),
+  },
+  (ctx, { gameId, cardInstanceIds, toZone, positions }) => {
+    const player = findPlayerBySender(ctx, gameId);
+
+    const ids: string[] = JSON.parse(cardInstanceIds);
+    const posMap: Record<string, { posX: string; posY: string }> = JSON.parse(positions);
+
+    for (const idStr of ids) {
+      const cardId = BigInt(idStr);
+      const card = ctx.db.CardInstance.id.find(cardId);
+      if (!card) throw new SenderError('Card not found: ' + idStr);
+      if (card.ownerId !== player.id) throw new SenderError('Not your card: ' + idStr);
+
+      const pos = posMap[idStr] || { posX: '', posY: '' };
+      const isFlipped = toZone === 'deck';
+
+      ctx.db.CardInstance.id.update({
+        ...card,
+        zone: toZone,
+        posX: pos.posX,
+        posY: pos.posY,
+        isFlipped,
+      });
+    }
+
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+
+    logAction(ctx, gameId, player.id, 'MOVE_CARDS_BATCH', JSON.stringify({ count: ids.length, toZone }), game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: shuffle_deck
+// ---------------------------------------------------------------------------
+export const shuffle_deck = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+  },
+  (ctx, { gameId }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+
+    // Get all player's deck cards
+    const deckCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+      (c: any) => c.ownerId === player.id && c.zone === 'deck'
+    );
+
+    // Increment rng counter and create seed
+    const newRngCounter = game.rngCounter + 1n;
+    ctx.db.Game.id.update({ ...game, rngCounter: newRngCounter });
+
+    const seed = makeSeed(ctx.timestamp.microsSinceUnixEpoch, gameId, player.id, newRngCounter);
+
+    // Shuffle zoneIndex values
+    const indices = deckCards.map((_: any, idx: number) => idx);
+    seededShuffle(indices, seed);
+
+    for (let i = 0; i < deckCards.length; i++) {
+      ctx.db.CardInstance.id.update({
+        ...deckCards[i],
+        zoneIndex: BigInt(indices[i]),
+      });
+    }
+
+    logAction(ctx, gameId, player.id, 'SHUFFLE', '', game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: shuffle_card_into_deck
+// ---------------------------------------------------------------------------
+export const shuffle_card_into_deck = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardInstanceId: t.u64(),
+  },
+  (ctx, { gameId, cardInstanceId }) => {
+    const player = findPlayerBySender(ctx, gameId);
+
+    const card = ctx.db.CardInstance.id.find(cardInstanceId);
+    if (!card) throw new SenderError('Card not found');
+    if (card.ownerId !== player.id) throw new SenderError('Not your card');
+
+    // Move card to deck
+    ctx.db.CardInstance.id.update({
+      ...card,
+      zone: 'deck',
+      isFlipped: true,
+    });
+
+    // Now shuffle entire deck (same logic as shuffle_deck)
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+
+    const deckCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+      (c: any) => c.ownerId === player.id && c.zone === 'deck'
+    );
+
+    const newRngCounter = game.rngCounter + 1n;
+    ctx.db.Game.id.update({ ...game, rngCounter: newRngCounter });
+
+    const seed = makeSeed(ctx.timestamp.microsSinceUnixEpoch, gameId, player.id, newRngCounter);
+
+    const indices = deckCards.map((_: any, idx: number) => idx);
+    seededShuffle(indices, seed);
+
+    for (let i = 0; i < deckCards.length; i++) {
+      ctx.db.CardInstance.id.update({
+        ...deckCards[i],
+        zoneIndex: BigInt(indices[i]),
+      });
+    }
+
+    logAction(ctx, gameId, player.id, 'SHUFFLE_INTO_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString() }), game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: meek_card
+// ---------------------------------------------------------------------------
+export const meek_card = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardInstanceId: t.u64(),
+  },
+  (ctx, { gameId, cardInstanceId }) => {
+    const player = findPlayerBySender(ctx, gameId);
+
+    const card = ctx.db.CardInstance.id.find(cardInstanceId);
+    if (!card) throw new SenderError('Card not found');
+    if (card.ownerId !== player.id) throw new SenderError('Not your card');
+
+    ctx.db.CardInstance.id.update({ ...card, isMeek: true });
+
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+
+    logAction(ctx, gameId, player.id, 'MEEK', JSON.stringify({ cardInstanceId: cardInstanceId.toString() }), game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: unmeek_card
+// ---------------------------------------------------------------------------
+export const unmeek_card = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardInstanceId: t.u64(),
+  },
+  (ctx, { gameId, cardInstanceId }) => {
+    const player = findPlayerBySender(ctx, gameId);
+
+    const card = ctx.db.CardInstance.id.find(cardInstanceId);
+    if (!card) throw new SenderError('Card not found');
+    if (card.ownerId !== player.id) throw new SenderError('Not your card');
+
+    ctx.db.CardInstance.id.update({ ...card, isMeek: false });
+
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+
+    logAction(ctx, gameId, player.id, 'UNMEEK', JSON.stringify({ cardInstanceId: cardInstanceId.toString() }), game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: flip_card
+// ---------------------------------------------------------------------------
+export const flip_card = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardInstanceId: t.u64(),
+  },
+  (ctx, { gameId, cardInstanceId }) => {
+    const player = findPlayerBySender(ctx, gameId);
+
+    const card = ctx.db.CardInstance.id.find(cardInstanceId);
+    if (!card) throw new SenderError('Card not found');
+    if (card.ownerId !== player.id) throw new SenderError('Not your card');
+
+    ctx.db.CardInstance.id.update({ ...card, isFlipped: !card.isFlipped });
+
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+
+    logAction(ctx, gameId, player.id, 'FLIP', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), isFlipped: !card.isFlipped }), game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: update_card_position
+// ---------------------------------------------------------------------------
+export const update_card_position = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardInstanceId: t.u64(),
+    posX: t.string(),
+    posY: t.string(),
+  },
+  (ctx, { gameId, cardInstanceId, posX, posY }) => {
+    const player = findPlayerBySender(ctx, gameId);
+
+    const card = ctx.db.CardInstance.id.find(cardInstanceId);
+    if (!card) throw new SenderError('Card not found');
+    if (card.ownerId !== player.id) throw new SenderError('Not your card');
+
+    ctx.db.CardInstance.id.update({ ...card, posX, posY });
+    // No logAction — too noisy
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: add_counter
+// ---------------------------------------------------------------------------
+export const add_counter = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardInstanceId: t.u64(),
+    color: t.string(),
+  },
+  (ctx, { gameId, cardInstanceId, color }) => {
+    const player = findPlayerBySender(ctx, gameId);
+
+    const card = ctx.db.CardInstance.id.find(cardInstanceId);
+    if (!card) throw new SenderError('Card not found');
+    if (card.ownerId !== player.id) throw new SenderError('Not your card');
+
+    // Find existing counter for this card+color
+    let existingCounter: any = null;
+    for (const counter of ctx.db.CardCounter.card_counter_card_instance_id.filter(cardInstanceId)) {
+      if (counter.color === color) {
+        existingCounter = counter;
+        break;
+      }
+    }
+
+    if (existingCounter) {
+      ctx.db.CardCounter.id.update({ ...existingCounter, count: existingCounter.count + 1n });
+    } else {
+      ctx.db.CardCounter.insert({
+        id: 0n,
+        cardInstanceId,
+        color,
+        count: 1n,
+      });
+    }
+
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+
+    logAction(ctx, gameId, player.id, 'ADD_COUNTER', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), color }), game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: remove_counter
+// ---------------------------------------------------------------------------
+export const remove_counter = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardInstanceId: t.u64(),
+    color: t.string(),
+  },
+  (ctx, { gameId, cardInstanceId, color }) => {
+    const player = findPlayerBySender(ctx, gameId);
+
+    const card = ctx.db.CardInstance.id.find(cardInstanceId);
+    if (!card) throw new SenderError('Card not found');
+    if (card.ownerId !== player.id) throw new SenderError('Not your card');
+
+    let existingCounter: any = null;
+    for (const counter of ctx.db.CardCounter.card_counter_card_instance_id.filter(cardInstanceId)) {
+      if (counter.color === color) {
+        existingCounter = counter;
+        break;
+      }
+    }
+
+    if (!existingCounter) throw new SenderError('No counter of that color found');
+
+    if (existingCounter.count <= 1n) {
+      ctx.db.CardCounter.id.delete(existingCounter.id);
+    } else {
+      ctx.db.CardCounter.id.update({ ...existingCounter, count: existingCounter.count - 1n });
+    }
+
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+
+    logAction(ctx, gameId, player.id, 'REMOVE_COUNTER', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), color }), game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: set_note
+// ---------------------------------------------------------------------------
+export const set_note = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardInstanceId: t.u64(),
+    text: t.string(),
+  },
+  (ctx, { gameId, cardInstanceId, text }) => {
+    const player = findPlayerBySender(ctx, gameId);
+
+    const card = ctx.db.CardInstance.id.find(cardInstanceId);
+    if (!card) throw new SenderError('Card not found');
+    if (card.ownerId !== player.id) throw new SenderError('Not your card');
+
+    ctx.db.CardInstance.id.update({ ...card, notes: text });
+    // No logAction
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: exchange_cards
+// ---------------------------------------------------------------------------
+export const exchange_cards = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardInstanceIds: t.string(),
+  },
+  (ctx, { gameId, cardInstanceIds }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+
+    const ids: string[] = JSON.parse(cardInstanceIds);
+
+    // Validate ownership of each card
+    for (const idStr of ids) {
+      const cardId = BigInt(idStr);
+      const card = ctx.db.CardInstance.id.find(cardId);
+      if (!card) throw new SenderError('Card not found: ' + idStr);
+      if (card.ownerId !== player.id) throw new SenderError('Not your card: ' + idStr);
+    }
+
+    // Move all cards to deck, flipped
+    for (const idStr of ids) {
+      const cardId = BigInt(idStr);
+      const card = ctx.db.CardInstance.id.find(cardId);
+      if (card) {
+        ctx.db.CardInstance.id.update({ ...card, zone: 'deck', isFlipped: true });
+      }
+    }
+
+    // Shuffle deck
+    const deckCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+      (c: any) => c.ownerId === player.id && c.zone === 'deck'
+    );
+
+    const newRngCounter = game.rngCounter + 1n;
+    ctx.db.Game.id.update({ ...game, rngCounter: newRngCounter });
+
+    const seed = makeSeed(ctx.timestamp.microsSinceUnixEpoch, gameId, player.id, newRngCounter);
+
+    const indices = deckCards.map((_: any, idx: number) => idx);
+    seededShuffle(indices, seed);
+
+    for (let i = 0; i < deckCards.length; i++) {
+      ctx.db.CardInstance.id.update({
+        ...deckCards[i],
+        zoneIndex: BigInt(indices[i]),
+      });
+    }
+
+    // Draw same number of replacement cards
+    const latestGame = ctx.db.Game.id.find(gameId);
+    if (latestGame) {
+      drawCardsForPlayer(ctx, latestGame, player, ids.length);
+    }
+
+    logAction(ctx, gameId, player.id, 'EXCHANGE', JSON.stringify({ count: ids.length }), game.turnNumber, game.currentPhase);
+  }
+);
+
+// ===========================================================================
+// Utility reducers
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Reducer: roll_dice
+// ---------------------------------------------------------------------------
+export const roll_dice = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    sides: t.u64(),
+  },
+  (ctx, { gameId, sides }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+
+    const newRngCounter = game.rngCounter + 1n;
+    const seed = makeSeed(ctx.timestamp.microsSinceUnixEpoch, gameId, player.id, newRngCounter);
+    const result = seededDiceRoll(Number(sides), seed);
+
+    const rollData = JSON.stringify({ result, sides: Number(sides), rollerId: player.id.toString() });
+
+    ctx.db.Game.id.update({ ...game, rngCounter: newRngCounter, lastDiceRoll: rollData });
+
+    logAction(ctx, gameId, player.id, 'ROLL_DICE', rollData, game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: send_chat
+// ---------------------------------------------------------------------------
+export const send_chat = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    text: t.string(),
+  },
+  (ctx, { gameId, text }) => {
+    // Try to find as player first
+    let senderId: bigint | null = null;
+
+    for (const player of ctx.db.Player.player_game_id.filter(gameId)) {
+      if (player.identity.toHexString() === ctx.sender.toHexString()) {
+        senderId = player.id;
+        break;
+      }
+    }
+
+    // If not a player, try spectator
+    if (senderId === null) {
+      for (const spectator of ctx.db.Spectator.spectator_game_id.filter(gameId)) {
+        if (spectator.identity.toHexString() === ctx.sender.toHexString()) {
+          senderId = spectator.id;
+          break;
+        }
+      }
+    }
+
+    if (senderId === null) {
+      throw new SenderError('Not a participant in this game');
+    }
+
+    ctx.db.ChatMessage.insert({
+      id: 0n,
+      gameId,
+      senderId,
+      text,
+      sentAt: ctx.timestamp,
+    });
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: set_player_option
+// ---------------------------------------------------------------------------
+export const set_player_option = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    optionName: t.string(),
+    value: t.string(),
+  },
+  (ctx, { gameId, optionName, value }) => {
+    const player = findPlayerBySender(ctx, gameId);
+
+    if (optionName === 'autoRouteLostSouls') {
+      ctx.db.Player.id.update({ ...player, autoRouteLostSouls: value === 'true' });
+    }
+  }
+);
 
 // ---------------------------------------------------------------------------
 // Lifecycle: clientConnected
