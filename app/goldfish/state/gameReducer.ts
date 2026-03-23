@@ -406,6 +406,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         isMeek: false,
         counters: [],
         isFlipped: false,
+        isToken: true,
         zone: 'land-of-redemption',
         ownerId: 'player1',
         notes: '',
