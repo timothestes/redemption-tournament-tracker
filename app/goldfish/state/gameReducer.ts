@@ -88,7 +88,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
       // Tokens dropped into reserve/banish/discard/hand/deck are removed entirely
       const TOKEN_REMOVE_ZONES: ZoneId[] = ['reserve', 'banish', 'discard', 'hand', 'deck'];
-      if (result.card.ownerId === 'player2' && TOKEN_REMOVE_ZONES.includes(toZone)) {
+      if (result.card.isToken && TOKEN_REMOVE_ZONES.includes(toZone)) {
         return { ...state, zones, history };
       }
 
@@ -186,7 +186,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (!cardInstanceId) return state;
       const result = findAndRemoveCard(zones, cardInstanceId);
       if (!result) return state;
-      if (result.card.ownerId === 'player2') return { ...state, zones, history };
+      if (result.card.isToken) return { ...state, zones, history };
       zones.deck = shuffleArray(zones.deck);
       result.card.zone = 'deck';
       zones.deck.unshift(result.card);
@@ -198,7 +198,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (!cardInstanceId) return state;
       const result = findAndRemoveCard(zones, cardInstanceId);
       if (!result) return state;
-      if (result.card.ownerId === 'player2') return { ...state, zones, history };
+      if (result.card.isToken) return { ...state, zones, history };
       zones.deck = shuffleArray(zones.deck);
       result.card.zone = 'deck';
       zones.deck.push(result.card);
@@ -379,6 +379,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         isMeek: false,
         counters: [],
         isFlipped: false,
+        isToken: true,
         zone: 'land-of-bondage',
         ownerId: 'player2',
         notes: '',
