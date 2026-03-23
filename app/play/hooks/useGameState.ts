@@ -356,6 +356,7 @@ export function useGameState(gameId: bigint): GameState {
   // ---------------------------------------------------------------------------
 
   return {
+    allGames,
     game,
     myPlayer,
     opponentPlayer,

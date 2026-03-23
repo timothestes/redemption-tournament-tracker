@@ -138,20 +138,26 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     }
   }, [isConnected, isActive, conn, code, gameParams]);
 
-  // Derive gameId once we have a connection — use the code index to find it
-  // useGameState requires a gameId; we pass 0n until we know the real one
-  const resolvedGameId = gameId ?? BigInt(0);
-  const gameState = useGameState(resolvedGameId);
+  // Discover gameId by scanning all games for our code
+  const gameState = useGameState(gameId ?? 0n);
+
+  // Also get raw game list to find our game by code before we know the ID
+  const spacetimeCtxForGames = useSpacetimeDB() as any;
+
+  useEffect(() => {
+    if (gameId !== null) return; // Already discovered
+    const { allGames } = gameState;
+    if (!allGames) return;
+    const found = allGames.find((g: any) => g.code === code);
+    if (found) {
+      setGameId(found.id);
+    }
+  }, [gameState.allGames, code, gameId]);
 
   // Sync lifecycle state from live game data
   useEffect(() => {
     const { game } = gameState;
     if (!game) return;
-
-    // Capture the real gameId from the first matching game row
-    if (gameId === null && game.code === code) {
-      setGameId(game.id);
-    }
 
     if (game.status === 'waiting') {
       setLifecycle('waiting');
@@ -160,7 +166,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     } else if (game.status === 'finished') {
       setLifecycle('finished');
     }
-  }, [gameState, code, gameId]);
+  }, [gameState.game]);
 
   // -------------------------------------------------------------------------
   // Render
