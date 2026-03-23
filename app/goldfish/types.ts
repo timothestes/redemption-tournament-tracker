@@ -64,6 +64,7 @@ export interface GameCard {
   isFlipped: boolean;
   zone: ZoneId;
   ownerId: 'player1' | 'player2';
+  isToken: boolean;
   notes: string;
   posX?: number;
   posY?: number;
