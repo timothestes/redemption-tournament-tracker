@@ -29,6 +29,9 @@ type SpectatorRow = Spectator;
 // ---------------------------------------------------------------------------
 
 export interface GameState {
+  // All games (used for game discovery by code before gameId is known)
+  allGames: GameRow[];
+
   // Core data
   game: GameRow | undefined;
   myPlayer: PlayerRow | undefined;

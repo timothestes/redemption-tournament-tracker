@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useSpacetimeConnection } from '@/app/play/hooks/useSpacetimeConnection';
@@ -8,6 +8,9 @@ import { SpacetimeProvider } from '@/app/play/lib/spacetimedb-provider';
 import { useGameState } from '@/app/play/hooks/useGameState';
 import { useSpacetimeDB } from 'spacetimedb/react';
 import GameOverOverlay from '@/app/play/components/GameOverOverlay';
+import CardPreviewPanel from '../components/CardPreviewPanel';
+import ChatPanel from '../components/ChatPanel';
+import type { GameCard } from '@/app/goldfish/types';
 
 // Konva requires browser APIs — lazy-load to avoid SSR issues
 const MultiplayerCanvas = dynamic(
@@ -85,6 +88,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const [lifecycle, setLifecycle] = useState<LifecycleState>('creating');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [gameId, setGameId] = useState<bigint | null>(null);
+  const [hoveredCard, setHoveredCard] = useState<GameCard | null>(null);
   const didCallReducer = useRef(false);
   const didSubscribe = useRef(false);
 
@@ -160,9 +164,10 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   }, [isConnected, isActive, conn, code, gameParams]);
 
   // Discover gameId by scanning all games for our code
-  const gameState = useGameState(gameId ?? 0n);
+  const gameState = useGameState(gameId ?? BigInt(0));
 
   // Also get raw game list to find our game by code before we know the ID
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const spacetimeCtxForGames = useSpacetimeDB() as any;
 
   useEffect(() => {
@@ -188,6 +193,14 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       setLifecycle('finished');
     }
   }, [gameState.game]);
+
+  // Build a player name map for ChatPanel
+  const playerNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (gameState.myPlayer) map[gameState.myPlayer.id.toString()] = gameState.myPlayer.displayName;
+    if (gameState.opponentPlayer) map[gameState.opponentPlayer.id.toString()] = gameState.opponentPlayer.displayName;
+    return map;
+  }, [gameState.myPlayer, gameState.opponentPlayer]);
 
   // -------------------------------------------------------------------------
   // Render
@@ -259,14 +272,61 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     router.push('/play');
   }
 
+  // ---------------------------------------------------------------------------
+  // Left sidebar — shared between playing and finished states
+  // ---------------------------------------------------------------------------
+  const leftSidebar = (
+    <div style={{
+      width: 'clamp(150px, 10vw, 220px)',
+      flexShrink: 0,
+      display: 'flex',
+      flexDirection: 'column',
+      background: 'rgba(10, 8, 5, 0.97)',
+      borderRight: '1px solid rgba(107, 78, 39, 0.3)',
+    }}>
+      {/* Card Preview — top */}
+      <div style={{ flexShrink: 0, borderBottom: '1px solid rgba(107, 78, 39, 0.2)' }}>
+        <CardPreviewPanel card={hoveredCard} />
+      </div>
+      {/* Chat — bottom, takes remaining space */}
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <ChatPanel
+          chatMessages={gameState.chatMessages}
+          gameActions={gameState.gameActions}
+          myPlayerId={gameState.myPlayer?.id ?? BigInt(0)}
+          onSendChat={gameState.sendChat}
+          playerNames={playerNameMap}
+        />
+      </div>
+    </div>
+  );
+
   // lifecycle === 'finished' — show canvas (frozen) with GameOverOverlay on top,
   // or render the overlay standalone if canvas data is unavailable.
   if (lifecycle === 'finished') {
     // If we have full game state, show the overlay over the frozen canvas
     if (gameId !== null && !gameState.isLoading) {
       return (
-        <div className="h-screen w-screen overflow-hidden bg-background" style={{ pointerEvents: 'none' }}>
-          <MultiplayerCanvas gameId={gameId} />
+        <div style={{ display: 'flex', width: '100vw', height: '100dvh' }}>
+          {leftSidebar}
+          <div style={{ flex: 1, position: 'relative', pointerEvents: 'none' }}>
+            <MultiplayerCanvas gameId={gameId} onHoveredCardChange={setHoveredCard} />
+            <GameOverOverlay
+              game={gameState.game}
+              myPlayer={gameState.myPlayer}
+              opponentPlayer={gameState.opponentPlayer}
+              gameActions={gameState.gameActions}
+              onReturnToLobby={handleReturnToLobby}
+            />
+          </div>
+        </div>
+      );
+    }
+    // Fallback — canvas not ready
+    return (
+      <div style={{ display: 'flex', width: '100vw', height: '100dvh' }}>
+        {leftSidebar}
+        <div style={{ flex: 1, position: 'relative' }}>
           <GameOverOverlay
             game={gameState.game}
             myPlayer={gameState.myPlayer}
@@ -275,62 +335,57 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             onReturnToLobby={handleReturnToLobby}
           />
         </div>
-      );
-    }
-    // Fallback — canvas not ready
-    return (
-      <div className="h-screen w-screen overflow-hidden bg-background">
-        <GameOverOverlay
-          game={gameState.game}
-          myPlayer={gameState.myPlayer}
-          opponentPlayer={gameState.opponentPlayer}
-          gameActions={gameState.gameActions}
-          onReturnToLobby={handleReturnToLobby}
-        />
       </div>
     );
   }
 
-  // lifecycle === 'playing' — render the multiplayer canvas with a Concede button overlay
+  // lifecycle === 'playing' — flex layout with left sidebar + canvas
   return (
-    <div className="h-screen w-screen overflow-hidden bg-background">
-      {gameId !== null && <MultiplayerCanvas gameId={gameId} />}
+    <div style={{ display: 'flex', width: '100vw', height: '100dvh' }}>
+      {leftSidebar}
 
-      {/* Concede floating button — sits above the canvas, bottom-right */}
-      {lifecycle === 'playing' && (
-        <button
-          onClick={handleConcede}
-          style={{
-            position: 'fixed',
-            bottom: 60,   // above TurnIndicator bar (52px) with a small gap
-            right: 12,
-            zIndex: 300,
-            padding: '5px 12px',
-            background: 'rgba(30, 10, 10, 0.9)',
-            border: '1px solid rgba(180, 60, 60, 0.45)',
-            borderRadius: 4,
-            cursor: 'pointer',
-            fontFamily: 'var(--font-cinzel), Georgia, serif',
-            fontSize: 10,
-            letterSpacing: '0.07em',
-            textTransform: 'uppercase',
-            color: 'rgba(220, 120, 120, 0.75)',
-            transition: 'background 0.15s, border-color 0.15s, color 0.15s',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(60, 10, 10, 0.95)';
-            e.currentTarget.style.borderColor = 'rgba(220, 80, 80, 0.7)';
-            e.currentTarget.style.color = 'rgba(240, 150, 150, 0.95)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'rgba(30, 10, 10, 0.9)';
-            e.currentTarget.style.borderColor = 'rgba(180, 60, 60, 0.45)';
-            e.currentTarget.style.color = 'rgba(220, 120, 120, 0.75)';
-          }}
-        >
-          Concede
-        </button>
-      )}
+      {/* Game canvas — takes remaining width */}
+      <div style={{ flex: 1, position: 'relative' }}>
+        {gameId !== null && (
+          <MultiplayerCanvas gameId={gameId} onHoveredCardChange={setHoveredCard} />
+        )}
+
+        {/* Concede floating button — sits above the canvas, bottom-right */}
+        {lifecycle === 'playing' && (
+          <button
+            onClick={handleConcede}
+            style={{
+              position: 'absolute',
+              bottom: 60,   // above TurnIndicator bar (52px) with a small gap
+              right: 12,
+              zIndex: 300,
+              padding: '5px 12px',
+              background: 'rgba(30, 10, 10, 0.9)',
+              border: '1px solid rgba(180, 60, 60, 0.45)',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: 10,
+              letterSpacing: '0.07em',
+              textTransform: 'uppercase',
+              color: 'rgba(220, 120, 120, 0.75)',
+              transition: 'background 0.15s, border-color 0.15s, color 0.15s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(60, 10, 10, 0.95)';
+              e.currentTarget.style.borderColor = 'rgba(220, 80, 80, 0.7)';
+              e.currentTarget.style.color = 'rgba(240, 150, 150, 0.95)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(30, 10, 10, 0.9)';
+              e.currentTarget.style.borderColor = 'rgba(180, 60, 60, 0.45)';
+              e.currentTarget.style.color = 'rgba(220, 120, 120, 0.75)';
+            }}
+          >
+            Concede
+          </button>
+        )}
+      </div>
     </div>
   );
 }
