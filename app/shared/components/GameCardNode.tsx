@@ -89,7 +89,7 @@ export const GameCardNode = memo(function GameCardNode({
   onMouseEnter,
   onMouseLeave,
 }: GameCardNodeProps) {
-  const isToken = card.ownerId === 'player2';
+  const isToken = card.isToken;
   const showFace = !card.isFlipped && image;
 
   const groupRefCb = useCallback((node: Konva.Group | null) => {
