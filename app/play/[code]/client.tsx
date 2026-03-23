@@ -113,6 +113,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       if (gameParams.role === 'create') {
         setLifecycle('creating');
         conn.reducers.createGame({
+          code,
           deckId: gameParams.deckId,
           displayName: gameParams.displayName,
           format: gameParams.format ?? 'standard',

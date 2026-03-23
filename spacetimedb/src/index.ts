@@ -178,37 +178,18 @@ function insertCardsShuffleDraw(
 // ---------------------------------------------------------------------------
 export const create_game = spacetimedb.reducer(
   {
+    code: t.string(),
     deckId: t.string(),
     displayName: t.string(),
     format: t.string(),
     supabaseUserId: t.string(),
     deckData: t.string(),
   },
-  (ctx, { deckId, displayName, format, supabaseUserId, deckData }) => {
-    // Generate game code
-    const codeSeed = makeSeed(ctx.timestamp.microsSinceUnixEpoch, 0n, 0n, 0n);
-    let code = generateGameCode(codeSeed);
-
-    // Check uniqueness among active games, regenerate if collision
-    let attempts = 0;
-    let collision = true;
-    while (collision && attempts < 10) {
-      collision = false;
-      for (const g of ctx.db.Game.game_code.filter(code)) {
-        if (g.status !== 'finished') {
-          collision = true;
-          break;
-        }
-      }
-      if (collision) {
-        attempts++;
-        const retrySeed = makeSeed(
-          ctx.timestamp.microsSinceUnixEpoch,
-          0n,
-          0n,
-          BigInt(attempts)
-        );
-        code = generateGameCode(retrySeed);
+  (ctx, { code, deckId, displayName, format, supabaseUserId, deckData }) => {
+    // Validate code is not already in use by an active game
+    for (const g of ctx.db.Game.game_code.filter(code)) {
+      if (g.status !== 'finished') {
+        throw new SenderError('Game code already in use');
       }
     }
 

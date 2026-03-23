@@ -11,6 +11,7 @@ import {
 } from "spacetimedb";
 
 export default {
+  code: __t.string(),
   deckId: __t.string(),
   displayName: __t.string(),
   format: __t.string(),
