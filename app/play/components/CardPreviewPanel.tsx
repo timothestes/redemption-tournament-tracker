@@ -1,7 +1,18 @@
 'use client';
 
-import Image from 'next/image';
 import type { GameCard } from '@/app/goldfish/types';
+
+const BLOB_BASE_URL = process.env.NEXT_PUBLIC_BLOB_BASE_URL || '';
+
+function sanitizeImgFile(f: string): string {
+  return f.replace(/\.jpe?g$/i, '');
+}
+
+function getCardImageUrl(imgFile: string): string {
+  if (!imgFile) return '';
+  if (imgFile.startsWith('/') || imgFile.startsWith('http')) return imgFile;
+  return `${BLOB_BASE_URL}/card-images/${sanitizeImgFile(imgFile)}.jpg`;
+}
 
 interface CardPreviewPanelProps {
   card: GameCard | null;
@@ -38,13 +49,14 @@ export default function CardPreviewPanel({ card }: CardPreviewPanelProps) {
             borderRadius: 4,
           }} />
         ) : card.cardImgFile ? (
-          <Image
-            src={card.cardImgFile}
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={getCardImageUrl(card.cardImgFile)}
             alt={card.cardName}
-            fill
-            style={{ objectFit: 'contain', borderRadius: 4 }}
-            sizes="220px"
-            unoptimized
+            style={{
+              width: '100%', height: '100%',
+              objectFit: 'contain', borderRadius: 4,
+            }}
           />
         ) : null}
       </div>
