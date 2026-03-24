@@ -4,7 +4,7 @@
  * Visual structure (top = opponent, bottom = you):
  *
  * ┌──────────────────────────────────────┬───────────────────┐
- * │ Opponent Hand (~12%)                  (full width)       │
+ * │ Opponent Hand (~14%)                  (full width)       │
  * ├──────────────────────────────────────┬───────────────────┤
  * │ Opponent LOB (~25% of half)          │ Opp inline piles  │
  * ├──────────────────────────────────────┤ (Dis,Deck,Res,    │
@@ -14,11 +14,10 @@
  * ├──────────────────────────────────────┤ (LOR,Ban,Res,     │
  * │ Your LOB (~25% of half)             │  Deck,Dis) ~15%   │
  * ├──────────────────────────────────────┴───────────────────┤
- * │ Your Hand (~12%)                      (full width)       │
- * ├──────────────────────────────────────────────────────────┤
- * │ Phase Bar (~7%)                       (full width)       │
+ * │ Your Hand (~14%)                      (full width)       │
  * └──────────────────────────────────────────────────────────┘
  *
+ * Phase bar (TurnIndicator) is HTML below the canvas, not part of this layout.
  * Left sidebar (card preview + chat) is HTML outside this canvas.
  */
 
@@ -39,8 +38,6 @@ export interface MirrorLayout {
   myHandRect: ZoneRect;
   /** Opponent hand area (top, card backs) */
   opponentHandRect: ZoneRect;
-  /** Phase bar area at bottom */
-  phaseBarRect: ZoneRect;
 }
 
 /** Card dimensions as a proportion of stage width. */
@@ -74,9 +71,8 @@ export function calculateMirrorLayout(
   isParagon: boolean = false
 ): MirrorLayout {
   // ── Row heights ──────────────────────────────────────────────────────
-  const phaseBarHeight = Math.round(stageHeight * 0.07);
-  const handHeight = Math.round(stageHeight * 0.12);
-  const playAreaHeight = stageHeight - phaseBarHeight - handHeight * 2;
+  const handHeight = Math.round(stageHeight * 0.14);
+  const playAreaHeight = stageHeight - handHeight * 2;
   const halfPlayHeight = Math.round(playAreaHeight / 2);
 
   const lobHeight = Math.round(halfPlayHeight * 0.25);
@@ -95,7 +91,6 @@ export function calculateMirrorLayout(
   const myTerritoryY = handHeight + halfPlayHeight;
   const myLobY = myTerritoryY + territoryHeight;
   const myHandY = myLobY + lobHeight;
-  const phaseBarY = myHandY + handHeight;
 
   const pad = 6;
   const zonePad = 4;
@@ -162,20 +157,17 @@ export function calculateMirrorLayout(
   const mySidebar = buildSidebar(myTerritoryY, halfPlayHeight, myPileLabels, myPileKeys);
   const opponentSidebar = buildSidebar(oppLobY, halfPlayHeight, oppPileLabels, oppPileKeys);
 
-  // ── Hand + phase bar ─────────────────────────────────────────────────
+  // ── Hand rects ──────────────────────────────────────────────────────
   const opponentHandRect: ZoneRect = {
     x: 0, y: oppHandY, width: stageWidth, height: handHeight, label: 'Opponent Hand',
   };
   const myHandRect: ZoneRect = {
     x: 0, y: myHandY, width: stageWidth, height: handHeight, label: 'Hand',
   };
-  const phaseBarRect: ZoneRect = {
-    x: 0, y: phaseBarY, width: stageWidth, height: phaseBarHeight, label: 'Phase Bar',
-  };
 
   return {
     myZones: { territory: myTerritoryZone, 'land-of-bondage': myLobZone, ...mySidebar },
     opponentZones: { territory: oppTerritoryZone, 'land-of-bondage': oppLobZone, ...opponentSidebar },
-    myHandRect, opponentHandRect, phaseBarRect,
+    myHandRect, opponentHandRect,
   };
 }

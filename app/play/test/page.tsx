@@ -97,7 +97,9 @@ function TestBoardCanvas() {
   // Render a single zone rectangle with label and count badge
   function renderZone(zone: { x: number; y: number; width: number; height: number; label: string }, key: string, isOpponent: boolean) {
     const count = ZONE_COUNTS[key] ?? 0;
-    const isSidebar = !['territory', 'land-of-bondage'].includes(key);
+    const isTerritory = key === 'territory';
+    const isLob = key === 'land-of-bondage';
+    const isSidebar = !isTerritory && !isLob;
     const labelFontSize = isSidebar ? 9 : 11;
 
     return (
@@ -124,7 +126,7 @@ function TestBoardCanvas() {
           listening={false}
         />
         {/* Card count badge */}
-        {count > 0 && (
+        {(isTerritory || isLob) && count > 0 && (
           <Group>
             <Rect
               x={zone.x + zone.width - 28}
@@ -147,8 +149,8 @@ function TestBoardCanvas() {
             />
           </Group>
         )}
-        {/* Mock card rectangles in territory / lob zones */}
-        {!isSidebar && count > 0 && Array.from({ length: Math.min(count, 5) }).map((_, i) => (
+        {/* Mock card rectangles in territory zone (free-form) */}
+        {isTerritory && count > 0 && Array.from({ length: Math.min(count, 5) }).map((_, i) => (
           <Rect
             key={i}
             x={zone.x + 12 + i * (cardWidth + 6)}
@@ -161,6 +163,41 @@ function TestBoardCanvas() {
             cornerRadius={2}
           />
         ))}
+        {/* Mock card rectangles in LOB zone (auto-arranged horizontal strip) */}
+        {isLob && count > 0 && (() => {
+          const padding = 8;
+          const maxSpacing = cardWidth + 6;
+          const minSpacing = cardWidth * 0.4;
+          const availWidth = zone.width - padding * 2;
+          const idealSpacing = Math.min(maxSpacing, availWidth / Math.max(count, 1));
+          const spacing = Math.max(minSpacing, idealSpacing);
+          const cy = zone.y + zone.height / 2 - cardHeight / 2;
+          return Array.from({ length: Math.min(count, 5) }).map((_, i) => (
+            <Rect
+              key={i}
+              x={zone.x + padding + i * spacing}
+              y={cy}
+              width={cardWidth}
+              height={cardHeight}
+              fill="rgba(40, 28, 16, 0.9)"
+              stroke="rgba(196, 149, 90, 0.5)"
+              strokeWidth={1}
+              cornerRadius={2}
+            />
+          ));
+        })()}
+        {/* Ghost text for empty territory */}
+        {isTerritory && count === 0 && (
+          <Text
+            x={zone.x}
+            y={zone.y + zone.height / 2 - 10}
+            width={zone.width}
+            text="Drop characters and enhancements here"
+            fontSize={13}
+            fill="rgba(232, 213, 163, 0.15)"
+            align="center"
+          />
+        )}
         {/* Sidebar pile — show a small card-back stack */}
         {isSidebar && count > 0 && (
           <Rect
@@ -248,25 +285,16 @@ function TestBoardCanvas() {
             fontFamily="var(--font-geist-sans, system-ui, sans-serif)"
           />
 
-          {/* Phase bar */}
-          <Rect
-            x={layout.phaseBarRect.x}
-            y={layout.phaseBarRect.y}
-            width={layout.phaseBarRect.width}
-            height={layout.phaseBarRect.height}
-            fill="rgba(10, 8, 5, 0.95)"
-            stroke="rgba(107, 78, 39, 0.3)"
-            strokeWidth={1}
-          />
+          {/* Test mode label — centered at bottom */}
           <Text
-            x={width / 2 - 60}
-            y={layout.phaseBarRect.y + layout.phaseBarRect.height / 2 - 7}
+            x={width / 2 - 80}
+            y={height - 30}
             text="TEST MODE — Static Mock Data"
             fontSize={11}
-            fill="rgba(196, 149, 90, 0.6)"
+            fill="rgba(196, 149, 90, 0.4)"
             fontFamily="var(--font-geist-sans, system-ui, sans-serif)"
             align="center"
-            width={120}
+            width={160}
           />
         </Layer>
       </Stage>

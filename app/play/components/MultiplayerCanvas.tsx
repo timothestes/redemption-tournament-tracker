@@ -26,7 +26,6 @@ import type {
 } from '@/lib/spacetimedb/module_bindings/types';
 import { CardContextMenu } from '@/app/shared/components/CardContextMenu';
 import type { GameActions } from '@/app/shared/types/gameActions';
-import TurnIndicator from './TurnIndicator';
 import DiceOverlay from './DiceOverlay';
 
 // ---------------------------------------------------------------------------
@@ -38,9 +37,12 @@ const BLOB_BASE_URL = process.env.NEXT_PUBLIC_BLOB_BASE_URL || '';
 /** Sidebar zones that display as a pile with a count badge (not individual cards). */
 const SIDEBAR_PILE_ZONES = ['deck', 'discard', 'reserve', 'banish', 'land-of-redemption'] as const;
 
-/** Zones where cards are positioned freely (territory, land-of-bondage). */
-const FREE_FORM_ZONES = ['territory', 'land-of-bondage'] as const;
+/** Zones where cards are positioned freely (territory only). */
+const FREE_FORM_ZONES = ['territory'] as const;
 type FreeFormZone = (typeof FREE_FORM_ZONES)[number];
+
+/** Zones where cards are auto-arranged in a horizontal strip. */
+const AUTO_ARRANGE_ZONES = ['land-of-bondage'] as const;
 
 /** All zone keys that can be a drop target. */
 type DropZoneKey = string;
@@ -142,7 +144,38 @@ function pointInRect(px: number, py: number, rect: ZoneRect): boolean {
 
 /** Determine if a zone key is a free-form zone (cards positioned at arbitrary x/y). */
 function isFreeFormZone(zone: string): boolean {
-  return zone === 'territory' || zone === 'land-of-bondage';
+  return zone === 'territory';
+}
+
+/** Determine if a zone key is an auto-arrange zone (horizontal strip layout). */
+function isAutoArrangeZone(zone: string): boolean {
+  return zone === 'land-of-bondage';
+}
+
+/**
+ * Calculate auto-arranged positions for cards in a horizontal strip zone (e.g., LOB).
+ * Cards are laid out left-to-right with overlap when space is tight.
+ */
+function calculateAutoArrangePositions(
+  cardCount: number,
+  zone: ZoneRect,
+  cardWidth: number,
+  cardHeight: number,
+): { x: number; y: number }[] {
+  if (cardCount === 0) return [];
+  const padding = 8;
+  const availWidth = zone.width - padding * 2;
+  const maxSpacing = cardWidth + 6;
+  const minSpacing = cardWidth * 0.4;
+  const idealSpacing = Math.min(maxSpacing, availWidth / Math.max(cardCount, 1));
+  const spacing = Math.max(minSpacing, idealSpacing);
+  const startX = zone.x + padding;
+  const cy = zone.y + zone.height / 2 - cardHeight / 2;
+
+  return Array.from({ length: cardCount }, (_, i) => ({
+    x: startX + i * spacing,
+    y: cy,
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -410,17 +443,17 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
         }
       }
 
-      // Check opponent free-form zones (territory/LOB) — sandbox mode allows
+      // Check opponent free-form and auto-arrange zones — sandbox mode allows
       // dropping on opponent territory during battles
       for (const [key, rect] of Object.entries(opponentZones)) {
-        if (isFreeFormZone(key) && pointInRect(x, y, rect)) {
+        if ((isFreeFormZone(key) || isAutoArrangeZone(key)) && pointInRect(x, y, rect)) {
           return { zone: key, owner: 'opponent' };
         }
       }
 
       // Check opponent sidebar zones too (e.g. dropping a lost soul in opp LOR)
       for (const [key, rect] of Object.entries(opponentZones)) {
-        if (!isFreeFormZone(key) && pointInRect(x, y, rect)) {
+        if (!isFreeFormZone(key) && !isAutoArrangeZone(key) && pointInRect(x, y, rect)) {
           return { zone: key, owner: 'opponent' };
         }
       }
@@ -658,14 +691,14 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
       }
 
       // Same non-free-form zone — snap back (no meaningful action)
-      if (isSameZone) {
+      if (isSameZone && !isFreeFormZone(targetZone)) {
         snapBack();
         return;
       }
 
       // Different zone — perform move
       // Hide dragged card to avoid visual flicker while state updates
-      if (!isFreeFormZone(targetZone)) {
+      if (!isFreeFormZone(targetZone) && !isAutoArrangeZone(targetZone)) {
         let cardGroup: Konva.Node | null = node;
         while (cardGroup && !cardGroup.draggable?.()) {
           cardGroup = cardGroup.parent;
@@ -697,6 +730,9 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
         clearSelection();
       } else if (isFreeFormZone(targetZone)) {
         moveCard(cardId, targetZone, '', String(dropX), String(dropY));
+      } else if (isAutoArrangeZone(targetZone)) {
+        // Auto-arrange zone: positions are ignored by rendering
+        moveCard(cardId, targetZone, '', '0', '0');
       } else if (targetZone === 'deck') {
         // Deck: for now just move to deck (Task 17 adds top/bottom/shuffle popup)
         moveCard(cardId, targetZone, '0');
@@ -892,7 +928,7 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
   }
 
   // Shorthand
-  const { myZones, opponentZones, myHandRect, opponentHandRect, phaseBarRect } = layout;
+  const { myZones, opponentZones, myHandRect, opponentHandRect } = layout;
 
   // ---- Helper: get image for a CardInstance ----
   const getCardImage = (card: CardInstance): HTMLImageElement | undefined => {
@@ -930,7 +966,7 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
               Zone backgrounds — My zones
               ================================================================ */}
           {Object.entries(myZones).map(([key, zone]) => {
-            const isFreeForm = key === 'territory' || key === 'land-of-bondage';
+            const showCountBadge = isFreeFormZone(key) || isAutoArrangeZone(key);
             const cardsInZone = myCards[key] ?? [];
             // Approximate label width: ~7px per uppercase char at fontSize 11 + letterSpacing 1
             const labelTextWidth = zone.label.toUpperCase().length * 7;
@@ -958,8 +994,8 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
                   width={zone.width - 12}
                   ellipsis
                 />
-                {/* Count badge for free-form zones */}
-                {isFreeForm && (
+                {/* Count badge for free-form and auto-arrange zones */}
+                {showCountBadge && (
                   <>
                     <Rect
                       x={zone.x + 6 + labelTextWidth + 8}
@@ -982,6 +1018,18 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
                     />
                   </>
                 )}
+                {/* Ghost text for empty territory */}
+                {key === 'territory' && cardsInZone.length === 0 && (
+                  <Text
+                    x={zone.x}
+                    y={zone.y + zone.height / 2 - 10}
+                    width={zone.width}
+                    text="Drop characters and enhancements here"
+                    fontSize={13}
+                    fill="rgba(232, 213, 163, 0.15)"
+                    align="center"
+                  />
+                )}
               </Group>
             );
           })}
@@ -990,7 +1038,7 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
               Zone backgrounds — Opponent zones
               ================================================================ */}
           {Object.entries(opponentZones).map(([key, zone]) => {
-            const isFreeForm = key === 'territory' || key === 'land-of-bondage';
+            const showCountBadge = isFreeFormZone(key) || isAutoArrangeZone(key);
             const cardsInZone = opponentCards[key] ?? [];
             const labelTextWidth = zone.label.toUpperCase().length * 7;
             return (
@@ -1017,8 +1065,8 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
                   width={zone.width - 12}
                   ellipsis
                 />
-                {/* Count badge for free-form zones */}
-                {isFreeForm && (
+                {/* Count badge for free-form and auto-arrange zones */}
+                {showCountBadge && (
                   <>
                     <Rect
                       x={zone.x + 6 + labelTextWidth + 8}
@@ -1040,6 +1088,18 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
                       align="center"
                     />
                   </>
+                )}
+                {/* Ghost text for empty territory */}
+                {key === 'territory' && cardsInZone.length === 0 && (
+                  <Text
+                    x={zone.x}
+                    y={zone.y + zone.height / 2 - 10}
+                    width={zone.width}
+                    text="Drop characters and enhancements here"
+                    fontSize={13}
+                    fill="rgba(232, 213, 163, 0.15)"
+                    align="center"
+                  />
                 )}
               </Group>
             );
@@ -1113,19 +1173,7 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
           </Group>
 
           {/* ================================================================
-              Phase bar background
-              ================================================================ */}
-          <Rect
-            x={phaseBarRect.x}
-            y={phaseBarRect.y}
-            width={phaseBarRect.width}
-            height={phaseBarRect.height}
-            fill="#0d0905"
-            opacity={0.6}
-          />
-
-          {/* ================================================================
-              Cards in free-form zones — My territory & LOB (draggable)
+              Cards in free-form zones — My territory (draggable, clipped)
               ================================================================ */}
           {FREE_FORM_ZONES.map((zoneKey) => {
             const cards = myCards[zoneKey];
@@ -1172,7 +1220,7 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
           })}
 
           {/* ================================================================
-              Cards in free-form zones — Opponent territory & LOB (NOT draggable)
+              Cards in free-form zones — Opponent territory (NOT draggable)
               ================================================================ */}
           {FREE_FORM_ZONES.map((zoneKey) => {
             const cards = opponentCards[zoneKey];
@@ -1196,6 +1244,91 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
                       card={gameCard}
                       x={x}
                       y={y}
+                      rotation={0}
+                      cardWidth={cardWidth}
+                      cardHeight={cardHeight}
+                      image={getCardImage(card)}
+                      isSelected={false}
+                      isDraggable={false}
+                      hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
+                      onDragStart={noopCardDrag}
+                      onDragMove={noopDrag}
+                      onDragEnd={noopCardDragEnd}
+                      onContextMenu={noopOpponentContextMenu}
+                      onDblClick={noopDblClick}
+                      onMouseEnter={handleMouseEnter}
+                      onMouseLeave={handleMouseLeave}
+                    />
+                  );
+                })}
+              </Group>
+            );
+          })}
+
+          {/* ================================================================
+              Cards in auto-arrange zones — My LOB (draggable, horizontal strip)
+              ================================================================ */}
+          {AUTO_ARRANGE_ZONES.map((zoneKey) => {
+            const cards = myCards[zoneKey];
+            if (!cards || cards.length === 0) return null;
+            const zone = myZones[zoneKey];
+            if (!zone) return null;
+            const positions = calculateAutoArrangePositions(cards.length, zone, cardWidth, cardHeight);
+            return (
+              <Group key={`my-auto-${zoneKey}`}>
+                {cards.map((card, i) => {
+                  const gameCard = adaptCard(card, 'player1');
+                  const pos = positions[i];
+                  if (!pos) return null;
+                  return (
+                    <GameCardNode
+                      key={String(card.id)}
+                      card={gameCard}
+                      x={pos.x}
+                      y={pos.y}
+                      rotation={0}
+                      cardWidth={cardWidth}
+                      cardHeight={cardHeight}
+                      image={getCardImage(card)}
+                      isSelected={false}
+                      isDraggable={true}
+                      hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
+                      nodeRef={registerCardNode}
+                      onDragStart={handleCardDragStart}
+                      onDragMove={handleCardDragMove}
+                      onDragEnd={handleCardDragEnd}
+                      onContextMenu={handleCardContextMenu}
+                      onDblClick={noopDblClick}
+                      onMouseEnter={handleMouseEnter}
+                      onMouseLeave={handleMouseLeave}
+                    />
+                  );
+                })}
+              </Group>
+            );
+          })}
+
+          {/* ================================================================
+              Cards in auto-arrange zones — Opponent LOB (NOT draggable, horizontal strip)
+              ================================================================ */}
+          {AUTO_ARRANGE_ZONES.map((zoneKey) => {
+            const cards = opponentCards[zoneKey];
+            if (!cards || cards.length === 0) return null;
+            const zone = opponentZones[zoneKey];
+            if (!zone) return null;
+            const positions = calculateAutoArrangePositions(cards.length, zone, cardWidth, cardHeight);
+            return (
+              <Group key={`opp-auto-${zoneKey}`}>
+                {cards.map((card, i) => {
+                  const gameCard = adaptCard(card, 'player2');
+                  const pos = positions[i];
+                  if (!pos) return null;
+                  return (
+                    <GameCardNode
+                      key={String(card.id)}
+                      card={gameCard}
+                      x={pos.x}
+                      y={pos.y}
                       rotation={0}
                       cardWidth={cardWidth}
                       cardHeight={cardHeight}
@@ -1470,19 +1603,6 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
       {/* ================================================================
           Zone highlight overlay during drag
           ================================================================ */}
-      {/* ================================================================
-          Turn Indicator + game controls bar (fixed bottom overlay)
-          ================================================================ */}
-      <TurnIndicator
-        game={gameState.game}
-        myPlayer={gameState.myPlayer}
-        opponentPlayer={gameState.opponentPlayer}
-        isMyTurn={gameState.isMyTurn}
-        onSetPhase={gameState.setPhase}
-        onEndTurn={gameState.endTurn}
-        onDrawCard={gameState.drawCard}
-        onRollDice={() => gameState.rollDice(BigInt(20))}
-      />
 
       {/* ================================================================
           Dice roll overlay — synced via lastDiceRoll field from SpacetimeDB

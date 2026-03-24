@@ -27,6 +27,7 @@ interface TurnIndicatorProps {
   onEndTurn: () => void;
   onDrawCard: () => void;
   onRollDice: () => void;
+  onConcede?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -42,6 +43,7 @@ export default function TurnIndicator({
   onEndTurn,
   onDrawCard,
   onRollDice,
+  onConcede,
 }: TurnIndicatorProps) {
   const currentPhase: string = game?.currentPhase ?? 'draw';
   const turnNumber: number = game?.turnNumber ? Number(game.turnNumber) : 1;
@@ -52,19 +54,14 @@ export default function TurnIndicator({
   return (
     <div
       style={{
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: 52,
+        width: '100%',
+        height: '100%',
         background: 'rgba(10, 8, 5, 0.96)',
         borderTop: '1px solid rgba(107, 78, 39, 0.5)',
         display: 'flex',
         alignItems: 'center',
-        paddingLeft: 'calc(12px + env(safe-area-inset-left, 0px))',
-        paddingRight: 'calc(12px + env(safe-area-inset-right, 0px))',
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-        zIndex: 200,
+        paddingLeft: 12,
+        paddingRight: 12,
         gap: 0,
       }}
     >
@@ -309,6 +306,42 @@ export default function TurnIndicator({
         >
           End Turn
         </button>
+
+        {/* Concede button */}
+        {onConcede && (
+          <button
+            onClick={() => {
+              const confirmed = window.confirm('Are you sure you want to concede this game?');
+              if (confirmed) onConcede();
+            }}
+            style={{
+              marginLeft: 8,
+              padding: '5px 12px',
+              background: 'transparent',
+              border: '1px solid rgba(180, 60, 60, 0.35)',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: 10,
+              letterSpacing: '0.07em',
+              textTransform: 'uppercase',
+              color: 'rgba(220, 120, 120, 0.6)',
+              transition: 'background 0.15s, border-color 0.15s, color 0.15s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(60, 10, 10, 0.5)';
+              e.currentTarget.style.borderColor = 'rgba(220, 80, 80, 0.6)';
+              e.currentTarget.style.color = 'rgba(240, 150, 150, 0.9)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.borderColor = 'rgba(180, 60, 60, 0.35)';
+              e.currentTarget.style.color = 'rgba(220, 120, 120, 0.6)';
+            }}
+          >
+            Concede
+          </button>
+        )}
       </div>
     </div>
   );

@@ -8,6 +8,7 @@ import { SpacetimeProvider } from '@/app/play/lib/spacetimedb-provider';
 import { useGameState } from '@/app/play/hooks/useGameState';
 import { useSpacetimeDB } from 'spacetimedb/react';
 import GameOverOverlay from '@/app/play/components/GameOverOverlay';
+import TurnIndicator from '@/app/play/components/TurnIndicator';
 import CardPreviewPanel from '../components/CardPreviewPanel';
 import ChatPanel from '../components/ChatPanel';
 import type { GameCard } from '@/app/goldfish/types';
@@ -256,16 +257,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // The canvas handles missing data gracefully with fallbacks.
 
   // ---------------------------------------------------------------------------
-  // Concede handler — shown during 'playing'
-  // ---------------------------------------------------------------------------
-  function handleConcede() {
-    const confirmed = window.confirm('Are you sure you want to concede this game?');
-    if (confirmed) {
-      gameState.resignGame();
-    }
-  }
-
-  // ---------------------------------------------------------------------------
   // Return to lobby handler used by GameOverOverlay
   // ---------------------------------------------------------------------------
   function handleReturnToLobby() {
@@ -309,15 +300,31 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       return (
         <div style={{ display: 'flex', width: '100vw', height: '100dvh' }}>
           {leftSidebar}
-          <div style={{ flex: 1, position: 'relative', overflow: 'hidden', pointerEvents: 'none' }}>
-            <MultiplayerCanvas gameId={gameId} onHoveredCardChange={setHoveredCard} />
-            <GameOverOverlay
-              game={gameState.game}
-              myPlayer={gameState.myPlayer}
-              opponentPlayer={gameState.opponentPlayer}
-              gameActions={gameState.gameActions}
-              onReturnToLobby={handleReturnToLobby}
-            />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {/* Canvas — takes remaining height */}
+            <div style={{ flex: 1, position: 'relative', overflow: 'hidden', pointerEvents: 'none' }}>
+              <MultiplayerCanvas gameId={gameId} onHoveredCardChange={setHoveredCard} />
+              <GameOverOverlay
+                game={gameState.game}
+                myPlayer={gameState.myPlayer}
+                opponentPlayer={gameState.opponentPlayer}
+                gameActions={gameState.gameActions}
+                onReturnToLobby={handleReturnToLobby}
+              />
+            </div>
+            {/* Phase bar — fixed height HTML below canvas */}
+            <div style={{ flexShrink: 0, height: 56 }}>
+              <TurnIndicator
+                game={gameState.game}
+                myPlayer={gameState.myPlayer}
+                opponentPlayer={gameState.opponentPlayer}
+                isMyTurn={gameState.isMyTurn}
+                onSetPhase={gameState.setPhase}
+                onEndTurn={gameState.endTurn}
+                onDrawCard={gameState.drawCard}
+                onRollDice={() => gameState.rollDice(BigInt(20))}
+              />
+            </div>
           </div>
         </div>
       );
@@ -326,14 +333,28 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     return (
       <div style={{ display: 'flex', width: '100vw', height: '100dvh' }}>
         {leftSidebar}
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          <GameOverOverlay
-            game={gameState.game}
-            myPlayer={gameState.myPlayer}
-            opponentPlayer={gameState.opponentPlayer}
-            gameActions={gameState.gameActions}
-            onReturnToLobby={handleReturnToLobby}
-          />
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+            <GameOverOverlay
+              game={gameState.game}
+              myPlayer={gameState.myPlayer}
+              opponentPlayer={gameState.opponentPlayer}
+              gameActions={gameState.gameActions}
+              onReturnToLobby={handleReturnToLobby}
+            />
+          </div>
+          <div style={{ flexShrink: 0, height: 56 }}>
+            <TurnIndicator
+              game={gameState.game}
+              myPlayer={gameState.myPlayer}
+              opponentPlayer={gameState.opponentPlayer}
+              isMyTurn={gameState.isMyTurn}
+              onSetPhase={gameState.setPhase}
+              onEndTurn={gameState.endTurn}
+              onDrawCard={gameState.drawCard}
+              onRollDice={() => gameState.rollDice(BigInt(20))}
+            />
+          </div>
         </div>
       </div>
     );
@@ -344,47 +365,28 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     <div style={{ display: 'flex', width: '100vw', height: '100dvh' }}>
       {leftSidebar}
 
-      {/* Game canvas — takes remaining width */}
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        {gameId !== null && (
-          <MultiplayerCanvas gameId={gameId} onHoveredCardChange={setHoveredCard} />
-        )}
-
-        {/* Concede floating button — sits above the canvas, bottom-right */}
-        {lifecycle === 'playing' && (
-          <button
-            onClick={handleConcede}
-            style={{
-              position: 'absolute',
-              bottom: 60,   // above TurnIndicator bar (52px) with a small gap
-              right: 12,
-              zIndex: 300,
-              padding: '5px 12px',
-              background: 'rgba(30, 10, 10, 0.9)',
-              border: '1px solid rgba(180, 60, 60, 0.45)',
-              borderRadius: 4,
-              cursor: 'pointer',
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 10,
-              letterSpacing: '0.07em',
-              textTransform: 'uppercase',
-              color: 'rgba(220, 120, 120, 0.75)',
-              transition: 'background 0.15s, border-color 0.15s, color 0.15s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(60, 10, 10, 0.95)';
-              e.currentTarget.style.borderColor = 'rgba(220, 80, 80, 0.7)';
-              e.currentTarget.style.color = 'rgba(240, 150, 150, 0.95)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(30, 10, 10, 0.9)';
-              e.currentTarget.style.borderColor = 'rgba(180, 60, 60, 0.45)';
-              e.currentTarget.style.color = 'rgba(220, 120, 120, 0.75)';
-            }}
-          >
-            Concede
-          </button>
-        )}
+      {/* Right side — canvas + phase bar in flex column */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Canvas — takes remaining height */}
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+          {gameId !== null && (
+            <MultiplayerCanvas gameId={gameId} onHoveredCardChange={setHoveredCard} />
+          )}
+        </div>
+        {/* Phase bar — fixed height HTML below canvas */}
+        <div style={{ flexShrink: 0, height: 56 }}>
+          <TurnIndicator
+            game={gameState.game}
+            myPlayer={gameState.myPlayer}
+            opponentPlayer={gameState.opponentPlayer}
+            isMyTurn={gameState.isMyTurn}
+            onSetPhase={gameState.setPhase}
+            onEndTurn={gameState.endTurn}
+            onDrawCard={gameState.drawCard}
+            onRollDice={() => gameState.rollDice(BigInt(20))}
+            onConcede={gameState.resignGame}
+          />
+        </div>
       </div>
     </div>
   );
