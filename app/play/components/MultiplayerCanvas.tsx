@@ -7,10 +7,11 @@ import KonvaLib from 'konva';
 import { useGameState } from '../hooks/useGameState';
 import { useMultiplayerImagePreloader } from '../hooks/useMultiplayerImagePreloader';
 import {
-  calculateMirrorLayout,
-  getCardDimensions,
+  calculateMultiplayerLayout,
   type ZoneRect,
-} from '../layout/mirrorLayout';
+} from '../layout/multiplayerLayout';
+import { calculateHandPositions } from '../layout/multiplayerHandLayout';
+import { calculateAutoArrangePositions } from '../layout/multiplayerAutoArrange';
 import {
   GameCardNode,
   CardBackShape,
@@ -97,46 +98,6 @@ function cardInstanceToGameCard(
   };
 }
 
-/**
- * Calculate fan positions for cards in the player's hand.
- * Adapted from goldfish handLayout for the multiplayer mirror layout hand rect.
- */
-function calculateMultiplayerHandPositions(
-  cardCount: number,
-  handRect: ZoneRect,
-  cardWidth: number,
-  cardHeight: number,
-): { x: number; y: number; rotation: number }[] {
-  if (cardCount === 0) return [];
-
-  const centerX = handRect.x + handRect.width / 2;
-  const handAreaWidth = handRect.width * 0.75;
-  const handY = handRect.y + Math.max(0, (handRect.height - cardHeight) / 2);
-
-  // Fan arc layout
-  const maxArcAngle = 20;
-  const minVisibleFraction = 0.3;
-
-  const maxCardSpacing = cardWidth + 4;
-  const minCardSpacing = cardWidth * minVisibleFraction;
-  const idealSpacing = Math.min(maxCardSpacing, handAreaWidth / Math.max(cardCount, 1));
-  const spacing = Math.max(minCardSpacing, idealSpacing);
-
-  const totalWidth = (cardCount - 1) * spacing;
-  const startX = centerX - totalWidth / 2;
-
-  const arcAngle = cardCount > 1 ? maxArcAngle / (cardCount - 1) : 0;
-  const startAngle = -maxArcAngle / 2;
-
-  return Array.from({ length: cardCount }, (_, i) => {
-    const x = startX + i * spacing;
-    const rotation = cardCount > 1 ? startAngle + i * arcAngle : 0;
-    const normalizedPos = cardCount > 1 ? (i / (cardCount - 1)) * 2 - 1 : 0;
-    const yOffset = normalizedPos * normalizedPos * 8; // parabolic arc (smaller for compact hand)
-    return { x, y: handY + yOffset, rotation };
-  });
-}
-
 /** Check if a point (px, py) is inside a ZoneRect. */
 function pointInRect(px: number, py: number, rect: ZoneRect): boolean {
   return px >= rect.x && px <= rect.x + rect.width && py >= rect.y && py <= rect.y + rect.height;
@@ -150,32 +111,6 @@ function isFreeFormZone(zone: string): boolean {
 /** Determine if a zone key is an auto-arrange zone (horizontal strip layout). */
 function isAutoArrangeZone(zone: string): boolean {
   return zone === 'land-of-bondage';
-}
-
-/**
- * Calculate auto-arranged positions for cards in a horizontal strip zone (e.g., LOB).
- * Cards are laid out left-to-right with overlap when space is tight.
- */
-function calculateAutoArrangePositions(
-  cardCount: number,
-  zone: ZoneRect,
-  cardWidth: number,
-  cardHeight: number,
-): { x: number; y: number }[] {
-  if (cardCount === 0) return [];
-  const padding = 8;
-  const availWidth = zone.width - padding * 2;
-  const maxSpacing = cardWidth + 6;
-  const minSpacing = cardWidth * 0.4;
-  const idealSpacing = Math.min(maxSpacing, availWidth / Math.max(cardCount, 1));
-  const spacing = Math.max(minSpacing, idealSpacing);
-  const startX = zone.x + padding;
-  const cy = zone.y + zone.height / 2 - cardHeight / 2;
-
-  return Array.from({ length: cardCount }, (_, i) => ({
-    x: startX + i * spacing,
-    y: cy,
-  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -222,21 +157,48 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
   } = gameState;
 
   // ---- Layout ----
-  const layout = useMemo(
-    () => (width > 0 && height > 0 ? calculateMirrorLayout(width, height) : null),
+  const mpLayout = useMemo(
+    () => (width > 0 && height > 0 ? calculateMultiplayerLayout(width, height) : null),
     [width, height],
   );
-  const { cardWidth, cardHeight } = useMemo(
-    () => (width > 0 ? getCardDimensions(width) : { cardWidth: 0, cardHeight: 0 }),
-    [width],
-  );
 
-  // Pile zone thumbnails — dynamically sized to fit within actual pile slot height
-  const samplePileZone = layout?.myZones?.['deck'];
-  const pileSlotHeight = samplePileZone?.height ?? 60;
-  // Leave 28px for count badge (18px) + padding above and below
-  const pileCardHeight = Math.min(Math.round(cardHeight * 0.6), Math.max(30, pileSlotHeight - 28));
-  const pileCardWidth = Math.round(pileCardHeight / 1.4);
+  // Four-tier card dimensions
+  const { cardWidth, cardHeight } = mpLayout?.mainCard ?? { cardWidth: 0, cardHeight: 0 };
+  const lobCard = mpLayout?.lobCard ?? { cardWidth: 0, cardHeight: 0 };
+  const oppHandCard = mpLayout?.opponentHandCard ?? { cardWidth: 0, cardHeight: 0 };
+  const pileCardWidth = mpLayout?.pileCard.cardWidth ?? 0;
+  const pileCardHeight = mpLayout?.pileCard.cardHeight ?? 0;
+
+  const myZones: Record<string, ZoneRect> = useMemo(() => {
+    if (!mpLayout) return {};
+    return {
+      territory: mpLayout.zones.playerTerritory,
+      'land-of-bondage': mpLayout.zones.playerLob,
+      'land-of-redemption': mpLayout.sidebar.player.lor!,
+      banish: mpLayout.sidebar.player.banish!,
+      reserve: mpLayout.sidebar.player.reserve!,
+      deck: mpLayout.sidebar.player.deck!,
+      discard: mpLayout.sidebar.player.discard!,
+      ...(mpLayout.sidebar.player.paragon ? { paragon: mpLayout.sidebar.player.paragon } : {}),
+    };
+  }, [mpLayout]);
+
+  const opponentZones: Record<string, ZoneRect> = useMemo(() => {
+    if (!mpLayout) return {};
+    return {
+      territory: mpLayout.zones.opponentTerritory,
+      'land-of-bondage': mpLayout.zones.opponentLob,
+      'land-of-redemption': mpLayout.sidebar.opponent.lor!,
+      banish: mpLayout.sidebar.opponent.banish!,
+      reserve: mpLayout.sidebar.opponent.reserve!,
+      deck: mpLayout.sidebar.opponent.deck!,
+      discard: mpLayout.sidebar.opponent.discard!,
+      ...(mpLayout.sidebar.opponent.paragon ? { paragon: mpLayout.sidebar.opponent.paragon } : {}),
+    };
+  }, [mpLayout]);
+
+  const myHandRect = mpLayout?.zones.playerHand ?? null;
+  const opponentHandRect = mpLayout?.zones.opponentHand ?? null;
 
   // ---- Stage ref ----
   const stageRef = useRef<Konva.Stage>(null);
@@ -428,8 +390,7 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
    */
   const findZoneAtPosition = useCallback(
     (x: number, y: number): { zone: DropZoneKey; owner: 'my' | 'opponent' } | null => {
-      if (!layout) return null;
-      const { myZones, opponentZones, myHandRect } = layout;
+      if (!mpLayout || !myHandRect) return null;
 
       // Check my hand zone
       if (pointInRect(x, y, myHandRect)) {
@@ -460,7 +421,7 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
 
       return null;
     },
-    [layout],
+    [mpLayout, myZones, opponentZones, myHandRect],
   );
 
   // ---- Drag handlers ----
@@ -812,9 +773,8 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
 
   // ---- Card bounds for marquee selection (my free-form + hand cards) ----
   const allCardBounds = useMemo((): CardBound[] => {
-    if (!layout) return [];
+    if (!mpLayout || !myHandRect) return [];
     const bounds: CardBound[] = [];
-    const { myZones, myHandRect } = layout;
 
     // My free-form zone cards
     for (const zoneKey of FREE_FORM_ZONES) {
@@ -836,7 +796,7 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
     // My hand cards
     const handCards = myCards['hand'] ?? [];
     if (handCards.length > 0) {
-      const positions = calculateMultiplayerHandPositions(
+      const positions = calculateHandPositions(
         handCards.length,
         myHandRect,
         cardWidth,
@@ -858,7 +818,7 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
     }
 
     return bounds;
-  }, [layout, myCards, cardWidth, cardHeight]);
+  }, [mpLayout, myHandRect, myZones, myCards, cardWidth, cardHeight]);
 
   // ---- Stage mouse handlers for marquee selection ----
   const handleStageMouseDown = useCallback(
@@ -921,14 +881,11 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
   // ---- Don't render canvas content until we have dimensions and layout ----
   // NOTE: The container div MUST always render so the ref gets attached and
   // ResizeObserver can measure it. Only the Stage content is gated.
-  if (width === 0 || height === 0 || !layout) {
+  if (width === 0 || height === 0 || !mpLayout || !myHandRect || !opponentHandRect) {
     return (
       <div ref={containerRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }} />
     );
   }
-
-  // Shorthand
-  const { myZones, opponentZones, myHandRect, opponentHandRect } = layout;
 
   // ---- Helper: get image for a CardInstance ----
   const getCardImage = (card: CardInstance): HTMLImageElement | undefined => {
@@ -1273,7 +1230,7 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
             if (!cards || cards.length === 0) return null;
             const zone = myZones[zoneKey];
             if (!zone) return null;
-            const positions = calculateAutoArrangePositions(cards.length, zone, cardWidth, cardHeight);
+            const positions = calculateAutoArrangePositions(cards.length, zone, lobCard.cardWidth, lobCard.cardHeight);
             return (
               <Group key={`my-auto-${zoneKey}`}>
                 {cards.map((card, i) => {
@@ -1287,8 +1244,8 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
                       x={pos.x}
                       y={pos.y}
                       rotation={0}
-                      cardWidth={cardWidth}
-                      cardHeight={cardHeight}
+                      cardWidth={lobCard.cardWidth}
+                      cardHeight={lobCard.cardHeight}
                       image={getCardImage(card)}
                       isSelected={false}
                       isDraggable={true}
@@ -1316,7 +1273,7 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
             if (!cards || cards.length === 0) return null;
             const zone = opponentZones[zoneKey];
             if (!zone) return null;
-            const positions = calculateAutoArrangePositions(cards.length, zone, cardWidth, cardHeight);
+            const positions = calculateAutoArrangePositions(cards.length, zone, lobCard.cardWidth, lobCard.cardHeight);
             return (
               <Group key={`opp-auto-${zoneKey}`}>
                 {cards.map((card, i) => {
@@ -1330,8 +1287,8 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
                       x={pos.x}
                       y={pos.y}
                       rotation={0}
-                      cardWidth={cardWidth}
-                      cardHeight={cardHeight}
+                      cardWidth={lobCard.cardWidth}
+                      cardHeight={lobCard.cardHeight}
                       image={getCardImage(card)}
                       isSelected={false}
                       isDraggable={false}
@@ -1516,22 +1473,21 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
               Opponent hand — row of card backs (NOT draggable)
               ================================================================ */}
           {(() => {
-            const oppHandCount = opponentCards['hand']?.length ?? 0;
-            if (oppHandCount === 0) return null;
+            const opponentHandCards = opponentCards['hand'] ?? [];
+            if (opponentHandCards.length === 0) return null;
 
-            const spacing = Math.min(
-              cardWidth + 4,
-              (opponentHandRect.width * 0.7) / Math.max(oppHandCount, 1),
+            const oppHandPositions = calculateHandPositions(
+              opponentHandCards.length,
+              opponentHandRect!,
+              oppHandCard.cardWidth,
+              oppHandCard.cardHeight,
             );
-            const totalWidth = (oppHandCount - 1) * spacing;
-            const startX = opponentHandRect.x + opponentHandRect.width / 2 - totalWidth / 2;
-            const cy = opponentHandRect.y + Math.max(0, (opponentHandRect.height - cardHeight) / 2);
 
             return (
               <Group>
-                {Array.from({ length: oppHandCount }, (_, i) => (
-                  <Group key={`opp-hand-${i}`} x={startX + i * spacing} y={cy}>
-                    <CardBackShape width={cardWidth} height={cardHeight} />
+                {oppHandPositions.map((pos, i) => (
+                  <Group key={`opp-hand-${i}`} x={pos.x} y={pos.y}>
+                    <CardBackShape width={oppHandCard.cardWidth} height={oppHandCard.cardHeight} />
                   </Group>
                 ))}
               </Group>
@@ -1545,9 +1501,9 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
             const handCards = myCards['hand'] ?? [];
             if (handCards.length === 0) return null;
 
-            const positions = calculateMultiplayerHandPositions(
+            const positions = calculateHandPositions(
               handCards.length,
-              myHandRect,
+              myHandRect!,
               cardWidth,
               cardHeight,
             );
