@@ -9,9 +9,9 @@ import { useGameState } from '@/app/play/hooks/useGameState';
 import { useSpacetimeDB } from 'spacetimedb/react';
 import GameOverOverlay from '@/app/play/components/GameOverOverlay';
 import TurnIndicator from '@/app/play/components/TurnIndicator';
-import CardPreviewPanel from '../components/CardPreviewPanel';
 import ChatPanel from '../components/ChatPanel';
-import type { GameCard } from '@/app/goldfish/types';
+import { CardPreviewProvider } from '@/app/goldfish/state/CardPreviewContext';
+import { CardLoupePanel } from '@/app/goldfish/components/CardLoupePanel';
 
 // Konva requires browser APIs — lazy-load to avoid SSR issues
 const MultiplayerCanvas = dynamic(
@@ -65,7 +65,9 @@ export function GameClient({ code }: GameClientProps) {
 
   return (
     <SpacetimeProvider connectionBuilder={connectionBuilder}>
-      <GameInner code={code} isConnected={isConnected} />
+      <CardPreviewProvider storageKey="multiplayer-loupe-visible">
+        <GameInner code={code} isConnected={isConnected} />
+      </CardPreviewProvider>
     </SpacetimeProvider>
   );
 }
@@ -89,7 +91,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const [lifecycle, setLifecycle] = useState<LifecycleState>('creating');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [gameId, setGameId] = useState<bigint | null>(null);
-  const [hoveredCard, setHoveredCard] = useState<GameCard | null>(null);
   const didCallReducer = useRef(false);
   const didSubscribe = useRef(false);
 
@@ -268,18 +269,14 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // ---------------------------------------------------------------------------
   const leftSidebar = (
     <div style={{
-      width: 'clamp(200px, 14vw, 280px)',
+      width: 'clamp(180px, 12vw, 240px)',
       flexShrink: 0,
       display: 'flex',
       flexDirection: 'column',
       background: 'rgba(10, 8, 5, 0.97)',
       borderRight: '1px solid rgba(107, 78, 39, 0.3)',
     }}>
-      {/* Card Preview — top */}
-      <div style={{ flexShrink: 0, borderBottom: '1px solid rgba(107, 78, 39, 0.2)' }}>
-        <CardPreviewPanel card={hoveredCard} />
-      </div>
-      {/* Chat — bottom, takes remaining space */}
+      {/* Chat — takes all space */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <ChatPanel
           chatMessages={gameState.chatMessages}
@@ -303,7 +300,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             {/* Canvas — takes remaining height */}
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden', pointerEvents: 'none' }}>
-              <MultiplayerCanvas gameId={gameId} onHoveredCardChange={setHoveredCard} />
+              <MultiplayerCanvas gameId={gameId} />
               <GameOverOverlay
                 game={gameState.game}
                 myPlayer={gameState.myPlayer}
@@ -326,6 +323,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               />
             </div>
           </div>
+          {/* Card loupe — right side */}
+          <CardLoupePanel />
         </div>
       );
     }
@@ -356,21 +355,23 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             />
           </div>
         </div>
+        {/* Card loupe — right side */}
+        <CardLoupePanel />
       </div>
     );
   }
 
-  // lifecycle === 'playing' — flex layout with left sidebar + canvas
+  // lifecycle === 'playing' — three-column layout: left sidebar + canvas + card loupe
   return (
     <div style={{ display: 'flex', width: '100vw', height: '100dvh' }}>
       {leftSidebar}
 
-      {/* Right side — canvas + phase bar in flex column */}
+      {/* Center — canvas + phase bar in flex column */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Canvas — takes remaining height */}
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           {gameId !== null && (
-            <MultiplayerCanvas gameId={gameId} onHoveredCardChange={setHoveredCard} />
+            <MultiplayerCanvas gameId={gameId} />
           )}
         </div>
         {/* Phase bar — fixed height HTML below canvas */}
@@ -388,6 +389,9 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           />
         </div>
       </div>
+
+      {/* Card loupe — right side */}
+      <CardLoupePanel />
     </div>
   );
 }

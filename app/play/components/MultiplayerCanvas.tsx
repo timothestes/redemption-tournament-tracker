@@ -27,6 +27,7 @@ import type {
 } from '@/lib/spacetimedb/module_bindings/types';
 import { CardContextMenu } from '@/app/shared/components/CardContextMenu';
 import type { GameActions } from '@/app/shared/types/gameActions';
+import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import DiceOverlay from './DiceOverlay';
 
 // ---------------------------------------------------------------------------
@@ -119,14 +120,15 @@ function isAutoArrangeZone(zone: string): boolean {
 
 interface MultiplayerCanvasProps {
   gameId: bigint;
-  onHoveredCardChange?: (card: GameCard | null) => void;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: MultiplayerCanvasProps) {
+export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
+  const { setPreviewCard } = useCardPreview();
+
   // ---- Container sizing (respects flex layout) ----
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -280,10 +282,14 @@ export default function MultiplayerCanvas({ gameId, onHoveredCardChange }: Multi
     setHoverProgress(0);
   }, []);
 
-  // Propagate hoveredCard to parent component
+  // Propagate hoveredCard to the shared CardPreview context (drives CardLoupePanel)
   useEffect(() => {
-    onHoveredCardChange?.(hoveredCard);
-  }, [hoveredCard, onHoveredCardChange]);
+    setPreviewCard(
+      hoveredCard
+        ? { cardName: hoveredCard.cardName, cardImgFile: hoveredCard.cardImgFile }
+        : null,
+    );
+  }, [hoveredCard, setPreviewCard]);
 
   // ---- Selection state (multi-select via marquee) ----
   const {
