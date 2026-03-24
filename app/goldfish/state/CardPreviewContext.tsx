@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, useMemo, type ReactNode } from 'react';
 
-const STORAGE_KEY = 'goldfish-loupe-visible';
+const DEFAULT_STORAGE_KEY = 'goldfish-loupe-visible';
 
 interface PreviewCard {
   cardName: string;
@@ -23,11 +23,17 @@ interface CardPreviewContextValue {
 
 const CardPreviewContext = createContext<CardPreviewContextValue | null>(null);
 
-export function CardPreviewProvider({ children }: { children: ReactNode }) {
+export function CardPreviewProvider({
+  children,
+  storageKey = DEFAULT_STORAGE_KEY
+}: {
+  children: ReactNode;
+  storageKey?: string;
+}) {
   const [previewCard, setPreviewCard] = useState<PreviewCard | null>(null);
   const [isLoupeVisible, setIsLoupeVisible] = useState(() => {
     if (typeof window === 'undefined') return false;
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(storageKey);
     // Default to true for first-time users on desktop
     if (stored === null) return window.innerWidth >= 1200;
     return stored === 'true';
@@ -36,10 +42,10 @@ export function CardPreviewProvider({ children }: { children: ReactNode }) {
   const toggleLoupe = useCallback(() => {
     setIsLoupeVisible(prev => {
       const next = !prev;
-      localStorage.setItem(STORAGE_KEY, String(next));
+      localStorage.setItem(storageKey, String(next));
       return next;
     });
-  }, []);
+  }, [storageKey]);
 
   // Auto-hide on narrow viewports
   useEffect(() => {
