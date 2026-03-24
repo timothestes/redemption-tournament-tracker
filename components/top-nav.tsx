@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { HiMenu, HiDocumentText, HiArrowSmRight, HiUserAdd, HiShieldCheck, HiGlobeAlt, HiSparkles, HiCalendar, HiCollection } from "react-icons/hi";
+import { GiCrossedSwords } from "react-icons/gi";
 import { IoClose } from "react-icons/io5";
 import { FaTrophy, FaBookOpen } from "react-icons/fa6";
 import { PiPencilLineBold } from "react-icons/pi";
@@ -123,6 +124,7 @@ const TopNav: React.FC = () => {
   const isActive = (path: string) => pathname?.startsWith(path);
 
   const navLinks = [
+    { href: "/play", label: "Play", icon: GiCrossedSwords, authRequired: true },
     { href: "/register", label: NATIONALS_CONFIG.adminOnly ? `${NATIONALS_CONFIG.displayName} (Admin Only)` : `${NATIONALS_CONFIG.displayName}`, icon: HiUserAdd, highlight: true },
     { href: "/decklist/card-search?new=true", label: "Deck Builder", icon: TbSearch },
     { href: "/spoilers", label: "Spoilers", icon: HiSparkles },
@@ -185,7 +187,8 @@ const TopNav: React.FC = () => {
 
           {/* Desktop Navigation - Center */}
           <div className={`hidden lg:flex lg:items-center lg:space-x-1 flex-1 justify-center transition-opacity duration-150 ${navReady ? 'opacity-100' : 'opacity-0'}`}>
-            {navLinks.slice(0, 1).map((link) => {
+            {navLinks.slice(0, 2).map((link) => {
+              if (link.authRequired && !user) return null;
               const Icon = link.icon;
               const isHighlight = link.highlight;
               return (
@@ -334,7 +337,8 @@ const TopNav: React.FC = () => {
             </div>
 
             {/* Rest of nav links */}
-            {navLinks.slice(1).map((link) => {
+            {navLinks.slice(2).map((link) => {
+              if (link.authRequired && !user) return null;
               const Icon = link.icon;
               const isHighlight = link.highlight;
               return (
@@ -550,8 +554,9 @@ const TopNav: React.FC = () => {
       {isMobileMenuOpen && (
         <div className="lg:hidden border-t border-border max-h-[calc(100dvh-4rem)] overflow-y-auto">
           <div className="px-2 pt-2 pb-3 space-y-1">
-            {/* Nationals link */}
-            {navLinks.slice(0, 1).map((link) => {
+            {/* Play + Nationals links */}
+            {navLinks.slice(0, 2).map((link) => {
+              if (link.authRequired && !user) return null;
               const Icon = link.icon;
               const isHighlight = link.highlight;
               return (
@@ -693,7 +698,8 @@ const TopNav: React.FC = () => {
             </div>
 
             {/* Rest of nav links */}
-            {navLinks.slice(1).map((link) => {
+            {navLinks.slice(2).map((link) => {
+              if (link.authRequired && !user) return null;
               const Icon = link.icon;
               const isHighlight = link.highlight;
               return (
