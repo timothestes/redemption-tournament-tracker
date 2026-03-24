@@ -37,14 +37,26 @@ export async function loadDeckForGame(deckId: string): Promise<LoadDeckResult> {
     throw new Error('You must be logged in to load a deck.');
   }
 
-  const { data: deck, error: deckError } = await supabase
+  // Try loading as user's own deck first, then fall back to public deck
+  const { data: ownDeck } = await supabase
     .from('decks')
     .select('id, name, format')
     .eq('id', deckId)
     .eq('user_id', user.id)
     .single();
 
-  if (deckError || !deck) {
+  let deck = ownDeck;
+  if (!deck) {
+    const { data: publicDeck } = await supabase
+      .from('decks')
+      .select('id, name, format')
+      .eq('id', deckId)
+      .eq('is_public', true)
+      .single();
+    deck = publicDeck;
+  }
+
+  if (!deck) {
     throw new Error('Deck not found.');
   }
 
@@ -81,4 +93,47 @@ export async function loadDeckForGame(deckId: string): Promise<LoadDeckResult> {
   }
 
   return { deck, deckData };
+}
+
+/**
+ * Search public community decks by name.
+ * Returns up to 20 results ordered by view count.
+ */
+export async function searchCommunityDecks(query: string): Promise<{
+  id: string;
+  name: string;
+  format: string | null;
+  card_count: number | null;
+  username: string | null;
+}[]> {
+  if (!query || query.length < 2) return [];
+
+  const supabase = await createClient();
+
+  const { data: decks, error } = await supabase
+    .from('decks')
+    .select('id, name, format, card_count, user_id')
+    .eq('is_public', true)
+    .ilike('name', `%${query}%`)
+    .order('view_count', { ascending: false })
+    .limit(20);
+
+  if (error || !decks) return [];
+
+  // Fetch usernames for the results
+  const userIds = [...new Set(decks.map(d => d.user_id))];
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, username')
+    .in('id', userIds);
+
+  const usernameMap = new Map(profiles?.map(p => [p.id, p.username]) ?? []);
+
+  return decks.map(d => ({
+    id: d.id,
+    name: d.name,
+    format: d.format,
+    card_count: d.card_count,
+    username: usernameMap.get(d.user_id) ?? null,
+  }));
 }

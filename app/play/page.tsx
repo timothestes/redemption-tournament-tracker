@@ -19,7 +19,7 @@ export default async function PlayPage() {
 
   const { data: decks } = await supabase
     .from('decks')
-    .select('id, name, format')
+    .select('id, name, format, card_count')
     .eq('user_id', user.id)
     .order('updated_at', { ascending: false });
 
