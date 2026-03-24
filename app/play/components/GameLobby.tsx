@@ -1,41 +1,36 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { loadDeckForGame, searchCommunityDecks } from '../actions';
-
-type DeckOption = {
-  id: string;
-  name: string;
-  format: string | null;
-  card_count: number | null;
-  username?: string | null;
-};
+import { getCardImageUrl } from '@/lib/card-images';
+import { loadDeckForGame } from '../actions';
+import { DeckPickerModal } from './DeckPickerModal';
+import type { DeckOption } from './DeckPickerCard';
 
 interface GameLobbyProps {
-  decks: { id: string; name: string; format: string | null; card_count: number | null }[];
+  decks: DeckOption[];
   userId: string;
   displayName: string;
 }
 
 export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
-  // Deck picker state
-  const [selectedDeck, setSelectedDeck] = useState<DeckOption | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'my' | 'community'>('my');
-  const [communityResults, setCommunityResults] = useState<DeckOption[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [showPicker, setShowPicker] = useState(true);
+  // Pre-fill game code from ?join=XXXX invite link
+  const joinCode = searchParams.get('join')?.toUpperCase().slice(0, 4) ?? '';
+
+  // Auto-select most recent deck (list is sorted by updated_at DESC)
+  const [selectedDeck, setSelectedDeck] = useState<DeckOption | null>(
+    decks.length > 0 ? decks[0] : null
+  );
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   // Game state
-  const [displayNameInput, setDisplayNameInput] = useState(displayName);
-  const [gameCode, setGameCode] = useState('');
+  const [gameCode, setGameCode] = useState(joinCode);
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,52 +38,10 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
   // Spectate state
   const [spectateCode, setSpectateCode] = useState('');
 
-  // Debounce timer ref for community search
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Community search with debounce
-  const doCommunitySearch = useCallback(async (query: string) => {
-    if (query.length < 2) {
-      setCommunityResults([]);
-      return;
-    }
-    setIsSearching(true);
-    try {
-      const results = await searchCommunityDecks(query);
-      setCommunityResults(results);
-    } catch {
-      setCommunityResults([]);
-    } finally {
-      setIsSearching(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (activeTab !== 'community') return;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      doCommunitySearch(searchQuery);
-    }, 300);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [searchQuery, activeTab, doCommunitySearch]);
-
-  // Filter user's decks client-side
-  const filteredMyDecks = decks.filter((d) =>
-    d.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
   function handleSelectDeck(deck: DeckOption) {
     setSelectedDeck(deck);
-    setShowPicker(false);
+    setPickerOpen(false);
     setError(null);
-  }
-
-  function handleChangeDeck() {
-    setSelectedDeck(null);
-    setShowPicker(true);
-    setSearchQuery('');
   }
 
   async function handleCreateGame() {
@@ -106,9 +59,11 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
         JSON.stringify({
           role: 'create',
           deckId: selectedDeck.id,
-          displayName: displayNameInput,
+          deckName: selectedDeck.name,
+          displayName,
           supabaseUserId: userId,
           format: selectedDeck.format || 'Type 1',
+          paragon: selectedDeck.paragon || null,
           deckData: JSON.stringify(deckData),
         })
       );
@@ -138,8 +93,11 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
         JSON.stringify({
           role: 'join',
           deckId: selectedDeck.id,
-          displayName: displayNameInput,
+          deckName: selectedDeck.name,
+          displayName,
           supabaseUserId: userId,
+          format: selectedDeck.format || 'Type 1',
+          paragon: selectedDeck.paragon || null,
           deckData: JSON.stringify(deckData),
         })
       );
@@ -156,216 +114,180 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
     router.push(`/play/spectate/${code}`);
   }
 
-  const resultsToShow: DeckOption[] = activeTab === 'my' ? filteredMyDecks : communityResults;
+  // Preview image helpers
+  const img1Url = getCardImageUrl(selectedDeck?.preview_card_1);
+  const img2Url = getCardImageUrl(selectedDeck?.preview_card_2);
+  const hasPreview = img1Url || img2Url;
+  const isParagon =
+    selectedDeck?.format?.toLowerCase().includes('paragon') && selectedDeck?.paragon;
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Deck Selection */}
-      <section className="rounded-lg border border-border bg-card p-6">
-        <h2 className="text-lg font-semibold mb-4">Select Deck</h2>
+    <div className="flex flex-col gap-5">
+      {/* Deck selection — matches community/my-decks card preview style */}
+      <section className="rounded-lg border border-border bg-card overflow-hidden">
+        {selectedDeck ? (
+          <>
+            {/* Card preview header — same style as community DeckCard */}
+            {isParagon ? (
+              <div className="h-32 overflow-hidden">
+                <img
+                  src={`/paragons/Paragon ${selectedDeck.paragon}.png`}
+                  alt={selectedDeck.paragon!}
+                  className="w-full h-full object-cover object-top"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              </div>
+            ) : hasPreview ? (
+              <div className="h-32 overflow-hidden bg-gray-100 dark:bg-gray-900 flex items-center justify-center gap-1 px-2 py-2">
+                {img1Url && (
+                  <img src={img1Url} alt="" className="h-full object-contain rounded" />
+                )}
+                {img2Url && (
+                  <img src={img2Url} alt="" className="h-full object-contain rounded" />
+                )}
+              </div>
+            ) : (
+              <div className="h-20 bg-gray-100 dark:bg-gray-900 flex items-center justify-center">
+                <img
+                  src="/gameplay/cardback.webp"
+                  alt=""
+                  className="h-14 w-auto object-contain rounded opacity-30"
+                />
+              </div>
+            )}
 
-        {decks.length === 0 && !selectedDeck && (
-          <p className="text-sm text-muted-foreground mb-4">
-            No saved decks found.{' '}
-            <a href="/decklist/card-search" className="underline text-primary">
-              Build a deck
-            </a>{' '}
-            first, or search community decks below.
-          </p>
-        )}
-
-        {selectedDeck && !showPicker ? (
-          <div className="flex items-center justify-between rounded-md border border-border bg-background px-4 py-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="font-medium truncate">{selectedDeck.name}</span>
-              {selectedDeck.format && (
-                <Badge variant="secondary" className="shrink-0 text-xs">
-                  {selectedDeck.format}
-                </Badge>
-              )}
-              {selectedDeck.card_count != null && (
-                <span className="text-xs text-muted-foreground shrink-0">
-                  {selectedDeck.card_count} cards
-                </span>
-              )}
-              {selectedDeck.username && (
-                <span className="text-xs text-muted-foreground shrink-0">
-                  by {selectedDeck.username}
-                </span>
-              )}
+            {/* Deck info + change button */}
+            <div className="flex items-center justify-between px-5 py-3">
+              <div className="flex flex-col min-w-0">
+                <span className="font-semibold truncate text-base">{selectedDeck.name}</span>
+                <div className="flex items-center gap-2 mt-0.5">
+                  {selectedDeck.format && (
+                    <Badge variant="secondary" className="text-xs">
+                      {selectedDeck.format}
+                    </Badge>
+                  )}
+                  {selectedDeck.card_count != null && (
+                    <span className="text-xs text-muted-foreground">
+                      {selectedDeck.card_count} cards
+                    </span>
+                  )}
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPickerOpen(true)}
+                className="shrink-0"
+              >
+                Change
+              </Button>
             </div>
+          </>
+        ) : (
+          <div className="flex flex-col items-center gap-3 py-6 px-5">
+            <p className="text-sm text-muted-foreground">
+              No saved decks.{' '}
+              <a href="/decklist/card-search" className="underline text-primary">
+                Build one
+              </a>{' '}
+              or pick from the community.
+            </p>
             <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleChangeDeck}
-              className="shrink-0 ml-2"
+              variant="outline"
+              onClick={() => setPickerOpen(true)}
             >
-              Change
+              Browse Decks
             </Button>
           </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {/* Search input */}
-            <Input
-              placeholder="Search your decks or community decks..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="focus-visible:ring-0 focus-visible:border-primary"
-            />
-
-            {/* Tabs */}
-            <div className="flex gap-1">
-              <button
-                type="button"
-                onClick={() => setActiveTab('my')}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  activeTab === 'my'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                }`}
-              >
-                My Decks
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('community')}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  activeTab === 'community'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                }`}
-              >
-                Community
-              </button>
-            </div>
-
-            {/* Results list */}
-            <div className="max-h-60 overflow-y-auto rounded-md border border-border bg-background">
-              {activeTab === 'community' && isSearching && (
-                <div className="px-4 py-3 text-sm text-muted-foreground">
-                  Searching...
-                </div>
-              )}
-
-              {activeTab === 'community' && !isSearching && searchQuery.length < 2 && (
-                <div className="px-4 py-3 text-sm text-muted-foreground">
-                  Type at least 2 characters to search community decks.
-                </div>
-              )}
-
-              {activeTab === 'community' && !isSearching && searchQuery.length >= 2 && resultsToShow.length === 0 && (
-                <div className="px-4 py-3 text-sm text-muted-foreground">
-                  No community decks found.
-                </div>
-              )}
-
-              {activeTab === 'my' && resultsToShow.length === 0 && (
-                <div className="px-4 py-3 text-sm text-muted-foreground">
-                  {searchQuery
-                    ? 'No matching decks found.'
-                    : 'No saved decks. Try the Community tab.'}
-                </div>
-              )}
-
-              {resultsToShow.length > 0 && (
-                <ul className="divide-y divide-border">
-                  {resultsToShow.map((deck) => (
-                    <li key={deck.id}>
-                      <button
-                        type="button"
-                        onClick={() => handleSelectDeck(deck)}
-                        className="w-full text-left px-4 py-3 hover:bg-muted transition-colors flex items-center gap-3"
-                      >
-                        <span className="font-medium truncate min-w-0 flex-1">
-                          {deck.name}
-                        </span>
-                        {deck.format && (
-                          <Badge variant="secondary" className="shrink-0 text-xs">
-                            {deck.format}
-                          </Badge>
-                        )}
-                        {deck.card_count != null && (
-                          <span className="text-xs text-muted-foreground shrink-0">
-                            {deck.card_count} cards
-                          </span>
-                        )}
-                        {deck.username && (
-                          <span className="text-xs text-muted-foreground shrink-0">
-                            by {deck.username}
-                          </span>
-                        )}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
         )}
       </section>
 
-      {/* Display Name */}
-      <section className="rounded-lg border border-border bg-card p-6">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="display-name">Display Name</Label>
-          <Input
-            id="display-name"
-            value={displayNameInput}
-            onChange={(e) => setDisplayNameInput(e.target.value)}
-            maxLength={32}
-            className="focus-visible:ring-0 focus-visible:border-primary"
-          />
-        </div>
-      </section>
+      {/* Deck Picker Modal */}
+      <DeckPickerModal
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        onSelect={handleSelectDeck}
+        myDecks={decks}
+        selectedDeckId={selectedDeck?.id}
+      />
 
-      {/* Create / Join */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Create Game */}
-        <section className="rounded-lg border border-border bg-card p-6">
-          <h2 className="text-lg font-semibold mb-4">Create Game</h2>
-          <div className="flex flex-col gap-3">
-            {selectedDeck?.format && (
-              <p className="text-sm text-muted-foreground">
-                Format: <span className="text-foreground">{selectedDeck.format}</span>
-              </p>
-            )}
+      {/* Actions — invite link mode shows join/spectate choice, normal mode shows create OR join */}
+      {joinCode ? (
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground text-center">
+            You&apos;ve been invited to game <span className="font-mono font-bold text-foreground">{joinCode}</span>
+          </p>
+          <div className="flex gap-2">
             <Button
+              size="lg"
+              onClick={handleJoinGame}
+              disabled={isJoining || !selectedDeck}
+              className="flex-1 h-12 text-base"
+            >
+              {isJoining ? 'Joining...' : 'Join as Player'}
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => {
+                router.push(`/play/spectate/${joinCode}`);
+              }}
+              className="flex-1 h-12 text-base"
+            >
+              Watch as Spectator
+            </Button>
+          </div>
+          <a
+            href="/play"
+            className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors text-center"
+          >
+            Or create your own game
+          </a>
+        </div>
+      ) : (
+        <div className="flex flex-col sm:flex-row items-stretch gap-3">
+          <div className="sm:basis-0 sm:flex-1">
+            <Button
+              size="lg"
               onClick={handleCreateGame}
               disabled={isCreating || !selectedDeck}
-              className="w-full"
+              className="w-full h-12 text-base"
             >
               {isCreating ? 'Loading deck...' : 'Create Game'}
             </Button>
           </div>
-        </section>
 
-        {/* Join Game */}
-        <section className="rounded-lg border border-border bg-card p-6">
-          <h2 className="text-lg font-semibold mb-4">Join Game</h2>
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="join-code">Game Code</Label>
-              <Input
-                id="join-code"
-                value={gameCode}
-                onChange={(e) =>
-                  setGameCode(e.target.value.toUpperCase().slice(0, 4))
-                }
-                placeholder="ABCD"
-                maxLength={4}
-                className="uppercase tracking-widest font-mono focus-visible:ring-0 focus-visible:border-primary"
-              />
-            </div>
+          {/* OR divider */}
+          <div className="flex sm:flex-col items-center justify-center gap-2 sm:gap-1 py-1 sm:py-0 sm:px-2 shrink-0">
+            <div className="flex-1 h-px sm:h-auto sm:w-px bg-border sm:flex-1" />
+            <span className="text-xs font-cinzel text-muted-foreground tracking-widest">OR</span>
+            <div className="flex-1 h-px sm:h-auto sm:w-px bg-border sm:flex-1" />
+          </div>
+
+          <div className="flex gap-2 sm:basis-0 sm:flex-1">
+            <Input
+              value={gameCode}
+              onChange={(e) =>
+                setGameCode(e.target.value.toUpperCase().slice(0, 4))
+              }
+              placeholder="Game Code"
+              maxLength={4}
+              className="flex-1 uppercase tracking-widest font-mono text-center h-12 focus-visible:ring-0 focus-visible:border-primary"
+            />
             <Button
+              size="lg"
+              variant="outline"
               onClick={handleJoinGame}
               disabled={isJoining || gameCode.length !== 4 || !selectedDeck}
-              className="w-full"
+              className="shrink-0 h-12 px-6"
             >
-              {isJoining ? 'Loading deck...' : 'Join Game'}
+              {isJoining ? 'Joining...' : 'Join'}
             </Button>
           </div>
-        </section>
-      </div>
+        </div>
+      )}
 
       {/* Error */}
       {error && (
@@ -373,28 +295,27 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
       )}
 
       {/* Spectate */}
-      <section className="rounded-lg border border-border bg-card p-6">
-        <div className="flex items-center gap-3">
-          <h2 className="text-sm font-semibold shrink-0">Spectate</h2>
-          <Input
-            value={spectateCode}
-            onChange={(e) =>
-              setSpectateCode(e.target.value.toUpperCase().slice(0, 4))
-            }
-            placeholder="ABCD"
-            maxLength={4}
-            className="uppercase tracking-widest font-mono max-w-24 focus-visible:ring-0 focus-visible:border-primary"
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSpectate}
-            disabled={spectateCode.trim().length !== 4}
-          >
-            Watch
-          </Button>
-        </div>
-      </section>
+      <div className="flex items-center justify-center gap-2 text-sm border-t border-border pt-4">
+        <span className="text-muted-foreground text-xs">Spectate a game</span>
+        <Input
+          value={spectateCode}
+          onChange={(e) =>
+            setSpectateCode(e.target.value.toUpperCase().slice(0, 4))
+          }
+          placeholder="Code"
+          maxLength={4}
+          className="uppercase tracking-widest font-mono w-20 h-8 text-sm text-center focus-visible:ring-0 focus-visible:border-primary"
+        />
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleSpectate}
+          disabled={spectateCode.trim().length !== 4}
+          className="h-8 text-xs text-muted-foreground hover:text-foreground"
+        >
+          Watch
+        </Button>
+      </div>
     </div>
   );
 }

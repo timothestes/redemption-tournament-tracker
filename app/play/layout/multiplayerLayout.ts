@@ -267,16 +267,16 @@ export function calculateMultiplayerLayout(
 
   // Opponent piles: reversed order — Discard (top) → Deck → Reserve → Banish → LOR (bottom)
   const oppPileLabels = isParagon
-    ? ['Paragon', 'Discard', 'Deck', 'Reserve', 'Banish Zone', 'Land of Redemption']
-    : ['Discard', 'Deck', 'Reserve', 'Banish Zone', 'Land of Redemption'];
+    ? ['Paragon', 'Discard', 'Deck', 'Reserve', 'Banish', 'Land of Redmn']
+    : ['Discard', 'Deck', 'Reserve', 'Banish', 'Land of Redmn'];
   const oppPileKeys: PileZone[] = isParagon
     ? ['paragon', 'discard', 'deck', 'reserve', 'banish', 'lor']
     : ['discard', 'deck', 'reserve', 'banish', 'lor'];
 
   // Player piles: LOR (top) → Banish → Reserve → Deck → Discard (bottom)
   const playerPileLabels = isParagon
-    ? ['Land of Redemption', 'Banish Zone', 'Reserve', 'Deck', 'Discard', 'Paragon']
-    : ['Land of Redemption', 'Banish Zone', 'Reserve', 'Deck', 'Discard'];
+    ? ['Land of Redmn', 'Banish', 'Reserve', 'Deck', 'Discard', 'Paragon']
+    : ['Land of Redmn', 'Banish', 'Reserve', 'Deck', 'Discard'];
   const playerPileKeys: PileZone[] = isParagon
     ? ['lor', 'banish', 'reserve', 'deck', 'discard', 'paragon']
     : ['lor', 'banish', 'reserve', 'deck', 'discard'];

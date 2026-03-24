@@ -155,7 +155,7 @@ function ListingCard({
   return (
     <div
       className={`group border rounded-lg transition-colors
-        ${isImminent ? "border-primary/30 bg-primary/[0.03]" : "border-border hover:bg-muted/30"}`}
+        ${isImminent ? "border-primary/30 bg-card/90 backdrop-blur-sm" : "border-border bg-card/80 backdrop-blur-sm hover:bg-card/90"}`}
     >
       <button
         onClick={onToggle}
@@ -659,7 +659,7 @@ export default function TournamentsClient({
             <div className="space-y-8">
               {grouped.map(({ month, listings: monthListings }) => (
                 <section key={month}>
-                  <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 sticky top-16 bg-background py-2 z-10 border-b border-border">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 sticky top-16 bg-card/90 backdrop-blur-sm py-2 z-10 border-b border-border">
                     {month}
                   </h2>
                   <div className="space-y-2">

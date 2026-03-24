@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useTheme } from "next-themes";
+import React from "react";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 
@@ -9,18 +8,7 @@ import Image from "next/image";
 const SKIP_BACKGROUND_PREFIXES = ["/decklist/", "/tracker/", "/admin/"];
 
 const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
-  const { theme, resolvedTheme } = useTheme();
   const pathname = usePathname();
-  const [mounted, setMounted] = useState(false);
-
-  // Only run on client to avoid hydration mismatch
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // Use a safe default for server-side rendering and initial load
-  const currentTheme = mounted ? (theme === 'system' ? resolvedTheme : theme) : 'light';
-  const isLightTheme = currentTheme === 'light';
 
   const skipBackground = SKIP_BACKGROUND_PREFIXES.some(prefix => pathname.startsWith(prefix));
 
@@ -34,49 +22,35 @@ const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
 
   return (
     <div className="min-h-screen w-full relative">
-      {/* Different background styling based on theme */}
-      <div className="fixed inset-0 overflow-hidden">
-        {/* Base background color - pure white for maximum light mode contrast */}
-        <div className="absolute inset-0 bg-white dark:bg-gray-900"></div>
+      {/* Solid background behind nav area */}
+      <div className="fixed inset-x-0 top-0 h-14 bg-white dark:bg-gray-900 z-0" />
 
-        {/* Image background with extremely reduced opacity for light mode */}
+      {/* Hero image container — starts below the nav */}
+      <div className="fixed inset-x-0 top-14 bottom-0 overflow-hidden">
+        {/* Base background color */}
+        <div className="absolute inset-0 bg-white dark:bg-gray-900" />
+
+        {/* Hero image — CSS-only theme handling, no JS state needed */}
         <Image
           src="/lor-login-splash.webp"
-          alt="Background"
+          alt=""
           fill
           sizes="100vw"
-          className={`object-cover ${isLightTheme ? 'opacity-10' : 'opacity-75'}`}
-          style={{
-            filter: isLightTheme
-              ? 'brightness(1.8) contrast(0.7) saturate(0.3) blur(1.5px)'
-              : 'brightness(1.05) contrast(0.95)'
-          }}
+          className="object-cover object-top opacity-10 dark:opacity-75 brightness-[1.8] contrast-[0.7] saturate-[0.3] blur-[1.5px] dark:brightness-[1.05] dark:contrast-[0.95] dark:saturate-100 dark:blur-0"
           priority
-          placeholder="blur"
-          blurDataURL="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiPjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiNmZmZmZmYiLz48L3N2Zz4="
         />
 
-        {/* White overlay for light mode to further enhance readability */}
-        <div className={`absolute inset-0 ${isLightTheme ? 'bg-white/50 mix-blend-overlay' : 'bg-black/40'}`}></div>
+        {/* Overlay — light gets white wash, dark gets dark wash */}
+        <div className="absolute inset-0 bg-white/50 mix-blend-overlay dark:bg-black/40 dark:mix-blend-normal" />
 
-        {/* Almost imperceptible bottom vignette for light mode */}
-        <div className="absolute inset-0 bg-gradient-to-t from-gray-300/10 dark:from-black/40 via-transparent to-transparent"></div>
+        {/* Bottom vignette */}
+        <div className="absolute inset-0 bg-gradient-to-t from-gray-300/10 dark:from-black/40 via-transparent to-transparent" />
 
-        {/* Extremely subtle bottom gradient for light mode */}
-        <div className="absolute inset-x-0 bottom-0 h-3/4 bg-gradient-to-t from-gray-200/10 dark:from-black/30 via-transparent to-transparent"></div>
+        {/* Bottom gradient */}
+        <div className="absolute inset-x-0 bottom-0 h-3/4 bg-gradient-to-t from-gray-200/10 dark:from-black/30 via-transparent to-transparent" />
 
-        {/* Custom gradient with minimal opacity for light mode */}
-        <div style={{
-            position: 'absolute',
-            top: '0px',
-            right: '0px',
-            bottom: '0px',
-            left: '0px',
-            backgroundImage: isLightTheme
-              ? 'linear-gradient(to top, rgba(0, 0, 0, 0.08) 0%, rgba(0, 0, 0, 0.03) 35%, transparent 65%)'
-              : 'linear-gradient(to top, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.15) 40%, transparent 80%)',
-            pointerEvents: 'none',
-          }}></div>
+        {/* Depth gradient */}
+        <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/[0.08] dark:from-black/35 via-black/[0.03] dark:via-black/15 via-35% dark:via-40% to-transparent to-65% dark:to-80%" />
       </div>
 
       <div className="relative z-10">{children}</div>

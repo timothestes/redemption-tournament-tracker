@@ -13,7 +13,7 @@ export default async function TournamentsPage() {
   const listings = await loadUpcomingListings();
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
+    <div className="flex flex-col min-h-screen">
       <TopNav />
       <div className="flex-1">
         <TournamentsClient listings={listings} />

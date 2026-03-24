@@ -1,0 +1,134 @@
+"use client";
+
+import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import { getCardImageUrl } from "@/lib/card-images";
+
+export type DeckOption = {
+  id: string;
+  name: string;
+  format: string | null;
+  card_count: number | null;
+  username?: string | null;
+  preview_card_1?: string | null;
+  preview_card_2?: string | null;
+  paragon?: string | null;
+};
+
+interface DeckPickerCardProps {
+  deck: DeckOption;
+  onClick: () => void;
+  selected?: boolean;
+}
+
+function formatDeckType(format: string | null): string {
+  if (!format) return "T1";
+  const fmt = format.toLowerCase();
+  if (fmt.includes("paragon")) return "Paragon";
+  if (fmt.includes("type 2") || fmt.includes("multi") || fmt === "t2")
+    return "T2";
+  return "T1";
+}
+
+export function DeckPickerCard({ deck, onClick, selected }: DeckPickerCardProps) {
+  const [img1Error, setImg1Error] = useState(false);
+  const [img2Error, setImg2Error] = useState(false);
+
+  const deckType = formatDeckType(deck.format);
+  const isParagon = deckType === "Paragon" && deck.paragon;
+
+  const img1Url = getCardImageUrl(deck.preview_card_1);
+  const img2Url = getCardImageUrl(deck.preview_card_2);
+  const hasPreviewImages =
+    (img1Url && !img1Error) || (img2Url && !img2Error);
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "w-full text-left rounded-lg border",
+        selected
+          ? "border-primary"
+          : "border-gray-200 dark:border-gray-700",
+        "bg-white dark:bg-gray-800",
+        "hover:border-primary/70 dark:hover:border-primary/70",
+        "transition-colors cursor-pointer",
+        "flex flex-col overflow-hidden",
+      )}
+    >
+      {/* Image Header */}
+      {isParagon ? (
+        <div className="h-24 overflow-hidden bg-gray-100 dark:bg-gray-900">
+          <img
+            src={`/paragons/Paragon ${deck.paragon}.png`}
+            alt={deck.paragon!}
+            className="w-full h-full object-cover object-top"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+            }}
+          />
+        </div>
+      ) : hasPreviewImages ? (
+        <div className="relative h-24 overflow-hidden bg-gray-100 dark:bg-gray-900 flex items-center justify-center gap-1 px-2 py-2">
+          {img1Url && !img1Error && (
+            <img
+              src={img1Url}
+              alt=""
+              className="h-full object-contain rounded"
+              onError={() => setImg1Error(true)}
+            />
+          )}
+          {img2Url && !img2Error && (
+            <img
+              src={img2Url}
+              alt=""
+              className="h-full object-contain rounded"
+              onError={() => setImg2Error(true)}
+            />
+          )}
+        </div>
+      ) : (
+        <div className="h-12 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-center">
+          <svg
+            className="w-5 h-5 text-gray-300 dark:text-gray-600"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.5}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.41a2.25 2.25 0 013.182 0l2.909 2.91M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z"
+            />
+          </svg>
+        </div>
+      )}
+
+      {/* Body */}
+      <div className="px-3 py-2 flex flex-col gap-0.5 min-w-0">
+        <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+          {deck.name}
+        </span>
+        <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+          <Badge
+            variant="secondary"
+            className="text-[10px] px-1.5 py-0 leading-4"
+          >
+            {deckType}
+          </Badge>
+          {deck.card_count != null && (
+            <span>{deck.card_count} cards</span>
+          )}
+        </div>
+        {deck.username && (
+          <span className="text-xs text-gray-400 dark:text-gray-500 truncate">
+            by {deck.username}
+          </span>
+        )}
+      </div>
+    </button>
+  );
+}

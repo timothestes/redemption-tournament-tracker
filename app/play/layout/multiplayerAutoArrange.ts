@@ -1,6 +1,4 @@
-// TODO: Once multiplayerLayout.ts lands, switch to:
-// import type { ZoneRect } from './multiplayerLayout';
-import type { ZoneRect } from './multiplayerHandLayout';
+import type { ZoneRect } from './multiplayerLayout';
 
 /**
  * Calculate auto-arranged positions for cards in a horizontal strip zone (LOB).

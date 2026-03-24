@@ -12,6 +12,9 @@ import TurnIndicator from '@/app/play/components/TurnIndicator';
 import ChatPanel from '../components/ChatPanel';
 import { CardPreviewProvider } from '@/app/goldfish/state/CardPreviewContext';
 import { CardLoupePanel } from '@/app/goldfish/components/CardLoupePanel';
+import TopNav from '@/components/top-nav';
+import WaitingRoomGoldfish from '../components/WaitingRoomGoldfish';
+import { convertToGoldfishDeck, type GameCardData } from '../utils/convertToGoldfishDeck';
 
 // Konva requires browser APIs — lazy-load to avoid SSR issues
 const MultiplayerCanvas = dynamic(
@@ -31,6 +34,8 @@ interface GameParams {
   supabaseUserId: string;
   deckData: string;
   format?: string;
+  deckName?: string;
+  paragon?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -77,6 +82,111 @@ export function GameClient({ code }: GameClientProps) {
 // ---------------------------------------------------------------------------
 type LifecycleState = 'creating' | 'joining' | 'waiting' | 'playing' | 'finished' | 'error';
 
+// ---------------------------------------------------------------------------
+// Waiting screen — shown while waiting for opponent
+// ---------------------------------------------------------------------------
+
+function CopyButton({ text, label, icon }: { text: string; label: string; icon: 'copy' | 'link' }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <button
+      onClick={handleCopy}
+      title={label}
+      className="flex items-center gap-2 px-4 py-2 rounded-md text-sm border border-border bg-card hover:bg-muted transition-colors"
+    >
+      {copied ? (
+        <>
+          <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+          </svg>
+          <span className="text-primary">Copied!</span>
+        </>
+      ) : icon === 'copy' ? (
+        <>
+          <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+          </svg>
+          <span>Copy Code</span>
+        </>
+      ) : (
+        <>
+          <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
+          </svg>
+          <span>Invite Link</span>
+        </>
+      )}
+    </button>
+  );
+}
+
+function WaitingScreen({ code, goldfishDeck, onPractice }: {
+  code: string;
+  goldfishDeck: import('@/app/goldfish/types').DeckDataForGoldfish | null;
+  onPractice: () => void;
+}) {
+  return (
+    <>
+    <TopNav />
+    <div className="flex min-h-[calc(100vh-56px)] items-center justify-center px-4">
+      <div className="rounded-xl border border-border bg-card/95 backdrop-blur-sm p-8 sm:p-10 text-center max-w-md w-full">
+        {/* Code display */}
+        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground font-cinzel">Game Code</p>
+        <p className="font-mono text-5xl sm:text-6xl font-bold tracking-wider text-foreground mt-2">{code}</p>
+
+        {/* Status */}
+        <p className="mt-5 text-sm text-muted-foreground">Waiting for opponent to join...</p>
+        <div className="mt-3 flex justify-center gap-1.5">
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:-0.3s]" />
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:-0.15s]" />
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary" />
+        </div>
+
+        {/* Share actions */}
+        <div className="mt-6 flex justify-center gap-2">
+          <CopyButton text={code} label="Copy code" icon="copy" />
+          <CopyButton
+            text={typeof window !== 'undefined' ? `${window.location.origin}/play?join=${code}` : code}
+            label="Copy invite link"
+            icon="link"
+          />
+        </div>
+
+        {/* Practice */}
+        {goldfishDeck && (
+          <>
+            <div className="my-6 h-px bg-border" />
+            <button
+              onClick={onPractice}
+              className="w-full py-3 rounded-lg border border-border hover:bg-muted/50 transition-colors font-cinzel tracking-wide text-sm"
+            >
+              Practice While You Wait
+            </button>
+          </>
+        )}
+
+        <a
+          href="/play"
+          className="mt-4 inline-block text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+        >
+          Back to lobby
+        </a>
+      </div>
+    </div>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Inner component — must live inside SpacetimeProvider to use SpacetimeDB hooks
+// ---------------------------------------------------------------------------
+
 interface GameInnerProps {
   code: string;
   isConnected: boolean;
@@ -90,6 +200,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
 
   const [lifecycle, setLifecycle] = useState<LifecycleState>('creating');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isPracticing, setIsPracticing] = useState(false);
   const [gameId, setGameId] = useState<bigint | null>(null);
   const didCallReducer = useRef(false);
   const didSubscribe = useRef(false);
@@ -151,13 +262,23 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         setLifecycle('waiting');
       } else {
         setLifecycle('joining');
-        conn.reducers.joinGame({
-          code,
-          deckId: gameParams.deckId,
-          displayName: gameParams.displayName,
-          supabaseUserId: gameParams.supabaseUserId,
-          deckData: gameParams.deckData,
-        });
+        try {
+          conn.reducers.joinGame({
+            code,
+            deckId: gameParams.deckId,
+            displayName: gameParams.displayName,
+            supabaseUserId: gameParams.supabaseUserId,
+            deckData: gameParams.deckData,
+          });
+        } catch (joinErr: unknown) {
+          // SpacetimeDB SenderError may throw synchronously
+          const msg = joinErr instanceof Error ? joinErr.message : 'Failed to join game';
+          setErrorMessage(msg.includes('No waiting game')
+            ? `No game found with code "${code}". The game may have ended or the code may be incorrect.`
+            : msg);
+          setLifecycle('error');
+          return;
+        }
       }
     } catch (e: unknown) {
       setErrorMessage(e instanceof Error ? e.message : 'Failed to initialize game');
@@ -182,6 +303,29 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     }
   }, [gameState.allGames, code, gameId]);
 
+  // Fast detection: once subscription data arrives and we're still 'joining',
+  // check if a game with our code exists. If not, fail immediately.
+  useEffect(() => {
+    if (lifecycle !== 'joining') return;
+    const { allGames } = gameState;
+    if (!allGames || allGames.length === 0) return; // subscription not applied yet
+    const found = allGames.find((g: any) => g.code === code);
+    if (!found) {
+      setErrorMessage(`No game found with code "${code}". The game may have ended or the code may be incorrect.`);
+      setLifecycle('error');
+    }
+  }, [lifecycle, gameState.allGames, code]);
+
+  // Fallback timeout — if subscription never arrives (network issues), fail after 5s
+  useEffect(() => {
+    if (lifecycle !== 'joining') return;
+    const timeout = setTimeout(() => {
+      setErrorMessage(`Could not connect to game "${code}". Please check your connection and try again.`);
+      setLifecycle('error');
+    }, 5000);
+    return () => clearTimeout(timeout);
+  }, [lifecycle, code]);
+
   // Sync lifecycle state from live game data
   useEffect(() => {
     const { game } = gameState;
@@ -204,52 +348,127 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     return map;
   }, [gameState.myPlayer, gameState.opponentPlayer]);
 
+  // Compute goldfish deck for practice-while-waiting
+  const goldfishDeck = useMemo(() => {
+    if (!gameParams?.deckData) return null;
+    try {
+      const cards = JSON.parse(gameParams.deckData) as GameCardData[];
+      if (cards.length === 0) return null;
+      return convertToGoldfishDeck(
+        cards,
+        gameParams.deckId,
+        gameParams.deckName || 'Practice Deck',
+        gameParams.format || 'Type 1',
+        gameParams.paragon
+      );
+    } catch {
+      return null;
+    }
+  }, [gameParams]);
+
   // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
 
   if (lifecycle === 'error') {
+    const isGameNotFound = errorMessage?.includes('No game found');
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-8 text-center">
-          <p className="text-lg font-semibold text-destructive">Error</p>
-          <p className="mt-2 text-sm text-muted-foreground">{errorMessage ?? 'An unexpected error occurred.'}</p>
+      <>
+      <TopNav />
+      <div className="flex min-h-[calc(100vh-56px)] items-center justify-center px-4">
+        <div className="rounded-lg border border-border bg-card/95 backdrop-blur-sm p-8 text-center max-w-sm">
+          {/* Visual anchor */}
+          <div className="mb-4 flex justify-center">
+            <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center">
+              {isGameNotFound ? (
+                <svg className="w-8 h-8 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                </svg>
+              ) : (
+                <svg className="w-8 h-8 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                </svg>
+              )}
+            </div>
+          </div>
+          <p className="text-lg font-semibold font-cinzel mb-2">
+            {isGameNotFound ? 'Game Not Found' : 'Connection Error'}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {isGameNotFound
+              ? `No game found with code "${code}".`
+              : (errorMessage ?? 'An unexpected error occurred.')}
+          </p>
+          {isGameNotFound && (
+            <p className="text-xs text-muted-foreground/70 mt-1">
+              The game may have ended, or the code may be wrong.
+            </p>
+          )}
           <a
             href="/play"
-            className="mt-4 inline-block rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            className="mt-6 inline-block rounded-md border border-border px-5 py-2.5 text-sm font-medium hover:bg-muted transition-colors"
           >
-            Back to lobby
+            Back to Lobby
           </a>
         </div>
       </div>
+      </>
     );
   }
 
   if (lifecycle === 'creating' || lifecycle === 'joining' || (!isConnected && !isActive)) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
         <div className="text-center">
           <div className="mb-4 h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" />
-          <p className="text-sm text-muted-foreground">Connecting...</p>
+          <p className="text-sm text-foreground">
+            {lifecycle === 'joining' ? `Joining game ${code}...` : 'Setting up game...'}
+          </p>
+          {lifecycle === 'joining' && (
+            <p className="text-xs text-muted-foreground mt-2">
+              Looking for game room...
+            </p>
+          )}
         </div>
       </div>
     );
   }
 
   if (lifecycle === 'waiting') {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Game code</p>
-          <p className="font-mono text-5xl font-bold tracking-wider text-foreground">{code}</p>
-          <p className="mt-6 text-sm text-muted-foreground">Waiting for opponent to join...</p>
-          <div className="mt-4 flex justify-center gap-1">
-            <span className="h-2 w-2 animate-bounce rounded-full bg-primary [animation-delay:-0.3s]" />
-            <span className="h-2 w-2 animate-bounce rounded-full bg-primary [animation-delay:-0.15s]" />
-            <span className="h-2 w-2 animate-bounce rounded-full bg-primary" />
+    if (isPracticing && goldfishDeck) {
+      return (
+        <div className="fixed inset-0 bg-background">
+          {/* Floating banner */}
+          <div className="fixed top-0 inset-x-0 z-50 h-12 flex items-center justify-between px-4 bg-background/90 backdrop-blur-sm border-b border-border">
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-lg font-bold tracking-wider">{code}</span>
+              <span className="text-sm text-muted-foreground">Waiting for opponent</span>
+              <span className="flex gap-1">
+                {[0, 1, 2].map(i => (
+                  <span key={i} className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+                ))}
+              </span>
+            </div>
+            <button
+              onClick={() => setIsPracticing(false)}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Exit Practice
+            </button>
+          </div>
+          <div className="pt-12">
+            <WaitingRoomGoldfish deck={goldfishDeck} />
           </div>
         </div>
-      </div>
+      );
+    }
+
+    return (
+      <WaitingScreen
+        code={code}
+        goldfishDeck={goldfishDeck}
+        onPractice={() => setIsPracticing(true)}
+      />
     );
   }
 
@@ -265,19 +484,26 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   }
 
   // ---------------------------------------------------------------------------
-  // Left sidebar — shared between playing and finished states
+  // Right panel — card preview (loupe) on top, chat below
   // ---------------------------------------------------------------------------
-  const leftSidebar = (
+  const rightPanel = (
     <div style={{
-      width: 'clamp(180px, 12vw, 240px)',
+      width: 'clamp(240px, 16vw, 300px)',
       flexShrink: 0,
       display: 'flex',
       flexDirection: 'column',
       background: 'rgba(10, 8, 5, 0.97)',
-      borderRight: '1px solid rgba(107, 78, 39, 0.3)',
+      borderLeft: '1px solid rgba(107, 78, 39, 0.3)',
+      overflow: 'hidden',
     }}>
-      {/* Chat — takes all space */}
-      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      {/* Card preview — top portion, override loupe width to fill parent */}
+      <div style={{ flexShrink: 0, overflow: 'hidden' }}>
+        <div style={{ width: '100%' }}>
+          <CardLoupePanel />
+        </div>
+      </div>
+      {/* Chat — fills remaining space */}
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', borderTop: '1px solid rgba(107, 78, 39, 0.3)' }}>
         <ChatPanel
           chatMessages={gameState.chatMessages}
           gameActions={gameState.gameActions}
@@ -296,9 +522,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     if (gameId !== null && !gameState.isLoading) {
       return (
         <div style={{ display: 'flex', width: '100vw', height: '100dvh' }}>
-          {leftSidebar}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            {/* Canvas — takes remaining height */}
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden', pointerEvents: 'none' }}>
               <MultiplayerCanvas gameId={gameId} />
               <GameOverOverlay
@@ -309,7 +533,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                 onReturnToLobby={handleReturnToLobby}
               />
             </div>
-            {/* Phase bar — fixed height HTML below canvas */}
             <div style={{ flexShrink: 0, height: 56 }}>
               <TurnIndicator
                 game={gameState.game}
@@ -323,15 +546,13 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               />
             </div>
           </div>
-          {/* Card loupe — right side */}
-          <CardLoupePanel />
+          {rightPanel}
         </div>
       );
     }
     // Fallback — canvas not ready
     return (
       <div style={{ display: 'flex', width: '100vw', height: '100dvh' }}>
-        {leftSidebar}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
             <GameOverOverlay
@@ -355,26 +576,21 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             />
           </div>
         </div>
-        {/* Card loupe — right side */}
-        <CardLoupePanel />
+        {rightPanel}
       </div>
     );
   }
 
-  // lifecycle === 'playing' — three-column layout: left sidebar + canvas + card loupe
+  // lifecycle === 'playing' — two-column layout: canvas + right panel (preview + chat)
   return (
     <div style={{ display: 'flex', width: '100vw', height: '100dvh' }}>
-      {leftSidebar}
-
-      {/* Center — canvas + phase bar in flex column */}
+      {/* Canvas + phase bar */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        {/* Canvas — takes remaining height */}
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           {gameId !== null && (
             <MultiplayerCanvas gameId={gameId} />
           )}
         </div>
-        {/* Phase bar — fixed height HTML below canvas */}
         <div style={{ flexShrink: 0, height: 56 }}>
           <TurnIndicator
             game={gameState.game}
@@ -390,8 +606,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         </div>
       </div>
 
-      {/* Card loupe — right side */}
-      <CardLoupePanel />
+      {/* Right panel — preview on top, chat below */}
+      {rightPanel}
     </div>
   );
 }

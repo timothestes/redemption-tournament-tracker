@@ -1,13 +1,4 @@
-// TODO: Once multiplayerLayout.ts lands, switch to:
-// import type { ZoneRect } from './multiplayerLayout';
-// For now, define locally so this file compiles independently.
-export interface ZoneRect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  label: string;
-}
+import type { ZoneRect } from './multiplayerLayout';
 
 export interface HandCardPosition {
   x: number;
