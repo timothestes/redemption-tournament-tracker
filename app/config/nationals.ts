@@ -38,7 +38,7 @@ export const NATIONALS_CONFIG: NationalsConfig = {
   year: 2026,
   
   // Display name for navigation and headings
-  displayName: "Nationals 2026",
+  displayName: "Nats 2026",
   
   // Tournament dates
   dates: "July 23-25, 2026",
