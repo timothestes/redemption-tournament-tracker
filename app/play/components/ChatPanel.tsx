@@ -82,7 +82,7 @@ export default function ChatPanel({
   onSendChat,
   playerNames,
 }: ChatPanelProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<'chat' | 'log'>('chat');
   const [inputText, setInputText] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
