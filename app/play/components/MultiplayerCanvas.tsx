@@ -345,6 +345,17 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     [],
   );
 
+  // ---- Escape key clears selection ----
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedIds.size > 0) {
+        clearSelection();
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [selectedIds.size, clearSelection]);
+
   // ---- Context menu state ----
   const [contextMenu, setContextMenu] = useState<{
     card: GameCard; x: number; y: number;
@@ -383,6 +394,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
   const isDraggingRef = useRef(false);
   const dragSourceZoneRef = useRef<string | null>(null);
   const dragOriginalPosRef = useRef<{ x: number; y: number } | null>(null);
+  const dragOriginalParentRef = useRef<Konva.Container | null>(null);
   const [dragHoverZone, setDragHoverZone] = useState<DropZoneKey | null>(null);
   const dragHoverZoneRef = useRef<DropZoneKey | null>(null);
 
@@ -460,8 +472,11 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
         // and renders on top of all other zones during the drag.
         const layer = node.getLayer();
         if (layer && node.parent !== layer) {
+          dragOriginalParentRef.current = node.parent as Konva.Container;
           node.moveTo(layer);
           node.moveToTop();
+        } else {
+          dragOriginalParentRef.current = null;
         }
       }
 
@@ -602,11 +617,13 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       const followerOffsets = dragFollowerOffsets.current;
       const originalPos = dragOriginalPosRef.current;
       const sourceZone = dragSourceZoneRef.current;
+      const originalParent = dragOriginalParentRef.current;
 
       // Reset drag state
       isDraggingRef.current = false;
       dragSourceZoneRef.current = null;
       dragOriginalPosRef.current = null;
+      dragOriginalParentRef.current = null;
       dragHoverZoneRef.current = null;
       dragFollowerOffsets.current = null;
       dragGhostOffsetRef.current = null;
@@ -636,6 +653,14 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       const isGroupDrag = selectedIds.has(card.instanceId) && selectedIds.size > 1;
       const cardIds = isGroupDrag ? Array.from(selectedIds) : [card.instanceId];
       const cardId = BigInt(card.instanceId);
+
+      // Restore the dragged node to its original parent (clip group) so that
+      // react-konva reconciliation doesn't create an orphaned duplicate.
+      // This must happen after reading dropX/dropY but before any state updates
+      // that would trigger a re-render.
+      if (originalParent && node.parent !== originalParent) {
+        node.moveTo(originalParent);
+      }
 
       // Helper to snap back to original position
       const snapBack = () => {
@@ -748,6 +773,8 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       cardHeight,
       selectedIds,
       clearSelection,
+      myZones,
+      opponentZones,
     ],
   );
 
@@ -761,6 +788,20 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
   const noopOpponentContextMenu = useCallback(
     (_card: GameCard, _e: Konva.KonvaEventObject<PointerEvent>) => {},
     [],
+  );
+
+  // Universal card click handler — shift-click toggles selection
+  const handleCardClick = useCallback(
+    (card: GameCard, e: Konva.KonvaEventObject<MouseEvent>) => {
+      if (e.evt.shiftKey) {
+        toggleSelect(card.instanceId);
+        return;
+      }
+      if (selectedIds.size > 0 && !selectedIds.has(card.instanceId)) {
+        clearSelection();
+      }
+    },
+    [selectedIds, clearSelection, toggleSelect],
   );
 
   const handleCardContextMenu = useCallback(
@@ -855,6 +896,28 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       }
     }
 
+    // My auto-arrange zone cards (LOB)
+    for (const zoneKey of AUTO_ARRANGE_ZONES) {
+      const cards = myCards[zoneKey] ?? [];
+      const zone = myZones[zoneKey];
+      if (cards.length > 0 && zone) {
+        const positions = calculateAutoArrangePositions(cards.length, zone, lobCard.cardWidth, lobCard.cardHeight);
+        cards.forEach((card, i) => {
+          const pos = positions[i];
+          if (pos) {
+            bounds.push({
+              instanceId: String(card.id),
+              x: pos.x,
+              y: pos.y,
+              width: lobCard.cardWidth,
+              height: lobCard.cardHeight,
+              rotation: 0,
+            });
+          }
+        });
+      }
+    }
+
     // My hand cards
     const handCards = myCards['hand'] ?? [];
     if (handCards.length > 0) {
@@ -881,7 +944,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     }
 
     return bounds;
-  }, [mpLayout, myHandRect, myZones, myCards, cardWidth, cardHeight, isSpreadHand]);
+  }, [mpLayout, myHandRect, myZones, myCards, cardWidth, cardHeight, lobCard, isSpreadHand]);
 
   // ---- Stage mouse handlers for marquee selection ----
   const handleStageMouseDown = useCallback(
@@ -1193,6 +1256,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                       isDraggable={true}
                       hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
                       nodeRef={registerCardNode}
+                      onClick={handleCardClick}
                       onDragStart={handleCardDragStart}
                       onDragMove={handleCardDragMove}
                       onDragEnd={handleCardDragEnd}
@@ -1288,10 +1352,11 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                       cardWidth={lobCard.cardWidth}
                       cardHeight={lobCard.cardHeight}
                       image={getCardImage(card)}
-                      isSelected={false}
+                      isSelected={isSelected(String(card.id))}
                       isDraggable={true}
                       hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
                       nodeRef={registerCardNode}
+                      onClick={handleCardClick}
                       onDragStart={handleCardDragStart}
                       onDragMove={handleCardDragMove}
                       onDragEnd={handleCardDragEnd}
@@ -1698,6 +1763,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                       isDraggable={true}
                       hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
                       nodeRef={registerCardNode}
+                      onClick={handleCardClick}
                       onDragStart={handleCardDragStart}
                       onDragMove={handleCardDragMove}
                       onDragEnd={handleCardDragEnd}
