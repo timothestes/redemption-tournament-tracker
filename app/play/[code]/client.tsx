@@ -36,6 +36,8 @@ interface GameParams {
   format?: string;
   deckName?: string;
   paragon?: string | null;
+  isPublic?: boolean;
+  lobbyMessage?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -257,6 +259,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           format: gameParams.format ?? 'standard',
           supabaseUserId: gameParams.supabaseUserId,
           deckData: gameParams.deckData,
+          isPublic: gameParams.isPublic ?? true,
+          lobbyMessage: gameParams.lobbyMessage ?? '',
         });
         // Transition to waiting — the game row will appear via subscription
         setLifecycle('waiting');

@@ -38,6 +38,11 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
   // Spectate state
   const [spectateCode, setSpectateCode] = useState('');
 
+  // Tab and lobby visibility state
+  const [activeTab, setActiveTab] = useState<'create' | 'lobby'>('create');
+  const [isPublic, setIsPublic] = useState(true);
+  const [lobbyMessage, setLobbyMessage] = useState('');
+
   function handleSelectDeck(deck: DeckOption) {
     setSelectedDeck(deck);
     setPickerOpen(false);
@@ -65,6 +70,8 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
           format: selectedDeck.format || 'Type 1',
           paragon: selectedDeck.paragon || null,
           deckData: JSON.stringify(deckData),
+          isPublic: isPublic,
+          lobbyMessage: lobbyMessage,
         })
       );
       router.push(`/play/${code}`);
@@ -213,7 +220,33 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
         selectedDeckId={selectedDeck?.id}
       />
 
-      {/* Actions — invite link mode shows join/spectate choice, normal mode shows create OR join */}
+      {/* Tab navigation — only shown when NOT in invite link mode */}
+      {!joinCode && (
+        <div className="flex border-b border-border">
+          <button
+            onClick={() => setActiveTab('create')}
+            className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'create'
+                ? 'border-primary text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Create / Join
+          </button>
+          <button
+            onClick={() => setActiveTab('lobby')}
+            className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'lobby'
+                ? 'border-primary text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Open Games
+          </button>
+        </div>
+      )}
+
+      {/* Actions — invite link mode shows join/spectate choice, normal mode shows tabbed content */}
       {joinCode ? (
         <div className="flex flex-col gap-3">
           <p className="text-sm text-muted-foreground text-center">
@@ -245,77 +278,125 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
           >
             Or create your own game
           </a>
+
+          {/* Error */}
+          {error && (
+            <p className="text-sm text-destructive text-center">{error}</p>
+          )}
         </div>
       ) : (
-        <div className="flex flex-col sm:flex-row items-stretch gap-3">
-          <div className="sm:basis-0 sm:flex-1">
-            <Button
-              size="lg"
-              onClick={handleCreateGame}
-              disabled={isCreating || !selectedDeck}
-              className="w-full h-12 text-base"
-            >
-              {isCreating ? 'Loading deck...' : 'Create Game'}
-            </Button>
-          </div>
+        <>
+          {activeTab === 'create' && (
+            <>
+              <div className="flex flex-col gap-3">
+                <div className="sm:basis-0 sm:flex-1">
+                  <Button
+                    size="lg"
+                    onClick={handleCreateGame}
+                    disabled={isCreating || !selectedDeck}
+                    className="w-full h-12 text-base"
+                  >
+                    {isCreating ? 'Loading deck...' : 'Create Game'}
+                  </Button>
+                </div>
 
-          {/* OR divider */}
-          <div className="flex sm:flex-col items-center justify-center gap-2 sm:gap-1 py-1 sm:py-0 sm:px-2 shrink-0">
-            <div className="flex-1 h-px sm:h-auto sm:w-px bg-border sm:flex-1" />
-            <span className="text-xs font-cinzel text-muted-foreground tracking-widest">OR</span>
-            <div className="flex-1 h-px sm:h-auto sm:w-px bg-border sm:flex-1" />
-          </div>
+                {/* Public game toggle */}
+                <div className="flex items-center justify-between py-2">
+                  <label htmlFor="public-toggle" className="text-sm text-muted-foreground">
+                    Show in lobby
+                  </label>
+                  <button
+                    id="public-toggle"
+                    role="switch"
+                    aria-checked={isPublic}
+                    onClick={() => setIsPublic(!isPublic)}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                      isPublic ? 'bg-primary' : 'bg-muted'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                        isPublic ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                      }`}
+                    />
+                  </button>
+                </div>
+                {isPublic && (
+                  <Input
+                    value={lobbyMessage}
+                    onChange={(e) => setLobbyMessage(e.target.value.slice(0, 100))}
+                    placeholder="Message (optional) — e.g. casual game, new players welcome"
+                    maxLength={100}
+                    className="text-sm h-9 focus-visible:ring-0 focus-visible:border-primary"
+                  />
+                )}
 
-          <div className="flex gap-2 sm:basis-0 sm:flex-1">
-            <Input
-              value={gameCode}
-              onChange={(e) =>
-                setGameCode(e.target.value.toUpperCase().slice(0, 4))
-              }
-              placeholder="Game Code"
-              maxLength={4}
-              className="flex-1 uppercase tracking-widest font-mono text-center h-12 focus-visible:ring-0 focus-visible:border-primary"
-            />
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={handleJoinGame}
-              disabled={isJoining || gameCode.length !== 4 || !selectedDeck}
-              className="shrink-0 h-12 px-6"
-            >
-              {isJoining ? 'Joining...' : 'Join'}
-            </Button>
-          </div>
-        </div>
+                {/* OR divider */}
+                <div className="flex sm:flex-col items-center justify-center gap-2 sm:gap-1 py-1 sm:py-0 sm:px-2 shrink-0">
+                  <div className="flex-1 h-px sm:h-auto sm:w-px bg-border sm:flex-1" />
+                  <span className="text-xs font-cinzel text-muted-foreground tracking-widest">OR</span>
+                  <div className="flex-1 h-px sm:h-auto sm:w-px bg-border sm:flex-1" />
+                </div>
+
+                <div className="flex gap-2">
+                  <Input
+                    value={gameCode}
+                    onChange={(e) =>
+                      setGameCode(e.target.value.toUpperCase().slice(0, 4))
+                    }
+                    placeholder="Game Code"
+                    maxLength={4}
+                    className="flex-1 uppercase tracking-widest font-mono text-center h-12 focus-visible:ring-0 focus-visible:border-primary"
+                  />
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    onClick={handleJoinGame}
+                    disabled={isJoining || gameCode.length !== 4 || !selectedDeck}
+                    className="shrink-0 h-12 px-6"
+                  >
+                    {isJoining ? 'Joining...' : 'Join'}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Error */}
+              {error && (
+                <p className="text-sm text-destructive text-center">{error}</p>
+              )}
+
+              {/* Spectate */}
+              <div className="flex items-center justify-center gap-2 text-sm border-t border-border pt-4">
+                <span className="text-muted-foreground text-xs">Spectate a game</span>
+                <Input
+                  value={spectateCode}
+                  onChange={(e) =>
+                    setSpectateCode(e.target.value.toUpperCase().slice(0, 4))
+                  }
+                  placeholder="Code"
+                  maxLength={4}
+                  className="uppercase tracking-widest font-mono w-20 h-8 text-sm text-center focus-visible:ring-0 focus-visible:border-primary"
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSpectate}
+                  disabled={spectateCode.trim().length !== 4}
+                  className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Watch
+                </Button>
+              </div>
+            </>
+          )}
+
+          {activeTab === 'lobby' && (
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              Loading open games...
+            </div>
+          )}
+        </>
       )}
-
-      {/* Error */}
-      {error && (
-        <p className="text-sm text-destructive text-center">{error}</p>
-      )}
-
-      {/* Spectate */}
-      <div className="flex items-center justify-center gap-2 text-sm border-t border-border pt-4">
-        <span className="text-muted-foreground text-xs">Spectate a game</span>
-        <Input
-          value={spectateCode}
-          onChange={(e) =>
-            setSpectateCode(e.target.value.toUpperCase().slice(0, 4))
-          }
-          placeholder="Code"
-          maxLength={4}
-          className="uppercase tracking-widest font-mono w-20 h-8 text-sm text-center focus-visible:ring-0 focus-visible:border-primary"
-        />
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleSpectate}
-          disabled={spectateCode.trim().length !== 4}
-          className="h-8 text-xs text-muted-foreground hover:text-foreground"
-        >
-          Watch
-        </Button>
-      </div>
     </div>
   );
 }
