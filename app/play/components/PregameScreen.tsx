@@ -71,8 +71,9 @@ function DeckSelectPhase({ gameState, gameId }: { gameState: GameState; gameId: 
   if (!game || !myPlayer) return null;
 
   const mySeat = myPlayer.seat;
-  const myReady = mySeat === 0n ? game.pregameReady0 : game.pregameReady1;
-  const opponentReady = mySeat === 0n ? game.pregameReady1 : game.pregameReady0;
+  const isSeat0 = mySeat.toString() === '0';
+  const myReady = isSeat0 ? game.pregameReady0 : game.pregameReady1;
+  const opponentReady = isSeat0 ? game.pregameReady1 : game.pregameReady0;
 
   const handleToggleReady = () => {
     gameState.pregameReady(!myReady);
@@ -173,8 +174,9 @@ function RollingPhase({ gameState, gameId }: { gameState: GameState; gameId: big
   if (!game || !myPlayer) return null;
 
   const mySeat = myPlayer.seat;
-  const myRoll = mySeat === 0n ? Number(game.rollResult0) : Number(game.rollResult1);
-  const opponentRoll = mySeat === 0n ? Number(game.rollResult1) : Number(game.rollResult0);
+  const isSeat0 = mySeat.toString() === '0';
+  const myRoll = isSeat0 ? Number(game.rollResult0) : Number(game.rollResult1);
+  const opponentRoll = isSeat0 ? Number(game.rollResult1) : Number(game.rollResult0);
   const iWon = mySeat.toString() === game.rollWinner;
   const winnerName = iWon ? myPlayer.displayName : (opponentPlayer?.displayName || 'Opponent');
 
@@ -264,7 +266,7 @@ function ChoosingPhase({ gameState, gameId }: { gameState: GameState; gameId: bi
             <Button size="lg" onClick={() => handleChoose(mySeat)}>
               I&apos;ll go first
             </Button>
-            <Button size="lg" variant="outline" onClick={() => handleChoose(mySeat === 0n ? 1n : 0n)}>
+            <Button size="lg" variant="outline" onClick={() => handleChoose(mySeat.toString() === '0' ? BigInt(1) : BigInt(0))}>
               {opponentPlayer?.displayName || 'Opponent'} goes first
             </Button>
           </div>
