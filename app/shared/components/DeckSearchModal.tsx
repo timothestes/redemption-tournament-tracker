@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { useGame } from '@/app/goldfish/state/GameContext';
+import { useModalGame } from '@/app/shared/contexts/ModalGameContext';
 import { GameCard, ZoneId, ZONE_LABELS } from '@/app/shared/types/gameCard';
 import { X, Search } from 'lucide-react';
 import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './ModalCardHoverPreview';
@@ -128,7 +128,8 @@ function rectsOverlap(
 }
 
 export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive }: DeckSearchModalProps) {
-  const { state, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleDeck } = useGame();
+  const { zones, actions } = useModalGame();
+  const { moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleDeck } = actions;
   const [search, setSearch] = useState('');
   const [searchField, setSearchField] = useState<'all' | 'type' | 'name' | 'brigade' | 'alignment' | 'ability' | 'identifier'>('all');
   const [autoShuffle, setAutoShuffle] = useState(true);
@@ -184,7 +185,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
     }
   };
 
-  const deckCards = state.zones.deck;
+  const deckCards = zones.deck;
   const filtered = search
     ? deckCards.filter(c => matchesSearch(c, search))
     : deckCards;
