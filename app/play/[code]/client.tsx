@@ -286,12 +286,17 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       return;
     }
 
-    // Reconnect scenario: game already exists, skip reducer call
-    const existingGames = [...(gameState.allGames || [])];
-    const existingGame = existingGames.find((g: any) => g.code === code);
-    if (existingGame) {
-      setGameId(existingGame.id);
-      return; // lifecycle sync effect handles the rest
+    // Reconnect scenario: if we're the creator and the game already exists,
+    // skip the createGame call (it would fail with "code already in use").
+    // Joiners must always call joinGame — they see the game via subscription
+    // before joining, so we can't use game existence as a skip signal for them.
+    if (gameParams.role === 'create') {
+      const existingGames = [...(gameState.allGames || [])];
+      const existingGame = existingGames.find((g: any) => g.code === code);
+      if (existingGame) {
+        setGameId(existingGame.id);
+        return; // lifecycle sync effect handles the rest
+      }
     }
 
     try {
