@@ -62,16 +62,36 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   ROLL_DICE: 'rolled dice',
   SEND_CHAT: 'sent a message',
   SET_PLAYER_OPTION: 'changed a setting',
-  RESIGN_GAME: 'resigned the game',
+  RESIGN: 'resigned',
+  RESIGN_GAME: 'resigned',
   LEAVE_GAME: 'left the game',
   UPDATE_CARD_POSITION: 'repositioned a card',
+  PREGAME_ROLL: 'rolled for first player',
+  PLAYER_JOINED: 'joined the game',
+  GAME_CREATED: 'created the game',
+  REMATCH_REQUESTED: 'wants to play again',
+  REMATCH_RESPONSE: 'responded to rematch',
 };
 
-function formatActionType(actionType: string, payload?: string): string {
+function formatActionType(actionType: string, payload?: string, playerNames?: Record<string, string>): string {
   if (actionType === 'ROLL_DICE' && payload) {
     try {
       const data = JSON.parse(payload);
       return `rolled a d${data.sides} → ${data.result}`;
+    } catch { /* fall through */ }
+  }
+  if (actionType === 'GAME_STARTED' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const chosenBy = data.chosenBy ?? 'Someone';
+      const chosenSeat = data.chosenSeat;
+      return `chose ${chosenSeat === '0' ? 'Player 1' : 'Player 2'} to go first`;
+    } catch { /* fall through */ }
+  }
+  if (actionType === 'PREGAME_ROLL' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      return `rolled ${data.result0} vs ${data.result1}`;
     } catch { /* fall through */ }
   }
   return ACTION_TYPE_LABELS[actionType] ?? actionType.toLowerCase().replace(/_/g, ' ');
