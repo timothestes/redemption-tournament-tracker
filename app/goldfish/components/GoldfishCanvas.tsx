@@ -19,6 +19,7 @@ import { DeckContextMenu } from '@/app/shared/components/DeckContextMenu';
 import { DeckPeekModal } from '@/app/shared/components/DeckPeekModal';
 import { DeckDropPopup } from '@/app/shared/components/DeckDropPopup';
 import { DeckExchangeModal } from '@/app/shared/components/DeckExchangeModal';
+import { ModalGameProvider, type ModalGameContextValue } from '@/app/shared/contexts/ModalGameContext';
 import { ZoneContextMenu } from '@/app/shared/components/ZoneContextMenu';
 import { LorContextMenu } from '@/app/shared/components/LorContextMenu';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
@@ -61,6 +62,19 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
     moveCardToBottomOfDeck: (cardId) => moveCardToBottomOfDeck(cardId),
     removeOpponentToken: (cardId) => removeOpponentToken(cardId),
   }), [moveCard, moveCardsBatch, flipCard, meekCard, unmeekCard, addCounter, removeCounter, shuffleCardIntoDeck, shuffleDeck, addNote, drawCard, drawMultiple, moveCardToTopOfDeck, moveCardToBottomOfDeck, removeOpponentToken]);
+
+  // Bridge goldfish game state into the shared ModalGameContext for shared modal components
+  const modalGameValue = useMemo<ModalGameContextValue>(() => ({
+    zones: state.zones,
+    actions: {
+      moveCard,
+      moveCardsBatch,
+      moveCardToTopOfDeck,
+      moveCardToBottomOfDeck,
+      shuffleDeck,
+      shuffleCardIntoDeck,
+    },
+  }), [state.zones, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleDeck, shuffleCardIntoDeck]);
 
   // Prevent browser-native drag on the canvas container.
   // Without this, the browser can hijack card drags (especially multi-select)
@@ -1676,38 +1690,39 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
         />
       )}
 
-      {browseZone && (
-        <ZoneBrowseModal
-          zoneId={browseZone}
-          onClose={() => setBrowseZone(null)}
-          onStartDrag={modalStartDrag}
-          onStartMultiDrag={modalStartMultiDrag}
-          didDragRef={modalDidDragRef}
-          isDragActive={modalDrag.isDragging}
-        />
-      )}
+      <ModalGameProvider value={modalGameValue}>
+        {browseZone && (
+          <ZoneBrowseModal
+            zoneId={browseZone}
+            onClose={() => setBrowseZone(null)}
+            onStartDrag={modalStartDrag}
+            onStartMultiDrag={modalStartMultiDrag}
+            didDragRef={modalDidDragRef}
+            isDragActive={modalDrag.isDragging}
+          />
+        )}
 
-      {showDeckSearch && (
-        <DeckSearchModal
-          onClose={() => setShowDeckSearch(false)}
-          onStartDrag={modalStartDrag}
-          onStartMultiDrag={modalStartMultiDrag}
-          didDragRef={modalDidDragRef}
-          isDragActive={modalDrag.isDragging}
-        />
-      )}
+        {showDeckSearch && (
+          <DeckSearchModal
+            onClose={() => setShowDeckSearch(false)}
+            onStartDrag={modalStartDrag}
+            onStartMultiDrag={modalStartMultiDrag}
+            didDragRef={modalDidDragRef}
+            isDragActive={modalDrag.isDragging}
+          />
+        )}
 
-      {peekState !== null && (
-        <DeckPeekModal
-          cardIds={peekState.cardIds}
-          title={peekState.title}
-          onClose={() => setPeekState(null)}
-          onStartDrag={modalStartDrag}
-          onStartMultiDrag={modalStartMultiDrag}
-          didDragRef={modalDidDragRef}
-          isDragActive={modalDrag.isDragging}
-        />
-      )}
+        {peekState !== null && (
+          <DeckPeekModal
+            cardIds={peekState.cardIds}
+            title={peekState.title}
+            onClose={() => setPeekState(null)}
+            onStartDrag={modalStartDrag}
+            onStartMultiDrag={modalStartMultiDrag}
+            didDragRef={modalDidDragRef}
+            isDragActive={modalDrag.isDragging}
+          />
+        )}
 
       {/* Zone drop target highlights — visible during any drag */}
       {(modalDrag.isDragging || canvasDragZone !== null) && (
@@ -1880,22 +1895,23 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
         />
       )}
 
-      {exchangeCardIds && (
-        <DeckExchangeModal
-          exchangeCardIds={exchangeCardIds}
-          onComplete={() => {
-            setExchangeCardIds(null);
-            clearSelection();
-          }}
-          onCancel={() => {
-            setExchangeCardIds(null);
-            setCardRenderKey(k => k + 1);
-          }}
-          onStartDrag={modalStartDrag}
-          didDragRef={modalDidDragRef}
-          isDragActive={modalDrag.isDragging}
-        />
-      )}
+        {exchangeCardIds && (
+          <DeckExchangeModal
+            exchangeCardIds={exchangeCardIds}
+            onComplete={() => {
+              setExchangeCardIds(null);
+              clearSelection();
+            }}
+            onCancel={() => {
+              setExchangeCardIds(null);
+              setCardRenderKey(k => k + 1);
+            }}
+            onStartDrag={modalStartDrag}
+            didDragRef={modalDidDragRef}
+            isDragActive={modalDrag.isDragging}
+          />
+        )}
+      </ModalGameProvider>
 
       <GameToastContainer />
       <DiceRollOverlay />
