@@ -3,7 +3,7 @@ export default spacetimedb;
 import { DisconnectTimeout, setDisconnectTimeoutReducer } from './schema';
 import { t, SenderError } from 'spacetimedb/server';
 import { ScheduleAt } from 'spacetimedb';
-import { makeSeed, seededShuffle, seededDiceRoll, generateGameCode } from './utils';
+import { makeSeed, seededShuffle, seededDiceRoll, xorshift64, generateGameCode } from './utils';
 
 // ---------------------------------------------------------------------------
 // Helper: logAction
@@ -287,6 +287,205 @@ export const join_game = spacetimedb.reducer(
 
     // Log action
     logAction(ctx, game.id, player.id, 'PLAYER_JOINED', '', 0n, 'pregame');
+  }
+);
+
+// ===========================================================================
+// Pregame ceremony reducers
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Reducer: pregame_ready
+// ---------------------------------------------------------------------------
+export const pregame_ready = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    ready: t.bool(),
+  },
+  (ctx, { gameId, ready }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'pregame') throw new SenderError('Game is not in pregame');
+    if (game.pregamePhase !== 'deck_select') throw new SenderError('Not in deck select phase');
+
+    const player = findPlayerBySender(ctx, gameId);
+
+    const updates: any = { ...game };
+    if (player.seat === 0n) {
+      updates.pregameReady0 = ready;
+    } else {
+      updates.pregameReady1 = ready;
+    }
+    ctx.db.Game.id.update(updates);
+
+    logAction(ctx, gameId, player.id, 'PREGAME_READY',
+      JSON.stringify({ seat: player.seat.toString(), ready }),
+      0n, 'pregame');
+
+    if (!ready) return;
+
+    const latestGame = ctx.db.Game.id.find(gameId);
+    if (!latestGame) return;
+    if (!latestGame.pregameReady0 || !latestGame.pregameReady1) return;
+
+    // Both ready — roll dice using single PRNG instance
+    const seed = makeSeed(
+      ctx.timestamp.microsSinceUnixEpoch,
+      gameId,
+      0n,
+      latestGame.rngCounter
+    );
+    const rng = xorshift64(seed);
+
+    let r0: number, r1: number;
+    do {
+      r0 = Number(rng.next() % 20n) + 1;
+      r1 = Number(rng.next() % 20n) + 1;
+    } while (r0 === r1);
+
+    const winner = r0 > r1 ? '0' : '1';
+
+    ctx.db.Game.id.update({
+      ...latestGame,
+      pregameReady0: false,
+      pregameReady1: false,
+      pregamePhase: 'rolling',
+      rollResult0: BigInt(r0),
+      rollResult1: BigInt(r1),
+      rollWinner: winner,
+      rngCounter: latestGame.rngCounter + 1n,
+    });
+
+    logAction(ctx, gameId, player.id, 'PREGAME_ROLL',
+      JSON.stringify({ result0: r0, result1: r1, winner }),
+      0n, 'pregame');
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: pregame_acknowledge_roll
+// ---------------------------------------------------------------------------
+export const pregame_acknowledge_roll = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+  },
+  (ctx, { gameId }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'pregame') throw new SenderError('Game is not in pregame');
+    if (game.pregamePhase !== 'rolling') throw new SenderError('Not in rolling phase');
+
+    const player = findPlayerBySender(ctx, gameId);
+
+    const updates: any = { ...game };
+    if (player.seat === 0n) {
+      updates.pregameReady0 = true;
+    } else {
+      updates.pregameReady1 = true;
+    }
+    ctx.db.Game.id.update(updates);
+
+    const latestGame = ctx.db.Game.id.find(gameId);
+    if (!latestGame) return;
+    if (!latestGame.pregameReady0 || !latestGame.pregameReady1) return;
+
+    ctx.db.Game.id.update({
+      ...latestGame,
+      pregamePhase: 'choosing',
+    });
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: pregame_choose_first
+// ---------------------------------------------------------------------------
+export const pregame_choose_first = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    chosenSeat: t.u64(),
+  },
+  (ctx, { gameId, chosenSeat }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'pregame') throw new SenderError('Game is not in pregame');
+    if (game.pregamePhase !== 'choosing') throw new SenderError('Not in choosing phase');
+    if (chosenSeat !== 0n && chosenSeat !== 1n) throw new SenderError('Invalid seat');
+
+    const player = findPlayerBySender(ctx, gameId);
+    if (player.seat.toString() !== game.rollWinner) {
+      throw new SenderError('Only the roll winner can choose');
+    }
+
+    const players: any[] = [...ctx.db.Player.player_game_id.filter(gameId)];
+    for (const p of players) {
+      if (!p.pendingDeckData || p.pendingDeckData === '') {
+        throw new SenderError('Player ' + p.displayName + ' has no deck data');
+      }
+      try { JSON.parse(p.pendingDeckData); } catch {
+        throw new SenderError('Invalid deck data for ' + p.displayName);
+      }
+    }
+
+    // Re-read game before each call since insertCardsShuffleDraw increments rngCounter
+    for (const p of players) {
+      const currentGame = ctx.db.Game.id.find(gameId);
+      if (!currentGame) throw new SenderError('Game not found');
+      insertCardsShuffleDraw(ctx, currentGame, p, p.pendingDeckData);
+      const latestPlayer = ctx.db.Player.id.find(p.id);
+      if (latestPlayer) {
+        ctx.db.Player.id.update({ ...latestPlayer, pendingDeckData: '' });
+      }
+    }
+
+    const latestGame = ctx.db.Game.id.find(gameId);
+    if (!latestGame) throw new SenderError('Game not found');
+    ctx.db.Game.id.update({
+      ...latestGame,
+      status: 'playing',
+      pregamePhase: '',
+      currentTurn: chosenSeat,
+      currentPhase: 'draw',
+      turnNumber: 1n,
+    });
+
+    logAction(ctx, gameId, player.id, 'GAME_STARTED',
+      JSON.stringify({ chosenSeat: chosenSeat.toString(), chosenBy: player.displayName }),
+      1n, 'draw');
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: pregame_change_deck
+// ---------------------------------------------------------------------------
+export const pregame_change_deck = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    deckId: t.string(),
+    deckData: t.string(),
+  },
+  (ctx, { gameId, deckId, deckData }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'pregame') throw new SenderError('Game is not in pregame');
+    if (game.pregamePhase !== 'deck_select') throw new SenderError('Not in deck select phase');
+
+    const player = findPlayerBySender(ctx, gameId);
+
+    const isReady = player.seat === 0n ? game.pregameReady0 : game.pregameReady1;
+    if (isReady) throw new SenderError('Cannot change deck while ready');
+
+    try {
+      const parsed = JSON.parse(deckData);
+      if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('not array or empty');
+    } catch {
+      throw new SenderError('Invalid deck data');
+    }
+
+    ctx.db.Player.id.update({ ...player, deckId, pendingDeckData: deckData });
+
+    logAction(ctx, gameId, player.id, 'PREGAME_DECK_CHANGE',
+      JSON.stringify({ seat: player.seat.toString(), newDeckId: deckId }),
+      0n, 'pregame');
   }
 );
 
