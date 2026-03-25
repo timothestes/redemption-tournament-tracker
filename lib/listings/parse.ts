@@ -48,7 +48,7 @@ function getClient() {
 export async function parseListingsWithLLM(pageText: string): Promise<ParsedListing[]> {
   const response = await getClient().messages.create({
     model: 'claude-haiku-4-5-20251001',
-    max_tokens: 8192,
+    max_tokens: 16384,
     temperature: 0,
     system: SYSTEM_PROMPT,
     messages: [

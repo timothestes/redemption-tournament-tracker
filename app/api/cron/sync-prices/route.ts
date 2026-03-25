@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/pricing/supabase-admin';
 import { getShopifyAccessToken, fetchAllShopifyProducts } from '@/lib/pricing/shopify';
 import { runMatchingPipeline, regenerateCardPrices, computeCheapestPrices } from '@/lib/pricing/matching';
+import { sendCronAlert } from '@/lib/cron/alerts';
 
 export const maxDuration = 300;
 
@@ -60,6 +61,7 @@ export async function GET(request: NextRequest) {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error('[cron] Price sync failed:', message);
+    await sendCronAlert('Price Sync', message);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

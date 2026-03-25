@@ -1,25 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { syncTournamentListings, SyncResult } from '@/lib/listings/sync';
 import { sendEmail } from '@/utils/email';
+import { sendCronAlert } from '@/lib/cron/alerts';
 
 const ALERT_EMAIL = 'landofredemption@gmail.com';
 
 function shouldAlert(result: SyncResult): string | null {
-  // Total failure — nothing parsed
   if (result.parsed === 0) {
     return 'Tournament sync parsed 0 listings — the Cactus page may have changed structure.';
   }
-
-  // Validation failures
   if (result.invalid > 0) {
     return `Tournament sync had ${result.invalid} invalid listing(s):\n${result.errors.join('\n')}`;
   }
-
-  // DB write errors
   if (result.errors.length > 0) {
     return `Tournament sync completed with errors:\n${result.errors.join('\n')}`;
   }
-
   return null;
 }
 
@@ -54,7 +49,7 @@ export async function GET(request: NextRequest) {
     const result = await syncTournamentListings();
     console.log('[cron] Tournament listings sync complete:', result);
 
-    // Check if we should alert
+    // Detailed alert for partial failures (parsing issues, DB errors, etc.)
     const alertReason = shouldAlert(result);
     if (alertReason) {
       console.warn('[cron] Sending alert email:', alertReason);
@@ -69,17 +64,7 @@ export async function GET(request: NextRequest) {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error('[cron] Tournament listings sync failed:', message);
-
-    // Alert on total failure
-    await sendEmail({
-      to: ALERT_EMAIL,
-      subject: `[RedemptionCCG] Tournament sync FAILED`,
-      html: `
-        <h2 style="margin:0 0 16px 0; color:#f87171;">Tournament Sync Failed</h2>
-        <p style="margin:0; font-family:monospace; font-size:13px; color:#fca5a5;">${message}</p>
-      `,
-    }).catch(() => {}); // Don't let email failure mask the original error
-
+    await sendCronAlert('Tournament Sync', message);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
