@@ -46,8 +46,11 @@ import JoinGameReducer from "./join_game_reducer";
 import LeaveGameReducer from "./leave_game_reducer";
 import MeekCardReducer from "./meek_card_reducer";
 import MoveCardReducer from "./move_card_reducer";
+import MoveCardToBottomOfDeckReducer from "./move_card_to_bottom_of_deck_reducer";
+import MoveCardToTopOfDeckReducer from "./move_card_to_top_of_deck_reducer";
 import MoveCardsBatchReducer from "./move_cards_batch_reducer";
 import RemoveCounterReducer from "./remove_counter_reducer";
+import RemoveTokenReducer from "./remove_token_reducer";
 import ResignGameReducer from "./resign_game_reducer";
 import RollDiceReducer from "./roll_dice_reducer";
 import SendChatReducer from "./send_chat_reducer";
@@ -56,6 +59,7 @@ import SetPhaseReducer from "./set_phase_reducer";
 import SetPlayerOptionReducer from "./set_player_option_reducer";
 import ShuffleCardIntoDeckReducer from "./shuffle_card_into_deck_reducer";
 import ShuffleDeckReducer from "./shuffle_deck_reducer";
+import SpawnLostSoulReducer from "./spawn_lost_soul_reducer";
 import UnmeekCardReducer from "./unmeek_card_reducer";
 import UpdateCardPositionReducer from "./update_card_position_reducer";
 import UpdateLobbyMessageReducer from "./update_lobby_message_reducer";
@@ -204,8 +208,11 @@ const reducersSchema = __reducers(
   __reducerSchema("leave_game", LeaveGameReducer),
   __reducerSchema("meek_card", MeekCardReducer),
   __reducerSchema("move_card", MoveCardReducer),
+  __reducerSchema("move_card_to_bottom_of_deck", MoveCardToBottomOfDeckReducer),
+  __reducerSchema("move_card_to_top_of_deck", MoveCardToTopOfDeckReducer),
   __reducerSchema("move_cards_batch", MoveCardsBatchReducer),
   __reducerSchema("remove_counter", RemoveCounterReducer),
+  __reducerSchema("remove_token", RemoveTokenReducer),
   __reducerSchema("resign_game", ResignGameReducer),
   __reducerSchema("roll_dice", RollDiceReducer),
   __reducerSchema("send_chat", SendChatReducer),
@@ -214,6 +221,7 @@ const reducersSchema = __reducers(
   __reducerSchema("set_player_option", SetPlayerOptionReducer),
   __reducerSchema("shuffle_card_into_deck", ShuffleCardIntoDeckReducer),
   __reducerSchema("shuffle_deck", ShuffleDeckReducer),
+  __reducerSchema("spawn_lost_soul", SpawnLostSoulReducer),
   __reducerSchema("unmeek_card", UnmeekCardReducer),
   __reducerSchema("update_card_position", UpdateCardPositionReducer),
   __reducerSchema("update_lobby_message", UpdateLobbyMessageReducer),
