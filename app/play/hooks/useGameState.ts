@@ -253,7 +253,7 @@ export function useGameState(gameId: bigint): GameState {
         gameId,
         cardInstanceIds,
         toZone,
-        positions: positions || '',
+        positions: positions || '{}',
       });
     },
     [conn, gameId],

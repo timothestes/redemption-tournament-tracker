@@ -1003,7 +1003,8 @@ export const move_card = spacetimedb.reducer(
 
     const card = ctx.db.CardInstance.id.find(cardInstanceId);
     if (!card) throw new SenderError('Card not found');
-    if (card.ownerId !== player.id) throw new SenderError('Not your card');
+    // Allow moves by either player (cards move between zones during battles/captures)
+    if (card.gameId !== gameId) throw new SenderError('Card not in this game');
 
     const fromZone = card.zone;
     const isFlipped = toZone === 'deck';
@@ -1038,13 +1039,14 @@ export const move_cards_batch = spacetimedb.reducer(
     const player = findPlayerBySender(ctx, gameId);
 
     const ids: string[] = JSON.parse(cardInstanceIds);
-    const posMap: Record<string, { posX: string; posY: string }> = JSON.parse(positions);
+    const posMap: Record<string, { posX: string; posY: string }> = positions ? JSON.parse(positions) : {};
 
     for (const idStr of ids) {
       const cardId = BigInt(idStr);
       const card = ctx.db.CardInstance.id.find(cardId);
       if (!card) throw new SenderError('Card not found: ' + idStr);
-      if (card.ownerId !== player.id) throw new SenderError('Not your card: ' + idStr);
+      // Allow moves by either player in the game (cards move between zones during battles)
+      if (card.gameId !== gameId) throw new SenderError('Card not in this game: ' + idStr);
 
       const pos = posMap[idStr] || { posX: '', posY: '' };
       const isFlipped = toZone === 'deck';
@@ -1116,7 +1118,7 @@ export const shuffle_card_into_deck = spacetimedb.reducer(
 
     const card = ctx.db.CardInstance.id.find(cardInstanceId);
     if (!card) throw new SenderError('Card not found');
-    if (card.ownerId !== player.id) throw new SenderError('Not your card');
+    if (card.gameId !== gameId) throw new SenderError('Card not in this game');
 
     // Move card to deck
     ctx.db.CardInstance.id.update({
@@ -1165,7 +1167,7 @@ export const meek_card = spacetimedb.reducer(
 
     const card = ctx.db.CardInstance.id.find(cardInstanceId);
     if (!card) throw new SenderError('Card not found');
-    if (card.ownerId !== player.id) throw new SenderError('Not your card');
+    if (card.gameId !== gameId) throw new SenderError('Card not in this game');
 
     ctx.db.CardInstance.id.update({ ...card, isMeek: true });
 
@@ -1189,7 +1191,7 @@ export const unmeek_card = spacetimedb.reducer(
 
     const card = ctx.db.CardInstance.id.find(cardInstanceId);
     if (!card) throw new SenderError('Card not found');
-    if (card.ownerId !== player.id) throw new SenderError('Not your card');
+    if (card.gameId !== gameId) throw new SenderError('Card not in this game');
 
     ctx.db.CardInstance.id.update({ ...card, isMeek: false });
 
@@ -1213,7 +1215,7 @@ export const flip_card = spacetimedb.reducer(
 
     const card = ctx.db.CardInstance.id.find(cardInstanceId);
     if (!card) throw new SenderError('Card not found');
-    if (card.ownerId !== player.id) throw new SenderError('Not your card');
+    if (card.gameId !== gameId) throw new SenderError('Card not in this game');
 
     ctx.db.CardInstance.id.update({ ...card, isFlipped: !card.isFlipped });
 
@@ -1239,7 +1241,7 @@ export const update_card_position = spacetimedb.reducer(
 
     const card = ctx.db.CardInstance.id.find(cardInstanceId);
     if (!card) throw new SenderError('Card not found');
-    if (card.ownerId !== player.id) throw new SenderError('Not your card');
+    if (card.gameId !== gameId) throw new SenderError('Card not in this game');
 
     ctx.db.CardInstance.id.update({ ...card, posX, posY });
     // No logAction — too noisy
@@ -1260,7 +1262,7 @@ export const add_counter = spacetimedb.reducer(
 
     const card = ctx.db.CardInstance.id.find(cardInstanceId);
     if (!card) throw new SenderError('Card not found');
-    if (card.ownerId !== player.id) throw new SenderError('Not your card');
+    if (card.gameId !== gameId) throw new SenderError('Card not in this game');
 
     // Find existing counter for this card+color
     let existingCounter: any = null;
@@ -1303,7 +1305,7 @@ export const remove_counter = spacetimedb.reducer(
 
     const card = ctx.db.CardInstance.id.find(cardInstanceId);
     if (!card) throw new SenderError('Card not found');
-    if (card.ownerId !== player.id) throw new SenderError('Not your card');
+    if (card.gameId !== gameId) throw new SenderError('Card not in this game');
 
     let existingCounter: any = null;
     for (const counter of ctx.db.CardCounter.card_counter_card_instance_id.filter(cardInstanceId)) {
@@ -1342,7 +1344,7 @@ export const set_note = spacetimedb.reducer(
 
     const card = ctx.db.CardInstance.id.find(cardInstanceId);
     if (!card) throw new SenderError('Card not found');
-    if (card.ownerId !== player.id) throw new SenderError('Not your card');
+    if (card.gameId !== gameId) throw new SenderError('Card not in this game');
 
     ctx.db.CardInstance.id.update({ ...card, notes: text });
     // No logAction
@@ -1369,7 +1371,7 @@ export const exchange_cards = spacetimedb.reducer(
       const cardId = BigInt(idStr);
       const card = ctx.db.CardInstance.id.find(cardId);
       if (!card) throw new SenderError('Card not found: ' + idStr);
-      if (card.ownerId !== player.id) throw new SenderError('Not your card: ' + idStr);
+      if (card.gameId !== gameId) throw new SenderError('Card not in this game: ' + idStr);
     }
 
     // Move all cards to deck, flipped
@@ -1428,7 +1430,7 @@ export const move_card_to_top_of_deck = spacetimedb.reducer(
 
     const card = ctx.db.CardInstance.id.find(cardInstanceId);
     if (!card) throw new SenderError('Card not found');
-    if (card.ownerId !== player.id) throw new SenderError('Not your card');
+    if (card.gameId !== gameId) throw new SenderError('Card not in this game');
 
     // Shift all existing deck cards' zoneIndex += 1
     const deckCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
@@ -1470,7 +1472,7 @@ export const move_card_to_bottom_of_deck = spacetimedb.reducer(
 
     const card = ctx.db.CardInstance.id.find(cardInstanceId);
     if (!card) throw new SenderError('Card not found');
-    if (card.ownerId !== player.id) throw new SenderError('Not your card');
+    if (card.gameId !== gameId) throw new SenderError('Card not in this game');
 
     // Find max zoneIndex among player's deck cards
     const deckCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
@@ -1562,7 +1564,7 @@ export const remove_token = spacetimedb.reducer(
 
     const card = ctx.db.CardInstance.id.find(cardInstanceId);
     if (!card) throw new SenderError('Card not found');
-    if (card.ownerId !== player.id) throw new SenderError('Not your card');
+    if (card.gameId !== gameId) throw new SenderError('Card not in this game');
     if (!card.cardType.startsWith('TOKEN_')) throw new SenderError('Card is not a token');
 
     ctx.db.CardInstance.id.delete(cardInstanceId);
