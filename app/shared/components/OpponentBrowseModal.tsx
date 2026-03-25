@@ -170,14 +170,14 @@ export function OpponentBrowseModal({
       onClick={() => { setContextCard(null); onClose(); }}
       onContextMenu={(e) => e.preventDefault()}
       style={{
-        position: 'absolute',
+        position: 'fixed',
         inset: 0,
         background: 'rgba(0,0,0,0.75)',
         display: 'flex',
         alignItems: 'flex-start',
         justifyContent: 'center',
         paddingTop: '5vh',
-        zIndex: 700,
+        zIndex: 900,
       }}
     >
       <div

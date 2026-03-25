@@ -119,7 +119,7 @@ function insertCardsShuffleDraw(
       id: 0n,
       gameId: game.id,
       ownerId: player.id,
-      zone: 'deck',
+      zone: card.isReserve ? 'reserve' : 'deck',
       zoneIndex: BigInt(i),
       posX: '',
       posY: '',

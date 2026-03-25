@@ -256,7 +256,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
         position: 'fixed',
         inset: 0,
         background: 'rgba(0,0,0,0.7)',
-        zIndex: 600,
+        zIndex: 900,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

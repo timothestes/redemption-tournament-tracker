@@ -368,14 +368,14 @@ export function DeckContextMenu({
       ref={menuRef}
       onContextMenu={(e) => e.preventDefault()}
       style={{
-        position: 'absolute',
+        position: 'fixed',
         left: menuLeft,
         top: Math.min(y, window.innerHeight - 300),
         background: 'var(--gf-bg)',
         border: '1px solid var(--gf-border)',
         borderRadius: 6,
         padding: '4px 0',
-        zIndex: 600,
+        zIndex: 900,
         boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
         whiteSpace: 'nowrap',
       }}

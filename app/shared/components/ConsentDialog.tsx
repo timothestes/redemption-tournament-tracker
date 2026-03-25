@@ -11,9 +11,9 @@ export function ConsentDialog({ requesterName, zoneName, onAllow, onDeny }: Cons
   return (
     <div
       style={{
-        position: 'absolute',
+        position: 'fixed',
         inset: 0,
-        zIndex: 800,
+        zIndex: 900,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

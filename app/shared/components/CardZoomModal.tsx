@@ -42,7 +42,7 @@ export function CardZoomModal({ card, onClose }: CardZoomModalProps) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 600,
+          zIndex: 900,
           cursor: 'pointer',
         }}
       >

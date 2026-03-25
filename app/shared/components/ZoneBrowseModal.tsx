@@ -77,7 +77,7 @@ function CardContextPopup({
         border: '1px solid var(--gf-border)',
         borderRadius: 6,
         padding: '4px 0',
-        zIndex: 600,
+        zIndex: 900,
         minWidth: 140,
         boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
       }}
@@ -146,7 +146,11 @@ interface ZoneBrowseModalProps {
 export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive, readOnly }: ZoneBrowseModalProps) {
   const { zones, actions } = useModalGame();
   const { moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck } = actions;
-  const cards = zones[zoneId];
+  const rawCards = zones[zoneId];
+  // Sort reserve by type then name (matches goldfish canvas convention)
+  const cards = zoneId === 'reserve'
+    ? [...rawCards].sort((a, b) => a.type.localeCompare(b.type) || a.cardName.localeCompare(b.cardName))
+    : rawCards;
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave } = useModalCardHover(200, { setPreviewCard, isLoupeVisible });
   const [contextCard, setContextCard] = useState<{ card: GameCard; x: number; y: number } | null>(null);
