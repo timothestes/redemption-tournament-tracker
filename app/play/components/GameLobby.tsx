@@ -7,7 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { getCardImageUrl } from '@/lib/card-images';
 import { loadDeckForGame } from '../actions';
+import { useSpacetimeConnection } from '../hooks/useSpacetimeConnection';
+import { SpacetimeProvider } from '../lib/spacetimedb-provider';
 import { DeckPickerModal } from './DeckPickerModal';
+import { LobbyList } from './LobbyList';
 import type { DeckOption } from './DeckPickerCard';
 
 interface GameLobbyProps {
@@ -42,10 +45,43 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
   const [activeTab, setActiveTab] = useState<'create' | 'lobby'>('create');
   const [isPrivate, setIsPrivate] = useState(false);
 
+  // SpacetimeDB connection for lobby
+  const { connectionBuilder, error: connError } = useSpacetimeConnection();
+
   function handleSelectDeck(deck: DeckOption) {
     setSelectedDeck(deck);
     setPickerOpen(false);
     setError(null);
+  }
+
+  async function handleJoinFromLobby(code: string) {
+    if (!selectedDeck) {
+      setError('Please select a deck first.');
+      return;
+    }
+    setGameCode(code);
+    setIsJoining(true);
+    setError(null);
+    try {
+      const { deckData } = await loadDeckForGame(selectedDeck.id);
+      sessionStorage.setItem(
+        `stdb_game_params_${code}`,
+        JSON.stringify({
+          role: 'join',
+          deckId: selectedDeck.id,
+          deckName: selectedDeck.name,
+          displayName,
+          supabaseUserId: userId,
+          format: selectedDeck.format || 'Type 1',
+          paragon: selectedDeck.paragon || null,
+          deckData: JSON.stringify(deckData),
+        })
+      );
+      router.push(`/play/${code}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load deck.');
+      setIsJoining(false);
+    }
   }
 
   async function handleCreateGame() {
@@ -284,7 +320,7 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
           )}
         </div>
       ) : (
-        <>
+        <SpacetimeProvider connectionBuilder={connectionBuilder}>
           {activeTab === 'create' && (
             <>
               <div className="flex flex-col sm:flex-row items-stretch gap-3">
@@ -381,11 +417,20 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
           )}
 
           {activeTab === 'lobby' && (
-            <div className="py-8 text-center text-sm text-muted-foreground">
-              Loading open games...
-            </div>
+            connError ? (
+              <div className="py-8 text-center">
+                <p className="text-sm text-destructive mb-1">Could not connect to game server</p>
+                <p className="text-xs text-muted-foreground">{connError}</p>
+              </div>
+            ) : (
+              <LobbyList
+                selectedDeckId={selectedDeck?.id ?? null}
+                onJoinGame={handleJoinFromLobby}
+                onSwitchToCreate={() => setActiveTab('create')}
+              />
+            )
           )}
-        </>
+        </SpacetimeProvider>
       )}
     </div>
   );
