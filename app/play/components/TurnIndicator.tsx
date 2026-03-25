@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { PHASE_ORDER } from '@/app/goldfish/types';
 import type { GamePhase } from '@/app/shared/types/gameCard';
 
@@ -42,6 +43,7 @@ export default function TurnIndicator({
   onEndTurn,
   onConcede,
 }: TurnIndicatorProps) {
+  const [showConcedeConfirm, setShowConcedeConfirm] = useState(false);
   const currentPhase: string = game?.currentPhase ?? 'draw';
   const turnNumber: number = game?.turnNumber ? Number(game.turnNumber) : 1;
   const currentIdx = PHASE_ORDER.indexOf(currentPhase as GamePhase);
@@ -256,10 +258,7 @@ export default function TurnIndicator({
       >
         {onConcede && (
           <button
-            onClick={() => {
-              const confirmed = window.confirm('Are you sure you want to concede this game?');
-              if (confirmed) onConcede();
-            }}
+            onClick={() => setShowConcedeConfirm(true)}
             style={{
               padding: '5px 12px',
               background: 'transparent',
@@ -288,6 +287,103 @@ export default function TurnIndicator({
           </button>
         )}
       </div>
+
+      {/* Concede confirmation modal */}
+      {showConcedeConfirm && (
+        <div
+          onClick={() => setShowConcedeConfirm(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 900,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(6, 4, 2, 0.7)',
+            backdropFilter: 'blur(3px)',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'rgba(14, 10, 6, 0.97)',
+              border: '1px solid rgba(180, 60, 60, 0.3)',
+              borderRadius: 10,
+              padding: '32px 36px',
+              textAlign: 'center',
+              maxWidth: 340,
+              width: '100%',
+              boxShadow: '0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(180, 60, 60, 0.08)',
+            }}
+          >
+            <p style={{
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: 10,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: 'rgba(220, 120, 120, 0.5)',
+            }}>Concede</p>
+            <h2 style={{
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: 18,
+              fontWeight: 700,
+              color: '#e8d5a3',
+              marginTop: 8,
+              textShadow: '0 1px 4px rgba(0,0,0,0.5)',
+            }}>Are you sure?</h2>
+            <p style={{
+              marginTop: 8,
+              fontFamily: 'Georgia, serif',
+              fontSize: 13,
+              color: 'rgba(196, 149, 90, 0.5)',
+            }}>This will end the game and count as a loss.</p>
+
+            <div style={{ marginTop: 24, display: 'flex', gap: 12 }}>
+              <button
+                onClick={() => setShowConcedeConfirm(false)}
+                style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  borderRadius: 4,
+                  border: '1px solid rgba(107, 78, 39, 0.3)',
+                  background: 'transparent',
+                  color: 'rgba(196, 149, 90, 0.6)',
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowConcedeConfirm(false);
+                  onConcede?.();
+                }}
+                style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  borderRadius: 4,
+                  border: '1px solid rgba(180, 60, 60, 0.45)',
+                  background: 'rgba(180, 60, 60, 0.15)',
+                  color: '#dc7878',
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                }}
+              >
+                Concede
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
