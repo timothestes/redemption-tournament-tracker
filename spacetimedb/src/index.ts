@@ -1442,6 +1442,22 @@ spacetimedb.clientDisconnected((ctx) => {
     if (player.identity.toHexString() === ctx.sender.toHexString()) {
       ctx.db.Player.id.update({ ...player, isConnected: false });
 
+      // If game is in pregame, cancel immediately — no state to preserve
+      const gameForPlayer = ctx.db.Game.id.find(player.gameId);
+      if (gameForPlayer && gameForPlayer.status === 'pregame') {
+        ctx.db.Game.id.update({ ...gameForPlayer, status: 'finished' });
+        logAction(
+          ctx,
+          player.gameId,
+          player.id,
+          'PREGAME_DISCONNECT',
+          JSON.stringify({ reason: 'opponent_disconnected' }),
+          0n,
+          'pregame'
+        );
+        continue; // Skip scheduling timeout for pregame games
+      }
+
       // Schedule a disconnect timeout (5 minutes)
       const futureTime = ctx.timestamp.microsSinceUnixEpoch + 300_000_000n;
       ctx.db.DisconnectTimeout.insert({
