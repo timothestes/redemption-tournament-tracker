@@ -1,12 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTable, useSpacetimeDB } from 'spacetimedb/react';
 import { tables } from '@/lib/spacetimedb/module_bindings';
 import type { Game } from '@/lib/spacetimedb/module_bindings/types';
 import { Button } from '@/components/ui/button';
-
-type GameRow = Game;
 
 interface LobbyListProps {
   selectedDeckId: string | null;
@@ -21,12 +19,14 @@ export function LobbyList({ selectedDeckId, onJoinGame, onSwitchToCreate }: Lobb
   const conn = spacetimeCtx?.getConnection?.() ?? null;
 
   // useTable returns [rows, subscribeApplied] where subscribeApplied=true means data is ready
-  const [games, subscribeApplied] = useTable(tables.Game) as [GameRow[], boolean];
+  const [games, subscribeApplied] = useTable(tables.Game) as [Game[], boolean];
   const [now, setNow] = useState(Date.now());
+  const didSubscribe = useRef(false);
 
-  // Subscribe to waiting public games on mount
+  // Subscribe to waiting public games on mount (guard prevents duplicate subscriptions)
   useEffect(() => {
-    if (!conn) return;
+    if (!conn || didSubscribe.current) return;
+    didSubscribe.current = true;
     try {
       conn.subscriptionBuilder().subscribe([
         "SELECT * FROM game WHERE status = 'waiting' AND is_public = true",
@@ -43,9 +43,14 @@ export function LobbyList({ selectedDeckId, onJoinGame, onSwitchToCreate }: Lobb
   }, []);
 
   // Client-side filter as safety net (subscription already filters server-side)
-  const openGames = (games || []).filter(
-    (g) => g.status === 'waiting' && g.isPublic
-  );
+  // Sort oldest first so longest-waiting games appear at top
+  const openGames = (games || [])
+    .filter((g) => g.status === 'waiting' && g.isPublic)
+    .sort((a, b) => {
+      const aTime = Number(a.createdAt.microsSinceUnixEpoch);
+      const bTime = Number(b.createdAt.microsSinceUnixEpoch);
+      return aTime - bTime;
+    });
 
   if (!subscribeApplied) {
     return (
