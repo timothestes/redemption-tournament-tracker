@@ -7,18 +7,7 @@ import { GameCard, ZoneId, ZONE_LABELS } from '../types';
 import { X, Search } from 'lucide-react';
 import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './ModalCardHoverPreview';
 import { useCardPreview } from '../state/CardPreviewContext';
-
-const BLOB_BASE_URL = process.env.NEXT_PUBLIC_BLOB_BASE_URL || '';
-
-function sanitizeImgFile(f: string): string {
-  return f.replace(/\.jpe?g$/i, '');
-}
-
-function getCardImageUrl(imgFile: string): string {
-  if (!imgFile) return '';
-  if (imgFile.startsWith('/')) return imgFile;
-  return `${BLOB_BASE_URL}/card-images/${sanitizeImgFile(imgFile)}.jpg`;
-}
+import { getCardImageUrl } from '../../shared/utils/cardImageUrl';
 
 const MOVE_ZONES: { id: ZoneId; label: string }[] = [
   { id: 'hand', label: 'Hand' },

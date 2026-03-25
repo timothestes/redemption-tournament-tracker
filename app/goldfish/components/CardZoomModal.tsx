@@ -6,18 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { GameCard } from '../types';
 import { X } from 'lucide-react';
 import { useDuplicateCards } from '../../decklist/card-search/hooks/useDuplicateCards';
-
-const BLOB_BASE_URL = process.env.NEXT_PUBLIC_BLOB_BASE_URL || '';
-
-function sanitizeImgFile(f: string): string {
-  return f.replace(/\.jpe?g$/i, '');
-}
-
-function getCardImageUrl(imgFile: string): string {
-  if (!imgFile) return '';
-  if (imgFile.startsWith('/')) return imgFile;
-  return `${BLOB_BASE_URL}/card-images/${sanitizeImgFile(imgFile)}.jpg`;
-}
+import { getCardImageUrl } from '../../shared/utils/cardImageUrl';
 
 interface CardZoomModalProps {
   card: GameCard;

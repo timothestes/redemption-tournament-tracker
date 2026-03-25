@@ -8,19 +8,9 @@ import { LoadingScreen } from '../components/LoadingScreen';
 import { CardLoupePanel, LOUPE_PANEL_WIDTH, LOUPE_COLLAPSED_WIDTH } from '../components/CardLoupePanel';
 import { useImagePreloader } from '../hooks/useImagePreloader';
 import type { DeckDataForGoldfish } from '../types';
+import { getCardImageUrl } from '../../shared/utils/cardImageUrl';
 
 const GoldfishCanvas = dynamic(() => import('../components/GoldfishCanvas'), { ssr: false });
-
-const BLOB_BASE_URL = process.env.NEXT_PUBLIC_BLOB_BASE_URL || '';
-
-function sanitizeImgFile(f: string): string {
-  return f.replace(/\.jpe?g$/i, '');
-}
-
-function getCardImageUrl(imgFile: string): string {
-  if (imgFile.startsWith('/')) return imgFile;
-  return `${BLOB_BASE_URL}/card-images/${sanitizeImgFile(imgFile)}.jpg`;
-}
 
 interface GoldfishClientProps {
   deck: DeckDataForGoldfish;

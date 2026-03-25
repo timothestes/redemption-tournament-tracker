@@ -13,6 +13,7 @@ import { CARD_DATA_URL } from "../card-search/constants";
 import { Card } from "../card-search/utils";
 import ModalWithClose from "../card-search/ModalWithClose";
 import { GoldfishButton } from "../../goldfish/components/GoldfishButton";
+import { sanitizeImgFile, getCardImageUrl as getImageUrl } from '../../shared/utils/cardImageUrl';
 import { useCardPrices } from "../card-search/hooks/useCardPrices";
 import BuyDeckModal from "../card-search/components/BuyDeckModal";
 import GeneratePDFModal from "../card-search/components/GeneratePDFModal";
@@ -126,16 +127,6 @@ function getDeckTypeBadgeClasses(format?: string): string {
     return "px-3 py-1 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 rounded-full text-sm font-semibold";
   }
   return "px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-sm font-semibold";
-}
-
-function getImageUrl(imgFile: string): string {
-  const sanitized = (imgFile || "").replace(/\.jpe?g$/i, "");
-  const baseUrl = process.env.NEXT_PUBLIC_BLOB_BASE_URL;
-  return `${baseUrl}/card-images/${sanitized}.jpg`;
-}
-
-function sanitizeImgFile(imgFile: string): string {
-  return (imgFile || "").replace(/\.jpe?g$/i, "");
 }
 
 export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {

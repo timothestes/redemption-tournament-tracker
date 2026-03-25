@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { loadPublicDeckAction } from "../actions";
 import { createClient } from "../../../utils/supabase/server";
 import PublicDeckClient from "./client";
+import { getCardImageUrlOrNull } from "../../shared/utils/cardImageUrl";
 
 interface PageProps {
   params: Promise<{ deckId: string }>;
@@ -29,15 +30,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   ].filter(Boolean).join(" · ");
 
   // Pick an OG image: use stored preview card, fall back to first card
-  const blobBase = process.env.NEXT_PUBLIC_BLOB_BASE_URL;
-  let ogImage: string | undefined;
-  if (blobBase) {
-    const previewImg = deck.preview_card_1 || mainCards[0]?.card_img_file;
-    if (previewImg) {
-      const sanitized = previewImg.replace(/\.jpe?g$/i, "");
-      ogImage = `${blobBase}/card-images/${sanitized}.jpg`;
-    }
-  }
+  const previewImg = deck.preview_card_1 || mainCards[0]?.card_img_file;
+  const ogImage = getCardImageUrlOrNull(previewImg) ?? undefined;
 
   return {
     title: `${deck.name} - Redemption Decklist`,

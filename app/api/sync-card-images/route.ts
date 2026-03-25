@@ -3,11 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const CARD_DATA_URL = "https://raw.githubusercontent.com/jalstad/RedemptionLackeyCCG/master/RedemptionQuick/sets/carddata.txt";
 const CARD_IMAGE_BASE_URL = "https://raw.githubusercontent.com/jalstad/RedemptionLackeyCCG/master/RedemptionQuick/sets/setimages/general/";
-const BLOB_PATH_PREFIX = 'card-images/';
+import { sanitizeImgFile } from '../../shared/utils/cardImageUrl';
 
-function sanitizeImgFile(f: string): string {
-  return f.replace(/\.jpe?g$/i, "");
-}
+const BLOB_PATH_PREFIX = 'card-images/';
 
 async function fetchBuffer(url: string): Promise<Buffer | null> {
   try {

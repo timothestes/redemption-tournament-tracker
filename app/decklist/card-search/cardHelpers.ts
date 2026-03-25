@@ -3,9 +3,8 @@
 
 import { GOOD_BRIGADES, EVIL_BRIGADES } from "./constants";
 
-export function sanitizeImgFile(f: string) {
-  return f.replace(/\.jpe?g$/i, "");
-}
+// Re-export from shared utils
+export { sanitizeImgFile } from "../../shared/utils/cardImageUrl";
 
 export function isNativityReference(ref: string): boolean {
   const r = ref.trim();

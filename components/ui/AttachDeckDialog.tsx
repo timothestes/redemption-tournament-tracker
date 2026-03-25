@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Search, X, BookOpen } from "lucide-react";
+import { getCardImageUrl } from "../../app/shared/utils/cardImageUrl";
 import {
   Dialog,
   DialogContent,
@@ -188,7 +189,7 @@ export default function AttachDeckDialog({
                     <div className="w-10 h-14 rounded bg-gray-200 dark:bg-gray-700 flex-shrink-0 overflow-hidden flex items-center justify-center">
                       {deck.preview_card_1 ? (
                         <img
-                          src={`${process.env.NEXT_PUBLIC_BLOB_BASE_URL}/card-images/${deck.preview_card_1.replace(/\.jpe?g$/i, "")}.jpg`}
+                          src={getCardImageUrl(deck.preview_card_1)}
                           alt=""
                           className="w-full h-full object-cover"
                         />
