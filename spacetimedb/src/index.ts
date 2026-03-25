@@ -184,8 +184,10 @@ export const create_game = spacetimedb.reducer(
     format: t.string(),
     supabaseUserId: t.string(),
     deckData: t.string(),
+    isPublic: t.bool(),
+    lobbyMessage: t.string(),
   },
-  (ctx, { code, deckId, displayName, format, supabaseUserId, deckData }) => {
+  (ctx, { code, deckId, displayName, format, supabaseUserId, deckData, isPublic, lobbyMessage }) => {
     // Validate code is not already in use by an active game
     for (const g of ctx.db.Game.game_code.filter(code)) {
       if (g.status !== 'finished') {
@@ -206,6 +208,9 @@ export const create_game = spacetimedb.reducer(
       lastDiceRoll: '',
       createdAt: ctx.timestamp,
       createdBy: ctx.sender,
+      isPublic,
+      lobbyMessage,
+      createdByName: displayName,
     });
 
     // Insert player row
