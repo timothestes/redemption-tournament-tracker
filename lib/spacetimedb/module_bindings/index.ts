@@ -63,7 +63,6 @@ import SendChatReducer from "./send_chat_reducer";
 import SetNoteReducer from "./set_note_reducer";
 import SetPhaseReducer from "./set_phase_reducer";
 import SetPlayerOptionReducer from "./set_player_option_reducer";
-import SetRematchCodeReducer from "./set_rematch_code_reducer";
 import ShuffleCardIntoDeckReducer from "./shuffle_card_into_deck_reducer";
 import ShuffleDeckReducer from "./shuffle_deck_reducer";
 import SpawnLostSoulReducer from "./spawn_lost_soul_reducer";
@@ -232,7 +231,6 @@ const reducersSchema = __reducers(
   __reducerSchema("set_note", SetNoteReducer),
   __reducerSchema("set_phase", SetPhaseReducer),
   __reducerSchema("set_player_option", SetPlayerOptionReducer),
-  __reducerSchema("set_rematch_code", SetRematchCodeReducer),
   __reducerSchema("shuffle_card_into_deck", ShuffleCardIntoDeckReducer),
   __reducerSchema("shuffle_deck", ShuffleDeckReducer),
   __reducerSchema("spawn_lost_soul", SpawnLostSoulReducer),

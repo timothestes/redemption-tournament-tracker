@@ -85,7 +85,6 @@ export interface GameState {
   // Rematch actions
   requestRematch: (deckId: string, deckData: string) => void;
   respondRematch: (accepted: boolean, deckId: string, deckData: string) => void;
-  setRematchCode: (code: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -419,10 +418,6 @@ export function useGameState(gameId: bigint): GameState {
     conn?.reducers.respondRematch({ gameId, accepted, deckId, deckData });
   }, [conn, gameId]);
 
-  const setRematchCode = useCallback((code: string) => {
-    conn?.reducers.setRematchCode({ gameId, code });
-  }, [conn, gameId]);
-
   // ---------------------------------------------------------------------------
   // Return
   // ---------------------------------------------------------------------------
@@ -473,7 +468,6 @@ export function useGameState(gameId: bigint): GameState {
     pregameChangeDeck,
     requestRematch,
     respondRematch,
-    setRematchCode,
   };
 }
 

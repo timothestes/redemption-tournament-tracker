@@ -623,6 +623,7 @@ export const respond_rematch = spacetimedb.reducer(
         throw new SenderError('Invalid deck data');
       }
 
+      // Store responder's deck data
       const updates: any = { ...game, rematchResponse: 'accepted' };
       if (player.seat === 0n) {
         updates.rematchDeckId0 = deckId;
@@ -632,35 +633,87 @@ export const respond_rematch = spacetimedb.reducer(
         updates.rematchDeckData1 = deckData;
       }
       ctx.db.Game.id.update(updates);
+
+      // ---- Reset the game in-place ----
+
+      // 1. Delete all existing cards and counters
+      for (const card of [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)]) {
+        // Delete counters for this card
+        for (const counter of [...ctx.db.CardCounter.card_counter_card_instance_id.filter(card.id)]) {
+          ctx.db.CardCounter.id.delete(counter.id);
+        }
+        ctx.db.CardInstance.id.delete(card.id);
+      }
+
+      // 2. Update players with new deck data
+      const allPlayers: any[] = [...ctx.db.Player.player_game_id.filter(gameId)];
+      for (const p of allPlayers) {
+        const latestGame = ctx.db.Game.id.find(gameId);
+        if (!latestGame) throw new SenderError('Game not found');
+        const newDeckId = p.seat === 0n ? latestGame.rematchDeckId0 : latestGame.rematchDeckId1;
+        const newDeckData = p.seat === 0n ? latestGame.rematchDeckData0 : latestGame.rematchDeckData1;
+        ctx.db.Player.id.update({ ...p, deckId: newDeckId, pendingDeckData: '' });
+
+        // 3. Insert new cards, shuffle, draw opening hand
+        const currentGame = ctx.db.Game.id.find(gameId);
+        if (!currentGame) throw new SenderError('Game not found');
+        insertCardsShuffleDraw(ctx, currentGame, p, newDeckData);
+      }
+
+      // 4. Roll dice for first player
+      const gameAfterCards = ctx.db.Game.id.find(gameId);
+      if (!gameAfterCards) throw new SenderError('Game not found');
+      const seed = makeSeed(
+        ctx.timestamp.microsSinceUnixEpoch,
+        gameId,
+        0n,
+        gameAfterCards.rngCounter
+      );
+      const rng = xorshift64(seed);
+
+      let r0: number, r1: number;
+      do {
+        r0 = Number(rng.next() % 20n) + 1;
+        r1 = Number(rng.next() % 20n) + 1;
+      } while (r0 === r1);
+
+      const winner = r0 > r1 ? '0' : '1';
+
+      // 5. Reset game to pregame/rolling
+      const gameBeforeReset = ctx.db.Game.id.find(gameId);
+      if (!gameBeforeReset) throw new SenderError('Game not found');
+      ctx.db.Game.id.update({
+        ...gameBeforeReset,
+        status: 'pregame',
+        pregamePhase: 'rolling',
+        currentTurn: 0n,
+        currentPhase: 'draw',
+        turnNumber: 0n,
+        lastDiceRoll: '',
+        pregameReady0: false,
+        pregameReady1: false,
+        rollResult0: BigInt(r0),
+        rollResult1: BigInt(r1),
+        rollWinner: winner,
+        rngCounter: gameBeforeReset.rngCounter + 1n,
+        rematchRequestedBy: '',
+        rematchDeckId0: '',
+        rematchDeckData0: '',
+        rematchDeckId1: '',
+        rematchDeckData1: '',
+        rematchResponse: '',
+        rematchCode: '',
+      });
+
+      logAction(ctx, gameId, player.id, 'REMATCH_STARTED',
+        JSON.stringify({ result0: r0, result1: r1, winner }),
+        0n, 'pregame');
     } else {
       ctx.db.Game.id.update({ ...game, rematchResponse: 'declined' });
+      logAction(ctx, gameId, player.id, 'REMATCH_RESPONSE',
+        JSON.stringify({ accepted: false, seat: player.seat.toString() }),
+        game.turnNumber, game.currentPhase);
     }
-
-    logAction(ctx, gameId, player.id, 'REMATCH_RESPONSE',
-      JSON.stringify({ accepted, seat: player.seat.toString() }),
-      game.turnNumber, game.currentPhase);
-  }
-);
-
-// ---------------------------------------------------------------------------
-// Reducer: set_rematch_code
-// ---------------------------------------------------------------------------
-export const set_rematch_code = spacetimedb.reducer(
-  {
-    gameId: t.u64(),
-    code: t.string(),
-  },
-  (ctx, { gameId, code }) => {
-    const game = ctx.db.Game.id.find(gameId);
-    if (!game) throw new SenderError('Game not found');
-    if (game.rematchResponse !== 'accepted') throw new SenderError('Rematch not accepted');
-
-    const player = findPlayerBySender(ctx, gameId);
-    if (player.seat.toString() !== game.rematchRequestedBy) {
-      throw new SenderError('Only the requester can set the rematch code');
-    }
-
-    ctx.db.Game.id.update({ ...game, rematchCode: code });
   }
 );
 

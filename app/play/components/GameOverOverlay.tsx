@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { DeckPickerModal } from './DeckPickerModal';
 import type { DeckOption } from './DeckPickerCard';
 import { loadUserDecks, loadDeckForGame } from '../actions';
@@ -48,13 +47,6 @@ function deriveEndReason(gameActions: any[], myPlayer: any): { label: string; wi
   return { label: 'Game ended', winnerName: '' };
 }
 
-function generateCode(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let code = '';
-  for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
-  return code;
-}
-
 // ---------------------------------------------------------------------------
 // Component — temporary toast + rematch logic (no blocking modal)
 // ---------------------------------------------------------------------------
@@ -69,7 +61,6 @@ export default function GameOverOverlay({
   playAgainTriggered,
   onPlayAgainHandled,
 }: GameOverOverlayProps) {
-  const router = useRouter();
   const { label, winnerName } = deriveEndReason(gameActions, myPlayer);
   const oppName: string = opponentPlayer?.displayName ?? 'Opponent';
   const mySeat = myPlayer?.seat?.toString() ?? '0';
@@ -77,7 +68,6 @@ export default function GameOverOverlay({
   // Rematch state from game (derived before effects that use it)
   const rematchRequestedBy = game?.rematchRequestedBy ?? '';
   const rematchResponse = game?.rematchResponse ?? '';
-  const rematchCode = game?.rematchCode ?? '';
   const iRequested = rematchRequestedBy === mySeat;
   const opponentRequested = rematchRequestedBy !== '' && !iRequested;
 
@@ -111,38 +101,9 @@ export default function GameOverOverlay({
     }
   }, [pickerOpen, myDecks.length]);
 
-  // Rematch state (derived above, before effects)
-
-  // Navigate to new game when rematch code is set
-  useEffect(() => {
-    if (rematchCode && rematchResponse === 'accepted') {
-      const isCreator = iRequested;
-      const myDeckId = mySeat === '0' ? game.rematchDeckId0 : game.rematchDeckId1;
-      const myDeckData = mySeat === '0' ? game.rematchDeckData0 : game.rematchDeckData1;
-
-      const params = {
-        role: isCreator ? 'create' : 'join',
-        deckId: myDeckId,
-        displayName: myPlayer?.displayName ?? 'Player',
-        supabaseUserId: myPlayer?.supabaseUserId ?? '',
-        deckData: myDeckData,
-        format: game?.format ?? 'standard',
-        isPublic: false,
-        lobbyMessage: '',
-      };
-
-      sessionStorage.setItem(`stdb_game_params_${rematchCode}`, JSON.stringify(params));
-      router.push(`/play/${rematchCode}`);
-    }
-  }, [rematchCode, rematchResponse, iRequested, mySeat, game, myPlayer, router]);
-
-  // When both accept and I'm the requester, create the new game
-  useEffect(() => {
-    if (rematchResponse === 'accepted' && iRequested && !rematchCode) {
-      const code = generateCode();
-      gameState.setRematchCode(code);
-    }
-  }, [rematchResponse, iRequested, rematchCode, gameState]);
+  // When rematch is accepted, the server resets the game in-place.
+  // The game status changes from 'finished' to 'pregame/rolling' automatically
+  // via SpacetimeDB subscription — no navigation needed.
 
   // Deck selected handler
   const handleDeckSelected = async (deck: DeckOption) => {
