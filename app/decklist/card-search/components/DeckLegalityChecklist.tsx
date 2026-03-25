@@ -36,6 +36,7 @@ const T1_RULE_CATEGORIES = [
       "t1-quantity-special-ability",
       "t1-quantity-vanilla",
       "t1-special-card",
+      "t1-character-alias",
     ],
   },
   {
@@ -78,6 +79,7 @@ const T2_RULE_CATEGORIES = [
       "t2-quantity-character-enhancement",
       "t2-quantity-vanilla-site",
       "t1-special-card",
+      "t1-character-alias",
     ],
   },
   {

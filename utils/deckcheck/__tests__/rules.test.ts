@@ -10,6 +10,7 @@ import {
   isSiteOrCity,
   getRequiredLostSouls,
   getMaxPerFifty,
+  extractLsAbilityName,
   checkDeckSize,
   checkLostSoulCount,
   checkReserveSize,
@@ -20,6 +21,7 @@ import {
   checkMultiBrigadeLimit,
   checkLostSoulAbilityLimit,
   checkSpecialAbilityLimit,
+  checkCharacterAliasLimit,
   checkVanillaLimit,
   checkSitesCitiesLimit,
   checkBannedCards,
@@ -2212,5 +2214,195 @@ describe("validateT1Rules (full pipeline)", () => {
     // At minimum, deck size error
     expect(errors.length).toBeGreaterThanOrEqual(1);
     expect(errors[0].rule).toBe("t1-deck-size");
+  });
+});
+
+// ===========================================================================
+// G. Cross-reference Lost Soul grouping tests
+// ===========================================================================
+
+describe("extractLsAbilityName", () => {
+  it("extracts from identifier field", () => {
+    const card = makeLostSoul({ identifier: '["Hopper"]' });
+    expect(extractLsAbilityName(card)).toBe("hopper");
+  });
+
+  it("extracts from quoted name in card name", () => {
+    const card = makeLostSoul({ name: 'Lost Soul "Revealer" [John 3:20]' });
+    expect(extractLsAbilityName(card)).toBe("revealer");
+  });
+
+  it("extracts from parenthetical in card name", () => {
+    const card = makeLostSoul({ name: "Lost Soul Romans 3:23 (Revealer)" });
+    expect(extractLsAbilityName(card)).toBe("revealer");
+  });
+
+  it("returns null when no ability name found", () => {
+    const card = makeLostSoul({ name: "Lost Soul", identifier: "" });
+    expect(extractLsAbilityName(card)).toBeNull();
+  });
+});
+
+describe("Cross-reference Lost Soul grouping (checkLostSoulAbilityLimit)", () => {
+  it("catches Revealer LS with different references (John 3:20 + Romans 3:23)", () => {
+    const revealer1 = makeLostSoul({
+      name: 'Lost Soul "Revealer" [John 3:20]',
+      specialAbility: "If an evil card targets...",
+      reference: "John 3:20",
+      identifier: '["Revealer"]',
+      quantity: 1,
+    });
+    const revealer2 = makeLostSoul({
+      name: "Lost Soul Romans 3:23 (Revealer)",
+      specialAbility: "If an evil card targets...",
+      reference: "Romans 3:23",
+      identifier: '["Revealer"]',
+      quantity: 1,
+    });
+    const issues = checkLostSoulAbilityLimit([revealer1, revealer2], [], []);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].rule).toBe("t1-quantity-ls-ability");
+    expect(issues[0].message).toContain("found 2");
+  });
+
+  it("catches Hopper LS with different references (II Chronicles 28:13 + Matthew 18:12)", () => {
+    const hopper1 = makeLostSoul({
+      name: 'Lost Soul "Hopper" [II Chronicles 28:13 - RR]',
+      specialAbility: "This Lost Soul does not count...",
+      reference: "II Chronicles 28:13",
+      identifier: '["Hopper"]',
+      quantity: 1,
+    });
+    const hopper2 = makeLostSoul({
+      name: 'Lost Soul "Hopper" [Matthew 18:12]',
+      specialAbility: "This Lost Soul does not count...",
+      reference: "Matthew 18:12",
+      identifier: '["Hopper"]',
+      quantity: 1,
+    });
+    const issues = checkLostSoulAbilityLimit([hopper1, hopper2], [], []);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].rule).toBe("t1-quantity-ls-ability");
+    expect(issues[0].message).toContain("found 2");
+  });
+
+  it("allows different LS with different ability names and references", () => {
+    const blind = makeLostSoul({
+      name: 'Lost Soul "Blind"',
+      specialAbility: "If a rescue attempt...",
+      reference: "Isaiah 42:18",
+      identifier: '["Blind"]',
+      quantity: 1,
+    });
+    const revealer = makeLostSoul({
+      name: 'Lost Soul "Revealer" [John 3:20]',
+      specialAbility: "If an evil card targets...",
+      reference: "John 3:20",
+      identifier: '["Revealer"]',
+      quantity: 1,
+    });
+    expect(checkLostSoulAbilityLimit([blind, revealer], [], [])).toHaveLength(0);
+  });
+});
+
+// ===========================================================================
+// H. Character alias (dual-alignment) tests
+// ===========================================================================
+
+describe("Rule: checkCharacterAliasLimit (t1-character-alias)", () => {
+  it("catches Manasseh Evil + Manasseh dual-type (both partly evil)", () => {
+    const kingManasseh = makeCard({
+      name: "King Manasseh",
+      type: "Evil Character",
+      brigade: "Brown/Pale Green",
+      alignment: "Evil",
+      specialAbility: "Some ability...",
+      quantity: 1,
+    });
+    const dualManasseh = makeCard({
+      name: "Manasseh, the Humbled / Manasseh, the Wicked (LoC)",
+      type: "Hero/Evil Character",
+      brigade: "Purple/Red/Brown/Pale Green",
+      alignment: "Neutral",
+      specialAbility: "Some ability...",
+      quantity: 1,
+    });
+    const mainDeck = makeValidMainDeck(50, [kingManasseh, dualManasseh]);
+    const issues = checkCharacterAliasLimit(mainDeck, [], []);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].rule).toBe("t1-character-alias");
+    expect(issues[0].message).toContain("Manasseh");
+  });
+
+  it("allows Good Manasseh + Evil Manasseh (no shared alignment component)", () => {
+    const goodManasseh = makeCard({
+      name: "Manasseh, the Calming (Roots)",
+      type: "Hero",
+      brigade: "Blue",
+      alignment: "Good",
+      specialAbility: "Some ability...",
+      quantity: 1,
+    });
+    const evilManasseh = makeCard({
+      name: "King Manasseh",
+      type: "Evil Character",
+      brigade: "Brown/Pale Green",
+      alignment: "Evil",
+      specialAbility: "Some ability...",
+      quantity: 1,
+    });
+    const mainDeck = makeValidMainDeck(50, [goodManasseh, evilManasseh]);
+    const issues = checkCharacterAliasLimit(mainDeck, [], []);
+    expect(issues).toHaveLength(0);
+  });
+
+  it("skips cards already in the same duplicate group", () => {
+    const joab1 = makeCard({
+      name: "Joab (CoW)",
+      type: "Hero/Evil Character",
+      brigade: "Red/Brown",
+      alignment: "Neutral",
+      specialAbility: "Some ability...",
+      duplicateGroupId: 42,
+      canonicalName: "Joab",
+      quantity: 1,
+    });
+    const joab2 = makeCard({
+      name: "Joab (L)",
+      type: "Hero",
+      brigade: "Red",
+      alignment: "Good",
+      specialAbility: "Some ability...",
+      duplicateGroupId: 42,
+      canonicalName: "Joab",
+      quantity: 1,
+    });
+    const mainDeck = makeValidMainDeck(50, [joab1, joab2]);
+    const issues = checkCharacterAliasLimit(mainDeck, [], []);
+    // Should be 0 — already caught by checkSpecialAbilityLimit via card groups
+    expect(issues).toHaveLength(0);
+  });
+
+  it("excludes Saul of Tarsus from King Saul alias", () => {
+    const kingSaul = makeCard({
+      name: "King Saul (CoW)",
+      type: "Hero/Evil Character",
+      brigade: "Purple/Brown",
+      alignment: "Neutral",
+      specialAbility: "Some ability...",
+      quantity: 1,
+    });
+    const saulOfTarsus = makeCard({
+      name: "Saul of Tarsus [2022 - Seasonal]",
+      type: "Evil Character",
+      brigade: "Gray",
+      alignment: "Evil",
+      specialAbility: "Some ability...",
+      quantity: 1,
+    });
+    const mainDeck = makeValidMainDeck(50, [kingSaul, saulOfTarsus]);
+    const issues = checkCharacterAliasLimit(mainDeck, [], []);
+    // Different people — should not conflict
+    expect(issues).toHaveLength(0);
   });
 });

@@ -245,6 +245,98 @@ function cardMatchesExclusion(
 }
 
 // ---------------------------------------------------------------------------
+// Character aliases — dual-alignment and renamed characters
+// ---------------------------------------------------------------------------
+// Characters that represent the same biblical figure but have different card
+// names. These should be treated as the same card for quantity limits when
+// they share at least one alignment component (both partly evil, both partly
+// good, or both dual-alignment).
+//
+// The duplicate_card_groups database catches many of these, but some are
+// missed when names differ significantly (e.g., "King Manasseh" vs
+// "Manasseh, the Humbled / Manasseh, the Wicked").
+
+interface CharacterAlias {
+  /** All known card name prefixes for this character. Case-insensitive, matched via startsWith. */
+  names: string[];
+  /** Name prefixes that should NOT match (different biblical figures sharing a name). */
+  excludeNames?: string[];
+  /** Human-readable label */
+  label: string;
+}
+
+// Cards with the same character identity but different names. This list covers
+// cases where the duplicate_card_groups database misses the relationship due
+// to significantly different names (e.g., "King X" vs "X, the Y / X, the Z").
+//
+// Characters that only have Good versions and Evil versions but NO dual-type
+// (Hero/Evil Character) version are not included — the alignment check handles them.
+const CHARACTER_ALIASES: CharacterAlias[] = [
+  // Lineage of Christ dual-type characters with single-type counterparts
+  { names: ["King Manasseh", "Manasseh"], label: "Manasseh" },
+  { names: ["King Solomon", "Solomon"], label: "Solomon" },
+  { names: ["King Abijah", "King Abijam", "Abijah, the Conqueror", "Abijam"], label: "Abijah/Abijam" },
+  { names: ["Amaziah, the Just", "Amaziah, the Arrogant"], label: "Amaziah" },
+  { names: ["Azariah, the Strong", "Uzziah"], label: "Azariah/Uzziah" },
+  { names: ["Joash, Child King", "Joash, the Murderer", "Joash"], label: "Joash" },
+  // Cloud of Witnesses / other dual-type characters
+  { names: ["King Saul", "Saul"], excludeNames: ["Saul of Tarsus", "Saul/Paul"], label: "King Saul" },
+  { names: ["King Jehu"], label: "King Jehu" },
+  { names: ["Joab"], label: "Joab" },
+  { names: ["Judas Iscariot", "Judas, the Betrayer"], label: "Judas Iscariot" },
+  // Gospel of Christ dual-type characters
+  { names: ["Zaccheus"], label: "Zaccheus" },
+  { names: ["Nicodemus"], label: "Nicodemus" },
+  { names: ["Pharaoh's Daughter"], label: "Pharaoh's Daughter" },
+];
+
+function cardMatchesAlias(card: ResolvedCard, namePrefix: string): boolean {
+  const lower = card.name.toLowerCase();
+  const prefix = namePrefix.toLowerCase();
+  return lower === prefix || lower.startsWith(prefix + " ") ||
+    lower.startsWith(prefix + ",") || lower.startsWith(prefix + "(") ||
+    lower.startsWith(prefix + "/");
+}
+
+function isCharacterType(card: ResolvedCard): boolean {
+  const t = card.type.toLowerCase();
+  return t.includes("hero") || t.includes("evil character");
+}
+
+/**
+ * Get alignment components from a card, considering BOTH the alignment field
+ * AND the type field. This is important for dual-type cards (Hero/Evil Character)
+ * which have "Neutral" alignment in the database but are both Good and Evil.
+ */
+function getAlignmentComponents(card: ResolvedCard): { good: boolean; evil: boolean } {
+  const alignment = (card.alignment || "").toLowerCase();
+  const type = (card.type || "").toLowerCase();
+
+  let good = alignment.includes("good");
+  let evil = alignment.includes("evil");
+
+  // For Hero/Evil Character dual-type cards, the alignment field says "Neutral"
+  // but the card is both Good and Evil. Derive from the type field.
+  if (type.includes("hero")) good = true;
+  if (type.includes("evil character")) evil = true;
+
+  return { good, evil };
+}
+
+/**
+ * Check if two cards share at least one alignment component.
+ * E.g., "Evil" and "Hero/Evil Character (Neutral)" share "Evil".
+ * Uses both the alignment field and the type field to determine components.
+ */
+function sharesAlignment(a: ResolvedCard, b: ResolvedCard): boolean {
+  const aComp = getAlignmentComponents(a);
+  const bComp = getAlignmentComponents(b);
+  if (aComp.good && bComp.good) return true;
+  if (aComp.evil && bComp.evil) return true;
+  return false;
+}
+
+// ---------------------------------------------------------------------------
 // Individual rule functions
 // ---------------------------------------------------------------------------
 
@@ -482,11 +574,45 @@ export function checkMultiBrigadeLimit(
 }
 
 /**
+ * Extract the Lost Soul ability name from a card's identifier or name.
+ * Examples:
+ *   identifier '["Hopper"]' → "hopper"
+ *   name 'Lost Soul "Revealer" [John 3:20]' → "revealer"
+ *   name 'Lost Soul Romans 3:23 (Revealer)' → "revealer"
+ * Returns null if no ability name can be extracted.
+ */
+export function extractLsAbilityName(card: ResolvedCard): string | null {
+  // Try identifier field first: e.g., '["Hopper"]', '["Revealer"]'
+  const idMatch = card.identifier?.match(/\["?([^"\]]+)"?\]/);
+  if (idMatch) return idMatch[1].trim().toLowerCase();
+
+  // Try card name: Lost Soul "Name" pattern
+  const quoteMatch = card.name.match(/Lost Soul\s+"([^"]+)"/i);
+  if (quoteMatch) return quoteMatch[1].trim().toLowerCase();
+
+  // Try card name: trailing (Name) pattern — e.g., "Lost Soul Romans 3:23 (Revealer)"
+  const parenMatch = card.name.match(/\(([^)]+)\)\s*$/);
+  if (parenMatch) {
+    const inner = parenMatch[1].trim();
+    // Skip set codes / year tags like "(PoC)", "(2025 - Seasonal)"
+    if (!/^\d{4}|^[A-Z]{2,4}$/.test(inner)) {
+      return inner.toLowerCase();
+    }
+  }
+
+  return null;
+}
+
+/**
  * Rule: t1-quantity-ls-ability — Lost Souls with a special ability are limited to 1 copy each.
  *
  * Per Deck Building Rules v1.3: "Lost Souls with the same reference have the same name"
  * So we group LS by reference, not just by CardGroup identity.
  * Exception: Jeremiah 22:3 has two different LS (Foreigner and Orphans).
+ *
+ * Additionally, Lost Souls with the same ability name but different references are the
+ * same card (e.g., Hopper: II Chronicles 28:13 and Matthew 18:12; Revealer: John 3:20
+ * and Romans 3:23). We merge groups that share an ability name.
  */
 export function checkLostSoulAbilityLimit(
   mainDeckCards: ResolvedCard[],
@@ -499,7 +625,7 @@ export function checkLostSoulAbilityLimit(
   // Collect all special-ability Lost Souls
   const specialLS = allCards.filter((c) => isLostSoul(c) && hasSpecialAbility(c));
 
-  // Group by reference — same reference = same card
+  // Step 1: Group by reference — same reference = same card
   const byReference = new Map<string, { cards: ResolvedCard[]; totalQty: number }>();
 
   for (const card of specialLS) {
@@ -522,7 +648,45 @@ export function checkLostSoulAbilityLimit(
     group.totalQty += card.quantity;
   }
 
-  for (const [, group] of byReference) {
+  // Step 2: Merge groups that share the same LS ability name across different references
+  // (e.g., Hopper: II Chronicles 28:13 + Matthew 18:12, Revealer: John 3:20 + Romans 3:23)
+  const byAbilityName = new Map<string, string[]>(); // ability name → list of reference keys
+  for (const [refKey, group] of byReference) {
+    for (const card of group.cards) {
+      const abilityName = extractLsAbilityName(card);
+      if (abilityName) {
+        if (!byAbilityName.has(abilityName)) {
+          byAbilityName.set(abilityName, []);
+        }
+        const refs = byAbilityName.get(abilityName)!;
+        if (!refs.includes(refKey)) {
+          refs.push(refKey);
+        }
+      }
+    }
+  }
+
+  // Merge reference groups that share an ability name
+  const merged = new Set<string>(); // reference keys that have been merged into another
+  for (const [, refKeys] of byAbilityName) {
+    if (refKeys.length < 2) continue;
+    // Merge all into the first reference key's group
+    const primary = refKeys[0];
+    const primaryGroup = byReference.get(primary)!;
+    for (let i = 1; i < refKeys.length; i++) {
+      const other = refKeys[i];
+      if (merged.has(other)) continue;
+      const otherGroup = byReference.get(other);
+      if (!otherGroup) continue;
+      primaryGroup.cards.push(...otherGroup.cards);
+      primaryGroup.totalQty += otherGroup.totalQty;
+      merged.add(other);
+    }
+  }
+
+  // Step 3: Check each group
+  for (const [refKey, group] of byReference) {
+    if (merged.has(refKey)) continue; // skip merged groups
     if (group.totalQty > 1) {
       const names = [...new Set(group.cards.map((c) => c.name))];
       const displayName = names.length === 1 ? names[0] : names.join(" / ");
@@ -569,6 +733,84 @@ export function checkSpecialAbilityLimit(
         rule: "t1-quantity-special-ability",
         message: `"${group.canonicalName}" has a special ability — max ${maxCopies} per deck (1 per 50 cards), found ${totalQty}.`,
         cards: [group.canonicalName],
+      });
+    }
+  }
+
+  return issues;
+}
+
+/**
+ * Rule: t1-character-alias — Characters that represent the same biblical figure
+ * (but have different card names) should be treated as the same card when they
+ * share at least one alignment component.
+ *
+ * This catches cases missed by the duplicate_card_groups database, such as
+ * "King Manasseh" (Evil) and "Manasseh, the Humbled / Manasseh, the Wicked" (Good/Evil).
+ * Both are "at least partly evil," so they conflict.
+ *
+ * A purely Good version and a purely Evil version of the same character do NOT
+ * conflict (they are considered different cards for deck building).
+ */
+export function checkCharacterAliasLimit(
+  mainDeckCards: ResolvedCard[],
+  reserveCards: ResolvedCard[],
+  cardGroups: CardGroup[]
+): DeckCheckIssue[] {
+  const issues: DeckCheckIssue[] = [];
+  const allCards = [...mainDeckCards, ...reserveCards];
+  const mainDeckSize = mainDeckCards.reduce((sum, c) => sum + c.quantity, 0);
+  const maxCopies = getMaxPerFifty(mainDeckSize, 1);
+
+  // Collect all character cards (with SA) that aren't already in the same card group
+  const characters = allCards.filter(
+    (c) => isCharacterType(c) && hasSpecialAbility(c) && c.quantity > 0
+  );
+
+  for (const alias of CHARACTER_ALIASES) {
+    // Find all characters matching any name prefix in this alias,
+    // excluding cards that match exclusion prefixes (different people)
+    const matchingCards = characters.filter((c) => {
+      if (alias.excludeNames?.some((ex) => cardMatchesAlias(c, ex))) return false;
+      return alias.names.some((n) => cardMatchesAlias(c, n));
+    });
+
+    if (matchingCards.length < 2) continue;
+
+    // Skip cards already in the same CardGroup (already caught by checkSpecialAbilityLimit)
+    const groupIds = new Set(
+      matchingCards
+        .filter((c) => c.duplicateGroupId != null)
+        .map((c) => c.duplicateGroupId!)
+    );
+    // If all matching cards share the same group ID, skip (already handled)
+    if (groupIds.size === 1 && matchingCards.every((c) => c.duplicateGroupId != null)) {
+      continue;
+    }
+
+    // Check for alignment conflicts: group cards by alignment components
+    // Cards sharing at least one alignment = same card for quantity limits
+    // Purely Good vs purely Evil = different cards (no conflict)
+    const conflictingCards: ResolvedCard[] = [];
+    for (let i = 0; i < matchingCards.length; i++) {
+      for (let j = i + 1; j < matchingCards.length; j++) {
+        if (sharesAlignment(matchingCards[i], matchingCards[j])) {
+          if (!conflictingCards.includes(matchingCards[i])) conflictingCards.push(matchingCards[i]);
+          if (!conflictingCards.includes(matchingCards[j])) conflictingCards.push(matchingCards[j]);
+        }
+      }
+    }
+
+    if (conflictingCards.length < 2) continue;
+
+    const totalQty = conflictingCards.reduce((sum, c) => sum + c.quantity, 0);
+    if (totalQty > maxCopies) {
+      const names = [...new Set(conflictingCards.map((c) => c.name))];
+      issues.push({
+        type: "error",
+        rule: "t1-character-alias",
+        message: `${alias.label}: "${names.join('" and "')}" represent the same character and share an alignment — max ${maxCopies} per deck, found ${totalQty}.`,
+        cards: names,
       });
     }
   }
@@ -806,6 +1048,11 @@ export function validateT1Rules(
 
   // Special card exceptions
   issues.push(...checkSpecialCards(mainDeckCards, reserveCards, cardGroups));
+
+  // Character alias checks (dual-alignment characters with different names)
+  issues.push(
+    ...checkCharacterAliasLimit(mainDeckCards, reserveCards, cardGroups)
+  );
 
   return issues;
 }
@@ -1224,6 +1471,11 @@ export function validateT2Rules(
   issues.push(...checkSitesCitiesLimit(mainDeckCards, reserveCards));
   issues.push(...checkBannedCards(mainDeckCards, reserveCards));
   issues.push(...checkSpecialCards(mainDeckCards, reserveCards, cardGroups));
+
+  // Character alias checks (dual-alignment characters with different names)
+  issues.push(
+    ...checkCharacterAliasLimit(mainDeckCards, reserveCards, cardGroups)
+  );
 
   return issues;
 }
