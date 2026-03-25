@@ -74,6 +74,12 @@ export const Game = __t.object("Game", {
   isPublic: __t.bool(),
   lobbyMessage: __t.string(),
   createdByName: __t.string(),
+  pregamePhase: __t.string(),
+  pregameReady0: __t.bool(),
+  pregameReady1: __t.bool(),
+  rollWinner: __t.string(),
+  rollResult0: __t.u64(),
+  rollResult1: __t.u64(),
 });
 export type Game = __Infer<typeof Game>;
 
@@ -99,6 +105,7 @@ export const Player = __t.object("Player", {
   supabaseUserId: __t.string(),
   isConnected: __t.bool(),
   autoRouteLostSouls: __t.bool(),
+  pendingDeckData: __t.string(),
 });
 export type Player = __Infer<typeof Player>;
 

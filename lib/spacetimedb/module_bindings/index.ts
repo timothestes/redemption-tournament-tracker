@@ -49,6 +49,10 @@ import MoveCardReducer from "./move_card_reducer";
 import MoveCardToBottomOfDeckReducer from "./move_card_to_bottom_of_deck_reducer";
 import MoveCardToTopOfDeckReducer from "./move_card_to_top_of_deck_reducer";
 import MoveCardsBatchReducer from "./move_cards_batch_reducer";
+import PregameAcknowledgeRollReducer from "./pregame_acknowledge_roll_reducer";
+import PregameChangeDeckReducer from "./pregame_change_deck_reducer";
+import PregameChooseFirstReducer from "./pregame_choose_first_reducer";
+import PregameReadyReducer from "./pregame_ready_reducer";
 import RemoveCounterReducer from "./remove_counter_reducer";
 import RemoveTokenReducer from "./remove_token_reducer";
 import ResignGameReducer from "./resign_game_reducer";
@@ -211,6 +215,10 @@ const reducersSchema = __reducers(
   __reducerSchema("move_card_to_bottom_of_deck", MoveCardToBottomOfDeckReducer),
   __reducerSchema("move_card_to_top_of_deck", MoveCardToTopOfDeckReducer),
   __reducerSchema("move_cards_batch", MoveCardsBatchReducer),
+  __reducerSchema("pregame_acknowledge_roll", PregameAcknowledgeRollReducer),
+  __reducerSchema("pregame_change_deck", PregameChangeDeckReducer),
+  __reducerSchema("pregame_choose_first", PregameChooseFirstReducer),
+  __reducerSchema("pregame_ready", PregameReadyReducer),
   __reducerSchema("remove_counter", RemoveCounterReducer),
   __reducerSchema("remove_token", RemoveTokenReducer),
   __reducerSchema("resign_game", ResignGameReducer),

@@ -25,4 +25,10 @@ export default __t.row({
   isPublic: __t.bool().name("is_public"),
   lobbyMessage: __t.string().name("lobby_message"),
   createdByName: __t.string().name("created_by_name"),
+  pregamePhase: __t.string().name("pregame_phase"),
+  pregameReady0: __t.bool().name("pregame_ready_0"),
+  pregameReady1: __t.bool().name("pregame_ready_1"),
+  rollWinner: __t.string().name("roll_winner"),
+  rollResult0: __t.u64().name("roll_result_0"),
+  rollResult1: __t.u64().name("roll_result_1"),
 });
