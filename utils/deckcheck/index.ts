@@ -98,9 +98,97 @@ async function resolveCard(
 }
 
 /**
+ * Get a high-level type category for a card. Cards with different type
+ * categories are fundamentally different cards even if they share a name.
+ * E.g., "Brass Serpent" the Enhancement and "Brass Serpent" the Artifact.
+ *
+ * For dual-type cards (e.g., "Hero/Enhancement"), the primary type wins:
+ * character types take precedence over enhancement.
+ */
+function getTypeCategory(type: string): string {
+  const t = type.toLowerCase();
+  if (t.includes("lost soul")) return "lost_soul";
+  if (t.includes("dominant")) return "dominant";
+  // Character types take precedence for dual-type cards like "Hero/Enhancement"
+  if (t.includes("evil character")) return "evil_character";
+  if (t.includes("hero")) return "hero";
+  if (t.includes("artifact")) return "artifact";
+  if (t.includes("fortress")) return "fortress";
+  if (t.includes("covenant")) return "covenant";
+  if (t.includes("curse")) return "curse";
+  if (t.includes("site")) return "site";
+  if (t.includes("city")) return "city";
+  if (t.includes("enhancement") || t === "ge" || t === "ee") return "enhancement";
+  return t || "unknown";
+}
+
+/**
+ * Normalize a brigade string for comparison.
+ * Lowercases, trims, sorts slash-separated parts, and deduplicates.
+ */
+function normalizeBrigade(brigade: string): string {
+  if (!brigade || brigade.trim() === "") return "";
+  const lower = brigade.toLowerCase().trim();
+  if (lower === "colorless") return "";
+  return lower
+    .split(/[/,]/)
+    .map((b) => b.trim())
+    .filter((b) => b.length > 0)
+    .sort()
+    .join("/");
+}
+
+/**
+ * Split a card group into sub-groups when cards have fundamentally different
+ * type categories or different brigades (art variants).
+ *
+ * This handles cases like:
+ * - "Brass Serpent" Enhancement vs Artifact → different type categories → split
+ * - "Panic Demon (Black)" vs "Panic Demon (Brown)" → different brigades → split
+ * - Same card reprinted in same brigade → stays grouped (correct)
+ *
+ * Lost Souls are NOT split by brigade (they have their own grouping logic).
+ */
+function refineCardGroup(group: CardGroup): CardGroup[] {
+  if (group.cards.length <= 1) return [group];
+
+  const subMap = new Map<string, CardGroup>();
+
+  for (const card of group.cards) {
+    const typeCategory = getTypeCategory(card.type);
+    // Split by brigade for all non-LS types (different brigades = different cards)
+    // Lost Souls are handled separately by checkLostSoulAbilityLimit
+    const brigade = typeCategory === "lost_soul" ? "" : normalizeBrigade(card.brigade);
+    const key = `${typeCategory}::${brigade}`;
+
+    const existing = subMap.get(key);
+    if (existing) {
+      existing.cards.push(card);
+      existing.totalQuantity += card.quantity;
+    } else {
+      subMap.set(key, {
+        canonicalName: card.canonicalName ?? group.canonicalName,
+        groupId: group.groupId,
+        cards: [card],
+        totalQuantity: card.quantity,
+      });
+    }
+  }
+
+  // If no splitting occurred, return original group unchanged
+  if (subMap.size === 1) return [group];
+
+  return Array.from(subMap.values());
+}
+
+/**
  * Build card groups from resolved cards. Cards sharing the same
  * duplicateGroupId are grouped together. Cards without a group ID
  * get their own group keyed by their name.
+ *
+ * After initial grouping, groups are refined to split cards that have
+ * fundamentally different type categories (e.g., Enhancement vs Artifact)
+ * or different brigades (art variants of generic characters).
  */
 function buildCardGroups(allCards: ResolvedCard[]): CardGroup[] {
   const groupById = new Map<number, CardGroup>();
@@ -136,10 +224,18 @@ function buildCardGroups(allCards: ResolvedCard[]): CardGroup[] {
     }
   }
 
-  return [
+  // Refine: split groups by type category and brigade
+  const rawGroups = [
     ...Array.from(groupById.values()),
     ...Array.from(groupByName.values()),
   ];
+
+  const refined: CardGroup[] = [];
+  for (const group of rawGroups) {
+    refined.push(...refineCardGroup(group));
+  }
+
+  return refined;
 }
 
 /**
