@@ -211,9 +211,15 @@ export const create_game = spacetimedb.reducer(
       isPublic,
       lobbyMessage,
       createdByName: displayName,
+      pregamePhase: '',
+      pregameReady0: false,
+      pregameReady1: false,
+      rollWinner: '',
+      rollResult0: 0n,
+      rollResult1: 0n,
     });
 
-    // Insert player row
+    // Insert player row with pending deck data (cards loaded later during pregame)
     const player = ctx.db.Player.insert({
       id: 0n,
       gameId: game.id,
@@ -224,10 +230,8 @@ export const create_game = spacetimedb.reducer(
       supabaseUserId,
       isConnected: true,
       autoRouteLostSouls: true,
+      pendingDeckData: deckData,
     });
-
-    // Insert cards, shuffle, and draw opening hand
-    insertCardsShuffleDraw(ctx, game, player, deckData);
 
     // Log action
     logAction(ctx, game.id, player.id, 'GAME_CREATED', JSON.stringify({ code }), 0n, 'draw');
@@ -258,7 +262,7 @@ export const join_game = spacetimedb.reducer(
       throw new SenderError('No waiting game found with that code');
     }
 
-    // Insert player (seat=1)
+    // Insert player (seat=1) with pending deck data (cards loaded later during pregame)
     const player = ctx.db.Player.insert({
       id: 0n,
       gameId: game.id,
@@ -269,24 +273,20 @@ export const join_game = spacetimedb.reducer(
       supabaseUserId,
       isConnected: true,
       autoRouteLostSouls: true,
+      pendingDeckData: deckData,
     });
 
-    // Insert cards, shuffle, and draw opening hand
-    insertCardsShuffleDraw(ctx, game, player, deckData);
-
-    // Update game to playing state
+    // Transition to pregame ceremony
     const latestGame = ctx.db.Game.id.find(game.id);
     if (!latestGame) throw new SenderError('Game not found');
     ctx.db.Game.id.update({
       ...latestGame,
-      status: 'playing',
-      currentTurn: 0n,
-      currentPhase: 'draw',
-      turnNumber: 1n,
+      status: 'pregame',
+      pregamePhase: 'deck_select',
     });
 
     // Log action
-    logAction(ctx, game.id, player.id, 'GAME_STARTED', '', 1n, 'draw');
+    logAction(ctx, game.id, player.id, 'PLAYER_JOINED', '', 0n, 'pregame');
   }
 );
 
