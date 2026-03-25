@@ -26,6 +26,12 @@ export const Game = table(
     isPublic: t.bool(),
     lobbyMessage: t.string(),
     createdByName: t.string(),
+    pregamePhase: t.string(),     // "" | "deck_select" | "rolling" | "choosing"
+    pregameReady0: t.bool(),      // seat 0 ready (reused for roll ack)
+    pregameReady1: t.bool(),      // seat 1 ready (reused for roll ack)
+    rollWinner: t.string(),       // "" | "0" | "1" — string to avoid 0n ambiguity
+    rollResult0: t.u64(),         // d20 result for seat 0
+    rollResult1: t.u64(),         // d20 result for seat 1
   }
 );
 
@@ -50,6 +56,7 @@ export const Player = table(
     supabaseUserId: t.string(),
     isConnected: t.bool(),
     autoRouteLostSouls: t.bool(),
+    pendingDeckData: t.string(),  // JSON deck data, stored until game starts
   }
 );
 
