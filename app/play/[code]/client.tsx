@@ -563,17 +563,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       return (
         <div style={{ display: 'flex', width: '100vw', height: '100dvh', backgroundImage: 'url(/gameplay/cave_background.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <div style={{ flex: 1, position: 'relative', overflow: 'hidden', pointerEvents: 'none' }}>
-              <MultiplayerCanvas gameId={gameId} />
-              <GameOverOverlay
-                game={gameState.game}
-                myPlayer={gameState.myPlayer}
-                opponentPlayer={gameState.opponentPlayer}
-                gameActions={gameState.gameActions}
-                onReturnToLobby={handleReturnToLobby}
-              />
-            </div>
-            <div style={{ flexShrink: 0, height: 56 }}>
+            <div style={{ flexShrink: 0, height: 48 }}>
               <TurnIndicator
                 game={gameState.game}
                 myPlayer={gameState.myPlayer}
@@ -585,6 +575,16 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                 onRollDice={() => gameState.rollDice(BigInt(20))}
               />
             </div>
+            <div style={{ flex: 1, position: 'relative', overflow: 'hidden', pointerEvents: 'none' }}>
+              <MultiplayerCanvas gameId={gameId} />
+              <GameOverOverlay
+                game={gameState.game}
+                myPlayer={gameState.myPlayer}
+                opponentPlayer={gameState.opponentPlayer}
+                gameActions={gameState.gameActions}
+                onReturnToLobby={handleReturnToLobby}
+              />
+            </div>
           </div>
           {rightPanel}
         </div>
@@ -594,16 +594,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     return (
       <div style={{ display: 'flex', width: '100vw', height: '100dvh', backgroundImage: 'url(/gameplay/cave_background.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-            <GameOverOverlay
-              game={gameState.game}
-              myPlayer={gameState.myPlayer}
-              opponentPlayer={gameState.opponentPlayer}
-              gameActions={gameState.gameActions}
-              onReturnToLobby={handleReturnToLobby}
-            />
-          </div>
-          <div style={{ flexShrink: 0, height: 56 }}>
+          <div style={{ flexShrink: 0, height: 48 }}>
             <TurnIndicator
               game={gameState.game}
               myPlayer={gameState.myPlayer}
@@ -615,6 +606,15 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               onRollDice={() => gameState.rollDice(BigInt(20))}
             />
           </div>
+          <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+            <GameOverOverlay
+              game={gameState.game}
+              myPlayer={gameState.myPlayer}
+              opponentPlayer={gameState.opponentPlayer}
+              gameActions={gameState.gameActions}
+              onReturnToLobby={handleReturnToLobby}
+            />
+          </div>
         </div>
         {rightPanel}
       </div>
@@ -624,14 +624,9 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // lifecycle === 'playing' — two-column layout: canvas + right panel (preview + chat)
   return (
     <div style={{ display: 'flex', width: '100vw', height: '100dvh', backgroundImage: 'url(/gameplay/cave_background.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
-      {/* Canvas + phase bar */}
+      {/* Turn bar + Canvas */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          {gameId !== null && (
-            <MultiplayerCanvas gameId={gameId} />
-          )}
-        </div>
-        <div style={{ flexShrink: 0, height: 56 }}>
+        <div style={{ flexShrink: 0, height: 48 }}>
           <TurnIndicator
             game={gameState.game}
             myPlayer={gameState.myPlayer}
@@ -643,6 +638,11 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             onRollDice={() => gameState.rollDice(BigInt(20))}
             onConcede={gameState.resignGame}
           />
+        </div>
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+          {gameId !== null && (
+            <MultiplayerCanvas gameId={gameId} />
+          )}
         </div>
       </div>
 

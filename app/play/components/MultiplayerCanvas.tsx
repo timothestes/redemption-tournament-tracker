@@ -26,6 +26,7 @@ import type {
   CardCounter,
 } from '@/lib/spacetimedb/module_bindings/types';
 import { CardContextMenu } from '@/app/shared/components/CardContextMenu';
+import { MultiCardContextMenu } from '@/app/shared/components/MultiCardContextMenu';
 import type { GameActions } from '@/app/shared/types/gameActions';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import DiceOverlay from './DiceOverlay';
@@ -341,6 +342,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
   } | null>(null);
   const contextMenuRef = useRef(contextMenu);
   contextMenuRef.current = contextMenu;
+  const [multiCardContextMenu, setMultiCardContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   // ---- Multiplayer GameActions adapter ----
   const multiplayerActions: GameActions = useMemo(() => ({
@@ -760,14 +762,31 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       setHoveredInstanceId(null);
       stopHoverAnimation();
 
-      setContextMenu({
-        card,
-        x: e.evt.clientX - container.left,
-        y: e.evt.clientY - container.top,
-      });
+      const menuX = e.evt.clientX - container.left;
+      const menuY = e.evt.clientY - container.top;
+
+      // If right-clicking a selected card with multi-selection, show multi-card menu
+      if (selectedIds.has(card.instanceId) && selectedIds.size > 1) {
+        setMultiCardContextMenu({ x: menuX, y: menuY });
+      } else {
+        // Clear selection if right-clicking an unselected card
+        if (selectedIds.size > 0 && !selectedIds.has(card.instanceId)) {
+          clearSelection();
+        }
+        setContextMenu({ card, x: menuX, y: menuY });
+      }
     },
-    [stopHoverAnimation],
+    [stopHoverAnimation, selectedIds, clearSelection],
   );
+  // Double-click toggles meek on your own cards
+  const handleDblClick = useCallback((card: GameCard) => {
+    if (card.ownerId !== 'player1') return; // only your own cards
+    if (card.isMeek) {
+      multiplayerActions.unmeekCard(card.instanceId);
+    } else {
+      multiplayerActions.meekCard(card.instanceId);
+    }
+  }, [multiplayerActions]);
   const noopDblClick = useCallback((_card: GameCard) => {}, []);
 
   const handleMouseEnter = useCallback(
@@ -1140,7 +1159,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                       onDragMove={handleCardDragMove}
                       onDragEnd={handleCardDragEnd}
                       onContextMenu={handleCardContextMenu}
-                      onDblClick={noopDblClick}
+                      onDblClick={handleDblClick}
                       onMouseEnter={handleMouseEnter}
                       onMouseLeave={handleMouseLeave}
                     />
@@ -1239,7 +1258,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                       onDragMove={handleCardDragMove}
                       onDragEnd={handleCardDragEnd}
                       onContextMenu={handleCardContextMenu}
-                      onDblClick={noopDblClick}
+                      onDblClick={handleDblClick}
                       onMouseEnter={handleMouseEnter}
                       onMouseLeave={handleMouseLeave}
                     />
@@ -1635,7 +1654,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                       onDragMove={handleCardDragMove}
                       onDragEnd={handleCardDragEnd}
                       onContextMenu={handleCardContextMenu}
-                      onDblClick={noopDblClick}
+                      onDblClick={handleDblClick}
                       onMouseEnter={handleMouseEnter}
                       onMouseLeave={handleMouseLeave}
                     />
@@ -1751,6 +1770,17 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
           y={contextMenu.y}
           actions={multiplayerActions}
           onClose={() => setContextMenu(null)}
+        />
+      )}
+
+      {multiCardContextMenu && (
+        <MultiCardContextMenu
+          selectedIds={Array.from(selectedIds)}
+          x={multiCardContextMenu.x}
+          y={multiCardContextMenu.y}
+          actions={multiplayerActions}
+          onClose={() => setMultiCardContextMenu(null)}
+          onClearSelection={() => { clearSelection(); setMultiCardContextMenu(null); }}
         />
       )}
     </div>
