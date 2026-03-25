@@ -1,6 +1,7 @@
 'use client';
 
 import { PHASE_ORDER } from '@/app/goldfish/types';
+import type { GamePhase } from '@/app/shared/types/gameCard';
 
 // ---------------------------------------------------------------------------
 // Phase display labels
@@ -19,14 +20,12 @@ const PHASE_LABELS: Record<string, string> = {
 // ---------------------------------------------------------------------------
 
 interface TurnIndicatorProps {
-  game: any; // Game row from SpacetimeDB — fields: currentPhase, turnNumber, currentTurn
-  myPlayer: any; // My player row — fields: displayName, seat
-  opponentPlayer: any; // Opponent player row — fields: displayName
+  game: any;
+  myPlayer: any;
+  opponentPlayer: any;
   isMyTurn: boolean;
   onSetPhase: (phase: string) => void;
   onEndTurn: () => void;
-  onDrawCard: () => void;
-  onRollDice: () => void;
   onConcede?: () => void;
 }
 
@@ -41,15 +40,32 @@ export default function TurnIndicator({
   isMyTurn,
   onSetPhase,
   onEndTurn,
-  onDrawCard,
-  onRollDice,
   onConcede,
 }: TurnIndicatorProps) {
   const currentPhase: string = game?.currentPhase ?? 'draw';
   const turnNumber: number = game?.turnNumber ? Number(game.turnNumber) : 1;
+  const currentIdx = PHASE_ORDER.indexOf(currentPhase as GamePhase);
+  const isFirstPhase = currentIdx <= 0;
+  const isLastPhase = currentIdx >= PHASE_ORDER.length - 1;
 
   const myName: string = myPlayer?.displayName ?? 'You';
   const opponentName: string = opponentPlayer?.displayName ?? 'Opponent';
+
+  const handlePrevPhase = () => {
+    if (!isMyTurn || isFirstPhase) return;
+    const prevPhase = PHASE_ORDER[currentIdx - 1];
+    onSetPhase(prevPhase);
+  };
+
+  const handleNextPhase = () => {
+    if (!isMyTurn) return;
+    if (isLastPhase) {
+      onEndTurn();
+    } else {
+      const nextPhase = PHASE_ORDER[currentIdx + 1];
+      onSetPhase(nextPhase);
+    }
+  };
 
   return (
     <div
@@ -57,7 +73,7 @@ export default function TurnIndicator({
         width: '100%',
         height: '100%',
         background: 'rgba(10, 8, 5, 0.96)',
-        borderTop: '1px solid rgba(107, 78, 39, 0.5)',
+        borderBottom: '1px solid rgba(107, 78, 39, 0.5)',
         display: 'flex',
         alignItems: 'center',
         paddingLeft: 12,
@@ -77,7 +93,6 @@ export default function TurnIndicator({
           flexShrink: 0,
         }}
       >
-        {/* Turn counter */}
         <span
           style={{
             fontFamily: 'var(--font-cinzel), Georgia, serif',
@@ -89,18 +104,10 @@ export default function TurnIndicator({
           }}
         >
           Turn{' '}
-          <span
-            style={{
-              color: '#e8d5a3',
-              fontSize: 13,
-              fontWeight: 700,
-            }}
-          >
+          <span style={{ color: '#e8d5a3', fontSize: 13, fontWeight: 700 }}>
             {turnNumber}
           </span>
         </span>
-
-        {/* Whose turn */}
         <span
           style={{
             fontFamily: 'var(--font-cinzel), Georgia, serif',
@@ -117,7 +124,7 @@ export default function TurnIndicator({
       </div>
 
       {/* ================================================================
-          CENTER — Phase buttons
+          CENTER — ‹ Arrow | Phase buttons | › Arrow (matches goldfish)
           ================================================================ */}
       <div
         style={{
@@ -128,6 +135,28 @@ export default function TurnIndicator({
           gap: 2,
         }}
       >
+        {/* Previous phase arrow */}
+        <button
+          onClick={handlePrevPhase}
+          disabled={!isMyTurn || isFirstPhase}
+          title="Previous phase"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            cursor: !isMyTurn || isFirstPhase ? 'default' : 'pointer',
+            color: !isMyTurn || isFirstPhase ? 'rgba(107, 78, 39, 0.3)' : 'rgba(232, 213, 163, 0.45)',
+            fontSize: 18,
+            fontFamily: 'serif',
+            padding: '2px 6px',
+            transition: 'color 0.2s',
+            lineHeight: 1,
+          }}
+          onMouseEnter={(e) => { if (isMyTurn && !isFirstPhase) e.currentTarget.style.color = '#e8d5a3'; }}
+          onMouseLeave={(e) => { if (isMyTurn && !isFirstPhase) e.currentTarget.style.color = 'rgba(232, 213, 163, 0.45)'; }}
+        >
+          &#x276E;
+        </button>
+
         {PHASE_ORDER.map((phase) => {
           const isActive = phase === currentPhase;
           const canClick = isMyTurn && !isActive;
@@ -141,14 +170,10 @@ export default function TurnIndicator({
               style={{
                 position: 'relative',
                 padding: '4px 10px',
-                background: isActive
-                  ? 'rgba(196, 149, 90, 0.15)'
-                  : 'transparent',
-                border: isActive
-                  ? '1px solid rgba(196, 149, 90, 0.45)'
-                  : '1px solid transparent',
+                background: isActive ? 'rgba(196, 149, 90, 0.15)' : 'transparent',
+                border: isActive ? '1px solid rgba(196, 149, 90, 0.45)' : '1px solid transparent',
                 borderRadius: 20,
-                cursor: isMyTurn && !isActive ? 'pointer' : 'default',
+                cursor: canClick ? 'pointer' : 'default',
                 fontFamily: 'var(--font-cinzel), Georgia, serif',
                 fontSize: 10,
                 letterSpacing: '0.07em',
@@ -162,20 +187,19 @@ export default function TurnIndicator({
                 whiteSpace: 'nowrap',
               }}
               onMouseEnter={(e) => {
-                if (isMyTurn && !isActive) {
+                if (canClick) {
                   e.currentTarget.style.color = '#e8d5a3';
                   e.currentTarget.style.background = 'rgba(196, 149, 90, 0.08)';
                 }
               }}
               onMouseLeave={(e) => {
-                if (isMyTurn && !isActive) {
+                if (canClick) {
                   e.currentTarget.style.color = 'rgba(232, 213, 163, 0.45)';
                   e.currentTarget.style.background = 'transparent';
                 }
               }}
             >
               {PHASE_LABELS[phase]}
-              {/* Active underline accent */}
               {isActive && (
                 <span
                   style={{
@@ -194,120 +218,42 @@ export default function TurnIndicator({
             </button>
           );
         })}
+
+        {/* Next phase / End Turn arrow */}
+        <button
+          onClick={handleNextPhase}
+          disabled={!isMyTurn}
+          title={isLastPhase ? 'End turn' : 'Next phase'}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            cursor: !isMyTurn ? 'default' : 'pointer',
+            color: !isMyTurn ? 'rgba(107, 78, 39, 0.3)' : 'rgba(232, 213, 163, 0.45)',
+            fontSize: 18,
+            fontFamily: 'serif',
+            padding: '2px 6px',
+            transition: 'color 0.2s',
+            lineHeight: 1,
+          }}
+          onMouseEnter={(e) => { if (isMyTurn) e.currentTarget.style.color = '#e8d5a3'; }}
+          onMouseLeave={(e) => { if (isMyTurn) e.currentTarget.style.color = 'rgba(232, 213, 163, 0.45)'; }}
+        >
+          &#x276F;
+        </button>
       </div>
 
       {/* ================================================================
-          RIGHT — Draw + End Turn buttons
+          RIGHT — Concede only (Draw/Roll/EndTurn moved to bottom toolbar)
           ================================================================ */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           gap: 6,
-          minWidth: 140,
           flexShrink: 0,
           justifyContent: 'flex-end',
         }}
       >
-        {/* Roll Dice button — available to both players at any time */}
-        <button
-          onClick={onRollDice}
-          title="Roll d20 (shared with opponent)"
-          style={{
-            padding: '5px 10px',
-            background: 'transparent',
-            border: '1px solid rgba(107, 78, 39, 0.4)',
-            borderRadius: 4,
-            cursor: 'pointer',
-            fontFamily: 'var(--font-cinzel), Georgia, serif',
-            fontSize: 10,
-            letterSpacing: '0.06em',
-            textTransform: 'uppercase',
-            color: 'rgba(196, 149, 90, 0.6)',
-            transition: 'background 0.15s, color 0.15s, border-color 0.15s',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(196, 149, 90, 0.1)';
-            e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.55)';
-            e.currentTarget.style.color = '#e8d5a3';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'transparent';
-            e.currentTarget.style.borderColor = 'rgba(107, 78, 39, 0.4)';
-            e.currentTarget.style.color = 'rgba(196, 149, 90, 0.6)';
-          }}
-        >
-          d20
-        </button>
-
-        {/* Draw button */}
-        <button
-          onClick={isMyTurn ? onDrawCard : undefined}
-          disabled={!isMyTurn}
-          style={{
-            padding: '5px 12px',
-            background: isMyTurn ? 'rgba(196, 149, 90, 0.1)' : 'transparent',
-            border: `1px solid ${isMyTurn ? 'rgba(196, 149, 90, 0.5)' : 'rgba(107, 78, 39, 0.25)'}`,
-            borderRadius: 4,
-            cursor: isMyTurn ? 'pointer' : 'default',
-            fontFamily: 'var(--font-cinzel), Georgia, serif',
-            fontSize: 10,
-            letterSpacing: '0.06em',
-            textTransform: 'uppercase',
-            color: isMyTurn ? '#e8d5a3' : 'rgba(150, 140, 120, 0.35)',
-            transition: 'background 0.15s, color 0.15s, border-color 0.15s',
-            opacity: isMyTurn ? 1 : 0.5,
-          }}
-          onMouseEnter={(e) => {
-            if (isMyTurn) {
-              e.currentTarget.style.background = 'rgba(196, 149, 90, 0.2)';
-              e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.75)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (isMyTurn) {
-              e.currentTarget.style.background = 'rgba(196, 149, 90, 0.1)';
-              e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.5)';
-            }
-          }}
-        >
-          Draw
-        </button>
-
-        {/* End Turn button */}
-        <button
-          onClick={isMyTurn ? onEndTurn : undefined}
-          disabled={!isMyTurn}
-          style={{
-            padding: '5px 14px',
-            background: isMyTurn ? 'rgba(196, 149, 90, 0.18)' : 'transparent',
-            border: `1px solid ${isMyTurn ? '#c4955a' : 'rgba(107, 78, 39, 0.25)'}`,
-            borderRadius: 4,
-            cursor: isMyTurn ? 'pointer' : 'default',
-            fontFamily: 'var(--font-cinzel), Georgia, serif',
-            fontSize: 10,
-            letterSpacing: '0.06em',
-            textTransform: 'uppercase',
-            color: isMyTurn ? '#e8d5a3' : 'rgba(150, 140, 120, 0.35)',
-            transition: 'background 0.15s, color 0.15s, border-color 0.15s',
-            opacity: isMyTurn ? 1 : 0.5,
-            fontWeight: isMyTurn ? 600 : 400,
-          }}
-          onMouseEnter={(e) => {
-            if (isMyTurn) {
-              e.currentTarget.style.background = 'rgba(196, 149, 90, 0.3)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (isMyTurn) {
-              e.currentTarget.style.background = 'rgba(196, 149, 90, 0.18)';
-            }
-          }}
-        >
-          End Turn
-        </button>
-
-        {/* Concede button */}
         {onConcede && (
           <button
             onClick={() => {
@@ -315,7 +261,6 @@ export default function TurnIndicator({
               if (confirmed) onConcede();
             }}
             style={{
-              marginLeft: 8,
               padding: '5px 12px',
               background: 'transparent',
               border: '1px solid rgba(180, 60, 60, 0.35)',

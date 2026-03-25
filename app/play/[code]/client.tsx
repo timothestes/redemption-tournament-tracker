@@ -13,6 +13,9 @@ import ChatPanel from '../components/ChatPanel';
 import { CardPreviewProvider } from '@/app/goldfish/state/CardPreviewContext';
 import { CardLoupePanel } from '@/app/goldfish/components/CardLoupePanel';
 import TopNav from '@/components/top-nav';
+import { GameToolbar } from '@/app/shared/components/GameToolbar';
+import { GameToastContainer, showGameToast } from '@/app/shared/components/GameToast';
+import type { GameActions } from '@/app/shared/types/gameActions';
 import WaitingRoomGoldfish from '../components/WaitingRoomGoldfish';
 import { convertToGoldfishDeck, type GameCardData } from '../utils/convertToGoldfishDeck';
 
@@ -539,7 +542,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       {/* Card preview — top portion, override loupe width to fill parent */}
       <div style={{ flexShrink: 0, overflow: 'hidden' }}>
         <div style={{ width: '100%' }}>
-          <CardLoupePanel alwaysVisible />
+          <CardLoupePanel />
         </div>
       </div>
       {/* Chat — fills remaining space */}
@@ -571,8 +574,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                 isMyTurn={gameState.isMyTurn}
                 onSetPhase={gameState.setPhase}
                 onEndTurn={gameState.endTurn}
-                onDrawCard={gameState.drawCard}
-                onRollDice={() => gameState.rollDice(BigInt(20))}
               />
             </div>
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden', pointerEvents: 'none' }}>
@@ -602,8 +603,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               isMyTurn={gameState.isMyTurn}
               onSetPhase={gameState.setPhase}
               onEndTurn={gameState.endTurn}
-              onDrawCard={gameState.drawCard}
-              onRollDice={() => gameState.rollDice(BigInt(20))}
             />
           </div>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
@@ -624,7 +623,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // lifecycle === 'playing' — two-column layout: canvas + right panel (preview + chat)
   return (
     <div style={{ display: 'flex', width: '100vw', height: '100dvh', backgroundImage: 'url(/gameplay/cave_background.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
-      {/* Turn bar + Canvas */}
+      {/* Turn bar + Canvas + Toolbar */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ flexShrink: 0, height: 48 }}>
           <TurnIndicator
@@ -634,8 +633,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             isMyTurn={gameState.isMyTurn}
             onSetPhase={gameState.setPhase}
             onEndTurn={gameState.endTurn}
-            onDrawCard={gameState.drawCard}
-            onRollDice={() => gameState.rollDice(BigInt(20))}
             onConcede={gameState.resignGame}
           />
         </div>
@@ -643,6 +640,36 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           {gameId !== null && (
             <MultiplayerCanvas gameId={gameId} />
           )}
+          {/* Quick action toolbar — floating above hand area */}
+          <GameToolbar
+            actions={{
+              drawCard: () => gameState.drawCard(),
+              drawMultiple: (n) => gameState.drawMultiple(BigInt(n)),
+              moveCard: (id, zone, px, py) => gameState.moveCard(BigInt(id), zone, undefined, px, py),
+              moveCardsBatch: (ids, zone) => gameState.moveCardsBatch(ids.join(','), zone),
+              flipCard: (id) => gameState.flipCard(BigInt(id)),
+              meekCard: (id) => gameState.meekCard(BigInt(id)),
+              unmeekCard: (id) => gameState.unmeekCard(BigInt(id)),
+              addCounter: (id, c) => gameState.addCounter(BigInt(id), c),
+              removeCounter: (id, c) => gameState.removeCounter(BigInt(id), c),
+              shuffleCardIntoDeck: (id) => gameState.shuffleCardIntoDeck(BigInt(id)),
+              shuffleDeck: () => gameState.shuffleDeck(),
+              setNote: (id, t) => gameState.setNote(BigInt(id), t),
+              exchangeCards: (ids) => gameState.exchangeCards(ids.join(',')),
+              moveCardToTopOfDeck: (id) => gameState.moveCardToTopOfDeck(BigInt(id)),
+              moveCardToBottomOfDeck: (id) => gameState.moveCardToBottomOfDeck(BigInt(id)),
+            } satisfies GameActions}
+            mode="multiplayer"
+            isMyTurn={gameState.isMyTurn}
+            isSpreadHand={false}
+            onToggleSpreadHand={() => {/* TODO: wire to canvas state */}}
+            deckCount={gameState.myCards['deck']?.length ?? 0}
+            handCount={gameState.myCards['hand']?.length ?? 0}
+            onRollDice={() => gameState.rollDice(BigInt(20))}
+            onShowToast={showGameToast}
+            onEndTurn={gameState.endTurn}
+          />
+          <GameToastContainer />
         </div>
       </div>
 
