@@ -164,12 +164,21 @@ function DeckSelectPhase({ gameState, gameId }: { gameState: GameState; gameId: 
 function RollingPhase({ gameState, gameId }: { gameState: GameState; gameId: bigint }) {
   const { game, myPlayer, opponentPlayer } = gameState;
   const [showResults, setShowResults] = useState(false);
-  const [acknowledged, setAcknowledged] = useState(false);
 
+  // Reveal dice results after animation delay
   useEffect(() => {
     const timer = setTimeout(() => setShowResults(true), 1500);
     return () => clearTimeout(timer);
   }, []);
+
+  // Auto-advance to choosing phase after showing results
+  useEffect(() => {
+    if (!showResults) return;
+    const timer = setTimeout(() => {
+      gameState.pregameAcknowledgeRoll();
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [showResults, gameState]);
 
   if (!game || !myPlayer) return null;
 
@@ -179,11 +188,6 @@ function RollingPhase({ gameState, gameId }: { gameState: GameState; gameId: big
   const opponentRoll = isSeat0 ? Number(game.rollResult1) : Number(game.rollResult0);
   const iWon = mySeat.toString() === game.rollWinner;
   const winnerName = iWon ? myPlayer.displayName : (opponentPlayer?.displayName || 'Opponent');
-
-  const handleAcknowledge = () => {
-    setAcknowledged(true);
-    gameState.pregameAcknowledgeRoll();
-  };
 
   return (
     <div style={{
@@ -294,37 +298,6 @@ function RollingPhase({ gameState, gameId }: { gameState: GameState; gameId: big
           }}>
             {winnerName} wins the roll!
           </p>
-
-          {!acknowledged ? (
-            <button
-              onClick={handleAcknowledge}
-              style={{
-                marginTop: 16,
-                padding: '10px 32px',
-                borderRadius: 4,
-                border: '1px solid rgba(196, 149, 90, 0.45)',
-                background: 'rgba(196, 149, 90, 0.15)',
-                color: '#e8d5a3',
-                fontFamily: 'var(--font-cinzel), Georgia, serif',
-                fontSize: 13,
-                fontWeight: 700,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                cursor: 'pointer',
-              }}
-            >
-              Continue
-            </button>
-          ) : (
-            <p style={{
-              marginTop: 16,
-              fontSize: 12,
-              color: 'rgba(196, 149, 90, 0.45)',
-              fontFamily: 'Georgia, serif',
-            }}>
-              Waiting for opponent...
-            </p>
-          )}
         </div>
       )}
     </div>
