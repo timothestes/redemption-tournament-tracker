@@ -193,10 +193,10 @@ function RollingPhase({ gameState, gameId }: { gameState: GameState; gameId: big
     <div style={{
       background: 'rgba(14, 10, 6, 0.97)',
       border: '1px solid rgba(107, 78, 39, 0.3)',
-      borderRadius: 8,
-      padding: '40px 48px',
+      borderRadius: 10,
+      padding: '36px 32px',
       textAlign: 'center',
-      maxWidth: 420,
+      maxWidth: 400,
       width: '100%',
       boxShadow: '0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(196, 149, 90, 0.08)',
     }}>
@@ -213,93 +213,117 @@ function RollingPhase({ gameState, gameId }: { gameState: GameState; gameId: big
         fontWeight: 700,
         color: '#e8d5a3',
         marginTop: 8,
-        textShadow: '0 1px 6px rgba(0,0,0,0.9)',
+        textShadow: '0 1px 6px rgba(0,0,0,0.5)',
       }}>Who Goes First?</h2>
 
-      <div style={{ marginTop: 32, display: 'flex', justifyContent: 'center', gap: 32, alignItems: 'flex-end' }}>
-        {/* My die */}
+      {/* 3-column grid: fixed equal columns so names don't shift layout */}
+      <div style={{
+        marginTop: 28,
+        display: 'grid',
+        gridTemplateColumns: '1fr auto 1fr',
+        alignItems: 'center',
+        gap: 16,
+      }}>
+        {/* My die column */}
         <div style={{ textAlign: 'center' }}>
           <p style={{
             fontFamily: 'Georgia, serif',
             fontSize: 12,
             color: '#c4955a',
-            marginBottom: 8,
+            marginBottom: 10,
             letterSpacing: '0.06em',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
           }}>{myPlayer.displayName}</p>
           <div style={{
-            width: 80,
-            height: 80,
+            width: 88,
+            height: 88,
             borderRadius: 8,
-            border: `2px solid ${showResults ? (iWon ? '#c4955a' : 'rgba(107, 78, 39, 0.3)') : 'rgba(107, 78, 39, 0.3)'}`,
+            margin: '0 auto',
+            border: `2px solid ${showResults ? (iWon ? '#c4955a' : 'rgba(107, 78, 39, 0.25)') : 'rgba(107, 78, 39, 0.3)'}`,
             background: showResults && iWon ? 'rgba(196, 149, 90, 0.12)' : '#1a1308',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            transition: 'all 0.5s ease',
-            boxShadow: showResults && iWon ? '0 0 16px rgba(196, 149, 90, 0.25)' : 'none',
+            transition: 'border-color 0.5s ease, background 0.5s ease, box-shadow 0.5s ease, transform 0.3s ease',
+            boxShadow: showResults && iWon ? '0 0 20px rgba(196, 149, 90, 0.3)' : 'none',
+            transform: showResults ? 'scale(1)' : 'scale(0.95)',
           }}>
             <span style={{
               fontFamily: 'Georgia, serif',
-              fontSize: 28,
+              fontSize: 32,
               fontWeight: 700,
-              color: showResults ? (iWon ? '#e8d5a3' : 'rgba(196, 149, 90, 0.35)') : 'rgba(196, 149, 90, 0.6)',
+              color: showResults ? (iWon ? '#e8d5a3' : 'rgba(196, 149, 90, 0.3)') : 'rgba(196, 149, 90, 0.5)',
+              transition: 'color 0.5s ease',
             }}>{showResults ? myRoll : '?'}</span>
           </div>
         </div>
 
+        {/* VS divider */}
         <span style={{
           fontFamily: 'var(--font-cinzel), Georgia, serif',
           fontSize: 11,
-          color: 'rgba(196, 149, 90, 0.35)',
+          color: 'rgba(196, 149, 90, 0.3)',
           letterSpacing: '0.1em',
-          paddingBottom: 30,
+          userSelect: 'none',
         }}>VS</span>
 
-        {/* Opponent die */}
+        {/* Opponent die column */}
         <div style={{ textAlign: 'center' }}>
           <p style={{
             fontFamily: 'Georgia, serif',
             fontSize: 12,
             color: '#4a7ab5',
-            marginBottom: 8,
+            marginBottom: 10,
             letterSpacing: '0.06em',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
           }}>{opponentPlayer?.displayName || 'Opponent'}</p>
           <div style={{
-            width: 80,
-            height: 80,
+            width: 88,
+            height: 88,
             borderRadius: 8,
-            border: `2px solid ${showResults ? (!iWon ? '#4a7ab5' : 'rgba(107, 78, 39, 0.3)') : 'rgba(107, 78, 39, 0.3)'}`,
+            margin: '0 auto',
+            border: `2px solid ${showResults ? (!iWon ? '#4a7ab5' : 'rgba(107, 78, 39, 0.25)') : 'rgba(107, 78, 39, 0.3)'}`,
             background: showResults && !iWon ? 'rgba(74, 122, 181, 0.12)' : '#1a1308',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            transition: 'all 0.5s ease',
-            boxShadow: showResults && !iWon ? '0 0 16px rgba(74, 122, 181, 0.25)' : 'none',
+            transition: 'border-color 0.5s ease, background 0.5s ease, box-shadow 0.5s ease, transform 0.3s ease',
+            boxShadow: showResults && !iWon ? '0 0 20px rgba(74, 122, 181, 0.3)' : 'none',
+            transform: showResults ? 'scale(1)' : 'scale(0.95)',
           }}>
             <span style={{
               fontFamily: 'Georgia, serif',
-              fontSize: 28,
+              fontSize: 32,
               fontWeight: 700,
-              color: showResults ? (!iWon ? '#e8d5a3' : 'rgba(196, 149, 90, 0.35)') : 'rgba(196, 149, 90, 0.6)',
+              color: showResults ? (!iWon ? '#e8d5a3' : 'rgba(196, 149, 90, 0.3)') : 'rgba(196, 149, 90, 0.5)',
+              transition: 'color 0.5s ease',
             }}>{showResults ? opponentRoll : '?'}</span>
           </div>
         </div>
       </div>
 
-      {showResults && (
-        <div style={{ marginTop: 24 }}>
-          <p style={{
-            fontFamily: 'var(--font-cinzel), Georgia, serif',
-            fontSize: 16,
-            fontWeight: 700,
-            color: '#e8d5a3',
-            letterSpacing: '0.06em',
-            textShadow: '0 1px 6px rgba(0,0,0,0.9)',
-          }}>
-            {winnerName} wins the roll!
-          </p>
-        </div>
-      )}
+      {/* Winner announcement — fades in */}
+      <div style={{
+        marginTop: 24,
+        opacity: showResults ? 1 : 0,
+        transform: showResults ? 'translateY(0)' : 'translateY(8px)',
+        transition: 'opacity 0.6s ease 0.3s, transform 0.6s ease 0.3s',
+      }}>
+        <p style={{
+          fontFamily: 'var(--font-cinzel), Georgia, serif',
+          fontSize: 15,
+          fontWeight: 700,
+          color: '#e8d5a3',
+          letterSpacing: '0.06em',
+          textShadow: '0 1px 4px rgba(0,0,0,0.5)',
+        }}>
+          {winnerName} wins the roll!
+        </p>
+      </div>
     </div>
   );
 }
