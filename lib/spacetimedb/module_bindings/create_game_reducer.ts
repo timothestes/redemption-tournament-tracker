@@ -17,4 +17,6 @@ export default {
   format: __t.string(),
   supabaseUserId: __t.string(),
   deckData: __t.string(),
+  isPublic: __t.bool(),
+  lobbyMessage: __t.string(),
 };

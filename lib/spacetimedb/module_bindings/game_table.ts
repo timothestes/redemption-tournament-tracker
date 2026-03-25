@@ -22,4 +22,7 @@ export default __t.row({
   lastDiceRoll: __t.string().name("last_dice_roll"),
   createdAt: __t.timestamp().name("created_at"),
   createdBy: __t.identity().name("created_by"),
+  isPublic: __t.bool().name("is_public"),
+  lobbyMessage: __t.string().name("lobby_message"),
+  createdByName: __t.string().name("created_by_name"),
 });

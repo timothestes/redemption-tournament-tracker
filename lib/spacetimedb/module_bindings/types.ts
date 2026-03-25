@@ -71,6 +71,9 @@ export const Game = __t.object("Game", {
   lastDiceRoll: __t.string(),
   createdAt: __t.timestamp(),
   createdBy: __t.identity(),
+  isPublic: __t.bool(),
+  lobbyMessage: __t.string(),
+  createdByName: __t.string(),
 });
 export type Game = __Infer<typeof Game>;
 
