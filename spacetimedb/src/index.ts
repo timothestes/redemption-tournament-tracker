@@ -1682,6 +1682,158 @@ spacetimedb.clientConnected((ctx) => {
   }
 });
 
+// ===========================================================================
+// Zone Search reducers
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Reducer: request_zone_search
+// ---------------------------------------------------------------------------
+export const request_zone_search = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    zone: t.string(),
+  },
+  (ctx, { gameId, zone }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
+
+    const player = findPlayerBySender(ctx, gameId);
+
+    if (!['deck', 'hand', 'reserve'].includes(zone)) {
+      throw new SenderError('Invalid zone for search: ' + zone);
+    }
+
+    const allPlayers = [...ctx.db.Player.player_game_id.filter(gameId)];
+    const opponent = allPlayers.find(p => p.id !== player.id);
+    if (!opponent) throw new SenderError('Opponent not found');
+
+    for (const req of ctx.db.ZoneSearchRequest.zone_search_request_game_id.filter(gameId)) {
+      if (req.requesterId === player.id && req.status === 'pending') {
+        throw new SenderError('You already have a pending search request');
+      }
+    }
+
+    ctx.db.ZoneSearchRequest.insert({
+      id: 0n,
+      gameId,
+      requesterId: player.id,
+      targetPlayerId: opponent.id,
+      zone,
+      status: 'pending',
+      createdAt: ctx.timestamp,
+    });
+
+    logAction(ctx, gameId, player.id, 'REQUEST_ZONE_SEARCH', JSON.stringify({ zone }), game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: approve_zone_search
+// ---------------------------------------------------------------------------
+export const approve_zone_search = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    requestId: t.u64(),
+  },
+  (ctx, { gameId, requestId }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    const req = ctx.db.ZoneSearchRequest.id.find(requestId);
+    if (!req) throw new SenderError('Request not found');
+    if (req.gameId !== gameId) throw new SenderError('Request not in this game');
+    if (req.targetPlayerId !== player.id) throw new SenderError('Only the target player can approve');
+    if (req.status !== 'pending') throw new SenderError('Request is not pending');
+
+    ctx.db.ZoneSearchRequest.id.update({ ...req, status: 'approved' });
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: deny_zone_search
+// ---------------------------------------------------------------------------
+export const deny_zone_search = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    requestId: t.u64(),
+  },
+  (ctx, { gameId, requestId }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    const req = ctx.db.ZoneSearchRequest.id.find(requestId);
+    if (!req) throw new SenderError('Request not found');
+    if (req.gameId !== gameId) throw new SenderError('Request not in this game');
+    if (req.targetPlayerId !== player.id) throw new SenderError('Only the target player can deny');
+    if (req.status !== 'pending') throw new SenderError('Request is not pending');
+
+    ctx.db.ZoneSearchRequest.id.delete(requestId);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: complete_zone_search
+// ---------------------------------------------------------------------------
+export const complete_zone_search = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    requestId: t.u64(),
+  },
+  (ctx, { gameId, requestId }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    const req = ctx.db.ZoneSearchRequest.id.find(requestId);
+    if (!req) throw new SenderError('Request not found');
+    if (req.gameId !== gameId) throw new SenderError('Request not in this game');
+    if (req.requesterId !== player.id) throw new SenderError('Only the requester can complete');
+    if (req.status !== 'approved') throw new SenderError('Request is not approved');
+
+    ctx.db.ZoneSearchRequest.id.delete(requestId);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: move_opponent_card
+// ---------------------------------------------------------------------------
+export const move_opponent_card = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    requestId: t.u64(),
+    cardInstanceId: t.u64(),
+    toZone: t.string(),
+    posX: t.string(),
+    posY: t.string(),
+  },
+  (ctx, { gameId, requestId, cardInstanceId, toZone, posX, posY }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+
+    const player = findPlayerBySender(ctx, gameId);
+
+    const req = ctx.db.ZoneSearchRequest.id.find(requestId);
+    if (!req) throw new SenderError('Search request not found');
+    if (req.gameId !== gameId) throw new SenderError('Request not in this game');
+    if (req.requesterId !== player.id) throw new SenderError('Not your search request');
+    if (req.status !== 'approved') throw new SenderError('Search request not approved');
+
+    const card = ctx.db.CardInstance.id.find(cardInstanceId);
+    if (!card) throw new SenderError('Card not found');
+    if (card.gameId !== gameId) throw new SenderError('Card not in this game');
+
+    const fromZone = card.zone;
+    const isFlipped = toZone === 'deck';
+    ctx.db.CardInstance.id.update({
+      ...card,
+      zone: toZone,
+      zoneIndex: 0n,
+      posX,
+      posY,
+      isFlipped,
+    });
+
+    logAction(ctx, gameId, player.id, 'MOVE_OPPONENT_CARD',
+      JSON.stringify({ requestId: requestId.toString(), cardInstanceId: cardInstanceId.toString(), from: fromZone, to: toZone }),
+      game.turnNumber, game.currentPhase);
+  }
+);
+
 // ---------------------------------------------------------------------------
 // Lifecycle: clientDisconnected
 // ---------------------------------------------------------------------------
