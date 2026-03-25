@@ -276,17 +276,62 @@ export const join_game = spacetimedb.reducer(
       pendingDeckData: deckData,
     });
 
-    // Transition to pregame ceremony
-    const latestGame = ctx.db.Game.id.find(game.id);
-    if (!latestGame) throw new SenderError('Game not found');
+    // Log join
+    logAction(ctx, game.id, player.id, 'PLAYER_JOINED', '', 0n, 'pregame');
+
+    // Load decks for both players
+    const allPlayers: any[] = [...ctx.db.Player.player_game_id.filter(game.id)];
+    for (const p of allPlayers) {
+      if (!p.pendingDeckData || p.pendingDeckData === '') {
+        throw new SenderError('Player ' + p.displayName + ' has no deck data');
+      }
+    }
+
+    // Insert cards, shuffle, and draw opening hand for both players
+    for (const p of allPlayers) {
+      const currentGame = ctx.db.Game.id.find(game.id);
+      if (!currentGame) throw new SenderError('Game not found');
+      insertCardsShuffleDraw(ctx, currentGame, p, p.pendingDeckData);
+      const latestPlayer = ctx.db.Player.id.find(p.id);
+      if (latestPlayer) {
+        ctx.db.Player.id.update({ ...latestPlayer, pendingDeckData: '' });
+      }
+    }
+
+    // Roll dice to determine who chooses first player
+    const gameAfterCards = ctx.db.Game.id.find(game.id);
+    if (!gameAfterCards) throw new SenderError('Game not found');
+    const seed = makeSeed(
+      ctx.timestamp.microsSinceUnixEpoch,
+      game.id,
+      0n,
+      gameAfterCards.rngCounter
+    );
+    const rng = xorshift64(seed);
+
+    let r0: number, r1: number;
+    do {
+      r0 = Number(rng.next() % 20n) + 1;
+      r1 = Number(rng.next() % 20n) + 1;
+    } while (r0 === r1);
+
+    const winner = r0 > r1 ? '0' : '1';
+
+    const gameBeforeUpdate = ctx.db.Game.id.find(game.id);
+    if (!gameBeforeUpdate) throw new SenderError('Game not found');
     ctx.db.Game.id.update({
-      ...latestGame,
+      ...gameBeforeUpdate,
       status: 'pregame',
-      pregamePhase: 'deck_select',
+      pregamePhase: 'rolling',
+      rollResult0: BigInt(r0),
+      rollResult1: BigInt(r1),
+      rollWinner: winner,
+      rngCounter: gameBeforeUpdate.rngCounter + 1n,
     });
 
-    // Log action
-    logAction(ctx, game.id, player.id, 'PLAYER_JOINED', '', 0n, 'pregame');
+    logAction(ctx, game.id, player.id, 'PREGAME_ROLL',
+      JSON.stringify({ result0: r0, result1: r1, winner }),
+      0n, 'pregame');
   }
 );
 

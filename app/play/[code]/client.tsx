@@ -669,19 +669,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   if (lifecycle === 'pregame') {
     const phase = gameState.game?.pregamePhase;
 
-    // deck_select: full-screen pregame (no cards loaded yet)
-    if (phase === 'deck_select' || !phase) {
-      return (
-        <PregameScreen
-          gameId={gameId!}
-          gameState={gameState}
-          code={code}
-        />
-      );
-    }
-
     // rolling / choosing: render game canvas with pregame overlay
-    // Cards are loaded — let players see their hand and card preview
+    // Cards are already loaded — players can see their hand
     return (
       <div style={{ display: 'flex', width: '100vw', height: '100dvh', backgroundImage: 'url(/gameplay/cave_background.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
