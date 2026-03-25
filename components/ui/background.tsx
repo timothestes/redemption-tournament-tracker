@@ -23,7 +23,7 @@ const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   return (
     <div className="min-h-screen w-full relative">
       {/* Solid background behind nav area */}
-      <div className="fixed inset-x-0 top-0 h-14 bg-white dark:bg-gray-900 z-0" />
+      <div className="fixed inset-x-0 top-0 h-17 bg-white dark:bg-gray-900 z-0" />
 
       {/* Hero image container — starts below the nav */}
       <div className="fixed inset-x-0 top-14 bottom-0 overflow-hidden">
