@@ -1664,7 +1664,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
           })()}
 
           {/* ================================================================
-              My hand — fan layout at bottom (draggable)
+              My hand — fan/spread layout at bottom (draggable)
               ================================================================ */}
           {(() => {
             const handCards = myCards['hand'] ?? [];
@@ -1675,6 +1675,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
               myHandRect!,
               cardWidth,
               cardHeight,
+              isSpreadHand,
             );
 
             return (
@@ -1843,6 +1844,58 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
           }}
         />
       )}
+
+      {/* ================================================================
+          Card hover preview — floating tooltip near cursor
+          ================================================================ */}
+      {hoveredCard && !isDraggingRef.current && !contextMenu && !multiCardContextMenu && (() => {
+        const previewWidth = 240;
+        const previewHeight = Math.round(previewWidth * 1.4);
+        const imageUrl = getSharedCardImageUrl(hoveredCard.cardImgFile);
+        if (!imageUrl) return null;
+
+        // Position above-right of cursor by default, flip if overflowing
+        let left = mousePos.x + 16;
+        let top = mousePos.y - previewHeight - 16;
+
+        if (typeof window !== 'undefined') {
+          if (left + previewWidth > window.innerWidth - 8) {
+            left = mousePos.x - previewWidth - 16;
+          }
+          if (top < 8) {
+            top = mousePos.y + 16;
+          }
+        }
+
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              left,
+              top,
+              width: previewWidth,
+              zIndex: 1000,
+              pointerEvents: 'none',
+              borderRadius: 6,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.8), 0 0 12px rgba(212,168,103,0.3)',
+              overflow: 'hidden',
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imageUrl}
+              alt={hoveredCard.cardName}
+              width={previewWidth}
+              height={previewHeight}
+              style={{
+                display: 'block',
+                borderRadius: 6,
+                transform: hoveredCard.isMeek ? 'rotate(180deg)' : undefined,
+              }}
+            />
+          </div>
+        );
+      })()}
     </div>
   );
 }
