@@ -535,20 +535,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     );
   }
 
-  if (lifecycle === 'pregame') {
-    return (
-      <PregameScreen
-        gameId={gameId!}
-        gameState={gameState}
-        code={code}
-      />
-    );
-  }
-
-  // Note: removed isLoading gate — subscribeApplied is unreliable for the host
-  // (tables that were empty at subscribe time may never flip to applied).
-  // The canvas handles missing data gracefully with fallbacks.
-
   // ---------------------------------------------------------------------------
   // Return to lobby handler used by GameOverOverlay
   // ---------------------------------------------------------------------------
@@ -558,6 +544,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
 
   // ---------------------------------------------------------------------------
   // Right panel — collapses entirely when preview is hidden
+  // (declared here so pregame canvas layout can use it)
   // ---------------------------------------------------------------------------
   const { isLoupeVisible, toggleLoupe, previewCard } = useCardPreview();
   const PANEL_EXPANDED_WIDTH = 'clamp(280px, 20vw, 380px)';
@@ -575,7 +562,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       overflow: 'hidden',
       transition: 'width 0.2s ease',
     }}>
-      {/* Toggle button — always visible */}
       <button
         onClick={toggleLoupe}
         title={isLoupeVisible ? 'Hide panel (Tab)' : 'Show panel (Tab)'}
@@ -614,11 +600,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           <span style={{ fontSize: 14 }}>‹</span>
         )}
       </button>
-
-      {/* Expanded content — preview + chat */}
       {isLoupeVisible && (
         <>
-          {/* Card preview — fills width */}
           <div style={{
             flexShrink: 0,
             padding: 12,
@@ -628,29 +611,27 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             gap: 8,
           }}>
             {previewCard ? (
-              <>
-                <div style={{
-                  width: '100%',
-                  aspectRatio: '375 / 525',
-                  borderRadius: 6,
-                  overflow: 'hidden',
-                  boxShadow: '0 4px 24px rgba(0,0,0,0.7), 0 0 8px rgba(212,168,103,0.2)',
-                  background: '#000',
-                }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={getCardImageUrl(previewCard.cardImgFile)}
-                    alt={previewCard.cardName}
-                    style={{
-                      display: 'block',
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'fill',
-                      transform: previewCard.isMeek ? 'rotate(180deg)' : undefined,
-                    }}
-                  />
-                </div>
-              </>
+              <div style={{
+                width: '100%',
+                aspectRatio: '375 / 525',
+                borderRadius: 6,
+                overflow: 'hidden',
+                boxShadow: '0 4px 24px rgba(0,0,0,0.7), 0 0 8px rgba(212,168,103,0.2)',
+                background: '#000',
+              }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={getCardImageUrl(previewCard.cardImgFile)}
+                  alt={previewCard.cardName}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'fill',
+                    transform: previewCard.isMeek ? 'rotate(180deg)' : undefined,
+                  }}
+                />
+              </div>
             ) : (
               <div style={{
                 width: '100%',
@@ -671,8 +652,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               </div>
             )}
           </div>
-
-          {/* Chat — fills remaining space */}
           <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', borderTop: '1px solid rgba(107, 78, 39, 0.3)' }}>
             <ChatPanel
               chatMessages={gameState.chatMessages}
@@ -686,6 +665,55 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       )}
     </div>
   );
+
+  if (lifecycle === 'pregame') {
+    const phase = gameState.game?.pregamePhase;
+
+    // deck_select: full-screen pregame (no cards loaded yet)
+    if (phase === 'deck_select' || !phase) {
+      return (
+        <PregameScreen
+          gameId={gameId!}
+          gameState={gameState}
+          code={code}
+        />
+      );
+    }
+
+    // rolling / choosing: render game canvas with pregame overlay
+    // Cards are loaded — let players see their hand and card preview
+    return (
+      <div style={{ display: 'flex', width: '100vw', height: '100dvh', backgroundImage: 'url(/gameplay/cave_background.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ flexShrink: 0, height: 48 }}>
+            <TurnIndicator
+              game={gameState.game}
+              myPlayer={gameState.myPlayer}
+              opponentPlayer={gameState.opponentPlayer}
+              isMyTurn={false}
+              onSetPhase={() => {}}
+              onEndTurn={() => {}}
+            />
+          </div>
+          <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+            {gameId !== null && (
+              <MultiplayerCanvas gameId={gameId} />
+            )}
+            {/* Pregame overlay — rolling or choosing */}
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)', zIndex: 50 }}>
+              <PregameScreen
+                gameId={gameId!}
+                gameState={gameState}
+                code={code}
+              />
+            </div>
+            <GameToastContainer />
+          </div>
+        </div>
+        {rightPanel}
+      </div>
+    );
+  }
 
   // lifecycle === 'finished' — show canvas (frozen) with GameOverOverlay on top,
   // or render the overlay standalone if canvas data is unavailable.

@@ -39,19 +39,20 @@ export default function PregameScreen({ gameId, gameState, code }: PregameScreen
 
   const phase = game.pregamePhase;
 
+  // rolling/choosing render as modal content (parent provides the overlay)
+  if (phase === 'rolling') {
+    return <RollingPhase gameState={gameState} gameId={gameId} />;
+  }
+  if (phase === 'choosing') {
+    return <ChoosingPhase gameState={gameState} gameId={gameId} />;
+  }
+
+  // deck_select: full-screen with TopNav
   return (
     <>
       <TopNav />
       <div className="flex min-h-[calc(100vh-56px)] items-center justify-center px-4">
-        {phase === 'deck_select' && (
-          <DeckSelectPhase gameState={gameState} gameId={gameId} />
-        )}
-        {phase === 'rolling' && (
-          <RollingPhase gameState={gameState} gameId={gameId} />
-        )}
-        {phase === 'choosing' && (
-          <ChoosingPhase gameState={gameState} gameId={gameId} />
-        )}
+        <DeckSelectPhase gameState={gameState} gameId={gameId} />
       </div>
     </>
   );

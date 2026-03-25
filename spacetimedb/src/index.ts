@@ -328,12 +328,36 @@ export const pregame_ready = spacetimedb.reducer(
     if (!latestGame) return;
     if (!latestGame.pregameReady0 || !latestGame.pregameReady1) return;
 
-    // Both ready — roll dice using single PRNG instance
+    // Both ready — load decks for both players first
+    const allPlayers: any[] = [...ctx.db.Player.player_game_id.filter(gameId)];
+    for (const p of allPlayers) {
+      if (!p.pendingDeckData || p.pendingDeckData === '') {
+        throw new SenderError('Player ' + p.displayName + ' has no deck data');
+      }
+      try { JSON.parse(p.pendingDeckData); } catch {
+        throw new SenderError('Invalid deck data for ' + p.displayName);
+      }
+    }
+
+    // Insert cards, shuffle, and draw opening hand for both players
+    for (const p of allPlayers) {
+      const currentGame = ctx.db.Game.id.find(gameId);
+      if (!currentGame) throw new SenderError('Game not found');
+      insertCardsShuffleDraw(ctx, currentGame, p, p.pendingDeckData);
+      const latestPlayer = ctx.db.Player.id.find(p.id);
+      if (latestPlayer) {
+        ctx.db.Player.id.update({ ...latestPlayer, pendingDeckData: '' });
+      }
+    }
+
+    // Now roll dice using single PRNG instance
+    const gameAfterCards = ctx.db.Game.id.find(gameId);
+    if (!gameAfterCards) return;
     const seed = makeSeed(
       ctx.timestamp.microsSinceUnixEpoch,
       gameId,
       0n,
-      latestGame.rngCounter
+      gameAfterCards.rngCounter
     );
     const rng = xorshift64(seed);
 
@@ -345,15 +369,17 @@ export const pregame_ready = spacetimedb.reducer(
 
     const winner = r0 > r1 ? '0' : '1';
 
+    const gameBeforeRoll = ctx.db.Game.id.find(gameId);
+    if (!gameBeforeRoll) return;
     ctx.db.Game.id.update({
-      ...latestGame,
+      ...gameBeforeRoll,
       pregameReady0: false,
       pregameReady1: false,
       pregamePhase: 'rolling',
       rollResult0: BigInt(r0),
       rollResult1: BigInt(r1),
       rollWinner: winner,
-      rngCounter: latestGame.rngCounter + 1n,
+      rngCounter: gameBeforeRoll.rngCounter + 1n,
     });
 
     logAction(ctx, gameId, player.id, 'PREGAME_ROLL',
@@ -416,27 +442,7 @@ export const pregame_choose_first = spacetimedb.reducer(
       throw new SenderError('Only the roll winner can choose');
     }
 
-    const players: any[] = [...ctx.db.Player.player_game_id.filter(gameId)];
-    for (const p of players) {
-      if (!p.pendingDeckData || p.pendingDeckData === '') {
-        throw new SenderError('Player ' + p.displayName + ' has no deck data');
-      }
-      try { JSON.parse(p.pendingDeckData); } catch {
-        throw new SenderError('Invalid deck data for ' + p.displayName);
-      }
-    }
-
-    // Re-read game before each call since insertCardsShuffleDraw increments rngCounter
-    for (const p of players) {
-      const currentGame = ctx.db.Game.id.find(gameId);
-      if (!currentGame) throw new SenderError('Game not found');
-      insertCardsShuffleDraw(ctx, currentGame, p, p.pendingDeckData);
-      const latestPlayer = ctx.db.Player.id.find(p.id);
-      if (latestPlayer) {
-        ctx.db.Player.id.update({ ...latestPlayer, pendingDeckData: '' });
-      }
-    }
-
+    // Cards were already loaded in pregame_ready — just start the game
     const latestGame = ctx.db.Game.id.find(gameId);
     if (!latestGame) throw new SenderError('Game not found');
     ctx.db.Game.id.update({
