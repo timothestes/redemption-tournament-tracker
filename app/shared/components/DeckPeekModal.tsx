@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useGame } from '@/app/goldfish/state/GameContext';
+import { useModalGame } from '@/app/shared/contexts/ModalGameContext';
 import { GameCard } from '@/app/shared/types/gameCard';
 import { X, ArrowUp, ArrowDown, Shuffle } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -67,7 +67,8 @@ interface DeckPeekModalProps {
 }
 
 export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive }: DeckPeekModalProps) {
-  const { state, moveCardsBatch, shuffleDeck } = useGame();
+  const { zones, actions } = useModalGame();
+  const { moveCardsBatch, shuffleDeck } = actions;
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave } = useModalCardHover(200, { setPreviewCard, isLoupeVisible });
 
@@ -99,7 +100,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
 
   // Derive live cards from current state (they may have been moved already)
   const peekedCards = peekedIds
-    .map(id => state.zones.deck.find(c => c.instanceId === id))
+    .map(id => zones.deck.find(c => c.instanceId === id))
     .filter((c): c is GameCard => !!c);
 
   const remainingIds = peekedCards.map(c => c.instanceId);
