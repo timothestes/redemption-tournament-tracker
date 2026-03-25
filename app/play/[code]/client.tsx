@@ -685,27 +685,40 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     return (
       <div style={{ display: 'flex', width: '100vw', height: '100dvh', backgroundImage: 'url(/gameplay/cave_background.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div style={{ flexShrink: 0, height: 48 }}>
-            <TurnIndicator
-              game={gameState.game}
-              myPlayer={gameState.myPlayer}
-              opponentPlayer={gameState.opponentPlayer}
-              isMyTurn={false}
-              onSetPhase={() => {}}
-              onEndTurn={() => {}}
-            />
+          {/* Pregame status bar instead of TurnIndicator */}
+          <div style={{
+            flexShrink: 0,
+            height: 48,
+            background: 'rgba(10, 8, 5, 0.96)',
+            borderBottom: '1px solid rgba(107, 78, 39, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+          }}>
+            <span style={{
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: 11,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              color: 'rgba(196, 149, 90, 0.6)',
+            }}>
+              {phase === 'rolling' ? 'Rolling for first player...' : 'Choosing who goes first...'}
+            </span>
           </div>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
             {gameId !== null && (
               <MultiplayerCanvas gameId={gameId} />
             )}
-            {/* Pregame overlay — rolling or choosing */}
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)', zIndex: 50 }}>
-              <PregameScreen
-                gameId={gameId!}
-                gameState={gameState}
-                code={code}
-              />
+            {/* Pregame overlay — pointer events pass through backdrop, only modal blocks */}
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, pointerEvents: 'none' }}>
+              <div style={{ pointerEvents: 'auto' }}>
+                <PregameScreen
+                  gameId={gameId!}
+                  gameState={gameState}
+                  code={code}
+                />
+              </div>
             </div>
             <GameToastContainer />
           </div>
