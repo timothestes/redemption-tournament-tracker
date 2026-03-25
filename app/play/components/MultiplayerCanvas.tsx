@@ -361,9 +361,11 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     exchangeCards: (cardIds) => gameState.exchangeCards(cardIds.join(',')),
     drawCard: () => gameState.drawCard(),
     drawMultiple: (count) => gameState.drawMultiple(BigInt(count)),
-    // Goldfish-only — not available in multiplayer
-    moveCardToTopOfDeck: undefined,
-    moveCardToBottomOfDeck: undefined,
+    moveCardToTopOfDeck: (cardId) => gameState.moveCardToTopOfDeck(BigInt(cardId)),
+    moveCardToBottomOfDeck: (cardId) => gameState.moveCardToBottomOfDeck(BigInt(cardId)),
+    spawnLostSoul: (testament, posX, posY) =>
+      gameState.spawnLostSoul(testament, posX ?? '0.5', posY ?? '0.5'),
+    removeToken: (cardId) => gameState.removeToken(BigInt(cardId)),
     removeOpponentToken: undefined,
   }), [gameState]);
 

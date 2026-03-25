@@ -965,6 +965,166 @@ export const exchange_cards = spacetimedb.reducer(
   }
 );
 
+// ---------------------------------------------------------------------------
+// Reducer: move_card_to_top_of_deck
+// ---------------------------------------------------------------------------
+export const move_card_to_top_of_deck = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardInstanceId: t.u64(),
+  },
+  (ctx, { gameId, cardInstanceId }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
+
+    const player = findPlayerBySender(ctx, gameId);
+
+    const card = ctx.db.CardInstance.id.find(cardInstanceId);
+    if (!card) throw new SenderError('Card not found');
+    if (card.ownerId !== player.id) throw new SenderError('Not your card');
+
+    // Shift all existing deck cards' zoneIndex += 1
+    const deckCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+      (c: any) => c.ownerId === player.id && c.zone === 'deck'
+    );
+
+    for (const dc of deckCards) {
+      ctx.db.CardInstance.id.update({ ...dc, zoneIndex: dc.zoneIndex + 1n });
+    }
+
+    // Update the target card: zone = 'deck', zoneIndex = 0n
+    const updatedCard = ctx.db.CardInstance.id.find(cardInstanceId);
+    if (!updatedCard) throw new SenderError('Card not found');
+    ctx.db.CardInstance.id.update({
+      ...updatedCard,
+      zone: 'deck',
+      zoneIndex: 0n,
+      isFlipped: true,
+    });
+
+    logAction(ctx, gameId, player.id, 'MOVE_TO_TOP_OF_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString() }), game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: move_card_to_bottom_of_deck
+// ---------------------------------------------------------------------------
+export const move_card_to_bottom_of_deck = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardInstanceId: t.u64(),
+  },
+  (ctx, { gameId, cardInstanceId }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
+
+    const player = findPlayerBySender(ctx, gameId);
+
+    const card = ctx.db.CardInstance.id.find(cardInstanceId);
+    if (!card) throw new SenderError('Card not found');
+    if (card.ownerId !== player.id) throw new SenderError('Not your card');
+
+    // Find max zoneIndex among player's deck cards
+    const deckCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+      (c: any) => c.ownerId === player.id && c.zone === 'deck'
+    );
+
+    let maxIndex = -1n;
+    for (const dc of deckCards) {
+      if (dc.zoneIndex > maxIndex) {
+        maxIndex = dc.zoneIndex;
+      }
+    }
+
+    ctx.db.CardInstance.id.update({
+      ...card,
+      zone: 'deck',
+      zoneIndex: maxIndex + 1n,
+      isFlipped: true,
+    });
+
+    logAction(ctx, gameId, player.id, 'MOVE_TO_BOTTOM_OF_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString() }), game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: spawn_lost_soul
+// ---------------------------------------------------------------------------
+export const spawn_lost_soul = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    testament: t.string(),
+    posX: t.string(),
+    posY: t.string(),
+  },
+  (ctx, { gameId, testament, posX, posY }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
+
+    const player = findPlayerBySender(ctx, gameId);
+
+    const isNT = testament === 'NT';
+    const cardName = isNT
+      ? 'Lost Soul Token "Harvest" [John 4:35]'
+      : 'Lost Soul Token "Lost Souls" [Proverbs 2:16-17]';
+    const cardSet = isNT ? 'GoC' : 'RR';
+    const cardImgFile = isNT ? '/gameplay/nt_soul_token.png' : '/gameplay/ot_lost_soul.png';
+
+    ctx.db.CardInstance.insert({
+      id: 0n,
+      gameId,
+      ownerId: player.id,
+      zone: 'land-of-bondage',
+      zoneIndex: 0n,
+      posX,
+      posY,
+      isMeek: false,
+      isFlipped: false,
+      cardName,
+      cardSet,
+      cardImgFile,
+      cardType: 'TOKEN_LS',
+      brigade: '',
+      strength: '',
+      toughness: '',
+      alignment: '',
+      identifier: '',
+      specialAbility: '',
+      notes: '',
+    });
+
+    logAction(ctx, gameId, player.id, 'SPAWN_LOST_SOUL', JSON.stringify({ testament }), game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: remove_token
+// ---------------------------------------------------------------------------
+export const remove_token = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardInstanceId: t.u64(),
+  },
+  (ctx, { gameId, cardInstanceId }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+
+    const player = findPlayerBySender(ctx, gameId);
+
+    const card = ctx.db.CardInstance.id.find(cardInstanceId);
+    if (!card) throw new SenderError('Card not found');
+    if (card.ownerId !== player.id) throw new SenderError('Not your card');
+    if (!card.cardType.startsWith('TOKEN_')) throw new SenderError('Card is not a token');
+
+    ctx.db.CardInstance.id.delete(cardInstanceId);
+
+    logAction(ctx, gameId, player.id, 'REMOVE_TOKEN', JSON.stringify({ cardInstanceId: cardInstanceId.toString() }), game.turnNumber, game.currentPhase);
+  }
+);
+
 // ===========================================================================
 // Utility reducers
 // ===========================================================================

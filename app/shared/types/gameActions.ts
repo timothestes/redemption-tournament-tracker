@@ -18,9 +18,13 @@ export interface GameActions {
   drawCard(): void;
   drawMultiple(count: number): void;
 
-  // Goldfish-only (optional — undefined in multiplayer)
-  moveCardToTopOfDeck?(cardId: string): void;
-  moveCardToBottomOfDeck?(cardId: string): void;
+  // Deck position operations (available in both modes)
+  moveCardToTopOfDeck(cardId: string): void;
+  moveCardToBottomOfDeck(cardId: string): void;
+
+  // Token operations (optional — not all modes may support)
+  spawnLostSoul?(testament: 'NT' | 'OT', posX?: string, posY?: string): void;
+  removeToken?(cardId: string): void;
   removeOpponentToken?(cardId: string): void;
 
   // Deck inspection (optional — may not be available in all modes)

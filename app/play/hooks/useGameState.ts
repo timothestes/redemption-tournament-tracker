@@ -71,6 +71,10 @@ export interface GameState {
   rollDice: (sides: bigint) => void;
   sendChat: (text: string) => void;
   setPlayerOption: (optionName: string, value: string) => void;
+  moveCardToTopOfDeck: (cardInstanceId: bigint) => void;
+  moveCardToBottomOfDeck: (cardInstanceId: bigint) => void;
+  spawnLostSoul: (testament: string, posX: string, posY: string) => void;
+  removeToken: (cardInstanceId: bigint) => void;
   resignGame: () => void;
   leaveGame: () => void;
 }
@@ -346,6 +350,34 @@ export function useGameState(gameId: bigint): GameState {
     [conn, gameId],
   );
 
+  const moveCardToTopOfDeck = useCallback(
+    (cardInstanceId: bigint) => {
+      conn?.reducers.moveCardToTopOfDeck({ gameId, cardInstanceId });
+    },
+    [conn, gameId],
+  );
+
+  const moveCardToBottomOfDeck = useCallback(
+    (cardInstanceId: bigint) => {
+      conn?.reducers.moveCardToBottomOfDeck({ gameId, cardInstanceId });
+    },
+    [conn, gameId],
+  );
+
+  const spawnLostSoul = useCallback(
+    (testament: string, posX: string, posY: string) => {
+      conn?.reducers.spawnLostSoul({ gameId, testament, posX, posY });
+    },
+    [conn, gameId],
+  );
+
+  const removeToken = useCallback(
+    (cardInstanceId: bigint) => {
+      conn?.reducers.removeToken({ gameId, cardInstanceId });
+    },
+    [conn, gameId],
+  );
+
   const resignGame = useCallback(() => {
     conn?.reducers.resignGame({ gameId });
   }, [conn, gameId]);
@@ -392,6 +424,10 @@ export function useGameState(gameId: bigint): GameState {
     rollDice,
     sendChat,
     setPlayerOption,
+    moveCardToTopOfDeck,
+    moveCardToBottomOfDeck,
+    spawnLostSoul,
+    removeToken,
     resignGame,
     leaveGame,
   };
