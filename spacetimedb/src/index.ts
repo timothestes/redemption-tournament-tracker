@@ -1493,24 +1493,29 @@ spacetimedb.clientDisconnected((ctx) => {
     if (player.identity.toHexString() === ctx.sender.toHexString()) {
       ctx.db.Player.id.update({ ...player, isConnected: false });
 
-      // If game is in waiting or pregame, cancel immediately — no state to preserve
+      // If game is in pregame, cancel immediately — opponent is present, no recovery
       const gameForPlayer = ctx.db.Game.id.find(player.gameId);
-      if (gameForPlayer && (gameForPlayer.status === 'waiting' || gameForPlayer.status === 'pregame')) {
+      if (gameForPlayer && gameForPlayer.status === 'pregame') {
         ctx.db.Game.id.update({ ...gameForPlayer, status: 'finished' });
         logAction(
           ctx,
           player.gameId,
           player.id,
-          gameForPlayer.status === 'waiting' ? 'LOBBY_DISCONNECT' : 'PREGAME_DISCONNECT',
+          'PREGAME_DISCONNECT',
           JSON.stringify({ reason: 'player_disconnected' }),
           0n,
-          gameForPlayer.status
+          'pregame'
         );
-        continue; // Skip scheduling timeout — game is cancelled
+        continue;
       }
 
-      // Schedule a disconnect timeout (5 minutes)
-      const futureTime = ctx.timestamp.microsSinceUnixEpoch + 300_000_000n;
+      // For waiting games, use a short timeout (15s) — the creator may just be
+      // navigating from lobby to game page, which briefly disconnects.
+      // For playing games, use the normal 5-minute timeout.
+      const timeoutMicros = gameForPlayer && gameForPlayer.status === 'waiting'
+        ? 15_000_000n   // 15 seconds
+        : 300_000_000n; // 5 minutes
+      const futureTime = ctx.timestamp.microsSinceUnixEpoch + timeoutMicros;
       ctx.db.DisconnectTimeout.insert({
         scheduledId: 0n,
         scheduledAt: ScheduleAt.time(futureTime),
