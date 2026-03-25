@@ -32,6 +32,14 @@ import { DeckContextMenu } from '@/app/shared/components/DeckContextMenu';
 import { DeckDropPopup } from '@/app/shared/components/DeckDropPopup';
 import { LorContextMenu } from '@/app/shared/components/LorContextMenu';
 import type { GameActions } from '@/app/shared/types/gameActions';
+import { ModalGameProvider, type ModalGameContextValue } from '@/app/shared/contexts/ModalGameContext';
+import { DeckSearchModal } from '@/app/shared/components/DeckSearchModal';
+import { DeckPeekModal } from '@/app/shared/components/DeckPeekModal';
+import { DeckExchangeModal } from '@/app/shared/components/DeckExchangeModal';
+import { ZoneBrowseModal } from '@/app/shared/components/ZoneBrowseModal';
+import { useModalCardDrag } from '@/app/shared/hooks/useModalCardDrag';
+import type { ZoneId } from '@/app/shared/types/gameCard';
+import type { ZoneRect as GoldfishZoneRect } from '@/app/goldfish/layout/zoneLayout';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import DiceOverlay from './DiceOverlay';
 import { getCardImageUrl as getSharedCardImageUrl } from '@/app/shared/utils/cardImageUrl';
@@ -370,8 +378,9 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
   contextMenuRef.current = contextMenu;
   const [multiCardContextMenu, setMultiCardContextMenu] = useState<{ x: number; y: number } | null>(null);
 
-  // ---- Zone browse overlay state (works for both player and opponent zones) ----
-  const [browseZone, setBrowseZone] = useState<{ zone: string; cards: typeof opponentCards[string]; label: string; readOnly: boolean } | null>(null);
+  // ---- Zone browse overlay state ----
+  const [browseMyZone, setBrowseMyZone] = useState<string | null>(null);
+  const [browseOpponentZone, setBrowseOpponentZone] = useState<{ zone: string; cards: typeof opponentCards[string]; label: string } | null>(null);
   const [zoneMenu, setZoneMenu] = useState<{ x: number; y: number; spawnX: number; spawnY: number } | null>(null);
   const [deckMenu, setDeckMenu] = useState<{ x: number; y: number } | null>(null);
   const [lorMenu, setLorMenu] = useState<{ x: number; y: number } | null>(null);
@@ -405,6 +414,26 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     removeOpponentToken: undefined,
   }), [gameState]);
 
+  // ---- ModalGameProvider value (for shared deck modals) ----
+  const modalGameValue = useMemo<ModalGameContextValue>(() => ({
+    zones: Object.fromEntries(
+      Object.entries(myCards).map(([zone, cards]) => [
+        zone,
+        cards.map(c => cardInstanceToGameCard(c, counters.get(c.id) ?? [], 'player1'))
+      ])
+    ),
+    actions: {
+      moveCard: (id, toZone, _idx, posX, posY) =>
+        gameState.moveCard(BigInt(id), String(toZone), undefined, posX?.toString(), posY?.toString()),
+      moveCardsBatch: (ids, toZone) =>
+        gameState.moveCardsBatch(ids.join(','), String(toZone)),
+      moveCardToTopOfDeck: (id) => gameState.moveCardToTopOfDeck(BigInt(id)),
+      moveCardToBottomOfDeck: (id) => gameState.moveCardToBottomOfDeck(BigInt(id)),
+      shuffleDeck: () => gameState.shuffleDeck(),
+      shuffleCardIntoDeck: (id) => gameState.shuffleCardIntoDeck(BigInt(id)),
+    },
+  }), [myCards, counters, gameState]);
+
   // ---- Close all menus helper ----
   const closeAllMenus = useCallback(() => {
     setContextMenu(null);
@@ -416,7 +445,8 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     setShowDeckSearch(false);
     setPeekState(null);
     setExchangeCardIds(null);
-    setBrowseZone(null);
+    setBrowseMyZone(null);
+    setBrowseOpponentZone(null);
   }, []);
 
   // ---- moveDeckCardsToZone helper ----
@@ -508,6 +538,52 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     },
     [mpLayout, myZones, opponentZones, myHandRect],
   );
+
+  // ---- Modal card drag hook (for dragging cards from modals to canvas) ----
+  const findZoneForModalDrag = useCallback((x: number, y: number): ZoneId | null => {
+    const hit = findZoneAtPosition(x, y);
+    if (!hit || hit.owner !== 'my') return null;
+    return hit.zone as ZoneId;
+  }, [findZoneAtPosition]);
+
+  const {
+    dragState: modalDrag,
+    startDrag: modalStartDrag,
+    startMultiDrag: modalStartMultiDrag,
+    ghostRef: modalGhostRef,
+    didDragRef: modalDidDragRef,
+  } = useModalCardDrag({
+    stageRef,
+    zoneLayout: myZones as Partial<Record<ZoneId, GoldfishZoneRect>>,
+    findZoneAtPosition: findZoneForModalDrag,
+    moveCard: (id: string, toZone: ZoneId, _idx?: number, posX?: number, posY?: number) =>
+      gameState.moveCard(BigInt(id), String(toZone), undefined, posX?.toString(), posY?.toString()),
+    moveCardsBatch: (ids: string[], toZone: ZoneId) =>
+      gameState.moveCardsBatch(ids.join(','), String(toZone)),
+    onDeckDrop: (cardId, screenX, screenY) => setDeckDrop({ x: screenX, y: screenY, cardId }),
+    cardWidth,
+    cardHeight,
+  });
+
+  // ---- Peek card IDs for DeckPeekModal ----
+  const peekCardIds = useMemo(() => {
+    if (!peekState) return [];
+    const sorted = [...(myCards['deck'] ?? [])].sort(
+      (a, b) => Number(a.zoneIndex) - Number(b.zoneIndex)
+    );
+    let selected: typeof sorted;
+    if (peekState.position === 'top') selected = sorted.slice(0, peekState.count);
+    else if (peekState.position === 'bottom') selected = sorted.slice(-peekState.count);
+    else {
+      const shuffled = [...sorted];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      selected = shuffled.slice(0, peekState.count);
+    }
+    return selected.map(c => String(c.id));
+  }, [peekState, myCards]);
 
   // ---- Drag handlers ----
 
@@ -1624,8 +1700,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
               <Group
                 key={`my-pile-${zoneKey}`}
                 onClick={zoneKey !== 'deck' ? () => {
-                  const zoneLabels: Record<string, string> = { discard: 'Your Discard', reserve: 'Your Reserve', banish: 'Your Banish', lor: 'Your Land of Redemption' };
-                  setBrowseZone({ zone: zoneKey, cards, label: zoneLabels[zoneKey] ?? zoneKey, readOnly: false });
+                  setBrowseMyZone(zoneKey);
                 } : undefined}
                 onDblClick={zoneKey === 'deck' ? () => {
                   multiplayerActions.drawCard();
@@ -1739,7 +1814,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                 key={`opp-pile-${zoneKey}`}
                 onClick={zoneKey !== 'deck' ? () => {
                   const zoneLabels: Record<string, string> = { discard: "Opponent's Discard", reserve: "Opponent's Reserve", banish: "Opponent's Banish", lor: "Opponent's Land of Redemption" };
-                  setBrowseZone({ zone: zoneKey, cards, label: zoneLabels[zoneKey] ?? zoneKey, readOnly: true });
+                  setBrowseOpponentZone({ zone: zoneKey, cards, label: zoneLabels[zoneKey] ?? zoneKey });
                 } : undefined}
               >
                 {/* Count badge */}
@@ -2062,7 +2137,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       {/* ================================================================
           Zone browse overlay — card grid for browsing pile contents
           ================================================================ */}
-      {browseZone && (
+      {browseOpponentZone && (
         <div
           style={{
             position: 'absolute',
@@ -2073,7 +2148,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
             justifyContent: 'center',
             background: 'rgba(0,0,0,0.7)',
           }}
-          onClick={() => setBrowseZone(null)}
+          onClick={() => setBrowseOpponentZone(null)}
         >
           <div
             onClick={(e) => e.stopPropagation()}
@@ -2095,10 +2170,10 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                 color: '#e8d5a3',
                 letterSpacing: '0.05em',
               }}>
-                {browseZone.label} ({browseZone.cards.length})
+                {browseOpponentZone.label} ({browseOpponentZone.cards.length})
               </span>
               <button
-                onClick={() => setBrowseZone(null)}
+                onClick={() => setBrowseOpponentZone(null)}
                 style={{
                   background: 'transparent',
                   border: 'none',
@@ -2111,7 +2186,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                 ✕
               </button>
             </div>
-            {browseZone.cards.length === 0 ? (
+            {browseOpponentZone.cards.length === 0 ? (
               <div style={{ color: 'rgba(232, 213, 163, 0.4)', fontSize: 13, textAlign: 'center', padding: 24 }}>
                 No cards in this zone
               </div>
@@ -2121,7 +2196,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                 gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))',
                 gap: 8,
               }}>
-                {browseZone.cards.map((card) => {
+                {browseOpponentZone.cards.map((card) => {
                   const imgUrl = getSharedCardImageUrl(card.cardImgFile);
                   return (
                     <div
@@ -2130,7 +2205,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                         borderRadius: 4,
                         overflow: 'hidden',
                         border: '1px solid rgba(107, 78, 39, 0.3)',
-                        cursor: browseZone.readOnly ? 'default' : 'pointer',
+                        cursor: 'default',
                       }}
                       title={card.cardName}
                     >
@@ -2148,6 +2223,55 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
           </div>
         </div>
       )}
+
+      {/* ================================================================
+          Shared deck modals — wrapped in ModalGameProvider
+          ================================================================ */}
+      <ModalGameProvider value={modalGameValue}>
+        {browseMyZone && (
+          <ZoneBrowseModal
+            zoneId={browseMyZone as ZoneId}
+            onClose={() => setBrowseMyZone(null)}
+            onStartDrag={modalStartDrag}
+            onStartMultiDrag={modalStartMultiDrag}
+            didDragRef={modalDidDragRef}
+            isDragActive={modalDrag.isDragging}
+          />
+        )}
+
+        {showDeckSearch && (
+          <DeckSearchModal
+            onClose={() => setShowDeckSearch(false)}
+            onStartDrag={modalStartDrag}
+            onStartMultiDrag={modalStartMultiDrag}
+            didDragRef={modalDidDragRef}
+            isDragActive={modalDrag.isDragging}
+          />
+        )}
+
+        {peekState && (
+          <DeckPeekModal
+            cardIds={peekCardIds}
+            title={`${peekState.position === 'top' ? 'Top' : peekState.position === 'bottom' ? 'Bottom' : 'Random'} ${peekState.count}`}
+            onClose={() => setPeekState(null)}
+            onStartDrag={modalStartDrag}
+            onStartMultiDrag={modalStartMultiDrag}
+            didDragRef={modalDidDragRef}
+            isDragActive={modalDrag.isDragging}
+          />
+        )}
+
+        {exchangeCardIds && (
+          <DeckExchangeModal
+            exchangeCardIds={exchangeCardIds}
+            onComplete={() => { setExchangeCardIds(null); clearSelection(); }}
+            onCancel={() => setExchangeCardIds(null)}
+            onStartDrag={modalStartDrag}
+            didDragRef={modalDidDragRef}
+            isDragActive={modalDrag.isDragging}
+          />
+        )}
+      </ModalGameProvider>
 
       {/* ================================================================
           Card hover preview — floating tooltip near cursor
