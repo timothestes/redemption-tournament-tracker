@@ -1306,13 +1306,15 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                   const zoneY = oppZone?.y ?? 0;
                   const zoneW = oppZone?.width ?? 0;
                   const zoneH = oppZone?.height ?? 0;
-                  // Mirror opponent positions: flip both axes so their top-left maps
-                  // to our bottom-right, and rotate the card 180° (upside down).
-                  // Konva rotates around (x,y), so offset by card size to keep it in place.
+                  // Mirror opponent positions: flip both axes so their board
+                  // appears rotated 180° (as if sitting across the table).
+                  // With rotation=180, Konva renders the card extending LEFT and UP
+                  // from (x,y), so the visible rectangle is (x-cardW, y-cardH) to (x,y).
+                  // No additional offset needed — the rotation pivot handles it.
                   const mirroredPosX = card.posX ? 1 - parseFloat(card.posX) : 0;
                   const mirroredPosY = card.posY ? 1 - parseFloat(card.posY) : 0;
-                  const x = mirroredPosX * zoneW + zoneX + cardWidth;
-                  const y = mirroredPosY * zoneH + zoneY + cardHeight;
+                  const x = mirroredPosX * zoneW + zoneX;
+                  const y = mirroredPosY * zoneH + zoneY;
                   return (
                     <GameCardNode
                       key={String(card.id)}
