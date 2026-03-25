@@ -244,6 +244,9 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const didCallReducer = useRef(false);
   const didSubscribe = useRef(false);
 
+  // Card preview hook — must be called before any early returns (Rules of Hooks)
+  const { isLoupeVisible, toggleLoupe, previewCard } = useCardPreview();
+
   // Subscribe to all tables once connected
   useEffect(() => {
     if ((!isConnected && !isActive) || !conn || didSubscribe.current) return;
@@ -544,9 +547,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
 
   // ---------------------------------------------------------------------------
   // Right panel — collapses entirely when preview is hidden
-  // (declared here so pregame canvas layout can use it)
   // ---------------------------------------------------------------------------
-  const { isLoupeVisible, toggleLoupe, previewCard } = useCardPreview();
   const PANEL_EXPANDED_WIDTH = 'clamp(280px, 20vw, 380px)';
   const PANEL_COLLAPSED_WIDTH = 36;
 
@@ -570,9 +571,10 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           height: 40,
           minHeight: 40,
           background: 'rgba(30, 22, 16, 0.92)',
+          borderTop: 'none',
+          borderLeft: 'none',
+          borderRight: 'none',
           borderBottom: isLoupeVisible ? '1px solid rgba(107, 78, 39, 0.4)' : 'none',
-          border: 'none',
-          borderBlockEnd: isLoupeVisible ? '1px solid rgba(107, 78, 39, 0.4)' : 'none',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
