@@ -363,6 +363,9 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
   const contextMenuRef = useRef(contextMenu);
   contextMenuRef.current = contextMenu;
   const [multiCardContextMenu, setMultiCardContextMenu] = useState<{ x: number; y: number } | null>(null);
+
+  // ---- Zone browse overlay state (works for both player and opponent zones) ----
+  const [browseZone, setBrowseZone] = useState<{ zone: string; cards: typeof opponentCards[string]; label: string; readOnly: boolean } | null>(null);
   const [zoneMenu, setZoneMenu] = useState<{ x: number; y: number; spawnX: number; spawnY: number } | null>(null);
 
   // ---- Multiplayer GameActions adapter ----
@@ -1552,8 +1555,8 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
               <Group
                 key={`my-pile-${zoneKey}`}
                 onClick={zoneKey !== 'deck' ? () => {
-                  // TODO Phase 2: open ZoneBrowseModal for this pile
-                  console.log(`[pile-click] ${zoneKey}: ${count} card(s)`);
+                  const zoneLabels: Record<string, string> = { discard: 'Your Discard', reserve: 'Your Reserve', banish: 'Your Banish', lor: 'Your Land of Redemption' };
+                  setBrowseZone({ zone: zoneKey, cards, label: zoneLabels[zoneKey] ?? zoneKey, readOnly: false });
                 } : undefined}
                 onDblClick={zoneKey === 'deck' ? () => {
                   multiplayerActions.drawCard();
@@ -1642,7 +1645,13 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
             const showFace = zoneKey === 'discard' && topCard && !topCard.isFlipped;
 
             return (
-              <Group key={`opp-pile-${zoneKey}`}>
+              <Group
+                key={`opp-pile-${zoneKey}`}
+                onClick={zoneKey !== 'deck' ? () => {
+                  const zoneLabels: Record<string, string> = { discard: "Opponent's Discard", reserve: "Opponent's Reserve", banish: "Opponent's Banish", lor: "Opponent's Land of Redemption" };
+                  setBrowseZone({ zone: zoneKey, cards, label: zoneLabels[zoneKey] ?? zoneKey, readOnly: true });
+                } : undefined}
+              >
                 {/* Count badge */}
                 <Group x={zone.x + zone.width - 32} y={zone.y + 2}>
                   <Rect width={26} height={18} fill="#101828" cornerRadius={4} stroke="#4a7ab5" strokeWidth={1} />
@@ -1909,6 +1918,96 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
             multiplayerActions.spawnLostSoul(testament, String(posX), String(posY));
           }}
         />
+      )}
+
+      {/* ================================================================
+          Zone browse overlay — card grid for browsing pile contents
+          ================================================================ */}
+      {browseZone && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 700,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.7)',
+          }}
+          onClick={() => setBrowseZone(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'rgba(20, 16, 12, 0.97)',
+              border: '1px solid rgba(107, 78, 39, 0.5)',
+              borderRadius: 8,
+              padding: 16,
+              maxWidth: '80%',
+              maxHeight: '70%',
+              overflow: 'auto',
+              minWidth: 300,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <span style={{
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+                fontSize: 14,
+                color: '#e8d5a3',
+                letterSpacing: '0.05em',
+              }}>
+                {browseZone.label} ({browseZone.cards.length})
+              </span>
+              <button
+                onClick={() => setBrowseZone(null)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#e8d5a3',
+                  cursor: 'pointer',
+                  fontSize: 18,
+                  padding: '2px 6px',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            {browseZone.cards.length === 0 ? (
+              <div style={{ color: 'rgba(232, 213, 163, 0.4)', fontSize: 13, textAlign: 'center', padding: 24 }}>
+                No cards in this zone
+              </div>
+            ) : (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))',
+                gap: 8,
+              }}>
+                {browseZone.cards.map((card) => {
+                  const imgUrl = getSharedCardImageUrl(card.cardImgFile);
+                  return (
+                    <div
+                      key={String(card.id)}
+                      style={{
+                        borderRadius: 4,
+                        overflow: 'hidden',
+                        border: '1px solid rgba(107, 78, 39, 0.3)',
+                        cursor: browseZone.readOnly ? 'default' : 'pointer',
+                      }}
+                      title={card.cardName}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={imgUrl}
+                        alt={card.cardName}
+                        style={{ width: '100%', display: 'block' }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* ================================================================
