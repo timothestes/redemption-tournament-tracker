@@ -63,37 +63,13 @@ export interface GameActions {
 }
 ```
 
-### Shared Card Data Interface
+### Shared Types Migration
 
-Both modes need a common card shape for shared UI components. Currently goldfish uses `GameCard` and multiplayer uses `CardInstanceRow` with an adapter. We formalize this:
+Currently all five shared components in `app/shared/` import types (`GameCard`, `ZoneId`, `ZONE_LABELS`, `COUNTER_COLORS`) from `../../goldfish/types`. This creates a dependency from shared → goldfish, which is backwards. As part of Phase 1, we **move these types to `app/shared/types/`** and re-export from `app/goldfish/types.ts` for backward compatibility.
 
-```typescript
-// app/shared/types/gameCard.ts
-export interface SharedGameCard {
-  instanceId: string;
-  cardName: string;
-  cardSet: string;
-  cardImgFile: string;
-  type: string;
-  brigade: string;
-  strength: string;
-  toughness: string;
-  specialAbility: string;
-  identifier: string;
-  alignment: string;
-  isMeek: boolean;
-  isFlipped: boolean;
-  isToken: boolean;
-  counters: { color: string; count: number }[];
-  zone: string;
-  ownerId: string;
-  notes: string;
-  posX?: string;
-  posY?: string;
-}
-```
+The existing `GameCard` type becomes the shared card interface. The goldfish `posX`/`posY` fields are already `number | undefined`; multiplayer stores them as strings. The adapter in multiplayer converts via `parseFloat()` — this pattern stays as-is since Konva needs numbers for rendering.
 
-Both modes already adapt their data into similar shapes for `GameCardNode`. We standardize this so all shared components use one type.
+**No new `SharedGameCard` type is created.** We reuse the existing `GameCard` type, moving it to `app/shared/types/gameCard.ts`.
 
 ---
 
@@ -128,9 +104,17 @@ Extract shared infrastructure that both modes need. This unlocks all subsequent 
 #### 1.5 Extract Quick Menu / Toolbar
 - **From**: `app/goldfish/components/GameToolbar.tsx`
 - **To**: `app/shared/components/GameToolbar.tsx`
-- Props: `actions: GameActions`, `mode: 'goldfish' | 'multiplayer'`, `isMyTurn?: boolean`, `isSpreadHand`, `onToggleSpreadHand`
+- Props: `actions: GameActions`, `mode: 'goldfish' | 'multiplayer'`, `isMyTurn?: boolean`, `isSpreadHand`, `onToggleSpreadHand`, `deckCount`, `handCount`, `onShowToast?`
+- **Decoupling required**: Current component calls `useGame()` directly, uses `triggerDiceRoll()` event emitter, and calls `showGameToast()`. Must remove all goldfish context dependencies and pass state/callbacks as props.
 - Multiplayer hides undo and new game buttons; disables draw/end-turn when not your turn
 - Both modes render this above the hand zone
+
+#### 1.7 Extract Toast Notification System
+- **From**: `app/goldfish/components/GameToast.tsx`
+- **To**: `app/shared/components/GameToast.tsx`
+- The shared toolbar and keyboard hooks need a way to show feedback ("Deck empty", "Hand full")
+- Extract as a simple standalone component with a trigger function
+- Both modes mount it in their layout wrapper
 
 #### 1.6 Extract Dice Animation
 - **From**: `app/goldfish/components/DiceRollOverlay.tsx` + `app/play/components/DiceOverlay.tsx`
@@ -146,9 +130,12 @@ These are the biggest feature gaps. The key insight: **deck search, peek, and br
 #### 2.1 Extract Deck Search Modal
 - **From**: `app/goldfish/components/DeckSearchModal.tsx`
 - **To**: `app/shared/components/DeckSearchModal.tsx`
-- Props: `deckCards: SharedGameCard[]`, `actions: GameActions`, `onClose`
+- Props: `deckCards: GameCard[]`, `actions: GameActions`, `onClose`, `getCardImageUrl`
 - Both modes pass their deck cards (goldfish from local state, multiplayer from subscription)
 - Search, filter, drag-to-zone all work through `GameActions`
+- **Decoupling required**: Current component calls `useGame()` directly, uses `useCardPreview()` goldfish context, and has its own `sanitizeImgFile`. Must remove goldfish context dependency and accept these as props/callbacks.
+- **Additional dependencies**: `ModalCardHoverPreview.tsx` and `useModalCardDrag.ts` hook must also be extracted to `app/shared/` for drag-from-modal and hover-in-modal to work
+- **Partial functionality note**: "Top of Deck" and "Bottom of Deck" actions require Phase 4 backend reducers. These actions are disabled (via optional `GameActions` methods) until Phase 4 completes.
 
 #### 2.2 Extract Zone Browse Modal
 - **From**: `app/goldfish/components/ZoneBrowseModal.tsx`
@@ -201,9 +188,15 @@ These are the biggest feature gaps. The key insight: **deck search, peek, and br
 - These are click handlers on the sidebar pile `<Group>` elements in MultiplayerCanvas
 
 #### 3.5 Wire Double-Click Actions
-- Double-click on card → toggle meek (call `actions.meekCard` / `unmeekCard`)
+- Double-click on card in territory/LOB → toggle meek (call `actions.meekCard` / `unmeekCard`)
 - Double-click on deck pile → draw card (call `actions.drawCard`)
 - Already exists in goldfish; needs wiring in MultiplayerCanvas
+
+#### 3.6 Extract Card Zoom Modal
+- **From**: `app/goldfish/components/CardZoomModal.tsx`
+- **To**: `app/shared/components/CardZoomModal.tsx`
+- Full-screen card detail view with related printings
+- Triggered by clicking the card image in the loupe panel (not by double-click on canvas cards)
 
 ### Phase 4: SpacetimeDB Backend Additions
 
@@ -219,12 +212,15 @@ New reducers needed for features that don't exist yet server-side:
 
 #### 4.3 `spawn_lost_soul` Reducer
 - Creates a new `CardInstance` row with token data (NT or OT lost soul)
-- `isToken = true`, owner = calling player, zone = land-of-bondage
+- **Token identification**: The `CardInstance` schema has no `isToken` column. Rather than adding one (which requires `--clear-database`), we use `cardType = "TOKEN_LS"` as a convention. The client-side adapter checks `cardType.startsWith('TOKEN_')` to identify tokens. This avoids a breaking schema migration.
+- Owner = calling player, zone = land-of-bondage
 - Stores position (posX, posY) for free-form placement
+- Fixed card data: name, set, imgFile based on NT/OT parameter
 
 #### 4.4 `remove_token` Reducer
-- Deletes a `CardInstance` row where `isToken = true`
+- Deletes a `CardInstance` row where `cardType` starts with `TOKEN_`
 - Validates ownership
+- Rejects attempts to delete non-token cards
 
 ### Phase 5: Layout & UX Polish
 
@@ -233,6 +229,7 @@ New reducers needed for features that don't exist yet server-side:
 - Change: Move it to the top of the canvas area
 - The `GameToolbar` (quick menu) takes its place at the bottom, near the hand
 - Layout becomes: `[TurnBar 48px] [Canvas flex-1] [Toolbar 48px]`
+- **Concede button**: Currently lives in `TurnIndicator`. After the layout change, it stays in the top turn bar (right side). The bottom toolbar is for quick game actions only.
 
 #### 5.2 Add Hand Fan/Spread Toggle
 - The shared `GameToolbar` includes the H button for fan/spread
@@ -273,17 +270,21 @@ New reducers needed for features that don't exist yet server-side:
 | New Location | Source |
 |---|---|
 | `app/shared/types/gameActions.ts` | Expanded from existing |
-| `app/shared/types/gameCard.ts` | New (standardized card interface) |
+| `app/shared/types/gameCard.ts` | Moved from `goldfish/types.ts` (GameCard, ZoneId, ZONE_LABELS, COUNTER_COLORS) |
 | `app/shared/hooks/useGameHotkeys.ts` | From `goldfish/hooks/useKeyboardShortcuts.ts` |
+| `app/shared/hooks/useModalCardDrag.ts` | From `goldfish/hooks/useModalCardDrag.ts` |
 | `app/shared/components/GameToolbar.tsx` | From `goldfish/components/GameToolbar.tsx` |
+| `app/shared/components/GameToast.tsx` | From `goldfish/components/GameToast.tsx` |
 | `app/shared/components/PhaseButtonStrip.tsx` | Extracted from PhaseBar + TurnIndicator |
 | `app/shared/components/DiceOverlay.tsx` | Merged from both modes |
 | `app/shared/components/CardHoverPreview.tsx` | From `goldfish/components/CardHoverPreview.tsx` |
+| `app/shared/components/ModalCardHoverPreview.tsx` | From `goldfish/components/ModalCardHoverPreview.tsx` |
 | `app/shared/components/DeckSearchModal.tsx` | From `goldfish/components/DeckSearchModal.tsx` |
 | `app/shared/components/ZoneBrowseModal.tsx` | From `goldfish/components/ZoneBrowseModal.tsx` |
 | `app/shared/components/DeckPeekModal.tsx` | From `goldfish/components/DeckPeekModal.tsx` |
 | `app/shared/components/DeckExchangeModal.tsx` | From `goldfish/components/DeckExchangeModal.tsx` |
 | `app/shared/components/DeckDropPopup.tsx` | From `goldfish/components/DeckDropPopup.tsx` |
+| `app/shared/components/CardZoomModal.tsx` | From `goldfish/components/CardZoomModal.tsx` |
 | `app/shared/components/LorContextMenu.tsx` | From `goldfish/components/LorContextMenu.tsx` |
 | `app/shared/utils/cardImageUrl.ts` | Consolidated from 4+ locations |
 
@@ -312,32 +313,36 @@ Phase 1 (Foundation) ───────────────────�
   1.2 useGameHotkeys extraction
   1.3 PhaseButtonStrip extraction
   1.4 cardImageUrl utility extraction
-  1.5 GameToolbar extraction
+  1.5 GameToolbar extraction (decouple from goldfish context)
   1.6 DiceOverlay unification
+  1.7 Toast notification extraction
+  1.8 Move shared types (GameCard, ZoneId, etc.) from goldfish/types to shared/types
 
 Phase 2 (Modals) ──────── depends on Phase 1 ──
-  2.1 DeckSearchModal extraction
+  2.1 DeckSearchModal extraction + ModalCardHoverPreview + useModalCardDrag
   2.2 ZoneBrowseModal extraction
   2.3 DeckPeekModal extraction
   2.4 DeckExchangeModal extraction
   2.5 DeckDropPopup extraction
   2.6 Wire modals into multiplayer client
+  NOTE: "Top/Bottom of Deck" actions in modals are disabled until Phase 4
 
 Phase 3 (Interactions) ── depends on Phase 1 ──
   3.1 Multi-card context menu wiring
-  3.2 Zone context menu (LOB tokens)
+  3.2 Zone context menu (LOB tokens) — fully functional after Phase 4.3
   3.3 LOR context menu extraction
   3.4 Sidebar pile click-through
   3.5 Double-click actions
+  3.6 CardZoomModal extraction
 
 Phase 4 (Backend) ──────── independent ─────────
   4.1 move_card_to_top_of_deck reducer
   4.2 move_card_to_bottom_of_deck reducer
-  4.3 spawn_lost_soul reducer
-  4.4 remove_token reducer
+  4.3 spawn_lost_soul reducer (uses cardType="TOKEN_LS" convention)
+  4.4 remove_token reducer (validates cardType starts with "TOKEN_")
 
 Phase 5 (Layout/UX) ──── depends on Phase 1 ───
-  5.1 Move TurnBar to top, Toolbar to bottom
+  5.1 Move TurnBar to top, Toolbar to bottom (concede stays in turn bar)
   5.2 Hand fan/spread toggle
   5.3 Card hover preview extraction
   5.4 Fix multi-card drag
@@ -347,7 +352,7 @@ Phase 6 (Multiplayer-only) ── depends on P2,P4 ─
   6.2 Consent-based zone search (deferred)
 ```
 
-Phases 2, 3, 4, and 5 can largely proceed in parallel after Phase 1 completes.
+Phases 2, 3, 4, and 5 can largely proceed in parallel after Phase 1 completes. Phase 4 is fully independent and can start immediately.
 
 ---
 
