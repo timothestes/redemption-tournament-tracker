@@ -20,7 +20,7 @@ import { DeckPeekModal } from './DeckPeekModal';
 import { DeckDropPopup } from './DeckDropPopup';
 import { DeckExchangeModal } from './DeckExchangeModal';
 import { ZoneContextMenu } from '@/app/shared/components/ZoneContextMenu';
-import { LorContextMenu } from './LorContextMenu';
+import { LorContextMenu } from '@/app/shared/components/LorContextMenu';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useModalCardDrag } from '../hooks/useModalCardDrag';
 import { useSelectionState, type CardBound } from '../hooks/useSelectionState';
