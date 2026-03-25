@@ -214,6 +214,28 @@ export const DisconnectTimeout = table(
 );
 
 // ---------------------------------------------------------------------------
+// 9. ZoneSearchRequest
+// ---------------------------------------------------------------------------
+export const ZoneSearchRequest = table(
+  {
+    name: 'zone_search_request',
+    public: true,
+    indexes: [
+      { accessor: 'zone_search_request_game_id', algorithm: 'btree' as const, columns: ['gameId'] },
+    ],
+  },
+  {
+    id: t.u64().primaryKey().autoInc(),
+    gameId: t.u64(),
+    requesterId: t.u64(),
+    targetPlayerId: t.u64(),
+    zone: t.string(),
+    status: t.string(),
+    createdAt: t.timestamp(),
+  }
+);
+
+// ---------------------------------------------------------------------------
 // Schema export
 // ---------------------------------------------------------------------------
 const spacetimedb = schema({
@@ -225,6 +247,7 @@ const spacetimedb = schema({
   ChatMessage,
   Spectator,
   DisconnectTimeout,
+  ZoneSearchRequest,
 });
 
 export default spacetimedb;
