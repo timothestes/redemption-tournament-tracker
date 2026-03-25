@@ -40,6 +40,8 @@ export interface GameToolbarProps {
   onNewGame?: () => void;
   /** Called for end turn (multiplayer only). */
   onEndTurn?: () => void;
+  /** Game is finished — keep toolbar active for review but disable end turn. */
+  isFinished?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -59,9 +61,10 @@ export function GameToolbar({
   onUndo,
   onNewGame,
   onEndTurn,
+  isFinished,
 }: GameToolbarProps) {
   const isMultiplayer = mode === 'multiplayer';
-  const disabled = isMultiplayer && !isMyTurn;
+  const disabled = isMultiplayer && !isMyTurn && !isFinished;
 
   const handleDraw = useCallback(() => {
     if (handCount >= 16) {
@@ -124,14 +127,14 @@ export function GameToolbar({
       shortcut: '',
       hidden: isMultiplayer,
     },
-    // End Turn — multiplayer only
+    // End Turn — multiplayer only, always disabled when finished
     {
       icon: SkipForward,
       label: 'End Turn',
       onClick: onEndTurn ?? (() => {}),
       shortcut: '',
       hidden: !isMultiplayer,
-      disabled,
+      disabled: disabled || !!isFinished,
     },
   ];
 

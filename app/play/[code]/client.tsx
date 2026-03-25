@@ -745,6 +745,37 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             </div>
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
               <MultiplayerCanvas gameId={gameId} />
+              {/* Bottom toolbar — stays active for draw/shuffle, end turn disabled */}
+              <GameToolbar
+                actions={{
+                  drawCard: () => gameState.drawCard(),
+                  drawMultiple: (n) => gameState.drawMultiple(BigInt(n)),
+                  moveCard: (id, zone, px, py) => gameState.moveCard(BigInt(id), zone, undefined, px, py),
+                  moveCardsBatch: (ids, zone) => gameState.moveCardsBatch(ids.join(','), zone),
+                  flipCard: (id) => gameState.flipCard(BigInt(id)),
+                  meekCard: (id) => gameState.meekCard(BigInt(id)),
+                  unmeekCard: (id) => gameState.unmeekCard(BigInt(id)),
+                  addCounter: (id, c) => gameState.addCounter(BigInt(id), c),
+                  removeCounter: (id, c) => gameState.removeCounter(BigInt(id), c),
+                  shuffleCardIntoDeck: (id) => gameState.shuffleCardIntoDeck(BigInt(id)),
+                  shuffleDeck: () => gameState.shuffleDeck(),
+                  setNote: (id, t) => gameState.setNote(BigInt(id), t),
+                  exchangeCards: (ids) => gameState.exchangeCards(ids.join(',')),
+                  moveCardToTopOfDeck: (id) => gameState.moveCardToTopOfDeck(BigInt(id)),
+                  moveCardToBottomOfDeck: (id) => gameState.moveCardToBottomOfDeck(BigInt(id)),
+                } satisfies GameActions}
+                mode="multiplayer"
+                isMyTurn={true}
+                isFinished
+                isSpreadHand={false}
+                onToggleSpreadHand={() => {}}
+                deckCount={gameState.myCards['deck']?.length ?? 0}
+                handCount={gameState.myCards['hand']?.length ?? 0}
+                onRollDice={() => gameState.rollDice(BigInt(20))}
+                onShowToast={showGameToast}
+                onEndTurn={() => {}}
+              />
+              <GameToastContainer />
               <GameOverOverlay
                 game={gameState.game}
                 myPlayer={gameState.myPlayer}

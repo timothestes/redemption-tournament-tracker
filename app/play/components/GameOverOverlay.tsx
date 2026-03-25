@@ -166,7 +166,7 @@ export default function GameOverOverlay({
       {showRematchBanner && (
         <div style={{
           position: 'fixed',
-          bottom: 16,
+          bottom: 56,
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: 800,
@@ -236,7 +236,7 @@ export default function GameOverOverlay({
       {(showWaitingStatus || showRematchResult) && (
         <div style={{
           position: 'fixed',
-          bottom: 16,
+          bottom: 56,
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: 800,
