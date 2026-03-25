@@ -506,8 +506,17 @@ export const pregame_choose_first = spacetimedb.reducer(
       turnNumber: 1n,
     });
 
+    // Find the chosen player's name
+    let chosenName = 'Player ' + (Number(chosenSeat) + 1);
+    for (const p of [...ctx.db.Player.player_game_id.filter(gameId)]) {
+      if (p.seat === chosenSeat) {
+        chosenName = p.displayName;
+        break;
+      }
+    }
+
     logAction(ctx, gameId, player.id, 'GAME_STARTED',
-      JSON.stringify({ chosenSeat: chosenSeat.toString(), chosenBy: player.displayName }),
+      JSON.stringify({ chosenSeat: chosenSeat.toString(), chosenBy: player.displayName, chosenName }),
       1n, 'draw');
   }
 );

@@ -83,9 +83,8 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
   if (actionType === 'GAME_STARTED' && payload) {
     try {
       const data = JSON.parse(payload);
-      const chosenBy = data.chosenBy ?? 'Someone';
-      const chosenSeat = data.chosenSeat;
-      return `chose ${chosenSeat === '0' ? 'Player 1' : 'Player 2'} to go first`;
+      const chosenName = data.chosenName ?? ('Player ' + (Number(data.chosenSeat) + 1));
+      return `chose ${chosenName} to go first`;
     } catch { /* fall through */ }
   }
   if (actionType === 'PREGAME_ROLL' && payload) {
