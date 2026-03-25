@@ -28,6 +28,9 @@ interface TurnIndicatorProps {
   onSetPhase: (phase: string) => void;
   onEndTurn: () => void;
   onConcede?: () => void;
+  isFinished?: boolean;
+  winnerName?: string;
+  onPlayAgain?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -42,6 +45,9 @@ export default function TurnIndicator({
   onSetPhase,
   onEndTurn,
   onConcede,
+  isFinished,
+  winnerName,
+  onPlayAgain,
 }: TurnIndicatorProps) {
   const [showConcedeConfirm, setShowConcedeConfirm] = useState(false);
   const currentPhase: string = game?.currentPhase ?? 'draw';
@@ -95,34 +101,52 @@ export default function TurnIndicator({
           flexShrink: 0,
         }}
       >
-        <span
-          style={{
-            fontFamily: 'var(--font-cinzel), Georgia, serif',
-            fontSize: 10,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            color: 'rgba(232, 213, 163, 0.55)',
-            lineHeight: 1,
-          }}
-        >
-          Turn{' '}
-          <span style={{ color: '#e8d5a3', fontSize: 13, fontWeight: 700 }}>
-            {turnNumber}
+        {isFinished ? (
+          <span
+            style={{
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: 12,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: '#e8d5a3',
+              fontWeight: 700,
+              lineHeight: 1.3,
+            }}
+          >
+            {winnerName ? `${winnerName} wins` : 'Game over'}
           </span>
-        </span>
-        <span
-          style={{
-            fontFamily: 'var(--font-cinzel), Georgia, serif',
-            fontSize: 9,
-            letterSpacing: '0.06em',
-            textTransform: 'uppercase',
-            color: isMyTurn ? '#c4955a' : '#4a7ab5',
-            lineHeight: 1,
-            marginTop: 3,
-          }}
-        >
-          {isMyTurn ? `${myName}'s turn (you)` : `${opponentName}'s turn`}
-        </span>
+        ) : (
+          <>
+            <span
+              style={{
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+                fontSize: 10,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                color: 'rgba(232, 213, 163, 0.55)',
+                lineHeight: 1,
+              }}
+            >
+              Turn{' '}
+              <span style={{ color: '#e8d5a3', fontSize: 13, fontWeight: 700 }}>
+                {turnNumber}
+              </span>
+            </span>
+            <span
+              style={{
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+                fontSize: 9,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                color: isMyTurn ? '#c4955a' : '#4a7ab5',
+                lineHeight: 1,
+                marginTop: 3,
+              }}
+            >
+              {isMyTurn ? `${myName}'s turn (you)` : `${opponentName}'s turn`}
+            </span>
+          </>
+        )}
       </div>
 
       {/* ================================================================
@@ -245,7 +269,7 @@ export default function TurnIndicator({
       </div>
 
       {/* ================================================================
-          RIGHT — Concede only (Draw/Roll/EndTurn moved to bottom toolbar)
+          RIGHT — Concede (playing) or Play Again (finished)
           ================================================================ */}
       <div
         style={{
@@ -256,7 +280,35 @@ export default function TurnIndicator({
           justifyContent: 'flex-end',
         }}
       >
-        {onConcede && (
+        {isFinished && onPlayAgain && (
+          <button
+            onClick={onPlayAgain}
+            style={{
+              padding: '5px 12px',
+              background: 'rgba(196, 149, 90, 0.15)',
+              border: '1px solid rgba(196, 149, 90, 0.45)',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: 10,
+              letterSpacing: '0.07em',
+              textTransform: 'uppercase',
+              color: '#e8d5a3',
+              transition: 'background 0.15s, border-color 0.15s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(196, 149, 90, 0.28)';
+              e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.75)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(196, 149, 90, 0.15)';
+              e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.45)';
+            }}
+          >
+            Play Again
+          </button>
+        )}
+        {!isFinished && onConcede && (
           <button
             onClick={() => setShowConcedeConfirm(true)}
             style={{

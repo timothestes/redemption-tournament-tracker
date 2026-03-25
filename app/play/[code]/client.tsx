@@ -7,7 +7,7 @@ import { useSpacetimeConnection } from '@/app/play/hooks/useSpacetimeConnection'
 import { SpacetimeProvider } from '@/app/play/lib/spacetimedb-provider';
 import { useGameState } from '@/app/play/hooks/useGameState';
 import { useSpacetimeDB } from 'spacetimedb/react';
-import GameOverOverlay from '@/app/play/components/GameOverOverlay';
+import GameOverOverlay, { deriveEndReason } from '@/app/play/components/GameOverOverlay';
 import TurnIndicator from '@/app/play/components/TurnIndicator';
 import ChatPanel from '../components/ChatPanel';
 import { CardPreviewProvider, useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
@@ -240,6 +240,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const [lifecycle, setLifecycle] = useState<LifecycleState>('creating');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isPracticing, setIsPracticing] = useState(false);
+  const [playAgainTriggered, setPlayAgainTriggered] = useState(false);
   const [gameId, setGameId] = useState<bigint | null>(null);
   const didCallReducer = useRef(false);
   const didSubscribe = useRef(false);
@@ -722,6 +723,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // lifecycle === 'finished' — show canvas (frozen) with GameOverOverlay on top,
   // or render the overlay standalone if canvas data is unavailable.
   if (lifecycle === 'finished') {
+    const { winnerName } = deriveEndReason(gameState.gameActions, gameState.myPlayer);
+
     // Show the overlay over the frozen canvas — always render canvas if gameId is known
     if (gameId !== null) {
       return (
@@ -732,9 +735,12 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                 game={gameState.game}
                 myPlayer={gameState.myPlayer}
                 opponentPlayer={gameState.opponentPlayer}
-                isMyTurn={gameState.isMyTurn}
-                onSetPhase={gameState.setPhase}
-                onEndTurn={gameState.endTurn}
+                isMyTurn={false}
+                onSetPhase={() => {}}
+                onEndTurn={() => {}}
+                isFinished
+                winnerName={winnerName}
+                onPlayAgain={() => setPlayAgainTriggered(true)}
               />
             </div>
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
@@ -746,6 +752,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                 gameActions={gameState.gameActions}
                 gameState={gameState}
                 onReturnToLobby={handleReturnToLobby}
+                playAgainTriggered={playAgainTriggered}
+                onPlayAgainHandled={() => setPlayAgainTriggered(false)}
               />
             </div>
           </div>
@@ -762,9 +770,12 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               game={gameState.game}
               myPlayer={gameState.myPlayer}
               opponentPlayer={gameState.opponentPlayer}
-              isMyTurn={gameState.isMyTurn}
-              onSetPhase={gameState.setPhase}
-              onEndTurn={gameState.endTurn}
+              isMyTurn={false}
+              onSetPhase={() => {}}
+              onEndTurn={() => {}}
+              isFinished
+              winnerName={winnerName}
+              onPlayAgain={() => setPlayAgainTriggered(true)}
             />
           </div>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>

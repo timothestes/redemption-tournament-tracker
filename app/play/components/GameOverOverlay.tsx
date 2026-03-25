@@ -18,13 +18,15 @@ interface GameOverOverlayProps {
   gameActions: any[];
   gameState: GameState;
   onReturnToLobby: () => void;
+  playAgainTriggered?: boolean;
+  onPlayAgainHandled?: () => void;
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function deriveEndReason(gameActions: any[], myPlayer: any): string {
+function deriveEndReason(gameActions: any[], myPlayer: any): { label: string; winnerName: string } {
   for (let i = gameActions.length - 1; i >= 0; i--) {
     const action = gameActions[i];
     const actionType: string = (action.actionType ?? '').toUpperCase();
@@ -33,17 +35,17 @@ function deriveEndReason(gameActions: any[], myPlayer: any): string {
       const actorId = action.playerId ?? action.actorId;
       const myId = myPlayer?.id;
       if (myId !== undefined && actorId !== undefined && actorId === myId) {
-        return 'You resigned';
+        return { label: 'You resigned', winnerName: '' };
       }
-      return 'Opponent resigned';
+      return { label: 'Opponent resigned', winnerName: myPlayer?.displayName ?? 'You' };
     }
 
     if (actionType === 'TIMEOUT') {
-      return 'Opponent disconnected';
+      return { label: 'Opponent disconnected', winnerName: myPlayer?.displayName ?? 'You' };
     }
   }
 
-  return 'Game ended';
+  return { label: 'Game ended', winnerName: '' };
 }
 
 function generateCode(): string {
@@ -54,23 +56,7 @@ function generateCode(): string {
 }
 
 // ---------------------------------------------------------------------------
-// Styles
-// ---------------------------------------------------------------------------
-
-const btnBase: React.CSSProperties = {
-  width: '100%',
-  padding: '10px 0',
-  borderRadius: 4,
-  cursor: 'pointer',
-  fontFamily: 'var(--font-cinzel), Georgia, serif',
-  fontSize: 11,
-  letterSpacing: '0.1em',
-  textTransform: 'uppercase',
-  transition: 'background 0.15s, border-color 0.15s',
-};
-
-// ---------------------------------------------------------------------------
-// Component
+// Component — temporary toast + rematch logic (no blocking modal)
 // ---------------------------------------------------------------------------
 
 export default function GameOverOverlay({
@@ -80,12 +66,38 @@ export default function GameOverOverlay({
   gameActions,
   gameState,
   onReturnToLobby,
+  playAgainTriggered,
+  onPlayAgainHandled,
 }: GameOverOverlayProps) {
   const router = useRouter();
-  const label = deriveEndReason(gameActions, myPlayer);
-  const myName: string = myPlayer?.displayName ?? 'You';
+  const { label, winnerName } = deriveEndReason(gameActions, myPlayer);
   const oppName: string = opponentPlayer?.displayName ?? 'Opponent';
   const mySeat = myPlayer?.seat?.toString() ?? '0';
+
+  // Rematch state from game (derived before effects that use it)
+  const rematchRequestedBy = game?.rematchRequestedBy ?? '';
+  const rematchResponse = game?.rematchResponse ?? '';
+  const rematchCode = game?.rematchCode ?? '';
+  const iRequested = rematchRequestedBy === mySeat;
+  const opponentRequested = rematchRequestedBy !== '' && !iRequested;
+
+  // Toast visibility
+  const [toastVisible, setToastVisible] = useState(true);
+
+  // Auto-dismiss toast after 4 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => setToastVisible(false), 4000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Open deck picker when Play Again is triggered from TurnIndicator
+  useEffect(() => {
+    if (playAgainTriggered && !rematchRequestedBy) {
+      setPickerMode('request');
+      setPickerOpen(true);
+      onPlayAgainHandled?.();
+    }
+  }, [playAgainTriggered, rematchRequestedBy, onPlayAgainHandled]);
 
   // Deck picker state
   const [myDecks, setMyDecks] = useState<DeckOption[]>([]);
@@ -93,19 +105,13 @@ export default function GameOverOverlay({
   const [pickerMode, setPickerMode] = useState<'request' | 'respond'>('request');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Load decks when needed
   useEffect(() => {
     if (pickerOpen && myDecks.length === 0) {
       loadUserDecks().then(setMyDecks).catch(() => {});
     }
   }, [pickerOpen, myDecks.length]);
 
-  // Rematch state from game
-  const rematchRequestedBy = game?.rematchRequestedBy ?? '';
-  const rematchResponse = game?.rematchResponse ?? '';
-  const rematchCode = game?.rematchCode ?? '';
-  const iRequested = rematchRequestedBy === mySeat;
-  const opponentRequested = rematchRequestedBy !== '' && !iRequested;
+  // Rematch state (derived above, before effects)
 
   // Navigate to new game when rematch code is set
   useEffect(() => {
@@ -145,7 +151,6 @@ export default function GameOverOverlay({
     try {
       const result = await loadDeckForGame(deck.id);
       const deckData = JSON.stringify(result.deckData);
-
       if (pickerMode === 'request') {
         gameState.requestRematch(deck.id, deckData);
       } else {
@@ -158,54 +163,69 @@ export default function GameOverOverlay({
     }
   };
 
-  // Determine rematch status content
-  let rematchContent: React.ReactNode = null;
+  // Show opponent's rematch request as a persistent banner
+  const showRematchBanner = opponentRequested && !rematchResponse;
+  // Show waiting status
+  const showWaitingStatus = iRequested && !rematchResponse;
+  // Show rematch result
+  const showRematchResult = rematchResponse === 'declined' || rematchResponse === 'accepted';
 
-  if (rematchResponse === 'declined') {
-    rematchContent = (
-      <p style={{
-        fontSize: 12,
-        color: 'rgba(220, 120, 120, 0.6)',
-        fontFamily: 'Georgia, serif',
-        marginBottom: 16,
-      }}>
-        {iRequested ? 'Opponent declined the rematch.' : 'You declined the rematch.'}
-      </p>
-    );
-  } else if (rematchResponse === 'accepted') {
-    rematchContent = (
-      <p style={{
-        fontSize: 12,
-        color: 'rgba(196, 149, 90, 0.6)',
-        fontFamily: 'Georgia, serif',
-        marginBottom: 16,
-      }}>
-        Setting up rematch...
-      </p>
-    );
-  } else if (iRequested) {
-    rematchContent = (
-      <p style={{
-        fontSize: 12,
-        color: 'rgba(196, 149, 90, 0.5)',
-        fontFamily: 'Georgia, serif',
-        marginBottom: 16,
-      }}>
-        Waiting for opponent to respond...
-      </p>
-    );
-  } else if (opponentRequested) {
-    rematchContent = (
-      <div style={{ marginBottom: 16 }}>
-        <p style={{
-          fontSize: 13,
-          color: '#e8d5a3',
-          fontFamily: 'Georgia, serif',
-          marginBottom: 12,
+  return (
+    <>
+      {/* Temporary toast — auto-dismisses */}
+      {toastVisible && (
+        <div style={{
+          position: 'fixed',
+          top: 60,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 800,
+          background: 'rgba(14, 10, 6, 0.95)',
+          border: '1px solid rgba(107, 78, 39, 0.5)',
+          borderRadius: 8,
+          padding: '12px 24px',
+          textAlign: 'center',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
+          pointerEvents: 'none',
+          animation: 'fadeInDown 0.3s ease',
         }}>
-          {oppName} wants to play again!
-        </p>
-        <div style={{ display: 'flex', gap: 10 }}>
+          <p style={{
+            fontFamily: 'var(--font-cinzel), Georgia, serif',
+            fontSize: 14,
+            fontWeight: 700,
+            color: '#e8d5a3',
+            letterSpacing: '0.06em',
+          }}>
+            {label}
+          </p>
+        </div>
+      )}
+
+      {/* Rematch request banner from opponent */}
+      {showRematchBanner && (
+        <div style={{
+          position: 'fixed',
+          bottom: 16,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 800,
+          background: 'rgba(14, 10, 6, 0.95)',
+          border: '1px solid rgba(196, 149, 90, 0.4)',
+          borderRadius: 8,
+          padding: '12px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+          boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
+        }}>
+          <p style={{
+            fontFamily: 'Georgia, serif',
+            fontSize: 13,
+            color: '#e8d5a3',
+            whiteSpace: 'nowrap',
+          }}>
+            {oppName} wants to play again
+          </p>
           <button
             onClick={() => {
               setPickerMode('respond');
@@ -213,162 +233,99 @@ export default function GameOverOverlay({
             }}
             disabled={isLoading}
             style={{
-              ...btnBase,
+              padding: '6px 16px',
+              borderRadius: 4,
+              border: '1px solid rgba(196, 149, 90, 0.45)',
               background: 'rgba(196, 149, 90, 0.15)',
-              border: '1px solid rgba(196, 149, 90, 0.5)',
               color: '#e8d5a3',
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
             }}
           >
-            {isLoading ? 'Loading...' : 'Accept'}
+            Accept
           </button>
           <button
             onClick={() => gameState.respondRematch(false, '', '')}
             style={{
-              ...btnBase,
-              background: 'transparent',
+              padding: '6px 16px',
+              borderRadius: 4,
               border: '1px solid rgba(107, 78, 39, 0.3)',
+              background: 'transparent',
               color: 'rgba(196, 149, 90, 0.5)',
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
             }}
           >
             Decline
           </button>
         </div>
-      </div>
-    );
-  }
+      )}
 
-  // Hide the game over card when deck picker is open
-  // so they don't fight for z-index
-  if (pickerOpen) {
-    return (
-      <div style={{ position: 'fixed', inset: 0, zIndex: 950 }}>
-        <DeckPickerModal
-          open={pickerOpen}
-          onOpenChange={setPickerOpen}
-          onSelect={handleDeckSelected}
-          myDecks={myDecks}
-          selectedDeckId={myPlayer?.deckId}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 900,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(6, 4, 2, 0.5)',
-        pointerEvents: 'none',
-      }}
-    >
-      <div
-        style={{
-          background: 'rgba(14, 10, 6, 0.97)',
-          border: '1px solid rgba(107, 78, 39, 0.6)',
-          borderRadius: 10,
-          padding: '36px 40px',
-          textAlign: 'center',
-          minWidth: 300,
-          maxWidth: 400,
-          boxShadow: '0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(196, 149, 90, 0.08)',
-          pointerEvents: 'auto',
-        }}
-      >
-        {/* Header */}
-        <p style={{
-          fontFamily: 'var(--font-cinzel), Georgia, serif',
-          fontSize: 11,
-          letterSpacing: '0.18em',
-          textTransform: 'uppercase',
-          color: 'rgba(232, 213, 163, 0.45)',
-          marginBottom: 12,
-        }}>
-          Game Over
-        </p>
-
-        {/* End reason */}
-        <p style={{
-          fontFamily: 'var(--font-cinzel), Georgia, serif',
-          fontSize: 22,
-          fontWeight: 700,
-          color: '#e8d5a3',
-          lineHeight: 1.2,
-          marginBottom: 20,
-        }}>
-          {label}
-        </p>
-
-        {/* Divider */}
-        <div style={{ height: 1, background: 'rgba(107, 78, 39, 0.35)', margin: '0 0 20px' }} />
-
-        {/* Player names */}
+      {/* Waiting/result status toast */}
+      {(showWaitingStatus || showRematchResult) && (
         <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          fontSize: 12,
-          color: 'rgba(232, 213, 163, 0.55)',
-          marginBottom: 20,
-          gap: 24,
+          position: 'fixed',
+          bottom: 16,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 800,
+          background: 'rgba(14, 10, 6, 0.95)',
+          border: `1px solid ${rematchResponse === 'declined' ? 'rgba(180, 60, 60, 0.3)' : 'rgba(107, 78, 39, 0.4)'}`,
+          borderRadius: 8,
+          padding: '10px 20px',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
         }}>
-          <span style={{
-            fontFamily: 'var(--font-cinzel), Georgia, serif',
-            letterSpacing: '0.05em',
-            color: 'rgba(196, 149, 90, 0.85)',
+          <p style={{
+            fontFamily: 'Georgia, serif',
+            fontSize: 12,
+            color: rematchResponse === 'declined'
+              ? 'rgba(220, 120, 120, 0.6)'
+              : rematchResponse === 'accepted'
+                ? 'rgba(196, 149, 90, 0.7)'
+                : 'rgba(196, 149, 90, 0.5)',
           }}>
-            {myName}
-          </span>
-          <span style={{ color: 'rgba(232, 213, 163, 0.3)', alignSelf: 'center' }}>vs</span>
-          <span style={{
-            fontFamily: 'var(--font-cinzel), Georgia, serif',
-            letterSpacing: '0.05em',
-            color: 'rgba(74, 122, 181, 0.85)',
-          }}>
-            {oppName}
-          </span>
+            {rematchResponse === 'declined'
+              ? (iRequested ? 'Opponent declined.' : 'You declined.')
+              : rematchResponse === 'accepted'
+                ? 'Setting up rematch...'
+                : 'Waiting for opponent...'}
+          </p>
         </div>
+      )}
 
-        {/* Rematch status content */}
-        {rematchContent}
-
-        {/* Action buttons */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {/* Play Again — only show if no rematch in progress */}
-          {!rematchRequestedBy && !rematchResponse && (
-            <button
-              onClick={() => {
-                setPickerMode('request');
-                setPickerOpen(true);
-              }}
-              disabled={isLoading}
-              style={{
-                ...btnBase,
-                background: 'rgba(196, 149, 90, 0.15)',
-                border: '1px solid rgba(196, 149, 90, 0.5)',
-                color: '#e8d5a3',
-              }}
-            >
-              {isLoading ? 'Loading...' : 'Play Again'}
-            </button>
-          )}
-
-          <button
-            onClick={onReturnToLobby}
-            style={{
-              ...btnBase,
-              background: 'transparent',
-              border: '1px solid rgba(107, 78, 39, 0.3)',
-              color: 'rgba(196, 149, 90, 0.5)',
-            }}
-          >
-            Return to Lobby
-          </button>
+      {/* Deck picker — renders above everything */}
+      {pickerOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 950 }}>
+          <DeckPickerModal
+            open={pickerOpen}
+            onOpenChange={setPickerOpen}
+            onSelect={handleDeckSelected}
+            myDecks={myDecks}
+            selectedDeckId={myPlayer?.deckId}
+          />
         </div>
-      </div>
-    </div>
+      )}
+
+      {/* Inline CSS animation */}
+      <style>{`
+        @keyframes fadeInDown {
+          from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+          to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+      `}</style>
+    </>
   );
 }
+
+// Export the helper so client.tsx can derive winner name
+export { deriveEndReason };
