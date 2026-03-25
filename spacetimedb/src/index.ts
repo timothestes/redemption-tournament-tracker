@@ -718,9 +718,19 @@ export const respond_rematch = spacetimedb.reducer(
         JSON.stringify({ result0: r0, result1: r1, winner }),
         0n, 'pregame');
     } else {
-      ctx.db.Game.id.update({ ...game, rematchResponse: 'declined' });
-      logAction(ctx, gameId, player.id, 'REMATCH_RESPONSE',
-        JSON.stringify({ accepted: false, seat: player.seat.toString() }),
+      // Decline — clear all rematch fields so either player can re-initiate
+      ctx.db.Game.id.update({
+        ...game,
+        rematchRequestedBy: '',
+        rematchDeckId0: '',
+        rematchDeckData0: '',
+        rematchDeckId1: '',
+        rematchDeckData1: '',
+        rematchResponse: '',
+        rematchCode: '',
+      });
+      logAction(ctx, gameId, player.id, 'REMATCH_DECLINED',
+        JSON.stringify({ seat: player.seat.toString() }),
         game.turnNumber, game.currentPhase);
     }
   }
