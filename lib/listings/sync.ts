@@ -73,16 +73,16 @@ export async function syncTournamentListings(): Promise<SyncResult> {
   // 4. Diff and upsert
   const supabase = getSupabaseAdmin();
 
-  // Get existing listings that are still upcoming
+  // Get ALL existing listings (any status) to avoid unique constraint violations
+  // when a previously removed/past listing reappears on the source page
   const { data: existing } = await supabase
     .from('tournament_listings')
-    .select('id, city, state, start_date, tournament_type, source_hash')
-    .eq('status', 'upcoming');
+    .select('id, city, state, start_date, tournament_type, source_hash, status');
 
-  const existingMap = new Map<string, { id: string; source_hash: string }>();
+  const existingMap = new Map<string, { id: string; source_hash: string; status: string }>();
   for (const row of existing || []) {
     const key = `${row.city.toLowerCase()}|${row.state.toLowerCase()}|${row.start_date}|${(row.tournament_type || '').toLowerCase()}`;
-    existingMap.set(key, { id: row.id, source_hash: row.source_hash });
+    existingMap.set(key, { id: row.id, source_hash: row.source_hash, status: row.status });
   }
 
   // Track which existing listings we saw in this sync (for removal detection)
@@ -133,8 +133,8 @@ export async function syncTournamentListings(): Promise<SyncResult> {
       } else {
         result.inserted++;
       }
-    } else if (existingEntry.source_hash !== sourceHash) {
-      // Existing listing changed — update
+    } else if (existingEntry.source_hash !== sourceHash || existingEntry.status !== 'upcoming') {
+      // Existing listing changed, or was removed/past and reappeared — update & resurrect
       const { error } = await supabase
         .from('tournament_listings')
         .update(row)
@@ -146,13 +146,13 @@ export async function syncTournamentListings(): Promise<SyncResult> {
         result.updated++;
       }
     }
-    // else: unchanged, skip
+    // else: unchanged and still upcoming, skip
   }
 
   // 5. Mark listings no longer on the page as 'removed'
-  // Only for upcoming listings — don't touch past/cancelled ones
+  // Only for upcoming listings — don't touch past/cancelled/already-removed ones
   for (const [key, entry] of existingMap) {
-    if (!seenKeys.has(key)) {
+    if (!seenKeys.has(key) && entry.status === 'upcoming') {
       const { error } = await supabase
         .from('tournament_listings')
         .update({ status: 'removed', updated_at: new Date().toISOString() })
