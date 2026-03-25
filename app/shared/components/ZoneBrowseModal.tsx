@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { useGame } from '@/app/goldfish/state/GameContext';
+import { useModalGame } from '@/app/shared/contexts/ModalGameContext';
 import { ZoneId, ZONE_LABELS, GameCard } from '@/app/shared/types/gameCard';
 import { X } from 'lucide-react';
 import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './ModalCardHoverPreview';
@@ -140,11 +140,13 @@ interface ZoneBrowseModalProps {
   onStartMultiDrag?: (cards: { card: GameCard; imageUrl: string }[], e: React.PointerEvent) => void;
   didDragRef?: React.MutableRefObject<boolean>;
   isDragActive?: boolean;
+  readOnly?: boolean;
 }
 
-export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive }: ZoneBrowseModalProps) {
-  const { state, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck } = useGame();
-  const cards = state.zones[zoneId];
+export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive, readOnly }: ZoneBrowseModalProps) {
+  const { zones, actions } = useModalGame();
+  const { moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck } = actions;
+  const cards = zones[zoneId];
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave } = useModalCardHover(200, { setPreviewCard, isLoupeVisible });
   const [contextCard, setContextCard] = useState<{ card: GameCard; x: number; y: number } | null>(null);
@@ -189,6 +191,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
 
   const handleCardContextMenu = (card: GameCard, e: React.MouseEvent) => {
     e.preventDefault();
+    if (readOnly) return;
     onCardMouseLeave();
     setContextCard({ card, x: e.clientX, y: e.clientY });
     // Re-set the loupe preview so it keeps showing the right-clicked card
@@ -200,6 +203,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
 
   const handlePointerDown = (card: GameCard, imageUrl: string, e: React.PointerEvent) => {
     if (e.button !== 0) return;
+    if (readOnly) return;
     onCardMouseLeave();
     pointerDownCardRef.current = card.instanceId;
 
@@ -513,7 +517,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
         )}
       </div>
 
-      {contextCard && (
+      {!readOnly && contextCard && (
         isMultiContext ? (
           <CardContextPopup
             card={contextCard.card}
