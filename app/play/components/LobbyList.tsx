@@ -24,9 +24,14 @@ export function LobbyList({ selectedDeckId, onJoinGame, onSwitchToCreate }: Lobb
   const [now, setNow] = useState(Date.now());
   const didSubscribe = useRef(false);
 
-  // Subscribe to waiting public games on mount (guard prevents duplicate subscriptions)
+  // Subscribe to waiting public games — re-subscribe when connection changes
+  // (e.g., after tab regains focus and WebSocket reconnects)
   useEffect(() => {
-    if (!conn || didSubscribe.current) return;
+    if (!conn) {
+      didSubscribe.current = false;
+      return;
+    }
+    if (didSubscribe.current) return;
     didSubscribe.current = true;
     try {
       conn.subscriptionBuilder().subscribe([
@@ -37,10 +42,19 @@ export function LobbyList({ selectedDeckId, onJoinGame, onSwitchToCreate }: Lobb
     }
   }, [conn]);
 
-  // Update relative timestamps every 30 seconds
+  // Update relative timestamps every 15 seconds + force refresh on tab focus
   useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 30_000);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => setNow(Date.now()), 15_000);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        setNow(Date.now());
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   // Client-side filter as safety net (subscription already filters server-side)
