@@ -374,6 +374,25 @@ export const resign_game = spacetimedb.reducer(
 );
 
 // ---------------------------------------------------------------------------
+// Reducer: update_lobby_message
+// ---------------------------------------------------------------------------
+export const update_lobby_message = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    message: t.string(),
+  },
+  (ctx, { gameId, message }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'waiting') throw new SenderError('Game is not in waiting state');
+    if (game.createdBy.toHexString() !== ctx.sender.toHexString()) {
+      throw new SenderError('Only the game creator can update the lobby message');
+    }
+    ctx.db.Game.id.update({ ...game, lobbyMessage: message.slice(0, 100) });
+  }
+);
+
+// ---------------------------------------------------------------------------
 // Scheduled reducer: handle_disconnect_timeout
 // ---------------------------------------------------------------------------
 export const handle_disconnect_timeout = spacetimedb.reducer(

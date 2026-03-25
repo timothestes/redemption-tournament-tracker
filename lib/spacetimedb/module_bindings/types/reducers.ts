@@ -30,6 +30,7 @@ import ShuffleCardIntoDeckReducer from "../shuffle_card_into_deck_reducer";
 import ShuffleDeckReducer from "../shuffle_deck_reducer";
 import UnmeekCardReducer from "../unmeek_card_reducer";
 import UpdateCardPositionReducer from "../update_card_position_reducer";
+import UpdateLobbyMessageReducer from "../update_lobby_message_reducer";
 
 export type AddCounterParams = __Infer<typeof AddCounterReducer>;
 export type CreateGameParams = __Infer<typeof CreateGameReducer>;
@@ -55,4 +56,5 @@ export type ShuffleCardIntoDeckParams = __Infer<typeof ShuffleCardIntoDeckReduce
 export type ShuffleDeckParams = __Infer<typeof ShuffleDeckReducer>;
 export type UnmeekCardParams = __Infer<typeof UnmeekCardReducer>;
 export type UpdateCardPositionParams = __Infer<typeof UpdateCardPositionReducer>;
+export type UpdateLobbyMessageParams = __Infer<typeof UpdateLobbyMessageReducer>;
 

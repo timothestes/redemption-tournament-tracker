@@ -40,8 +40,7 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
 
   // Tab and lobby visibility state
   const [activeTab, setActiveTab] = useState<'create' | 'lobby'>('create');
-  const [isPublic, setIsPublic] = useState(true);
-  const [lobbyMessage, setLobbyMessage] = useState('');
+  const [isPrivate, setIsPrivate] = useState(false);
 
   function handleSelectDeck(deck: DeckOption) {
     setSelectedDeck(deck);
@@ -70,8 +69,8 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
           format: selectedDeck.format || 'Type 1',
           paragon: selectedDeck.paragon || null,
           deckData: JSON.stringify(deckData),
-          isPublic: isPublic,
-          lobbyMessage: lobbyMessage,
+          isPublic: !isPrivate,
+          lobbyMessage: '',
         })
       );
       router.push(`/play/${code}`);
@@ -288,7 +287,7 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
         <>
           {activeTab === 'create' && (
             <>
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col sm:flex-row items-stretch gap-3">
                 <div className="sm:basis-0 sm:flex-1">
                   <Button
                     size="lg"
@@ -300,37 +299,6 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
                   </Button>
                 </div>
 
-                {/* Public game toggle */}
-                <div className="flex items-center justify-between py-2">
-                  <label htmlFor="public-toggle" className="text-sm text-muted-foreground">
-                    Show in lobby
-                  </label>
-                  <button
-                    id="public-toggle"
-                    role="switch"
-                    aria-checked={isPublic}
-                    onClick={() => setIsPublic(!isPublic)}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                      isPublic ? 'bg-primary' : 'bg-muted'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                        isPublic ? 'translate-x-[18px]' : 'translate-x-[3px]'
-                      }`}
-                    />
-                  </button>
-                </div>
-                {isPublic && (
-                  <Input
-                    value={lobbyMessage}
-                    onChange={(e) => setLobbyMessage(e.target.value.slice(0, 100))}
-                    placeholder="Message (optional) — e.g. casual game, new players welcome"
-                    maxLength={100}
-                    className="text-sm h-9 focus-visible:ring-0 focus-visible:border-primary"
-                  />
-                )}
-
                 {/* OR divider */}
                 <div className="flex sm:flex-col items-center justify-center gap-2 sm:gap-1 py-1 sm:py-0 sm:px-2 shrink-0">
                   <div className="flex-1 h-px sm:h-auto sm:w-px bg-border sm:flex-1" />
@@ -338,7 +306,7 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
                   <div className="flex-1 h-px sm:h-auto sm:w-px bg-border sm:flex-1" />
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex gap-2 sm:basis-0 sm:flex-1">
                   <Input
                     value={gameCode}
                     onChange={(e) =>
@@ -358,6 +326,28 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
                     {isJoining ? 'Joining...' : 'Join'}
                   </Button>
                 </div>
+              </div>
+
+              {/* Private game toggle */}
+              <div className="flex items-center justify-between py-1">
+                <label htmlFor="private-toggle" className="text-sm text-muted-foreground">
+                  Private game
+                </label>
+                <button
+                  id="private-toggle"
+                  role="switch"
+                  aria-checked={isPrivate}
+                  onClick={() => setIsPrivate(!isPrivate)}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                    isPrivate ? 'bg-primary' : 'bg-muted'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                      isPrivate ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                    }`}
+                  />
+                </button>
               </div>
 
               {/* Error */}

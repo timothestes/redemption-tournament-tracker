@@ -58,6 +58,7 @@ import ShuffleCardIntoDeckReducer from "./shuffle_card_into_deck_reducer";
 import ShuffleDeckReducer from "./shuffle_deck_reducer";
 import UnmeekCardReducer from "./unmeek_card_reducer";
 import UpdateCardPositionReducer from "./update_card_position_reducer";
+import UpdateLobbyMessageReducer from "./update_lobby_message_reducer";
 
 // Import all procedure arg schemas
 
@@ -215,6 +216,7 @@ const reducersSchema = __reducers(
   __reducerSchema("shuffle_deck", ShuffleDeckReducer),
   __reducerSchema("unmeek_card", UnmeekCardReducer),
   __reducerSchema("update_card_position", UpdateCardPositionReducer),
+  __reducerSchema("update_lobby_message", UpdateLobbyMessageReducer),
 );
 
 /** The schema information for all procedures in this module. This is defined the same way as the procedures would have been defined in the server. */
