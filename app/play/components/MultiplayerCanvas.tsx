@@ -130,7 +130,7 @@ interface MultiplayerCanvasProps {
 // ---------------------------------------------------------------------------
 
 export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
-  const { setPreviewCard } = useCardPreview();
+  const { setPreviewCard, isLoupeVisible } = useCardPreview();
 
   // ---- Container sizing (respects flex layout) ----
   const containerRef = useRef<HTMLDivElement>(null);
@@ -300,6 +300,9 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
   // ---- Mouse position tracking for hover preview ----
   const mousePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  // Delayed hover — only show preview after 250ms of continuous hover
+  const [hoverReady, setHoverReady] = useState(false);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ---- Selection state (multi-select via marquee) ----
   const {
@@ -855,6 +858,10 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       const pos = { x: e.evt.clientX, y: e.evt.clientY };
       mousePosRef.current = pos;
       setMousePos(pos);
+      // Start 250ms delay before showing hover preview
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+      setHoverReady(false);
+      hoverTimerRef.current = setTimeout(() => setHoverReady(true), 250);
     },
     [startHoverAnimation],
   );
@@ -863,6 +870,9 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     setHoveredInstanceId(null);
     setHoveredCard(null);
     stopHoverAnimation();
+    // Clear hover preview delay
+    if (hoverTimerRef.current) { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = null; }
+    setHoverReady(false);
   }, [stopHoverAnimation]);
 
   // ---- Adapter: get GameCard for a CardInstance ----
@@ -1319,7 +1329,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                       onDragStart={noopCardDrag}
                       onDragMove={noopDrag}
                       onDragEnd={noopCardDragEnd}
-                      onContextMenu={noopOpponentContextMenu}
+                      onContextMenu={handleCardContextMenu}
                       onDblClick={noopDblClick}
                       onMouseEnter={handleMouseEnter}
                       onMouseLeave={handleMouseLeave}
@@ -1405,7 +1415,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                       onDragStart={noopCardDrag}
                       onDragMove={noopDrag}
                       onDragEnd={noopCardDragEnd}
-                      onContextMenu={noopOpponentContextMenu}
+                      onContextMenu={handleCardContextMenu}
                       onDblClick={noopDblClick}
                       onMouseEnter={handleMouseEnter}
                       onMouseLeave={handleMouseLeave}
@@ -1693,7 +1703,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                               onDragStart={noopCardDrag}
                               onDragMove={noopDrag}
                               onDragEnd={noopCardDragEnd}
-                              onContextMenu={noopOpponentContextMenu}
+                              onContextMenu={handleCardContextMenu}
                               onDblClick={noopDblClick}
                               onMouseEnter={handleMouseEnter}
                               onMouseLeave={handleMouseLeave}
@@ -2013,8 +2023,8 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       {/* ================================================================
           Card hover preview — floating tooltip near cursor
           ================================================================ */}
-      {hoveredCard && !isDraggingRef.current && !contextMenu && !multiCardContextMenu && (() => {
-        const previewWidth = 240;
+      {hoveredCard && hoverReady && !isLoupeVisible && !isDraggingRef.current && !contextMenu && !multiCardContextMenu && (() => {
+        const previewWidth = 280;
         const previewHeight = Math.round(previewWidth * 1.4);
         const imageUrl = getSharedCardImageUrl(hoveredCard.cardImgFile);
         if (!imageUrl) return null;
@@ -2039,6 +2049,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
               left,
               top,
               width: previewWidth,
+              height: previewHeight,
               zIndex: 1000,
               pointerEvents: 'none',
               borderRadius: 6,
@@ -2054,6 +2065,8 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
               height={previewHeight}
               style={{
                 display: 'block',
+                width: previewWidth,
+                height: previewHeight,
                 borderRadius: 6,
                 transform: hoveredCard.isMeek ? 'rotate(180deg)' : undefined,
               }}

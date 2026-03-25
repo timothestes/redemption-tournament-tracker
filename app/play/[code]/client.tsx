@@ -10,8 +10,8 @@ import { useSpacetimeDB } from 'spacetimedb/react';
 import GameOverOverlay from '@/app/play/components/GameOverOverlay';
 import TurnIndicator from '@/app/play/components/TurnIndicator';
 import ChatPanel from '../components/ChatPanel';
-import { CardPreviewProvider } from '@/app/goldfish/state/CardPreviewContext';
-import { CardLoupePanel } from '@/app/goldfish/components/CardLoupePanel';
+import { CardPreviewProvider, useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
+import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import TopNav from '@/components/top-nav';
 import { GameToolbar } from '@/app/shared/components/GameToolbar';
 import { GameToastContainer, showGameToast } from '@/app/shared/components/GameToast';
@@ -527,34 +527,133 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   }
 
   // ---------------------------------------------------------------------------
-  // Right panel — card preview (loupe) on top, chat below
+  // Right panel — collapses entirely when preview is hidden
   // ---------------------------------------------------------------------------
+  const { isLoupeVisible, toggleLoupe, previewCard } = useCardPreview();
+  const PANEL_EXPANDED_WIDTH = 'clamp(280px, 20vw, 380px)';
+  const PANEL_COLLAPSED_WIDTH = 36;
+
   const rightPanel = (
     <div style={{
-      width: 'clamp(280px, 20vw, 380px)',
+      width: isLoupeVisible ? PANEL_EXPANDED_WIDTH : PANEL_COLLAPSED_WIDTH,
+      minWidth: isLoupeVisible ? undefined : PANEL_COLLAPSED_WIDTH,
       flexShrink: 0,
       display: 'flex',
       flexDirection: 'column',
-      background: 'rgba(10, 8, 5, 0.97)',
-      borderLeft: '1px solid rgba(107, 78, 39, 0.3)',
+      background: isLoupeVisible ? 'rgba(10, 8, 5, 0.97)' : 'transparent',
+      borderLeft: isLoupeVisible ? '1px solid rgba(107, 78, 39, 0.3)' : 'none',
       overflow: 'hidden',
+      transition: 'width 0.2s ease',
     }}>
-      {/* Card preview — top portion, override loupe width to fill parent */}
-      <div style={{ flexShrink: 0, overflow: 'hidden' }}>
-        <div style={{ width: '100%' }}>
-          <CardLoupePanel />
-        </div>
-      </div>
-      {/* Chat — fills remaining space */}
-      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', borderTop: '1px solid rgba(107, 78, 39, 0.3)' }}>
-        <ChatPanel
-          chatMessages={gameState.chatMessages}
-          gameActions={gameState.gameActions}
-          myPlayerId={gameState.myPlayer?.id ?? BigInt(0)}
-          onSendChat={gameState.sendChat}
-          playerNames={playerNameMap}
-        />
-      </div>
+      {/* Toggle button — always visible */}
+      <button
+        onClick={toggleLoupe}
+        title={isLoupeVisible ? 'Hide panel (Tab)' : 'Show panel (Tab)'}
+        style={{
+          width: '100%',
+          height: 40,
+          minHeight: 40,
+          background: 'rgba(30, 22, 16, 0.92)',
+          borderBottom: isLoupeVisible ? '1px solid rgba(107, 78, 39, 0.4)' : 'none',
+          border: 'none',
+          borderBlockEnd: isLoupeVisible ? '1px solid rgba(107, 78, 39, 0.4)' : 'none',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: isLoupeVisible ? 'flex-start' : 'center',
+          gap: 6,
+          padding: isLoupeVisible ? '0 12px' : '0',
+          color: 'rgba(232, 213, 163, 0.5)',
+          flexShrink: 0,
+        }}
+      >
+        {isLoupeVisible ? (
+          <>
+            <span style={{ fontSize: 14 }}>›</span>
+            <span style={{
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: 11,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              whiteSpace: 'nowrap',
+            }}>
+              Preview
+            </span>
+          </>
+        ) : (
+          <span style={{ fontSize: 14 }}>‹</span>
+        )}
+      </button>
+
+      {/* Expanded content — preview + chat */}
+      {isLoupeVisible && (
+        <>
+          {/* Card preview — fills width */}
+          <div style={{
+            flexShrink: 0,
+            padding: 12,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 8,
+          }}>
+            {previewCard ? (
+              <>
+                <div style={{
+                  width: '100%',
+                  aspectRatio: '375 / 525',
+                  borderRadius: 6,
+                  overflow: 'hidden',
+                  boxShadow: '0 4px 24px rgba(0,0,0,0.7), 0 0 8px rgba(212,168,103,0.2)',
+                  background: '#000',
+                }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={getCardImageUrl(previewCard.cardImgFile)}
+                    alt={previewCard.cardName}
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'fill',
+                      transform: previewCard.isMeek ? 'rotate(180deg)' : undefined,
+                    }}
+                  />
+                </div>
+              </>
+            ) : (
+              <div style={{
+                width: '100%',
+                aspectRatio: '1 / 1.4',
+                borderRadius: 6,
+                border: '1px dashed rgba(107, 78, 39, 0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: 0.55,
+              }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/gameplay/cardback.webp"
+                  alt="Hover a card"
+                  style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 6, opacity: 0.7 }}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Chat — fills remaining space */}
+          <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', borderTop: '1px solid rgba(107, 78, 39, 0.3)' }}>
+            <ChatPanel
+              chatMessages={gameState.chatMessages}
+              gameActions={gameState.gameActions}
+              myPlayerId={gameState.myPlayer?.id ?? BigInt(0)}
+              onSendChat={gameState.sendChat}
+              playerNames={playerNameMap}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 

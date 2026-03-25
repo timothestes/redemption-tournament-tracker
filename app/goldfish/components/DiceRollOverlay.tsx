@@ -8,7 +8,7 @@ type RollListener = (value: number) => void;
 const rollListeners: RollListener[] = [];
 
 export function triggerDiceRoll() {
-  const result = Math.floor(Math.random() * 6) + 1;
+  const result = Math.floor(Math.random() * 20) + 1;
   rollListeners.forEach(fn => fn(result));
   return result;
 }
@@ -43,7 +43,7 @@ export function DiceRollOverlay() {
   return (
     <DiceOverlay
       result={result}
-      sides={6}
+      sides={20}
       onDismiss={handleDismiss}
     />
   );

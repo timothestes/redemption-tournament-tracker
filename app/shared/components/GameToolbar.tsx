@@ -95,7 +95,6 @@ export function GameToolbar({
       label: 'Draw',
       onClick: handleDraw,
       shortcut: 'D',
-      disabled,
     },
     {
       icon: Dices,
