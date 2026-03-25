@@ -110,7 +110,6 @@ export default function GameOverOverlay({
   // Navigate to new game when rematch code is set
   useEffect(() => {
     if (rematchCode && rematchResponse === 'accepted') {
-      // Store game params in sessionStorage for the new game
       const isCreator = iRequested;
       const myDeckId = mySeat === '0' ? game.rematchDeckId0 : game.rematchDeckId1;
       const myDeckData = mySeat === '0' ? game.rematchDeckData0 : game.rematchDeckData1;
@@ -159,11 +158,10 @@ export default function GameOverOverlay({
     }
   };
 
-  // Determine what to show
+  // Determine rematch status content
   let rematchContent: React.ReactNode = null;
 
   if (rematchResponse === 'declined') {
-    // Opponent declined
     rematchContent = (
       <p style={{
         fontSize: 12,
@@ -175,7 +173,6 @@ export default function GameOverOverlay({
       </p>
     );
   } else if (rematchResponse === 'accepted') {
-    // Accepted — waiting for navigation
     rematchContent = (
       <p style={{
         fontSize: 12,
@@ -187,7 +184,6 @@ export default function GameOverOverlay({
       </p>
     );
   } else if (iRequested) {
-    // I requested, waiting for opponent
     rematchContent = (
       <p style={{
         fontSize: 12,
@@ -199,7 +195,6 @@ export default function GameOverOverlay({
       </p>
     );
   } else if (opponentRequested) {
-    // Opponent wants rematch — show accept/decline
     rematchContent = (
       <div style={{ marginBottom: 16 }}>
         <p style={{
@@ -242,132 +237,138 @@ export default function GameOverOverlay({
     );
   }
 
+  // Hide the game over card when deck picker is open
+  // so they don't fight for z-index
+  if (pickerOpen) {
+    return (
+      <div style={{ position: 'fixed', inset: 0, zIndex: 950 }}>
+        <DeckPickerModal
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          onSelect={handleDeckSelected}
+          myDecks={myDecks}
+          selectedDeckId={myPlayer?.deckId}
+        />
+      </div>
+    );
+  }
+
   return (
-    <>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 900,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'rgba(6, 4, 2, 0.5)',
+        pointerEvents: 'none',
+      }}
+    >
       <div
         style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 900,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'rgba(6, 4, 2, 0.6)',
-          pointerEvents: 'none',
+          background: 'rgba(14, 10, 6, 0.97)',
+          border: '1px solid rgba(107, 78, 39, 0.6)',
+          borderRadius: 10,
+          padding: '36px 40px',
+          textAlign: 'center',
+          minWidth: 300,
+          maxWidth: 400,
+          boxShadow: '0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(196, 149, 90, 0.08)',
+          pointerEvents: 'auto',
         }}
       >
-        <div
-          style={{
-            background: 'rgba(14, 10, 6, 0.97)',
-            border: '1px solid rgba(107, 78, 39, 0.6)',
-            borderRadius: 10,
-            padding: '36px 40px',
-            textAlign: 'center',
-            minWidth: 300,
-            maxWidth: 400,
-            boxShadow: '0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(196, 149, 90, 0.08)',
-            pointerEvents: 'auto',
-          }}
-        >
-          {/* Header */}
-          <p style={{
+        {/* Header */}
+        <p style={{
+          fontFamily: 'var(--font-cinzel), Georgia, serif',
+          fontSize: 11,
+          letterSpacing: '0.18em',
+          textTransform: 'uppercase',
+          color: 'rgba(232, 213, 163, 0.45)',
+          marginBottom: 12,
+        }}>
+          Game Over
+        </p>
+
+        {/* End reason */}
+        <p style={{
+          fontFamily: 'var(--font-cinzel), Georgia, serif',
+          fontSize: 22,
+          fontWeight: 700,
+          color: '#e8d5a3',
+          lineHeight: 1.2,
+          marginBottom: 20,
+        }}>
+          {label}
+        </p>
+
+        {/* Divider */}
+        <div style={{ height: 1, background: 'rgba(107, 78, 39, 0.35)', margin: '0 0 20px' }} />
+
+        {/* Player names */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          fontSize: 12,
+          color: 'rgba(232, 213, 163, 0.55)',
+          marginBottom: 20,
+          gap: 24,
+        }}>
+          <span style={{
             fontFamily: 'var(--font-cinzel), Georgia, serif',
-            fontSize: 11,
-            letterSpacing: '0.18em',
-            textTransform: 'uppercase',
-            color: 'rgba(232, 213, 163, 0.45)',
-            marginBottom: 12,
+            letterSpacing: '0.05em',
+            color: 'rgba(196, 149, 90, 0.85)',
           }}>
-            Game Over
-          </p>
-
-          {/* End reason */}
-          <p style={{
+            {myName}
+          </span>
+          <span style={{ color: 'rgba(232, 213, 163, 0.3)', alignSelf: 'center' }}>vs</span>
+          <span style={{
             fontFamily: 'var(--font-cinzel), Georgia, serif',
-            fontSize: 22,
-            fontWeight: 700,
-            color: '#e8d5a3',
-            lineHeight: 1.2,
-            marginBottom: 20,
+            letterSpacing: '0.05em',
+            color: 'rgba(74, 122, 181, 0.85)',
           }}>
-            {label}
-          </p>
+            {oppName}
+          </span>
+        </div>
 
-          {/* Divider */}
-          <div style={{ height: 1, background: 'rgba(107, 78, 39, 0.35)', margin: '0 0 20px' }} />
+        {/* Rematch status content */}
+        {rematchContent}
 
-          {/* Player names */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            fontSize: 12,
-            color: 'rgba(232, 213, 163, 0.55)',
-            marginBottom: 20,
-            gap: 24,
-          }}>
-            <span style={{
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              letterSpacing: '0.05em',
-              color: 'rgba(196, 149, 90, 0.85)',
-            }}>
-              {myName}
-            </span>
-            <span style={{ color: 'rgba(232, 213, 163, 0.3)', alignSelf: 'center' }}>vs</span>
-            <span style={{
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              letterSpacing: '0.05em',
-              color: 'rgba(74, 122, 181, 0.85)',
-            }}>
-              {oppName}
-            </span>
-          </div>
-
-          {/* Rematch content */}
-          {rematchContent}
-
-          {/* Action buttons */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {/* Play Again — only show if no rematch in progress */}
-            {!rematchRequestedBy && !rematchResponse && (
-              <button
-                onClick={() => {
-                  setPickerMode('request');
-                  setPickerOpen(true);
-                }}
-                disabled={isLoading}
-                style={{
-                  ...btnBase,
-                  background: 'rgba(196, 149, 90, 0.15)',
-                  border: '1px solid rgba(196, 149, 90, 0.5)',
-                  color: '#e8d5a3',
-                }}
-              >
-                {isLoading ? 'Loading...' : 'Play Again'}
-              </button>
-            )}
-
+        {/* Action buttons */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* Play Again — only show if no rematch in progress */}
+          {!rematchRequestedBy && !rematchResponse && (
             <button
-              onClick={onReturnToLobby}
+              onClick={() => {
+                setPickerMode('request');
+                setPickerOpen(true);
+              }}
+              disabled={isLoading}
               style={{
                 ...btnBase,
-                background: 'transparent',
-                border: '1px solid rgba(107, 78, 39, 0.3)',
-                color: 'rgba(196, 149, 90, 0.5)',
+                background: 'rgba(196, 149, 90, 0.15)',
+                border: '1px solid rgba(196, 149, 90, 0.5)',
+                color: '#e8d5a3',
               }}
             >
-              Return to Lobby
+              {isLoading ? 'Loading...' : 'Play Again'}
             </button>
-          </div>
+          )}
+
+          <button
+            onClick={onReturnToLobby}
+            style={{
+              ...btnBase,
+              background: 'transparent',
+              border: '1px solid rgba(107, 78, 39, 0.3)',
+              color: 'rgba(196, 149, 90, 0.5)',
+            }}
+          >
+            Return to Lobby
+          </button>
         </div>
       </div>
-
-      <DeckPickerModal
-        open={pickerOpen}
-        onOpenChange={setPickerOpen}
-        onSelect={handleDeckSelected}
-        myDecks={myDecks}
-        selectedDeckId={myPlayer?.deckId}
-      />
-    </>
+    </div>
   );
 }

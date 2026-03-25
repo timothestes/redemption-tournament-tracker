@@ -722,8 +722,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // lifecycle === 'finished' — show canvas (frozen) with GameOverOverlay on top,
   // or render the overlay standalone if canvas data is unavailable.
   if (lifecycle === 'finished') {
-    // If we have full game state, show the overlay over the frozen canvas
-    if (gameId !== null && !gameState.isLoading) {
+    // Show the overlay over the frozen canvas — always render canvas if gameId is known
+    if (gameId !== null) {
       return (
         <div style={{ display: 'flex', width: '100vw', height: '100dvh', backgroundImage: 'url(/gameplay/cave_background.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
