@@ -69,6 +69,8 @@ A real-time list of public games waiting for an opponent. Each row displays:
 
 **Why denormalize `createdByName`?** The lobby subscription only needs the `game` table. Joining against the `player` table would require subscribing to all players across all games just to show names in the lobby. Denormalizing avoids this — the name is set once at creation and never changes.
 
+**Schema migration note:** Adding columns to an existing SpacetimeDB table requires a `--clear-database` republish — SpacetimeDB does not support live schema migrations. This will wipe existing game data. Acceptable since games are ephemeral.
+
 ### Reducer changes
 
 **`createGame`** — Add two new parameters:
@@ -76,7 +78,9 @@ A real-time list of public games waiting for an opponent. Each row displays:
 - `is_public: boolean`
 - `lobby_message: string`
 
-These are written to the game row at creation. The creator's `display_name` (already a parameter) is also written to `game.createdByName`.
+These are written to the game row at creation. The creator's existing `displayName` parameter (currently only written to the `Player` row) is also written to `game.createdByName` as a new write target.
+
+Client-side game code generation (in `GameLobby.tsx`) is intentionally preserved — no change to this flow.
 
 No new reducers needed. Joining from the lobby uses the existing `joinGame(code, ...)` reducer — we already have the code from the lobby row.
 
@@ -96,7 +100,7 @@ This is a filtered subscription — only waiting public games are sent to the cl
 
 Currently, the SpacetimeDB connection is only established on `/play/[code]`. For the lobby to work, we need a connection on `/play` itself.
 
-Wrap the Open Games tab content in the existing `SpacetimeDBProvider`. The connection is lightweight — a single filtered subscription on the `game` table. The `useSpacetimeConnection` hook and provider pattern are already built and reusable.
+Use the existing `useSpacetimeConnection` hook (from `app/play/hooks/useSpacetimeConnection.ts`) to build a connection, then wrap lobby content in the custom `SpacetimeProvider` (from `app/play/lib/spacetimedb-provider.tsx`). The lobby subscription is separate from the game-specific subscription in `/play/[code]/client.tsx` — the lobby only subscribes to `SELECT * FROM game WHERE status = 'waiting' AND is_public = true`, not to all 8 game tables. If the existing `useSpacetimeConnection` hook has game-specific logic, it may need minor refactoring to support a lobby-only connection.
 
 The connection could be established eagerly (on page load) or lazily (when the Open Games tab is first selected). Lazy is slightly more efficient but eager keeps the lobby instantly populated.
 
@@ -104,10 +108,13 @@ The connection could be established eagerly (on page load) or lazily (when the O
 
 ### Component structure
 
+This is a refactor of the existing `GameLobby.tsx` — not a new component. The current create/join/spectate sections get wrapped in a tab layout, and the lobby list is added as a second tab.
+
 ```
 /play/page.tsx (server component — fetches auth + decks, unchanged)
-└── GameLobby.tsx (client component)
+└── GameLobby.tsx (client component — refactored to add tabs)
     ├── Deck picker card (existing, shared above tabs)
+    ├── SpacetimeProvider (wraps entire tab area for lobby subscription)
     ├── Tabs
     │   ├── "Create / Join" tab
     │   │   ├── Create Game section (existing + public toggle + message input)
@@ -117,14 +124,13 @@ The connection could be established eagerly (on page load) or lazily (when the O
     │       └── LobbyList.tsx (new component)
     │           ├── Real-time game list rows
     │           └── Empty state
-    └── SpacetimeDBProvider (wraps lobby tab content)
 ```
 
 ### LobbyList component
 
 - Uses `useTable(tables.Game)` filtered client-side to `status === 'waiting' && isPublic === true`
 - Renders rows with: display name, message, format, relative time, join button
-- "Time waiting" is derived from `createdAt` — a simple `Date.now() - createdAt` calculation, re-rendered every ~30 seconds via a timer
+- "Time waiting" is derived from `createdAt` — note that SpacetimeDB timestamps are `microsSinceUnixEpoch` BigInts, so conversion is `new Date(Number(row.createdAt.microsSinceUnixEpoch / 1000n))`. Re-rendered every ~30 seconds via a timer.
 - Join button: validates deck is selected, then calls `loadDeckForGame`, stores sessionStorage params, navigates to `/play/[code]`
 
 ### Tab state
