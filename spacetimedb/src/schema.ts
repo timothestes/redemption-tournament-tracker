@@ -23,6 +23,9 @@ export const Game = table(
     lastDiceRoll: t.string(),     // JSON: { result, sides, rollerId }
     createdAt: t.timestamp(),
     createdBy: t.identity(),
+    isPublic: t.bool(),
+    lobbyMessage: t.string(),
+    createdByName: t.string(),
   }
 );
 
