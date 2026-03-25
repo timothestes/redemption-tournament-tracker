@@ -217,6 +217,13 @@ export const create_game = spacetimedb.reducer(
       rollWinner: '',
       rollResult0: 0n,
       rollResult1: 0n,
+      rematchRequestedBy: '',
+      rematchDeckId0: '',
+      rematchDeckData0: '',
+      rematchDeckId1: '',
+      rematchDeckData1: '',
+      rematchResponse: '',
+      rematchCode: '',
     });
 
     // Insert player row with pending deck data (cards loaded later during pregame)
@@ -537,6 +544,123 @@ export const pregame_change_deck = spacetimedb.reducer(
     logAction(ctx, gameId, player.id, 'PREGAME_DECK_CHANGE',
       JSON.stringify({ seat: player.seat.toString(), newDeckId: deckId }),
       0n, 'pregame');
+  }
+);
+
+// ===========================================================================
+// Rematch reducers
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Reducer: request_rematch
+// ---------------------------------------------------------------------------
+export const request_rematch = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    deckId: t.string(),
+    deckData: t.string(),
+  },
+  (ctx, { gameId, deckId, deckData }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'finished') throw new SenderError('Game is not finished');
+    if (game.rematchRequestedBy !== '') throw new SenderError('Rematch already requested');
+
+    const player = findPlayerBySender(ctx, gameId);
+
+    // Validate deck data
+    try {
+      const parsed = JSON.parse(deckData);
+      if (!Array.isArray(parsed) || parsed.length === 0) throw new Error();
+    } catch {
+      throw new SenderError('Invalid deck data');
+    }
+
+    const updates: any = { ...game, rematchRequestedBy: player.seat.toString() };
+    if (player.seat === 0n) {
+      updates.rematchDeckId0 = deckId;
+      updates.rematchDeckData0 = deckData;
+    } else {
+      updates.rematchDeckId1 = deckId;
+      updates.rematchDeckData1 = deckData;
+    }
+    ctx.db.Game.id.update(updates);
+
+    logAction(ctx, gameId, player.id, 'REMATCH_REQUESTED',
+      JSON.stringify({ seat: player.seat.toString() }),
+      game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: respond_rematch
+// ---------------------------------------------------------------------------
+export const respond_rematch = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    accepted: t.bool(),
+    deckId: t.string(),
+    deckData: t.string(),
+  },
+  (ctx, { gameId, accepted, deckId, deckData }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'finished') throw new SenderError('Game is not finished');
+    if (game.rematchRequestedBy === '') throw new SenderError('No rematch requested');
+    if (game.rematchResponse !== '') throw new SenderError('Already responded');
+
+    const player = findPlayerBySender(ctx, gameId);
+    if (player.seat.toString() === game.rematchRequestedBy) {
+      throw new SenderError('Cannot respond to your own rematch request');
+    }
+
+    if (accepted) {
+      // Validate deck data
+      try {
+        const parsed = JSON.parse(deckData);
+        if (!Array.isArray(parsed) || parsed.length === 0) throw new Error();
+      } catch {
+        throw new SenderError('Invalid deck data');
+      }
+
+      const updates: any = { ...game, rematchResponse: 'accepted' };
+      if (player.seat === 0n) {
+        updates.rematchDeckId0 = deckId;
+        updates.rematchDeckData0 = deckData;
+      } else {
+        updates.rematchDeckId1 = deckId;
+        updates.rematchDeckData1 = deckData;
+      }
+      ctx.db.Game.id.update(updates);
+    } else {
+      ctx.db.Game.id.update({ ...game, rematchResponse: 'declined' });
+    }
+
+    logAction(ctx, gameId, player.id, 'REMATCH_RESPONSE',
+      JSON.stringify({ accepted, seat: player.seat.toString() }),
+      game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: set_rematch_code
+// ---------------------------------------------------------------------------
+export const set_rematch_code = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    code: t.string(),
+  },
+  (ctx, { gameId, code }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.rematchResponse !== 'accepted') throw new SenderError('Rematch not accepted');
+
+    const player = findPlayerBySender(ctx, gameId);
+    if (player.seat.toString() !== game.rematchRequestedBy) {
+      throw new SenderError('Only the requester can set the rematch code');
+    }
+
+    ctx.db.Game.id.update({ ...game, rematchCode: code });
   }
 );
 

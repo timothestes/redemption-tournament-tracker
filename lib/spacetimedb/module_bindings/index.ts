@@ -55,12 +55,15 @@ import PregameChooseFirstReducer from "./pregame_choose_first_reducer";
 import PregameReadyReducer from "./pregame_ready_reducer";
 import RemoveCounterReducer from "./remove_counter_reducer";
 import RemoveTokenReducer from "./remove_token_reducer";
+import RequestRematchReducer from "./request_rematch_reducer";
 import ResignGameReducer from "./resign_game_reducer";
+import RespondRematchReducer from "./respond_rematch_reducer";
 import RollDiceReducer from "./roll_dice_reducer";
 import SendChatReducer from "./send_chat_reducer";
 import SetNoteReducer from "./set_note_reducer";
 import SetPhaseReducer from "./set_phase_reducer";
 import SetPlayerOptionReducer from "./set_player_option_reducer";
+import SetRematchCodeReducer from "./set_rematch_code_reducer";
 import ShuffleCardIntoDeckReducer from "./shuffle_card_into_deck_reducer";
 import ShuffleDeckReducer from "./shuffle_deck_reducer";
 import SpawnLostSoulReducer from "./spawn_lost_soul_reducer";
@@ -221,12 +224,15 @@ const reducersSchema = __reducers(
   __reducerSchema("pregame_ready", PregameReadyReducer),
   __reducerSchema("remove_counter", RemoveCounterReducer),
   __reducerSchema("remove_token", RemoveTokenReducer),
+  __reducerSchema("request_rematch", RequestRematchReducer),
   __reducerSchema("resign_game", ResignGameReducer),
+  __reducerSchema("respond_rematch", RespondRematchReducer),
   __reducerSchema("roll_dice", RollDiceReducer),
   __reducerSchema("send_chat", SendChatReducer),
   __reducerSchema("set_note", SetNoteReducer),
   __reducerSchema("set_phase", SetPhaseReducer),
   __reducerSchema("set_player_option", SetPlayerOptionReducer),
+  __reducerSchema("set_rematch_code", SetRematchCodeReducer),
   __reducerSchema("shuffle_card_into_deck", ShuffleCardIntoDeckReducer),
   __reducerSchema("shuffle_deck", ShuffleDeckReducer),
   __reducerSchema("spawn_lost_soul", SpawnLostSoulReducer),

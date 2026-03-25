@@ -32,6 +32,13 @@ export const Game = table(
     rollWinner: t.string(),       // "" | "0" | "1" — string to avoid 0n ambiguity
     rollResult0: t.u64(),         // d20 result for seat 0
     rollResult1: t.u64(),         // d20 result for seat 1
+    rematchRequestedBy: t.string(), // "" | "0" | "1" — seat that requested rematch
+    rematchDeckId0: t.string(),     // seat 0's deck ID for rematch
+    rematchDeckData0: t.string(),   // seat 0's deck data for rematch
+    rematchDeckId1: t.string(),     // seat 1's deck ID for rematch
+    rematchDeckData1: t.string(),   // seat 1's deck data for rematch
+    rematchResponse: t.string(),    // "" | "accepted" | "declined"
+    rematchCode: t.string(),        // new game code for rematch
   }
 );
 

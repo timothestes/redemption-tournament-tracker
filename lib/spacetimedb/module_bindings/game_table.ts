@@ -31,4 +31,11 @@ export default __t.row({
   rollWinner: __t.string().name("roll_winner"),
   rollResult0: __t.u64().name("roll_result_0"),
   rollResult1: __t.u64().name("roll_result_1"),
+  rematchRequestedBy: __t.string().name("rematch_requested_by"),
+  rematchDeckId0: __t.string().name("rematch_deck_id_0"),
+  rematchDeckData0: __t.string().name("rematch_deck_data_0"),
+  rematchDeckId1: __t.string().name("rematch_deck_id_1"),
+  rematchDeckData1: __t.string().name("rematch_deck_data_1"),
+  rematchResponse: __t.string().name("rematch_response"),
+  rematchCode: __t.string().name("rematch_code"),
 });

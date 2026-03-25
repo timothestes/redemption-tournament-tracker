@@ -737,13 +737,14 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                 onEndTurn={gameState.endTurn}
               />
             </div>
-            <div style={{ flex: 1, position: 'relative', overflow: 'hidden', pointerEvents: 'none' }}>
+            <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
               <MultiplayerCanvas gameId={gameId} />
               <GameOverOverlay
                 game={gameState.game}
                 myPlayer={gameState.myPlayer}
                 opponentPlayer={gameState.opponentPlayer}
                 gameActions={gameState.gameActions}
+                gameState={gameState}
                 onReturnToLobby={handleReturnToLobby}
               />
             </div>
@@ -772,6 +773,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               myPlayer={gameState.myPlayer}
               opponentPlayer={gameState.opponentPlayer}
               gameActions={gameState.gameActions}
+              gameState={gameState}
               onReturnToLobby={handleReturnToLobby}
             />
           </div>

@@ -80,6 +80,13 @@ export const Game = __t.object("Game", {
   rollWinner: __t.string(),
   rollResult0: __t.u64(),
   rollResult1: __t.u64(),
+  rematchRequestedBy: __t.string(),
+  rematchDeckId0: __t.string(),
+  rematchDeckData0: __t.string(),
+  rematchDeckId1: __t.string(),
+  rematchDeckData1: __t.string(),
+  rematchResponse: __t.string(),
+  rematchCode: __t.string(),
 });
 export type Game = __Infer<typeof Game>;
 
