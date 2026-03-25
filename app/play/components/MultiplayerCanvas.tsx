@@ -31,6 +31,10 @@ import { ZoneContextMenu } from '@/app/shared/components/ZoneContextMenu';
 import { DeckContextMenu } from '@/app/shared/components/DeckContextMenu';
 import { DeckDropPopup } from '@/app/shared/components/DeckDropPopup';
 import { LorContextMenu } from '@/app/shared/components/LorContextMenu';
+import { OpponentZoneContextMenu } from '@/app/shared/components/OpponentZoneContextMenu';
+import { ConsentDialog } from '@/app/shared/components/ConsentDialog';
+import { OpponentBrowseModal } from '@/app/shared/components/OpponentBrowseModal';
+import { showGameToast } from '@/app/shared/components/GameToast';
 import type { GameActions } from '@/app/shared/types/gameActions';
 import { ModalGameProvider, type ModalGameContextValue } from '@/app/shared/contexts/ModalGameContext';
 import { DeckSearchModal } from '@/app/shared/components/DeckSearchModal';
@@ -170,6 +174,14 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     moveCard,
     moveCardsBatch,
     updateCardPosition,
+    incomingSearchRequest,
+    approvedSearchRequest,
+    requestZoneSearch,
+    approveZoneSearch,
+    denyZoneSearch,
+    completeZoneSearch,
+    moveOpponentCard,
+    zoneSearchRequests,
   } = gameState;
 
   // ---- Layout ----
@@ -388,6 +400,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
   const [showDeckSearch, setShowDeckSearch] = useState(false);
   const [peekState, setPeekState] = useState<{ position: 'top' | 'bottom' | 'random'; count: number } | null>(null);
   const [exchangeCardIds, setExchangeCardIds] = useState<string[] | null>(null);
+  const [opponentZoneMenu, setOpponentZoneMenu] = useState<{ x: number; y: number; zone: string; zoneName: string } | null>(null);
 
   // ---- Multiplayer GameActions adapter ----
   const multiplayerActions: GameActions = useMemo(() => ({
@@ -447,6 +460,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     setExchangeCardIds(null);
     setBrowseMyZone(null);
     setBrowseOpponentZone(null);
+    setOpponentZoneMenu(null);
   }, []);
 
   // ---- moveDeckCardsToZone helper ----
@@ -564,6 +578,56 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     cardWidth,
     cardHeight,
   });
+
+  // ---- Modal card drag hook for opponent browse (dragging opponent cards to zones) ----
+  const findZoneForOpponentDrag = useCallback((x: number, y: number): ZoneId | null => {
+    const hit = findZoneAtPosition(x, y);
+    if (!hit) return null;
+    return hit.zone as ZoneId;
+  }, [findZoneAtPosition]);
+
+  const {
+    dragState: opponentModalDrag,
+    startDrag: opponentModalStartDrag,
+    didDragRef: opponentModalDidDragRef,
+  } = useModalCardDrag({
+    stageRef,
+    zoneLayout: { ...myZones, ...opponentZones } as Partial<Record<ZoneId, GoldfishZoneRect>>,
+    findZoneAtPosition: findZoneForOpponentDrag,
+    moveCard: (id: string, toZone: ZoneId, _idx?: number, posX?: number, posY?: number) => {
+      if (approvedSearchRequest) {
+        moveOpponentCard(
+          BigInt(approvedSearchRequest.id),
+          BigInt(id),
+          String(toZone),
+          posX?.toString(),
+          posY?.toString()
+        );
+      }
+    },
+    moveCardsBatch: (ids: string[], toZone: ZoneId) => {
+      if (approvedSearchRequest) {
+        for (const id of ids) {
+          moveOpponentCard(BigInt(approvedSearchRequest.id), BigInt(id), String(toZone));
+        }
+      }
+    },
+    cardWidth,
+    cardHeight,
+  });
+
+  // ---- Track denied search requests for toast notification ----
+  const pendingSearchRef = useRef<any>(null);
+
+  useEffect(() => {
+    const myPending = zoneSearchRequests?.find(
+      (r: any) => r.requesterId === gameState.myPlayer?.id && r.status === 'pending'
+    );
+    if (pendingSearchRef.current && !myPending && !approvedSearchRequest) {
+      showGameToast('Search request denied');
+    }
+    pendingSearchRef.current = myPending ?? null;
+  }, [zoneSearchRequests, gameState.myPlayer, approvedSearchRequest]);
 
   // ---- Peek card IDs for DeckPeekModal ----
   const peekCardIds = useMemo(() => {
@@ -1816,6 +1880,20 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                   const zoneLabels: Record<string, string> = { discard: "Opponent's Discard", reserve: "Opponent's Reserve", banish: "Opponent's Banish", lor: "Opponent's Land of Redemption" };
                   setBrowseOpponentZone({ zone: zoneKey, cards, label: zoneLabels[zoneKey] ?? zoneKey });
                 } : undefined}
+                onContextMenu={['deck', 'reserve'].includes(zoneKey) ? (e: Konva.KonvaEventObject<PointerEvent>) => {
+                  e.evt.preventDefault();
+                  const stage = stageRef.current;
+                  if (!stage) return;
+                  const container = stage.container().getBoundingClientRect();
+                  closeAllMenus();
+                  const zoneNames: Record<string, string> = { deck: 'Deck', reserve: 'Reserve' };
+                  setOpponentZoneMenu({
+                    x: e.evt.clientX - container.left,
+                    y: e.evt.clientY - container.top,
+                    zone: zoneKey,
+                    zoneName: zoneNames[zoneKey] ?? zoneKey,
+                  });
+                } : undefined}
               >
                 {/* Count badge */}
                 <Group x={zone.x + zone.width - 32} y={zone.y + 2}>
@@ -1893,7 +1971,21 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
             );
 
             return (
-              <Group>
+              <Group
+                onContextMenu={(e: Konva.KonvaEventObject<PointerEvent>) => {
+                  e.evt.preventDefault();
+                  const stage = stageRef.current;
+                  if (!stage) return;
+                  const container = stage.container().getBoundingClientRect();
+                  closeAllMenus();
+                  setOpponentZoneMenu({
+                    x: e.evt.clientX - container.left,
+                    y: e.evt.clientY - container.top,
+                    zone: 'hand',
+                    zoneName: 'Hand',
+                  });
+                }}
+              >
                 {oppHandPositions.map((pos, i) => (
                   <Group key={`opp-hand-${i}`} x={pos.x} y={pos.y}>
                     <CardBackShape width={oppHandCard.cardWidth} height={oppHandCard.cardHeight} />
@@ -2133,6 +2225,62 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
           onCancel={() => setDeckDrop(null)}
         />
       )}
+
+      {/* ================================================================
+          Opponent zone search — context menu, consent dialog, browse modal
+          ================================================================ */}
+      {opponentZoneMenu && (
+        <OpponentZoneContextMenu
+          x={opponentZoneMenu.x}
+          y={opponentZoneMenu.y}
+          zoneName={opponentZoneMenu.zoneName}
+          onSearch={() => {
+            requestZoneSearch(opponentZoneMenu.zone);
+            showGameToast('Waiting for opponent to approve...');
+            setOpponentZoneMenu(null);
+          }}
+          onClose={() => setOpponentZoneMenu(null)}
+        />
+      )}
+
+      {incomingSearchRequest && (
+        <ConsentDialog
+          requesterName={gameState.opponentPlayer?.displayName ?? 'Opponent'}
+          zoneName={incomingSearchRequest.zone}
+          onAllow={() => approveZoneSearch(BigInt(incomingSearchRequest.id))}
+          onDeny={() => denyZoneSearch(BigInt(incomingSearchRequest.id))}
+        />
+      )}
+
+      {approvedSearchRequest && (() => {
+        const zoneCards = (opponentCards[approvedSearchRequest.zone] ?? [])
+          .map((c: any) => cardInstanceToGameCard(c, counters.get(c.id) ?? [], 'player2'));
+        return (
+          <OpponentBrowseModal
+            zoneName={approvedSearchRequest.zone}
+            cards={zoneCards}
+            onMoveCard={(cardId, action) => {
+              const reqId = BigInt(approvedSearchRequest.id);
+              if (action === 'discard') {
+                moveOpponentCard(reqId, BigInt(cardId), 'discard');
+              } else if (action === 'banish') {
+                moveOpponentCard(reqId, BigInt(cardId), 'banish');
+              } else if (action === 'deck-top') {
+                moveOpponentCard(reqId, BigInt(cardId), 'deck');
+              } else if (action === 'deck-bottom') {
+                moveOpponentCard(reqId, BigInt(cardId), 'deck');
+              } else if (action === 'deck-shuffle') {
+                moveOpponentCard(reqId, BigInt(cardId), 'deck');
+                gameState.shuffleDeck();
+              }
+            }}
+            onClose={() => completeZoneSearch(BigInt(approvedSearchRequest.id))}
+            onStartDrag={opponentModalStartDrag}
+            didDragRef={opponentModalDidDragRef}
+            isDragActive={opponentModalDrag.isDragging}
+          />
+        );
+      })()}
 
       {/* ================================================================
           Zone browse overlay — card grid for browsing pile contents
