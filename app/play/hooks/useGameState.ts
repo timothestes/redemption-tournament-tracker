@@ -44,6 +44,9 @@ export interface GameState {
   gameActions: GameActionRow[];
   spectators: SpectatorRow[];
   soulsRescued: { me: number; opponent: number };
+  zoneSearchRequests: any[];
+  incomingSearchRequest: any | null;
+  approvedSearchRequest: any | null;
 
   // Loading state
   isLoading: boolean;
@@ -85,6 +88,11 @@ export interface GameState {
   // Rematch actions
   requestRematch: (deckId: string, deckData: string) => void;
   respondRematch: (accepted: boolean, deckId: string, deckData: string) => void;
+  requestZoneSearch: (zone: string) => void;
+  approveZoneSearch: (requestId: bigint) => void;
+  denyZoneSearch: (requestId: bigint) => void;
+  completeZoneSearch: (requestId: bigint) => void;
+  moveOpponentCard: (requestId: bigint, cardInstanceId: bigint, toZone: string, posX?: string, posY?: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -110,6 +118,7 @@ export function useGameState(gameId: bigint): GameState {
   const [allChat, chatLoading] = useTable(tables.ChatMessage) as [ChatMessageRow[], boolean];
   const [allActions, actionsLoading] = useTable(tables.GameAction) as [GameActionRow[], boolean];
   const [allSpectators, spectatorsLoading] = useTable(tables.Spectator) as [SpectatorRow[], boolean];
+  const [allZoneSearchRequests, zsrLoading] = useTable((tables as any).ZoneSearchRequest) as [any[], boolean];
 
   // useTable returns [rows, subscribeApplied] where subscribeApplied=true means data is ready
   // Only require core tables (game, player, cards) — chat/actions/spectators can load async
@@ -217,6 +226,21 @@ export function useGameState(gameId: bigint): GameState {
     const oppLor = opponentCards['land-of-redemption'] ?? [];
     return { me: myLor.length, opponent: oppLor.length };
   }, [myCards, opponentCards]);
+
+  const zoneSearchRequests = useMemo(
+    () => allZoneSearchRequests.filter((r: any) => r.gameId === gameId),
+    [allZoneSearchRequests, gameId],
+  );
+
+  const incomingSearchRequest = useMemo(() => {
+    if (!myPlayer) return null;
+    return zoneSearchRequests.find((r: any) => r.targetPlayerId === myPlayer.id && r.status === 'pending') ?? null;
+  }, [zoneSearchRequests, myPlayer]);
+
+  const approvedSearchRequest = useMemo(() => {
+    if (!myPlayer) return null;
+    return zoneSearchRequests.find((r: any) => r.requesterId === myPlayer.id && r.status === 'approved') ?? null;
+  }, [zoneSearchRequests, myPlayer]);
 
   // ---------------------------------------------------------------------------
   // Action methods — each wraps a SpacetimeDB reducer call using object syntax
@@ -418,6 +442,48 @@ export function useGameState(gameId: bigint): GameState {
     conn?.reducers.respondRematch({ gameId, accepted, deckId, deckData });
   }, [conn, gameId]);
 
+  const requestZoneSearch = useCallback(
+    (zone: string) => {
+      (conn?.reducers as any)?.requestZoneSearch({ gameId, zone });
+    },
+    [conn, gameId],
+  );
+
+  const approveZoneSearch = useCallback(
+    (requestId: bigint) => {
+      (conn?.reducers as any)?.approveZoneSearch({ gameId, requestId });
+    },
+    [conn, gameId],
+  );
+
+  const denyZoneSearch = useCallback(
+    (requestId: bigint) => {
+      (conn?.reducers as any)?.denyZoneSearch({ gameId, requestId });
+    },
+    [conn, gameId],
+  );
+
+  const completeZoneSearch = useCallback(
+    (requestId: bigint) => {
+      (conn?.reducers as any)?.completeZoneSearch({ gameId, requestId });
+    },
+    [conn, gameId],
+  );
+
+  const moveOpponentCard = useCallback(
+    (requestId: bigint, cardInstanceId: bigint, toZone: string, posX?: string, posY?: string) => {
+      (conn?.reducers as any)?.moveOpponentCard({
+        gameId,
+        requestId,
+        cardInstanceId,
+        toZone,
+        posX: posX || '',
+        posY: posY || '',
+      });
+    },
+    [conn, gameId],
+  );
+
   // ---------------------------------------------------------------------------
   // Return
   // ---------------------------------------------------------------------------
@@ -468,6 +534,14 @@ export function useGameState(gameId: bigint): GameState {
     pregameChangeDeck,
     requestRematch,
     respondRematch,
+    zoneSearchRequests,
+    incomingSearchRequest,
+    approvedSearchRequest,
+    requestZoneSearch,
+    approveZoneSearch,
+    denyZoneSearch,
+    completeZoneSearch,
+    moveOpponentCard,
   };
 }
 

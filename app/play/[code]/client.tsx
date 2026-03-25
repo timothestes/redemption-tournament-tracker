@@ -262,6 +262,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         'SELECT * FROM chat_message',
         'SELECT * FROM spectator',
         'SELECT * FROM disconnect_timeout',
+        'SELECT * FROM zone_search_request',
       ]);
     } catch (e) {
       console.error('Failed to subscribe:', e);
