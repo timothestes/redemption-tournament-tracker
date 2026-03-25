@@ -67,7 +67,13 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   UPDATE_CARD_POSITION: 'repositioned a card',
 };
 
-function formatActionType(actionType: string): string {
+function formatActionType(actionType: string, payload?: string): string {
+  if (actionType === 'ROLL_DICE' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      return `rolled a d${data.sides} → ${data.result}`;
+    } catch { /* fall through */ }
+  }
   return ACTION_TYPE_LABELS[actionType] ?? actionType.toLowerCase().replace(/_/g, ' ');
 }
 
@@ -475,7 +481,7 @@ export default function ChatPanel({
                 const playerName =
                   playerNames[action.playerId.toString()] ??
                   `Player ${action.playerId}`;
-                const verb = formatActionType(action.actionType);
+                const verb = formatActionType(action.actionType, action.payload);
                 const time = formatTimestamp(action.timestamp.microsSinceUnixEpoch);
                 const turn = Number(action.turnNumber);
 

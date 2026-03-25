@@ -528,7 +528,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // ---------------------------------------------------------------------------
   const rightPanel = (
     <div style={{
-      width: 'clamp(240px, 16vw, 300px)',
+      width: 'clamp(280px, 20vw, 380px)',
       flexShrink: 0,
       display: 'flex',
       flexDirection: 'column',
@@ -539,7 +539,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       {/* Card preview — top portion, override loupe width to fill parent */}
       <div style={{ flexShrink: 0, overflow: 'hidden' }}>
         <div style={{ width: '100%' }}>
-          <CardLoupePanel />
+          <CardLoupePanel alwaysVisible />
         </div>
       </div>
       {/* Chat — fills remaining space */}
@@ -561,7 +561,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     // If we have full game state, show the overlay over the frozen canvas
     if (gameId !== null && !gameState.isLoading) {
       return (
-        <div style={{ display: 'flex', width: '100vw', height: '100dvh' }}>
+        <div style={{ display: 'flex', width: '100vw', height: '100dvh', backgroundImage: 'url(/gameplay/cave_background.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden', pointerEvents: 'none' }}>
               <MultiplayerCanvas gameId={gameId} />
@@ -592,7 +592,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     }
     // Fallback — canvas not ready
     return (
-      <div style={{ display: 'flex', width: '100vw', height: '100dvh' }}>
+      <div style={{ display: 'flex', width: '100vw', height: '100dvh', backgroundImage: 'url(/gameplay/cave_background.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
             <GameOverOverlay
@@ -623,7 +623,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
 
   // lifecycle === 'playing' — two-column layout: canvas + right panel (preview + chat)
   return (
-    <div style={{ display: 'flex', width: '100vw', height: '100dvh' }}>
+    <div style={{ display: 'flex', width: '100vw', height: '100dvh', backgroundImage: 'url(/gameplay/cave_background.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
       {/* Canvas + phase bar */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>

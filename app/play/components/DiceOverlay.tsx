@@ -115,9 +115,9 @@ export default function DiceOverlay({
       return;
     }
 
-    // Resolve roller display name
-    const myIdentityHex = identityHex ?? '';
-    const isMe = parsed.rollerId === myIdentityHex;
+    // Resolve roller display name — rollerId is the Player table row ID (not identity hex)
+    const myPlayerId = myPlayer ? String((myPlayer as any).id) : '';
+    const isMe = parsed.rollerId === myPlayerId;
 
     let rollerName = 'Unknown';
     if (isMe) {
@@ -208,13 +208,17 @@ export default function DiceOverlay({
           <AnimatePresence>
             {!isTumbling && (
               <motion.div
-                initial={{ opacity: 0, y: 4 }}
+                initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2, delay: 0.05 }}
                 style={{
-                  marginTop: 8,
+                  position: 'absolute',
+                  top: dieSize + 10,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
                   textAlign: 'center',
+                  whiteSpace: 'nowrap',
                   pointerEvents: 'none',
                 }}
               >

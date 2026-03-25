@@ -6,15 +6,15 @@
  * ┌──────────────────────────────────────────────────────────────┐
  * │ Opponent Hand (8%)                         (full width)      │
  * ├────────────────────────────────────────────┬─────────────────┤
- * │ Opponent Territory (27%)                   │ Opp sidebar     │
+ * │ Opponent LOB (9%)                          │ Opp sidebar     │
  * ├────────────────────────────────────────────┤ (Dis→LOR) 15%  │
- * │ Opponent LOB (9%)                          │                 │
+ * │ Opponent Territory (27%)                   │                 │
  * ├════════════════════════════════════════════╪═════════════════┤
  * │ Divider (2%)                               │                 │
  * ├════════════════════════════════════════════╪═════════════════┤
- * │ Player LOB (9%)                            │ Your sidebar    │
+ * │ Player Territory (27%)                     │ Your sidebar    │
  * ├────────────────────────────────────────────┤ (LOR→Dis) 15%  │
- * │ Player Territory (27%)                     │                 │
+ * │ Player LOB (9%)                            │                 │
  * ├────────────────────────────────────────────┴─────────────────┤
  * │ Player Hand (18%)                          (full width)      │
  * └──────────────────────────────────────────────────────────────┘
@@ -69,11 +69,11 @@ const SIDEBAR_WIDTH_RATIO = 0.15;
 
 // Vertical band ratios (must sum to 1.0)
 const OPP_HAND_RATIO = 0.08;
-const OPP_TERRITORY_RATIO = 0.27;
+const OPP_TERRITORY_RATIO = 0.2775;
 const OPP_LOB_RATIO = 0.09;
-const DIVIDER_RATIO = 0.02;
+const DIVIDER_RATIO = 0.005;
 const PLAYER_LOB_RATIO = 0.09;
-const PLAYER_TERRITORY_RATIO = 0.27;
+const PLAYER_TERRITORY_RATIO = 0.2775;
 const PLAYER_HAND_RATIO = 0.18;
 
 // Card sizing ratios
@@ -191,16 +191,20 @@ export function calculateMultiplayerLayout(
   const playerHandHeight = Math.round(stageHeight * PLAYER_HAND_RATIO);
 
   // ── Y anchors ────────────────────────────────────────────────────────
+  // Order: Opp Hand → Opp LOB → Opp Territory → Divider → Player Territory → Player LOB → Player Hand
   const oppHandY = 0;
-  const oppTerritoryY = oppHandHeight;
-  const oppLobY = oppTerritoryY + oppTerritoryHeight;
-  const dividerY = oppLobY + oppLobHeight;
-  const playerLobY = dividerY + dividerHeight;
-  const playerTerritoryY = playerLobY + playerLobHeight;
-  const playerHandY = playerTerritoryY + playerTerritoryHeight;
+  const oppLobY = oppHandHeight;
+  const oppTerritoryY = oppLobY + oppLobHeight;
+  const dividerY = oppTerritoryY + oppTerritoryHeight;
+  const playerTerritoryY = dividerY + dividerHeight;
+  const playerLobY = playerTerritoryY + playerTerritoryHeight;
+  const playerHandY = playerLobY + playerLobHeight;
 
   // ── Zone rects ───────────────────────────────────────────────────────
-  // Hands span full stageWidth; territory/LOB span playAreaWidth
+  // Hands span full stageWidth; territory/LOB span playAreaWidth.
+  // Use tight gap (2px) between territory↔LOB↔hand to minimize dead space.
+  const gap = 2;
+
   const opponentHand: ZoneRect = {
     x: 0,
     y: oppHandY,
@@ -209,20 +213,20 @@ export function calculateMultiplayerLayout(
     label: 'Opponent Hand',
   };
 
-  const opponentTerritory: ZoneRect = {
-    x: pad,
-    y: oppTerritoryY + pad,
-    width: playAreaWidth - pad * 2,
-    height: oppTerritoryHeight - pad * 2,
-    label: 'Opponent Territory',
-  };
-
   const opponentLob: ZoneRect = {
     x: pad,
-    y: oppLobY + pad,
+    y: oppLobY + gap,
     width: playAreaWidth - pad * 2,
-    height: oppLobHeight - pad * 2,
-    label: 'Opponent Land of Bondage',
+    height: oppLobHeight - gap * 2,
+    label: 'Land of Bondage',
+  };
+
+  const opponentTerritory: ZoneRect = {
+    x: pad,
+    y: oppTerritoryY + gap,
+    width: playAreaWidth - pad * 2,
+    height: oppTerritoryHeight - gap,
+    label: 'Opponent Territory',
   };
 
   const divider: ZoneRect = {
@@ -233,20 +237,20 @@ export function calculateMultiplayerLayout(
     label: '',
   };
 
-  const playerLob: ZoneRect = {
-    x: pad,
-    y: playerLobY + pad,
-    width: playAreaWidth - pad * 2,
-    height: playerLobHeight - pad * 2,
-    label: 'Land of Bondage',
-  };
-
   const playerTerritory: ZoneRect = {
     x: pad,
-    y: playerTerritoryY + pad,
+    y: playerTerritoryY,
     width: playAreaWidth - pad * 2,
-    height: playerTerritoryHeight - pad * 2,
+    height: playerTerritoryHeight - gap,
     label: 'Territory',
+  };
+
+  const playerLob: ZoneRect = {
+    x: pad,
+    y: playerLobY + gap,
+    width: playAreaWidth - pad * 2,
+    height: playerLobHeight - gap * 2,
+    label: 'Land of Bondage',
   };
 
   const playerHand: ZoneRect = {
@@ -258,12 +262,11 @@ export function calculateMultiplayerLayout(
   };
 
   // ── Sidebars ─────────────────────────────────────────────────────────
-  // Sidebar is split 50/50 vertically: opponent top half, player bottom half.
-  // Sidebar covers the area between the two hand zones.
-  const sidebarTotalHeight =
-    oppTerritoryHeight + oppLobHeight + dividerHeight + playerLobHeight + playerTerritoryHeight;
-  const sidebarTopY = oppTerritoryY;
-  const halfSidebarHeight = Math.round(sidebarTotalHeight / 2);
+  // Split at the center divider so each sidebar mirrors its half of the board.
+  const oppSidebarY = oppLobY;
+  const oppSidebarHeight = dividerY - oppLobY;
+  const playerSidebarY = dividerY + dividerHeight;
+  const playerSidebarHeight = playerHandY - playerSidebarY;
 
   // Opponent piles: reversed order — Discard (top) → Deck → Reserve → Banish → LOR (bottom)
   const oppPileLabels = isParagon
@@ -282,11 +285,11 @@ export function calculateMultiplayerLayout(
     : ['lor', 'banish', 'reserve', 'deck', 'discard'];
 
   const opponentSidebar = buildSidebar(
-    sidebarX, sidebarTopY, halfSidebarHeight,
+    sidebarX, oppSidebarY, oppSidebarHeight,
     oppPileLabels, oppPileKeys, sidebarWidth, zonePad, pad
   );
   const playerSidebar = buildSidebar(
-    sidebarX, sidebarTopY + halfSidebarHeight, halfSidebarHeight,
+    sidebarX, playerSidebarY, playerSidebarHeight,
     playerPileLabels, playerPileKeys, sidebarWidth, zonePad, pad
   );
 
@@ -295,11 +298,12 @@ export function calculateMultiplayerLayout(
   const lobCard = getLobCardDimensions(mainCard, playerLobHeight);
   const opponentHandCard = getOpponentHandCardDimensions(mainCard, oppHandHeight);
 
-  // Pile card size based on a single sidebar slot height
+  // Pile card size based on a single sidebar slot height (use the smaller half)
   const pileSlotCount = isParagon ? 6 : 5;
   const slotPad = 4;
+  const sidebarHalfHeight = Math.min(oppSidebarHeight, playerSidebarHeight);
   const pileSlotHeight = Math.round(
-    (halfSidebarHeight - slotPad * (pileSlotCount + 1)) / pileSlotCount
+    (sidebarHalfHeight - slotPad * (pileSlotCount + 1)) / pileSlotCount
   );
   const pileCard = getPileCardDimensions(pileSlotHeight);
 

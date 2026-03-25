@@ -21,18 +21,19 @@ const HEADER_HEIGHT = 40;
 
 export { PANEL_WIDTH as LOUPE_PANEL_WIDTH, COLLAPSED_WIDTH as LOUPE_COLLAPSED_WIDTH };
 
-export function CardLoupePanel() {
-  const { previewCard, isLoupeVisible, toggleLoupe } = useCardPreview();
+export function CardLoupePanel({ alwaysVisible = false }: { alwaysVisible?: boolean }) {
+  const { previewCard, isLoupeVisible: _isLoupeVisible, toggleLoupe } = useCardPreview();
+  const isLoupeVisible = alwaysVisible || _isLoupeVisible;
 
   const imageUrl = previewCard ? getCardImageUrl(previewCard.cardImgFile) : '';
-  const totalWidth = isLoupeVisible ? PANEL_WIDTH : COLLAPSED_WIDTH;
+  const totalWidth = alwaysVisible ? '100%' : isLoupeVisible ? PANEL_WIDTH : COLLAPSED_WIDTH;
 
   return (
     <div
       onContextMenu={(e) => e.preventDefault()}
       style={{
         width: totalWidth,
-        minWidth: totalWidth,
+        minWidth: alwaysVisible ? undefined : totalWidth,
         height: isLoupeVisible ? '100%' : 'auto',
         background: isLoupeVisible ? 'rgba(13, 9, 5, 0.6)' : 'transparent',
         borderLeft: isLoupeVisible ? '1px solid rgba(107, 78, 39, 0.35)' : 'none',
@@ -44,56 +45,58 @@ export function CardLoupePanel() {
         transition: 'width 0.2s ease, min-width 0.2s ease',
       }}
     >
-      {/* Header bar — always visible, matches PhaseBar style */}
-      <button
-        onClick={toggleLoupe}
-        title={isLoupeVisible ? 'Hide preview (Tab)' : 'Show preview (Tab)'}
-        style={{
-          width: '100%',
-          height: HEADER_HEIGHT,
-          minHeight: HEADER_HEIGHT,
-          background: 'var(--gf-bg, rgba(30,22,16,0.92))',
-          borderBottom: '1px solid var(--gf-border, rgba(107,78,39,0.4))',
-          border: 'none',
-          borderBlockEnd: '1px solid var(--gf-border, rgba(107,78,39,0.4))',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: isLoupeVisible ? 'flex-start' : 'center',
-          gap: 6,
-          padding: isLoupeVisible ? '0 12px' : '0',
-          color: 'var(--gf-text-dim, rgba(232,213,163,0.5))',
-          transition: 'color 0.15s, background 0.15s',
-          flexShrink: 0,
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.color = 'var(--gf-text-bright, #e8d5a3)';
-          e.currentTarget.style.background = 'var(--gf-hover, rgba(42,31,18,0.95))';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.color = 'var(--gf-text-dim, rgba(232,213,163,0.5))';
-          e.currentTarget.style.background = 'var(--gf-bg, rgba(30,22,16,0.92))';
-        }}
-      >
-        {isLoupeVisible ? (
-          <>
-            <ChevronRight size={14} />
-            <span
-              style={{
-                fontFamily: 'var(--font-cinzel), Georgia, serif',
-                fontSize: 11,
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              Preview
-            </span>
-          </>
-        ) : (
-          <ChevronLeft size={14} />
-        )}
-      </button>
+      {/* Header bar — always visible (hidden when alwaysVisible), matches PhaseBar style */}
+      {!alwaysVisible && (
+        <button
+          onClick={toggleLoupe}
+          title={isLoupeVisible ? 'Hide preview (Tab)' : 'Show preview (Tab)'}
+          style={{
+            width: '100%',
+            height: HEADER_HEIGHT,
+            minHeight: HEADER_HEIGHT,
+            background: 'var(--gf-bg, rgba(30,22,16,0.92))',
+            borderBottom: '1px solid var(--gf-border, rgba(107,78,39,0.4))',
+            border: 'none',
+            borderBlockEnd: '1px solid var(--gf-border, rgba(107,78,39,0.4))',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: isLoupeVisible ? 'flex-start' : 'center',
+            gap: 6,
+            padding: isLoupeVisible ? '0 12px' : '0',
+            color: 'var(--gf-text-dim, rgba(232,213,163,0.5))',
+            transition: 'color 0.15s, background 0.15s',
+            flexShrink: 0,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--gf-text-bright, #e8d5a3)';
+            e.currentTarget.style.background = 'var(--gf-hover, rgba(42,31,18,0.95))';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--gf-text-dim, rgba(232,213,163,0.5))';
+            e.currentTarget.style.background = 'var(--gf-bg, rgba(30,22,16,0.92))';
+          }}
+        >
+          {isLoupeVisible ? (
+            <>
+              <ChevronRight size={14} />
+              <span
+                style={{
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  fontSize: 11,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Preview
+              </span>
+            </>
+          ) : (
+            <ChevronLeft size={14} />
+          )}
+        </button>
+      )}
 
       {/* Panel content — only when visible */}
       {isLoupeVisible && (
@@ -126,15 +129,13 @@ export function CardLoupePanel() {
                   borderRadius: 6,
                   boxShadow: '0 4px 24px rgba(0,0,0,0.7), 0 0 8px rgba(212,168,103,0.2)',
                   overflow: 'hidden',
-                  width: PANEL_WIDTH - 24,
+                  width: '100%',
                   background: '#000',
                 }}
               >
                 <img
                   src={imageUrl}
                   alt={previewCard.cardName}
-                  width={PANEL_WIDTH - 24}
-                  height={(PANEL_WIDTH - 24) * 1.4}
                   style={{
                     display: 'block',
                     width: '100%',
@@ -174,8 +175,7 @@ export function CardLoupePanel() {
             >
               <div
                 style={{
-                  width: PANEL_WIDTH - 24,
-                  height: (PANEL_WIDTH - 24) * 1.4,
+                  width: '100%',
                   borderRadius: 6,
                   border: '1px dashed rgba(107, 78, 39, 0.5)',
                   display: 'flex',
@@ -186,8 +186,6 @@ export function CardLoupePanel() {
                 <img
                   src="/gameplay/cardback.webp"
                   alt="Card preview"
-                  width={PANEL_WIDTH - 24}
-                  height={(PANEL_WIDTH - 24) * 1.4}
                   style={{
                     display: 'block',
                     width: '100%',

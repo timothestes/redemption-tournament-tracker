@@ -38,8 +38,8 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Spectate state
-  const [spectateCode, setSpectateCode] = useState('');
+  // Spectate toggle
+  const [isSpectate, setIsSpectate] = useState(false);
 
   // Tab and lobby visibility state
   const [activeTab, setActiveTab] = useState<'create' | 'lobby'>('create');
@@ -122,6 +122,10 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
       setError('Game code must be 4 characters.');
       return;
     }
+    if (isSpectate) {
+      router.push(`/play/spectate/${code}`);
+      return;
+    }
     if (!selectedDeck) {
       setError('Please select a deck.');
       return;
@@ -148,12 +152,6 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
       setError(err instanceof Error ? err.message : 'Failed to load deck.');
       setIsJoining(false);
     }
-  }
-
-  function handleSpectate() {
-    const code = spectateCode.trim().toUpperCase();
-    if (code.length !== 4) return;
-    router.push(`/play/spectate/${code}`);
   }
 
   // Preview image helpers
@@ -324,7 +322,7 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
           {activeTab === 'create' && (
             <>
               <div className="flex flex-col sm:flex-row items-stretch gap-3">
-                <div className="sm:basis-0 sm:flex-1">
+                <div className="sm:basis-0 sm:flex-1 flex flex-col gap-2.5">
                   <Button
                     size="lg"
                     onClick={handleCreateGame}
@@ -333,57 +331,79 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
                   >
                     {isCreating ? 'Loading deck...' : 'Create Game'}
                   </Button>
+                  {/* Private game toggle — visually belongs to Create Game */}
+                  <div className="flex items-center gap-2 justify-center">
+                    <label htmlFor="private-toggle" className="text-xs text-muted-foreground">
+                      Private game
+                    </label>
+                    <button
+                      id="private-toggle"
+                      role="switch"
+                      aria-checked={isPrivate}
+                      onClick={() => setIsPrivate(!isPrivate)}
+                      className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${
+                        isPrivate ? 'bg-primary' : 'bg-muted'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                          isPrivate ? 'translate-x-[14px]' : 'translate-x-[2px]'
+                        }`}
+                      />
+                    </button>
+                  </div>
                 </div>
 
                 {/* OR divider */}
                 <div className="flex sm:flex-col items-center justify-center gap-2 sm:gap-1 py-1 sm:py-0 sm:px-2 shrink-0">
                   <div className="flex-1 h-px sm:h-auto sm:w-px bg-border sm:flex-1" />
-                  <span className="text-xs font-cinzel text-muted-foreground tracking-widest">OR</span>
+                  <span className="text-xs text-muted-foreground tracking-widest">OR</span>
                   <div className="flex-1 h-px sm:h-auto sm:w-px bg-border sm:flex-1" />
                 </div>
 
-                <div className="flex gap-2 sm:basis-0 sm:flex-1">
-                  <Input
-                    value={gameCode}
-                    onChange={(e) =>
-                      setGameCode(e.target.value.toUpperCase().slice(0, 4))
-                    }
-                    placeholder="Game Code"
-                    maxLength={4}
-                    className="flex-1 uppercase tracking-widest font-mono text-center h-12 focus-visible:ring-0 focus-visible:border-primary"
-                  />
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    onClick={handleJoinGame}
-                    disabled={isJoining || gameCode.length !== 4 || !selectedDeck}
-                    className="shrink-0 h-12 px-6"
-                  >
-                    {isJoining ? 'Joining...' : 'Join'}
-                  </Button>
+                <div className="sm:basis-0 sm:flex-1 flex flex-col gap-2.5">
+                  <div className="flex gap-2">
+                    <Input
+                      value={gameCode}
+                      onChange={(e) =>
+                        setGameCode(e.target.value.toUpperCase().slice(0, 4))
+                      }
+                      placeholder="Game Code"
+                      maxLength={4}
+                      className="flex-1 uppercase tracking-widest font-mono text-center h-12 focus-visible:ring-0 focus-visible:border-primary"
+                    />
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      onClick={handleJoinGame}
+                      disabled={isJoining || gameCode.length !== 4 || (!isSpectate && !selectedDeck)}
+                      className="shrink-0 h-12 px-6"
+                    >
+                      {isJoining ? 'Joining...' : isSpectate ? 'Watch' : 'Join'}
+                    </Button>
+                  </div>
+                  {/* Spectate toggle — mirrors Private game toggle on Create side */}
+                  <div className="flex items-center gap-2 justify-center">
+                    <label htmlFor="spectate-toggle" className="text-xs text-muted-foreground">
+                      Spectate
+                    </label>
+                    <button
+                      id="spectate-toggle"
+                      role="switch"
+                      aria-checked={isSpectate}
+                      onClick={() => setIsSpectate(!isSpectate)}
+                      className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${
+                        isSpectate ? 'bg-primary' : 'bg-muted'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                          isSpectate ? 'translate-x-[14px]' : 'translate-x-[2px]'
+                        }`}
+                      />
+                    </button>
+                  </div>
                 </div>
-              </div>
-
-              {/* Private game toggle */}
-              <div className="flex items-center justify-between py-1">
-                <label htmlFor="private-toggle" className="text-sm text-muted-foreground">
-                  Private game
-                </label>
-                <button
-                  id="private-toggle"
-                  role="switch"
-                  aria-checked={isPrivate}
-                  onClick={() => setIsPrivate(!isPrivate)}
-                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                    isPrivate ? 'bg-primary' : 'bg-muted'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                      isPrivate ? 'translate-x-[18px]' : 'translate-x-[3px]'
-                    }`}
-                  />
-                </button>
               </div>
 
               {/* Error */}
@@ -391,28 +411,6 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
                 <p className="text-sm text-destructive text-center">{error}</p>
               )}
 
-              {/* Spectate */}
-              <div className="flex items-center justify-center gap-2 text-sm border-t border-border pt-4">
-                <span className="text-muted-foreground text-xs">Spectate a game</span>
-                <Input
-                  value={spectateCode}
-                  onChange={(e) =>
-                    setSpectateCode(e.target.value.toUpperCase().slice(0, 4))
-                  }
-                  placeholder="Code"
-                  maxLength={4}
-                  className="uppercase tracking-widest font-mono w-20 h-8 text-sm text-center focus-visible:ring-0 focus-visible:border-primary"
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleSpectate}
-                  disabled={spectateCode.trim().length !== 4}
-                  className="h-8 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  Watch
-                </Button>
-              </div>
             </>
           )}
 

@@ -18,8 +18,9 @@ export function LobbyList({ selectedDeckId, onJoinGame, onSwitchToCreate }: Lobb
   const spacetimeCtx = useSpacetimeDB() as any;
   const conn = spacetimeCtx?.getConnection?.() ?? null;
 
-  // useTable returns [rows, subscribeApplied] where subscribeApplied=true means data is ready
-  const [games, subscribeApplied] = useTable(tables.Game) as [Game[], boolean];
+  // Note: subscribeApplied is unreliable when the subscription returns no rows
+  // (it may never flip to true). Don't gate rendering on it.
+  const [games] = useTable(tables.Game) as [Game[], boolean];
   const [now, setNow] = useState(Date.now());
   const didSubscribe = useRef(false);
 
@@ -52,7 +53,7 @@ export function LobbyList({ selectedDeckId, onJoinGame, onSwitchToCreate }: Lobb
       return aTime - bTime;
     });
 
-  if (!subscribeApplied) {
+  if (!conn) {
     return (
       <div className="py-8 text-center text-sm text-muted-foreground">
         Connecting to lobby...

@@ -441,6 +441,14 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       const node = cardNodeRefs.current.get(card.instanceId);
       if (node) {
         dragOriginalPosRef.current = { x: node.x(), y: node.y() };
+
+        // Move the card node to the layer root so it escapes any clip groups
+        // and renders on top of all other zones during the drag.
+        const layer = node.getLayer();
+        if (layer && node.parent !== layer) {
+          node.moveTo(layer);
+          node.moveToTop();
+        }
       }
 
       // Clear hover state
@@ -633,16 +641,25 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       const targetZone = hit.zone;
       const isSameZone = targetZone === sourceZone;
 
+      // Resolve the zone rect for the drop target so we can store normalized positions
+      // (0–1 ratios). This ensures cards render at the correct proportional position
+      // regardless of each player's screen/window size.
+      const zoneRect = hit.owner === 'my' ? myZones[targetZone] : opponentZones[targetZone];
+      const zoneOffX = zoneRect?.x ?? 0;
+      const zoneOffY = zoneRect?.y ?? 0;
+      const zoneW = zoneRect?.width || 1;
+      const zoneH = zoneRect?.height || 1;
+
       // Same free-form zone: just update position
       if (isSameZone && isFreeFormZone(targetZone)) {
         if (isGroupDrag) {
-          // Build positions for batch move
+          // Build positions for batch move (normalized 0–1)
           const positions: Record<string, { posX: number; posY: number }> = {
-            [card.instanceId]: { posX: dropX, posY: dropY },
+            [card.instanceId]: { posX: (dropX - zoneOffX) / zoneW, posY: (dropY - zoneOffY) / zoneH },
           };
           if (followerOffsets) {
             for (const [id, offset] of followerOffsets) {
-              positions[id] = { posX: dropX + offset.dx, posY: dropY + offset.dy };
+              positions[id] = { posX: (dropX + offset.dx - zoneOffX) / zoneW, posY: (dropY + offset.dy - zoneOffY) / zoneH };
             }
           }
           moveCardsBatch(
@@ -652,7 +669,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
           );
           clearSelection();
         } else {
-          updateCardPosition(cardId, String(dropX), String(dropY));
+          updateCardPosition(cardId, String((dropX - zoneOffX) / zoneW), String((dropY - zoneOffY) / zoneH));
         }
         return;
       }
@@ -679,11 +696,11 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       if (isGroupDrag) {
         if (isFreeFormZone(targetZone)) {
           const positions: Record<string, { posX: number; posY: number }> = {
-            [card.instanceId]: { posX: dropX, posY: dropY },
+            [card.instanceId]: { posX: (dropX - zoneOffX) / zoneW, posY: (dropY - zoneOffY) / zoneH },
           };
           if (followerOffsets) {
             for (const [id, offset] of followerOffsets) {
-              positions[id] = { posX: dropX + offset.dx, posY: dropY + offset.dy };
+              positions[id] = { posX: (dropX + offset.dx - zoneOffX) / zoneW, posY: (dropY + offset.dy - zoneOffY) / zoneH };
             }
           }
           moveCardsBatch(
@@ -696,7 +713,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
         }
         clearSelection();
       } else if (isFreeFormZone(targetZone)) {
-        moveCard(cardId, targetZone, '', String(dropX), String(dropY));
+        moveCard(cardId, targetZone, '', String((dropX - zoneOffX) / zoneW), String((dropY - zoneOffY) / zoneH));
       } else if (isAutoArrangeZone(targetZone)) {
         // Auto-arrange zone: positions are ignored by rendering
         moveCard(cardId, targetZone, '', '0', '0');
@@ -786,8 +803,11 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     for (const zoneKey of FREE_FORM_ZONES) {
       const cards = myCards[zoneKey] ?? [];
       for (const card of cards) {
-        const x = card.posX ? parseFloat(card.posX) : (myZones[zoneKey]?.x ?? 0) + 20;
-        const y = card.posY ? parseFloat(card.posY) : (myZones[zoneKey]?.y ?? 0) + 24;
+        const zone = myZones[zoneKey];
+        const zoneX = zone?.x ?? 0;
+        const zoneY = zone?.y ?? 0;
+        const x = card.posX ? parseFloat(card.posX) * (zone?.width ?? 0) + zoneX : zoneX + 20;
+        const y = card.posY ? parseFloat(card.posY) * (zone?.height ?? 0) + zoneY : zoneY + 24;
         bounds.push({
           instanceId: String(card.id),
           x,
@@ -929,7 +949,10 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
               Zone backgrounds — My zones
               ================================================================ */}
           {Object.entries(myZones).map(([key, zone]) => {
-            const showCountBadge = isFreeFormZone(key) || isAutoArrangeZone(key);
+            // LOB + territory zones get their label+badge rendered as an overlay after cards
+            const isLob = isAutoArrangeZone(key);
+            const isFreeForm = isFreeFormZone(key);
+            const skipLabel = isLob || isFreeForm;
             const cardsInZone = myCards[key] ?? [];
             // Approximate label width: ~7px per uppercase char at fontSize 11 + letterSpacing 1
             const labelTextWidth = zone.label.toUpperCase().length * 7;
@@ -946,53 +969,23 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                   cornerRadius={3}
                   opacity={0.35}
                 />
-                <Text
-                  x={zone.x + 6}
-                  y={zone.y + 4}
-                  text={zone.label.toUpperCase()}
-                  fontSize={11}
-                  fontFamily="Cinzel, Georgia, serif"
-                  fill="#e8d5a3"
-                  letterSpacing={1}
-                  width={zone.width - 12}
-                  ellipsis
-                />
-                {/* Count badge for free-form and auto-arrange zones */}
-                {showCountBadge && (
+                {/* Label + badge — skip for LOB/territory zones (rendered as overlay after cards) */}
+                {!skipLabel && (
                   <>
-                    <Rect
-                      x={zone.x + 6 + labelTextWidth + 8}
-                      y={zone.y + 4}
-                      width={24}
-                      height={18}
-                      fill="rgba(196, 149, 90, 0.25)"
-                      cornerRadius={4}
-                      stroke="rgba(196, 149, 90, 0.5)"
-                      strokeWidth={0.5}
-                    />
                     <Text
-                      x={zone.x + 6 + labelTextWidth + 8}
-                      y={zone.y + 5}
-                      width={24}
-                      text={String(cardsInZone.length)}
+                      x={zone.x + 6}
+                      y={zone.y + 4}
+                      text={zone.label.toUpperCase()}
                       fontSize={11}
+                      fontFamily="Cinzel, Georgia, serif"
                       fill="#e8d5a3"
-                      align="center"
+                      letterSpacing={1}
+                      width={zone.width - 12}
+                      ellipsis
                     />
                   </>
                 )}
                 {/* Ghost text for empty territory */}
-                {key === 'territory' && cardsInZone.length === 0 && (
-                  <Text
-                    x={zone.x}
-                    y={zone.y + zone.height / 2 - 10}
-                    width={zone.width}
-                    text="Drop characters and enhancements here"
-                    fontSize={13}
-                    fill="rgba(232, 213, 163, 0.15)"
-                    align="center"
-                  />
-                )}
               </Group>
             );
           })}
@@ -1001,7 +994,9 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
               Zone backgrounds — Opponent zones
               ================================================================ */}
           {Object.entries(opponentZones).map(([key, zone]) => {
-            const showCountBadge = isFreeFormZone(key) || isAutoArrangeZone(key);
+            const isLob = isAutoArrangeZone(key);
+            const isFreeForm = isFreeFormZone(key);
+            const skipLabel = isLob || isFreeForm;
             const cardsInZone = opponentCards[key] ?? [];
             const labelTextWidth = zone.label.toUpperCase().length * 7;
             return (
@@ -1017,53 +1012,23 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                   cornerRadius={3}
                   opacity={0.35}
                 />
-                <Text
-                  x={zone.x + 6}
-                  y={zone.y + 4}
-                  text={zone.label.toUpperCase()}
-                  fontSize={11}
-                  fontFamily="Cinzel, Georgia, serif"
-                  fill="#a3c5e8"
-                  letterSpacing={1}
-                  width={zone.width - 12}
-                  ellipsis
-                />
-                {/* Count badge for free-form and auto-arrange zones */}
-                {showCountBadge && (
+                {/* Label + badge — skip for LOB/territory zones (rendered as overlay after cards) */}
+                {!skipLabel && (
                   <>
-                    <Rect
-                      x={zone.x + 6 + labelTextWidth + 8}
-                      y={zone.y + 4}
-                      width={24}
-                      height={18}
-                      fill="rgba(100, 149, 237, 0.25)"
-                      cornerRadius={4}
-                      stroke="rgba(100, 149, 237, 0.5)"
-                      strokeWidth={0.5}
-                    />
                     <Text
-                      x={zone.x + 6 + labelTextWidth + 8}
-                      y={zone.y + 5}
-                      width={24}
-                      text={String(cardsInZone.length)}
+                      x={zone.x + 6}
+                      y={zone.y + 4}
+                      text={zone.label.toUpperCase()}
                       fontSize={11}
+                      fontFamily="Cinzel, Georgia, serif"
                       fill="#a3c5e8"
-                      align="center"
+                      letterSpacing={1}
+                      width={zone.width - 12}
+                      ellipsis
                     />
                   </>
                 )}
                 {/* Ghost text for empty territory */}
-                {key === 'territory' && cardsInZone.length === 0 && (
-                  <Text
-                    x={zone.x}
-                    y={zone.y + zone.height / 2 - 10}
-                    width={zone.width}
-                    text="Drop characters and enhancements here"
-                    fontSize={13}
-                    fill="rgba(232, 213, 163, 0.15)"
-                    align="center"
-                  />
-                )}
               </Group>
             );
           })}
@@ -1152,8 +1117,11 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
               >
                 {cards.map((card) => {
                   const gameCard = adaptCard(card, 'player1');
-                  const x = card.posX ? parseFloat(card.posX) : (myZones[zoneKey]?.x ?? 0) + 20;
-                  const y = card.posY ? parseFloat(card.posY) : (myZones[zoneKey]?.y ?? 0) + 24;
+                  const myZone = myZones[zoneKey];
+                  const zoneX = myZone?.x ?? 0;
+                  const zoneY = myZone?.y ?? 0;
+                  const x = card.posX ? parseFloat(card.posX) * (myZone?.width ?? 0) + zoneX : zoneX + 20;
+                  const y = card.posY ? parseFloat(card.posY) * (myZone?.height ?? 0) + zoneY : zoneY + 24;
                   return (
                     <GameCardNode
                       key={String(card.id)}
@@ -1199,15 +1167,25 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
               >
                 {cards.map((card) => {
                   const gameCard = adaptCard(card, 'player2');
-                  const x = card.posX ? parseFloat(card.posX) : (opponentZones[zoneKey]?.x ?? 0) + 20;
-                  const y = card.posY ? parseFloat(card.posY) : (opponentZones[zoneKey]?.y ?? 0) + 24;
+                  const oppZone = opponentZones[zoneKey];
+                  const zoneX = oppZone?.x ?? 0;
+                  const zoneY = oppZone?.y ?? 0;
+                  const zoneW = oppZone?.width ?? 0;
+                  const zoneH = oppZone?.height ?? 0;
+                  // Mirror opponent positions: flip both axes so their top-left maps
+                  // to our bottom-right, and rotate the card 180° (upside down).
+                  // Konva rotates around (x,y), so offset by card size to keep it in place.
+                  const mirroredPosX = card.posX ? 1 - parseFloat(card.posX) : 0;
+                  const mirroredPosY = card.posY ? 1 - parseFloat(card.posY) : 0;
+                  const x = mirroredPosX * zoneW + zoneX + cardWidth;
+                  const y = mirroredPosY * zoneH + zoneY + cardHeight;
                   return (
                     <GameCardNode
                       key={String(card.id)}
                       card={gameCard}
                       x={x}
                       y={y}
-                      rotation={0}
+                      rotation={180}
                       cardWidth={cardWidth}
                       cardHeight={cardHeight}
                       image={getCardImage(card)}
@@ -1290,9 +1268,9 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                     <GameCardNode
                       key={String(card.id)}
                       card={gameCard}
-                      x={pos.x}
-                      y={pos.y}
-                      rotation={0}
+                      x={pos.x + lobCard.cardWidth}
+                      y={pos.y + lobCard.cardHeight}
+                      rotation={180}
                       cardWidth={lobCard.cardWidth}
                       cardHeight={lobCard.cardHeight}
                       image={getCardImage(card)}
@@ -1312,6 +1290,125 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
               </Group>
             );
           })}
+
+          {/* ================================================================
+              LOB label overlays — rendered AFTER cards so labels sit on top
+              ================================================================ */}
+          {(() => {
+            const lobEntries: { zone: typeof myZones[string]; isOpponent: boolean }[] = [];
+            const myLob = myZones['land-of-bondage'];
+            const oppLob = opponentZones['land-of-bondage'];
+            if (myLob) lobEntries.push({ zone: myLob, isOpponent: false });
+            if (oppLob) lobEntries.push({ zone: oppLob, isOpponent: true });
+            return lobEntries.map(({ zone, isOpponent }) => {
+              const cards = isOpponent ? (opponentCards['land-of-bondage'] ?? []) : (myCards['land-of-bondage'] ?? []);
+              const labelTextWidth = zone.label.toUpperCase().length * 7;
+              const fillColor = isOpponent ? '#a3c5e8' : '#e8d5a3';
+              const badgeFill = isOpponent ? 'rgba(100, 149, 237, 0.25)' : 'rgba(196, 149, 90, 0.25)';
+              const badgeStroke = isOpponent ? 'rgba(100, 149, 237, 0.5)' : 'rgba(196, 149, 90, 0.5)';
+              const bgFill = isOpponent ? 'rgba(16, 20, 30, 0.85)' : 'rgba(30, 22, 16, 0.85)';
+              const labelW = labelTextWidth + 8 + 24 + 8; // text + gap + badge + pad
+              return (
+                <Group key={`lob-overlay-${isOpponent ? 'opp' : 'my'}`}>
+                  <Rect
+                    x={zone.x}
+                    y={zone.y}
+                    width={labelW + 6}
+                    height={20}
+                    fill={bgFill}
+                    cornerRadius={[3, 0, 4, 0]}
+                  />
+                  <Text
+                    x={zone.x + 6}
+                    y={zone.y + 4}
+                    text={zone.label.toUpperCase()}
+                    fontSize={11}
+                    fontFamily="Cinzel, Georgia, serif"
+                    fill={fillColor}
+                    letterSpacing={1}
+                  />
+                  <Rect
+                    x={zone.x + 6 + labelTextWidth + 8}
+                    y={zone.y + 4}
+                    width={24}
+                    height={14}
+                    fill={badgeFill}
+                    cornerRadius={3}
+                    stroke={badgeStroke}
+                    strokeWidth={0.5}
+                  />
+                  <Text
+                    x={zone.x + 6 + labelTextWidth + 8}
+                    y={zone.y + 4}
+                    width={24}
+                    text={String(cards.length)}
+                    fontSize={11}
+                    fill={fillColor}
+                    align="center"
+                  />
+                </Group>
+              );
+            });
+          })()}
+
+          {/* ================================================================
+              Territory label overlays — rendered AFTER cards so labels sit on top
+              ================================================================ */}
+          {(() => {
+            const territoryEntries: { zone: typeof myZones[string]; isOpponent: boolean; cards: typeof myCards[string] }[] = [];
+            const myTerr = myZones['territory'];
+            const oppTerr = opponentZones['territory'];
+            if (myTerr) territoryEntries.push({ zone: myTerr, isOpponent: false, cards: myCards['territory'] ?? [] });
+            if (oppTerr) territoryEntries.push({ zone: oppTerr, isOpponent: true, cards: opponentCards['territory'] ?? [] });
+            return territoryEntries.map(({ zone, isOpponent, cards }) => {
+              const labelTextWidth = zone.label.toUpperCase().length * 7;
+              const fillColor = isOpponent ? '#a3c5e8' : '#e8d5a3';
+              const badgeFill = isOpponent ? 'rgba(100, 149, 237, 0.25)' : 'rgba(196, 149, 90, 0.25)';
+              const badgeStroke = isOpponent ? 'rgba(100, 149, 237, 0.5)' : 'rgba(196, 149, 90, 0.5)';
+              const bgFill = isOpponent ? 'rgba(16, 20, 30, 0.85)' : 'rgba(30, 22, 16, 0.85)';
+              const labelW = labelTextWidth + 8 + 24 + 8;
+              return (
+                <Group key={`territory-overlay-${isOpponent ? 'opp' : 'my'}`}>
+                  <Rect
+                    x={zone.x}
+                    y={zone.y}
+                    width={labelW + 6}
+                    height={20}
+                    fill={bgFill}
+                    cornerRadius={[3, 0, 4, 0]}
+                  />
+                  <Text
+                    x={zone.x + 6}
+                    y={zone.y + 4}
+                    text={zone.label.toUpperCase()}
+                    fontSize={11}
+                    fontFamily="Cinzel, Georgia, serif"
+                    fill={fillColor}
+                    letterSpacing={1}
+                  />
+                  <Rect
+                    x={zone.x + 6 + labelTextWidth + 8}
+                    y={zone.y + 4}
+                    width={24}
+                    height={14}
+                    fill={badgeFill}
+                    cornerRadius={3}
+                    stroke={badgeStroke}
+                    strokeWidth={0.5}
+                  />
+                  <Text
+                    x={zone.x + 6 + labelTextWidth + 8}
+                    y={zone.y + 4}
+                    width={24}
+                    text={String(cards.length)}
+                    fontSize={11}
+                    fill={fillColor}
+                    align="center"
+                  />
+                </Group>
+              );
+            });
+          })()}
 
           {/* ================================================================
               Sidebar pile indicators — My zones (NOT draggable, interactions via context menu)

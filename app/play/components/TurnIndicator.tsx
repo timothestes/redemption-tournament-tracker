@@ -112,7 +112,7 @@ export default function TurnIndicator({
             marginTop: 3,
           }}
         >
-          {isMyTurn ? `You (${myName})` : `Opp (${opponentName})`}
+          {isMyTurn ? `${myName}'s turn (you)` : `${opponentName}'s turn`}
         </span>
       </div>
 
