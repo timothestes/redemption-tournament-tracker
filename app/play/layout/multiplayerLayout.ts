@@ -81,7 +81,7 @@ const MAIN_CARD_WIDTH_RATIO = 0.06;
 const MAIN_CARD_HAND_HEADROOM = 0.82;
 const LOB_CARD_HEADROOM = 0.85;
 const OPP_HAND_HEADROOM = 0.78;
-const OPP_HAND_SCALE = 0.55;
+const OPP_HAND_SCALE = 0.75;
 const PILE_LABEL_RATIO = 0.22;
 
 // ── Private card sizing functions ───────────────────────────────────────

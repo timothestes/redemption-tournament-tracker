@@ -1736,6 +1736,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
               opponentHandRect!,
               oppHandCard.cardWidth,
               oppHandCard.cardHeight,
+              true, // flat spread — no fan arc for opponent
             );
 
             return (
