@@ -18,6 +18,7 @@ import { GameToastContainer, showGameToast } from '@/app/shared/components/GameT
 import type { GameActions } from '@/app/shared/types/gameActions';
 import WaitingRoomGoldfish from '../components/WaitingRoomGoldfish';
 import { convertToGoldfishDeck, type GameCardData } from '../utils/convertToGoldfishDeck';
+import PregameScreen from '../components/PregameScreen';
 
 // Konva requires browser APIs — lazy-load to avoid SSR issues
 const MultiplayerCanvas = dynamic(
@@ -85,7 +86,7 @@ export function GameClient({ code }: GameClientProps) {
 // ---------------------------------------------------------------------------
 // Inner component — must live inside SpacetimeProvider to use SpacetimeDB hooks
 // ---------------------------------------------------------------------------
-type LifecycleState = 'creating' | 'joining' | 'waiting' | 'playing' | 'finished' | 'error';
+type LifecycleState = 'creating' | 'joining' | 'waiting' | 'pregame' | 'playing' | 'finished' | 'error';
 
 // ---------------------------------------------------------------------------
 // Waiting screen — shown while waiting for opponent
@@ -285,6 +286,14 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       return;
     }
 
+    // Reconnect scenario: game already exists, skip reducer call
+    const existingGames = [...(gameState.allGames || [])];
+    const existingGame = existingGames.find((g: any) => g.code === code);
+    if (existingGame) {
+      setGameId(existingGame.id);
+      return; // lifecycle sync effect handles the rest
+    }
+
     try {
       if (gameParams.role === 'create') {
         setLifecycle('creating');
@@ -373,12 +382,18 @@ function GameInner({ code, isConnected }: GameInnerProps) {
 
     if (game.status === 'waiting') {
       setLifecycle('waiting');
+    } else if (game.status === 'pregame') {
+      setLifecycle('pregame');
     } else if (game.status === 'playing') {
       setLifecycle('playing');
+    } else if (game.status === 'finished' && lifecycle === 'pregame') {
+      setErrorMessage('Opponent disconnected. Game cancelled.');
+      setLifecycle('error');
+      return;
     } else if (game.status === 'finished') {
       setLifecycle('finished');
     }
-  }, [gameState.game]);
+  }, [gameState.game, lifecycle]);
 
   // Build a player name map for ChatPanel
   const playerNameMap = useMemo(() => {
@@ -511,6 +526,16 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         onUpdateMessage={gameId && conn ? (message: string) => {
           conn.reducers.updateLobbyMessage({ gameId, message });
         } : undefined}
+      />
+    );
+  }
+
+  if (lifecycle === 'pregame') {
+    return (
+      <PregameScreen
+        gameId={gameId!}
+        gameState={gameState}
+        code={code}
       />
     );
   }
