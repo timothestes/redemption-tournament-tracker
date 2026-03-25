@@ -28,6 +28,9 @@ import type {
 import { CardContextMenu } from '@/app/shared/components/CardContextMenu';
 import { MultiCardContextMenu } from '@/app/shared/components/MultiCardContextMenu';
 import { ZoneContextMenu } from '@/app/shared/components/ZoneContextMenu';
+import { DeckContextMenu } from '@/app/shared/components/DeckContextMenu';
+import { DeckDropPopup } from '@/app/shared/components/DeckDropPopup';
+import { LorContextMenu } from '@/app/shared/components/LorContextMenu';
 import type { GameActions } from '@/app/shared/types/gameActions';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import DiceOverlay from './DiceOverlay';
@@ -370,6 +373,12 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
   // ---- Zone browse overlay state (works for both player and opponent zones) ----
   const [browseZone, setBrowseZone] = useState<{ zone: string; cards: typeof opponentCards[string]; label: string; readOnly: boolean } | null>(null);
   const [zoneMenu, setZoneMenu] = useState<{ x: number; y: number; spawnX: number; spawnY: number } | null>(null);
+  const [deckMenu, setDeckMenu] = useState<{ x: number; y: number } | null>(null);
+  const [lorMenu, setLorMenu] = useState<{ x: number; y: number } | null>(null);
+  const [deckDrop, setDeckDrop] = useState<{ x: number; y: number; cardId: string } | null>(null);
+  const [showDeckSearch, setShowDeckSearch] = useState(false);
+  const [peekState, setPeekState] = useState<{ position: 'top' | 'bottom' | 'random'; count: number } | null>(null);
+  const [exchangeCardIds, setExchangeCardIds] = useState<string[] | null>(null);
 
   // ---- Multiplayer GameActions adapter ----
   const multiplayerActions: GameActions = useMemo(() => ({
@@ -395,6 +404,44 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     removeToken: (cardId) => gameState.removeToken(BigInt(cardId)),
     removeOpponentToken: undefined,
   }), [gameState]);
+
+  // ---- Close all menus helper ----
+  const closeAllMenus = useCallback(() => {
+    setContextMenu(null);
+    setMultiCardContextMenu(null);
+    setZoneMenu(null);
+    setDeckMenu(null);
+    setLorMenu(null);
+    setDeckDrop(null);
+    setShowDeckSearch(false);
+    setPeekState(null);
+    setExchangeCardIds(null);
+    setBrowseZone(null);
+  }, []);
+
+  // ---- moveDeckCardsToZone helper ----
+  const moveDeckCardsToZone = useCallback((
+    position: 'top' | 'bottom' | 'random',
+    count: number,
+    targetZone: string,
+  ) => {
+    const deckCards = [...(myCards['deck'] ?? [])].sort(
+      (a, b) => Number(a.zoneIndex) - Number(b.zoneIndex)
+    );
+    let selected: typeof deckCards;
+    if (position === 'top') selected = deckCards.slice(0, count);
+    else if (position === 'bottom') selected = deckCards.slice(-count);
+    else {
+      const shuffled = [...deckCards];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      selected = shuffled.slice(0, count);
+    }
+    const ids = selected.map(c => String(c.id));
+    if (ids.length > 0) multiplayerActions.moveCardsBatch(ids, targetZone);
+  }, [myCards, multiplayerActions]);
 
   // ---- Drag state ----
   const isDraggingRef = useRef(false);
@@ -763,8 +810,18 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
         // Auto-arrange zone: positions are ignored by rendering
         moveCard(cardId, targetZone, '', '0', '0');
       } else if (targetZone === 'deck') {
-        // Deck: for now just move to deck (Task 17 adds top/bottom/shuffle popup)
-        moveCard(cardId, targetZone, '0');
+        const stage = stageRef.current;
+        if (stage) {
+          const pointer = stage.getPointerPosition();
+          const container = stage.container().getBoundingClientRect();
+          setDeckDrop({
+            x: (pointer?.x ?? container.width / 2),
+            y: (pointer?.y ?? container.height / 2),
+            cardId: String(cardId),
+          });
+        } else {
+          moveCard(cardId, targetZone, '0');
+        }
       } else {
         // Stacked zone
         moveCard(cardId, targetZone, '0');
@@ -1573,6 +1630,27 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                 onDblClick={zoneKey === 'deck' ? () => {
                   multiplayerActions.drawCard();
                 } : undefined}
+                onContextMenu={zoneKey === 'deck' ? (e: Konva.KonvaEventObject<PointerEvent>) => {
+                  e.evt.preventDefault();
+                  const stage = stageRef.current;
+                  if (!stage) return;
+                  const container = stage.container().getBoundingClientRect();
+                  closeAllMenus();
+                  setDeckMenu({
+                    x: e.evt.clientX - container.left,
+                    y: e.evt.clientY - container.top,
+                  });
+                } : zoneKey === 'land-of-redemption' ? (e: Konva.KonvaEventObject<PointerEvent>) => {
+                  e.evt.preventDefault();
+                  const stage = stageRef.current;
+                  if (!stage) return;
+                  const container = stage.container().getBoundingClientRect();
+                  closeAllMenus();
+                  setLorMenu({
+                    x: e.evt.clientX - container.left,
+                    y: e.evt.clientY - container.top,
+                  });
+                } : undefined}
               >
                 {/* Count badge */}
                 <Group x={zone.x + zone.width - 32} y={zone.y + 2}>
@@ -1906,6 +1984,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
           y={contextMenu.y}
           actions={multiplayerActions}
           onClose={() => setContextMenu(null)}
+          onExchange={(cardIds) => { setContextMenu(null); setExchangeCardIds(cardIds); }}
         />
       )}
 
@@ -1930,6 +2009,53 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
           onAddOpponentLostSoul={(testament, posX, posY) => {
             multiplayerActions.spawnLostSoul(testament, String(posX), String(posY));
           }}
+        />
+      )}
+
+      {deckMenu && (
+        <DeckContextMenu
+          x={deckMenu.x}
+          y={deckMenu.y}
+          deckSize={(myCards['deck'] ?? []).length}
+          onClose={() => setDeckMenu(null)}
+          onSearchDeck={() => { setDeckMenu(null); setShowDeckSearch(true); }}
+          onShuffleDeck={() => { multiplayerActions.shuffleDeck(); setDeckMenu(null); }}
+          onDrawTop={(n) => { multiplayerActions.drawMultiple(n); setDeckMenu(null); }}
+          onRevealTop={(n) => { setDeckMenu(null); setPeekState({ position: 'top', count: n }); }}
+          onDiscardTop={(n) => { moveDeckCardsToZone('top', n, 'discard'); setDeckMenu(null); }}
+          onReserveTop={(n) => { moveDeckCardsToZone('top', n, 'reserve'); setDeckMenu(null); }}
+          onDrawBottom={(n) => { moveDeckCardsToZone('bottom', n, 'hand'); setDeckMenu(null); }}
+          onRevealBottom={(n) => { setDeckMenu(null); setPeekState({ position: 'bottom', count: n }); }}
+          onDiscardBottom={(n) => { moveDeckCardsToZone('bottom', n, 'discard'); setDeckMenu(null); }}
+          onReserveBottom={(n) => { moveDeckCardsToZone('bottom', n, 'reserve'); setDeckMenu(null); }}
+          onDrawRandom={(n) => { moveDeckCardsToZone('random', n, 'hand'); setDeckMenu(null); }}
+          onRevealRandom={(n) => { setDeckMenu(null); setPeekState({ position: 'random', count: n }); }}
+          onDiscardRandom={(n) => { moveDeckCardsToZone('random', n, 'discard'); setDeckMenu(null); }}
+          onReserveRandom={(n) => { moveDeckCardsToZone('random', n, 'reserve'); setDeckMenu(null); }}
+        />
+      )}
+
+      {lorMenu && (
+        <LorContextMenu
+          x={lorMenu.x}
+          y={lorMenu.y}
+          onClose={() => setLorMenu(null)}
+          onAddSoul={() => {
+            multiplayerActions.spawnLostSoul?.('NT', '0.5', '0.5');
+            setLorMenu(null);
+          }}
+        />
+      )}
+
+      {deckDrop && (
+        <DeckDropPopup
+          x={deckDrop.x}
+          y={deckDrop.y}
+          onShuffleIn={() => { multiplayerActions.shuffleCardIntoDeck(deckDrop.cardId); setDeckDrop(null); }}
+          onTopDeck={() => { multiplayerActions.moveCardToTopOfDeck(deckDrop.cardId); setDeckDrop(null); }}
+          onBottomDeck={() => { multiplayerActions.moveCardToBottomOfDeck(deckDrop.cardId); setDeckDrop(null); }}
+          onExchange={() => { setDeckDrop(null); setExchangeCardIds([deckDrop.cardId]); }}
+          onCancel={() => setDeckDrop(null)}
         />
       )}
 
