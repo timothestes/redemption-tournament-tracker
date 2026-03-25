@@ -77,6 +77,11 @@ export interface GameState {
   removeToken: (cardInstanceId: bigint) => void;
   resignGame: () => void;
   leaveGame: () => void;
+  // Pregame ceremony actions
+  pregameReady: (ready: boolean) => void;
+  pregameAcknowledgeRoll: () => void;
+  pregameChooseFirst: (chosenSeat: bigint) => void;
+  pregameChangeDeck: (deckId: string, deckData: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -386,6 +391,22 @@ export function useGameState(gameId: bigint): GameState {
     conn?.reducers.leaveGame({ gameId });
   }, [conn, gameId]);
 
+  const pregameReady = useCallback((ready: boolean) => {
+    conn?.reducers.pregameReady({ gameId, ready });
+  }, [conn, gameId]);
+
+  const pregameAcknowledgeRoll = useCallback(() => {
+    conn?.reducers.pregameAcknowledgeRoll({ gameId });
+  }, [conn, gameId]);
+
+  const pregameChooseFirst = useCallback((chosenSeat: bigint) => {
+    conn?.reducers.pregameChooseFirst({ gameId, chosenSeat });
+  }, [conn, gameId]);
+
+  const pregameChangeDeck = useCallback((deckId: string, deckData: string) => {
+    conn?.reducers.pregameChangeDeck({ gameId, deckId, deckData });
+  }, [conn, gameId]);
+
   // ---------------------------------------------------------------------------
   // Return
   // ---------------------------------------------------------------------------
@@ -430,6 +451,10 @@ export function useGameState(gameId: bigint): GameState {
     removeToken,
     resignGame,
     leaveGame,
+    pregameReady,
+    pregameAcknowledgeRoll,
+    pregameChooseFirst,
+    pregameChangeDeck,
   };
 }
 
