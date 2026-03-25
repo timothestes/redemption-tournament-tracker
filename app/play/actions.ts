@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/utils/supabase/server';
+import type { DeckOption } from './components/DeckPickerCard';
 
 export interface GameCardData {
   cardName: string;
@@ -136,4 +137,22 @@ export async function searchCommunityDecks(query: string): Promise<{
     card_count: d.card_count,
     username: usernameMap.get(d.user_id) ?? null,
   }));
+}
+
+/**
+ * Load the current user's decks for the pregame deck picker.
+ * Returns the same shape as the lobby page query.
+ */
+export async function loadUserDecks(): Promise<DeckOption[]> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: decks } = await supabase
+    .from('decks')
+    .select('id, name, format, card_count, preview_card_1, preview_card_2, paragon')
+    .eq('user_id', user.id)
+    .order('updated_at', { ascending: false });
+
+  return decks || [];
 }
