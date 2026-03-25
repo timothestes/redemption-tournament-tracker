@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import TopNav from '@/components/top-nav';
 import { DeckPickerModal } from './DeckPickerModal';
@@ -166,7 +166,6 @@ function RollingPhase({ gameState, gameId }: { gameState: GameState; gameId: big
   const [showResults, setShowResults] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
 
-  // Animate: show dice rolling, then reveal results after delay
   useEffect(() => {
     const timer = setTimeout(() => setShowResults(true), 1500);
     return () => clearTimeout(timer);
@@ -187,52 +186,143 @@ function RollingPhase({ gameState, gameId }: { gameState: GameState; gameId: big
   };
 
   return (
-    <div className="rounded-xl border border-border bg-card/95 backdrop-blur-sm p-8 sm:p-10 text-center max-w-md w-full">
-      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground font-cinzel">Dice Roll</p>
-      <h2 className="text-2xl font-bold font-cinzel mt-2">Who Goes First?</h2>
+    <div style={{
+      background: 'rgba(14, 10, 6, 0.97)',
+      border: '1px solid rgba(107, 78, 39, 0.3)',
+      borderRadius: 8,
+      padding: '40px 48px',
+      textAlign: 'center',
+      maxWidth: 420,
+      width: '100%',
+      boxShadow: '0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(196, 149, 90, 0.08)',
+    }}>
+      <p style={{
+        fontFamily: 'var(--font-cinzel), Georgia, serif',
+        fontSize: 10,
+        letterSpacing: '0.18em',
+        textTransform: 'uppercase',
+        color: 'rgba(196, 149, 90, 0.5)',
+      }}>Dice Roll</p>
+      <h2 style={{
+        fontFamily: 'var(--font-cinzel), Georgia, serif',
+        fontSize: 22,
+        fontWeight: 700,
+        color: '#e8d5a3',
+        marginTop: 8,
+        textShadow: '0 1px 6px rgba(0,0,0,0.9)',
+      }}>Who Goes First?</h2>
 
-      <div className="mt-8 flex justify-center gap-8">
+      <div style={{ marginTop: 32, display: 'flex', justifyContent: 'center', gap: 32, alignItems: 'flex-end' }}>
         {/* My die */}
-        <div className="text-center">
-          <p className="text-sm text-muted-foreground mb-2">{myPlayer.displayName}</p>
-          <div className={`w-20 h-20 rounded-xl border-2 flex items-center justify-center text-3xl font-bold font-mono transition-all duration-500 ${
-            showResults
-              ? iWon ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-muted text-muted-foreground'
-              : 'border-border bg-muted animate-pulse'
-          }`}>
-            {showResults ? myRoll : '?'}
+        <div style={{ textAlign: 'center' }}>
+          <p style={{
+            fontFamily: 'Georgia, serif',
+            fontSize: 12,
+            color: '#c4955a',
+            marginBottom: 8,
+            letterSpacing: '0.06em',
+          }}>{myPlayer.displayName}</p>
+          <div style={{
+            width: 80,
+            height: 80,
+            borderRadius: 8,
+            border: `2px solid ${showResults ? (iWon ? '#c4955a' : 'rgba(107, 78, 39, 0.3)') : 'rgba(107, 78, 39, 0.3)'}`,
+            background: showResults && iWon ? 'rgba(196, 149, 90, 0.12)' : '#1a1308',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.5s ease',
+            boxShadow: showResults && iWon ? '0 0 16px rgba(196, 149, 90, 0.25)' : 'none',
+          }}>
+            <span style={{
+              fontFamily: 'Georgia, serif',
+              fontSize: 28,
+              fontWeight: 700,
+              color: showResults ? (iWon ? '#e8d5a3' : 'rgba(196, 149, 90, 0.35)') : 'rgba(196, 149, 90, 0.6)',
+            }}>{showResults ? myRoll : '?'}</span>
           </div>
         </div>
 
-        {/* VS */}
-        <div className="flex items-center text-muted-foreground font-cinzel text-sm pt-6">vs</div>
+        <span style={{
+          fontFamily: 'var(--font-cinzel), Georgia, serif',
+          fontSize: 11,
+          color: 'rgba(196, 149, 90, 0.35)',
+          letterSpacing: '0.1em',
+          paddingBottom: 30,
+        }}>VS</span>
 
         {/* Opponent die */}
-        <div className="text-center">
-          <p className="text-sm text-muted-foreground mb-2">{opponentPlayer?.displayName || 'Opponent'}</p>
-          <div className={`w-20 h-20 rounded-xl border-2 flex items-center justify-center text-3xl font-bold font-mono transition-all duration-500 ${
-            showResults
-              ? !iWon ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-muted text-muted-foreground'
-              : 'border-border bg-muted animate-pulse'
-          }`}>
-            {showResults ? opponentRoll : '?'}
+        <div style={{ textAlign: 'center' }}>
+          <p style={{
+            fontFamily: 'Georgia, serif',
+            fontSize: 12,
+            color: '#4a7ab5',
+            marginBottom: 8,
+            letterSpacing: '0.06em',
+          }}>{opponentPlayer?.displayName || 'Opponent'}</p>
+          <div style={{
+            width: 80,
+            height: 80,
+            borderRadius: 8,
+            border: `2px solid ${showResults ? (!iWon ? '#4a7ab5' : 'rgba(107, 78, 39, 0.3)') : 'rgba(107, 78, 39, 0.3)'}`,
+            background: showResults && !iWon ? 'rgba(74, 122, 181, 0.12)' : '#1a1308',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.5s ease',
+            boxShadow: showResults && !iWon ? '0 0 16px rgba(74, 122, 181, 0.25)' : 'none',
+          }}>
+            <span style={{
+              fontFamily: 'Georgia, serif',
+              fontSize: 28,
+              fontWeight: 700,
+              color: showResults ? (!iWon ? '#e8d5a3' : 'rgba(196, 149, 90, 0.35)') : 'rgba(196, 149, 90, 0.6)',
+            }}>{showResults ? opponentRoll : '?'}</span>
           </div>
         </div>
       </div>
 
       {showResults && (
-        <div className="mt-6">
-          <p className="text-lg font-semibold font-cinzel">
+        <div style={{ marginTop: 24 }}>
+          <p style={{
+            fontFamily: 'var(--font-cinzel), Georgia, serif',
+            fontSize: 16,
+            fontWeight: 700,
+            color: '#e8d5a3',
+            letterSpacing: '0.06em',
+            textShadow: '0 1px 6px rgba(0,0,0,0.9)',
+          }}>
             {winnerName} wins the roll!
           </p>
 
           {!acknowledged ? (
-            <Button className="mt-4" onClick={handleAcknowledge}>
+            <button
+              onClick={handleAcknowledge}
+              style={{
+                marginTop: 16,
+                padding: '10px 32px',
+                borderRadius: 4,
+                border: '1px solid rgba(196, 149, 90, 0.45)',
+                background: 'rgba(196, 149, 90, 0.15)',
+                color: '#e8d5a3',
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+                fontSize: 13,
+                fontWeight: 700,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+              }}
+            >
               Continue
-            </Button>
+            </button>
           ) : (
-            <p className="mt-4 text-sm text-muted-foreground">
-              Waiting for opponent to continue...
+            <p style={{
+              marginTop: 16,
+              fontSize: 12,
+              color: 'rgba(196, 149, 90, 0.45)',
+              fontFamily: 'Georgia, serif',
+            }}>
+              Waiting for opponent...
             </p>
           )}
         </div>
@@ -254,32 +344,100 @@ function ChoosingPhase({ gameState, gameId }: { gameState: GameState; gameId: bi
     gameState.pregameChooseFirst(seat);
   };
 
+  const btnBase: React.CSSProperties = {
+    padding: '12px 24px',
+    borderRadius: 4,
+    fontFamily: 'var(--font-cinzel), Georgia, serif',
+    fontSize: 13,
+    fontWeight: 700,
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase',
+    cursor: 'pointer',
+    width: '100%',
+    transition: 'all 0.15s ease',
+  };
+
   return (
-    <div className="rounded-xl border border-border bg-card/95 backdrop-blur-sm p-8 sm:p-10 text-center max-w-md w-full">
-      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground font-cinzel">First Player</p>
+    <div style={{
+      background: 'rgba(14, 10, 6, 0.97)',
+      border: '1px solid rgba(107, 78, 39, 0.3)',
+      borderRadius: 8,
+      padding: '40px 48px',
+      textAlign: 'center',
+      maxWidth: 420,
+      width: '100%',
+      boxShadow: '0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(196, 149, 90, 0.08)',
+    }}>
+      <p style={{
+        fontFamily: 'var(--font-cinzel), Georgia, serif',
+        fontSize: 10,
+        letterSpacing: '0.18em',
+        textTransform: 'uppercase',
+        color: 'rgba(196, 149, 90, 0.5)',
+      }}>First Player</p>
 
       {iWon ? (
         <>
-          <h2 className="text-2xl font-bold font-cinzel mt-2">You Won the Roll!</h2>
-          <p className="mt-2 text-muted-foreground">Who should go first?</p>
+          <h2 style={{
+            fontFamily: 'var(--font-cinzel), Georgia, serif',
+            fontSize: 22,
+            fontWeight: 700,
+            color: '#e8d5a3',
+            marginTop: 8,
+            textShadow: '0 1px 6px rgba(0,0,0,0.9)',
+          }}>You Won the Roll!</h2>
+          <p style={{
+            marginTop: 8,
+            fontSize: 13,
+            color: 'rgba(196, 149, 90, 0.5)',
+            fontFamily: 'Georgia, serif',
+          }}>Who should go first?</p>
 
-          <div className="mt-6 flex flex-col gap-3">
-            <Button size="lg" onClick={() => handleChoose(mySeat)}>
+          <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <button
+              onClick={() => handleChoose(mySeat)}
+              style={{
+                ...btnBase,
+                border: '1px solid rgba(196, 149, 90, 0.45)',
+                background: 'rgba(196, 149, 90, 0.15)',
+                color: '#e8d5a3',
+              }}
+            >
               I&apos;ll go first
-            </Button>
-            <Button size="lg" variant="outline" onClick={() => handleChoose(mySeat.toString() === '0' ? BigInt(1) : BigInt(0))}>
+            </button>
+            <button
+              onClick={() => handleChoose(mySeat.toString() === '0' ? BigInt(1) : BigInt(0))}
+              style={{
+                ...btnBase,
+                border: '1px solid rgba(107, 78, 39, 0.3)',
+                background: 'transparent',
+                color: 'rgba(196, 149, 90, 0.6)',
+              }}
+            >
               {opponentPlayer?.displayName || 'Opponent'} goes first
-            </Button>
+            </button>
           </div>
         </>
       ) : (
         <>
-          <h2 className="text-2xl font-bold font-cinzel mt-2">{winnerName} Won the Roll</h2>
-          <p className="mt-4 text-muted-foreground">Waiting for them to choose who goes first...</p>
-          <div className="mt-3 flex justify-center gap-1.5">
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:-0.3s]" />
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:-0.15s]" />
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary" />
+          <h2 style={{
+            fontFamily: 'var(--font-cinzel), Georgia, serif',
+            fontSize: 22,
+            fontWeight: 700,
+            color: '#e8d5a3',
+            marginTop: 8,
+            textShadow: '0 1px 6px rgba(0,0,0,0.9)',
+          }}>{winnerName} Won the Roll</h2>
+          <p style={{
+            marginTop: 16,
+            fontSize: 13,
+            color: 'rgba(196, 149, 90, 0.45)',
+            fontFamily: 'Georgia, serif',
+          }}>Waiting for them to choose who goes first...</p>
+          <div style={{ marginTop: 12, display: 'flex', justifyContent: 'center', gap: 6 }}>
+            <span className="animate-bounce [animation-delay:-0.3s]" style={{ width: 6, height: 6, borderRadius: '50%', background: '#c4955a' }} />
+            <span className="animate-bounce [animation-delay:-0.15s]" style={{ width: 6, height: 6, borderRadius: '50%', background: '#c4955a' }} />
+            <span className="animate-bounce" style={{ width: 6, height: 6, borderRadius: '50%', background: '#c4955a' }} />
           </div>
         </>
       )}
