@@ -35,7 +35,10 @@ import {
 
 // Import all reducer arg schemas
 import AddCounterReducer from "./add_counter_reducer";
+import ApproveZoneSearchReducer from "./approve_zone_search_reducer";
+import CompleteZoneSearchReducer from "./complete_zone_search_reducer";
 import CreateGameReducer from "./create_game_reducer";
+import DenyZoneSearchReducer from "./deny_zone_search_reducer";
 import DrawCardReducer from "./draw_card_reducer";
 import DrawMultipleReducer from "./draw_multiple_reducer";
 import EndTurnReducer from "./end_turn_reducer";
@@ -49,6 +52,7 @@ import MoveCardReducer from "./move_card_reducer";
 import MoveCardToBottomOfDeckReducer from "./move_card_to_bottom_of_deck_reducer";
 import MoveCardToTopOfDeckReducer from "./move_card_to_top_of_deck_reducer";
 import MoveCardsBatchReducer from "./move_cards_batch_reducer";
+import MoveOpponentCardReducer from "./move_opponent_card_reducer";
 import PregameAcknowledgeRollReducer from "./pregame_acknowledge_roll_reducer";
 import PregameChangeDeckReducer from "./pregame_change_deck_reducer";
 import PregameChooseFirstReducer from "./pregame_choose_first_reducer";
@@ -56,6 +60,7 @@ import PregameReadyReducer from "./pregame_ready_reducer";
 import RemoveCounterReducer from "./remove_counter_reducer";
 import RemoveTokenReducer from "./remove_token_reducer";
 import RequestRematchReducer from "./request_rematch_reducer";
+import RequestZoneSearchReducer from "./request_zone_search_reducer";
 import ResignGameReducer from "./resign_game_reducer";
 import RespondRematchReducer from "./respond_rematch_reducer";
 import RollDiceReducer from "./roll_dice_reducer";
@@ -81,6 +86,7 @@ import GameRow from "./game_table";
 import GameActionRow from "./game_action_table";
 import PlayerRow from "./player_table";
 import SpectatorRow from "./spectator_table";
+import ZoneSearchRequestRow from "./zone_search_request_table";
 
 /** Type-only namespace exports for generated type groups. */
 
@@ -198,12 +204,29 @@ const tablesSchema = __schema({
       { name: 'spectator_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, SpectatorRow),
+  ZoneSearchRequest: __table({
+    name: 'zone_search_request',
+    indexes: [
+      { accessor: 'zone_search_request_game_id', name: 'zone_search_request_game_id_idx_btree', algorithm: 'btree', columns: [
+        'gameId',
+      ] },
+      { accessor: 'id', name: 'zone_search_request_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'zone_search_request_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ZoneSearchRequestRow),
 });
 
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
 const reducersSchema = __reducers(
   __reducerSchema("add_counter", AddCounterReducer),
+  __reducerSchema("approve_zone_search", ApproveZoneSearchReducer),
+  __reducerSchema("complete_zone_search", CompleteZoneSearchReducer),
   __reducerSchema("create_game", CreateGameReducer),
+  __reducerSchema("deny_zone_search", DenyZoneSearchReducer),
   __reducerSchema("draw_card", DrawCardReducer),
   __reducerSchema("draw_multiple", DrawMultipleReducer),
   __reducerSchema("end_turn", EndTurnReducer),
@@ -217,6 +240,7 @@ const reducersSchema = __reducers(
   __reducerSchema("move_card_to_bottom_of_deck", MoveCardToBottomOfDeckReducer),
   __reducerSchema("move_card_to_top_of_deck", MoveCardToTopOfDeckReducer),
   __reducerSchema("move_cards_batch", MoveCardsBatchReducer),
+  __reducerSchema("move_opponent_card", MoveOpponentCardReducer),
   __reducerSchema("pregame_acknowledge_roll", PregameAcknowledgeRollReducer),
   __reducerSchema("pregame_change_deck", PregameChangeDeckReducer),
   __reducerSchema("pregame_choose_first", PregameChooseFirstReducer),
@@ -224,6 +248,7 @@ const reducersSchema = __reducers(
   __reducerSchema("remove_counter", RemoveCounterReducer),
   __reducerSchema("remove_token", RemoveTokenReducer),
   __reducerSchema("request_rematch", RequestRematchReducer),
+  __reducerSchema("request_zone_search", RequestZoneSearchReducer),
   __reducerSchema("resign_game", ResignGameReducer),
   __reducerSchema("respond_rematch", RespondRematchReducer),
   __reducerSchema("roll_dice", RollDiceReducer),

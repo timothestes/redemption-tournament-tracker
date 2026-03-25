@@ -124,3 +124,14 @@ export const Spectator = __t.object("Spectator", {
 });
 export type Spectator = __Infer<typeof Spectator>;
 
+export const ZoneSearchRequest = __t.object("ZoneSearchRequest", {
+  id: __t.u64(),
+  gameId: __t.u64(),
+  requesterId: __t.u64(),
+  targetPlayerId: __t.u64(),
+  zone: __t.string(),
+  status: __t.string(),
+  createdAt: __t.timestamp(),
+});
+export type ZoneSearchRequest = __Infer<typeof ZoneSearchRequest>;
+

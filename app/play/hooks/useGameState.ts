@@ -118,7 +118,7 @@ export function useGameState(gameId: bigint): GameState {
   const [allChat, chatLoading] = useTable(tables.ChatMessage) as [ChatMessageRow[], boolean];
   const [allActions, actionsLoading] = useTable(tables.GameAction) as [GameActionRow[], boolean];
   const [allSpectators, spectatorsLoading] = useTable(tables.Spectator) as [SpectatorRow[], boolean];
-  const [allZoneSearchRequests, zsrLoading] = useTable((tables as any).ZoneSearchRequest) as [any[], boolean];
+  const [allZoneSearchRequests, zsrLoading] = useTable(tables.ZoneSearchRequest) as [any[], boolean];
 
   // useTable returns [rows, subscribeApplied] where subscribeApplied=true means data is ready
   // Only require core tables (game, player, cards) — chat/actions/spectators can load async
@@ -444,35 +444,35 @@ export function useGameState(gameId: bigint): GameState {
 
   const requestZoneSearch = useCallback(
     (zone: string) => {
-      (conn?.reducers as any)?.requestZoneSearch({ gameId, zone });
+      conn?.reducers.requestZoneSearch({ gameId, zone });
     },
     [conn, gameId],
   );
 
   const approveZoneSearch = useCallback(
     (requestId: bigint) => {
-      (conn?.reducers as any)?.approveZoneSearch({ gameId, requestId });
+      conn?.reducers.approveZoneSearch({ gameId, requestId });
     },
     [conn, gameId],
   );
 
   const denyZoneSearch = useCallback(
     (requestId: bigint) => {
-      (conn?.reducers as any)?.denyZoneSearch({ gameId, requestId });
+      conn?.reducers.denyZoneSearch({ gameId, requestId });
     },
     [conn, gameId],
   );
 
   const completeZoneSearch = useCallback(
     (requestId: bigint) => {
-      (conn?.reducers as any)?.completeZoneSearch({ gameId, requestId });
+      conn?.reducers.completeZoneSearch({ gameId, requestId });
     },
     [conn, gameId],
   );
 
   const moveOpponentCard = useCallback(
     (requestId: bigint, cardInstanceId: bigint, toZone: string, posX?: string, posY?: string) => {
-      (conn?.reducers as any)?.moveOpponentCard({
+      conn?.reducers.moveOpponentCard({
         gameId,
         requestId,
         cardInstanceId,
