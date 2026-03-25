@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { useGame } from '@/app/goldfish/state/GameContext';
+import { useModalGame } from '@/app/shared/contexts/ModalGameContext';
 import { GameCard } from '@/app/shared/types/gameCard';
 import { X, Search, ArrowLeftRight } from 'lucide-react';
 import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './ModalCardHoverPreview';
@@ -28,7 +28,8 @@ export function DeckExchangeModal({
   didDragRef,
   isDragActive,
 }: DeckExchangeModalProps) {
-  const { state, moveCard, moveCardToTopOfDeck, shuffleDeck } = useGame();
+  const { zones, actions } = useModalGame();
+  const { moveCard, moveCardToTopOfDeck, shuffleDeck } = actions;
   const [search, setSearch] = useState('');
   const [searchField, setSearchField] = useState<'all' | 'type' | 'name' | 'brigade' | 'alignment' | 'ability' | 'identifier'>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -75,14 +76,14 @@ export function DeckExchangeModal({
 
   // Find the cards being exchanged (they may be in any zone)
   const exchangeCards = exchangeCardIds.map(id => {
-    for (const cards of Object.values(state.zones)) {
+    for (const cards of Object.values(zones)) {
       const found = cards.find(c => c.instanceId === id);
       if (found) return found;
     }
     return null;
   }).filter(Boolean) as GameCard[];
 
-  const deckCards = state.zones.deck;
+  const deckCards = zones.deck;
   const filtered = search
     ? deckCards.filter(c => matchesSearch(c, search))
     : deckCards;
