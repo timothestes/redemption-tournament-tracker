@@ -128,11 +128,22 @@ function CopyButton({ text, label, icon }: { text: string; label: string; icon: 
   );
 }
 
-function WaitingScreen({ code, goldfishDeck, onPractice }: {
+function WaitingScreen({ code, goldfishDeck, onPractice, onUpdateMessage }: {
   code: string;
   goldfishDeck: import('@/app/goldfish/types').DeckDataForGoldfish | null;
   onPractice: () => void;
+  onUpdateMessage?: (message: string) => void;
 }) {
+  const [message, setMessage] = useState('');
+  const [messageSaved, setMessageSaved] = useState(false);
+
+  function handleSaveMessage() {
+    if (!onUpdateMessage) return;
+    onUpdateMessage(message);
+    setMessageSaved(true);
+    setTimeout(() => setMessageSaved(false), 2000);
+  }
+
   return (
     <>
     <TopNav />
@@ -149,6 +160,28 @@ function WaitingScreen({ code, goldfishDeck, onPractice }: {
           <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:-0.15s]" />
           <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary" />
         </div>
+
+        {/* Lobby message */}
+        {onUpdateMessage && (
+          <div className="mt-5">
+            <div className="flex gap-2">
+              <input
+                value={message}
+                onChange={(e) => setMessage(e.target.value.slice(0, 100))}
+                placeholder="Lobby message (optional)"
+                maxLength={100}
+                className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-primary"
+              />
+              <button
+                onClick={handleSaveMessage}
+                disabled={messageSaved}
+                className="shrink-0 rounded-md border border-border px-3 py-2 text-sm hover:bg-muted transition-colors disabled:opacity-50"
+              >
+                {messageSaved ? 'Saved' : 'Set'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Share actions */}
         <div className="mt-6 flex justify-center gap-2">
@@ -472,6 +505,9 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         code={code}
         goldfishDeck={goldfishDeck}
         onPractice={() => setIsPracticing(true)}
+        onUpdateMessage={gameId && conn ? (message: string) => {
+          conn.reducers.updateLobbyMessage({ gameId, message });
+        } : undefined}
       />
     );
   }
