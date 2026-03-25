@@ -27,9 +27,11 @@ import type {
 } from '@/lib/spacetimedb/module_bindings/types';
 import { CardContextMenu } from '@/app/shared/components/CardContextMenu';
 import { MultiCardContextMenu } from '@/app/shared/components/MultiCardContextMenu';
+import { ZoneContextMenu } from '@/app/shared/components/ZoneContextMenu';
 import type { GameActions } from '@/app/shared/types/gameActions';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import DiceOverlay from './DiceOverlay';
+import { getCardImageUrl as getSharedCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -292,6 +294,13 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     );
   }, [hoveredCard, setPreviewCard]);
 
+  // ---- Hand spread toggle (fan vs flat) ----
+  const [isSpreadHand, setIsSpreadHand] = useState(false);
+
+  // ---- Mouse position tracking for hover preview ----
+  const mousePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
   // ---- Selection state (multi-select via marquee) ----
   const {
     selectedIds,
@@ -343,6 +352,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
   const contextMenuRef = useRef(contextMenu);
   contextMenuRef.current = contextMenu;
   const [multiCardContextMenu, setMultiCardContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [zoneMenu, setZoneMenu] = useState<{ x: number; y: number; spawnX: number; spawnY: number } | null>(null);
 
   // ---- Multiplayer GameActions adapter ----
   const multiplayerActions: GameActions = useMemo(() => ({
@@ -792,17 +802,22 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
   const noopDblClick = useCallback((_card: GameCard) => {}, []);
 
   const handleMouseEnter = useCallback(
-    (card: GameCard, _e: Konva.KonvaEventObject<MouseEvent>) => {
+    (card: GameCard, e: Konva.KonvaEventObject<MouseEvent>) => {
       if (isDraggingRef.current) return;
       setHoveredInstanceId(card.instanceId);
       setHoveredCard(card);
       startHoverAnimation();
+      // Capture mouse position for the hover preview tooltip
+      const pos = { x: e.evt.clientX, y: e.evt.clientY };
+      mousePosRef.current = pos;
+      setMousePos(pos);
     },
     [startHoverAnimation],
   );
 
   const handleMouseLeave = useCallback(() => {
     setHoveredInstanceId(null);
+    setHoveredCard(null);
     stopHoverAnimation();
   }, [stopHoverAnimation]);
 
@@ -848,6 +863,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
         myHandRect,
         cardWidth,
         cardHeight,
+        isSpreadHand,
       );
       handCards.forEach((card, i) => {
         const pos = positions[i];
@@ -865,7 +881,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     }
 
     return bounds;
-  }, [mpLayout, myHandRect, myZones, myCards, cardWidth, cardHeight]);
+  }, [mpLayout, myHandRect, myZones, myCards, cardWidth, cardHeight, isSpreadHand]);
 
   // ---- Stage mouse handlers for marquee selection ----
   const handleStageMouseDown = useCallback(
@@ -900,6 +916,13 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
 
   const handleStageMouseMove = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
+      // Track mouse position for hover preview tooltip
+      const clientPos = { x: e.evt.clientX, y: e.evt.clientY };
+      mousePosRef.current = clientPos;
+      if (hoveredCard) {
+        setMousePos(clientPos);
+      }
+
       if (!isSelectingRef.current) return;
       // Cancel selection if a card drag started
       if (isDraggingRef.current) {
@@ -914,7 +937,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
         updateSelectionDrag(pos.x, pos.y, allCardBounds, e.evt.shiftKey);
       }
     },
-    [updateSelectionDrag, allCardBounds, isSelectingRef, onRectChangeRef],
+    [updateSelectionDrag, allCardBounds, isSelectingRef, onRectChangeRef, hoveredCard],
   );
 
   const handleStageMouseUp = useCallback(
@@ -989,6 +1012,19 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                   strokeWidth={1}
                   cornerRadius={3}
                   opacity={0.35}
+                  onContextMenu={isLob ? (e: Konva.KonvaEventObject<PointerEvent>) => {
+                    e.evt.preventDefault();
+                    const stage = stageRef.current;
+                    if (!stage) return;
+                    const container = stage.container().getBoundingClientRect();
+                    const menuX = e.evt.clientX - container.left;
+                    const menuY = e.evt.clientY - container.top;
+                    // Compute spawn position as normalized 0-1 within the LOB zone
+                    const pointer = stage.getPointerPosition();
+                    const spawnX = pointer ? (pointer.x - zone.x) / zone.width : 0.5;
+                    const spawnY = pointer ? (pointer.y - zone.y) / zone.height : 0.5;
+                    setZoneMenu({ x: menuX, y: menuY, spawnX, spawnY });
+                  } : undefined}
                 />
                 {/* Label + badge — skip for LOB/territory zones (rendered as overlay after cards) */}
                 {!skipLabel && (
@@ -1448,7 +1484,16 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
             const showFace = zoneKey === 'discard' && topCard && !topCard.isFlipped;
 
             return (
-              <Group key={`my-pile-${zoneKey}`}>
+              <Group
+                key={`my-pile-${zoneKey}`}
+                onClick={zoneKey !== 'deck' ? () => {
+                  // TODO Phase 2: open ZoneBrowseModal for this pile
+                  console.log(`[pile-click] ${zoneKey}: ${count} card(s)`);
+                } : undefined}
+                onDblClick={zoneKey === 'deck' ? () => {
+                  multiplayerActions.drawCard();
+                } : undefined}
+              >
                 {/* Count badge */}
                 <Group x={zone.x + zone.width - 32} y={zone.y + 2}>
                   <Rect width={26} height={18} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} />
@@ -1783,6 +1828,19 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
           actions={multiplayerActions}
           onClose={() => setMultiCardContextMenu(null)}
           onClearSelection={() => { clearSelection(); setMultiCardContextMenu(null); }}
+        />
+      )}
+
+      {zoneMenu && (
+        <ZoneContextMenu
+          x={zoneMenu.x}
+          y={zoneMenu.y}
+          spawnX={zoneMenu.spawnX}
+          spawnY={zoneMenu.spawnY}
+          onClose={() => setZoneMenu(null)}
+          onAddOpponentLostSoul={(testament, posX, posY) => {
+            multiplayerActions.spawnLostSoul(testament, String(posX), String(posY));
+          }}
         />
       )}
     </div>
