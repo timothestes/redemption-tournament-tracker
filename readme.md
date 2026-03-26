@@ -116,14 +116,13 @@ Deck upvoting
 Offline intallable app on phone (Progressive Web app with offline capabilities)
 
 ## Bugs:
-Right click on discard pile card menu hidden below preview loupe. Please fix this
+Right click on discard pile card menu hidden below preview loupe. Please fix this. 
 
 Can't drag opponents territory cards around. We should be able to do this I think.
 
 Opponent's reserve preview is thinner than the normal reserve modal. They should look the same.
-Opponent's reserve doesn't have a request flow. Its hidden information, so it should Zone Search Request.
 
-Opponents can hover face down cards in play and see what they are. Opponents shouldn't be able to see what face down cards are.
+
 
 Reserve sorting isn't a thing yet. Check out how goldfish mode sorts the reserve (I think its by type). We want the reserve to be sorted each time we open it.
 
@@ -138,3 +137,58 @@ Can't drag the top card of my or my opponents discard pile into play
 On some dimensions, the bottom menu covers up the hand. I don't know if this is a big probem that we need to try and solve for though.
 
 When rolling die, if having a long user name, the die roll that's rendered on the right hand side gets cutoff
+
+can we expand the dim zone for the hand to the bottom of the screen please?
+
+Cant drag card to opponent's hand. Should be doable just like all the other zones
+
+Cards in land of redemption should be face up and viewable by all players
+
+Still unable to drag cards from my territory to opponent's territory.
+
+search deck modal isn't centered on battlefield. We need a consistent centering strategy
+
+Lasso isn't visible in search deck menu or search reserve view
+
+
+## Features
+
+Need to add random actions to hand menu
+
+Need to add easy deck loading options in-game
+
+Concede button needs to be brighter just a little
+
+Land of Redmn looks off to me. What can we do better there?
+
+Delete play-tu50x spacetime db
+
+Enhance logs
+
+Clicking out of search deck should close search deck modal
+
+Look into this:
+
+Warning
+	Table card_instance had 1025 subscription queries with sequential scan. Consider adding an index.
+Warning
+	Table chat_message had 392 subscription queries with sequential scan. Consider adding an index.
+Warning
+	Table game had 1234 subscription queries with sequential scan. Consider adding an index.
+Warning
+	Table game_action had 1073 subscription queries with sequential scan. Consider adding an index.
+Warning
+	Table player had 1089 subscription queries with sequential scan. Consider adding an index.
+Warning
+	Table card_instance had 275 subscription queries with sequential scan. Consider adding an index.
+Warning
+	Table game had 300 subscription queries with sequential scan. Consider adding an index.
+Warning
+	Table game_action had 286 subscription queries with sequential scan. Consider adding an index.
+Warning
+	Table player had 287 subscription queries with sequential scan. Consider adding an index.
+
+Figure out how to clean up game lobby stuff
+export-game-2026-03-26-04-05-22.csv
+
+Unstack feature? When cards are placed ontop of each other
