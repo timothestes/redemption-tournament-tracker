@@ -61,6 +61,8 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
     moveCardToTopOfDeck: (cardId) => moveCardToTopOfDeck(cardId),
     moveCardToBottomOfDeck: (cardId) => moveCardToBottomOfDeck(cardId),
     removeOpponentToken: (cardId) => removeOpponentToken(cardId),
+    randomHandToZone: () => {}, // not used in goldfish
+    reloadDeck: () => {}, // not used in goldfish
   }), [moveCard, moveCardsBatch, flipCard, meekCard, unmeekCard, addCounter, removeCounter, shuffleCardIntoDeck, shuffleDeck, addNote, drawCard, drawMultiple, moveCardToTopOfDeck, moveCardToBottomOfDeck, removeOpponentToken]);
 
   // Bridge goldfish game state into the shared ModalGameContext for shared modal components

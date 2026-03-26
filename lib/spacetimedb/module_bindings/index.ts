@@ -57,6 +57,8 @@ import PregameAcknowledgeRollReducer from "./pregame_acknowledge_roll_reducer";
 import PregameChangeDeckReducer from "./pregame_change_deck_reducer";
 import PregameChooseFirstReducer from "./pregame_choose_first_reducer";
 import PregameReadyReducer from "./pregame_ready_reducer";
+import RandomHandToZoneReducer from "./random_hand_to_zone_reducer";
+import ReloadDeckReducer from "./reload_deck_reducer";
 import RemoveCounterReducer from "./remove_counter_reducer";
 import RemoveTokenReducer from "./remove_token_reducer";
 import RequestRematchReducer from "./request_rematch_reducer";
@@ -81,6 +83,7 @@ import UpdateLobbyMessageReducer from "./update_lobby_message_reducer";
 import CardCounterRow from "./card_counter_table";
 import CardInstanceRow from "./card_instance_table";
 import ChatMessageRow from "./chat_message_table";
+import CleanupScheduleRow from "./cleanup_schedule_table";
 import DisconnectTimeoutRow from "./disconnect_timeout_table";
 import GameRow from "./game_table";
 import GameActionRow from "./game_action_table";
@@ -137,6 +140,17 @@ const tablesSchema = __schema({
       { name: 'chat_message_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ChatMessageRow),
+  CleanupSchedule: __table({
+    name: 'cleanup_schedule',
+    indexes: [
+      { accessor: 'scheduledId', name: 'cleanup_schedule_scheduled_id_idx_btree', algorithm: 'btree', columns: [
+        'scheduledId',
+      ] },
+    ],
+    constraints: [
+      { name: 'cleanup_schedule_scheduled_id_key', constraint: 'unique', columns: ['scheduledId'] },
+    ],
+  }, CleanupScheduleRow),
   DisconnectTimeout: __table({
     name: 'disconnect_timeout',
     indexes: [
@@ -245,6 +259,8 @@ const reducersSchema = __reducers(
   __reducerSchema("pregame_change_deck", PregameChangeDeckReducer),
   __reducerSchema("pregame_choose_first", PregameChooseFirstReducer),
   __reducerSchema("pregame_ready", PregameReadyReducer),
+  __reducerSchema("random_hand_to_zone", RandomHandToZoneReducer),
+  __reducerSchema("reload_deck", ReloadDeckReducer),
   __reducerSchema("remove_counter", RemoveCounterReducer),
   __reducerSchema("remove_token", RemoveTokenReducer),
   __reducerSchema("request_rematch", RequestRematchReducer),

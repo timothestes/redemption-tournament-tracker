@@ -51,6 +51,12 @@ export const ChatMessage = __t.object("ChatMessage", {
 });
 export type ChatMessage = __Infer<typeof ChatMessage>;
 
+export const CleanupSchedule = __t.object("CleanupSchedule", {
+  scheduledId: __t.u64(),
+  scheduledAt: __t.scheduleAt(),
+});
+export type CleanupSchedule = __Infer<typeof CleanupSchedule>;
+
 export const DisconnectTimeout = __t.object("DisconnectTimeout", {
   scheduledId: __t.u64(),
   scheduledAt: __t.scheduleAt(),

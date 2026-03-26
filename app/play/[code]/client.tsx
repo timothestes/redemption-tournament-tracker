@@ -822,6 +822,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                   exchangeCards: (ids) => gameState.exchangeCards(JSON.stringify(ids)),
                   moveCardToTopOfDeck: (id) => gameState.moveCardToTopOfDeck(BigInt(id)),
                   moveCardToBottomOfDeck: (id) => gameState.moveCardToBottomOfDeck(BigInt(id)),
+                  randomHandToZone: (count, toZone, deckPosition) => gameState.randomHandToZone(count, toZone, deckPosition),
+                  reloadDeck: (deckId, deckData) => gameState.reloadDeck(deckId, deckData),
                 } satisfies GameActions}
                 mode="multiplayer"
                 isMyTurn={true}
@@ -922,6 +924,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               exchangeCards: (ids) => gameState.exchangeCards(JSON.stringify(ids)),
               moveCardToTopOfDeck: (id) => gameState.moveCardToTopOfDeck(BigInt(id)),
               moveCardToBottomOfDeck: (id) => gameState.moveCardToBottomOfDeck(BigInt(id)),
+              randomHandToZone: (count, toZone, deckPosition) => gameState.randomHandToZone(count, toZone, deckPosition),
+              reloadDeck: (deckId, deckData) => gameState.reloadDeck(deckId, deckData),
             } satisfies GameActions}
             mode="multiplayer"
             isMyTurn={gameState.isMyTurn}

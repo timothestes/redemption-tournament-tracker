@@ -30,6 +30,8 @@ export function useKeyboardShortcuts() {
     drawMultiple: () => {},
     moveCardToTopOfDeck: () => {},
     moveCardToBottomOfDeck: () => {},
+    randomHandToZone: () => {},
+    reloadDeck: () => {},
   }), [drawCard, shuffleDeck]);
 
   useGameHotkeys({
