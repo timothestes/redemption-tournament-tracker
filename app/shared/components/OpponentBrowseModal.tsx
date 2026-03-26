@@ -281,8 +281,8 @@ export function OpponentBrowseModal({
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
-                gap: 8,
+                gridTemplateColumns: 'repeat(5, 1fr)',
+                gap: 10,
                 position: 'relative',
                 userSelect: 'none',
               }}
