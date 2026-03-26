@@ -865,6 +865,16 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     (e: Konva.KonvaEventObject<DragEvent>) => {
       const node = e.target;
 
+      // Keep the dragged card at the Layer root so it renders above all
+      // zone clip-groups (territory, LOB, etc.). React re-renders (e.g.
+      // from zone-highlight state changes) can reconcile the node back
+      // into its original parent group, which resets z-ordering.
+      const layer = node.getLayer();
+      if (layer && node.parent !== layer) {
+        node.moveTo(layer);
+        node.moveToTop();
+      }
+
       // Clamp card position to stage bounds
       const clampedX = Math.max(-cardWidth / 2, Math.min(node.x(), width - cardWidth / 2));
       const clampedY = Math.max(-cardHeight / 2, Math.min(node.y(), height - cardHeight / 2));
@@ -926,13 +936,9 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
         dragGhostRef.current = null;
         dragGhostLayerRef.current?.batchDraw();
       }
-      // Restore follower node visibility
-      if (followerOffsets) {
-        for (const [id] of followerOffsets) {
-          const fNode = cardNodeRefs.current.get(id);
-          if (fNode) fNode.visible(true);
-        }
-      }
+      // NOTE: Follower visibility is NOT restored here. Instead it is
+      // restored later based on the drop outcome so that followers appear
+      // at the correct position (avoiding the jump-back visual glitch).
 
       const node = e.target;
       const dropX = node.x();
@@ -963,7 +969,13 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       };
 
       if (!hit) {
-        // No valid drop zone — snap back
+        // No valid drop zone — snap back; restore followers at original positions
+        if (followerOffsets) {
+          for (const [id] of followerOffsets) {
+            const fNode = cardNodeRefs.current.get(id);
+            if (fNode) fNode.visible(true);
+          }
+        }
         snapBack();
         return;
       }
@@ -983,6 +995,18 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       // Same free-form zone: just update position
       if (isSameZone && isFreeFormZone(targetZone)) {
         if (isGroupDrag) {
+          // Move follower nodes to their drop positions so they appear
+          // exactly where the ghost image was — no jump-back flicker.
+          if (followerOffsets) {
+            for (const [id, offset] of followerOffsets) {
+              const fNode = cardNodeRefs.current.get(id);
+              if (fNode) {
+                fNode.x(dropX + offset.dx);
+                fNode.y(dropY + offset.dy);
+                fNode.visible(true);
+              }
+            }
+          }
           // Build positions for batch move (normalized 0–1)
           const positions: Record<string, { posX: number; posY: number }> = {
             [card.instanceId]: { posX: (dropX - zoneOffX) / zoneW, posY: (dropY - zoneOffY) / zoneH },
@@ -1006,6 +1030,12 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
 
       // Same non-free-form zone — snap back (no meaningful action)
       if (isSameZone && !isFreeFormZone(targetZone)) {
+        if (followerOffsets) {
+          for (const [id] of followerOffsets) {
+            const fNode = cardNodeRefs.current.get(id);
+            if (fNode) fNode.visible(true);
+          }
+        }
         snapBack();
         return;
       }
