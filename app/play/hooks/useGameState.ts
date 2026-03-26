@@ -57,8 +57,8 @@ export interface GameState {
   // Action methods — each wraps a SpacetimeDB reducer call
   drawCard: () => void;
   drawMultiple: (count: bigint) => void;
-  moveCard: (cardInstanceId: bigint, toZone: string, zoneIndex?: string, posX?: string, posY?: string) => void;
-  moveCardsBatch: (cardInstanceIds: string, toZone: string, positions?: string) => void;
+  moveCard: (cardInstanceId: bigint, toZone: string, zoneIndex?: string, posX?: string, posY?: string, targetOwnerId?: string) => void;
+  moveCardsBatch: (cardInstanceIds: string, toZone: string, positions?: string, targetOwnerId?: string) => void;
   shuffleDeck: () => void;
   shuffleCardIntoDeck: (cardInstanceId: bigint) => void;
   reloadDeck: (deckId: string, deckData: string) => void;
@@ -260,7 +260,7 @@ export function useGameState(gameId: bigint): GameState {
   );
 
   const moveCard = useCallback(
-    (cardInstanceId: bigint, toZone: string, zoneIndex?: string, posX?: string, posY?: string) => {
+    (cardInstanceId: bigint, toZone: string, zoneIndex?: string, posX?: string, posY?: string, targetOwnerId?: string) => {
       conn?.reducers.moveCard({
         gameId,
         cardInstanceId,
@@ -268,18 +268,20 @@ export function useGameState(gameId: bigint): GameState {
         zoneIndex: zoneIndex || '0',
         posX: posX || '',
         posY: posY || '',
+        targetOwnerId: targetOwnerId || '',
       });
     },
     [conn, gameId],
   );
 
   const moveCardsBatch = useCallback(
-    (cardInstanceIds: string, toZone: string, positions?: string) => {
+    (cardInstanceIds: string, toZone: string, positions?: string, targetOwnerId?: string) => {
       conn?.reducers.moveCardsBatch({
         gameId,
         cardInstanceIds,
         toZone,
         positions: positions || '{}',
+        targetOwnerId: targetOwnerId || '',
       });
     },
     [conn, gameId],

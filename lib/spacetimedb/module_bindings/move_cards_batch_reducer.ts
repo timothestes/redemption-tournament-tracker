@@ -15,4 +15,5 @@ export default {
   cardInstanceIds: __t.string(),
   toZone: __t.string(),
   positions: __t.string(),
+  targetOwnerId: __t.string(),
 };

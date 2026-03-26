@@ -170,9 +170,8 @@ export function OpponentBrowseModal({
         inset: 0,
         background: 'rgba(0,0,0,0.75)',
         display: 'flex',
-        alignItems: 'flex-start',
+        alignItems: 'center',
         justifyContent: 'center',
-        paddingTop: '5vh',
         zIndex: 900,
       }}
     >

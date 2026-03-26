@@ -17,4 +17,5 @@ export default {
   zoneIndex: __t.string(),
   posX: __t.string(),
   posY: __t.string(),
+  targetOwnerId: __t.string(),
 };

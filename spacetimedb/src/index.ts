@@ -1083,8 +1083,9 @@ export const move_card = spacetimedb.reducer(
     zoneIndex: t.string(),
     posX: t.string(),
     posY: t.string(),
+    targetOwnerId: t.string(),
   },
-  (ctx, { gameId, cardInstanceId, toZone, zoneIndex, posX, posY }) => {
+  (ctx, { gameId, cardInstanceId, toZone, zoneIndex, posX, posY, targetOwnerId }) => {
     const player = findPlayerBySender(ctx, gameId);
 
     const card = ctx.db.CardInstance.id.find(cardInstanceId);
@@ -1094,6 +1095,8 @@ export const move_card = spacetimedb.reducer(
 
     const fromZone = card.zone;
     const isFlipped = toZone === 'deck';
+    // Optionally transfer ownership (e.g. rescue lost soul, capture hero)
+    const newOwnerId = targetOwnerId ? BigInt(targetOwnerId) : card.ownerId;
 
     ctx.db.CardInstance.id.update({
       ...card,
@@ -1102,6 +1105,7 @@ export const move_card = spacetimedb.reducer(
       posX,
       posY,
       isFlipped,
+      ownerId: newOwnerId,
     });
 
     const game = ctx.db.Game.id.find(gameId);
@@ -1120,12 +1124,14 @@ export const move_cards_batch = spacetimedb.reducer(
     cardInstanceIds: t.string(),
     toZone: t.string(),
     positions: t.string(),
+    targetOwnerId: t.string(),
   },
-  (ctx, { gameId, cardInstanceIds, toZone, positions }) => {
+  (ctx, { gameId, cardInstanceIds, toZone, positions, targetOwnerId }) => {
     const player = findPlayerBySender(ctx, gameId);
 
     const ids: string[] = JSON.parse(cardInstanceIds);
     const posMap: Record<string, { posX: string; posY: string }> = positions ? JSON.parse(positions) : {};
+    const newOwnerId = targetOwnerId ? BigInt(targetOwnerId) : null;
 
     for (const idStr of ids) {
       const cardId = BigInt(idStr);
@@ -1143,6 +1149,7 @@ export const move_cards_batch = spacetimedb.reducer(
         posX: pos.posX,
         posY: pos.posY,
         isFlipped,
+        ownerId: newOwnerId ?? card.ownerId,
       });
     }
 

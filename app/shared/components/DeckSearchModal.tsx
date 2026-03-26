@@ -397,9 +397,8 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
         inset: 0,
         background: 'rgba(0,0,0,0.35)',
         display: 'flex',
-        alignItems: 'flex-start',
+        alignItems: 'center',
         justifyContent: 'center',
-        paddingTop: '5vh',
         zIndex: 500,
       }}
     >
@@ -687,11 +686,11 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
                     top: lassoRect.y,
                     width: lassoRect.w,
                     height: lassoRect.h,
-                    border: '1px dashed var(--gf-accent)',
-                    background: 'rgba(196,149,90,0.12)',
+                    border: '2px dashed var(--gf-accent)',
+                    background: 'rgba(196,149,90,0.15)',
                     borderRadius: 2,
                     pointerEvents: 'none',
-                    zIndex: 10,
+                    zIndex: 100,
                   }}
                 />
               )}

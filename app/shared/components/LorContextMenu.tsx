@@ -34,7 +34,7 @@ export function LorContextMenu({ x, y, onAddSoul, onClose }: LorContextMenuProps
       ref={menuRef}
       onContextMenu={(e) => e.preventDefault()}
       style={{
-        position: 'absolute',
+        position: 'fixed',
         left: Math.min(x, window.innerWidth - 160),
         top: Math.min(y, window.innerHeight - 100),
         background: 'var(--gf-bg)',

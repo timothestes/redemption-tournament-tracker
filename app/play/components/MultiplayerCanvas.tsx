@@ -582,6 +582,11 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
         return { zone: 'hand', owner: 'my' };
       }
 
+      // Check opponent hand zone
+      if (opponentHandRect && pointInRect(x, y, opponentHandRect)) {
+        return { zone: 'hand', owner: 'opponent' };
+      }
+
       // Check my zones (all: free-form + sidebar piles)
       for (const [key, rect] of Object.entries(myZones)) {
         if (pointInRect(x, y, rect)) {
@@ -606,7 +611,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
 
       return null;
     },
-    [mpLayout, myZones, opponentZones, myHandRect],
+    [mpLayout, myZones, opponentZones, myHandRect, opponentHandRect],
   );
 
   // ---- Modal card drag hook (for dragging cards from modals to canvas) ----
@@ -997,6 +1002,12 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       const zoneOffY = zoneRect?.y ?? 0;
       const zoneW = zoneRect?.width || 1;
       const zoneH = zoneRect?.height || 1;
+      // Resolve target owner ID for cross-player moves (e.g. rescue lost soul,
+      // capture hero, or placing cards in opponent's zones).
+      const targetOwnerId = hit.owner === 'opponent' && gameState.opponentPlayer
+        ? String(gameState.opponentPlayer.id)
+        : '';
+
       // Opponent zones render with mirrored positions (1-posX, 1-posY).
       // When dropping into an opponent zone, inverse-mirror so the card
       // appears where it was visually dropped, not at the mirrored position.
@@ -1087,16 +1098,17 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
             JSON.stringify(cardIds),
             targetZone,
             JSON.stringify(positions),
+            targetOwnerId,
           );
         } else {
-          moveCardsBatch(JSON.stringify(cardIds), targetZone);
+          moveCardsBatch(JSON.stringify(cardIds), targetZone, undefined, targetOwnerId);
         }
         clearSelection();
       } else if (isFreeFormZone(targetZone)) {
-        moveCard(cardId, targetZone, '', String(normX(dropX)), String(normY(dropY)));
+        moveCard(cardId, targetZone, '', String(normX(dropX)), String(normY(dropY)), targetOwnerId);
       } else if (isAutoArrangeZone(targetZone)) {
         // Auto-arrange zone: positions are ignored by rendering
-        moveCard(cardId, targetZone, '', '0', '0');
+        moveCard(cardId, targetZone, '', '0', '0', targetOwnerId);
       } else if (targetZone === 'deck') {
         const stage = stageRef.current;
         if (stage) {
@@ -1108,11 +1120,11 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
             cardId: String(cardId),
           });
         } else {
-          moveCard(cardId, targetZone, '0');
+          moveCard(cardId, targetZone, '0', undefined, undefined, targetOwnerId);
         }
       } else {
         // Stacked zone
-        moveCard(cardId, targetZone, '0');
+        moveCard(cardId, targetZone, '0', undefined, undefined, targetOwnerId);
       }
     },
     [
@@ -1126,6 +1138,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       clearSelection,
       myZones,
       opponentZones,
+      gameState.opponentPlayer,
     ],
   );
 
@@ -1526,7 +1539,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
             x={myHandRect.x}
             y={myHandRect.y}
             width={myHandRect.width}
-            height={myHandRect.height}
+            height={height - myHandRect.y}
             fill="#0d0905"
             opacity={0.5}
             onContextMenu={(e: Konva.KonvaEventObject<PointerEvent>) => {
@@ -1928,9 +1941,9 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
             // Center card vertically in remaining space after count badge (18px top)
             const cy = zone.y + 18 + Math.max(0, (zone.height - 18 - pileCardHeight) / 2);
 
-            // For discard, show top card face-up; for everything else, card back
+            // Discard and LOR show top card face-up; everything else shows card back
             const topCard = cards[cards.length - 1];
-            const showFace = zoneKey === 'discard' && topCard && !topCard.isFlipped;
+            const showFace = (zoneKey === 'discard' || zoneKey === 'land-of-redemption') && topCard && !topCard.isFlipped;
 
             return (
               <Group
@@ -2044,7 +2057,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
             const cy = zone.y + 18 + Math.max(0, (zone.height - 18 - pileCardHeight) / 2);
 
             const topCard = cards[cards.length - 1];
-            const showFace = zoneKey === 'discard' && topCard && !topCard.isFlipped;
+            const showFace = (zoneKey === 'discard' || zoneKey === 'land-of-redemption') && topCard && !topCard.isFlipped;
 
             return (
               <Group

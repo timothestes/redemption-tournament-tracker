@@ -509,11 +509,11 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
                   top: lassoRect.y,
                   width: lassoRect.w,
                   height: lassoRect.h,
-                  border: '1px dashed var(--gf-accent)',
-                  background: 'rgba(196,149,90,0.12)',
+                  border: '2px dashed var(--gf-accent)',
+                  background: 'rgba(196,149,90,0.15)',
                   borderRadius: 2,
                   pointerEvents: 'none',
-                  zIndex: 10,
+                  zIndex: 100,
                 }}
               />
             )}
