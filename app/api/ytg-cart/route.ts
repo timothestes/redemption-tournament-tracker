@@ -132,7 +132,7 @@ function findBudgetSubstitute(
   cardNameIndex: Map<string, CardRow[]>,
   dupIndex: DuplicateGroupIndex,
   cardLookup: Map<string, CardLookupEntry>,
-  liveInventory: Map<string, { variantId: string; inventory: number; tracked: boolean }> | null,
+  liveInventory: Map<string, { variantId: string; inventory: number; tracked: boolean; continuesSelling: boolean }> | null,
 ): BudgetSubstituteResult {
   // Find the source card in carddata to get its special ability
   const sourceCard = cardData.find(c => c.card_key === cardKey);
@@ -182,7 +182,7 @@ function findBudgetSubstitute(
     let variantId = info.cached_variant_id;
     if (liveInventory) {
       const live = liveInventory.get(info.shopify_product_id);
-      if (live && live.tracked && live.inventory <= 0) {
+      if (live && live.tracked && live.inventory <= 0 && !live.continuesSelling) {
         hadPricedButSoldOut = true;
         continue;
       }
@@ -453,7 +453,7 @@ export async function POST(request: NextRequest) {
     )];
 
     // Step 4: Real-time inventory check via Shopify Admin API
-    let liveInventory: Map<string, { variantId: string; inventory: number; tracked: boolean }> | null = null;
+    let liveInventory: Map<string, { variantId: string; inventory: number; tracked: boolean; continuesSelling: boolean }> | null = null;
     try {
       const token = await getShopifyAccessToken();
       liveInventory = await fetchProductInventory(token, productIds);
@@ -548,7 +548,7 @@ export async function POST(request: NextRequest) {
       // Check live inventory if available
       if (liveInventory) {
         const live = liveInventory.get(info.shopify_product_id);
-        if (live && live.tracked && live.inventory <= 0) {
+        if (live && live.tracked && live.inventory <= 0 && !live.continuesSelling) {
           unmatched.push({
             card_name: card.card_name,
             card_key: card.card_key,
