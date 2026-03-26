@@ -163,11 +163,35 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
     { id: 'ability', label: 'Ability' },
   ];
 
+  const TYPE_ALIASES: Record<string, string[]> = {
+    'ls': ['lost soul', 'lost souls'],
+    'he': ['hero', 'heroes'],
+    'ec': ['evil character', 'evil characters'],
+    'gc': ['good character', 'good characters'],
+    'ee': ['evil enhancement', 'evil enhancements'],
+    'ge': ['good enhancement', 'good enhancements'],
+    'da': ['dominant artifact', 'dominant artifacts'],
+    'ar': ['artifact'],
+    'fo': ['fortress'],
+    'si': ['site'],
+    'cu': ['curse'],
+    'co': ['covenant'],
+  };
+
   const matchesSearch = (c: GameCard, term: string): boolean => {
     const t = term.toLowerCase();
+
+    const matchesType = (type: string, searchTerm: string): boolean => {
+      const typeLower = type.toLowerCase();
+      if (typeLower.includes(searchTerm)) return true;
+      const aliases = TYPE_ALIASES[typeLower];
+      if (aliases) return aliases.some(alias => alias.includes(searchTerm));
+      return false;
+    };
+
     if (searchField === 'all') {
       return (
-        c.type.toLowerCase().includes(t) ||
+        matchesType(c.type, t) ||
         c.cardName.toLowerCase().includes(t) ||
         c.brigade.toLowerCase().includes(t) ||
         c.alignment.toLowerCase().includes(t) ||
@@ -176,7 +200,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
       );
     }
     switch (searchField) {
-      case 'type': return c.type.toLowerCase().includes(t);
+      case 'type': return matchesType(c.type, t);
       case 'name': return c.cardName.toLowerCase().includes(t);
       case 'brigade': return c.brigade.toLowerCase().includes(t);
       case 'alignment': return c.alignment.toLowerCase().includes(t);
