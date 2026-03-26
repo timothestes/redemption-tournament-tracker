@@ -328,7 +328,7 @@ export default function DeckBuilderPanel({
   const [deckType, setDeckType] = useState<'T1' | 'T2' | 'Paragon'>(() => {
     const format = deck.format?.toLowerCase();
     if (format?.includes('paragon')) return 'Paragon';
-    if (format?.includes('type 2') || format?.includes('multi')) return 'T2';
+    if (format?.includes('type 2')) return 'T2';
     return 'T1';
   });
 
@@ -338,7 +338,7 @@ export default function DeckBuilderPanel({
     let newType: 'T1' | 'T2' | 'Paragon';
     if (format?.includes('paragon')) {
       newType = 'Paragon';
-    } else if (format?.includes('type 2') || format?.includes('multi')) {
+    } else if (format?.includes('type 2')) {
       newType = 'T2';
     } else {
       newType = 'T1';
@@ -1645,7 +1645,7 @@ export default function DeckBuilderPanel({
             const errCount = deckCheckResult
               ? deckCheckResult.issues.filter(i => i.type === "error").length
               : validation.issues.filter(i => i.type === "error").length;
-            const isT2Fmt = deck.format?.toLowerCase().includes("type 2") || deck.format?.toLowerCase().includes("multi");
+            const isT2Fmt = deck.format?.toLowerCase().includes("type 2");
             const label = valid
               ? "Tournament Legal"
               : `${errCount} issue${errCount !== 1 ? "s" : ""} found`;
@@ -2700,7 +2700,7 @@ export default function DeckBuilderPanel({
               </h3>
               <div className="grid grid-cols-2 gap-3">
                 {(() => {
-                  const isT2Format = deck.format?.toLowerCase().includes("type 2") || deck.format?.toLowerCase().includes("multi");
+                  const isT2Format = deck.format?.toLowerCase().includes("type 2");
 
                   // Calculate raw alignment counts (all cards)
                   const alignmentCounts = deck.cards.reduce((acc, deckCard) => {

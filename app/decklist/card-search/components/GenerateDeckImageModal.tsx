@@ -19,7 +19,7 @@ interface GenerateDeckImageModalProps {
 export default function GenerateDeckImageModal({ deck, onClose, isLegal }: GenerateDeckImageModalProps) {
   const deckType = deck.format?.toLowerCase().includes("paragon")
     ? "paragon"
-    : deck.format?.toLowerCase().includes("type 2") || deck.format?.toLowerCase().includes("multi")
+    : deck.format?.toLowerCase().includes("type 2")
     ? "type_2"
     : "type_1";
 

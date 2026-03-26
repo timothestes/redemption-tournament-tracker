@@ -53,7 +53,7 @@ function formatDeckType(format?: string): string {
   if (!format) return "T1";
   const fmt = format.toLowerCase();
   if (fmt.includes("paragon")) return "Paragon";
-  if (fmt.includes("type 2") || fmt.includes("multi") || fmt === "t2") return "T2";
+  if (fmt.includes("type 2") || fmt === "t2") return "T2";
   return "T1";
 }
 
@@ -93,43 +93,32 @@ function getPlacementLabel(place: number): string {
 }
 
 function TrophyIcon({ place, className }: { place: number; className?: string }) {
-  if (place === 1) {
-    return (
-      <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M6 2h12v6a6 6 0 01-12 0V2z" fill="#FFD700" stroke="#B8860B" strokeWidth="1.5"/>
-        <path d="M6 4H3a1 1 0 00-1 1v1a4 4 0 004 4" stroke="#B8860B" strokeWidth="1.5" fill="#FFD700"/>
-        <path d="M18 4h3a1 1 0 011 1v1a4 4 0 01-4 4" stroke="#B8860B" strokeWidth="1.5" fill="#FFD700"/>
-        <path d="M9 14h6v2H9z" fill="#B8860B"/>
-        <path d="M8 16h8v1a1 1 0 01-1 1H9a1 1 0 01-1-1v-1z" fill="#FFD700" stroke="#B8860B" strokeWidth="1"/>
-        <path d="M7 19h10v2a1 1 0 01-1 1H8a1 1 0 01-1-1v-2z" fill="#B8860B"/>
-      </svg>
-    );
-  }
-  if (place === 2) {
-    return (
-      <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M6 2h12v6a6 6 0 01-12 0V2z" fill="#C0C0C0" stroke="#808080" strokeWidth="1.5"/>
-        <path d="M6 4H3a1 1 0 00-1 1v1a4 4 0 004 4" stroke="#808080" strokeWidth="1.5" fill="#C0C0C0"/>
-        <path d="M18 4h3a1 1 0 011 1v1a4 4 0 01-4 4" stroke="#808080" strokeWidth="1.5" fill="#C0C0C0"/>
-        <path d="M9 14h6v2H9z" fill="#808080"/>
-        <path d="M8 16h8v1a1 1 0 01-1 1H9a1 1 0 01-1-1v-1z" fill="#C0C0C0" stroke="#808080" strokeWidth="1"/>
-        <path d="M7 19h10v2a1 1 0 01-1 1H8a1 1 0 01-1-1v-2z" fill="#808080"/>
-      </svg>
-    );
-  }
-  if (place === 3) {
-    return (
-      <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M6 2h12v6a6 6 0 01-12 0V2z" fill="#CD7F32" stroke="#8B5A2B" strokeWidth="1.5"/>
-        <path d="M6 4H3a1 1 0 00-1 1v1a4 4 0 004 4" stroke="#8B5A2B" strokeWidth="1.5" fill="#CD7F32"/>
-        <path d="M18 4h3a1 1 0 011 1v1a4 4 0 01-4 4" stroke="#8B5A2B" strokeWidth="1.5" fill="#CD7F32"/>
-        <path d="M9 14h6v2H9z" fill="#8B5A2B"/>
-        <path d="M8 16h8v1a1 1 0 01-1 1H9a1 1 0 01-1-1v-1z" fill="#CD7F32" stroke="#8B5A2B" strokeWidth="1"/>
-        <path d="M7 19h10v2a1 1 0 01-1 1H8a1 1 0 01-1-1v-2z" fill="#8B5A2B"/>
-      </svg>
-    );
-  }
-  return null;
+  const colors = place === 1
+    ? { fill: "#FFD700", stroke: "#B8860B" }
+    : place === 2
+      ? { fill: "#C0C0C0", stroke: "#808080" }
+      : place === 3
+        ? { fill: "#CD7F32", stroke: "#8B5A2B" }
+        : null;
+
+  if (!colors) return null;
+
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Cup bowl */}
+      <path d="M7 3h10v5c0 2.76-2.24 5-5 5s-5-2.24-5-5V3z" fill={colors.fill} stroke={colors.stroke} strokeWidth="1.2"/>
+      {/* Left handle */}
+      <path d="M7 5H5.5C4.12 5 3 6.12 3 7.5S4.12 10 5.5 10H7" stroke={colors.stroke} strokeWidth="1.2" fill="none"/>
+      {/* Right handle */}
+      <path d="M17 5h1.5C19.88 5 21 6.12 21 7.5S19.88 10 18.5 10H17" stroke={colors.stroke} strokeWidth="1.2" fill="none"/>
+      {/* Stem */}
+      <path d="M11 13h2v4h-2z" fill={colors.stroke}/>
+      {/* Base */}
+      <path d="M8 17h8v1.5a1 1 0 01-1 1H9a1 1 0 01-1-1V17z" fill={colors.fill} stroke={colors.stroke} strokeWidth="1"/>
+      {/* Base plate */}
+      <rect x="7" y="20" width="10" height="1.5" rx="0.5" fill={colors.stroke}/>
+    </svg>
+  );
 }
 
 const PAGE_SIZE = 24;
