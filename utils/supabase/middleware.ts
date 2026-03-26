@@ -56,7 +56,10 @@ export const updateSession = async (request: NextRequest) => {
 
       // Protected routes: redirect to sign-in if no session
       if (needsAuth(pathname) && !user && error) {
-        return NextResponse.redirect(new URL("/sign-in", request.url));
+        const fullPath = request.nextUrl.pathname + request.nextUrl.search;
+        const signInUrl = new URL("/sign-in", request.url);
+        signInUrl.searchParams.set("redirectTo", fullPath);
+        return NextResponse.redirect(signInUrl);
       }
 
       // Logged-in users hitting root get sent to the tracker

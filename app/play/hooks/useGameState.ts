@@ -558,5 +558,13 @@ function groupCardsByZone(cards: CardInstanceRow[]): Record<string, CardInstance
     }
     result[zone].push(card);
   }
+  // Sort deck cards by zoneIndex to preserve shuffled order
+  if (result['deck']) {
+    result['deck'].sort((a, b) => {
+      const ai = typeof a.zoneIndex === 'bigint' ? a.zoneIndex : BigInt(a.zoneIndex ?? 0);
+      const bi = typeof b.zoneIndex === 'bigint' ? b.zoneIndex : BigInt(b.zoneIndex ?? 0);
+      return ai < bi ? -1 : ai > bi ? 1 : 0;
+    });
+  }
   return result;
 }

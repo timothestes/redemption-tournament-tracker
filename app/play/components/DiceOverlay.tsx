@@ -20,6 +20,15 @@ interface DiceOverlayProps {
   identityHex: string | undefined;
 }
 
+interface ActiveRoll {
+  id: number;
+  data: DiceRollData;
+  rollerName: string;
+  isMe: boolean;
+  displayValue: number;
+  isTumbling: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Animation constants
 // ---------------------------------------------------------------------------
@@ -81,6 +90,91 @@ function D20Face({ value, sides, size }: { value: number; sides: number; size: n
 }
 
 // ---------------------------------------------------------------------------
+// Single die display (used for each roll slot)
+// ---------------------------------------------------------------------------
+
+function DieDisplay({ roll, dieSize }: { roll: ActiveRoll; dieSize: number }) {
+  return (
+    <div
+      style={{
+        position: 'relative',
+        width: dieSize,
+      }}
+    >
+      {/* Die with tumble animation */}
+      <motion.div
+        key={`die-${roll.id}`}
+        initial={{ scale: 0.4, rotate: -90, opacity: 0 }}
+        animate={
+          roll.isTumbling
+            ? { scale: [0.4, 1.15, 0.95, 1.05, 1], rotate: [-90, 60, -20, 8, 0], opacity: 1 }
+            : { scale: 1, rotate: 0, opacity: 1 }
+        }
+        transition={
+          roll.isTumbling
+            ? { duration: TUMBLE_DURATION_MS / 1000, ease: 'easeOut' }
+            : { duration: 0.12 }
+        }
+        style={{
+          filter:
+            'drop-shadow(0 4px 20px rgba(0,0,0,0.8)) drop-shadow(0 0 10px rgba(196,149,90,0.3))',
+        }}
+      >
+        <D20Face value={roll.displayValue} sides={roll.data.sides} size={dieSize} />
+      </motion.div>
+
+      {/* Roller name + result label — fades in after tumble, absolutely positioned below die */}
+      <AnimatePresence>
+        {!roll.isTumbling && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2, delay: 0.05 }}
+            style={{
+              position: 'absolute',
+              top: dieSize + 4,
+              left: 0,
+              right: 0,
+              textAlign: 'center',
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none',
+            }}
+          >
+            <div
+              style={{
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+                fontSize: 11,
+                letterSpacing: '0.07em',
+                textTransform: 'uppercase',
+                color: roll.isMe ? '#c4955a' : '#4a7ab5',
+                textShadow: '0 1px 6px rgba(0,0,0,0.9)',
+                lineHeight: 1.3,
+              }}
+            >
+              {roll.rollerName}
+            </div>
+            <div
+              style={{
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+                fontSize: 10,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                color: 'rgba(232,213,163,0.6)',
+                textShadow: '0 1px 6px rgba(0,0,0,0.9)',
+                lineHeight: 1.3,
+              }}
+            >
+              rolled {roll.data.result}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main overlay component
 // ---------------------------------------------------------------------------
 
@@ -90,17 +184,11 @@ export default function DiceOverlay({
   opponentPlayer,
   identityHex,
 }: DiceOverlayProps) {
-  const [activeRoll, setActiveRoll] = useState<{
-    id: number;
-    data: DiceRollData;
-    rollerName: string;
-    isMe: boolean;
-  } | null>(null);
-  const [displayValue, setDisplayValue] = useState(1);
-  const [isTumbling, setIsTumbling] = useState(false);
+  const [myRoll, setMyRoll] = useState<ActiveRoll | null>(null);
+  const [opponentRoll, setOpponentRoll] = useState<ActiveRoll | null>(null);
 
   const rollIdRef = useRef(0);
-  const prevLastDiceRollRef = useRef<string>('');
+  const prevLastDiceRollRef = useRef<string>(lastDiceRoll || '');
 
   useEffect(() => {
     if (!lastDiceRoll || lastDiceRoll === '' || lastDiceRoll === prevLastDiceRollRef.current) {
@@ -127,26 +215,41 @@ export default function DiceOverlay({
     }
 
     const id = ++rollIdRef.current;
+    const setRoll = isMe ? setMyRoll : setOpponentRoll;
 
-    setIsTumbling(true);
-    setDisplayValue(Math.floor(Math.random() * (parsed.sides || 20)) + 1);
-    setActiveRoll({ id, data: parsed, rollerName, isMe });
+    const newRoll: ActiveRoll = {
+      id,
+      data: parsed,
+      rollerName,
+      isMe,
+      displayValue: Math.floor(Math.random() * (parsed.sides || 20)) + 1,
+      isTumbling: true,
+    };
+    setRoll(newRoll);
 
     // Tumble through random faces
     let frame = 0;
     const interval = setInterval(() => {
       frame++;
-      setDisplayValue(Math.floor(Math.random() * (parsed.sides || 20)) + 1);
+      const dv = frame >= TUMBLE_FRAMES
+        ? parsed.result
+        : Math.floor(Math.random() * (parsed.sides || 20)) + 1;
+      setRoll((prev) => {
+        if (!prev || prev.id !== id) return prev;
+        return {
+          ...prev,
+          displayValue: dv,
+          isTumbling: frame < TUMBLE_FRAMES,
+        };
+      });
       if (frame >= TUMBLE_FRAMES) {
         clearInterval(interval);
-        setDisplayValue(parsed.result);
-        setIsTumbling(false);
       }
     }, TUMBLE_DURATION_MS / TUMBLE_FRAMES);
 
     // Auto-dismiss
     const dismissTimer = setTimeout(() => {
-      setActiveRoll((prev) => (prev?.id === id ? null : prev));
+      setRoll((prev) => (prev?.id === id ? null : prev));
     }, TUMBLE_DURATION_MS + DISPLAY_DURATION_MS);
 
     return () => {
@@ -158,101 +261,50 @@ export default function DiceOverlay({
   const dieSize = 96;
 
   return (
-    <AnimatePresence>
-      {activeRoll && (
-        <motion.div
-          key={activeRoll.id}
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20, transition: { duration: 0.25 } }}
-          transition={{ duration: 0.15 }}
-          style={{
-            position: 'fixed',
-            bottom: 68, // sits above the 52px TurnIndicator bar with a small gap
-            left: 16,
-            zIndex: 500,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            pointerEvents: 'none',
-            gap: 0,
-          }}
-        >
-          {/* Die with tumble animation */}
+    <>
+      {/* My roll — bottom-left */}
+      <AnimatePresence>
+        {myRoll && (
           <motion.div
-            key={`die-${activeRoll.id}`}
-            initial={{ scale: 0.4, rotate: -90, opacity: 0 }}
-            animate={
-              isTumbling
-                ? { scale: [0.4, 1.15, 0.95, 1.05, 1], rotate: [-90, 60, -20, 8, 0], opacity: 1 }
-                : { scale: 1, rotate: 0, opacity: 1 }
-            }
-            transition={
-              isTumbling
-                ? { duration: TUMBLE_DURATION_MS / 1000, ease: 'easeOut' }
-                : { duration: 0.12 }
-            }
+            key={`my-${myRoll.id}`}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20, transition: { duration: 0.25 } }}
+            transition={{ duration: 0.15 }}
             style={{
-              filter:
-                'drop-shadow(0 4px 20px rgba(0,0,0,0.8)) drop-shadow(0 0 10px rgba(196,149,90,0.3))',
+              position: 'fixed',
+              bottom: 68,
+              left: 16,
+              zIndex: 500,
+              pointerEvents: 'none',
             }}
           >
-            <D20Face
-              value={displayValue}
-              sides={activeRoll.data.sides}
-              size={dieSize}
-            />
+            <DieDisplay roll={myRoll} dieSize={dieSize} />
           </motion.div>
+        )}
+      </AnimatePresence>
 
-          {/* Roller name + result label — fades in after tumble */}
-          <AnimatePresence>
-            {!isTumbling && (
-              <motion.div
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2, delay: 0.05 }}
-                style={{
-                  position: 'absolute',
-                  top: dieSize + 10,
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  textAlign: 'center',
-                  whiteSpace: 'nowrap',
-                  pointerEvents: 'none',
-                }}
-              >
-                <div
-                  style={{
-                    fontFamily: 'var(--font-cinzel), Georgia, serif',
-                    fontSize: 11,
-                    letterSpacing: '0.07em',
-                    textTransform: 'uppercase',
-                    color: activeRoll.isMe ? '#c4955a' : '#4a7ab5',
-                    textShadow: '0 1px 6px rgba(0,0,0,0.9)',
-                    lineHeight: 1.3,
-                  }}
-                >
-                  {activeRoll.rollerName}
-                </div>
-                <div
-                  style={{
-                    fontFamily: 'var(--font-cinzel), Georgia, serif',
-                    fontSize: 10,
-                    letterSpacing: '0.06em',
-                    textTransform: 'uppercase',
-                    color: 'rgba(232,213,163,0.6)',
-                    textShadow: '0 1px 6px rgba(0,0,0,0.9)',
-                    lineHeight: 1.3,
-                  }}
-                >
-                  rolled {activeRoll.data.result}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
-      )}
-    </AnimatePresence>
+      {/* Opponent roll — bottom-right */}
+      <AnimatePresence>
+        {opponentRoll && (
+          <motion.div
+            key={`opp-${opponentRoll.id}`}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20, transition: { duration: 0.25 } }}
+            transition={{ duration: 0.15 }}
+            style={{
+              position: 'fixed',
+              bottom: 68,
+              right: 16,
+              zIndex: 500,
+              pointerEvents: 'none',
+            }}
+          >
+            <DieDisplay roll={opponentRoll} dieSize={dieSize} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

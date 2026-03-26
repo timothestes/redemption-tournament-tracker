@@ -42,6 +42,7 @@ export const signUpAction = async (formData: FormData) => {
 export const signInAction = async (formData: FormData) => {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
+  const redirectTo = formData.get("redirectTo") as string | null;
   const supabase = await createClient();
 
   const { error } = await supabase.auth.signInWithPassword({
@@ -52,18 +53,19 @@ export const signInAction = async (formData: FormData) => {
   if (error) {
     const searchParams = new URLSearchParams();
     searchParams.append('email', email);
-    
+
     // Map Supabase error to user-friendly message
     let friendlyMessage = error.message;
     if (error.message === 'Invalid login credentials') {
       friendlyMessage = 'Incorrect email or password. Please try again.';
     }
-    
+
     searchParams.append('error', friendlyMessage);
+    if (redirectTo) searchParams.append('redirectTo', redirectTo);
     return redirect(`/sign-in?${searchParams.toString()}`);
   }
 
-  return redirect("/decklist/community");
+  return redirect(redirectTo || "/decklist/community");
 };
 
 export const forgotPasswordAction = async (formData: FormData) => {

@@ -366,7 +366,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      onClick={handleClose}
+      onClick={() => { if (!didDragRef?.current) handleClose(); }}
       onContextMenu={(e) => e.preventDefault()}
       style={{
         position: 'fixed',

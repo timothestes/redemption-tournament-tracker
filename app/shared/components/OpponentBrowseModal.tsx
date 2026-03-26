@@ -116,15 +116,6 @@ export function OpponentBrowseModal({
     ? cards.filter(c => c.cardName.toLowerCase().includes(search.toLowerCase()))
     : cards;
 
-  // Close modal after a successful drag-to-canvas completes
-  const prevDragActive = useRef(false);
-  useEffect(() => {
-    if (prevDragActive.current && !isDragActive) {
-      onClose();
-    }
-    prevDragActive.current = !!isDragActive;
-  }, [isDragActive, onClose]);
-
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();

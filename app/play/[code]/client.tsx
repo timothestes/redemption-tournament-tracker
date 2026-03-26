@@ -17,6 +17,7 @@ import { GameToolbar } from '@/app/shared/components/GameToolbar';
 import { GameToastContainer, showGameToast } from '@/app/shared/components/GameToast';
 import type { GameActions } from '@/app/shared/types/gameActions';
 import WaitingRoomGoldfish from '../components/WaitingRoomGoldfish';
+import { SpreadHandProvider, useSpreadHand } from '../contexts/SpreadHandContext';
 import { convertToGoldfishDeck, type GameCardData } from '../utils/convertToGoldfishDeck';
 import PregameScreen from '../components/PregameScreen';
 
@@ -77,7 +78,9 @@ export function GameClient({ code }: GameClientProps) {
   return (
     <SpacetimeProvider connectionBuilder={connectionBuilder}>
       <CardPreviewProvider storageKey="multiplayer-loupe-visible">
-        <GameInner code={code} isConnected={isConnected} />
+        <SpreadHandProvider>
+          <GameInner code={code} isConnected={isConnected} />
+        </SpreadHandProvider>
       </CardPreviewProvider>
     </SpacetimeProvider>
   );
@@ -92,13 +95,35 @@ type LifecycleState = 'creating' | 'joining' | 'waiting' | 'pregame' | 'playing'
 // Waiting screen — shown while waiting for opponent
 // ---------------------------------------------------------------------------
 
-function CopyButton({ text, label, icon }: { text: string; label: string; icon: 'copy' | 'link' }) {
+function CopyButton({ text, label, icon, inline }: { text: string; label: string; icon: 'copy' | 'link'; inline?: boolean }) {
   const [copied, setCopied] = useState(false);
   const handleCopy = () => {
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  if (inline) {
+    return (
+      <button
+        onClick={handleCopy}
+        title={label}
+        className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+      >
+        {copied ? (
+          <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+          </svg>
+        ) : (
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+          </svg>
+        )}
+      </button>
+    );
+  }
+
   return (
     <button
       onClick={handleCopy}
@@ -155,7 +180,10 @@ function WaitingScreen({ code, goldfishDeck, onPractice, onUpdateMessage }: {
       <div className="rounded-xl border border-border bg-card/95 backdrop-blur-sm p-8 sm:p-10 text-center max-w-md w-full">
         {/* Code display */}
         <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground font-cinzel">Game Code</p>
-        <p className="font-mono text-5xl sm:text-6xl font-bold tracking-wider text-foreground mt-2">{code}</p>
+        <div className="flex items-center justify-center gap-3 mt-2">
+          <p className="font-mono text-5xl sm:text-6xl font-bold tracking-wider text-foreground">{code}</p>
+          <CopyButton text={code} label="Copy code" icon="copy" inline />
+        </div>
 
         {/* Status */}
         <p className="mt-5 text-sm text-muted-foreground">Waiting for opponent to join...</p>
@@ -189,7 +217,6 @@ function WaitingScreen({ code, goldfishDeck, onPractice, onUpdateMessage }: {
 
         {/* Share actions */}
         <div className="mt-6 flex justify-center gap-2">
-          <CopyButton text={code} label="Copy code" icon="copy" />
           <CopyButton
             text={typeof window !== 'undefined' ? `${window.location.origin}/play?join=${code}` : code}
             label="Copy invite link"
@@ -247,6 +274,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
 
   // Card preview hook — must be called before any early returns (Rules of Hooks)
   const { isLoupeVisible, toggleLoupe, previewCard } = useCardPreview();
+  const { isSpreadHand, toggleSpreadHand } = useSpreadHand();
 
   // Subscribe to all tables once connected
   useEffect(() => {
@@ -752,7 +780,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                   drawCard: () => gameState.drawCard(),
                   drawMultiple: (n) => gameState.drawMultiple(BigInt(n)),
                   moveCard: (id, zone, px, py) => gameState.moveCard(BigInt(id), zone, undefined, px, py),
-                  moveCardsBatch: (ids, zone) => gameState.moveCardsBatch(ids.join(','), zone),
+                  moveCardsBatch: (ids, zone) => gameState.moveCardsBatch(JSON.stringify(ids), zone),
                   flipCard: (id) => gameState.flipCard(BigInt(id)),
                   meekCard: (id) => gameState.meekCard(BigInt(id)),
                   unmeekCard: (id) => gameState.unmeekCard(BigInt(id)),
@@ -761,15 +789,15 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                   shuffleCardIntoDeck: (id) => gameState.shuffleCardIntoDeck(BigInt(id)),
                   shuffleDeck: () => gameState.shuffleDeck(),
                   setNote: (id, t) => gameState.setNote(BigInt(id), t),
-                  exchangeCards: (ids) => gameState.exchangeCards(ids.join(',')),
+                  exchangeCards: (ids) => gameState.exchangeCards(JSON.stringify(ids)),
                   moveCardToTopOfDeck: (id) => gameState.moveCardToTopOfDeck(BigInt(id)),
                   moveCardToBottomOfDeck: (id) => gameState.moveCardToBottomOfDeck(BigInt(id)),
                 } satisfies GameActions}
                 mode="multiplayer"
                 isMyTurn={true}
                 isFinished
-                isSpreadHand={false}
-                onToggleSpreadHand={() => {}}
+                isSpreadHand={isSpreadHand}
+                onToggleSpreadHand={toggleSpreadHand}
                 deckCount={gameState.myCards['deck']?.length ?? 0}
                 handCount={gameState.myCards['hand']?.length ?? 0}
                 onRollDice={() => gameState.rollDice(BigInt(20))}
@@ -852,7 +880,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               drawCard: () => gameState.drawCard(),
               drawMultiple: (n) => gameState.drawMultiple(BigInt(n)),
               moveCard: (id, zone, px, py) => gameState.moveCard(BigInt(id), zone, undefined, px, py),
-              moveCardsBatch: (ids, zone) => gameState.moveCardsBatch(ids.join(','), zone),
+              moveCardsBatch: (ids, zone) => gameState.moveCardsBatch(JSON.stringify(ids), zone),
               flipCard: (id) => gameState.flipCard(BigInt(id)),
               meekCard: (id) => gameState.meekCard(BigInt(id)),
               unmeekCard: (id) => gameState.unmeekCard(BigInt(id)),
@@ -861,14 +889,14 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               shuffleCardIntoDeck: (id) => gameState.shuffleCardIntoDeck(BigInt(id)),
               shuffleDeck: () => gameState.shuffleDeck(),
               setNote: (id, t) => gameState.setNote(BigInt(id), t),
-              exchangeCards: (ids) => gameState.exchangeCards(ids.join(',')),
+              exchangeCards: (ids) => gameState.exchangeCards(JSON.stringify(ids)),
               moveCardToTopOfDeck: (id) => gameState.moveCardToTopOfDeck(BigInt(id)),
               moveCardToBottomOfDeck: (id) => gameState.moveCardToBottomOfDeck(BigInt(id)),
             } satisfies GameActions}
             mode="multiplayer"
             isMyTurn={gameState.isMyTurn}
-            isSpreadHand={false}
-            onToggleSpreadHand={() => {/* TODO: wire to canvas state */}}
+            isSpreadHand={isSpreadHand}
+            onToggleSpreadHand={toggleSpreadHand}
             deckCount={gameState.myCards['deck']?.length ?? 0}
             handCount={gameState.myCards['hand']?.length ?? 0}
             onRollDice={() => gameState.rollDice(BigInt(20))}

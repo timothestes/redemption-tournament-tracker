@@ -26,7 +26,8 @@ export function calculateHandPositions(
   if (cardCount === 0) return [];
 
   const centerX = handRect.x + handRect.width / 2;
-  const handAreaWidth = handRect.width * 0.75;
+  // Use more of the available width — 85% gives cards more room to spread
+  const handAreaWidth = handRect.width * 0.85;
   const handY =
     handRect.y + Math.max(0, (handRect.height - cardHeight) / 2);
 

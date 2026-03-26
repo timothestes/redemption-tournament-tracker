@@ -8,14 +8,16 @@ export const metadata = {
   description: 'Create or join an online game',
 };
 
-export default async function PlayPage() {
+export default async function PlayPage({ searchParams }: { searchParams: Promise<{ join?: string }> }) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/sign-in');
+    const params = await searchParams;
+    const returnPath = params.join ? `/play?join=${encodeURIComponent(params.join)}` : '/play';
+    redirect(`/sign-in?redirectTo=${encodeURIComponent(returnPath)}`);
   }
 
   const { data: decks } = await supabase

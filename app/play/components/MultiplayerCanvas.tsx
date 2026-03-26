@@ -5,6 +5,7 @@ import { Stage, Layer, Rect, Text, Group, Circle } from 'react-konva';
 import type Konva from 'konva';
 import KonvaLib from 'konva';
 import { useGameState } from '../hooks/useGameState';
+import { useSpreadHand } from '../contexts/SpreadHandContext';
 import { useMultiplayerImagePreloader } from '../hooks/useMultiplayerImagePreloader';
 import {
   calculateMultiplayerLayout,
@@ -318,7 +319,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
   }, [hoveredCard, setPreviewCard]);
 
   // ---- Hand spread toggle (fan vs flat) ----
-  const [isSpreadHand, setIsSpreadHand] = useState(false);
+  const { isSpreadHand } = useSpreadHand();
 
   // ---- Mouse position tracking for hover preview ----
   const mousePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -409,7 +410,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     moveCard: (cardId, toZone, posX, posY) =>
       gameState.moveCard(BigInt(cardId), toZone, undefined, posX, posY),
     moveCardsBatch: (cardIds, toZone) =>
-      gameState.moveCardsBatch(cardIds.join(','), toZone),
+      gameState.moveCardsBatch(JSON.stringify(cardIds), toZone),
     flipCard: (cardId) => gameState.flipCard(BigInt(cardId)),
     meekCard: (cardId) => gameState.meekCard(BigInt(cardId)),
     unmeekCard: (cardId) => gameState.unmeekCard(BigInt(cardId)),
@@ -418,7 +419,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     shuffleCardIntoDeck: (cardId) => gameState.shuffleCardIntoDeck(BigInt(cardId)),
     shuffleDeck: () => gameState.shuffleDeck(),
     setNote: (cardId, text) => gameState.setNote(BigInt(cardId), text),
-    exchangeCards: (cardIds) => gameState.exchangeCards(cardIds.join(',')),
+    exchangeCards: (cardIds) => gameState.exchangeCards(JSON.stringify(cardIds)),
     drawCard: () => gameState.drawCard(),
     drawMultiple: (count) => gameState.drawMultiple(BigInt(count)),
     moveCardToTopOfDeck: (cardId) => gameState.moveCardToTopOfDeck(BigInt(cardId)),
@@ -441,7 +442,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       moveCard: (id, toZone, _idx, posX, posY) =>
         gameState.moveCard(BigInt(id), String(toZone), undefined, posX?.toString(), posY?.toString()),
       moveCardsBatch: (ids, toZone) =>
-        gameState.moveCardsBatch(ids.join(','), String(toZone)),
+        gameState.moveCardsBatch(JSON.stringify(ids), String(toZone)),
       moveCardToTopOfDeck: (id) => gameState.moveCardToTopOfDeck(BigInt(id)),
       moveCardToBottomOfDeck: (id) => gameState.moveCardToBottomOfDeck(BigInt(id)),
       shuffleDeck: () => gameState.shuffleDeck(),
@@ -461,7 +462,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       moveCard: (id, toZone, _idx, posX, posY) =>
         gameState.moveCard(BigInt(id), String(toZone), undefined, posX?.toString(), posY?.toString()),
       moveCardsBatch: (ids, toZone) =>
-        gameState.moveCardsBatch(ids.join(','), String(toZone)),
+        gameState.moveCardsBatch(JSON.stringify(ids), String(toZone)),
       moveCardToTopOfDeck: (id) => gameState.moveCardToTopOfDeck(BigInt(id)),
       moveCardToBottomOfDeck: (id) => gameState.moveCardToBottomOfDeck(BigInt(id)),
       shuffleDeck: () => gameState.shuffleDeck(),
@@ -605,7 +606,9 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
   // ---- Modal card drag hook (for dragging cards from modals to canvas) ----
   const findZoneForModalDrag = useCallback((x: number, y: number): ZoneId | null => {
     const hit = findZoneAtPosition(x, y);
-    if (!hit || hit.owner !== 'my') return null;
+    if (!hit) return null;
+    // Allow dropping on own zones, plus opponent territory/LOB for battles
+    if (hit.owner === 'opponent' && !isFreeFormZone(hit.zone) && !isAutoArrangeZone(hit.zone)) return null;
     return hit.zone as ZoneId;
   }, [findZoneAtPosition]);
 
@@ -621,7 +624,16 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     findZoneAtPosition: findZoneForModalDrag,
     moveCard: (id: string, toZone: ZoneId, _idx?: number, posX?: number, posY?: number) => {
       // Normalize pixel coords to 0–1 relative to target zone (matches canvas drag convention)
-      const zone = myZones[toZone];
+      // Both myZones and opponentZones may share keys like 'territory', so pick the zone
+      // that actually contains the drop point to normalize against the correct rect.
+      let zone: ZoneRect | undefined;
+      if (posX != null && posY != null) {
+        const my = myZones[toZone];
+        const opp = opponentZones[toZone];
+        if (my && pointInRect(posX, posY, my)) zone = my;
+        else if (opp && pointInRect(posX, posY, opp)) zone = opp;
+        else zone = my || opp;
+      }
       if (zone && posX != null && posY != null) {
         const normX = (posX - zone.x) / zone.width;
         const normY = (posY - zone.y) / zone.height;
@@ -631,7 +643,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       }
     },
     moveCardsBatch: (ids: string[], toZone: ZoneId) =>
-      gameState.moveCardsBatch(ids.join(','), String(toZone)),
+      gameState.moveCardsBatch(JSON.stringify(ids), String(toZone)),
     onDeckDrop: (cardId, screenX, screenY) => setDeckDrop({ x: screenX, y: screenY, cardId }),
     cardWidth,
     cardHeight,
@@ -981,7 +993,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
             }
           }
           moveCardsBatch(
-            cardIds.join(','),
+            JSON.stringify(cardIds),
             targetZone,
             JSON.stringify(positions),
           );
@@ -1022,12 +1034,12 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
             }
           }
           moveCardsBatch(
-            cardIds.join(','),
+            JSON.stringify(cardIds),
             targetZone,
             JSON.stringify(positions),
           );
         } else {
-          moveCardsBatch(cardIds.join(','), targetZone);
+          moveCardsBatch(JSON.stringify(cardIds), targetZone);
         }
         clearSelection();
       } else if (isFreeFormZone(targetZone)) {

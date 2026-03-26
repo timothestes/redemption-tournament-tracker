@@ -93,7 +93,12 @@ function getMainCardDimensions(
   const widthBased = playWidth * MAIN_CARD_WIDTH_RATIO;
   const playerHandHeight = stageHeight * PLAYER_HAND_RATIO;
   const heightBased = (playerHandHeight * MAIN_CARD_HAND_HEADROOM) / CARD_ASPECT_RATIO;
-  const w = Math.round(Math.min(widthBased, heightBased));
+  // On squarer displays (low aspect ratio), allow cards to be slightly taller
+  // by relaxing the height constraint headroom
+  const aspectRatio = playWidth / stageHeight;
+  const adjustedHeadroom = aspectRatio < 1.2 ? 0.92 : MAIN_CARD_HAND_HEADROOM;
+  const adjustedHeightBased = (playerHandHeight * adjustedHeadroom) / CARD_ASPECT_RATIO;
+  const w = Math.round(Math.min(widthBased, adjustedHeightBased));
   return { cardWidth: w, cardHeight: Math.round(w * CARD_ASPECT_RATIO) };
 }
 
