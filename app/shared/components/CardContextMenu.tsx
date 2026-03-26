@@ -51,7 +51,7 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
   }, [onClose]);
 
   const menuStyle: React.CSSProperties = {
-    position: 'absolute',
+    position: 'fixed',
     left: Math.min(x, window.innerWidth - 200),
     top: Math.min(y, window.innerHeight - 400),
     background: 'var(--gf-bg)',

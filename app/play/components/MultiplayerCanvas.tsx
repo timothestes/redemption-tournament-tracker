@@ -997,6 +997,20 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       const zoneOffY = zoneRect?.y ?? 0;
       const zoneW = zoneRect?.width || 1;
       const zoneH = zoneRect?.height || 1;
+      // Opponent zones render with mirrored positions (1-posX, 1-posY).
+      // When dropping into an opponent zone, inverse-mirror so the card
+      // appears where it was visually dropped, not at the mirrored position.
+      const isOpponentTarget = hit.owner === 'opponent';
+
+      // Helper: normalize pixel position to 0–1 and apply opponent mirror if needed
+      const normX = (px: number) => {
+        const raw = (px - zoneOffX) / zoneW;
+        return isOpponentTarget ? 1 - raw : raw;
+      };
+      const normY = (py: number) => {
+        const raw = (py - zoneOffY) / zoneH;
+        return isOpponentTarget ? 1 - raw : raw;
+      };
 
       // Same free-form zone: just update position
       if (isSameZone && isFreeFormZone(targetZone)) {
@@ -1015,11 +1029,11 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
           }
           // Build positions for batch move (normalized 0–1)
           const positions: Record<string, { posX: number; posY: number }> = {
-            [card.instanceId]: { posX: (dropX - zoneOffX) / zoneW, posY: (dropY - zoneOffY) / zoneH },
+            [card.instanceId]: { posX: normX(dropX), posY: normY(dropY) },
           };
           if (followerOffsets) {
             for (const [id, offset] of followerOffsets) {
-              positions[id] = { posX: (dropX + offset.dx - zoneOffX) / zoneW, posY: (dropY + offset.dy - zoneOffY) / zoneH };
+              positions[id] = { posX: normX(dropX + offset.dx), posY: normY(dropY + offset.dy) };
             }
           }
           moveCardsBatch(
@@ -1029,7 +1043,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
           );
           clearSelection();
         } else {
-          updateCardPosition(cardId, String((dropX - zoneOffX) / zoneW), String((dropY - zoneOffY) / zoneH));
+          updateCardPosition(cardId, String(normX(dropX)), String(normY(dropY)));
         }
         return;
       }
@@ -1062,11 +1076,11 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       if (isGroupDrag) {
         if (isFreeFormZone(targetZone)) {
           const positions: Record<string, { posX: number; posY: number }> = {
-            [card.instanceId]: { posX: (dropX - zoneOffX) / zoneW, posY: (dropY - zoneOffY) / zoneH },
+            [card.instanceId]: { posX: normX(dropX), posY: normY(dropY) },
           };
           if (followerOffsets) {
             for (const [id, offset] of followerOffsets) {
-              positions[id] = { posX: (dropX + offset.dx - zoneOffX) / zoneW, posY: (dropY + offset.dy - zoneOffY) / zoneH };
+              positions[id] = { posX: normX(dropX + offset.dx), posY: normY(dropY + offset.dy) };
             }
           }
           moveCardsBatch(
@@ -1079,7 +1093,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
         }
         clearSelection();
       } else if (isFreeFormZone(targetZone)) {
-        moveCard(cardId, targetZone, '', String((dropX - zoneOffX) / zoneW), String((dropY - zoneOffY) / zoneH));
+        moveCard(cardId, targetZone, '', String(normX(dropX)), String(normY(dropY)));
       } else if (isAutoArrangeZone(targetZone)) {
         // Auto-arrange zone: positions are ignored by rendering
         moveCard(cardId, targetZone, '', '0', '0');
@@ -1154,8 +1168,9 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       setHoverReady(false);
       stopHoverAnimation();
 
-      const menuX = e.evt.clientX - container.left;
-      const menuY = e.evt.clientY - container.top;
+      // Use viewport coordinates (clientX/Y) for fixed-position context menus
+      const menuX = e.evt.clientX;
+      const menuY = e.evt.clientY;
 
       // If right-clicking a selected card with multi-selection, show multi-card menu
       if (selectedIds.has(card.instanceId) && selectedIds.size > 1) {
@@ -1432,14 +1447,11 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                     e.evt.preventDefault();
                     const stage = stageRef.current;
                     if (!stage) return;
-                    const container = stage.container().getBoundingClientRect();
-                    const menuX = e.evt.clientX - container.left;
-                    const menuY = e.evt.clientY - container.top;
                     // Compute spawn position as normalized 0-1 within the LOB zone
                     const pointer = stage.getPointerPosition();
                     const spawnX = pointer ? (pointer.x - zone.x) / zone.width : 0.5;
                     const spawnY = pointer ? (pointer.y - zone.y) / zone.height : 0.5;
-                    setZoneMenu({ x: menuX, y: menuY, spawnX, spawnY });
+                    setZoneMenu({ x: e.evt.clientX, y: e.evt.clientY, spawnX, spawnY });
                   } : undefined}
                 />
                 {/* Label + badge — skip for LOB/territory zones (rendered as overlay after cards) */}
@@ -1524,8 +1536,8 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
               const container = stage.container().getBoundingClientRect();
               closeAllMenus();
               setHandMenu({
-                x: e.evt.clientX - container.left,
-                y: e.evt.clientY - container.top,
+                x: e.evt.clientX,
+                y: e.evt.clientY,
               });
             }}
           />
@@ -1946,8 +1958,8 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                   const container = stage.container().getBoundingClientRect();
                   closeAllMenus();
                   setLorMenu({
-                    x: e.evt.clientX - container.left,
-                    y: e.evt.clientY - container.top,
+                    x: e.evt.clientX,
+                    y: e.evt.clientY,
                   });
                 } : undefined}
               >
@@ -2050,13 +2062,10 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                   if (zoneKey === 'deck') {
                     setOpponentDeckMenu({ x: e.evt.clientX, y: e.evt.clientY });
                   } else {
-                    const stage = stageRef.current;
-                    if (!stage) return;
-                    const container = stage.container().getBoundingClientRect();
                     const zoneNames: Record<string, string> = { reserve: 'Reserve' };
                     setOpponentZoneMenu({
-                      x: e.evt.clientX - container.left,
-                      y: e.evt.clientY - container.top,
+                      x: e.evt.clientX,
+                      y: e.evt.clientY,
                       zone: zoneKey,
                       zoneName: zoneNames[zoneKey] ?? zoneKey,
                     });
@@ -2148,8 +2157,8 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                   const container = stage.container().getBoundingClientRect();
                   closeAllMenus();
                   setOpponentZoneMenu({
-                    x: e.evt.clientX - container.left,
-                    y: e.evt.clientY - container.top,
+                    x: e.evt.clientX,
+                    y: e.evt.clientY,
                     zone: 'hand',
                     zoneName: 'Hand',
                   });

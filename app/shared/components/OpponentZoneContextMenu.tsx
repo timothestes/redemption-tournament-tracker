@@ -34,7 +34,7 @@ export function OpponentZoneContextMenu({ x, y, zoneName, onSearch, onClose }: O
       ref={menuRef}
       onContextMenu={(e) => e.preventDefault()}
       style={{
-        position: 'absolute',
+        position: 'fixed',
         left: Math.min(x, typeof window !== 'undefined' ? window.innerWidth - 200 : x),
         top: Math.min(y, typeof window !== 'undefined' ? window.innerHeight - 60 : y),
         background: 'var(--gf-bg)',

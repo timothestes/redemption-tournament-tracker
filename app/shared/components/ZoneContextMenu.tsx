@@ -32,7 +32,7 @@ export function ZoneContextMenu({ x, y, spawnX, spawnY, onClose, onAddOpponentLo
   }, [onClose]);
 
   const menuStyle: React.CSSProperties = {
-    position: 'absolute',
+    position: 'fixed',
     left: Math.min(x, window.innerWidth - 220),
     top: Math.min(y, window.innerHeight - 200),
     background: 'var(--gf-bg)',

@@ -134,8 +134,9 @@ function DieDisplay({ roll, dieSize }: { roll: ActiveRoll; dieSize: number }) {
             style={{
               position: 'absolute',
               top: dieSize + 4,
-              left: -16,
-              right: -16,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: dieSize + 32,
               textAlign: 'center',
               whiteSpace: 'nowrap',
               overflow: 'hidden',

@@ -64,7 +64,7 @@ export function MultiCardContextMenu({ selectedIds, x, y, actions, onClose, onCl
   }, [x, y]);
 
   const menuStyle: React.CSSProperties = {
-    position: 'absolute',
+    position: 'fixed',
     left: pos.left,
     top: pos.top,
     background: 'var(--gf-bg)',
