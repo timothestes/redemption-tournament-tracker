@@ -314,14 +314,14 @@ export default function TurnIndicator({
             style={{
               padding: '5px 12px',
               background: 'transparent',
-              border: '1px solid rgba(180, 60, 60, 0.35)',
+              border: '1px solid rgba(180, 60, 60, 0.5)',
               borderRadius: 4,
               cursor: 'pointer',
               fontFamily: 'var(--font-cinzel), Georgia, serif',
               fontSize: 10,
               letterSpacing: '0.07em',
               textTransform: 'uppercase',
-              color: 'rgba(220, 120, 120, 0.6)',
+              color: 'rgba(220, 120, 120, 0.75)',
               transition: 'background 0.15s, border-color 0.15s, color 0.15s',
             }}
             onMouseEnter={(e) => {
@@ -331,8 +331,8 @@ export default function TurnIndicator({
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.background = 'transparent';
-              e.currentTarget.style.borderColor = 'rgba(180, 60, 60, 0.35)';
-              e.currentTarget.style.color = 'rgba(220, 120, 120, 0.6)';
+              e.currentTarget.style.borderColor = 'rgba(180, 60, 60, 0.5)';
+              e.currentTarget.style.color = 'rgba(220, 120, 120, 0.75)';
             }}
           >
             Concede
