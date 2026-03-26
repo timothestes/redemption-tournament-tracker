@@ -112,9 +112,14 @@ export function OpponentBrowseModal({
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave } = useModalCardHover(350, { setPreviewCard, isLoupeVisible });
 
-  const filtered = search
-    ? cards.filter(c => c.cardName.toLowerCase().includes(search.toLowerCase()))
+  const isReserve = zoneName.toLowerCase().includes('reserve');
+  const sortedCards = isReserve
+    ? [...cards].sort((a, b) => a.type.localeCompare(b.type) || a.cardName.localeCompare(b.cardName))
     : cards;
+
+  const filtered = search
+    ? sortedCards.filter(c => c.cardName.toLowerCase().includes(search.toLowerCase()))
+    : sortedCards;
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
