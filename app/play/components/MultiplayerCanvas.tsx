@@ -1775,7 +1775,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                   <Rect
                     x={zone.x}
                     y={zone.y}
-                    width={labelW + 6}
+                    width={Math.min(labelW + 6, zone.width)}
                     height={20}
                     fill={bgFill}
                     cornerRadius={[3, 0, 4, 0]}
@@ -1788,6 +1788,8 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                     fontFamily="Cinzel, Georgia, serif"
                     fill={fillColor}
                     letterSpacing={1}
+                    width={zone.width - 44}
+                    ellipsis={true}
                   />
                   <Rect
                     x={zone.x + 6 + labelTextWidth + 8}
@@ -1834,7 +1836,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                   <Rect
                     x={zone.x}
                     y={zone.y}
-                    width={labelW + 6}
+                    width={Math.min(labelW + 6, zone.width)}
                     height={20}
                     fill={bgFill}
                     cornerRadius={[3, 0, 4, 0]}
@@ -1847,6 +1849,8 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                     fontFamily="Cinzel, Georgia, serif"
                     fill={fillColor}
                     letterSpacing={1}
+                    width={zone.width - 44}
+                    ellipsis={true}
                   />
                   <Rect
                     x={zone.x + 6 + labelTextWidth + 8}
