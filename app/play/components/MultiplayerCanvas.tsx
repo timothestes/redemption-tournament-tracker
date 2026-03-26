@@ -2028,8 +2028,50 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                   />
                 </Group>
 
-                {/* Pile visual — only if zone has cards */}
-                {count > 0 && (
+                {/* LOR: spread all cards face-up with vertical overlap */}
+                {zoneKey === 'land-of-redemption' && count > 0 && (() => {
+                  const pad = 4;
+                  const topOffset = 20; // below count badge
+                  const availH = zone.height - topOffset - pad;
+                  const overlap = count <= 1 ? 0 : Math.min(pileCardHeight * 0.25, (availH - pileCardHeight) / (count - 1));
+                  return cards.map((c, i) => {
+                    const img = getCardImage(c);
+                    const gameCard = adaptCard(c, 'player1');
+                    const cardX = zone.x + (zone.width - pileCardWidth) / 2;
+                    const cardY = zone.y + topOffset + i * overlap;
+                    return img ? (
+                      <GameCardNode
+                        key={String(c.id)}
+                        card={gameCard}
+                        x={cardX}
+                        y={cardY}
+                        rotation={0}
+                        cardWidth={pileCardWidth}
+                        cardHeight={pileCardHeight}
+                        image={img}
+                        isSelected={isSelected(String(c.id))}
+                        isDraggable={true}
+                        nodeRef={registerCardNode}
+                        hoverProgress={hoveredInstanceId === String(c.id) ? hoverProgress : 0}
+                        onClick={handleCardClick}
+                        onDragStart={handleCardDragStart}
+                        onDragMove={handleCardDragMove}
+                        onDragEnd={handleCardDragEnd}
+                        onContextMenu={handleCardContextMenu}
+                        onDblClick={noopDblClick}
+                        onMouseEnter={handleMouseEnter}
+                        onMouseLeave={handleMouseLeave}
+                      />
+                    ) : (
+                      <Group key={String(c.id)} x={cardX} y={cardY}>
+                        <CardBackShape width={pileCardWidth} height={pileCardHeight} />
+                      </Group>
+                    );
+                  });
+                })()}
+
+                {/* Pile visual — only if zone has cards (non-LOR) */}
+                {zoneKey !== 'land-of-redemption' && count > 0 && (
                   <Group x={cx} y={cy}>
                     {/* Shadow card for depth if multiple */}
                     {count > 1 && (
@@ -2056,12 +2098,12 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                               cardHeight={pileCardHeight}
                               image={img}
                               isSelected={false}
-                              isDraggable={zoneKey === 'discard' || zoneKey === 'land-of-redemption'}
-                              nodeRef={(zoneKey === 'discard' || zoneKey === 'land-of-redemption') ? registerCardNode : undefined}
+                              isDraggable={zoneKey === 'discard'}
+                              nodeRef={zoneKey === 'discard' ? registerCardNode : undefined}
                               hoverProgress={hoveredInstanceId === String(topCard.id) ? hoverProgress : 0}
-                              onDragStart={(zoneKey === 'discard' || zoneKey === 'land-of-redemption') ? handleCardDragStart : noopCardDrag}
-                              onDragMove={(zoneKey === 'discard' || zoneKey === 'land-of-redemption') ? handleCardDragMove : noopDrag}
-                              onDragEnd={(zoneKey === 'discard' || zoneKey === 'land-of-redemption') ? handleCardDragEnd : noopCardDragEnd}
+                              onDragStart={zoneKey === 'discard' ? handleCardDragStart : noopCardDrag}
+                              onDragMove={zoneKey === 'discard' ? handleCardDragMove : noopDrag}
+                              onDragEnd={zoneKey === 'discard' ? handleCardDragEnd : noopCardDragEnd}
                               onContextMenu={handleCardContextMenu}
                               onDblClick={noopDblClick}
                               onMouseEnter={handleMouseEnter}
@@ -2137,7 +2179,50 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                   />
                 </Group>
 
-                {count > 0 && (
+                {/* Opponent LOR: spread all cards face-up with vertical overlap */}
+                {zoneKey === 'land-of-redemption' && count > 0 && (() => {
+                  const pad = 4;
+                  const topOffset = 20;
+                  const availH = zone.height - topOffset - pad;
+                  const overlap = count <= 1 ? 0 : Math.min(pileCardHeight * 0.25, (availH - pileCardHeight) / (count - 1));
+                  return cards.map((c, i) => {
+                    const img = getCardImage(c);
+                    const gameCard = adaptCard(c, 'player2');
+                    const cardX = zone.x + (zone.width - pileCardWidth) / 2;
+                    const cardY = zone.y + topOffset + i * overlap;
+                    return img ? (
+                      <GameCardNode
+                        key={String(c.id)}
+                        card={gameCard}
+                        x={cardX}
+                        y={cardY}
+                        rotation={0}
+                        cardWidth={pileCardWidth}
+                        cardHeight={pileCardHeight}
+                        image={img}
+                        isSelected={isSelected(String(c.id))}
+                        isDraggable={true}
+                        nodeRef={registerCardNode}
+                        hoverProgress={hoveredInstanceId === String(c.id) ? hoverProgress : 0}
+                        onClick={handleCardClick}
+                        onDragStart={handleCardDragStart}
+                        onDragMove={handleCardDragMove}
+                        onDragEnd={handleCardDragEnd}
+                        onContextMenu={handleCardContextMenu}
+                        onDblClick={noopDblClick}
+                        onMouseEnter={handleMouseEnter}
+                        onMouseLeave={handleMouseLeave}
+                      />
+                    ) : (
+                      <Group key={String(c.id)} x={cardX} y={cardY}>
+                        <CardBackShape width={pileCardWidth} height={pileCardHeight} />
+                      </Group>
+                    );
+                  });
+                })()}
+
+                {/* Non-LOR pile visual */}
+                {zoneKey !== 'land-of-redemption' && count > 0 && (
                   <Group x={cx} y={cy}>
                     {count > 1 && (
                       <Group x={-2} y={-2}>
@@ -2158,12 +2243,12 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                               cardHeight={pileCardHeight}
                               image={img}
                               isSelected={false}
-                              isDraggable={zoneKey === 'discard' || zoneKey === 'land-of-redemption'}
-                              nodeRef={(zoneKey === 'discard' || zoneKey === 'land-of-redemption') ? registerCardNode : undefined}
+                              isDraggable={zoneKey === 'discard'}
+                              nodeRef={zoneKey === 'discard' ? registerCardNode : undefined}
                               hoverProgress={hoveredInstanceId === String(topCard.id) ? hoverProgress : 0}
-                              onDragStart={(zoneKey === 'discard' || zoneKey === 'land-of-redemption') ? handleCardDragStart : noopCardDrag}
-                              onDragMove={(zoneKey === 'discard' || zoneKey === 'land-of-redemption') ? handleCardDragMove : noopDrag}
-                              onDragEnd={(zoneKey === 'discard' || zoneKey === 'land-of-redemption') ? handleCardDragEnd : noopCardDragEnd}
+                              onDragStart={zoneKey === 'discard' ? handleCardDragStart : noopCardDrag}
+                              onDragMove={zoneKey === 'discard' ? handleCardDragMove : noopDrag}
+                              onDragEnd={zoneKey === 'discard' ? handleCardDragEnd : noopCardDragEnd}
                               onContextMenu={handleCardContextMenu}
                               onDblClick={noopDblClick}
                               onMouseEnter={handleMouseEnter}
