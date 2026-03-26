@@ -2047,12 +2047,12 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                               cardHeight={pileCardHeight}
                               image={img}
                               isSelected={false}
-                              isDraggable={zoneKey === 'discard'}
-                              nodeRef={zoneKey === 'discard' ? registerCardNode : undefined}
+                              isDraggable={zoneKey === 'discard' || zoneKey === 'land-of-redemption'}
+                              nodeRef={(zoneKey === 'discard' || zoneKey === 'land-of-redemption') ? registerCardNode : undefined}
                               hoverProgress={hoveredInstanceId === String(topCard.id) ? hoverProgress : 0}
-                              onDragStart={zoneKey === 'discard' ? handleCardDragStart : noopCardDrag}
-                              onDragMove={zoneKey === 'discard' ? handleCardDragMove : noopDrag}
-                              onDragEnd={zoneKey === 'discard' ? handleCardDragEnd : noopCardDragEnd}
+                              onDragStart={(zoneKey === 'discard' || zoneKey === 'land-of-redemption') ? handleCardDragStart : noopCardDrag}
+                              onDragMove={(zoneKey === 'discard' || zoneKey === 'land-of-redemption') ? handleCardDragMove : noopDrag}
+                              onDragEnd={(zoneKey === 'discard' || zoneKey === 'land-of-redemption') ? handleCardDragEnd : noopCardDragEnd}
                               onContextMenu={handleCardContextMenu}
                               onDblClick={noopDblClick}
                               onMouseEnter={handleMouseEnter}
@@ -2149,12 +2149,12 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                               cardHeight={pileCardHeight}
                               image={img}
                               isSelected={false}
-                              isDraggable={zoneKey === 'discard'}
-                              nodeRef={zoneKey === 'discard' ? registerCardNode : undefined}
+                              isDraggable={zoneKey === 'discard' || zoneKey === 'land-of-redemption'}
+                              nodeRef={(zoneKey === 'discard' || zoneKey === 'land-of-redemption') ? registerCardNode : undefined}
                               hoverProgress={hoveredInstanceId === String(topCard.id) ? hoverProgress : 0}
-                              onDragStart={zoneKey === 'discard' ? handleCardDragStart : noopCardDrag}
-                              onDragMove={zoneKey === 'discard' ? handleCardDragMove : noopDrag}
-                              onDragEnd={zoneKey === 'discard' ? handleCardDragEnd : noopCardDragEnd}
+                              onDragStart={(zoneKey === 'discard' || zoneKey === 'land-of-redemption') ? handleCardDragStart : noopCardDrag}
+                              onDragMove={(zoneKey === 'discard' || zoneKey === 'land-of-redemption') ? handleCardDragMove : noopDrag}
+                              onDragEnd={(zoneKey === 'discard' || zoneKey === 'land-of-redemption') ? handleCardDragEnd : noopCardDragEnd}
                               onContextMenu={handleCardContextMenu}
                               onDblClick={noopDblClick}
                               onMouseEnter={handleMouseEnter}
