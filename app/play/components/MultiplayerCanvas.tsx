@@ -1619,7 +1619,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
           })}
 
           {/* ================================================================
-              Cards in free-form zones — Opponent territory (NOT draggable)
+              Cards in free-form zones — Opponent territory (draggable)
               ================================================================ */}
           {FREE_FORM_ZONES.map((zoneKey) => {
             const cards = opponentCards[zoneKey];
@@ -1659,12 +1659,14 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                       cardWidth={cardWidth}
                       cardHeight={cardHeight}
                       image={getCardImage(card)}
-                      isSelected={false}
-                      isDraggable={false}
+                      isSelected={isSelected(String(card.id))}
+                      isDraggable={true}
                       hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
-                      onDragStart={noopCardDrag}
-                      onDragMove={noopDrag}
-                      onDragEnd={noopCardDragEnd}
+                      nodeRef={registerCardNode}
+                      onClick={handleCardClick}
+                      onDragStart={handleCardDragStart}
+                      onDragMove={handleCardDragMove}
+                      onDragEnd={handleCardDragEnd}
                       onContextMenu={handleCardContextMenu}
                       onDblClick={noopDblClick}
                       onMouseEnter={handleMouseEnter}
