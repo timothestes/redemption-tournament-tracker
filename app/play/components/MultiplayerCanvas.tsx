@@ -1975,11 +1975,12 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                               cardHeight={pileCardHeight}
                               image={img}
                               isSelected={false}
-                              isDraggable={false}
+                              isDraggable={zoneKey === 'discard'}
+                              nodeRef={zoneKey === 'discard' ? registerCardNode : undefined}
                               hoverProgress={hoveredInstanceId === String(topCard.id) ? hoverProgress : 0}
-                              onDragStart={noopCardDrag}
-                              onDragMove={noopDrag}
-                              onDragEnd={noopCardDragEnd}
+                              onDragStart={zoneKey === 'discard' ? handleCardDragStart : noopCardDrag}
+                              onDragMove={zoneKey === 'discard' ? handleCardDragMove : noopDrag}
+                              onDragEnd={zoneKey === 'discard' ? handleCardDragEnd : noopCardDragEnd}
                               onContextMenu={handleCardContextMenu}
                               onDblClick={noopDblClick}
                               onMouseEnter={handleMouseEnter}
@@ -2017,9 +2018,12 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
             return (
               <Group
                 key={`opp-pile-${zoneKey}`}
-                onClick={zoneKey !== 'deck' ? () => {
-                  const zoneLabels: Record<string, string> = { discard: "Opponent's Discard", reserve: "Opponent's Reserve", banish: "Opponent's Banish", lor: "Opponent's Land of Redemption" };
+                onClick={zoneKey !== 'deck' && zoneKey !== 'reserve' ? () => {
+                  const zoneLabels: Record<string, string> = { discard: "Opponent's Discard", banish: "Opponent's Banish", lor: "Opponent's Land of Redemption" };
                   setBrowseOpponentZone({ zone: zoneKey, cards, label: zoneLabels[zoneKey] ?? zoneKey });
+                } : zoneKey === 'reserve' ? () => {
+                  requestZoneSearch('reserve');
+                  showGameToast('Waiting for opponent to approve reserve search...');
                 } : undefined}
                 onContextMenu={['deck', 'reserve'].includes(zoneKey) ? (e: Konva.KonvaEventObject<PointerEvent>) => {
                   e.evt.preventDefault();
@@ -2076,11 +2080,12 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                               cardHeight={pileCardHeight}
                               image={img}
                               isSelected={false}
-                              isDraggable={false}
+                              isDraggable={zoneKey === 'discard'}
+                              nodeRef={zoneKey === 'discard' ? registerCardNode : undefined}
                               hoverProgress={hoveredInstanceId === String(topCard.id) ? hoverProgress : 0}
-                              onDragStart={noopCardDrag}
-                              onDragMove={noopDrag}
-                              onDragEnd={noopCardDragEnd}
+                              onDragStart={zoneKey === 'discard' ? handleCardDragStart : noopCardDrag}
+                              onDragMove={zoneKey === 'discard' ? handleCardDragMove : noopDrag}
+                              onDragEnd={zoneKey === 'discard' ? handleCardDragEnd : noopCardDragEnd}
                               onContextMenu={handleCardContextMenu}
                               onDblClick={noopDblClick}
                               onMouseEnter={handleMouseEnter}
