@@ -276,26 +276,42 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const { isLoupeVisible, toggleLoupe, previewCard } = useCardPreview();
   const { isSpreadHand, toggleSpreadHand } = useSpreadHand();
 
-  // Subscribe to all tables once connected
+  // Phase 1: Subscribe to game table filtered by code so we can discover the
+  // numeric gameId. This avoids sequential scans on unfiltered SELECT * queries.
   useEffect(() => {
     if ((!isConnected && !isActive) || !conn || didSubscribe.current) return;
     didSubscribe.current = true;
     try {
       conn.subscriptionBuilder().subscribe([
-        'SELECT * FROM game',
-        'SELECT * FROM player',
-        'SELECT * FROM card_instance',
-        'SELECT * FROM card_counter',
-        'SELECT * FROM game_action',
-        'SELECT * FROM chat_message',
-        'SELECT * FROM spectator',
-        'SELECT * FROM disconnect_timeout',
-        'SELECT * FROM zone_search_request',
+        `SELECT * FROM game WHERE code = '${code}'`,
       ]);
     } catch (e) {
-      console.error('Failed to subscribe:', e);
+      console.error('Failed to subscribe (phase 1):', e);
     }
-  }, [isConnected, isActive, conn]);
+  }, [isConnected, isActive, conn, code]);
+
+  // Phase 2: Once gameId is known, subscribe to remaining tables scoped to
+  // this game. This uses the btree indexes on game_id columns, eliminating
+  // the "subscription queries with sequential scan" warnings.
+  const didSubscribePhase2 = useRef(false);
+  useEffect(() => {
+    if (!conn || gameId === null || didSubscribePhase2.current) return;
+    didSubscribePhase2.current = true;
+    try {
+      conn.subscriptionBuilder().subscribe([
+        `SELECT * FROM player WHERE game_id = ${gameId}`,
+        `SELECT * FROM card_instance WHERE game_id = ${gameId}`,
+        `SELECT * FROM card_counter`,
+        `SELECT * FROM game_action WHERE game_id = ${gameId}`,
+        `SELECT * FROM chat_message WHERE game_id = ${gameId}`,
+        `SELECT * FROM spectator WHERE game_id = ${gameId}`,
+        `SELECT * FROM disconnect_timeout WHERE game_id = ${gameId}`,
+        `SELECT * FROM zone_search_request WHERE game_id = ${gameId}`,
+      ]);
+    } catch (e) {
+      console.error('Failed to subscribe (phase 2):', e);
+    }
+  }, [conn, gameId]);
 
   // Read session storage params set by the lobby page
   const [gameParams] = useState<GameParams | null>(() => {
