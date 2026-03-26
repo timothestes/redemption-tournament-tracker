@@ -33,6 +33,7 @@ import { DeckContextMenu } from '@/app/shared/components/DeckContextMenu';
 import { DeckDropPopup } from '@/app/shared/components/DeckDropPopup';
 import { LorContextMenu } from '@/app/shared/components/LorContextMenu';
 import { OpponentZoneContextMenu } from '@/app/shared/components/OpponentZoneContextMenu';
+import { HandContextMenu } from '@/app/shared/components/HandContextMenu';
 import { ConsentDialog } from '@/app/shared/components/ConsentDialog';
 import { OpponentBrowseModal } from '@/app/shared/components/OpponentBrowseModal';
 import { showGameToast } from '@/app/shared/components/GameToast';
@@ -404,6 +405,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
   const [opponentZoneMenu, setOpponentZoneMenu] = useState<{ x: number; y: number; zone: string; zoneName: string } | null>(null);
   const [opponentDeckMenu, setOpponentDeckMenu] = useState<{ x: number; y: number } | null>(null);
   const [opponentPeekState, setOpponentPeekState] = useState<{ position: 'top' | 'bottom' | 'random'; count: number } | null>(null);
+  const [handMenu, setHandMenu] = useState<{ x: number; y: number } | null>(null);
 
   // ---- Multiplayer GameActions adapter ----
   const multiplayerActions: GameActions = useMemo(() => ({
@@ -428,6 +430,9 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       gameState.spawnLostSoul(testament, posX ?? '0.5', posY ?? '0.5'),
     removeToken: (cardId) => gameState.removeToken(BigInt(cardId)),
     removeOpponentToken: undefined,
+    randomHandToZone: (count, toZone, deckPosition) =>
+      gameState.randomHandToZone(count, toZone, deckPosition),
+    reloadDeck: (deckId, deckData) => gameState.reloadDeck(deckId, deckData),
   }), [gameState]);
 
   // ---- ModalGameProvider value (for shared deck modals) ----
@@ -486,6 +491,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     setOpponentZoneMenu(null);
     setOpponentDeckMenu(null);
     setOpponentPeekState(null);
+    setHandMenu(null);
   }, []);
 
   // ---- moveDeckCardsToZone helper ----
@@ -1511,6 +1517,17 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
             height={myHandRect.height}
             fill="#0d0905"
             opacity={0.5}
+            onContextMenu={(e: Konva.KonvaEventObject<PointerEvent>) => {
+              e.evt.preventDefault();
+              const stage = stageRef.current;
+              if (!stage) return;
+              const container = stage.container().getBoundingClientRect();
+              closeAllMenus();
+              setHandMenu({
+                x: e.evt.clientX - container.left,
+                y: e.evt.clientY - container.top,
+              });
+            }}
           />
           <Text
             x={myHandRect.x + 8}
@@ -2354,6 +2371,20 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
         />
       )}
 
+      {handMenu && (
+        <HandContextMenu
+          x={handMenu.x}
+          y={handMenu.y}
+          handSize={myCards['hand']?.length ?? 0}
+          onClose={() => setHandMenu(null)}
+          onRandomToDiscard={(count) => { setHandMenu(null); multiplayerActions.randomHandToZone(count, 'discard', ''); }}
+          onRandomToReserve={(count) => { setHandMenu(null); multiplayerActions.randomHandToZone(count, 'reserve', ''); }}
+          onRandomToDeckTop={(count) => { setHandMenu(null); multiplayerActions.randomHandToZone(count, 'deck', 'top'); }}
+          onRandomToDeckBottom={(count) => { setHandMenu(null); multiplayerActions.randomHandToZone(count, 'deck', 'bottom'); }}
+          onShuffleRandomIntoDeck={(count) => { setHandMenu(null); multiplayerActions.randomHandToZone(count, 'deck', 'shuffle'); }}
+        />
+      )}
+
       {opponentDeckMenu && (
         <DeckContextMenu
           x={opponentDeckMenu.x}
@@ -2704,7 +2735,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       {/* ================================================================
           Card hover preview — floating tooltip near cursor
           ================================================================ */}
-      {hoveredCard && hoverReady && !isLoupeVisible && !isDraggingRef.current && !contextMenu && !multiCardContextMenu && !deckMenu && !zoneMenu && !lorMenu && !opponentZoneMenu && (() => {
+      {hoveredCard && hoverReady && !isLoupeVisible && !isDraggingRef.current && !contextMenu && !multiCardContextMenu && !deckMenu && !zoneMenu && !lorMenu && !opponentZoneMenu && !handMenu && (() => {
         const previewWidth = 280;
         const previewHeight = Math.round(previewWidth * 1.4);
         const imageUrl = getSharedCardImageUrl(hoveredCard.cardImgFile);

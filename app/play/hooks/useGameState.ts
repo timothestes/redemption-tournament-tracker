@@ -62,6 +62,7 @@ export interface GameState {
   shuffleDeck: () => void;
   shuffleCardIntoDeck: (cardInstanceId: bigint) => void;
   reloadDeck: (deckId: string, deckData: string) => void;
+  randomHandToZone: (count: number, toZone: string, deckPosition: string) => void;
   meekCard: (cardInstanceId: bigint) => void;
   unmeekCard: (cardInstanceId: bigint) => void;
   flipCard: (cardInstanceId: bigint) => void;
