@@ -992,7 +992,9 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       }
 
       const targetZone = hit.zone;
-      const isSameZone = targetZone === sourceZone;
+      // Same zone = same zone name AND same owner (my hand ≠ opponent hand)
+      const sourceOwner = card.ownerId === 'player1' ? 'my' : 'opponent';
+      const isSameZone = targetZone === sourceZone && hit.owner === sourceOwner;
 
       // Resolve the zone rect for the drop target so we can store normalized positions
       // (0–1 ratios). This ensures cards render at the correct proportional position
