@@ -1420,6 +1420,9 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
   for (const [key, rect] of Object.entries(opponentZones)) {
     allZoneRects.push({ key: `opponent:${key}`, rect, owner: 'opponent' });
   }
+  if (opponentHandRect) {
+    allZoneRects.push({ key: 'opponent:hand', rect: opponentHandRect, owner: 'opponent' });
+  }
 
   return (
     <div ref={containerRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
