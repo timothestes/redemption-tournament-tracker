@@ -138,9 +138,6 @@ On some dimensions, the bottom menu covers up the hand. I don't know if this is 
 
 When rolling die, if having a long user name, the die roll that's rendered on the right hand side gets cutoff
 
-can we expand the dim zone for the hand to the bottom of the screen please?
-
-Cant drag card to opponent's hand. Should be doable just like all the other zones
 
 Cards in land of redemption should be face up and viewable by all players
 
