@@ -670,6 +670,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
   const {
     dragState: opponentModalDrag,
     startDrag: opponentModalStartDrag,
+    ghostRef: opponentModalGhostRef,
     didDragRef: opponentModalDidDragRef,
   } = useModalCardDrag({
     stageRef,
@@ -2779,6 +2780,26 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
             }}
           />
         )
+      )}
+
+      {/* Floating drag ghost (opponent modal → canvas drag) */}
+      {opponentModalDrag.isDragging && opponentModalDrag.imageUrl && (
+        <img
+          ref={opponentModalGhostRef as React.RefObject<HTMLImageElement>}
+          src={opponentModalDrag.imageUrl}
+          alt="Dragging card"
+          draggable={false}
+          style={{
+            position: 'fixed',
+            width: 80,
+            borderRadius: 4,
+            border: '2px solid var(--gf-accent)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
+            pointerEvents: 'none',
+            zIndex: 700,
+            opacity: 0.9,
+          }}
+        />
       )}
 
       {/* ================================================================

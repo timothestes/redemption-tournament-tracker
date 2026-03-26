@@ -473,7 +473,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
           <div style={{ position: 'relative', flexShrink: 0 }}>
             <select
               value={searchField}
-              onChange={(e) => setSearchField(e.target.value as typeof searchField)}
+              onChange={(e) => { setSearchField(e.target.value as typeof searchField); setSearch(''); }}
               style={{
                 appearance: 'none',
                 WebkitAppearance: 'none',
