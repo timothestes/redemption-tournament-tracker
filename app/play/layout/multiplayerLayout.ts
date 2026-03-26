@@ -82,7 +82,8 @@ const MAIN_CARD_HAND_HEADROOM = 0.82;
 const LOB_CARD_HEADROOM = 0.85;
 const OPP_HAND_HEADROOM = 0.78;
 const OPP_HAND_SCALE = 0.75;
-const PILE_LABEL_RATIO = 0.22;
+const PILE_LABEL_RATIO = 0.15;
+const TOOLBAR_RESERVED = 48; // toolbar height + padding, so hand cards render above it
 
 // ── Private card sizing functions ───────────────────────────────────────
 
@@ -128,7 +129,7 @@ function getOpponentHandCardDimensions(
 
 function getPileCardDimensions(slotHeight: number): CardDimensions {
   const usable = slotHeight * (1 - PILE_LABEL_RATIO);
-  const h = Math.max(usable, 30);
+  const h = Math.min(Math.max(usable, 30), 140);
   const w = Math.round(h / CARD_ASPECT_RATIO);
   return { cardWidth: Math.max(w, Math.round(30 / CARD_ASPECT_RATIO)), cardHeight: Math.round(Math.max(h, 30)) };
 }
@@ -262,7 +263,7 @@ export function calculateMultiplayerLayout(
     x: 0,
     y: playerHandY,
     width: stageWidth,
-    height: playerHandHeight,
+    height: Math.max(playerHandHeight - TOOLBAR_RESERVED, 40),
     label: 'Hand',
   };
 

@@ -1896,8 +1896,8 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
             const cards = myCards[zoneKey] ?? [];
             const count = cards.length;
             const cx = zone.x + zone.width / 2 - pileCardWidth / 2;
-            // Center card vertically in remaining space after count badge (20px top)
-            const cy = zone.y + 20 + Math.max(0, (zone.height - 20 - pileCardHeight) / 2);
+            // Center card vertically in remaining space after count badge (18px top)
+            const cy = zone.y + 18 + Math.max(0, (zone.height - 18 - pileCardHeight) / 2);
 
             // For discard, show top card face-up; for everything else, card back
             const topCard = cards[cards.length - 1];
@@ -2011,8 +2011,8 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
             const cards = opponentCards[zoneKey] ?? [];
             const count = cards.length;
             const cx = zone.x + zone.width / 2 - pileCardWidth / 2;
-            // Center card vertically in remaining space after count badge (20px top)
-            const cy = zone.y + 20 + Math.max(0, (zone.height - 20 - pileCardHeight) / 2);
+            // Center card vertically in remaining space after count badge (18px top)
+            const cy = zone.y + 18 + Math.max(0, (zone.height - 18 - pileCardHeight) / 2);
 
             const topCard = cards[cards.length - 1];
             const showFace = zoneKey === 'discard' && topCard && !topCard.isFlipped;
