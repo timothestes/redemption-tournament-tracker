@@ -1142,8 +1142,10 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       if (!stage) return;
       const container = stage.container().getBoundingClientRect();
 
-      // Clear hover state
+      // Clear hover state — dismiss both the glow AND the preview tooltip
       setHoveredInstanceId(null);
+      setHoveredCard(null);
+      setHoverReady(false);
       stopHoverAnimation();
 
       const menuX = e.evt.clientX - container.left;
@@ -1177,8 +1179,15 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     (card: GameCard, e: Konva.KonvaEventObject<MouseEvent>) => {
       if (isDraggingRef.current) return;
       setHoveredInstanceId(card.instanceId);
-      setHoveredCard(card);
       startHoverAnimation();
+
+      // Don't show card preview for face-down opponent cards (hidden info)
+      if (card.isFlipped && card.ownerId === 'player2') {
+        setHoveredCard(null);
+        return;
+      }
+
+      setHoveredCard(card);
       // Capture mouse position for the hover preview tooltip
       const pos = { x: e.evt.clientX, y: e.evt.clientY };
       mousePosRef.current = pos;
