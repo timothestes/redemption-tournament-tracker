@@ -1017,6 +1017,25 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       // appears where it was visually dropped, not at the mirrored position.
       const isOpponentTarget = hit.owner === 'opponent';
 
+      // Adjust drop position when rotation changes between source and target.
+      // Opponent territory cards render with rotation=180 (anchor at bottom-right),
+      // player territory cards render with rotation=0 (anchor at top-left).
+      // When crossing between them, offset by card dimensions so the visual
+      // position stays consistent.
+      const sourceIsRotated = sourceOwner === 'opponent' && isFreeFormZone(sourceZone ?? '');
+      const targetIsRotated = isOpponentTarget && isFreeFormZone(targetZone);
+      let adjDropX = dropX;
+      let adjDropY = dropY;
+      if (sourceIsRotated && !targetIsRotated) {
+        // rotation 180→0: shift anchor from bottom-right to top-left
+        adjDropX -= cardWidth;
+        adjDropY -= cardHeight;
+      } else if (!sourceIsRotated && targetIsRotated) {
+        // rotation 0→180: shift anchor from top-left to bottom-right
+        adjDropX += cardWidth;
+        adjDropY += cardHeight;
+      }
+
       // Helper: normalize pixel position to 0–1 and apply opponent mirror if needed
       const normX = (px: number) => {
         const raw = (px - zoneOffX) / zoneW;
@@ -1091,11 +1110,11 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       if (isGroupDrag) {
         if (isFreeFormZone(targetZone)) {
           const positions: Record<string, { posX: number; posY: number }> = {
-            [card.instanceId]: { posX: normX(dropX), posY: normY(dropY) },
+            [card.instanceId]: { posX: normX(adjDropX), posY: normY(adjDropY) },
           };
           if (followerOffsets) {
             for (const [id, offset] of followerOffsets) {
-              positions[id] = { posX: normX(dropX + offset.dx), posY: normY(dropY + offset.dy) };
+              positions[id] = { posX: normX(adjDropX + offset.dx), posY: normY(adjDropY + offset.dy) };
             }
           }
           moveCardsBatch(
@@ -1109,7 +1128,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
         }
         clearSelection();
       } else if (isFreeFormZone(targetZone)) {
-        moveCard(cardId, targetZone, '', String(normX(dropX)), String(normY(dropY)), targetOwnerId);
+        moveCard(cardId, targetZone, '', String(normX(adjDropX)), String(normY(adjDropY)), targetOwnerId);
       } else if (isAutoArrangeZone(targetZone)) {
         // Auto-arrange zone: positions are ignored by rendering
         moveCard(cardId, targetZone, '', '0', '0', targetOwnerId);
