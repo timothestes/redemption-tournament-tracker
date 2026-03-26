@@ -61,6 +61,7 @@ export interface GameState {
   moveCardsBatch: (cardInstanceIds: string, toZone: string, positions?: string) => void;
   shuffleDeck: () => void;
   shuffleCardIntoDeck: (cardInstanceId: bigint) => void;
+  reloadDeck: (deckId: string, deckData: string) => void;
   meekCard: (cardInstanceId: bigint) => void;
   unmeekCard: (cardInstanceId: bigint) => void;
   flipCard: (cardInstanceId: bigint) => void;
@@ -301,6 +302,13 @@ export function useGameState(gameId: bigint): GameState {
     [conn, gameId],
   );
 
+  const reloadDeck = useCallback(
+    (deckId: string, deckData: string) => {
+      conn?.reducers.reloadDeck({ gameId, deckId, deckData });
+    },
+    [conn, gameId],
+  );
+
   const meekCard = useCallback(
     (cardInstanceId: bigint) => {
       conn?.reducers.meekCard({ gameId, cardInstanceId });
@@ -517,6 +525,7 @@ export function useGameState(gameId: bigint): GameState {
     shuffleDeck,
     shuffleCardIntoDeck,
     randomHandToZone,
+    reloadDeck,
     meekCard,
     unmeekCard,
     flipCard,

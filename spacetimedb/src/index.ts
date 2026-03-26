@@ -1337,6 +1337,50 @@ export const random_hand_to_zone = spacetimedb.reducer(
 );
 
 // ---------------------------------------------------------------------------
+// Reducer: reload_deck
+// ---------------------------------------------------------------------------
+export const reload_deck = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    deckId: t.string(),
+    deckData: t.string(),
+  },
+  (ctx, { gameId, deckId, deckData }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in progress');
+
+    const player = findPlayerBySender(ctx, gameId);
+
+    // Validate deck data
+    try { JSON.parse(deckData); } catch {
+      throw new SenderError('Invalid deck data');
+    }
+
+    // 1. Delete all card instances and counters for this player
+    for (const card of [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)]) {
+      if (card.ownerId !== player.id) continue;
+      for (const counter of [...ctx.db.CardCounter.card_counter_card_instance_id.filter(card.id)]) {
+        ctx.db.CardCounter.id.delete(counter.id);
+      }
+      ctx.db.CardInstance.id.delete(card.id);
+    }
+
+    // 2. Update player's deck ID
+    ctx.db.Player.id.update({ ...player, deckId });
+
+    // 3. Insert new cards, shuffle, draw opening hand (reuses existing helper)
+    const currentGame = ctx.db.Game.id.find(gameId);
+    if (!currentGame) throw new SenderError('Game not found');
+    insertCardsShuffleDraw(ctx, currentGame, player, deckData);
+
+    logAction(ctx, gameId, player.id, 'RELOAD_DECK',
+      JSON.stringify({ deckId }),
+      game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
 // Reducer: meek_card
 // ---------------------------------------------------------------------------
 export const meek_card = spacetimedb.reducer(

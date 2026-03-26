@@ -14,6 +14,7 @@ export interface GameActions {
   shuffleCardIntoDeck(cardId: string): void;
   shuffleDeck(): void;
   randomHandToZone(count: number, toZone: string, deckPosition: string): void;
+  reloadDeck: (deckId: string, deckData: string) => void;
   setNote(cardId: string, text: string): void;
   exchangeCards(cardIds: string[]): void;
   drawCard(): void;
