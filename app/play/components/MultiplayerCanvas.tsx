@@ -634,23 +634,25 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     zoneLayout: myZones as Partial<Record<ZoneId, GoldfishZoneRect>>,
     findZoneAtPosition: findZoneForModalDrag,
     moveCard: (id: string, toZone: ZoneId, _idx?: number, posX?: number, posY?: number) => {
-      // Normalize pixel coords to 0–1 relative to target zone (matches canvas drag convention)
-      // Both myZones and opponentZones may share keys like 'territory', so pick the zone
-      // that actually contains the drop point to normalize against the correct rect.
-      let zone: ZoneRect | undefined;
-      if (posX != null && posY != null) {
-        const my = myZones[toZone];
-        const opp = opponentZones[toZone];
-        if (my && pointInRect(posX, posY, my)) zone = my;
-        else if (opp && pointInRect(posX, posY, opp)) zone = opp;
-        else zone = my || opp;
-      }
+      // Determine which player's zone was hit so we can normalize correctly
+      const hit = posX != null && posY != null
+        ? findZoneAtPosition(posX + cardWidth / 2, posY + cardHeight / 2)
+        : null;
+      const isOppZone = hit?.owner === 'opponent';
+      const zone = isOppZone ? opponentZones[toZone] : myZones[toZone];
+      const ownerId = isOppZone && gameState.opponentPlayer
+        ? String(gameState.opponentPlayer.id)
+        : gameState.myPlayer ? String(gameState.myPlayer.id) : '';
+
       if (zone && posX != null && posY != null) {
-        const normX = (posX - zone.x) / zone.width;
-        const normY = (posY - zone.y) / zone.height;
-        gameState.moveCard(BigInt(id), String(toZone), undefined, normX.toString(), normY.toString());
+        const rawX = (posX - zone.x) / zone.width;
+        const rawY = (posY - zone.y) / zone.height;
+        // Inverse-mirror for opponent zones (they render with 1-posX, 1-posY)
+        const normX = isOppZone ? 1 - rawX : rawX;
+        const normY = isOppZone ? 1 - rawY : rawY;
+        gameState.moveCard(BigInt(id), String(toZone), undefined, normX.toString(), normY.toString(), ownerId);
       } else {
-        gameState.moveCard(BigInt(id), String(toZone), undefined, posX?.toString(), posY?.toString());
+        gameState.moveCard(BigInt(id), String(toZone), undefined, posX?.toString(), posY?.toString(), ownerId);
       }
     },
     moveCardsBatch: (ids: string[], toZone: ZoneId) =>
@@ -678,14 +680,21 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     findZoneAtPosition: findZoneForOpponentDrag,
     moveCard: (id: string, toZone: ZoneId, _idx?: number, posX?: number, posY?: number) => {
       if (approvedSearchRequest) {
-        // Normalize pixel coords to 0–1 relative to target zone
-        const allZones = { ...myZones, ...opponentZones };
-        const zone = allZones[toZone];
+        // Determine which player's zone was hit so we can normalize correctly
+        const hit = posX != null && posY != null
+          ? findZoneAtPosition(posX + cardWidth / 2, posY + cardHeight / 2)
+          : null;
+        const isOppZone = hit?.owner === 'opponent';
+        const zone = isOppZone ? opponentZones[toZone] : myZones[toZone];
+
         let normX = posX?.toString();
         let normY = posY?.toString();
         if (zone && posX != null && posY != null) {
-          normX = ((posX - zone.x) / zone.width).toString();
-          normY = ((posY - zone.y) / zone.height).toString();
+          const rawX = (posX - zone.x) / zone.width;
+          const rawY = (posY - zone.y) / zone.height;
+          // Inverse-mirror for opponent zones (they render with 1-posX, 1-posY)
+          normX = (isOppZone ? 1 - rawX : rawX).toString();
+          normY = (isOppZone ? 1 - rawY : rawY).toString();
         }
         moveOpponentCard(
           BigInt(approvedSearchRequest.id),
