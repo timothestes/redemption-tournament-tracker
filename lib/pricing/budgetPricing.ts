@@ -52,6 +52,9 @@ const ABILITY_OVERRIDES: Record<string, string> = {
   // Lost Soul "Darkness" — 2019 promo reworded "search...for...and put it in hand or play" → "take or play...from"
   "if put in play by an opponent's special ability (or if you have no evil characters in territory when drawn), you may take or play an evil character from deck or reserve.":
     "if put in play by an opponent's special ability (or if you have no evil characters in territory when drawn), you may search deck or reserve for an evil character and put it in hand or play.",
+  // Foreign Wives — 2022 Side Event promo reworded ability
+  "take household idols from discard pile. if opponent has drawn 5 or more cards this turn, protect this card from cards used by opponent. cannot be negated.":
+    "search discard pile for household idols. if opponent has draw 5 or more cards this turn, protect foreign wives from cards used by opponent. cannot be negated.",
 };
 
 /**
