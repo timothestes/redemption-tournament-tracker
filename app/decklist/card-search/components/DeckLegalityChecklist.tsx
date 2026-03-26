@@ -151,7 +151,7 @@ export default function DeckLegalityChecklist({
   totalCards,
   format,
 }: DeckLegalityChecklistProps) {
-  const isT2 = format?.toLowerCase().includes("type 2") || format?.toLowerCase().includes("multi");
+  const isT2 = format?.toLowerCase().includes("type 2");
   const categories = isT2 ? T2_RULE_CATEGORIES : T1_RULE_CATEGORIES;
 
   if (totalCards === 0) {

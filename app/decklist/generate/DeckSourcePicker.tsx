@@ -34,7 +34,7 @@ function formatToDeckType(format?: string): string | null {
   if (!format) return null;
   const fmt = format.toLowerCase();
   if (fmt.includes("paragon")) return "paragon";
-  if (fmt.includes("type 2") || fmt.includes("multi") || fmt === "t2") return "type_2";
+  if (fmt.includes("type 2") || fmt === "t2") return "type_2";
   if (fmt.includes("type 1") || fmt === "t1") return "type_1";
   return null;
 }
@@ -43,7 +43,7 @@ function formatDeckType(format?: string): string {
   if (!format) return "T1";
   const fmt = format.toLowerCase();
   if (fmt.includes("paragon")) return "Paragon";
-  if (fmt.includes("type 2") || fmt.includes("multi") || fmt === "t2") return "T2";
+  if (fmt.includes("type 2") || fmt === "t2") return "T2";
   return "T1";
 }
 

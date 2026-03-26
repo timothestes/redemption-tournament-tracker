@@ -10,6 +10,7 @@ import { resolveCardIdentity } from "./sameCard";
 import {
   validateT1Rules,
   validateT2Rules,
+  validateParagonRules,
   isLostSoul,
   isDominant,
   isSiteOrCity,
@@ -277,10 +278,14 @@ export async function checkDeck(
   const cardGroups = buildCardGroups(allResolvedCards);
 
   // Step 4: Run rules based on format
-  const isT2 = resolvedFormat.toLowerCase().includes("type 2") || resolvedFormat.toLowerCase().includes("multi");
-  const ruleIssues = isT2
-    ? validateT2Rules(mainDeckCards, reserveCards, cardGroups)
-    : validateT1Rules(mainDeckCards, reserveCards, cardGroups);
+  const fmtLower = resolvedFormat.toLowerCase();
+  const isT2 = fmtLower.includes("type 2");
+  const isParagon = fmtLower.includes("paragon");
+  const ruleIssues = isParagon
+    ? validateParagonRules(mainDeckCards, reserveCards, cardGroups)
+    : isT2
+      ? validateT2Rules(mainDeckCards, reserveCards, cardGroups)
+      : validateT1Rules(mainDeckCards, reserveCards, cardGroups);
   issues.push(...ruleIssues);
 
   // Step 5: Build stats

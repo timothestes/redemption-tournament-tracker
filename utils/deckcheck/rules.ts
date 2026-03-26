@@ -1058,6 +1058,90 @@ export function validateT1Rules(
 }
 
 // ---------------------------------------------------------------------------
+// Paragon validation entry point
+// ---------------------------------------------------------------------------
+
+/**
+ * Rule: paragon-deck-size — Main deck must be exactly 40 cards.
+ */
+export function checkParagonDeckSize(mainDeckCards: ResolvedCard[]): DeckCheckIssue[] {
+  const issues: DeckCheckIssue[] = [];
+  const size = mainDeckCards.reduce((sum, c) => sum + c.quantity, 0);
+
+  if (size < 40) {
+    issues.push({
+      type: "error",
+      rule: "paragon-deck-size",
+      message: `Main deck has ${size} cards — Paragon requires exactly 40.`,
+    });
+  }
+  if (size > 40) {
+    issues.push({
+      type: "error",
+      rule: "paragon-deck-size",
+      message: `Main deck has ${size} cards — Paragon requires exactly 40.`,
+    });
+  }
+
+  return issues;
+}
+
+/**
+ * Validate a deck against Paragon rules.
+ *
+ * Paragon skips: Lost Soul count check, Dominant-vs-Lost-Soul limit.
+ * Paragon keeps: deck size (40 exact), reserve size/contents, dominant uniqueness,
+ *                mutual exclusion, quantity rules, banned cards, etc.
+ */
+export function validateParagonRules(
+  mainDeckCards: ResolvedCard[],
+  reserveCards: ResolvedCard[],
+  cardGroups: CardGroup[]
+): DeckCheckIssue[] {
+  const issues: DeckCheckIssue[] = [];
+
+  // Paragon-specific deck size (exactly 40)
+  issues.push(...checkParagonDeckSize(mainDeckCards));
+
+  // Reserve rules (same as T1: max 10, no Dominants/LS in reserve)
+  issues.push(...checkReserveSize(reserveCards));
+  issues.push(...checkReserveContents(reserveCards));
+
+  // Dominant uniqueness (max 1 copy of each — still applies)
+  issues.push(...checkDominantUnique(mainDeckCards, reserveCards, cardGroups));
+
+  // Mutual exclusion
+  issues.push(...checkMutualExclusion(mainDeckCards, reserveCards));
+
+  // Quantity rules
+  issues.push(
+    ...checkMultiBrigadeLimit(mainDeckCards, reserveCards, cardGroups)
+  );
+  issues.push(
+    ...checkSpecialAbilityLimit(mainDeckCards, reserveCards, cardGroups)
+  );
+  issues.push(...checkVanillaLimit(mainDeckCards, reserveCards, cardGroups));
+
+  // Sites + Cities
+  issues.push(...checkSitesCitiesLimit(mainDeckCards, reserveCards));
+
+  // Banned cards
+  issues.push(...checkBannedCards(mainDeckCards, reserveCards));
+
+  // Special card exceptions
+  issues.push(...checkSpecialCards(mainDeckCards, reserveCards, cardGroups));
+
+  // Character alias checks
+  issues.push(
+    ...checkCharacterAliasLimit(mainDeckCards, reserveCards, cardGroups)
+  );
+
+  // NOTE: No checkLostSoulCount, no checkDominantLimit (Paragon has no LS)
+
+  return issues;
+}
+
+// ---------------------------------------------------------------------------
 // Type 2 helper functions
 // ---------------------------------------------------------------------------
 
