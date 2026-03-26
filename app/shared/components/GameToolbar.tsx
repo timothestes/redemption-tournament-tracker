@@ -8,6 +8,7 @@ import {
   PanelBottomOpen,
   Dices,
   SkipForward,
+  RefreshCw,
 } from 'lucide-react';
 import type { GameActions } from '../types/gameActions';
 
@@ -40,6 +41,8 @@ export interface GameToolbarProps {
   onNewGame?: () => void;
   /** Called for end turn (multiplayer only). */
   onEndTurn?: () => void;
+  /** Called to trigger mid-game deck reload (multiplayer only). */
+  onLoadDeck?: () => void;
   /** Game is finished — keep toolbar active for review but disable end turn. */
   isFinished?: boolean;
 }
@@ -61,6 +64,7 @@ export function GameToolbar({
   onUndo,
   onNewGame,
   onEndTurn,
+  onLoadDeck,
   isFinished,
 }: GameToolbarProps) {
   const isMultiplayer = mode === 'multiplayer';
@@ -135,6 +139,14 @@ export function GameToolbar({
       shortcut: '',
       hidden: !isMultiplayer,
       disabled: disabled || !!isFinished,
+    },
+    // Load Deck — multiplayer only
+    {
+      icon: RefreshCw,
+      label: 'Load Deck',
+      onClick: onLoadDeck ?? (() => {}),
+      shortcut: '',
+      hidden: !isMultiplayer,
     },
   ];
 

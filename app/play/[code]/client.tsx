@@ -20,6 +20,9 @@ import WaitingRoomGoldfish from '../components/WaitingRoomGoldfish';
 import { SpreadHandProvider, useSpreadHand } from '../contexts/SpreadHandContext';
 import { convertToGoldfishDeck, type GameCardData } from '../utils/convertToGoldfishDeck';
 import PregameScreen from '../components/PregameScreen';
+import { DeckPickerModal } from '../components/DeckPickerModal';
+import type { DeckOption } from '../components/DeckPickerCard';
+import { loadUserDecks, loadDeckForGame } from '../actions';
 
 // Konva requires browser APIs — lazy-load to avoid SSR issues
 const MultiplayerCanvas = dynamic(
@@ -271,6 +274,17 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const [gameId, setGameId] = useState<bigint | null>(null);
   const didCallReducer = useRef(false);
   const didSubscribe = useRef(false);
+
+  // Deck reload state
+  const [showReloadDeckPicker, setShowReloadDeckPicker] = useState(false);
+  const [reloadMyDecks, setReloadMyDecks] = useState<DeckOption[]>([]);
+  const [reloadDeckConfirm, setReloadDeckConfirm] = useState<{ deckId: string; deckName: string; deckData: string } | null>(null);
+
+  useEffect(() => {
+    if (showReloadDeckPicker && reloadMyDecks.length === 0) {
+      loadUserDecks().then(setReloadMyDecks).catch(() => {});
+    }
+  }, [showReloadDeckPicker, reloadMyDecks.length]);
 
   // Card preview hook — must be called before any early returns (Rules of Hooks)
   const { isLoupeVisible, toggleLoupe, previewCard } = useCardPreview();
@@ -918,6 +932,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             onRollDice={() => gameState.rollDice(BigInt(20))}
             onShowToast={showGameToast}
             onEndTurn={gameState.endTurn}
+            onLoadDeck={() => setShowReloadDeckPicker(true)}
           />
           <GameToastContainer />
         </div>
@@ -925,6 +940,60 @@ function GameInner({ code, isConnected }: GameInnerProps) {
 
       {/* Right panel — preview on top, chat below */}
       {rightPanel}
+
+      {/* Deck reload picker */}
+      <DeckPickerModal
+        open={showReloadDeckPicker}
+        onOpenChange={(open) => setShowReloadDeckPicker(open)}
+        onSelect={async (deck) => {
+          const result = await loadDeckForGame(deck.id);
+          setShowReloadDeckPicker(false);
+          setReloadDeckConfirm({ deckId: deck.id, deckName: deck.name, deckData: JSON.stringify(result.deckData) });
+        }}
+        myDecks={reloadMyDecks}
+      />
+
+      {/* Deck reload confirmation dialog */}
+      {reloadDeckConfirm && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div style={{
+            background: 'var(--gf-bg, #1a1410)', border: '1px solid var(--gf-border, #3d2e1f)',
+            borderRadius: 8, padding: 24, maxWidth: 400, textAlign: 'center',
+          }}>
+            <p style={{ color: 'var(--gf-text, #e8d5a3)', marginBottom: 16, fontSize: 14 }}>
+              This will clear all your cards from the game and load <strong>{reloadDeckConfirm.deckName}</strong>. Continue?
+            </p>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <button
+                onClick={() => setReloadDeckConfirm(null)}
+                style={{
+                  padding: '8px 20px', background: 'transparent',
+                  border: '1px solid var(--gf-border, #3d2e1f)',
+                  borderRadius: 4, color: 'var(--gf-text-dim, #a89070)', cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  gameState.reloadDeck(reloadDeckConfirm.deckId, reloadDeckConfirm.deckData);
+                  setReloadDeckConfirm(null);
+                }}
+                style={{
+                  padding: '8px 20px', background: 'rgba(196,149,90,0.2)',
+                  border: '1px solid #c4955a', borderRadius: 4,
+                  color: '#e8d5a3', cursor: 'pointer',
+                }}
+              >
+                Load Deck
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
