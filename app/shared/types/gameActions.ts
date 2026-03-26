@@ -13,6 +13,7 @@ export interface GameActions {
   removeCounter(cardId: string, color: string): void;
   shuffleCardIntoDeck(cardId: string): void;
   shuffleDeck(): void;
+  randomHandToZone(count: number, toZone: string, deckPosition: string): void;
   setNote(cardId: string, text: string): void;
   exchangeCards(cardIds: string[]): void;
   drawCard(): void;

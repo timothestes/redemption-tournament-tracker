@@ -1241,6 +1241,102 @@ export const shuffle_card_into_deck = spacetimedb.reducer(
 );
 
 // ---------------------------------------------------------------------------
+// Reducer: random_hand_to_zone
+// ---------------------------------------------------------------------------
+export const random_hand_to_zone = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    count: t.u64(),
+    toZone: t.string(),
+    deckPosition: t.string(),
+  },
+  (ctx, { gameId, count, toZone, deckPosition }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in progress');
+
+    const player = findPlayerBySender(ctx, gameId);
+
+    const handCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+      (c: any) => c.ownerId === player.id && c.zone === 'hand'
+    );
+
+    if (handCards.length === 0) throw new SenderError('No cards in hand');
+    const actualCount = Math.min(Number(count), handCards.length);
+
+    // Use seeded PRNG to pick random cards
+    const newRngCounter = game.rngCounter + 1n;
+    ctx.db.Game.id.update({ ...game, rngCounter: newRngCounter });
+    const seed = makeSeed(ctx.timestamp.microsSinceUnixEpoch, gameId, player.id, newRngCounter);
+    const rng = xorshift64(seed);
+
+    // Fisher-Yates partial shuffle to select random indices
+    const indices = handCards.map((_: any, i: number) => i);
+    for (let i = indices.length - 1; i > indices.length - 1 - actualCount && i > 0; i--) {
+      const j = Number(rng.next() % BigInt(i + 1));
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    const pickedCards = indices.slice(indices.length - actualCount).map((i: number) => handCards[i]);
+
+    // Get max deck zoneIndex for bottom placement
+    let maxDeckIndex = 0n;
+    if (toZone === 'deck') {
+      for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+        if (c.ownerId === player.id && c.zone === 'deck' && c.zoneIndex > maxDeckIndex) {
+          maxDeckIndex = c.zoneIndex;
+        }
+      }
+    }
+
+    const movedNames: string[] = [];
+    for (let i = 0; i < pickedCards.length; i++) {
+      const card = pickedCards[i];
+      movedNames.push(card.cardName);
+
+      let newZoneIndex = 0n;
+      if (toZone === 'deck') {
+        if (deckPosition === 'top') {
+          newZoneIndex = BigInt(-(i + 1));
+        } else if (deckPosition === 'bottom') {
+          newZoneIndex = maxDeckIndex + BigInt(i + 1);
+        }
+      }
+
+      ctx.db.CardInstance.id.update({
+        ...card,
+        zone: toZone,
+        zoneIndex: newZoneIndex,
+        posX: '',
+        posY: '',
+      });
+    }
+
+    // If shuffle into deck, shuffle entire deck
+    if (toZone === 'deck' && deckPosition === 'shuffle') {
+      const latestGame = ctx.db.Game.id.find(gameId);
+      if (!latestGame) return;
+      const shuffleRng = latestGame.rngCounter + 1n;
+      ctx.db.Game.id.update({ ...latestGame, rngCounter: shuffleRng });
+
+      const allDeckCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+        (c: any) => c.ownerId === player.id && c.zone === 'deck'
+      );
+      const shuffleIndices = allDeckCards.map((_: any, idx: number) => idx);
+      const shuffleSeed = makeSeed(ctx.timestamp.microsSinceUnixEpoch, gameId, player.id, shuffleRng);
+      seededShuffle(shuffleIndices, shuffleSeed);
+      for (let i = 0; i < allDeckCards.length; i++) {
+        ctx.db.CardInstance.id.update({ ...allDeckCards[i], zoneIndex: BigInt(shuffleIndices[i]) });
+      }
+    }
+
+    const destLabel = toZone === 'deck' ? `deck (${deckPosition})` : toZone;
+    logAction(ctx, gameId, player.id, 'RANDOM_HAND_TO_ZONE',
+      JSON.stringify({ cards: movedNames, destination: destLabel, count: actualCount }),
+      game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
 // Reducer: meek_card
 // ---------------------------------------------------------------------------
 export const meek_card = spacetimedb.reducer(
