@@ -236,6 +236,27 @@ export const ZoneSearchRequest = table(
 );
 
 // ---------------------------------------------------------------------------
+// 10. CleanupSchedule (scheduled table)
+// ---------------------------------------------------------------------------
+
+let _handleCleanupStaleGames: any;
+export const setCleanupStaleGamesReducer = (reducer: any) => {
+  _handleCleanupStaleGames = reducer;
+};
+
+export const CleanupSchedule = table(
+  {
+    name: 'cleanup_schedule',
+    public: true,
+    scheduled: () => _handleCleanupStaleGames,
+  },
+  {
+    scheduledId: t.u64().primaryKey().autoInc(),
+    scheduledAt: t.scheduleAt(),
+  }
+);
+
+// ---------------------------------------------------------------------------
 // Schema export
 // ---------------------------------------------------------------------------
 const spacetimedb = schema({
@@ -248,6 +269,7 @@ const spacetimedb = schema({
   Spectator,
   DisconnectTimeout,
   ZoneSearchRequest,
+  CleanupSchedule,
 });
 
 export default spacetimedb;

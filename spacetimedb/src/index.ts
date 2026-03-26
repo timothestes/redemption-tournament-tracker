@@ -1,6 +1,6 @@
 import spacetimedb from './schema';
 export default spacetimedb;
-import { DisconnectTimeout, setDisconnectTimeoutReducer } from './schema';
+import { DisconnectTimeout, setDisconnectTimeoutReducer, CleanupSchedule, setCleanupStaleGamesReducer } from './schema';
 import { t, SenderError } from 'spacetimedb/server';
 import { ScheduleAt } from 'spacetimedb';
 import { makeSeed, seededShuffle, seededDiceRoll, xorshift64, generateGameCode } from './utils';
@@ -869,6 +869,92 @@ export const handle_disconnect_timeout = spacetimedb.reducer(
 // Wire the scheduled reducer to the schema's forward reference
 setDisconnectTimeoutReducer(handle_disconnect_timeout);
 
+// ---------------------------------------------------------------------------
+// Scheduled reducer: cleanup_stale_games
+// ---------------------------------------------------------------------------
+const ONE_HOUR_MICROS = 3_600_000_000n;
+const THIRTY_MIN_MICROS = 1_800_000_000n;
+const TWENTY_FOUR_HOURS_MICROS = 86_400_000_000n;
+
+export const cleanup_stale_games = spacetimedb.reducer(
+  { arg: CleanupSchedule.rowType },
+  (ctx, { arg }) => {
+    const now = ctx.timestamp.microsSinceUnixEpoch;
+
+    // 1. Abandon waiting games older than 1 hour
+    for (const game of [...ctx.db.Game.iter()]) {
+      if (game.status === 'waiting' && (now - game.createdAt.microsSinceUnixEpoch) > ONE_HOUR_MICROS) {
+        ctx.db.Game.id.update({ ...game, status: 'finished' });
+      }
+    }
+
+    // 2. Abandon pregame games older than 30 minutes
+    for (const game of [...ctx.db.Game.iter()]) {
+      if (game.status === 'pregame' && (now - game.createdAt.microsSinceUnixEpoch) > THIRTY_MIN_MICROS) {
+        ctx.db.Game.id.update({ ...game, status: 'finished' });
+      }
+    }
+
+    // 3. Abandon playing games where both players disconnected, no recent activity
+    for (const game of [...ctx.db.Game.iter()]) {
+      if (game.status !== 'playing') continue;
+      const players = [...ctx.db.Player.player_game_id.filter(game.id)];
+      const allDisconnected = players.length > 0 && players.every((p: any) => !p.isConnected);
+      if (!allDisconnected) continue;
+
+      let latestActionTime = 0n;
+      for (const action of ctx.db.GameAction.game_action_game_id.filter(game.id)) {
+        const actionTime = action.timestamp.microsSinceUnixEpoch;
+        if (actionTime > latestActionTime) latestActionTime = actionTime;
+      }
+      if (latestActionTime === 0n) latestActionTime = game.createdAt.microsSinceUnixEpoch;
+
+      if ((now - latestActionTime) > THIRTY_MIN_MICROS) {
+        ctx.db.Game.id.update({ ...game, status: 'finished' });
+      }
+    }
+
+    // 4. Delete data for finished games older than 24 hours
+    for (const game of [...ctx.db.Game.iter()]) {
+      if (game.status !== 'finished') continue;
+      if ((now - game.createdAt.microsSinceUnixEpoch) <= TWENTY_FOUR_HOURS_MICROS) continue;
+
+      const gameId = game.id;
+
+      for (const card of [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)]) {
+        for (const counter of [...ctx.db.CardCounter.card_counter_card_instance_id.filter(card.id)]) {
+          ctx.db.CardCounter.id.delete(counter.id);
+        }
+        ctx.db.CardInstance.id.delete(card.id);
+      }
+      for (const action of [...ctx.db.GameAction.game_action_game_id.filter(gameId)]) {
+        ctx.db.GameAction.id.delete(action.id);
+      }
+      for (const msg of [...ctx.db.ChatMessage.chat_message_game_id.filter(gameId)]) {
+        ctx.db.ChatMessage.id.delete(msg.id);
+      }
+      for (const spec of [...ctx.db.Spectator.spectator_game_id.filter(gameId)]) {
+        ctx.db.Spectator.id.delete(spec.id);
+      }
+      for (const req of [...ctx.db.ZoneSearchRequest.zone_search_request_game_id.filter(gameId)]) {
+        ctx.db.ZoneSearchRequest.id.delete(req.id);
+      }
+      for (const player of [...ctx.db.Player.player_game_id.filter(gameId)]) {
+        ctx.db.Player.id.delete(player.id);
+      }
+      ctx.db.Game.id.delete(gameId);
+    }
+
+    // Schedule next cleanup in 1 hour
+    ctx.db.CleanupSchedule.insert({
+      scheduledId: 0n,
+      scheduledAt: ScheduleAt.time(now + ONE_HOUR_MICROS),
+    });
+  }
+);
+
+setCleanupStaleGamesReducer(cleanup_stale_games);
+
 // ===========================================================================
 // Turn / Phase reducers
 // ===========================================================================
@@ -1679,6 +1765,15 @@ spacetimedb.clientConnected((ctx) => {
         }
       }
     }
+  }
+
+  // Seed cleanup schedule if none exists
+  const existingCleanup = [...ctx.db.CleanupSchedule.iter()];
+  if (existingCleanup.length === 0) {
+    ctx.db.CleanupSchedule.insert({
+      scheduledId: 0n,
+      scheduledAt: ScheduleAt.time(ctx.timestamp.microsSinceUnixEpoch + ONE_HOUR_MICROS),
+    });
   }
 });
 
