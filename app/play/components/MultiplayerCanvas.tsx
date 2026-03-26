@@ -1004,9 +1004,11 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       const zoneOffY = zoneRect?.y ?? 0;
       const zoneW = zoneRect?.width || 1;
       const zoneH = zoneRect?.height || 1;
-      // Resolve target owner ID for cross-player moves (e.g. rescue lost soul,
-      // capture hero, or placing cards in opponent's zones).
-      const targetOwnerId = hit.owner === 'opponent' && gameState.opponentPlayer
+      // Resolve target owner ID — always set to the target zone's owner so
+      // cards transfer ownership when moving between players' zones.
+      const targetOwnerId = hit.owner === 'my' && gameState.myPlayer
+        ? String(gameState.myPlayer.id)
+        : hit.owner === 'opponent' && gameState.opponentPlayer
         ? String(gameState.opponentPlayer.id)
         : '';
 
@@ -1140,6 +1142,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       clearSelection,
       myZones,
       opponentZones,
+      gameState.myPlayer,
       gameState.opponentPlayer,
     ],
   );
