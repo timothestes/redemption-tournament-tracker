@@ -289,17 +289,36 @@ export default function FilterGrid({
             🎲
           </button>
           <button
-            className="px-2.5 py-0.5 md:px-3 md:py-1.5 border rounded text-sm bg-muted text-foreground hover:bg-muted/80 font-semibold"
+            className={clsx(
+              'px-2.5 py-0.5 md:px-3 md:py-1.5 border text-sm font-semibold transition-colors',
+              advancedOpen
+                ? 'bg-emerald-600 text-white border-emerald-600 rounded rounded-b-none'
+                : 'bg-muted text-foreground border-border rounded hover:bg-muted/80'
+            )}
             onClick={() => setAdvancedOpen(!advancedOpen)}
           >
-            Advanced Filters {advancedOpen ? '▲' : '▼'}
+            Advanced Filters
+            <svg
+              className={clsx(
+                'inline-block ml-1.5 w-3 h-3 transition-transform duration-200',
+                advancedOpen && 'rotate-180'
+              )}
+              viewBox="0 0 12 12"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M2 4l4 4 4-4" />
+            </svg>
           </button>
         </div>
       </div>
 
       {/* Advanced Filters panel — full width when open */}
       {advancedOpen && (
-        <div className="p-2 border rounded space-y-2">
+        <div className="p-2 border border-emerald-600 rounded rounded-tl-none space-y-2">
           <p className="font-bold text-base md:text-lg text-foreground rounded px-2 py-1 inline-block shadow-none">Testament</p>
           <div className="flex flex-wrap gap-1.5 mb-2">
             {['OT','NT'].map((t) => {
