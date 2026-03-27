@@ -724,10 +724,19 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       (r: any) => r.requesterId === gameState.myPlayer?.id && r.status === 'pending'
     );
     if (pendingSearchRef.current && !myPending && !approvedSearchRequest) {
-      showGameToast('Search request denied');
+      const wasReveal = pendingSearchRef.current.zone === 'hand-reveal';
+      showGameToast(wasReveal ? 'Reveal request denied' : 'Search request denied');
     }
     pendingSearchRef.current = myPending ?? null;
   }, [zoneSearchRequests, gameState.myPlayer, approvedSearchRequest]);
+
+  // Auto-complete hand-reveal requests — no browse modal needed
+  useEffect(() => {
+    if (approvedSearchRequest && approvedSearchRequest.zone === 'hand-reveal') {
+      completeZoneSearch(BigInt(approvedSearchRequest.id));
+      showGameToast('Opponent revealed their hand');
+    }
+  }, [approvedSearchRequest, completeZoneSearch]);
 
   // ---- Peek card IDs for DeckPeekModal ----
   const peekCardIds = useMemo(() => {
@@ -1622,6 +1631,16 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
             height={opponentHandRect.height}
             fill="#050911"
             opacity={0.5}
+            onContextMenu={(e: Konva.KonvaEventObject<PointerEvent>) => {
+              e.evt.preventDefault();
+              closeAllMenus();
+              setOpponentZoneMenu({
+                x: e.evt.clientX,
+                y: e.evt.clientY,
+                zone: 'hand',
+                zoneName: 'Hand',
+              });
+            }}
           />
           <Text
             x={opponentHandRect.x + 8}
@@ -2316,6 +2335,12 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                         cardHeight={oppHandCard.cardHeight}
                         image={getCardImage(card)}
                         isDraggable={false}
+                        hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
+                        onDragStart={noopCardDrag}
+                        onDragMove={noopDrag}
+                        onDragEnd={noopCardDragEnd}
+                        onContextMenu={handleCardContextMenu}
+                        onDblClick={noopDblClick}
                         onMouseEnter={handleMouseEnter}
                         onMouseLeave={handleMouseLeave}
                       />
@@ -2612,12 +2637,18 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
         <OpponentZoneContextMenu
           x={opponentZoneMenu.x}
           y={opponentZoneMenu.y}
+          zone={opponentZoneMenu.zone}
           zoneName={opponentZoneMenu.zoneName}
           onSearch={() => {
             requestZoneSearch(opponentZoneMenu.zone);
             showGameToast('Waiting for opponent to approve...');
             setOpponentZoneMenu(null);
           }}
+          onRevealHand={opponentZoneMenu.zone === 'hand' ? () => {
+            requestZoneSearch('hand-reveal');
+            showGameToast('Asking opponent to reveal hand...');
+            setOpponentZoneMenu(null);
+          } : undefined}
           onClose={() => setOpponentZoneMenu(null)}
         />
       )}
@@ -2625,13 +2656,19 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       {incomingSearchRequest && (
         <ConsentDialog
           requesterName={gameState.opponentPlayer?.displayName ?? 'Opponent'}
-          zoneName={incomingSearchRequest.zone}
-          onAllow={() => approveZoneSearch(BigInt(incomingSearchRequest.id))}
+          zoneName={incomingSearchRequest.zone === 'hand-reveal' ? 'hand' : incomingSearchRequest.zone}
+          requestType={incomingSearchRequest.zone === 'hand-reveal' ? 'reveal' : 'search'}
+          onAllow={() => {
+            approveZoneSearch(BigInt(incomingSearchRequest.id));
+            if (incomingSearchRequest.zone === 'hand-reveal') {
+              gameState.revealHand(true);
+            }
+          }}
           onDeny={() => denyZoneSearch(BigInt(incomingSearchRequest.id))}
         />
       )}
 
-      {approvedSearchRequest && (() => {
+      {approvedSearchRequest && approvedSearchRequest.zone !== 'hand-reveal' && (() => {
         const zoneCards = (opponentCards[approvedSearchRequest.zone] ?? [])
           .map((c: any) => cardInstanceToGameCard(c, counters.get(c.id) ?? [], 'player2'));
         return (

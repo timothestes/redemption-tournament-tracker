@@ -463,6 +463,27 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     }
   }, [gameState.game, lifecycle]);
 
+  // Clean up waiting-status games when the user leaves the page.
+  // Uses a ref so the beforeunload handler always reads the latest lifecycle.
+  const lifecycleRef = useRef(lifecycle);
+  lifecycleRef.current = lifecycle;
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (lifecycleRef.current === 'waiting' && gameId !== null) {
+        gameState.leaveGame();
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      // Component unmount (navigation away) — clean up if still waiting
+      if (lifecycleRef.current === 'waiting' && gameId !== null) {
+        gameState.leaveGame();
+      }
+    };
+  }, [gameId, gameState]);
+
   // Build a player name map for ChatPanel
   const playerNameMap = useMemo(() => {
     const map: Record<string, string> = {};

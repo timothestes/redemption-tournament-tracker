@@ -3,11 +3,12 @@
 interface ConsentDialogProps {
   requesterName: string;
   zoneName: string;
+  requestType?: 'search' | 'reveal';
   onAllow: () => void;
   onDeny: () => void;
 }
 
-export function ConsentDialog({ requesterName, zoneName, onAllow, onDeny }: ConsentDialogProps) {
+export function ConsentDialog({ requesterName, zoneName, requestType = 'search', onAllow, onDeny }: ConsentDialogProps) {
   return (
     <div
       style={{
@@ -40,7 +41,7 @@ export function ConsentDialog({ requesterName, zoneName, onAllow, onDeny }: Cons
             letterSpacing: '0.05em',
           }}
         >
-          Zone Search Request
+          {requestType === 'reveal' ? 'Reveal Hand Request' : 'Zone Search Request'}
         </div>
         <div
           style={{
@@ -50,7 +51,11 @@ export function ConsentDialog({ requesterName, zoneName, onAllow, onDeny }: Cons
             lineHeight: 1.5,
           }}
         >
-          <strong style={{ color: 'var(--gf-accent)' }}>{requesterName}</strong> wants to search your <strong style={{ color: 'var(--gf-text-bright)' }}>{zoneName}</strong>.
+          {requestType === 'reveal' ? (
+            <><strong style={{ color: 'var(--gf-accent)' }}>{requesterName}</strong> is asking you to reveal your <strong style={{ color: 'var(--gf-text-bright)' }}>hand</strong>.</>
+          ) : (
+            <><strong style={{ color: 'var(--gf-accent)' }}>{requesterName}</strong> wants to search your <strong style={{ color: 'var(--gf-text-bright)' }}>{zoneName}</strong>.</>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
           <button

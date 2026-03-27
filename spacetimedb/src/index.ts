@@ -786,6 +786,13 @@ export const leave_game = spacetimedb.reducer(
     for (const player of ctx.db.Player.player_game_id.filter(gameId)) {
       if (player.identity.toHexString() === ctx.sender.toHexString()) {
         ctx.db.Player.id.update({ ...player, isConnected: false });
+
+        // If the game is still in the lobby (waiting), finish it immediately
+        // so it disappears from the lobby list right away.
+        const game = ctx.db.Game.id.find(gameId);
+        if (game && game.status === 'waiting') {
+          ctx.db.Game.id.update({ ...game, status: 'finished' });
+        }
         return;
       }
     }
@@ -2136,11 +2143,12 @@ spacetimedb.clientDisconnected((ctx) => {
         continue;
       }
 
-      // For waiting games, use a short timeout (15s) — the creator may just be
-      // navigating from lobby to game page, which briefly disconnects.
+      // For waiting games, use a short timeout (5s) — just long enough to survive
+      // a page refresh. The client proactively calls leave_game on navigation,
+      // so this is only a fallback for crashes/network drops.
       // For playing games, use the normal 5-minute timeout.
       const timeoutMicros = gameForPlayer && gameForPlayer.status === 'waiting'
-        ? 15_000_000n   // 15 seconds
+        ? 5_000_000n    // 5 seconds
         : 300_000_000n; // 5 minutes
       const futureTime = ctx.timestamp.microsSinceUnixEpoch + timeoutMicros;
       ctx.db.DisconnectTimeout.insert({

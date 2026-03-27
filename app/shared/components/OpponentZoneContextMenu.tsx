@@ -1,17 +1,19 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { Search } from 'lucide-react';
+import { Search, Eye } from 'lucide-react';
 
 interface OpponentZoneContextMenuProps {
   x: number;
   y: number;
   zoneName: string;
+  zone: string;
   onSearch: () => void;
+  onRevealHand?: () => void;
   onClose: () => void;
 }
 
-export function OpponentZoneContextMenu({ x, y, zoneName, onSearch, onClose }: OpponentZoneContextMenuProps) {
+export function OpponentZoneContextMenu({ x, y, zoneName, zone, onSearch, onRevealHand, onClose }: OpponentZoneContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -28,6 +30,21 @@ export function OpponentZoneContextMenu({ x, y, zoneName, onSearch, onClose }: O
       document.removeEventListener('keydown', handleKey);
     };
   }, [onClose]);
+
+  const btnStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    width: '100%',
+    padding: '6px 14px',
+    background: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    color: 'var(--gf-text)',
+    fontSize: 13,
+    textAlign: 'left',
+    fontFamily: 'var(--font-cinzel), Georgia, serif',
+  };
 
   return (
     <div
@@ -50,24 +67,22 @@ export function OpponentZoneContextMenu({ x, y, zoneName, onSearch, onClose }: O
         onClick={onSearch}
         onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          width: '100%',
-          padding: '6px 14px',
-          background: 'transparent',
-          border: 'none',
-          cursor: 'pointer',
-          color: 'var(--gf-text)',
-          fontSize: 13,
-          textAlign: 'left',
-          fontFamily: 'var(--font-cinzel), Georgia, serif',
-        }}
+        style={btnStyle}
       >
         <Search size={14} />
         Search {zoneName}
       </button>
+      {zone === 'hand' && onRevealHand && (
+        <button
+          onClick={onRevealHand}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          style={btnStyle}
+        >
+          <Eye size={14} />
+          Request Reveal Hand
+        </button>
+      )}
     </div>
   );
 }

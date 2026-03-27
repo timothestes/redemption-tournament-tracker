@@ -506,28 +506,23 @@ function RollingPhase({ gameState, gameId }: { gameState: GameState; gameId: big
         </motion.div>
       </div>
 
-      {/* Winner announcement — fades in after dice land */}
-      <AnimatePresence>
-        {showResults && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            style={{ marginTop: 24 }}
-          >
-            <p style={{
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 15,
-              fontWeight: 700,
-              color: '#e8d5a3',
-              letterSpacing: '0.06em',
-              textShadow: '0 1px 4px rgba(0,0,0,0.5)',
-            }}>
-              {winnerName} wins the roll!
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Winner announcement — always rendered to reserve layout space, fades in after dice land */}
+      <motion.div
+        animate={showResults ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
+        transition={{ duration: 0.5, delay: showResults ? 0.2 : 0 }}
+        style={{ marginTop: 24 }}
+      >
+        <p style={{
+          fontFamily: 'var(--font-cinzel), Georgia, serif',
+          fontSize: 15,
+          fontWeight: 700,
+          color: '#e8d5a3',
+          letterSpacing: '0.06em',
+          textShadow: '0 1px 4px rgba(0,0,0,0.5)',
+        }}>
+          {winnerName} wins the roll!
+        </p>
+      </motion.div>
     </div>
   );
 }
@@ -589,31 +584,6 @@ function ChoosingPhase({ gameState, gameId }: { gameState: GameState; gameId: bi
 
   const timerBar = (
     <div style={{ marginTop: 20 }}>
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 6,
-      }}>
-        <span style={{
-          fontFamily: 'var(--font-cinzel), Georgia, serif',
-          fontSize: 10,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          color: secondsLeft <= 10 ? 'rgba(220, 120, 80, 0.7)' : 'rgba(196, 149, 90, 0.4)',
-        }}>
-          Time to choose
-        </span>
-        <span style={{
-          fontFamily: 'Georgia, serif',
-          fontSize: 12,
-          fontWeight: 700,
-          color: secondsLeft <= 10 ? '#dc7850' : 'rgba(232, 213, 163, 0.6)',
-          fontVariantNumeric: 'tabular-nums',
-        }}>
-          {secondsLeft}s
-        </span>
-      </div>
       <div style={{
         width: '100%',
         height: 3,
