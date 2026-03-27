@@ -6,6 +6,8 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "../../components/ui/badge";
+import { useIsAdmin } from "../../hooks/useIsAdmin";
+import { Settings } from "lucide-react";
 import type { PublicSpoiler } from "./actions";
 
 /* ------------------------------------------------------------------ */
@@ -372,6 +374,25 @@ function SetSection({
 }
 
 /* ------------------------------------------------------------------ */
+/*  Admin FAB                                                          */
+/* ------------------------------------------------------------------ */
+
+function AdminManageFab() {
+  const { isAdmin, permissions, loading } = useIsAdmin();
+  if (loading || !isAdmin || !permissions.includes("manage_spoilers")) return null;
+
+  return (
+    <Link
+      href="/admin/spoilers"
+      className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-lg transition-opacity hover:opacity-90"
+    >
+      <Settings className="h-4 w-4" />
+      Manage
+    </Link>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Main client component                                              */
 /* ------------------------------------------------------------------ */
 
@@ -459,6 +480,9 @@ function SpoilersPageInner({ initialSpoilers }: { initialSpoilers: PublicSpoiler
           onNavigate={setLightboxIndex}
         />
       )}
+
+      {/* Admin FAB */}
+      <AdminManageFab />
     </>
   );
 }
