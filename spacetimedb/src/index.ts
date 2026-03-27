@@ -269,6 +269,14 @@ export const join_game = spacetimedb.reducer(
       throw new SenderError('No waiting game found with that code');
     }
 
+    // Reject join if the creator has disconnected — the game is effectively dead
+    const creator = [...ctx.db.Player.player_game_id.filter(game.id)]
+      .find((p: any) => p.seat === 0n);
+    if (creator && !creator.isConnected) {
+      ctx.db.Game.id.update({ ...game, status: 'finished' });
+      throw new SenderError('No waiting game found with that code');
+    }
+
     // Insert player (seat=1) with pending deck data (cards loaded later during pregame)
     const player = ctx.db.Player.insert({
       id: 0n,
@@ -881,6 +889,12 @@ export const cleanup_stale_games = spacetimedb.reducer(
   (ctx, { arg }) => {
     const now = ctx.timestamp.microsSinceUnixEpoch;
 
+    // Always reschedule first — if cleanup logic throws, the chain must not break
+    ctx.db.CleanupSchedule.insert({
+      scheduledId: 0n,
+      scheduledAt: ScheduleAt.time(now + ONE_HOUR_MICROS),
+    });
+
     // 1. Abandon waiting games older than 1 hour
     for (const game of [...ctx.db.Game.iter()]) {
       if (game.status === 'waiting' && (now - game.createdAt.microsSinceUnixEpoch) > ONE_HOUR_MICROS) {
@@ -944,12 +958,6 @@ export const cleanup_stale_games = spacetimedb.reducer(
       }
       ctx.db.Game.id.delete(gameId);
     }
-
-    // Schedule next cleanup in 1 hour
-    ctx.db.CleanupSchedule.insert({
-      scheduledId: 0n,
-      scheduledAt: ScheduleAt.time(now + ONE_HOUR_MICROS),
-    });
   }
 );
 

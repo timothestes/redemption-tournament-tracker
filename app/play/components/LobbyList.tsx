@@ -58,13 +58,19 @@ export function LobbyList({ selectedDeckId, onJoinGame, onSwitchToCreate }: Lobb
   }, []);
 
   // Client-side filter as safety net (subscription already filters server-side)
-  // Sort oldest first so longest-waiting games appear at top
+  // Hide lobbies older than 1 hour — cleanup should have caught them but may lag
+  // Sort newest first so freshest games appear at top
+  const ONE_HOUR_MS = 60 * 60 * 1000;
   const openGames = (games || [])
-    .filter((g) => g.status === 'waiting' && g.isPublic)
+    .filter((g) => {
+      if (g.status !== 'waiting' || !g.isPublic) return false;
+      const createdMs = Number(g.createdAt.microsSinceUnixEpoch / BigInt(1000));
+      return (now - createdMs) < ONE_HOUR_MS;
+    })
     .sort((a, b) => {
       const aTime = Number(a.createdAt.microsSinceUnixEpoch);
       const bTime = Number(b.createdAt.microsSinceUnixEpoch);
-      return aTime - bTime;
+      return bTime - aTime;
     });
 
   if (!conn) {

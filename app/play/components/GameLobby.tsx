@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,6 +40,16 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
 
   // Spectate toggle
   const [isSpectate, setIsSpectate] = useState(false);
+
+  // Show error from redirect (e.g. stale lobby join attempt)
+  useEffect(() => {
+    const lobbyError = sessionStorage.getItem('lobby_error');
+    if (lobbyError) {
+      setError(lobbyError);
+      setActiveTab('lobby');
+      sessionStorage.removeItem('lobby_error');
+    }
+  }, []);
 
   // Tab and lobby visibility state
   const [activeTab, setActiveTab] = useState<'create' | 'lobby'>('create');
@@ -421,11 +431,16 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
                 <p className="text-xs text-muted-foreground">{connError}</p>
               </div>
             ) : (
-              <LobbyList
-                selectedDeckId={selectedDeck?.id ?? null}
-                onJoinGame={handleJoinFromLobby}
-                onSwitchToCreate={() => setActiveTab('create')}
-              />
+              <>
+                {error && (
+                  <p className="text-sm text-destructive text-center mb-2">{error}</p>
+                )}
+                <LobbyList
+                  selectedDeckId={selectedDeck?.id ?? null}
+                  onJoinGame={handleJoinFromLobby}
+                  onSwitchToCreate={() => setActiveTab('create')}
+                />
+              </>
             )
           )}
         </SpacetimeProvider>
