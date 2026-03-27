@@ -55,6 +55,9 @@ const ABILITY_OVERRIDES: Record<string, string> = {
   // Foreign Wives — 2022 Side Event promo reworded ability
   "take household idols from discard pile. if opponent has drawn 5 or more cards this turn, protect this card from cards used by opponent. cannot be negated.":
     "search discard pile for household idols. if opponent has draw 5 or more cards this turn, protect foreign wives from cards used by opponent. cannot be negated.",
+  // Lost Soul "Hopper" — RR/Matthew 18:12 say "this card", LR/Fundraiser say "this Lost Soul"
+  "if drawn, give this lost soul to an opponent's territory.":
+    "if drawn, give this card to an opponent's territory.",
 };
 
 /**
