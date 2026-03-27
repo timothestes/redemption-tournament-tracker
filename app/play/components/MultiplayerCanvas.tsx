@@ -2269,7 +2269,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
           })}
 
           {/* ================================================================
-              Opponent hand — row of card backs (NOT draggable)
+              Opponent hand — card backs or face-up if hand is revealed
               ================================================================ */}
           {(() => {
             const opponentHandCards = opponentCards['hand'] ?? [];
@@ -2282,6 +2282,8 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
               oppHandCard.cardHeight,
               true, // flat spread — no fan arc for opponent
             );
+
+            const oppHandRevealed = gameState.opponentPlayer?.handRevealed ?? false;
 
             return (
               <Group
@@ -2299,11 +2301,32 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                   });
                 }}
               >
-                {oppHandPositions.map((pos, i) => (
-                  <Group key={`opp-hand-${i}`} x={pos.x} y={pos.y}>
-                    <CardBackShape width={oppHandCard.cardWidth} height={oppHandCard.cardHeight} />
-                  </Group>
-                ))}
+                {oppHandPositions.map((pos, i) => {
+                  const card = opponentHandCards[i];
+                  if (oppHandRevealed && card) {
+                    const gameCard = adaptCard(card, 'player2');
+                    return (
+                      <GameCardNode
+                        key={String(card.id)}
+                        card={gameCard}
+                        x={pos.x}
+                        y={pos.y}
+                        rotation={pos.rotation}
+                        cardWidth={oppHandCard.cardWidth}
+                        cardHeight={oppHandCard.cardHeight}
+                        image={getCardImage(card)}
+                        isDraggable={false}
+                        onMouseEnter={handleMouseEnter}
+                        onMouseLeave={handleMouseLeave}
+                      />
+                    );
+                  }
+                  return (
+                    <Group key={`opp-hand-${i}`} x={pos.x} y={pos.y}>
+                      <CardBackShape width={oppHandCard.cardWidth} height={oppHandCard.cardHeight} />
+                    </Group>
+                  );
+                })}
               </Group>
             );
           })()}
@@ -2526,6 +2549,8 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
           onRandomToDeckTop={(count) => { setHandMenu(null); multiplayerActions.randomHandToZone(count, 'deck', 'top'); }}
           onRandomToDeckBottom={(count) => { setHandMenu(null); multiplayerActions.randomHandToZone(count, 'deck', 'bottom'); }}
           onShuffleRandomIntoDeck={(count) => { setHandMenu(null); multiplayerActions.randomHandToZone(count, 'deck', 'shuffle'); }}
+          isHandRevealed={gameState.myPlayer?.handRevealed ?? false}
+          onRevealHand={(revealed) => { setHandMenu(null); gameState.revealHand(revealed); }}
         />
       )}
 

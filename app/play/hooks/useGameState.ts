@@ -76,6 +76,7 @@ export interface GameState {
   rollDice: (sides: bigint) => void;
   sendChat: (text: string) => void;
   setPlayerOption: (optionName: string, value: string) => void;
+  revealHand: (revealed: boolean) => void;
   moveCardToTopOfDeck: (cardInstanceId: bigint) => void;
   moveCardToBottomOfDeck: (cardInstanceId: bigint) => void;
   spawnLostSoul: (testament: string, posX: string, posY: string) => void;
@@ -400,6 +401,13 @@ export function useGameState(gameId: bigint): GameState {
     [conn, gameId],
   );
 
+  const revealHand = useCallback(
+    (revealed: boolean) => {
+      conn?.reducers.toggleRevealHand({ gameId, revealed });
+    },
+    [conn, gameId],
+  );
+
   const moveCardToTopOfDeck = useCallback(
     (cardInstanceId: bigint) => {
       conn?.reducers.moveCardToTopOfDeck({ gameId, cardInstanceId });
@@ -542,6 +550,7 @@ export function useGameState(gameId: bigint): GameState {
     rollDice,
     sendChat,
     setPlayerOption,
+    revealHand,
     moveCardToTopOfDeck,
     moveCardToBottomOfDeck,
     spawnLostSoul,

@@ -98,6 +98,31 @@ interface OpponentBrowseModalProps {
   isDragActive?: boolean;
 }
 
+const SEARCH_FIELDS: { id: string; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'type', label: 'Type' },
+  { id: 'name', label: 'Name' },
+  { id: 'brigade', label: 'Brigade' },
+  { id: 'alignment', label: 'Alignment' },
+  { id: 'identifier', label: 'Identifier' },
+  { id: 'ability', label: 'Ability' },
+];
+
+const TYPE_ALIASES: Record<string, string[]> = {
+  'ls': ['lost soul', 'lost souls'],
+  'he': ['hero', 'heroes'],
+  'ec': ['evil character', 'evil characters'],
+  'gc': ['good character', 'good characters'],
+  'ee': ['evil enhancement', 'evil enhancements'],
+  'ge': ['good enhancement', 'good enhancements'],
+  'da': ['dominant artifact', 'dominant artifacts'],
+  'ar': ['artifact'],
+  'fo': ['fortress'],
+  'si': ['site'],
+  'cu': ['curse'],
+  'co': ['covenant'],
+};
+
 export function OpponentBrowseModal({
   zoneName,
   cards,
@@ -108,6 +133,7 @@ export function OpponentBrowseModal({
   isDragActive,
 }: OpponentBrowseModalProps) {
   const [search, setSearch] = useState('');
+  const [searchField, setSearchField] = useState<string>('all');
   const [contextCard, setContextCard] = useState<{ card: GameCard; x: number; y: number } | null>(null);
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave } = useModalCardHover(350, { setPreviewCard, isLoupeVisible });
@@ -117,8 +143,30 @@ export function OpponentBrowseModal({
     ? [...cards].sort((a, b) => a.type.localeCompare(b.type) || a.cardName.localeCompare(b.cardName))
     : cards;
 
+  const matchesSearch = (c: GameCard, term: string): boolean => {
+    const t = term.toLowerCase();
+    const matchesType = (type: string, s: string): boolean => {
+      const tl = type.toLowerCase();
+      if (tl.includes(s)) return true;
+      const aliases = TYPE_ALIASES[tl];
+      return aliases ? aliases.some(a => a.includes(s)) : false;
+    };
+    if (searchField === 'all') {
+      return matchesType(c.type, t) || c.cardName.toLowerCase().includes(t) ||
+        c.brigade.toLowerCase().includes(t) || c.alignment.toLowerCase().includes(t) ||
+        c.identifier.toLowerCase().includes(t) || c.specialAbility.toLowerCase().includes(t);
+    }
+    if (searchField === 'type') return matchesType(c.type, t);
+    if (searchField === 'name') return c.cardName.toLowerCase().includes(t);
+    if (searchField === 'brigade') return c.brigade.toLowerCase().includes(t);
+    if (searchField === 'alignment') return c.alignment.toLowerCase().includes(t);
+    if (searchField === 'identifier') return c.identifier.toLowerCase().includes(t);
+    if (searchField === 'ability') return c.specialAbility.toLowerCase().includes(t);
+    return true;
+  };
+
   const filtered = search
-    ? sortedCards.filter(c => c.cardName.toLowerCase().includes(search.toLowerCase()))
+    ? sortedCards.filter(c => matchesSearch(c, search))
     : sortedCards;
 
   useEffect(() => {
@@ -168,6 +216,7 @@ export function OpponentBrowseModal({
       style={{
         position: 'fixed',
         inset: 0,
+        right: isLoupeVisible ? 'clamp(280px, 20vw, 380px)' : '36px',
         background: 'rgba(0,0,0,0.75)',
         display: 'flex',
         alignItems: 'center',
@@ -182,8 +231,9 @@ export function OpponentBrowseModal({
           border: '1px solid var(--gf-border)',
           borderRadius: 8,
           padding: 20,
-          width: '90vw',
-          maxWidth: 850,
+          width: '80vw',
+          maxWidth: 700,
+          height: '80vh',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
@@ -211,55 +261,91 @@ export function OpponentBrowseModal({
           </button>
         </div>
 
-        {/* Search input */}
-        <div style={{ position: 'relative', marginBottom: 12 }}>
-          <Search
-            size={14}
-            style={{
-              position: 'absolute',
-              left: 10,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: 'var(--gf-text-dim)',
-            }}
-          />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name..."
-            autoFocus
-            style={{
-              width: '100%',
-              padding: '8px 30px 8px 30px',
-              background: '#1e1610',
-              border: '1px solid var(--gf-border)',
-              borderRadius: 4,
-              color: 'var(--gf-text)',
-              fontSize: 13,
-              outline: 'none',
-            }}
-          />
-          {search && (
-            <button
-              onClick={() => setSearch('')}
+        {/* Search input + field selector */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <select
+              value={searchField}
+              onChange={(e) => { setSearchField(e.target.value); setSearch(''); }}
               style={{
-                position: 'absolute',
-                right: 8,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                background: 'transparent',
-                border: 'none',
+                appearance: 'none',
+                WebkitAppearance: 'none',
+                padding: '8px 28px 8px 10px',
+                background: '#1e1610',
+                border: '1px solid var(--gf-border)',
+                borderRadius: 4,
+                color: 'var(--gf-text)',
+                fontSize: 12,
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+                outline: 'none',
                 cursor: 'pointer',
-                color: 'var(--gf-text-dim)',
-                padding: 2,
-                display: 'flex',
-                alignItems: 'center',
               }}
             >
-              <X size={14} />
-            </button>
-          )}
+              {SEARCH_FIELDS.map(f => (
+                <option key={f.id} value={f.id}>{f.label}</option>
+              ))}
+            </select>
+            <div style={{
+              position: 'absolute',
+              right: 8,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              pointerEvents: 'none',
+              color: 'var(--gf-text-dim)',
+              fontSize: 10,
+            }}>
+              ▼
+            </div>
+          </div>
+          <div style={{ position: 'relative', flex: 1 }}>
+            <Search
+              size={14}
+              style={{
+                position: 'absolute',
+                left: 10,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--gf-text-dim)',
+              }}
+            />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={searchField === 'all' ? 'Search all fields...' : `Search by ${SEARCH_FIELDS.find(f => f.id === searchField)?.label.toLowerCase()}...`}
+              autoFocus
+              style={{
+                width: '100%',
+                padding: '8px 30px 8px 30px',
+                background: '#1e1610',
+                border: '1px solid var(--gf-border)',
+                borderRadius: 4,
+                color: 'var(--gf-text)',
+                fontSize: 13,
+                outline: 'none',
+              }}
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                style={{
+                  position: 'absolute',
+                  right: 8,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--gf-text-dim)',
+                  padding: 2,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Hint */}
@@ -269,7 +355,7 @@ export function OpponentBrowseModal({
           </span>
         </div>
 
-        {/* Card grid */}
+        {/* Card grid — scrollable */}
         <div style={{ overflow: 'auto', flex: 1 }}>
           {filtered.length === 0 ? (
             <p style={{ color: 'var(--gf-text-dim)', fontStyle: 'italic', textAlign: 'center', padding: 20 }}>
@@ -279,8 +365,8 @@ export function OpponentBrowseModal({
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(5, 1fr)',
-                gap: 10,
+                gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                gap: 8,
                 position: 'relative',
                 userSelect: 'none',
               }}

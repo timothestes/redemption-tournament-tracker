@@ -237,6 +237,7 @@ export const create_game = spacetimedb.reducer(
       supabaseUserId,
       isConnected: true,
       autoRouteLostSouls: true,
+      handRevealed: false,
       pendingDeckData: deckData,
     });
 
@@ -288,6 +289,7 @@ export const join_game = spacetimedb.reducer(
       supabaseUserId,
       isConnected: true,
       autoRouteLostSouls: true,
+      handRevealed: false,
       pendingDeckData: deckData,
     });
 
@@ -1901,6 +1903,31 @@ export const set_player_option = spacetimedb.reducer(
     if (optionName === 'autoRouteLostSouls') {
       ctx.db.Player.id.update({ ...player, autoRouteLostSouls: value === 'true' });
     }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: toggle_reveal_hand
+// ---------------------------------------------------------------------------
+export const toggle_reveal_hand = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    revealed: t.bool(),
+  },
+  (ctx, { gameId, revealed }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    ctx.db.Player.id.update({ ...player, handRevealed: revealed });
+
+    const game = ctx.db.Game.id.find(gameId);
+    logAction(
+      ctx,
+      gameId,
+      player.id,
+      revealed ? 'REVEAL_HAND' : 'HIDE_HAND',
+      '',
+      game ? game.currentTurn : 0n,
+      game ? game.currentPhase : 'draw',
+    );
   }
 );
 

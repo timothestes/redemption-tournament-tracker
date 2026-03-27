@@ -118,6 +118,7 @@ export const Player = __t.object("Player", {
   supabaseUserId: __t.string(),
   isConnected: __t.bool(),
   autoRouteLostSouls: __t.bool(),
+  handRevealed: __t.bool(),
   pendingDeckData: __t.string(),
 });
 export type Player = __Infer<typeof Player>;

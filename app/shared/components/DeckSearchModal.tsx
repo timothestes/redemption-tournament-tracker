@@ -395,6 +395,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
       style={{
         position: 'fixed',
         inset: 0,
+        right: isLoupeVisible ? 'clamp(280px, 20vw, 380px)' : '36px',
         background: 'rgba(0,0,0,0.35)',
         display: 'flex',
         alignItems: 'center',

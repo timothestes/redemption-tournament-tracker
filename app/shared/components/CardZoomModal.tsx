@@ -7,6 +7,7 @@ import { GameCard } from '@/app/shared/types/gameCard';
 import { X } from 'lucide-react';
 import { useDuplicateCards } from '@/app/decklist/card-search/hooks/useDuplicateCards';
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
+import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 
 interface CardZoomModalProps {
   card: GameCard;
@@ -14,6 +15,7 @@ interface CardZoomModalProps {
 }
 
 export function CardZoomModal({ card, onClose }: CardZoomModalProps) {
+  const { isLoupeVisible } = useCardPreview();
   const { siblings } = useDuplicateCards(card.cardName);
 
   useEffect(() => {
@@ -38,6 +40,7 @@ export function CardZoomModal({ card, onClose }: CardZoomModalProps) {
         style={{
           position: 'fixed',
           inset: 0,
+          right: isLoupeVisible ? 'clamp(280px, 20vw, 380px)' : '36px',
           background: 'rgba(0,0,0,0.8)',
           display: 'flex',
           alignItems: 'center',

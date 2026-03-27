@@ -347,6 +347,11 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
   // Determine if context card is part of a multi-selection
   const isMultiContext = contextCard && selectedIds.has(contextCard.card.instanceId) && selectedIds.size > 1;
 
+  // When the right panel (loupe + chat) is expanded, don't dim it
+  const panelWidth = isLoupeVisible ? 'clamp(280px, 20vw, 380px)' : '36px';
+
+  const gridColumns = zoneId === 'hand' ? 4 : 5;
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -357,6 +362,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
       style={{
         position: 'fixed',
         inset: 0,
+        right: panelWidth,
         background: 'rgba(0,0,0,0.75)',
         display: 'flex',
         alignItems: 'center',
@@ -373,7 +379,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
           border: '1px solid var(--gf-border)',
           borderRadius: 8,
           padding: 20,
-          maxWidth: 850,
+          maxWidth: gridColumns === 4 ? 680 : 850,
           maxHeight: '85vh',
           width: '90vw',
           overflow: 'auto',
@@ -436,7 +442,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
             ref={gridRef}
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(5, 1fr)',
+              gridTemplateColumns: `repeat(${gridColumns}, 1fr)`,
               gap: 10,
               position: 'relative',
               userSelect: 'none',

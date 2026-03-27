@@ -196,6 +196,7 @@ export function DeckExchangeModal({
         style={{
           position: 'fixed',
           inset: 0,
+          right: isLoupeVisible ? 'clamp(280px, 20vw, 380px)' : '36px',
           background: 'rgba(0,0,0,0.6)',
           display: 'flex',
           alignItems: 'flex-start',

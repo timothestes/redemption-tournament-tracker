@@ -255,6 +255,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
       style={{
         position: 'fixed',
         inset: 0,
+        right: isLoupeVisible ? 'clamp(280px, 20vw, 380px)' : '36px',
         background: 'rgba(0,0,0,0.7)',
         zIndex: 900,
         display: 'flex',

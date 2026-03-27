@@ -263,7 +263,7 @@ export function calculateMultiplayerLayout(
     x: 0,
     y: playerHandY,
     width: stageWidth,
-    height: Math.max(playerHandHeight - TOOLBAR_RESERVED, 40),
+    height: stageHeight - playerHandY,
     label: 'Hand',
   };
 

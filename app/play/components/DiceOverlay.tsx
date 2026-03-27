@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // ---------------------------------------------------------------------------
@@ -36,12 +36,53 @@ interface ActiveRoll {
 const TUMBLE_DURATION_MS = 600;
 const DISPLAY_DURATION_MS = 3000;
 const TUMBLE_FRAMES = 10;
+const SPARK_COUNT = 8;
+
+// ---------------------------------------------------------------------------
+// Spark particles — burst outward when die lands
+// ---------------------------------------------------------------------------
+
+function SparkBurst({ color, size }: { color: string; size: number }) {
+  const sparks = useMemo(() =>
+    Array.from({ length: SPARK_COUNT }, (_, i) => {
+      const angle = (i / SPARK_COUNT) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+      const dist = size * 0.5 + Math.random() * size * 0.4;
+      return {
+        x: Math.cos(angle) * dist,
+        y: Math.sin(angle) * dist,
+        delay: Math.random() * 0.06,
+        s: 0.4 + Math.random() * 0.7,
+      };
+    }),
+  [size]);
+
+  return (
+    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+      {sparks.map((sp, i) => (
+        <motion.div
+          key={i}
+          initial={{ x: size / 2, y: size / 2, scale: sp.s, opacity: 1 }}
+          animate={{ x: size / 2 + sp.x, y: size / 2 + sp.y, scale: 0, opacity: 0 }}
+          transition={{ duration: 0.45, delay: sp.delay, ease: 'easeOut' }}
+          style={{
+            position: 'absolute',
+            width: 3,
+            height: 3,
+            borderRadius: '50%',
+            backgroundColor: color,
+            boxShadow: `0 0 5px ${color}`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // d20 SVG shape
 // ---------------------------------------------------------------------------
 
-function D20Face({ value, sides, size }: { value: number; sides: number; size: number }) {
+function D20Face({ value, sides, size, accent = '#c4955a' }: { value: number; sides: number; size: number; accent?: string }) {
   const label = String(value);
   const sidesLabel = `d${sides}`;
 
@@ -51,14 +92,14 @@ function D20Face({ value, sides, size }: { value: number; sides: number; size: n
       <polygon
         points="50,4 96,27 96,73 50,96 4,73 4,27"
         fill="#1a1308"
-        stroke="#c4955a"
+        stroke={accent}
         strokeWidth={2}
       />
       {/* Inner inset polygon */}
       <polygon
         points="50,12 88,31 88,69 50,88 12,69 12,31"
         fill="none"
-        stroke="rgba(196,149,90,0.18)"
+        stroke={`${accent}30`}
         strokeWidth={1}
       />
       {/* Die type label (small, top) */}
@@ -68,7 +109,7 @@ function D20Face({ value, sides, size }: { value: number; sides: number; size: n
         textAnchor="middle"
         fontFamily="Georgia, serif"
         fontSize="11"
-        fill="rgba(196,149,90,0.6)"
+        fill={`${accent}99`}
         letterSpacing="1"
       >
         {sidesLabel}
@@ -94,6 +135,8 @@ function D20Face({ value, sides, size }: { value: number; sides: number; size: n
 // ---------------------------------------------------------------------------
 
 function DieDisplay({ roll, dieSize }: { roll: ActiveRoll; dieSize: number }) {
+  const sparkColor = roll.isMe ? '#c4955a' : '#4a7ab5';
+
   return (
     <div
       style={{
@@ -101,6 +144,13 @@ function DieDisplay({ roll, dieSize }: { roll: ActiveRoll; dieSize: number }) {
         width: dieSize,
       }}
     >
+      {/* Spark burst on landing */}
+      <AnimatePresence>
+        {!roll.isTumbling && (
+          <SparkBurst color={sparkColor} size={dieSize} />
+        )}
+      </AnimatePresence>
+
       {/* Die with tumble animation */}
       <motion.div
         key={`die-${roll.id}`}
@@ -108,42 +158,62 @@ function DieDisplay({ roll, dieSize }: { roll: ActiveRoll; dieSize: number }) {
         animate={
           roll.isTumbling
             ? { scale: [0.4, 1.15, 0.95, 1.05, 1], rotate: [-90, 60, -20, 8, 0], opacity: 1 }
-            : { scale: 1, rotate: 0, opacity: 1 }
+            : { scale: [1.12, 1], rotate: 0, opacity: 1 }
         }
         transition={
           roll.isTumbling
             ? { duration: TUMBLE_DURATION_MS / 1000, ease: 'easeOut' }
-            : { duration: 0.12 }
+            : { duration: 0.2, ease: 'easeOut' }
         }
         style={{
-          filter:
-            'drop-shadow(0 4px 20px rgba(0,0,0,0.8)) drop-shadow(0 0 10px rgba(196,149,90,0.3))',
+          filter: roll.isTumbling
+            ? 'drop-shadow(0 4px 20px rgba(0,0,0,0.8)) drop-shadow(0 0 10px rgba(196,149,90,0.3))'
+            : `drop-shadow(0 4px 20px rgba(0,0,0,0.8)) drop-shadow(0 0 14px ${sparkColor}40)`,
         }}
       >
-        <D20Face value={roll.displayValue} sides={roll.data.sides} size={dieSize} />
+        <D20Face value={roll.displayValue} sides={roll.data.sides} size={dieSize} accent={sparkColor} />
       </motion.div>
 
       {/* Roller name + result label — fades in after tumble, absolutely positioned below die */}
       <AnimatePresence>
         {!roll.isTumbling && (
           <motion.div
-            initial={{ opacity: 0, y: 6 }}
+            initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2, delay: 0.05 }}
             style={{
               position: 'absolute',
-              top: dieSize + 4,
+              top: dieSize - 6,
               left: '50%',
               transform: 'translateX(-50%)',
-              width: dieSize + 32,
+              width: dieSize + 80,
               textAlign: 'center',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
               pointerEvents: 'none',
             }}
           >
+            {/* Countdown bar */}
+            <div
+              style={{
+                width: '100%',
+                height: 2,
+                borderRadius: 1,
+                backgroundColor: 'rgba(232,213,163,0.12)',
+                marginBottom: 6,
+                overflow: 'hidden',
+              }}
+            >
+              <motion.div
+                initial={{ width: '100%' }}
+                animate={{ width: '0%' }}
+                transition={{ duration: DISPLAY_DURATION_MS / 1000, ease: 'linear' }}
+                style={{
+                  height: '100%',
+                  borderRadius: 1,
+                  backgroundColor: roll.isMe ? 'rgba(196,149,90,0.5)' : 'rgba(74,122,181,0.5)',
+                }}
+              />
+            </div>
             <div
               style={{
                 fontFamily: 'var(--font-cinzel), Georgia, serif',

@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useCallback, useEffect, useRef, useState } from 'react';
-import { Trash2, Archive, ChevronUp, ChevronDown, Shuffle, ChevronRight } from 'lucide-react';
+import { Trash2, Archive, ChevronUp, ChevronDown, Shuffle, ChevronRight, Eye, EyeOff } from 'lucide-react';
 
 // Context to let SubMenuActionRow lock/unlock the parent SubmenuTrigger from auto-closing
 const SubmenuLockContext = createContext<{
@@ -26,6 +26,8 @@ interface HandContextMenuProps {
   onRandomToDeckTop: (count: number) => void;
   onRandomToDeckBottom: (count: number) => void;
   onShuffleRandomIntoDeck: (count: number) => void;
+  isHandRevealed?: boolean;
+  onRevealHand?: (revealed: boolean) => void;
 }
 
 const ITEM_STYLE: React.CSSProperties = {
@@ -330,6 +332,8 @@ export function HandContextMenu({
   onRandomToDeckTop,
   onRandomToDeckBottom,
   onShuffleRandomIntoDeck,
+  isHandRevealed,
+  onRevealHand,
 }: HandContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
@@ -421,6 +425,21 @@ export function HandContextMenu({
           onAction={onShuffleRandomIntoDeck}
         />
       </ActiveSubmenuContext.Provider>
+
+      {onRevealHand && (
+        <>
+          <div style={SEPARATOR_STYLE} />
+          <button
+            style={ITEM_STYLE}
+            onClick={() => { onRevealHand(!isHandRevealed); onClose(); }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          >
+            {isHandRevealed ? <EyeOff size={14} /> : <Eye size={14} />}
+            {isHandRevealed ? 'Hide Hand' : 'Reveal Hand'}
+          </button>
+        </>
+      )}
     </div>
   );
 }

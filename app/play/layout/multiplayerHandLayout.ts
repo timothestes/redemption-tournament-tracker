@@ -28,8 +28,11 @@ export function calculateHandPositions(
   const centerX = handRect.x + handRect.width / 2;
   // Use more of the available width — 85% gives cards more room to spread
   const handAreaWidth = handRect.width * 0.85;
+  // Reserve space at the bottom for the floating toolbar so cards don't render behind it
+  const toolbarReserve = 48;
+  const usableHeight = handRect.height - toolbarReserve;
   const handY =
-    handRect.y + Math.max(0, (handRect.height - cardHeight) / 2);
+    handRect.y + Math.max(0, (usableHeight - cardHeight) / 2);
 
   if (isSpread) {
     // Flat spread — evenly spaced, no rotation, no arc

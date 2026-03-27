@@ -63,6 +63,7 @@ export const Player = table(
     supabaseUserId: t.string(),
     isConnected: t.bool(),
     autoRouteLostSouls: t.bool(),
+    handRevealed: t.bool(),       // When true, hand is visible to opponent
     pendingDeckData: t.string(),  // JSON deck data, stored until game starts
   }
 );

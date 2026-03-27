@@ -20,5 +20,6 @@ export default __t.row({
   supabaseUserId: __t.string().name("supabase_user_id"),
   isConnected: __t.bool().name("is_connected"),
   autoRouteLostSouls: __t.bool().name("auto_route_lost_souls"),
+  handRevealed: __t.bool().name("hand_revealed"),
   pendingDeckData: __t.string().name("pending_deck_data"),
 });
