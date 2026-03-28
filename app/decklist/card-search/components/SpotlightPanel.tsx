@@ -196,22 +196,28 @@ export default function SpotlightPanel({
         </svg>
       </button>
 
-      {/* Card image */}
-      <div style={{ width: "min(100%, 400px)" }}>
-        <CardImage
-          imgFile={card.imgFile}
-          alt={card.name}
-          className="rounded-xl w-full shadow-2xl"
-          sizes="400px"
-        />
-      </div>
+      {/* Card image + price — keyed for fade-in on card change */}
+      <div
+        key={card.dataLine}
+        className="flex flex-col items-center"
+        style={{ animation: "card-fade-in 300ms ease-out" }}
+      >
+        <div style={{ width: "min(100%, 400px)" }}>
+          <CardImage
+            imgFile={card.imgFile}
+            alt={card.name}
+            className="rounded-xl w-full shadow-2xl"
+            sizes="400px"
+          />
+        </div>
 
-      {/* Price */}
-      {price !== null && (
-        <p className="mt-3 text-lg font-semibold text-gray-600 dark:text-gray-300">
-          ${price.toFixed(2)}
-        </p>
-      )}
+        {/* Price */}
+        {price !== null && (
+          <p className="mt-3 text-lg font-semibold text-gray-600 dark:text-gray-300">
+            ${price.toFixed(2)}
+          </p>
+        )}
+      </div>
 
       {/* Scoreboard */}
       <Scoreboard
