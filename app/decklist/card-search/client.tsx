@@ -214,19 +214,21 @@ export default function CardSearchClient() {
   const isSpotlight = mode === "spotlight";
 
   // Spotlight mode is desktop-only — reset on mobile
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 767px)");
     const handler = (e: MediaQueryListEvent) => {
-      if (e.matches && mode === "spotlight") {
+      if (e.matches && modeRef.current === "spotlight") {
         setMode("deck");
       }
     };
-    if (mediaQuery.matches && mode === "spotlight") {
+    if (mediaQuery.matches && modeRef.current === "spotlight") {
       setMode("deck");
     }
     mediaQuery.addEventListener("change", handler);
     return () => mediaQuery.removeEventListener("change", handler);
-  }, [mode]);
+  }, []);
 
   // Clear spotlight card when leaving spotlight mode
   useEffect(() => {
@@ -2137,6 +2139,7 @@ export default function CardSearchClient() {
             : "bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600"
         }`}
         title="Spotlight Mode — preview cards for streaming"
+        aria-pressed={isSpotlight}
       >
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -2223,15 +2226,7 @@ export default function CardSearchClient() {
           {isSpotlight ? (
             <SpotlightPanel
               card={spotlightCard}
-              price={
-                spotlightCard
-                  ? (() => {
-                      const priceKey = `${spotlightCard.name}|${spotlightCard.set}|${spotlightCard.imgFile}`;
-                      const priceInfo = getPrice(priceKey);
-                      return priceInfo ? priceInfo.price : null;
-                    })()
-                  : null
-              }
+              price={spotlightCard ? (getPrice(`${spotlightCard.name}|${spotlightCard.set}|${spotlightCard.imgFile}`)?.price ?? null) : null}
               onClear={() => setSpotlightCard(null)}
             />
           ) : isInitializing ? (
