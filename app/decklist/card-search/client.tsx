@@ -7,6 +7,7 @@ import ModalWithClose from "./ModalWithClose";
 import FilterGrid from "./components/FilterGrid";
 import CardImage from "./components/CardImage";
 import DeckBuilderPanel, { TabType } from "./components/DeckBuilderPanel";
+import SpotlightPanel from "./components/SpotlightPanel";
 import { CARD_DATA_URL, OT_BOOKS, NT_BOOKS, GOSPEL_BOOKS } from "./constants";
 import { 
   Card, 
@@ -2075,7 +2076,30 @@ export default function CardSearchClient() {
         </div>
         </div>
       )}
-      
+
+      {/* Spotlight Mode Toggle - Desktop only */}
+      <button
+        onClick={() => {
+          const newMode = mode === "spotlight" ? "deck" : "spotlight";
+          setMode(newMode);
+          if (newMode === "spotlight") {
+            setShowDeckBuilder(true);
+            setShowSearch(true);
+          }
+        }}
+        className={`hidden md:flex fixed top-20 right-4 z-50 items-center gap-2 px-3 py-2 rounded-lg shadow-lg transition-all text-sm font-medium ${
+          isSpotlight
+            ? "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/30"
+            : "bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600"
+        }`}
+        title="Spotlight Mode — preview cards for streaming"
+      >
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+        Spotlight
+      </button>
+
       {/* Central Divider with Toggle Buttons */}
       {showSearch && showDeckBuilder && (
         <div
@@ -2152,7 +2176,21 @@ export default function CardSearchClient() {
           className="hidden md:flex flex-col overflow-visible flex-shrink-0"
           style={{ width: showSearch ? `${deckPanelWidth}%` : '100%' }}
         >
-          {isInitializing ? (
+          {isSpotlight ? (
+            <SpotlightPanel
+              card={spotlightCard}
+              price={
+                spotlightCard
+                  ? (() => {
+                      const priceKey = `${spotlightCard.name}|${spotlightCard.set}|${spotlightCard.imgFile}`;
+                      const priceInfo = getPrice(priceKey);
+                      return priceInfo ? priceInfo.price : null;
+                    })()
+                  : null
+              }
+              onClear={() => setSpotlightCard(null)}
+            />
+          ) : isInitializing ? (
             <div className="flex-1 flex items-center justify-center bg-background">
               <div className="text-muted-foreground text-sm">Loading deck...</div>
             </div>
