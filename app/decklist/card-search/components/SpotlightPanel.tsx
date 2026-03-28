@@ -165,8 +165,8 @@ export default function SpotlightPanel({
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8">
         <div
-          className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl w-3/4 max-w-lg"
-          style={{ aspectRatio: "5 / 7" }}
+          className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl"
+          style={{ width: "min(100%, 400px)", aspectRatio: "5 / 7" }}
         />
         <Scoreboard
           player1Name={player1Name}
@@ -196,28 +196,25 @@ export default function SpotlightPanel({
         </svg>
       </button>
 
-      {/* Card image + price — keyed for fade-in on card change */}
+      {/* Card image */}
       <div
         key={card.dataLine}
-        className="flex flex-col items-center"
-        style={{ animation: "card-fade-in 300ms ease-out" }}
+        style={{ width: "min(100%, 400px)", animation: "card-fade-in 300ms ease-out" }}
       >
-        <div className="w-3/4 max-w-lg">
-          <CardImage
-            imgFile={card.imgFile}
-            alt={card.name}
-            className="rounded-xl w-full shadow-2xl"
-            sizes="(max-width: 1024px) 40vw, 30vw"
-          />
-        </div>
-
-        {/* Price */}
-        {price !== null && (
-          <p className="mt-3 text-lg font-semibold text-gray-600 dark:text-gray-300">
-            ${price.toFixed(2)}
-          </p>
-        )}
+        <CardImage
+          imgFile={card.imgFile}
+          alt={card.name}
+          className="rounded-xl w-full shadow-2xl"
+          sizes="400px"
+        />
       </div>
+
+      {/* Price */}
+      {price !== null && (
+        <p className="mt-3 text-lg font-semibold text-gray-600 dark:text-gray-300">
+          ${price.toFixed(2)}
+        </p>
+      )}
 
       {/* Scoreboard */}
       <Scoreboard
