@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import CardImage from "./CardImage";
 import type { Card } from "../utils";
 
@@ -197,14 +197,11 @@ export default function SpotlightPanel({
       </button>
 
       {/* Card image */}
-      <div
-        key={card.dataLine}
-        style={{ width: "min(100%, 400px)", animation: "card-fade-in 300ms ease-out" }}
-      >
+      <div style={{ width: "min(100%, 400px)" }}>
         <CardImage
           imgFile={card.imgFile}
           alt={card.name}
-          className="rounded-xl w-full shadow-2xl"
+          className="rounded-xl w-full shadow-2xl transition-opacity duration-200"
           sizes="400px"
         />
       </div>
