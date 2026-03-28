@@ -2017,10 +2017,10 @@ export default function CardSearchClient() {
                     </div>
                   )}
 
-                  {/* Card Image - Click to view modal */}
+                  {/* Card Image - Click to view modal (or spotlight in spotlight mode) */}
                   <div
                     className="relative overflow-hidden rounded"
-                    onClick={() => setModalCard(c)}
+                    onClick={() => isSpotlight ? setSpotlightCard(c) : setModalCard(c)}
                   >
                     <CardImage
                       imgFile={c.imgFile}
