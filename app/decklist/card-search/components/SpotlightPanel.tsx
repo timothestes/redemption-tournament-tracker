@@ -50,7 +50,7 @@ function PlayerScore({
               setIsEditing(false);
             }
           }}
-          className="w-full text-center text-sm font-medium bg-transparent border-b border-gray-400 dark:border-gray-500 outline-none text-gray-800 dark:text-gray-200 px-1 py-0.5"
+          className="w-full text-center text-sm font-medium bg-transparent border-b border-gray-400 dark:border-gray-500 outline-none text-gray-800 dark:text-gray-200 px-1 h-7 leading-7"
           autoFocus
         />
       ) : (
@@ -59,7 +59,7 @@ function PlayerScore({
             setEditValue(name);
             setIsEditing(true);
           }}
-          className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors truncate max-w-full cursor-text"
+          className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors truncate max-w-full cursor-text h-7 leading-7 border-b border-transparent"
           title="Click to edit name"
         >
           {name}
