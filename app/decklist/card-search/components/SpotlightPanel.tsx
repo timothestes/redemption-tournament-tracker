@@ -33,8 +33,8 @@ function PlayerScore({
   const [editValue, setEditValue] = useState(name);
 
   return (
-    <div className="flex flex-col items-center gap-2 min-w-0 flex-1">
-      {/* Editable name */}
+    <div className="flex flex-col items-center min-w-0 flex-1">
+      {/* Name */}
       {isEditing ? (
         <input
           type="text"
@@ -66,8 +66,13 @@ function PlayerScore({
         </button>
       )}
 
-      {/* Score controls */}
-      <div className="flex items-center gap-3">
+      {/* Score */}
+      <span className="text-3xl font-bold text-gray-800 dark:text-gray-100 tabular-nums mt-1">
+        {score}
+      </span>
+
+      {/* +/- buttons */}
+      <div className="flex items-center gap-3 mt-6">
         <button
           onClick={() => onScoreChange(Math.max(0, score - 1))}
           disabled={score <= 0}
@@ -78,9 +83,6 @@ function PlayerScore({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20 12H4" />
           </svg>
         </button>
-        <span className="text-3xl font-bold text-gray-800 dark:text-gray-100 tabular-nums w-8 text-center">
-          {score}
-        </span>
         <button
           onClick={() => onScoreChange(Math.min(7, score + 1))}
           disabled={score >= 7}
