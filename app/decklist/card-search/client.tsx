@@ -1887,10 +1887,14 @@ export default function CardSearchClient() {
               return (
                 <div
                   key={c.dataLine}
-                  className="relative cursor-pointer group rounded overflow-hidden transition-all duration-200"
+                  className={`relative cursor-pointer group rounded overflow-hidden transition-all duration-200 ${
+                    isSpotlight && spotlightCard?.dataLine === c.dataLine
+                      ? "ring-2 ring-amber-500 dark:ring-amber-400"
+                      : ""
+                  }`}
                 >
                   {/* Backdrop overlay when menu is open */}
-                  {isMenuOpen && (
+                  {!isSpotlight && isMenuOpen && (
                     <div
                       className="absolute inset-0 bg-black/60 backdrop-blur-sm z-30 rounded"
                       onClick={(e) => {
@@ -1901,7 +1905,7 @@ export default function CardSearchClient() {
                   )}
 
                   {/* Menu items overlay */}
-                  {isMenuOpen && (
+                  {!isSpotlight && isMenuOpen && (
                     <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-1.5 py-4 z-40">
                       {/* Add to Main Deck */}
                       <button
@@ -1983,33 +1987,50 @@ export default function CardSearchClient() {
 
                     {/* Controls Overlay - Centered on Card */}
                     <div className="absolute inset-0 flex items-center justify-center transition-opacity duration-200">
-                      <div className="flex items-center gap-3 md:gap-2">
+                      {isSpotlight ? (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            removeCard(c.name, c.set, activeDeckTab === "reserve");
+                            setSpotlightCard(c);
                           }}
-                          className="flex w-11 h-11 md:w-9 md:h-9 items-center justify-center rounded-lg bg-black/50 md:bg-black/30 md:hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-2xl md:text-xl border border-white/20 md:opacity-0 md:group-hover:opacity-100 md:pointer-events-none md:group-hover:pointer-events-auto"
-                          aria-label="Remove card"
-                          title="Remove card from deck"
+                          className="flex w-11 h-11 md:w-9 md:h-9 items-center justify-center rounded-lg bg-black/50 md:bg-black/30 md:hover:bg-black/50 backdrop-blur-md text-white transition-all border border-white/20 md:opacity-0 md:group-hover:opacity-100 md:pointer-events-none md:group-hover:pointer-events-auto"
+                          aria-label="Spotlight this card"
+                          title="Spotlight this card"
                         >
-                          −
+                          <svg className="w-5 h-5 md:w-4 md:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
                         </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            addCard(c, activeDeckTab === "reserve");
-                          }}
-                          className="flex w-11 h-11 md:w-9 md:h-9 items-center justify-center rounded-lg bg-black/50 md:bg-black/30 md:hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-2xl md:text-xl border border-white/20 md:opacity-0 md:group-hover:opacity-100 md:pointer-events-none md:group-hover:pointer-events-auto"
-                          aria-label="Add card"
-                          title="Add card to deck"
-                        >
-                          +
-                        </button>
-                      </div>
+                      ) : (
+                        <div className="flex items-center gap-3 md:gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeCard(c.name, c.set, activeDeckTab === "reserve");
+                            }}
+                            className="flex w-11 h-11 md:w-9 md:h-9 items-center justify-center rounded-lg bg-black/50 md:bg-black/30 md:hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-2xl md:text-xl border border-white/20 md:opacity-0 md:group-hover:opacity-100 md:pointer-events-none md:group-hover:pointer-events-auto"
+                            aria-label="Remove card"
+                            title="Remove card from deck"
+                          >
+                            −
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addCard(c, activeDeckTab === "reserve");
+                            }}
+                            className="flex w-11 h-11 md:w-9 md:h-9 items-center justify-center rounded-lg bg-black/50 md:bg-black/30 md:hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-2xl md:text-xl border border-white/20 md:opacity-0 md:group-hover:opacity-100 md:pointer-events-none md:group-hover:pointer-events-auto"
+                            aria-label="Add card"
+                            title="Add card to deck"
+                          >
+                            +
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Menu Button - Bottom Left */}
+                    {!isSpotlight && (
                     <div className="absolute bottom-0.5 left-0.5 z-10">
                       <button
                         onClick={(e) => {
@@ -2024,10 +2045,11 @@ export default function CardSearchClient() {
                         </svg>
                       </button>
                     </div>
+                    )}
 
 
                     {/* Quantity Badge - Bottom Right, Always Visible */}
-                    {(quantityInDeck > 0 || quantityInReserve > 0) && (
+                    {!isSpotlight && (quantityInDeck > 0 || quantityInReserve > 0) && (
                       <div className="absolute bottom-1 right-1 flex flex-col items-end gap-0.5">
                         {quantityInDeck > 0 && (
                           <div key={`m${quantityInDeck}`} className="animate-qty-pop bg-black/75 backdrop-blur-sm text-white px-1.5 py-0.5 rounded font-bold text-xs shadow-lg">
