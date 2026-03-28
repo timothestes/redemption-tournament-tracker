@@ -207,6 +207,11 @@ export default function CardSearchClient() {
   const [showSearch, setShowSearch] = useState(true);
   const [isMobileDeckDrawerOpen, setIsMobileDeckDrawerOpen] = useState(false);
 
+  // Spotlight mode state
+  const [mode, setMode] = useState<"deck" | "spotlight">("deck");
+  const [spotlightCard, setSpotlightCard] = useState<Card | null>(null);
+  const isSpotlight = mode === "spotlight";
+
   // Auto-open deck drawer on mobile when editing an existing deck
   useEffect(() => {
     if (deckIdFromUrl && !isNewDeck && window.innerWidth < 768) {
@@ -414,10 +419,11 @@ export default function CardSearchClient() {
     if (filters.demonOnly) params.set('demon', 'true');
     if (filters.danielOnly) params.set('daniel', 'true');
     if (filters.postexilicOnly) params.set('postexilic', 'true');
+    if (mode === 'spotlight') params.set('mode', 'spotlight');
 
     const url = params.toString() ? `?${params.toString()}` : '';
     router.replace(`/decklist/card-search${url}`, { scroll: false });
-  }, [router, deck.id]);
+  }, [router, deck.id, mode]);
 
   // Check user authentication on mount
   useEffect(() => {
@@ -496,6 +502,11 @@ export default function CardSearchClient() {
       setDanielOnly(searchParams.get('daniel') === 'true');
       setPostexilicOnly(searchParams.get('postexilic') === 'true');
       
+      // Spotlight mode from URL (desktop only — mobile fallback handled in render)
+      if (searchParams.get('mode') === 'spotlight') {
+        setMode('spotlight');
+      }
+
       setIsInitialized(true);
     }
   }, [searchParams, isInitialized]);
@@ -532,7 +543,7 @@ export default function CardSearchClient() {
     selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, strengthFilter,
     strengthOp, toughnessFilter, toughnessOp, noAltArt, noFirstPrint,
     nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly,
-    postexilicOnly, updateURL
+    postexilicOnly, updateURL, mode
   ]);
 
   // Note: We don't warn on page unload because the deck is always saved to localStorage
