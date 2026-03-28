@@ -213,6 +213,28 @@ export default function CardSearchClient() {
   const [spotlightCard, setSpotlightCard] = useState<Card | null>(null);
   const isSpotlight = mode === "spotlight";
 
+  // Spotlight mode is desktop-only — reset on mobile
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+    const handler = (e: MediaQueryListEvent) => {
+      if (e.matches && mode === "spotlight") {
+        setMode("deck");
+      }
+    };
+    if (mediaQuery.matches && mode === "spotlight") {
+      setMode("deck");
+    }
+    mediaQuery.addEventListener("change", handler);
+    return () => mediaQuery.removeEventListener("change", handler);
+  }, [mode]);
+
+  // Clear spotlight card when leaving spotlight mode
+  useEffect(() => {
+    if (mode === "deck") {
+      setSpotlightCard(null);
+    }
+  }, [mode]);
+
   // Auto-open deck drawer on mobile when editing an existing deck
   useEffect(() => {
     if (deckIdFromUrl && !isNewDeck && window.innerWidth < 768) {
