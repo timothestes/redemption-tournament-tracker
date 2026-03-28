@@ -245,6 +245,18 @@ export default function CardSearchClient() {
     }
   }, [mode]);
 
+  // ESC clears spotlight card
+  useEffect(() => {
+    if (!isSpotlight) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && spotlightCard) {
+        setSpotlightCard(null);
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [isSpotlight, spotlightCard]);
+
   // Auto-open deck drawer on mobile when editing an existing deck
   useEffect(() => {
     if (deckIdFromUrl && !isNewDeck && window.innerWidth < 768) {
