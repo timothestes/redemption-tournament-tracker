@@ -166,7 +166,7 @@ export default function SpotlightPanel({
       <div className="flex-1 flex flex-col items-center justify-center p-8">
         <div
           className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl"
-          style={{ width: "min(100%, 400px)", aspectRatio: "5 / 7" }}
+          style={{ width: "min(100%, 50vh)", aspectRatio: "5 / 7" }}
         />
         <Scoreboard
           player1Name={player1Name}
@@ -202,12 +202,12 @@ export default function SpotlightPanel({
         className="flex flex-col items-center"
         style={{ animation: "card-fade-in 300ms ease-out" }}
       >
-        <div style={{ width: "min(100%, 400px)" }}>
+        <div className="w-full" style={{ maxWidth: "min(100%, 50vh)" }}>
           <CardImage
             imgFile={card.imgFile}
             alt={card.name}
             className="rounded-xl w-full shadow-2xl"
-            sizes="400px"
+            sizes="50vh"
           />
         </div>
 
