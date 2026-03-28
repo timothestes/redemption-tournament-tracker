@@ -525,8 +525,8 @@ export default function CardSearchClient() {
       setDanielOnly(searchParams.get('daniel') === 'true');
       setPostexilicOnly(searchParams.get('postexilic') === 'true');
       
-      // Spotlight mode from URL (desktop only — mobile fallback handled in render)
-      if (searchParams.get('mode') === 'spotlight') {
+      // Spotlight mode from URL (desktop only)
+      if (searchParams.get('mode') === 'spotlight' && !window.matchMedia("(max-width: 767px)").matches) {
         setMode('spotlight');
       }
 
