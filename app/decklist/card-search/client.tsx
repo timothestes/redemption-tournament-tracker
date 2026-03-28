@@ -212,6 +212,10 @@ export default function CardSearchClient() {
   const [mode, setMode] = useState<"deck" | "spotlight">("deck");
   const [spotlightCard, setSpotlightCard] = useState<Card | null>(null);
   const isSpotlight = mode === "spotlight";
+  const [player1Name, setPlayer1Name] = useState("Player 1");
+  const [player2Name, setPlayer2Name] = useState("Player 2");
+  const [player1Score, setPlayer1Score] = useState(0);
+  const [player2Score, setPlayer2Score] = useState(0);
 
   // Spotlight mode is desktop-only — reset on mobile
   const modeRef = useRef(mode);
@@ -230,10 +234,14 @@ export default function CardSearchClient() {
     return () => mediaQuery.removeEventListener("change", handler);
   }, []);
 
-  // Clear spotlight card when leaving spotlight mode
+  // Clear spotlight state when leaving spotlight mode
   useEffect(() => {
     if (mode === "deck") {
       setSpotlightCard(null);
+      setPlayer1Name("Player 1");
+      setPlayer2Name("Player 2");
+      setPlayer1Score(0);
+      setPlayer2Score(0);
     }
   }, [mode]);
 
@@ -2228,6 +2236,20 @@ export default function CardSearchClient() {
               card={spotlightCard}
               price={spotlightCard ? (getPrice(`${spotlightCard.name}|${spotlightCard.set}|${spotlightCard.imgFile}`)?.price ?? null) : null}
               onClear={() => setSpotlightCard(null)}
+              player1Name={player1Name}
+              player2Name={player2Name}
+              player1Score={player1Score}
+              player2Score={player2Score}
+              onPlayer1NameChange={setPlayer1Name}
+              onPlayer2NameChange={setPlayer2Name}
+              onPlayer1ScoreChange={setPlayer1Score}
+              onPlayer2ScoreChange={setPlayer2Score}
+              onResetScoreboard={() => {
+                setPlayer1Name("Player 1");
+                setPlayer2Name("Player 2");
+                setPlayer1Score(0);
+                setPlayer2Score(0);
+              }}
             />
           ) : isInitializing ? (
             <div className="flex-1 flex items-center justify-center bg-background">
