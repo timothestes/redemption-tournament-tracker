@@ -1320,7 +1320,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             if (zoneId === 'territory') {
               const zone = zoneLayout[zoneId];
               return (
-                <Group key={zoneId}>
+                <Group key={zoneId} clipX={zone.x} clipY={zone.y} clipWidth={zone.width} clipHeight={zone.height}>
                   {cards.map((card, i) => {
                     const x = card.posX ?? (zone.x + 8 + (i % 8) * (cardWidth + 4));
                     const y = card.posY ?? (zone.y + 20 + Math.floor(i / 8) * (cardHeight * 0.35));
@@ -1356,7 +1356,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             if (zoneId === 'land-of-bondage') {
               const zone = zoneLayout[zoneId];
               return (
-                <Group key={zoneId}>
+                <Group key={zoneId} clipX={zone.x} clipY={zone.y} clipWidth={zone.width} clipHeight={zone.height}>
                   {cards.map((card, i) => {
                     const x = card.posX ?? (zone.x + 8 + (i % 8) * (cardWidth + 4));
                     const y = card.posY ?? (zone.y + 20 + Math.floor(i / 8) * (cardHeight * 0.35));

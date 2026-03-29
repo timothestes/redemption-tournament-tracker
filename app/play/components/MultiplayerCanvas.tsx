@@ -1819,7 +1819,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
             if (!zone) return null;
             const positions = calculateAutoArrangePositions(cards.length, zone, lobCard.cardWidth, lobCard.cardHeight);
             return (
-              <Group key={`my-auto-${zoneKey}`}>
+              <Group key={`my-auto-${zoneKey}`} clipX={zone.x} clipY={zone.y} clipWidth={zone.width} clipHeight={zone.height}>
                 {cards.map((card, i) => {
                   const gameCard = adaptCard(card, 'player1');
                   const pos = positions[i];
@@ -1863,7 +1863,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
             if (!zone) return null;
             const positions = calculateAutoArrangePositions(cards.length, zone, lobCard.cardWidth, lobCard.cardHeight);
             return (
-              <Group key={`opp-auto-${zoneKey}`}>
+              <Group key={`opp-auto-${zoneKey}`} clipX={zone.x} clipY={zone.y} clipWidth={zone.width} clipHeight={zone.height}>
                 {cards.map((card, i) => {
                   const gameCard = adaptCard(card, 'player2');
                   const pos = positions[i];
