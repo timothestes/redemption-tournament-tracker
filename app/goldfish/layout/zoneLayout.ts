@@ -8,26 +8,15 @@ export interface ZoneRect {
   label: string;
 }
 
-// Card dimensions as proportions of stage width
-export const CARD_WIDTH_RATIO = 0.052; // ~100px at 1920
-export const CARD_HEIGHT_RATIO = 0.093; // ~100 * 1.4 aspect ratio at 1080
+// Fixed card dimensions in virtual canvas coordinates (1920x1080).
+// Previously computed as proportions of viewport — now constants.
 export const CARD_ASPECT_RATIO = 1.4;
+export const CARD_WIDTH = 100;   // was Math.round(1920 * 0.052)
+export const CARD_HEIGHT = 140;  // was Math.round(100 * 1.4)
 
-export function getCardDimensions(stageWidth: number, stageHeight?: number) {
-  const widthBased = Math.round(stageWidth * CARD_WIDTH_RATIO);
-
-  if (stageHeight) {
-    // Ensure a card fits inside a sidebar zone (5 zones in play area, ~24px label padding)
-    const playAreaHeight = stageHeight * 0.73; // after phase bar and hand
-    const sidebarZoneHeight = playAreaHeight / 5;
-    const maxCardHeight = sidebarZoneHeight - 28; // room for label + padding
-    const heightBased = Math.round(maxCardHeight / CARD_ASPECT_RATIO);
-    const w = Math.min(widthBased, heightBased);
-    return { cardWidth: w, cardHeight: Math.round(w * CARD_ASPECT_RATIO) };
-  }
-
-  const height = Math.round(widthBased * CARD_ASPECT_RATIO);
-  return { cardWidth: widthBased, cardHeight: height };
+/** @deprecated Use CARD_WIDTH / CARD_HEIGHT constants directly. */
+export function getCardDimensions(_stageWidth: number, _stageHeight?: number) {
+  return { cardWidth: CARD_WIDTH, cardHeight: CARD_HEIGHT };
 }
 
 /**
