@@ -40,12 +40,15 @@ export default function PregameScreen({ gameId, gameState, code }: PregameScreen
 
   const phase = game.pregamePhase;
 
-  // rolling/choosing render as modal content (parent provides the overlay)
+  // rolling/choosing/revealing render as modal content (parent provides the overlay)
   if (phase === 'rolling') {
     return <RollingPhase gameState={gameState} gameId={gameId} />;
   }
   if (phase === 'choosing') {
     return <ChoosingPhase gameState={gameState} gameId={gameId} />;
+  }
+  if (phase === 'revealing') {
+    return <RevealingPhase gameState={gameState} gameId={gameId} />;
   }
 
   // deck_select: full-screen with TopNav
@@ -356,24 +359,39 @@ function RitualDie({
 // Rolling phase — animated ritual
 // ---------------------------------------------------------------------------
 
+const ROLLING_PAUSE_MS = 600;
+const ROLLING_RESULT_DISPLAY_MS = 2200;
+const ROLLING_TOTAL_MS = ROLLING_PAUSE_MS + RITUAL_TUMBLE_MS + ROLLING_RESULT_DISPLAY_MS;
+
 function RollingPhase({ gameState, gameId }: { gameState: GameState; gameId: bigint }) {
   const { game, myPlayer, opponentPlayer } = gameState;
   const [revealed, setRevealed] = useState(false);
+  const hasSkippedRef = useRef(false);
 
   // Start the tumble after a brief dramatic pause
   useEffect(() => {
-    const timer = setTimeout(() => setRevealed(true), 600);
+    const timer = setTimeout(() => setRevealed(true), ROLLING_PAUSE_MS);
     return () => clearTimeout(timer);
   }, []);
 
   // Auto-advance after tumble + display time
+  const alreadyAcknowledged = game && myPlayer
+    ? (myPlayer.seat.toString() === '0' ? game.pregameReady0 : game.pregameReady1)
+    : false;
+
   useEffect(() => {
-    if (!revealed) return;
+    if (!revealed || alreadyAcknowledged) return;
     const timer = setTimeout(() => {
       gameState.pregameAcknowledgeRoll();
-    }, RITUAL_TUMBLE_MS + 2200);
+    }, RITUAL_TUMBLE_MS + ROLLING_RESULT_DISPLAY_MS);
     return () => clearTimeout(timer);
-  }, [revealed, gameState]);
+  }, [revealed, alreadyAcknowledged, gameState]);
+
+  const handleSkip = () => {
+    if (hasSkippedRef.current || alreadyAcknowledged) return;
+    hasSkippedRef.current = true;
+    gameState.pregameAcknowledgeRoll();
+  };
 
   if (!game || !myPlayer) return null;
 
@@ -523,6 +541,49 @@ function RollingPhase({ gameState, gameId }: { gameState: GameState; gameId: big
           {winnerName} wins the roll!
         </p>
       </motion.div>
+
+      {/* Countdown bar + skip */}
+      <div style={{ marginTop: 20 }}>
+        <div style={{
+          width: '100%',
+          height: 3,
+          borderRadius: 2,
+          backgroundColor: 'rgba(232,213,163,0.08)',
+          overflow: 'hidden',
+        }}>
+          <motion.div
+            initial={{ width: '100%' }}
+            animate={{ width: '0%' }}
+            transition={{ duration: ROLLING_TOTAL_MS / 1000, ease: 'linear' }}
+            style={{
+              height: '100%',
+              borderRadius: 2,
+              backgroundColor: 'rgba(196, 149, 90, 0.4)',
+            }}
+          />
+        </div>
+        {!alreadyAcknowledged && (
+          <motion.button
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8 }}
+            onClick={handleSkip}
+            style={{
+              marginTop: 12,
+              background: 'none',
+              border: 'none',
+              fontFamily: 'Georgia, serif',
+              fontSize: 11,
+              color: 'rgba(196, 149, 90, 0.35)',
+              cursor: 'pointer',
+              letterSpacing: '0.06em',
+              padding: '4px 8px',
+            }}
+          >
+            Skip
+          </motion.button>
+        )}
+      </div>
     </div>
   );
 }
@@ -698,6 +759,156 @@ function ChoosingPhase({ gameState, gameId }: { gameState: GameState; gameId: bi
   );
 }
 
+// ---------------------------------------------------------------------------
+// Revealing phase — announce who goes first
+// ---------------------------------------------------------------------------
+
+const REVEAL_AUTO_ACK_MS = 3500;
+
+function RevealingPhase({ gameState, gameId }: { gameState: GameState; gameId: bigint }) {
+  const { game, myPlayer, opponentPlayer } = gameState;
+
+  const alreadyAcknowledged = game && myPlayer
+    ? (myPlayer.seat.toString() === '0' ? game.pregameReady0 : game.pregameReady1)
+    : false;
+
+  // Auto-acknowledge after display time
+  useEffect(() => {
+    if (alreadyAcknowledged) return;
+    const timer = setTimeout(() => {
+      gameState.pregameAcknowledgeFirst();
+    }, REVEAL_AUTO_ACK_MS);
+    return () => clearTimeout(timer);
+  }, [alreadyAcknowledged, gameState]);
+
+  if (!game || !myPlayer) return null;
+
+  const firstSeat = game.currentTurn;
+  const iGoFirst = myPlayer.seat === firstSeat;
+  const firstPlayerName = iGoFirst
+    ? myPlayer.displayName
+    : (opponentPlayer?.displayName || 'Opponent');
+  const accentColor = iGoFirst ? '#c4955a' : '#4a7ab5';
+
+  return (
+    <div style={{
+      background: 'rgba(14, 10, 6, 0.97)',
+      border: '1px solid rgba(107, 78, 39, 0.3)',
+      borderRadius: 10,
+      padding: '44px 36px',
+      textAlign: 'center',
+      maxWidth: 400,
+      width: '100%',
+      boxShadow: '0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(196, 149, 90, 0.08)',
+    }}>
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.4 }}
+        style={{
+          fontFamily: 'var(--font-cinzel), Georgia, serif',
+          fontSize: 10,
+          letterSpacing: '0.18em',
+          textTransform: 'uppercase',
+          color: 'rgba(196, 149, 90, 0.5)',
+        }}
+      >First Player</motion.p>
+
+      {/* Shield / icon accent */}
+      <motion.div
+        initial={{ scale: 0.5, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.5, delay: 0.2, ease: 'easeOut' }}
+        style={{ marginTop: 20 }}
+      >
+        <svg width="56" height="56" viewBox="0 0 56 56" style={{ margin: '0 auto', display: 'block' }}>
+          <path
+            d="M28 4 L50 16 L50 32 C50 42 40 50 28 54 C16 50 6 42 6 32 L6 16 Z"
+            fill="none"
+            stroke={accentColor}
+            strokeWidth={1.5}
+            opacity={0.6}
+          />
+          <path
+            d="M28 12 L44 20 L44 32 C44 39 37 45 28 48 C19 45 12 39 12 32 L12 20 Z"
+            fill={`${accentColor}15`}
+            stroke={`${accentColor}30`}
+            strokeWidth={1}
+          />
+          <text
+            x="28"
+            y="36"
+            textAnchor="middle"
+            fontFamily="Georgia, serif"
+            fontSize="20"
+            fontWeight="bold"
+            fill={accentColor}
+          >
+            1
+          </text>
+        </svg>
+      </motion.div>
+
+      <motion.h2
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.4 }}
+        style={{
+          fontFamily: 'var(--font-cinzel), Georgia, serif',
+          fontSize: 22,
+          fontWeight: 700,
+          color: '#e8d5a3',
+          marginTop: 16,
+          textShadow: '0 1px 6px rgba(0,0,0,0.5)',
+        }}
+      >
+        {firstPlayerName}
+      </motion.h2>
+
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.4, delay: 0.6 }}
+        style={{
+          fontFamily: 'Georgia, serif',
+          fontSize: 13,
+          color: 'rgba(196, 149, 90, 0.5)',
+          marginTop: 6,
+        }}
+      >
+        {iGoFirst ? 'You go first' : 'goes first'}
+      </motion.p>
+
+      {/* Subtle progress bar before auto-advance */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.8 }}
+        style={{ marginTop: 28 }}
+      >
+        <div style={{
+          width: '100%',
+          height: 2,
+          borderRadius: 1,
+          backgroundColor: 'rgba(232,213,163,0.06)',
+          overflow: 'hidden',
+        }}>
+          <motion.div
+            initial={{ width: '100%' }}
+            animate={{ width: '0%' }}
+            transition={{ duration: REVEAL_AUTO_ACK_MS / 1000, ease: 'linear' }}
+            style={{
+              height: '100%',
+              borderRadius: 1,
+              backgroundColor: `${accentColor}40`,
+            }}
+          />
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 function SpectatorPregameView({ game }: { game: any }) {
   const phase = game.pregamePhase;
 
@@ -708,6 +919,7 @@ function SpectatorPregameView({ game }: { game: any }) {
         {phase === 'deck_select' && 'Players Preparing...'}
         {phase === 'rolling' && 'Rolling for First Player...'}
         {phase === 'choosing' && 'Choosing Who Goes First...'}
+        {phase === 'revealing' && 'First Player Chosen'}
       </h2>
 
       {phase === 'deck_select' && (
@@ -738,6 +950,12 @@ function SpectatorPregameView({ game }: { game: any }) {
       {phase === 'choosing' && (
         <p className="mt-4 text-sm text-muted-foreground">
           Waiting for roll winner to choose...
+        </p>
+      )}
+
+      {phase === 'revealing' && (
+        <p className="mt-4 text-sm text-muted-foreground">
+          Seat {Number(game.currentTurn) + 1} goes first. Game starting...
         </p>
       )}
     </div>

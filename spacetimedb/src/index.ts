@@ -507,17 +507,47 @@ export const pregame_choose_first = spacetimedb.reducer(
       throw new SenderError('Only the roll winner can choose');
     }
 
-    // Cards were already loaded in pregame_ready — just start the game
+    // Transition to revealing phase — show who goes first before starting
     const latestGame = ctx.db.Game.id.find(gameId);
     if (!latestGame) throw new SenderError('Game not found');
     ctx.db.Game.id.update({
       ...latestGame,
-      status: 'playing',
-      pregamePhase: '',
+      pregamePhase: 'revealing',
       currentTurn: chosenSeat,
-      currentPhase: 'draw',
-      turnNumber: 1n,
+      pregameReady0: false,
+      pregameReady1: false,
     });
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: pregame_acknowledge_first
+// ---------------------------------------------------------------------------
+export const pregame_acknowledge_first = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+  },
+  (ctx, { gameId }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'pregame') throw new SenderError('Game is not in pregame');
+    if (game.pregamePhase !== 'revealing') throw new SenderError('Not in revealing phase');
+
+    const player = findPlayerBySender(ctx, gameId);
+    const updates: any = { ...game };
+    if (player.seat === 0n) {
+      updates.pregameReady0 = true;
+    } else {
+      updates.pregameReady1 = true;
+    }
+    ctx.db.Game.id.update(updates);
+
+    const latestGame = ctx.db.Game.id.find(gameId);
+    if (!latestGame) return;
+    if (!latestGame.pregameReady0 || !latestGame.pregameReady1) return;
+
+    // Both acknowledged — start the game
+    const chosenSeat = latestGame.currentTurn;
 
     // Find the chosen player's name
     let chosenName = 'Player ' + (Number(chosenSeat) + 1);
@@ -528,8 +558,16 @@ export const pregame_choose_first = spacetimedb.reducer(
       }
     }
 
+    ctx.db.Game.id.update({
+      ...latestGame,
+      status: 'playing',
+      pregamePhase: '',
+      currentPhase: 'draw',
+      turnNumber: 1n,
+    });
+
     logAction(ctx, gameId, player.id, 'GAME_STARTED',
-      JSON.stringify({ chosenSeat: chosenSeat.toString(), chosenBy: player.displayName, chosenName }),
+      JSON.stringify({ chosenSeat: chosenSeat.toString(), chosenName }),
       1n, 'draw');
   }
 );
