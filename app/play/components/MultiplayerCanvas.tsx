@@ -311,7 +311,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
   useEffect(() => {
     setPreviewCard(
       hoveredCard
-        ? { cardName: hoveredCard.cardName, cardImgFile: hoveredCard.cardImgFile }
+        ? { cardName: hoveredCard.cardName, cardImgFile: hoveredCard.cardImgFile, isMeek: hoveredCard.isMeek }
         : null,
     );
   }, [hoveredCard, setPreviewCard]);
