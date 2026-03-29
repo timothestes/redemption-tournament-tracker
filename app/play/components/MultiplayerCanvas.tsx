@@ -2339,6 +2339,10 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
 
             return (
               <Group
+                clipX={opponentHandRect!.x}
+                clipY={opponentHandRect!.y}
+                clipWidth={opponentHandRect!.width}
+                clipHeight={opponentHandRect!.height}
                 onContextMenu={(e: Konva.KonvaEventObject<PointerEvent>) => {
                   e.evt.preventDefault();
                   const stage = stageRef.current;
