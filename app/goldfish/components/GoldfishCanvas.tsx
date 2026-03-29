@@ -221,6 +221,11 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   const zoneLayout = useMemo(() => calculateZoneLayout(VIRTUAL_WIDTH, VIRTUAL_HEIGHT, isParagon), [isParagon]);
   const cardWidth = Math.round(CARD_WIDTH * cardScale);
   const cardHeight = Math.round(CARD_HEIGHT * cardScale);
+  // Sidebar pile cards are capped to fit within the sidebar zone height
+  const sidebarZoneHeight = zoneLayout['deck']?.height ?? 0;
+  const maxSidebarCardHeight = sidebarZoneHeight - 28; // room for label + padding
+  const sidebarCardHeight = Math.min(cardHeight, maxSidebarCardHeight);
+  const sidebarCardWidth = Math.round(sidebarCardHeight / CARD_ASPECT_RATIO);
   // Virtual canvas is always 16:9 — no need to rotate sidebar piles
   const rotateSidebarPiles = false;
 
@@ -1123,16 +1128,16 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
               const cx = zone.x + zone.width / 2;
               const cy = zone.y + zone.height / 2;
               const rot = rotateSidebarPiles ? -90 : 0;
-              const oX = rotateSidebarPiles ? cardWidth / 2 : 0;
-              const oY = rotateSidebarPiles ? cardHeight / 2 : 0;
+              const oX = rotateSidebarPiles ? sidebarCardWidth / 2 : 0;
+              const oY = rotateSidebarPiles ? sidebarCardHeight / 2 : 0;
               // When not rotated, position top-left so card sits below the label
-              const px = rotateSidebarPiles ? cx : zone.x + zone.width / 2 - cardWidth / 2;
+              const px = rotateSidebarPiles ? cx : zone.x + zone.width / 2 - sidebarCardWidth / 2;
               const py = rotateSidebarPiles ? cy : zone.y + 24;
               return (
                 <Group key={zoneId}>
                   {cards.length > 1 && (
                     <Group x={px - 2} y={py - 2} rotation={rot} offsetX={oX} offsetY={oY}>
-                      <CardBackShape width={cardWidth} height={cardHeight} />
+                      <CardBackShape width={sidebarCardWidth} height={sidebarCardHeight} />
                     </Group>
                   )}
                   <Group
@@ -1145,7 +1150,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                     onDblClick={(e) => { if (e.evt.button === 0) drawCard(); }}
                     onDblTap={() => drawCard()}
                   >
-                    <CardBackShape width={cardWidth} height={cardHeight} />
+                    <CardBackShape width={sidebarCardWidth} height={sidebarCardHeight} />
                   </Group>
                 </Group>
               );
@@ -1161,7 +1166,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
               );
               const overlap = sorted.length <= 1
                 ? 0
-                : Math.min(cardWidth * 0.3, (availW - cardWidth) / (sorted.length - 1));
+                : Math.min(sidebarCardWidth * 0.3, (availW - sidebarCardWidth) / (sorted.length - 1));
               return (
                 <Group key={zoneId}>
                   {sorted.map((card, i) => (
@@ -1171,8 +1176,8 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                       x={zone.x + pad + i * overlap}
                       y={zone.y + 24}
                       rotation={0}
-                      cardWidth={cardWidth}
-                      cardHeight={cardHeight}
+                      cardWidth={sidebarCardWidth}
+                      cardHeight={sidebarCardHeight}
                       image={getImage(card.cardImgFile)}
                       isSelected={selectedIds.has(card.instanceId)}
                       hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
@@ -1197,15 +1202,15 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
               const cx = zone.x + zone.width / 2;
               const cy = zone.y + zone.height / 2;
               const rot = rotateSidebarPiles ? -90 : 0;
-              const oX = rotateSidebarPiles ? cardWidth / 2 : 0;
-              const oY = rotateSidebarPiles ? cardHeight / 2 : 0;
-              const px = rotateSidebarPiles ? cx : zone.x + zone.width / 2 - cardWidth / 2;
+              const oX = rotateSidebarPiles ? sidebarCardWidth / 2 : 0;
+              const oY = rotateSidebarPiles ? sidebarCardHeight / 2 : 0;
+              const px = rotateSidebarPiles ? cx : zone.x + zone.width / 2 - sidebarCardWidth / 2;
               const py = rotateSidebarPiles ? cy : zone.y + 24;
               return (
                 <Group key={zoneId}>
                   {cards.length > 1 && (
                     <Group x={px - 2} y={py - 2} rotation={rot} offsetX={oX} offsetY={oY}>
-                      <CardBackShape width={cardWidth} height={cardHeight} />
+                      <CardBackShape width={sidebarCardWidth} height={sidebarCardHeight} />
                     </Group>
                   )}
                   <Group
@@ -1218,7 +1223,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                     onTap={() => setBrowseZone('banish')}
                     onContextMenu={(e) => { e.evt.preventDefault(); setBrowseZone('banish'); }}
                   >
-                    <CardBackShape width={cardWidth} height={cardHeight} />
+                    <CardBackShape width={sidebarCardWidth} height={sidebarCardHeight} />
                   </Group>
                 </Group>
               );
@@ -1231,8 +1236,8 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
               const cy = zone.y + zone.height / 2;
               // When rotated, GameCardNode rotates around top-left, so pre-offset
               // so the visual center lands at (cx, cy).
-              const baseX = rotateSidebarPiles ? cx - cardHeight / 2 : cx - cardWidth / 2;
-              const baseY = rotateSidebarPiles ? cy + cardWidth / 2 : zone.y + 24;
+              const baseX = rotateSidebarPiles ? cx - sidebarCardHeight / 2 : cx - sidebarCardWidth / 2;
+              const baseY = rotateSidebarPiles ? cy + sidebarCardWidth / 2 : zone.y + 24;
               const baseRot = rotateSidebarPiles ? -90 : 0;
               return (
                 <Group key={zoneId}>
@@ -1252,8 +1257,8 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                         x={baseX + jitterX}
                         y={baseY + jitterY}
                         rotation={baseRot + jitterRot}
-                        cardWidth={cardWidth}
-                        cardHeight={cardHeight}
+                        cardWidth={sidebarCardWidth}
+                        cardHeight={sidebarCardHeight}
                         image={getImage(card.cardImgFile)}
                         isSelected={selectedIds.has(card.instanceId)}
                       hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
@@ -1280,7 +1285,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
               const availW = zone.width - pad * 2;
               const overlap = cards.length <= 1
                 ? 0
-                : Math.min(cardWidth * 0.3, (availW - cardWidth) / (cards.length - 1));
+                : Math.min(sidebarCardWidth * 0.3, (availW - sidebarCardWidth) / (cards.length - 1));
               return (
                 <Group key={zoneId}>
                   {cards.map((card, i) => (
@@ -1290,8 +1295,8 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                       x={zone.x + pad + i * overlap}
                       y={zone.y + 24}
                       rotation={0}
-                      cardWidth={cardWidth}
-                      cardHeight={cardHeight}
+                      cardWidth={sidebarCardWidth}
+                      cardHeight={sidebarCardHeight}
                       image={getImage(card.cardImgFile)}
                       isSelected={selectedIds.has(card.instanceId)}
                       hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
