@@ -967,11 +967,6 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
         onMouseMove={handleStageMouseMove}
         onMouseUp={handleStageMouseUp}
       >
-        {/* Letterbox background — real pixel coords */}
-        <Layer listening={false}>
-          <Rect width={containerWidth} height={containerHeight} fill="#0d0905" />
-        </Layer>
-
         {/* Game layer — scaled to virtual canvas 1920x1080 */}
         <Layer
           ref={gameLayerRef as any}

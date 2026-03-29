@@ -1479,11 +1479,6 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
         onMouseMove={handleStageMouseMove}
         onMouseUp={handleStageMouseUp}
       >
-        {/* Letterbox background — real pixel coords */}
-        <Layer listening={false}>
-          <Rect width={containerWidth} height={containerHeight} fill="#0d0905" />
-        </Layer>
-
         {/* Game layer — all content in 1920x1080 virtual coords */}
         <Layer
           ref={gameLayerRef as any}
