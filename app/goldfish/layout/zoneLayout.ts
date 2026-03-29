@@ -14,11 +14,6 @@ export const CARD_ASPECT_RATIO = 1.4;
 export const CARD_WIDTH = 100;   // was Math.round(1920 * 0.052)
 export const CARD_HEIGHT = 140;  // was Math.round(100 * 1.4)
 
-/** @deprecated Use CARD_WIDTH / CARD_HEIGHT constants directly. */
-export function getCardDimensions(_stageWidth: number, _stageHeight?: number) {
-  return { cardWidth: CARD_WIDTH, cardHeight: CARD_HEIGHT };
-}
-
 /**
  * Calculate zone positions and sizes as proportions of the stage.
  *
