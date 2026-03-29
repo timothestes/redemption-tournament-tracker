@@ -52,14 +52,31 @@ export interface VirtualCanvasState extends ScaleResult {
 export function useVirtualCanvas(containerRef: RefObject<HTMLDivElement | null>): VirtualCanvasState {
   const [container, setContainer] = useState({ width: 0, height: 0 });
 
+  // Re-run when the ref's DOM element appears (handles conditional rendering).
+  // Poll containerRef.current until it's available, then attach ResizeObserver.
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const update = () => setContainer({ width: el.clientWidth, height: el.clientHeight });
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
+    let ro: ResizeObserver | null = null;
+    let raf: number | null = null;
+
+    const tryAttach = () => {
+      const el = containerRef.current;
+      if (!el) {
+        // Element not yet in DOM — check again next frame
+        raf = requestAnimationFrame(tryAttach);
+        return;
+      }
+      const update = () => setContainer({ width: el.clientWidth, height: el.clientHeight });
+      update();
+      ro = new ResizeObserver(update);
+      ro.observe(el);
+    };
+
+    tryAttach();
+
+    return () => {
+      if (raf !== null) cancelAnimationFrame(raf);
+      ro?.disconnect();
+    };
   }, [containerRef]);
 
   const scaling = useMemo(
