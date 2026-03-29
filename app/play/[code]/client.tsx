@@ -665,7 +665,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       display: 'flex',
       flexDirection: 'column',
       background: isLoupeVisible ? 'rgba(10, 8, 5, 0.97)' : 'transparent',
-      borderLeft: isLoupeVisible ? '1px solid rgba(107, 78, 39, 0.3)' : 'none',
+      borderLeft: '1px solid rgba(107, 78, 39, 0.3)',
       overflow: 'hidden',
       transition: 'width 0.2s ease',
     }}>
@@ -674,13 +674,13 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         title={isLoupeVisible ? 'Hide panel (Tab)' : 'Show panel (Tab)'}
         style={{
           width: '100%',
-          height: 40,
-          minHeight: 40,
+          height: 48,
+          minHeight: 48,
           background: 'rgba(30, 22, 16, 0.92)',
           borderTop: 'none',
           borderLeft: 'none',
           borderRight: 'none',
-          borderBottom: isLoupeVisible ? '1px solid rgba(107, 78, 39, 0.4)' : 'none',
+          borderBottom: '1px solid rgba(107, 78, 39, 0.4)',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
