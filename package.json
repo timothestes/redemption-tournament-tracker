@@ -31,7 +31,7 @@
     "react-konva": "^19.2.2",
     "react-markdown": "^10.1.0",
     "resend": "^6.7.0",
-    "spacetimedb": "^2.0.4",
+    "spacetimedb": "^2.1.0",
     "use-sound": "^5.0.0"
   },
   "devDependencies": {

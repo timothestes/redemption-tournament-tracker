@@ -338,10 +338,12 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     }
   });
 
-  // Once connected, call the appropriate reducer once
+  // Once subscription data is ready, call the appropriate reducer once.
+  // Gate on isGamesReady (subscription applied) instead of isConnected (WebSocket open)
+  // to eliminate the race where allGames is empty and createGame re-fires.
   useEffect(() => {
-    console.log('[game-debug] reducer effect:', { isConnected, isActive, hasConn: !!conn, didCall: didCallReducer.current, role: gameParams?.role });
-    if ((!isConnected && !isActive) || !conn || didCallReducer.current) return;
+    console.log('[game-debug] reducer effect:', { isGamesReady: gameState.isGamesReady, hasConn: !!conn, didCall: didCallReducer.current, role: gameParams?.role });
+    if (!gameState.isGamesReady || !conn || didCallReducer.current) return;
     didCallReducer.current = true;
 
     if (!gameParams) {
@@ -408,7 +410,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       setErrorMessage(e instanceof Error ? e.message : 'Failed to initialize game');
       setLifecycle('error');
     }
-  }, [isConnected, isActive, conn, code, gameParams]);
+  }, [gameState.isGamesReady, conn, code, gameParams]);
 
   // Discover gameId by scanning all games for our code
   const gameState = useGameState(gameId ?? BigInt(0));
@@ -440,7 +442,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   useEffect(() => {
     if (lifecycle !== 'joining') return;
     const { allGames } = gameState;
-    if (!allGames || allGames.length === 0) return; // subscription not applied yet
+    if (!gameState.isGamesReady) return; // subscription not applied yet
     const found = allGames.find((g: any) => g.code === code && g.status !== 'finished');
     if (!found) {
       setErrorMessage(`No game found with code "${code}". The game may have ended or the code may be incorrect.`);
@@ -454,7 +456,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     const timeout = setTimeout(() => {
       setErrorMessage(`Could not connect to game "${code}". Please check your connection and try again.`);
       setLifecycle('error');
-    }, 5000);
+    }, 12000);
     return () => clearTimeout(timeout);
   }, [lifecycle, code]);
 

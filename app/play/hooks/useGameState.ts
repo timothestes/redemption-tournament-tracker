@@ -50,6 +50,8 @@ export interface GameState {
 
   // Loading state
   isLoading: boolean;
+  // True once the game table subscription has applied (data is in client cache)
+  isGamesReady: boolean;
 
   // Connection identity (as hex string for comparisons)
   identityHex: string | undefined;
@@ -528,6 +530,7 @@ export function useGameState(gameId: bigint): GameState {
     spectators,
     soulsRescued,
     isLoading,
+    isGamesReady: gamesLoading,
     identityHex,
     drawCard,
     drawMultiple,

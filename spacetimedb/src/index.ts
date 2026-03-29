@@ -2136,29 +2136,14 @@ spacetimedb.clientDisconnected((ctx) => {
       console.log('[stdb-debug] clientDisconnected — player:', String(player.id), 'game:', String(player.gameId), 'gameStatus:', gameForPlayer?.status);
       ctx.db.Player.id.update({ ...player, isConnected: false });
 
-      // If game is in pregame, cancel immediately — opponent is present, no recovery
-      if (gameForPlayer && gameForPlayer.status === 'pregame') {
-        ctx.db.Game.id.update({ ...gameForPlayer, status: 'finished' });
-        logAction(
-          ctx,
-          player.gameId,
-          player.id,
-          'PREGAME_DISCONNECT',
-          JSON.stringify({ reason: 'player_disconnected' }),
-          0n,
-          'pregame'
-        );
-        continue;
-      }
-
-      // For waiting games, use a 30-second timeout — long enough to survive
+      // For waiting and pregame, use a 30-second grace window — long enough to survive
       // WebSocket reconnections and page refreshes. The client proactively
       // calls leave_game on navigation, so this is only a fallback for
       // crashes/network drops.
       // For playing games, use the normal 5-minute timeout.
-      const timeoutMicros = gameForPlayer && gameForPlayer.status === 'waiting'
-        ? 30_000_000n   // 30 seconds
-        : 300_000_000n; // 5 minutes
+      const timeoutMicros = gameForPlayer && gameForPlayer.status === 'playing'
+        ? 300_000_000n  // 5 minutes for active games
+        : 30_000_000n;  // 30 seconds for waiting and pregame
       const futureTime = ctx.timestamp.microsSinceUnixEpoch + timeoutMicros;
       ctx.db.DisconnectTimeout.insert({
         scheduledId: 0n,
