@@ -5,8 +5,10 @@ import { Stage, Layer, Rect, Text, Image as KonvaImage, Group, Circle } from 're
 import type Konva from 'konva';
 import KonvaLib from 'konva';
 import { useGame } from '../state/GameContext';
-import { calculateZoneLayout, getCardDimensions, calculateCardPositionsInZone, type ZoneRect } from '../layout/zoneLayout';
+import { calculateZoneLayout, calculateCardPositionsInZone, type ZoneRect } from '../layout/zoneLayout';
+import { CARD_WIDTH, CARD_HEIGHT } from '../layout/zoneLayout';
 import { calculateHandPositions } from '../layout/handLayout';
+import { VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen, screenToVirtual } from '@/app/shared/layout/virtualCanvas';
 import { GameCard, ZoneId, ZONE_LABELS } from '../types';
 import { GameCardNode, CardBackShape, cardBackListeners, cardBackLoaded } from '../../shared/components/GameCardNode';
 import { PhaseBar } from './PhaseBar';
@@ -34,14 +36,18 @@ import { useCardPreview } from '../state/CardPreviewContext';
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 
 interface GoldfishCanvasProps {
-  width: number;
-  height: number;
+  containerWidth: number;
+  containerHeight: number;
+  scale: number;
+  offsetX: number;
+  offsetY: number;
 }
 
-export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
+export default function GoldfishCanvas({ containerWidth, containerHeight, scale, offsetX, offsetY }: GoldfishCanvasProps) {
   const { state, dispatch, drawCard, drawMultiple, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck, shuffleDeck, meekCard, unmeekCard, flipCard, addCounter, removeCounter, addNote, addOpponentLostSoul, removeOpponentToken, addPlayerLostSoul } = useGame();
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const stageRef = useRef<Konva.Stage>(null);
+  const gameLayerRef = useRef<Konva.Layer>(null);
 
   // Adapter: bridge goldfish game context to shared GameActions interface
   const goldfishActions: GameActions = useMemo(() => ({
@@ -209,11 +215,11 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
   useKeyboardShortcuts();
 
   const isParagon = false; // TODO: re-enable paragon zone later
-  const zoneLayout = useMemo(() => calculateZoneLayout(width, height, isParagon), [width, height, isParagon]);
-  const { cardWidth, cardHeight } = useMemo(() => getCardDimensions(width, height), [width, height]);
-  // Rotate deck/discard/banish sideways when the aspect ratio is wide enough
-  // that cards would overflow their sidebar zones vertically
-  const rotateSidebarPiles = width / height > 1.9;
+  const zoneLayout = useMemo(() => calculateZoneLayout(VIRTUAL_WIDTH, VIRTUAL_HEIGHT, isParagon), [isParagon]);
+  const cardWidth = CARD_WIDTH;
+  const cardHeight = CARD_HEIGHT;
+  // Virtual canvas is always 16:9 — no need to rotate sidebar piles
+  const rotateSidebarPiles = false;
 
   // Escape key clears selection
   useEffect(() => {
@@ -319,6 +325,15 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
     setBatchDeckDropIds(cardInstanceIds);
   }, []);
 
+  // Wrapper: convert container-pixel coords to virtual coords for modal drag hit-testing
+  const findZoneAtScreenPosition = useCallback(
+    (screenX: number, screenY: number): ZoneId | null => {
+      const virt = screenToVirtual(screenX, screenY, scale, offsetX, offsetY);
+      return findZoneAtPosition(virt.x, virt.y);
+    },
+    [findZoneAtPosition, scale, offsetX, offsetY]
+  );
+
   // Modal card drag (drag from search/peek/browse modals to canvas zones)
   const {
     dragState: modalDrag,
@@ -330,7 +345,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
   } = useModalCardDrag({
     stageRef,
     zoneLayout,
-    findZoneAtPosition,
+    findZoneAtPosition: findZoneAtScreenPosition,
     moveCard,
     moveCardsBatch,
     onDeckDrop: handleDeckDrop,
@@ -412,7 +427,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
               opacity: 1,
             }) as Konva.Image;
 
-            // Add to a dedicated ghost layer
+            // Add to a dedicated ghost layer (scaled to match game layer)
             const stage = stageRef.current;
             if (stage) {
               let ghostLayer = dragGhostLayerRef.current;
@@ -421,6 +436,11 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                 dragGhostLayerRef.current = ghostLayer;
                 stage.add(ghostLayer);
               }
+              // Match the game layer's transform so ghost aligns with cards
+              ghostLayer.scaleX(scale);
+              ghostLayer.scaleY(scale);
+              ghostLayer.x(offsetX);
+              ghostLayer.y(offsetY);
               ghostLayer.add(ghostImage);
               ghostLayer.moveToTop();
               ghostLayer.batchDraw();
@@ -438,7 +458,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
     } else {
       dragFollowerOffsets.current = null;
     }
-  }, [selectedIds, cardWidth, cardHeight]);
+  }, [selectedIds, cardWidth, cardHeight, scale, offsetX, offsetY]);
 
   const canvasDragZoneRef = useRef<ZoneId | null>(null);
   // Track the ghost's offset from the drag card origin for repositioning
@@ -447,9 +467,9 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
     (e: Konva.KonvaEventObject<DragEvent>) => {
       const node = e.target;
 
-      // Clamp card position to stage bounds
-      const clampedX = Math.max(-cardWidth / 2, Math.min(node.x(), width - cardWidth / 2));
-      const clampedY = Math.max(-cardHeight / 2, Math.min(node.y(), height - cardHeight / 2));
+      // Clamp card position to virtual canvas bounds
+      const clampedX = Math.max(-cardWidth / 2, Math.min(node.x(), VIRTUAL_WIDTH - cardWidth / 2));
+      const clampedY = Math.max(-cardHeight / 2, Math.min(node.y(), VIRTUAL_HEIGHT - cardHeight / 2));
       if (clampedX !== node.x() || clampedY !== node.y()) {
         node.x(clampedX);
         node.y(clampedY);
@@ -481,7 +501,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
         dragGhostLayerRef.current?.batchDraw();
       }
     },
-    [findZoneAtPosition, cardWidth, cardHeight, width, height]
+    [findZoneAtPosition, cardWidth, cardHeight]
   );
 
   const handleCardDragEnd = useCallback(
@@ -537,7 +557,8 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
           if (isGroupDrag) {
             setBatchDeckDropIds(cardIds);
           }
-          handleDeckDrop(card.instanceId, rect.left + centerX, rect.top + centerY);
+          const screenPos = virtualToScreen(centerX, centerY, scale, offsetX, offsetY);
+          handleDeckDrop(card.instanceId, rect.left + screenPos.x, rect.top + screenPos.y);
         }
       } else if (targetZone && (targetZone !== card.zone || targetZone === 'territory' || targetZone === 'land-of-bondage')) {
         // Hide the dragged card group immediately so it doesn't linger at the drop position
@@ -591,7 +612,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
         }, 700);
       }
     },
-    [findZoneAtPosition, moveCard, moveCardsBatch, handleDeckDrop, cardWidth, cardHeight, selectedIds, clearSelection, state.turn]
+    [findZoneAtPosition, moveCard, moveCardsBatch, handleDeckDrop, cardWidth, cardHeight, selectedIds, clearSelection, state.turn, scale, offsetX, offsetY]
   );
 
   const handleCardContextMenu = useCallback(
@@ -792,8 +813,8 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
 
   // Calculate card positions for each zone
   const handPositions = useMemo(
-    () => calculateHandPositions(state.zones.hand.length, width, height, state.isSpreadHand),
-    [state.zones.hand.length, width, height, state.isSpreadHand]
+    () => calculateHandPositions(state.zones.hand.length, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, state.isSpreadHand, cardWidth, cardHeight),
+    [state.zones.hand.length, state.isSpreadHand, cardWidth, cardHeight]
   );
 
   // Render all zones except hand
@@ -808,7 +829,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
     const bounds: CardBound[] = [];
 
     // Hand cards
-    const handPos = calculateHandPositions(state.zones.hand.length, width, height, state.isSpreadHand);
+    const handPos = calculateHandPositions(state.zones.hand.length, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, state.isSpreadHand, cardWidth, cardHeight);
     state.zones.hand.forEach((card, i) => {
       const pos = handPos[i];
       if (pos) bounds.push({ instanceId: card.instanceId, x: pos.x, y: pos.y, width: cardWidth, height: cardHeight, rotation: pos.rotation });
@@ -861,7 +882,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
     }
 
     return bounds;
-  }, [state.zones, width, height, state.isSpreadHand, zoneLayout, cardWidth, cardHeight]);
+  }, [state.zones, state.isSpreadHand, zoneLayout, cardWidth, cardHeight]);
 
   // Stage event handlers for rectangular selection drag
   const handleStageMouseDown = useCallback(
@@ -884,9 +905,9 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
       if (!e.evt.shiftKey && selectedIds.size > 0) {
         clearSelection();
       }
-      const stage = stageRef.current;
-      if (!stage) return;
-      const pos = stage.getPointerPosition();
+      const layer = gameLayerRef.current;
+      if (!layer) return;
+      const pos = layer.getRelativePointerPosition();
       if (!pos) return;
       startSelectionDrag(pos.x, pos.y, e.evt.shiftKey);
     },
@@ -903,9 +924,9 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
         onRectChangeRef.current?.(null);
         return;
       }
-      const stage = stageRef.current;
-      if (!stage) return;
-      const pos = stage.getPointerPosition();
+      const layer = gameLayerRef.current;
+      if (!layer) return;
+      const pos = layer.getRelativePointerPosition();
       if (pos) {
         updateSelectionDrag(pos.x, pos.y, allCardBounds, e.evt.shiftKey);
       }
@@ -944,15 +965,28 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
     <>
       <Stage
         ref={stageRef}
-        width={width}
-        height={height}
+        width={containerWidth}
+        height={containerHeight}
+        pixelRatio={typeof window !== 'undefined' ? window.devicePixelRatio : 1}
         onContextMenu={(e) => e.evt.preventDefault()}
         onMouseDown={handleStageMouseDown}
         onMouseMove={handleStageMouseMove}
         onMouseUp={handleStageMouseUp}
       >
-        {/* Zone backgrounds layer */}
-        <Layer listening={true}>
+        {/* Letterbox background — real pixel coords */}
+        <Layer listening={false}>
+          <Rect width={containerWidth} height={containerHeight} fill="#0d0905" />
+        </Layer>
+
+        {/* Game layer — scaled to virtual canvas 1920x1080 */}
+        <Layer
+          ref={gameLayerRef as any}
+          scaleX={scale}
+          scaleY={scale}
+          x={offsetX}
+          y={offsetY}
+          listening={true}
+        >
           {nonHandZones.map(zoneId => {
             const rect = zoneLayout[zoneId];
             if (!rect) return null;
@@ -977,7 +1011,8 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                     const stage = stageRef.current;
                     if (!stage) return;
                     const container = stage.container().getBoundingClientRect();
-                    const pointer = stage.getPointerPosition();
+                    const layer = gameLayerRef.current;
+                    const pointer = layer?.getRelativePointerPosition();
                     setZoneMenu({
                       x: e.evt.clientX - container.left,
                       y: e.evt.clientY - container.top,
@@ -1084,10 +1119,8 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
               align="center"
             />
           )}
-        </Layer>
 
-        {/* Card layer — non-hand zones */}
-        <Layer key={`cards-${cardRenderKey}`}>
+          {/* Card rendering — non-hand zones */}
           {nonHandZones.map(zoneId => {
             const cards = state.zones[zoneId];
             if (!cards || cards.length === 0) return null;
@@ -1398,10 +1431,8 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
               </Group>
             );
           })}
-        </Layer>
 
-        {/* Hand layer — separate for z-ordering */}
-        <Layer key={`hand-${cardRenderKey}`}>
+          {/* Hand cards */}
           {state.zones.hand.map((card, i) => {
             const pos = handPositions[i];
             if (!pos) return null;
@@ -1431,8 +1462,15 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
           })}
         </Layer>
 
-        {/* Selection rectangle layer — updated imperatively for performance */}
-        <Layer ref={selectionLayerRef as any} listening={false}>
+        {/* Selection rectangle layer — scaled to match game layer */}
+        <Layer
+          ref={selectionLayerRef as any}
+          listening={false}
+          scaleX={scale}
+          scaleY={scale}
+          x={offsetX}
+          y={offsetY}
+        >
           <Rect
             ref={selectionRectRef as any}
             visible={false}
@@ -1447,14 +1485,21 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
       {/* DOM overlays */}
 
       {/* Reserve lock indicator on turn 1 */}
-      {state.turn === 1 && zoneLayout.reserve && (
+      {state.turn === 1 && zoneLayout.reserve && (() => {
+        const reserveTopRight = virtualToScreen(
+          zoneLayout.reserve.x + zoneLayout.reserve.width,
+          zoneLayout.reserve.y,
+          scale, offsetX, offsetY
+        );
+        const lockPos = { x: reserveTopRight.x - 52, y: reserveTopRight.y + 5 };
+        return (
         <div
           className="reserve-lock-wrapper"
           onContextMenu={(e) => e.preventDefault()}
           style={{
             position: 'absolute',
-            left: zoneLayout.reserve.x + zoneLayout.reserve.width - 52,
-            top: zoneLayout.reserve.y + 5,
+            left: lockPos.x,
+            top: lockPos.y,
             pointerEvents: 'auto',
             cursor: 'help',
             display: 'flex',
@@ -1496,7 +1541,8 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
             }
           `}</style>
         </div>
-      )}
+        );
+      })()}
 
       <PhaseBar />
       <GameToolbar />
@@ -1734,15 +1780,17 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
             if (!modalDrag.isDragging && dragSourceZoneRef.current === zoneId) return null;
             const activeHoveredZone = modalDrag.isDragging ? modalHoveredZone : canvasDragZone;
             const isHovered = activeHoveredZone === zoneId;
+            const screenTopLeft = virtualToScreen(rect.x, rect.y, scale, offsetX, offsetY);
+            const screenBottomRight = virtualToScreen(rect.x + rect.width, rect.y + rect.height, scale, offsetX, offsetY);
             return (
               <div
                 key={zoneId}
                 style={{
                   position: 'absolute',
-                  left: rect.x,
-                  top: rect.y,
-                  width: rect.width,
-                  height: rect.height,
+                  left: screenTopLeft.x,
+                  top: screenTopLeft.y,
+                  width: screenBottomRight.x - screenTopLeft.x,
+                  height: screenBottomRight.y - screenTopLeft.y,
                   border: isHovered ? '1px solid rgba(196,149,90,0.6)' : '1px solid var(--gf-hover)',
                   background: isHovered ? 'rgba(196,149,90,0.12)' : 'transparent',
                   borderRadius: 4,

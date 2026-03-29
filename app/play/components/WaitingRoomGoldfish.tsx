@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useRef } from 'react';
 import dynamic from 'next/dynamic';
-import { CardPreviewProvider, useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
+import { CardPreviewProvider } from '@/app/goldfish/state/CardPreviewContext';
 import { GameProvider } from '@/app/goldfish/state/GameContext';
-import { CardLoupePanel, LOUPE_PANEL_WIDTH, LOUPE_COLLAPSED_WIDTH } from '@/app/goldfish/components/CardLoupePanel';
+import { CardLoupePanel } from '@/app/goldfish/components/CardLoupePanel';
 import type { DeckDataForGoldfish } from '@/app/goldfish/types';
+import { useVirtualCanvas } from '@/app/shared/layout/virtualCanvas';
 
 const DynamicGoldfishCanvas = dynamic(
   () => import('@/app/goldfish/components/GoldfishCanvas'),
@@ -14,47 +15,20 @@ const DynamicGoldfishCanvas = dynamic(
 
 export const BANNER_HEIGHT = 48;
 
-// Match the original goldfish aspect ratio cap
-const MAX_ASPECT_RATIO = 2.0;
-
-function getEffectiveDimensions(viewportWidth: number, viewportHeight: number, loupeWidth: number) {
-  const availableWidth = viewportWidth - loupeWidth;
-  const ar = availableWidth / viewportHeight;
-  const effectiveWidth = ar > MAX_ASPECT_RATIO
-    ? Math.round(viewportHeight * MAX_ASPECT_RATIO)
-    : availableWidth;
-  return { width: effectiveWidth, height: viewportHeight };
-}
-
 interface WaitingRoomGoldfishProps {
   deck: DeckDataForGoldfish;
 }
 
 function GoldfishArea() {
-  const { isLoupeVisible } = useCardPreview();
-
-  const [viewport, setViewport] = useState<{ width: number; height: number } | null>(null);
-
-  useEffect(() => {
-    function update() {
-      setViewport({ width: window.innerWidth, height: window.innerHeight - BANNER_HEIGHT });
-    }
-    update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, []);
-
-  if (!viewport) return null;
-
-  const loupeWidth = isLoupeVisible ? LOUPE_PANEL_WIDTH : LOUPE_COLLAPSED_WIDTH;
-  const dimensions = getEffectiveDimensions(viewport.width, viewport.height, loupeWidth);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { scale, offsetX, offsetY, containerWidth, containerHeight } = useVirtualCanvas(containerRef);
 
   return (
     <div
       style={{
         position: 'relative',
         width: '100%',
-        height: viewport.height,
+        height: `calc(100vh - ${BANNER_HEIGHT}px)`,
         overflow: 'hidden',
         background: '#0d0905',
         display: 'flex',
@@ -88,10 +62,16 @@ function GoldfishArea() {
       />
 
       {/* Game area */}
-      <div style={{ position: 'relative', flex: 1, height: '100%' }}>
-        <div style={{ position: 'relative', width: dimensions.width, height: '100%', margin: '0 auto' }}>
-          <DynamicGoldfishCanvas width={dimensions.width} height={dimensions.height} />
-        </div>
+      <div ref={containerRef} style={{ position: 'relative', flex: 1, height: '100%' }}>
+        {containerWidth > 0 && containerHeight > 0 && (
+          <DynamicGoldfishCanvas
+            containerWidth={containerWidth}
+            containerHeight={containerHeight}
+            scale={scale}
+            offsetX={offsetX}
+            offsetY={offsetY}
+          />
+        )}
       </div>
 
       {/* Card preview panel */}
