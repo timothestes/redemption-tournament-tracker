@@ -4,20 +4,23 @@
  * Visual structure (top = opponent, bottom = you):
  *
  * ┌──────────────────────────────────────────────────────────────┐
- * │ Opponent Hand (8%)                         (full width)      │
+ * │ Opponent Hand                              (full width)      │
  * ├────────────────────────────────────────────┬─────────────────┤
- * │ Opponent LOB (9%)                          │ Opp sidebar     │
- * ├────────────────────────────────────────────┤ (Dis→LOR) 15%  │
- * │ Opponent Territory (27%)                   │                 │
+ * │ Opponent LOB                               │ Opp sidebar     │
+ * ├────────────────────────────────────────────┤ (Dis→LOR)       │
+ * │ Opponent Territory                         │                 │
  * ├════════════════════════════════════════════╪═════════════════┤
- * │ Divider (2%)                               │                 │
+ * │ Divider                                    │                 │
  * ├════════════════════════════════════════════╪═════════════════┤
- * │ Player Territory (27%)                     │ Your sidebar    │
- * ├────────────────────────────────────────────┤ (LOR→Dis) 15%  │
- * │ Player LOB (9%)                            │                 │
+ * │ Player Territory                           │ Your sidebar    │
+ * ├────────────────────────────────────────────┤ (LOR→Dis)       │
+ * │ Player LOB                                 │                 │
  * ├────────────────────────────────────────────┴─────────────────┤
- * │ Player Hand (18%)                          (full width)      │
+ * │ Player Hand                                (full width)      │
  * └──────────────────────────────────────────────────────────────┘
+ *
+ * Two layout profiles (Narrow ≤1700 / Standard >1700 virtual width)
+ * with different proportions tuned for each aspect ratio range.
  *
  * stageWidth is already the Konva canvas width (loupe is outside).
  * Phase bar (TurnIndicator) is HTML below the canvas.
@@ -62,35 +65,78 @@ export interface MultiplayerLayout {
   playAreaWidth: number;
 }
 
-// ── Proportion constants ────────────────────────────────────────────────
+// ── Layout profiles ─────────────────────────────────────────────────────
+// Two profiles tuned for different aspect ratio ranges. The virtual canvas
+// width adapts from 1440 (4:3) to 2560 (21:9) — a single set of proportions
+// can't serve both ends well.
 
 const CARD_ASPECT_RATIO = 1.4;
-const SIDEBAR_WIDTH_RATIO = 0.15;
 
-// Vertical band ratios (must sum to 1.0)
-const OPP_HAND_RATIO = 0.08;
-const OPP_TERRITORY_RATIO = 0.2775;
-const OPP_LOB_RATIO = 0.09;
-const DIVIDER_RATIO = 0.005;
-const PLAYER_LOB_RATIO = 0.09;
-const PLAYER_TERRITORY_RATIO = 0.2775;
-const PLAYER_HAND_RATIO = 0.18;
+interface LayoutProfile {
+  sidebarWidthRatio: number;
+  oppHandRatio: number;
+  oppTerritoryRatio: number;
+  oppLobRatio: number;
+  dividerRatio: number;
+  playerLobRatio: number;
+  playerTerritoryRatio: number;
+  playerHandRatio: number;
+  mainCardWidthRatio: number;
+  oppHandScale: number;
+  pileLabelRatio: number;
+}
 
-const PILE_LABEL_RATIO = 0.15;
+/** Narrow displays: 4:3 to ~3:2 (virtual width ≤ 1700). */
+const NARROW_PROFILE: LayoutProfile = {
+  sidebarWidthRatio: 0.18,
+  oppHandRatio: 0.07,        // smaller to save vertical space
+  oppTerritoryRatio: 0.28,
+  oppLobRatio: 0.10,         // larger so LOB cards fit
+  dividerRatio: 0.005,
+  playerLobRatio: 0.10,
+  playerTerritoryRatio: 0.28,
+  playerHandRatio: 0.165,    // slightly smaller
+  mainCardWidthRatio: 0.065, // slightly larger cards relative to play area
+  oppHandScale: 0.70,
+  pileLabelRatio: 0.10,      // less label overhead → bigger pile cards
+};
+// Sum check: 0.07 + 0.28 + 0.10 + 0.005 + 0.10 + 0.28 + 0.165 = 1.0 ✓
+
+/** Standard/wide displays: 16:10 and wider (virtual width > 1700). */
+const STANDARD_PROFILE: LayoutProfile = {
+  sidebarWidthRatio: 0.15,
+  oppHandRatio: 0.08,
+  oppTerritoryRatio: 0.2775,
+  oppLobRatio: 0.09,
+  dividerRatio: 0.005,
+  playerLobRatio: 0.09,
+  playerTerritoryRatio: 0.2775,
+  playerHandRatio: 0.18,
+  mainCardWidthRatio: 0.06,
+  oppHandScale: 0.75,
+  pileLabelRatio: 0.15,
+};
+// Sum check: 0.08 + 0.2775 + 0.09 + 0.005 + 0.09 + 0.2775 + 0.18 = 1.0 ✓
+
+/** Virtual width breakpoint — below this use Narrow, above use Standard. */
+const BREAKPOINT_WIDTH = 1700;
+
+function getProfile(virtualWidth: number): LayoutProfile {
+  return virtualWidth <= BREAKPOINT_WIDTH ? NARROW_PROFILE : STANDARD_PROFILE;
+}
 
 // ── Card dimension helpers (derived from actual virtual width + height) ──
-// Card sizes adapt to the aspect ratio so they fit at narrower widths (e.g.
-// 4:3 displays) instead of being hardcoded for 1920×1080.
-// The 0.06 ratio gives ~98px at 1920 width, scaling down proportionally.
-const MAIN_CARD_WIDTH_RATIO = 0.06;
-const OPP_HAND_SCALE = 0.75;
 
-function computeCardDimensions(playAreaWidth: number, lobZoneHeight: number): {
+function computeCardDimensions(
+  playAreaWidth: number,
+  lobZoneHeight: number,
+  profile: LayoutProfile,
+): {
   mainCard: CardDimensions;
   lobCard: CardDimensions;
   oppHandCard: CardDimensions;
 } {
-  const mainW = Math.round(playAreaWidth * MAIN_CARD_WIDTH_RATIO);
+  const mainW = Math.round(playAreaWidth * profile.mainCardWidthRatio);
   const mainH = Math.round(mainW * CARD_ASPECT_RATIO);
   const mainCard = { cardWidth: mainW, cardHeight: mainH };
 
@@ -100,8 +146,8 @@ function computeCardDimensions(playAreaWidth: number, lobZoneHeight: number): {
   const lobW = Math.round(lobH / CARD_ASPECT_RATIO);
   const lobCard = { cardWidth: lobW, cardHeight: lobH };
 
-  // Opponent hand cards: 75% of main card size
-  const oppW = Math.round(mainW * OPP_HAND_SCALE);
+  // Opponent hand cards: scaled down from main card size
+  const oppW = Math.round(mainW * profile.oppHandScale);
   const oppH = Math.round(oppW * CARD_ASPECT_RATIO);
   const oppHandCard = { cardWidth: oppW, cardHeight: oppH };
 
@@ -113,8 +159,8 @@ export const MAIN_CARD: CardDimensions = { cardWidth: 98, cardHeight: 137 };
 export const LOB_CARD: CardDimensions = { cardWidth: 59, cardHeight: 83 };
 export const OPP_HAND_CARD: CardDimensions = { cardWidth: 74, cardHeight: 104 };
 
-function getPileCardDimensions(slotHeight: number, sidebarWidth: number, zonePad: number): CardDimensions {
-  const usableH = slotHeight * (1 - PILE_LABEL_RATIO);
+function getPileCardDimensions(slotHeight: number, sidebarWidth: number, zonePad: number, pileLabelRatio: number): CardDimensions {
+  const usableH = slotHeight * (1 - pileLabelRatio);
   // Constrain by both slot height and sidebar width (minus padding + badge space)
   const usableW = sidebarWidth - zonePad * 2 - 40; // 40px for count badge + label
   const maxCardW = Math.max(usableW * 0.55, 30); // card takes up to 55% of usable width
@@ -170,22 +216,23 @@ export function calculateMultiplayerLayout(
   stageHeight: number,
   isParagon: boolean = false
 ): MultiplayerLayout {
+  const profile = getProfile(stageWidth);
   const pad = 6;
   const zonePad = 4;
 
   // ── Column widths ────────────────────────────────────────────────────
-  const sidebarWidth = Math.round(stageWidth * SIDEBAR_WIDTH_RATIO);
+  const sidebarWidth = Math.round(stageWidth * profile.sidebarWidthRatio);
   const playAreaWidth = stageWidth - sidebarWidth;
   const sidebarX = playAreaWidth;
 
   // ── Row heights ──────────────────────────────────────────────────────
-  const oppHandHeight = Math.round(stageHeight * OPP_HAND_RATIO);
-  const oppTerritoryHeight = Math.round(stageHeight * OPP_TERRITORY_RATIO);
-  const oppLobHeight = Math.round(stageHeight * OPP_LOB_RATIO);
-  const dividerHeight = Math.round(stageHeight * DIVIDER_RATIO);
-  const playerLobHeight = Math.round(stageHeight * PLAYER_LOB_RATIO);
-  const playerTerritoryHeight = Math.round(stageHeight * PLAYER_TERRITORY_RATIO);
-  const playerHandHeight = Math.round(stageHeight * PLAYER_HAND_RATIO);
+  const oppHandHeight = Math.round(stageHeight * profile.oppHandRatio);
+  const oppTerritoryHeight = Math.round(stageHeight * profile.oppTerritoryRatio);
+  const oppLobHeight = Math.round(stageHeight * profile.oppLobRatio);
+  const dividerHeight = Math.round(stageHeight * profile.dividerRatio);
+  const playerLobHeight = Math.round(stageHeight * profile.playerLobRatio);
+  const playerTerritoryHeight = Math.round(stageHeight * profile.playerTerritoryRatio);
+  const playerHandHeight = Math.round(stageHeight * profile.playerHandRatio);
 
   // ── Y anchors ────────────────────────────────────────────────────────
   // Order: Opp Hand → Opp LOB → Opp Territory → Divider → Player Territory → Player LOB → Player Hand
@@ -291,7 +338,7 @@ export function calculateMultiplayerLayout(
   );
 
   // ── Card dimensions (four tiers, derived from actual virtual width) ──
-  const computed = computeCardDimensions(playAreaWidth, oppLobHeight);
+  const computed = computeCardDimensions(playAreaWidth, oppLobHeight, profile);
   const mainCard = computed.mainCard;
   const lobCard = computed.lobCard;
   const opponentHandCard = computed.oppHandCard;
@@ -303,7 +350,7 @@ export function calculateMultiplayerLayout(
   const pileSlotHeight = Math.round(
     (sidebarHalfHeight - slotPad * (pileSlotCount + 1)) / pileSlotCount
   );
-  const pileCard = getPileCardDimensions(pileSlotHeight, sidebarWidth, zonePad);
+  const pileCard = getPileCardDimensions(pileSlotHeight, sidebarWidth, zonePad, profile.pileLabelRatio);
 
   return {
     zones: {
