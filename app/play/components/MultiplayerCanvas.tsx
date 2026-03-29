@@ -154,7 +154,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
 
   // ---- Container sizing (respects flex layout) ----
   const containerRef = useRef<HTMLDivElement>(null);
-  const { scale, offsetX, offsetY, containerWidth, containerHeight } = useVirtualCanvas(containerRef);
+  const { scale, offsetX, offsetY, containerWidth, containerHeight, virtualWidth } = useVirtualCanvas(containerRef);
 
   // ---- Game state ----
   const gameState = useGameState(gameId);
@@ -177,8 +177,8 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
 
   // ---- Layout ----
   const mpLayout = useMemo(
-    () => calculateMultiplayerLayout(VIRTUAL_WIDTH, VIRTUAL_HEIGHT),
-    [],
+    () => calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT),
+    [virtualWidth],
   );
 
   // Card scale preference
@@ -930,7 +930,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       }
 
       // Clamp card position to virtual canvas bounds
-      const clampedX = Math.max(-cardWidth / 2, Math.min(node.x(), VIRTUAL_WIDTH - cardWidth / 2));
+      const clampedX = Math.max(-cardWidth / 2, Math.min(node.x(), virtualWidth - cardWidth / 2));
       const clampedY = Math.max(-cardHeight / 2, Math.min(node.y(), VIRTUAL_HEIGHT - cardHeight / 2));
       if (clampedX !== node.x() || clampedY !== node.y()) {
         node.x(clampedX);

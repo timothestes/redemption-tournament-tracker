@@ -21,7 +21,7 @@ interface WaitingRoomGoldfishProps {
 
 function GoldfishArea() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { scale, offsetX, offsetY, containerWidth, containerHeight } = useVirtualCanvas(containerRef);
+  const { scale, offsetX, offsetY, containerWidth, containerHeight, virtualWidth } = useVirtualCanvas(containerRef);
 
   return (
     <div
@@ -70,6 +70,7 @@ function GoldfishArea() {
             scale={scale}
             offsetX={offsetX}
             offsetY={offsetY}
+            virtualWidth={virtualWidth}
           />
         )}
       </div>

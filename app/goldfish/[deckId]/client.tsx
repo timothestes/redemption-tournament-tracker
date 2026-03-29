@@ -19,7 +19,7 @@ interface GoldfishClientProps {
 
 function GoldfishGameArea({ deck }: { deck: DeckDataForGoldfish }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { scale, offsetX, offsetY, containerWidth, containerHeight } = useVirtualCanvas(containerRef);
+  const { scale, offsetX, offsetY, containerWidth, containerHeight, virtualWidth } = useVirtualCanvas(containerRef);
 
   // Collect all unique image URLs to preload
   const imageUrls = useMemo(() => {
@@ -87,6 +87,7 @@ function GoldfishGameArea({ deck }: { deck: DeckDataForGoldfish }) {
             scale={scale}
             offsetX={offsetX}
             offsetY={offsetY}
+            virtualWidth={virtualWidth}
           />
         )}
       </div>

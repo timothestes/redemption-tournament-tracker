@@ -43,9 +43,10 @@ interface GoldfishCanvasProps {
   scale: number;
   offsetX: number;
   offsetY: number;
+  virtualWidth: number;
 }
 
-export default function GoldfishCanvas({ containerWidth, containerHeight, scale, offsetX, offsetY }: GoldfishCanvasProps) {
+export default function GoldfishCanvas({ containerWidth, containerHeight, scale, offsetX, offsetY, virtualWidth }: GoldfishCanvasProps) {
   const { state, dispatch, drawCard, drawMultiple, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck, shuffleDeck, meekCard, unmeekCard, flipCard, addCounter, removeCounter, addNote, addOpponentLostSoul, removeOpponentToken, addPlayerLostSoul } = useGame();
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const stageRef = useRef<Konva.Stage>(null);
@@ -218,7 +219,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   useKeyboardShortcuts({ onZoomIn: zoomIn, onZoomOut: zoomOut });
 
   const isParagon = false; // TODO: re-enable paragon zone later
-  const zoneLayout = useMemo(() => calculateZoneLayout(VIRTUAL_WIDTH, VIRTUAL_HEIGHT, isParagon), [isParagon]);
+  const zoneLayout = useMemo(() => calculateZoneLayout(virtualWidth, VIRTUAL_HEIGHT, isParagon), [isParagon, virtualWidth]);
   const cardWidth = Math.round(CARD_WIDTH * cardScale);
   const cardHeight = Math.round(CARD_HEIGHT * cardScale);
   // Sidebar pile cards are capped to fit within the sidebar zone height
@@ -470,7 +471,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       const node = e.target;
 
       // Clamp card position to virtual canvas bounds
-      const clampedX = Math.max(-cardWidth / 2, Math.min(node.x(), VIRTUAL_WIDTH - cardWidth / 2));
+      const clampedX = Math.max(-cardWidth / 2, Math.min(node.x(), virtualWidth - cardWidth / 2));
       const clampedY = Math.max(-cardHeight / 2, Math.min(node.y(), VIRTUAL_HEIGHT - cardHeight / 2));
       if (clampedX !== node.x() || clampedY !== node.y()) {
         node.x(clampedX);
@@ -815,8 +816,8 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
 
   // Calculate card positions for each zone
   const handPositions = useMemo(
-    () => calculateHandPositions(state.zones.hand.length, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, state.isSpreadHand, cardWidth, cardHeight),
-    [state.zones.hand.length, state.isSpreadHand, cardWidth, cardHeight]
+    () => calculateHandPositions(state.zones.hand.length, virtualWidth, VIRTUAL_HEIGHT, state.isSpreadHand, cardWidth, cardHeight),
+    [state.zones.hand.length, state.isSpreadHand, cardWidth, cardHeight, virtualWidth]
   );
 
   // Render all zones except hand
@@ -831,7 +832,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     const bounds: CardBound[] = [];
 
     // Hand cards
-    const handPos = calculateHandPositions(state.zones.hand.length, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, state.isSpreadHand, cardWidth, cardHeight);
+    const handPos = calculateHandPositions(state.zones.hand.length, virtualWidth, VIRTUAL_HEIGHT, state.isSpreadHand, cardWidth, cardHeight);
     state.zones.hand.forEach((card, i) => {
       const pos = handPos[i];
       if (pos) bounds.push({ instanceId: card.instanceId, x: pos.x, y: pos.y, width: cardWidth, height: cardHeight, rotation: pos.rotation });
