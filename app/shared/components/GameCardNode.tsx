@@ -113,6 +113,7 @@ export const GameCardNode = memo(function GameCardNode({
       onDblTap={() => onDblClick(card)}
       onMouseEnter={(e) => onMouseEnter(card, e)}
       onMouseLeave={onMouseLeave}
+      onTouchStart={(e) => onMouseEnter(card, e as unknown as Konva.KonvaEventObject<MouseEvent>)}
     >
       {/* Selection highlight — golden glow border */}
       {isSelected && (
