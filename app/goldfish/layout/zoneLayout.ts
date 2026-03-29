@@ -9,10 +9,10 @@ export interface ZoneRect {
 }
 
 // Fixed card dimensions in virtual canvas coordinates (1920x1080).
-// Previously computed as proportions of viewport — now constants.
+// Sized larger than multiplayer since goldfish has only one player's zones.
 export const CARD_ASPECT_RATIO = 1.4;
-export const CARD_WIDTH = 100;   // was Math.round(1920 * 0.052)
-export const CARD_HEIGHT = 140;  // was Math.round(100 * 1.4)
+export const CARD_WIDTH = 120;
+export const CARD_HEIGHT = 168;  // 120 * 1.4
 
 /**
  * Calculate zone positions and sizes as proportions of the stage.
@@ -36,11 +36,11 @@ export function calculateZoneLayout(
   stageHeight: number,
   isParagon: boolean = false
 ): Record<ZoneId, ZoneRect> {
-  const sidebarWidth = stageWidth * 0.15;
+  const sidebarWidth = stageWidth * 0.17;
   const sidebarX = stageWidth - sidebarWidth;
   const mainWidth = stageWidth - sidebarWidth;
 
-  const phaseBarHeight = stageHeight * 0.05; // top phase bar
+  const phaseBarHeight = stageHeight * 0.02; // small top gap (phase bar is HTML above canvas)
   const handHeight = stageHeight * 0.22; // bottom hand area
   const playAreaHeight = stageHeight - phaseBarHeight - handHeight;
 
