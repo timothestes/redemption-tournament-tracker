@@ -49,6 +49,7 @@ import type { ZoneRect as GoldfishZoneRect } from '@/app/goldfish/layout/zoneLay
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import DiceOverlay from './DiceOverlay';
 import { getCardImageUrl as getSharedCardImageUrl } from '@/app/shared/utils/cardImageUrl';
+import { useVirtualCanvas, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen } from '@/app/shared/layout/virtualCanvas';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -151,21 +152,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
 
   // ---- Container sizing (respects flex layout) ----
   const containerRef = useRef<HTMLDivElement>(null);
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const update = () => {
-      setDimensions({ width: el.clientWidth, height: el.clientHeight });
-    };
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  const { width, height } = dimensions;
+  const { scale, offsetX, offsetY, containerWidth, containerHeight } = useVirtualCanvas(containerRef);
 
   // ---- Game state ----
   const gameState = useGameState(gameId);
@@ -188,8 +175,8 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
 
   // ---- Layout ----
   const mpLayout = useMemo(
-    () => (width > 0 && height > 0 ? calculateMultiplayerLayout(width, height) : null),
-    [width, height],
+    () => calculateMultiplayerLayout(VIRTUAL_WIDTH, VIRTUAL_HEIGHT),
+    [],
   );
 
   // Four-tier card dimensions
@@ -232,6 +219,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
 
   // ---- Stage ref ----
   const stageRef = useRef<Konva.Stage>(null);
+  const gameLayerRef = useRef<Konva.Layer>(null);
 
   // Prevent browser-native drag on the canvas container
   useEffect(() => {
@@ -870,6 +858,10 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                   dragGhostLayerRef.current = ghostLayer;
                   stage.add(ghostLayer);
                 }
+                ghostLayer.scaleX(scale);
+                ghostLayer.scaleY(scale);
+                ghostLayer.x(offsetX);
+                ghostLayer.y(offsetY);
                 ghostLayer.add(ghostImage);
                 ghostLayer.moveToTop();
                 ghostLayer.batchDraw();
@@ -888,7 +880,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
         dragFollowerOffsets.current = null;
       }
     },
-    [selectedIds, cardWidth, cardHeight, stopHoverAnimation],
+    [selectedIds, cardWidth, cardHeight, stopHoverAnimation, scale, offsetX, offsetY],
   );
 
   const handleCardDragMove = useCallback(
@@ -905,9 +897,9 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
         node.moveToTop();
       }
 
-      // Clamp card position to stage bounds
-      const clampedX = Math.max(-cardWidth / 2, Math.min(node.x(), width - cardWidth / 2));
-      const clampedY = Math.max(-cardHeight / 2, Math.min(node.y(), height - cardHeight / 2));
+      // Clamp card position to virtual canvas bounds
+      const clampedX = Math.max(-cardWidth / 2, Math.min(node.x(), VIRTUAL_WIDTH - cardWidth / 2));
+      const clampedY = Math.max(-cardHeight / 2, Math.min(node.y(), VIRTUAL_HEIGHT - cardHeight / 2));
       if (clampedX !== node.x() || clampedY !== node.y()) {
         node.x(clampedX);
         node.y(clampedY);
@@ -940,7 +932,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
         dragGhostLayerRef.current?.batchDraw();
       }
     },
-    [findZoneAtPosition, cardWidth, cardHeight, width, height],
+    [findZoneAtPosition, cardWidth, cardHeight],
   );
 
   const handleCardDragEnd = useCallback(
@@ -1154,11 +1146,10 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       } else if (targetZone === 'deck') {
         const stage = stageRef.current;
         if (stage) {
-          const pointer = stage.getPointerPosition();
-          const container = stage.container().getBoundingClientRect();
+          const screenPos = virtualToScreen(centerX, centerY, scale, offsetX, offsetY);
           setDeckDrop({
-            x: (pointer?.x ?? container.width / 2),
-            y: (pointer?.y ?? container.height / 2),
+            x: screenPos.x,
+            y: screenPos.y,
             cardId: String(cardId),
           });
         } else {
@@ -1182,6 +1173,9 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
       opponentZones,
       gameState.myPlayer,
       gameState.opponentPlayer,
+      scale,
+      offsetX,
+      offsetY,
     ],
   );
 
@@ -1392,9 +1386,9 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
         clearSelection();
       }
 
-      const stage = stageRef.current;
-      if (!stage) return;
-      const pos = stage.getPointerPosition();
+      const layer = gameLayerRef.current;
+      if (!layer) return;
+      const pos = layer.getRelativePointerPosition();
       if (!pos) return;
       startSelectionDrag(pos.x, pos.y, e.evt.shiftKey);
     },
@@ -1417,9 +1411,9 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
         onRectChangeRef.current?.(null);
         return;
       }
-      const stage = stageRef.current;
-      if (!stage) return;
-      const pos = stage.getPointerPosition();
+      const layer = gameLayerRef.current;
+      if (!layer) return;
+      const pos = layer.getRelativePointerPosition();
       if (pos) {
         updateSelectionDrag(pos.x, pos.y, allCardBounds, e.evt.shiftKey);
       }
@@ -1438,7 +1432,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
   // ---- Don't render canvas content until we have dimensions and layout ----
   // NOTE: The container div MUST always render so the ref gets attached and
   // ResizeObserver can measure it. Only the Stage content is gated.
-  if (width === 0 || height === 0 || !mpLayout || !myHandRect || !opponentHandRect) {
+  if (containerWidth === 0 || containerHeight === 0 || !mpLayout || !myHandRect || !opponentHandRect) {
     return (
       <div ref={containerRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }} />
     );
@@ -1471,14 +1465,27 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     <div ref={containerRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
       <Stage
         ref={stageRef}
-        width={width}
-        height={height}
+        width={containerWidth}
+        height={containerHeight}
+        pixelRatio={typeof window !== 'undefined' ? window.devicePixelRatio : 1}
         onContextMenu={(e) => e.evt.preventDefault()}
         onMouseDown={handleStageMouseDown}
         onMouseMove={handleStageMouseMove}
         onMouseUp={handleStageMouseUp}
       >
-        <Layer>
+        {/* Letterbox background — real pixel coords */}
+        <Layer listening={false}>
+          <Rect width={containerWidth} height={containerHeight} fill="#0d0905" />
+        </Layer>
+
+        {/* Game layer — all content in 1920x1080 virtual coords */}
+        <Layer
+          ref={gameLayerRef as any}
+          scaleX={scale}
+          scaleY={scale}
+          x={offsetX}
+          y={offsetY}
+        >
           {/* ================================================================
               Zone backgrounds — My zones
               ================================================================ */}
@@ -1504,10 +1511,9 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                   opacity={0.35}
                   onContextMenu={isLob ? (e: Konva.KonvaEventObject<PointerEvent>) => {
                     e.evt.preventDefault();
-                    const stage = stageRef.current;
-                    if (!stage) return;
                     // Compute spawn position as normalized 0-1 within the LOB zone
-                    const pointer = stage.getPointerPosition();
+                    const layer = gameLayerRef.current;
+                    const pointer = layer?.getRelativePointerPosition();
                     const spawnX = pointer ? (pointer.x - zone.x) / zone.width : 0.5;
                     const spawnY = pointer ? (pointer.y - zone.y) / zone.height : 0.5;
                     setZoneMenu({ x: e.evt.clientX, y: e.evt.clientY, spawnX, spawnY });
@@ -1585,7 +1591,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
             x={myHandRect.x}
             y={myHandRect.y}
             width={myHandRect.width}
-            height={height - myHandRect.y}
+            height={VIRTUAL_HEIGHT - myHandRect.y}
             fill="#0d0905"
             opacity={0.5}
             onContextMenu={(e: Konva.KonvaEventObject<PointerEvent>) => {
@@ -1677,8 +1683,8 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                 key={`my-cards-${zoneKey}`}
                 clipX={zone?.x ?? 0}
                 clipY={zone?.y ?? 0}
-                clipWidth={zone?.width ?? width}
-                clipHeight={zone?.height ?? height}
+                clipWidth={zone?.width ?? VIRTUAL_WIDTH}
+                clipHeight={zone?.height ?? VIRTUAL_HEIGHT}
               >
                 {cards.map((card) => {
                   const gameCard = adaptCard(card, 'player1');
@@ -1728,8 +1734,8 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                 key={`opp-cards-${zoneKey}`}
                 clipX={zone?.x ?? 0}
                 clipY={zone?.y ?? 0}
-                clipWidth={zone?.width ?? width}
-                clipHeight={zone?.height ?? height}
+                clipWidth={zone?.width ?? VIRTUAL_WIDTH}
+                clipHeight={zone?.height ?? VIRTUAL_HEIGHT}
               >
                 {cards.map((card) => {
                   const gameCard = adaptCard(card, 'player2');
@@ -2407,8 +2413,15 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
           })()}
         </Layer>
 
-        {/* Selection rectangle layer — updated imperatively for performance */}
-        <Layer ref={selectionLayerRef as any} listening={false}>
+        {/* Selection rectangle layer — scaled to match game layer */}
+        <Layer
+          ref={selectionLayerRef as any}
+          listening={false}
+          scaleX={scale}
+          scaleY={scale}
+          x={offsetX}
+          y={offsetY}
+        >
           <Rect
             ref={selectionRectRef as any}
             visible={false}
@@ -2461,15 +2474,18 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                   ? 'rgba(100,149,237,0.12)'
                   : 'transparent';
 
+            const screenTopLeft = virtualToScreen(rect.x, rect.y, scale, offsetX, offsetY);
+            const screenBottomRight = virtualToScreen(rect.x + rect.width, rect.y + rect.height, scale, offsetX, offsetY);
+
             return (
               <div
                 key={key}
                 style={{
                   position: 'absolute',
-                  left: rect.x,
-                  top: rect.y,
-                  width: rect.width,
-                  height: rect.height,
+                  left: screenTopLeft.x,
+                  top: screenTopLeft.y,
+                  width: screenBottomRight.x - screenTopLeft.x,
+                  height: screenBottomRight.y - screenTopLeft.y,
                   border: `1px solid ${borderColor}`,
                   background: bgColor,
                   borderRadius: 4,
