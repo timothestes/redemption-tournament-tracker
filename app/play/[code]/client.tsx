@@ -1009,19 +1009,36 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
         }}>
           <div style={{
-            background: 'var(--gf-bg, #1a1410)', border: '1px solid var(--gf-border, #3d2e1f)',
-            borderRadius: 8, padding: 24, maxWidth: 400, textAlign: 'center',
+            background: 'rgba(14, 10, 6, 0.97)',
+            border: '1px solid rgba(107, 78, 39, 0.3)',
+            borderRadius: 8,
+            padding: '20px 28px',
+            maxWidth: 320,
+            width: '100%',
+            textAlign: 'center',
+            boxShadow: '0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(196, 149, 90, 0.08)',
           }}>
-            <p style={{ color: 'var(--gf-text, #e8d5a3)', marginBottom: 16, fontSize: 14 }}>
-              This will clear all your cards from the game and load <strong>{reloadDeckConfirm.deckName}</strong>. Continue?
+            <p style={{
+              fontFamily: 'Georgia, serif',
+              color: '#e8d5a3',
+              fontSize: 13,
+              lineHeight: 1.5,
+            }}>
+              Clear all cards and load a new deck?
             </p>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 18 }}>
               <button
                 onClick={() => setReloadDeckConfirm(null)}
                 style={{
-                  padding: '8px 20px', background: 'transparent',
-                  border: '1px solid var(--gf-border, #3d2e1f)',
-                  borderRadius: 4, color: 'var(--gf-text-dim, #a89070)', cursor: 'pointer',
+                  padding: '7px 18px',
+                  background: 'transparent',
+                  border: '1px solid rgba(107, 78, 39, 0.3)',
+                  borderRadius: 4,
+                  color: 'rgba(196, 149, 90, 0.6)',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  fontFamily: 'Georgia, serif',
+                  transition: 'all 0.15s ease',
                 }}
               >
                 Cancel
@@ -1032,9 +1049,16 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                   setReloadDeckConfirm(null);
                 }}
                 style={{
-                  padding: '8px 20px', background: 'rgba(196,149,90,0.2)',
-                  border: '1px solid #c4955a', borderRadius: 4,
-                  color: '#e8d5a3', cursor: 'pointer',
+                  padding: '7px 18px',
+                  background: 'rgba(196, 149, 90, 0.15)',
+                  border: '1px solid rgba(196, 149, 90, 0.45)',
+                  borderRadius: 4,
+                  color: '#e8d5a3',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  fontFamily: 'Georgia, serif',
+                  fontWeight: 600,
+                  transition: 'all 0.15s ease',
                 }}
               >
                 Load Deck

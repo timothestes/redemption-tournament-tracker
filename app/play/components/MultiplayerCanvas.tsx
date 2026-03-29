@@ -2088,17 +2088,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
                   />
                 </Group>
 
-                {/* LOR: spread all cards face-up with vertical overlap */}
+                {/* LOR: spread all cards face-up with horizontal overlap */}
                 {zoneKey === 'land-of-redemption' && count > 0 && (() => {
                   const pad = 4;
-                  const topOffset = 20; // below count badge
-                  const availH = zone.height - topOffset - pad;
-                  const overlap = count <= 1 ? 0 : Math.min(pileCardHeight * 0.25, (availH - pileCardHeight) / (count - 1));
+                  const availW = zone.width - pad * 2;
+                  const overlap = count <= 1 ? 0 : Math.min(pileCardWidth * 0.3, (availW - pileCardWidth) / (count - 1));
                   return cards.map((c, i) => {
                     const img = getCardImage(c);
                     const gameCard = adaptCard(c, 'player1');
-                    const cardX = zone.x + (zone.width - pileCardWidth) / 2;
-                    const cardY = zone.y + topOffset + i * overlap;
+                    const cardX = zone.x + pad + i * overlap;
+                    const cardY = zone.y + (zone.height - pileCardHeight) / 2;
                     return img ? (
                       <GameCardNode
                         key={String(c.id)}
@@ -2239,17 +2238,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
                   />
                 </Group>
 
-                {/* Opponent LOR: spread all cards face-up with vertical overlap */}
+                {/* Opponent LOR: spread all cards face-up with horizontal overlap */}
                 {zoneKey === 'land-of-redemption' && count > 0 && (() => {
                   const pad = 4;
-                  const topOffset = 20;
-                  const availH = zone.height - topOffset - pad;
-                  const overlap = count <= 1 ? 0 : Math.min(pileCardHeight * 0.25, (availH - pileCardHeight) / (count - 1));
+                  const availW = zone.width - pad * 2;
+                  const overlap = count <= 1 ? 0 : Math.min(pileCardWidth * 0.3, (availW - pileCardWidth) / (count - 1));
                   return cards.map((c, i) => {
                     const img = getCardImage(c);
                     const gameCard = adaptCard(c, 'player2');
-                    const cardX = zone.x + (zone.width - pileCardWidth) / 2;
-                    const cardY = zone.y + topOffset + i * overlap;
+                    const cardX = zone.x + pad + i * overlap;
+                    const cardY = zone.y + (zone.height - pileCardHeight) / 2;
                     return img ? (
                       <GameCardNode
                         key={String(c.id)}

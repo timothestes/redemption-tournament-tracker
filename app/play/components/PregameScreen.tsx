@@ -933,17 +933,12 @@ function RevealingPhase({ gameState, gameId }: { gameState: GameState; gameId: b
 
   // Build contextual message based on who won the roll and who goes first
   let headline: string;
-  let subtitle: string;
   if (iWonRoll) {
-    // I won the roll and made the choice
-    headline = iGoFirst ? 'You chose to go first' : `You chose ${opponentName}`;
-    subtitle = iGoFirst ? 'Draw your opening hand' : `${opponentName} will go first`;
+    headline = iGoFirst ? 'You chose to go first' : `You chose ${opponentName} to go first`;
   } else {
-    // Opponent won the roll and made the choice
     headline = iGoFirst
       ? `${opponentName} chose you to go first`
       : `${opponentName} chose to go first`;
-    subtitle = iGoFirst ? 'Draw your opening hand' : `${opponentName} will draw first`;
   }
 
   return (
@@ -1020,20 +1015,6 @@ function RevealingPhase({ gameState, gameId }: { gameState: GameState; gameId: b
       >
         {headline}
       </motion.h2>
-
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.4, delay: 0.6 }}
-        style={{
-          fontFamily: 'Georgia, serif',
-          fontSize: 13,
-          color: 'rgba(196, 149, 90, 0.5)',
-          marginTop: 6,
-        }}
-      >
-        {subtitle}
-      </motion.p>
 
       {/* Continue button + progress bar */}
       <motion.div
