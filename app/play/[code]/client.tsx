@@ -340,10 +340,12 @@ function GameInner({ code, isConnected }: GameInnerProps) {
 
   // Once connected, call the appropriate reducer once
   useEffect(() => {
+    console.log('[game-debug] reducer effect:', { isConnected, isActive, hasConn: !!conn, didCall: didCallReducer.current, role: gameParams?.role });
     if ((!isConnected && !isActive) || !conn || didCallReducer.current) return;
     didCallReducer.current = true;
 
     if (!gameParams) {
+      console.log('[game-debug] no gameParams — showing error');
       setErrorMessage('No game parameters found. Please return to the lobby.');
       setLifecycle('error');
       return;
@@ -353,10 +355,13 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     // skip the createGame call (it would fail with "code already in use").
     // Joiners must always call joinGame — they see the game via subscription
     // before joining, so we can't use game existence as a skip signal for them.
+    // Filter out finished games — old games with the same code may still exist.
     if (gameParams.role === 'create') {
       const existingGames = [...(gameState.allGames || [])];
-      const existingGame = existingGames.find((g: any) => g.code === code);
+      console.log('[game-debug] reconnect check — games with this code:', existingGames.filter((g: any) => g.code === code).map((g: any) => ({ id: String(g.id), status: g.status })));
+      const existingGame = existingGames.find((g: any) => g.code === code && g.status !== 'finished');
       if (existingGame) {
+        console.log('[game-debug] reconnect — reusing existing game:', String(existingGame.id), existingGame.status);
         setGameId(existingGame.id);
         return; // lifecycle sync effect handles the rest
       }
@@ -364,6 +369,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
 
     try {
       if (gameParams.role === 'create') {
+        console.log('[game-debug] calling createGame reducer for code:', code);
         setLifecycle('creating');
         conn.reducers.createGame({
           code,
@@ -376,6 +382,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           lobbyMessage: gameParams.lobbyMessage ?? '',
         });
         // Transition to waiting — the game row will appear via subscription
+        console.log('[game-debug] createGame called — setting lifecycle to waiting');
         setLifecycle('waiting');
       } else {
         setLifecycle('joining');
@@ -414,19 +421,27 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     if (gameId !== null) return; // Already discovered
     const { allGames } = gameState;
     if (!allGames) return;
-    const found = allGames.find((g: any) => g.code === code);
+    const gamesWithCode = allGames.filter((g: any) => g.code === code);
+    if (gamesWithCode.length > 0) {
+      console.log('[game-debug] discovery — all games with code:', gamesWithCode.map((g: any) => ({ id: String(g.id), status: g.status })));
+    }
+    // Prefer active games — old finished games with the same code may still exist
+    const found = allGames.find((g: any) => g.code === code && g.status !== 'finished')
+      ?? allGames.find((g: any) => g.code === code);
     if (found) {
+      console.log('[game-debug] discovery — selected game:', String(found.id), 'status:', found.status);
       setGameId(found.id);
     }
   }, [gameState.allGames, code, gameId]);
 
   // Fast detection: once subscription data arrives and we're still 'joining',
   // check if a game with our code exists. If not, fail immediately.
+  // Only look for non-finished games — finished games with the same code are stale.
   useEffect(() => {
     if (lifecycle !== 'joining') return;
     const { allGames } = gameState;
     if (!allGames || allGames.length === 0) return; // subscription not applied yet
-    const found = allGames.find((g: any) => g.code === code);
+    const found = allGames.find((g: any) => g.code === code && g.status !== 'finished');
     if (!found) {
       setErrorMessage(`No game found with code "${code}". The game may have ended or the code may be incorrect.`);
       setLifecycle('error');
@@ -448,6 +463,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     const { game } = gameState;
     if (!game) return;
 
+    console.log('[game-debug] lifecycle sync — game.status:', game.status, 'current lifecycle:', lifecycle, 'gameId:', String(game.id));
+
     if (game.status === 'waiting') {
       setLifecycle('waiting');
     } else if (game.status === 'pregame') {
@@ -459,30 +476,35 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       setLifecycle('error');
       return;
     } else if (game.status === 'finished') {
+      console.log('[game-debug] lifecycle sync — transitioning to FINISHED from', lifecycle);
       setLifecycle('finished');
     }
   }, [gameState.game, lifecycle]);
 
   // Clean up waiting-status games when the user leaves the page.
-  // Uses a ref so the beforeunload handler always reads the latest lifecycle.
+  // Uses refs so handlers always read the latest values without causing
+  // the effect to re-run (which would trigger the cleanup and call leaveGame).
   const lifecycleRef = useRef(lifecycle);
   lifecycleRef.current = lifecycle;
+  const gameStateRef = useRef(gameState);
+  gameStateRef.current = gameState;
 
   useEffect(() => {
+    if (gameId === null) return;
     const handleBeforeUnload = () => {
-      if (lifecycleRef.current === 'waiting' && gameId !== null) {
-        gameState.leaveGame();
+      if (lifecycleRef.current === 'waiting') {
+        gameStateRef.current.leaveGame();
       }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       // Component unmount (navigation away) — clean up if still waiting
-      if (lifecycleRef.current === 'waiting' && gameId !== null) {
-        gameState.leaveGame();
+      if (lifecycleRef.current === 'waiting') {
+        gameStateRef.current.leaveGame();
       }
     };
-  }, [gameId, gameState]);
+  }, [gameId]);
 
   // Build a player name map for ChatPanel
   const playerNameMap = useMemo(() => {

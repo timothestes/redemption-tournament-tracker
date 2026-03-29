@@ -12,16 +12,19 @@ export function useSpacetimeConnection() {
   const [error, setError] = useState<string | null>(null);
 
   const onConnect = useCallback((_conn: DbConnection, _identity: any, token: string) => {
+    console.log('[game-debug] onConnect — identity:', _identity?.toHexString?.());
     localStorage.setItem(TOKEN_KEY, token);
     setIsConnected(true);
     setError(null);
   }, []);
 
   const onDisconnect = useCallback(() => {
+    console.log('[game-debug] onDisconnect fired');
     setIsConnected(false);
   }, []);
 
   const onConnectError = useCallback((e: any) => {
+    console.log('[game-debug] onConnectError:', e?.message);
     setError(e?.message || 'Connection failed');
     setIsConnected(false);
   }, []);

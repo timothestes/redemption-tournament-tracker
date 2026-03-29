@@ -188,8 +188,10 @@ export const create_game = spacetimedb.reducer(
     lobbyMessage: t.string(),
   },
   (ctx, { code, deckId, displayName, format, supabaseUserId, deckData, isPublic, lobbyMessage }) => {
+    console.log('[stdb-debug] create_game called — code:', code, 'sender:', ctx.sender.toHexString());
     // Validate code is not already in use by an active game
     for (const g of ctx.db.Game.game_code.filter(code)) {
+      console.log('[stdb-debug] create_game — existing game with code:', String(g.id), 'status:', g.status);
       if (g.status !== 'finished') {
         throw new SenderError('Game code already in use');
       }
@@ -242,6 +244,7 @@ export const create_game = spacetimedb.reducer(
     });
 
     // Log action
+    console.log('[stdb-debug] create_game — SUCCESS — gameId:', String(game.id), 'status:', game.status);
     logAction(ctx, game.id, player.id, 'GAME_CREATED', JSON.stringify({ code }), 0n, 'draw');
   }
 );
@@ -1942,9 +1945,12 @@ export const toggle_reveal_hand = spacetimedb.reducer(
 // Lifecycle: clientConnected
 // ---------------------------------------------------------------------------
 spacetimedb.clientConnected((ctx) => {
+  console.log('[stdb-debug] clientConnected:', ctx.sender.toHexString());
   // Find all player rows for this identity and set connected
   for (const player of ctx.db.Player.iter()) {
     if (player.identity.toHexString() === ctx.sender.toHexString()) {
+      const game = ctx.db.Game.id.find(player.gameId);
+      console.log('[stdb-debug] clientConnected — player:', String(player.id), 'game:', String(player.gameId), 'gameStatus:', game?.status);
       ctx.db.Player.id.update({ ...player, isConnected: true });
 
       // Cancel any pending disconnect timeouts for this player
@@ -2122,13 +2128,15 @@ export const move_opponent_card = spacetimedb.reducer(
 // Lifecycle: clientDisconnected
 // ---------------------------------------------------------------------------
 spacetimedb.clientDisconnected((ctx) => {
+  console.log('[stdb-debug] clientDisconnected:', ctx.sender.toHexString());
   // Find all player rows for this identity and set disconnected
   for (const player of ctx.db.Player.iter()) {
     if (player.identity.toHexString() === ctx.sender.toHexString()) {
+      const gameForPlayer = ctx.db.Game.id.find(player.gameId);
+      console.log('[stdb-debug] clientDisconnected — player:', String(player.id), 'game:', String(player.gameId), 'gameStatus:', gameForPlayer?.status);
       ctx.db.Player.id.update({ ...player, isConnected: false });
 
       // If game is in pregame, cancel immediately — opponent is present, no recovery
-      const gameForPlayer = ctx.db.Game.id.find(player.gameId);
       if (gameForPlayer && gameForPlayer.status === 'pregame') {
         ctx.db.Game.id.update({ ...gameForPlayer, status: 'finished' });
         logAction(
@@ -2143,12 +2151,13 @@ spacetimedb.clientDisconnected((ctx) => {
         continue;
       }
 
-      // For waiting games, use a short timeout (5s) — just long enough to survive
-      // a page refresh. The client proactively calls leave_game on navigation,
-      // so this is only a fallback for crashes/network drops.
+      // For waiting games, use a 30-second timeout — long enough to survive
+      // WebSocket reconnections and page refreshes. The client proactively
+      // calls leave_game on navigation, so this is only a fallback for
+      // crashes/network drops.
       // For playing games, use the normal 5-minute timeout.
       const timeoutMicros = gameForPlayer && gameForPlayer.status === 'waiting'
-        ? 5_000_000n    // 5 seconds
+        ? 30_000_000n   // 30 seconds
         : 300_000_000n; // 5 minutes
       const futureTime = ctx.timestamp.microsSinceUnixEpoch + timeoutMicros;
       ctx.db.DisconnectTimeout.insert({
