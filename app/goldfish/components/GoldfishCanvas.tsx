@@ -44,9 +44,12 @@ interface GoldfishCanvasProps {
   offsetX: number;
   offsetY: number;
   virtualWidth: number;
+  onSimulateDimensions?: (width: number, height: number) => void;
+  onClearSimulation?: () => void;
+  simulatedLabel?: string | null;
 }
 
-export default function GoldfishCanvas({ containerWidth, containerHeight, scale, offsetX, offsetY, virtualWidth }: GoldfishCanvasProps) {
+export default function GoldfishCanvas({ containerWidth, containerHeight, scale, offsetX, offsetY, virtualWidth, onSimulateDimensions, onClearSimulation, simulatedLabel }: GoldfishCanvasProps) {
   const { state, dispatch, drawCard, drawMultiple, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck, shuffleDeck, meekCard, unmeekCard, flipCard, addCounter, removeCounter, addNote, addOpponentLostSoul, removeOpponentToken, addPlayerLostSoul } = useGame();
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const stageRef = useRef<Konva.Stage>(null);
@@ -1551,6 +1554,9 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
         minScale={MIN_SCALE}
         maxScale={MAX_SCALE}
         step={STEP}
+        onSimulateDimensions={onSimulateDimensions}
+        onClearSimulation={onClearSimulation}
+        simulatedLabel={simulatedLabel}
       />
 
       {contextMenu && (

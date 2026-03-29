@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { GameProvider } from '../state/GameContext';
 import { CardPreviewProvider } from '../state/CardPreviewContext';
@@ -19,7 +19,28 @@ interface GoldfishClientProps {
 
 function GoldfishGameArea({ deck }: { deck: DeckDataForGoldfish }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { scale, offsetX, offsetY, containerWidth, containerHeight, virtualWidth } = useVirtualCanvas(containerRef);
+
+  // Dimension simulation for testing different aspect ratios
+  const [simulated, setSimulated] = useState<{ width: number; height: number; label: string } | null>(null);
+  const simulatedSize = simulated ? { width: simulated.width, height: simulated.height } : null;
+
+  const { scale, offsetX, offsetY, containerWidth, containerHeight, virtualWidth } = useVirtualCanvas(containerRef, simulatedSize);
+
+  const onSimulateDimensions = useCallback((width: number, height: number) => {
+    // Find the label from the preset
+    const presets = [
+      { label: '4:3 (1440x1080)', width: 1440, height: 1080 },
+      { label: '16:10 (1680x1050)', width: 1680, height: 1050 },
+      { label: '16:9 (1920x1080)', width: 1920, height: 1080 },
+      { label: '21:9 Ultrawide (2560x1080)', width: 2560, height: 1080 },
+      { label: '32:9 Super UW (3440x1080)', width: 3440, height: 1080 },
+      { label: 'iPad (1024x768)', width: 1024, height: 768 },
+    ];
+    const match = presets.find(p => p.width === width && p.height === height);
+    setSimulated({ width, height, label: match?.label ?? `${width}x${height}` });
+  }, []);
+
+  const onClearSimulation = useCallback(() => setSimulated(null), []);
 
   // Collect all unique image URLs to preload
   const imageUrls = useMemo(() => {
@@ -88,6 +109,9 @@ function GoldfishGameArea({ deck }: { deck: DeckDataForGoldfish }) {
             offsetX={offsetX}
             offsetY={offsetY}
             virtualWidth={virtualWidth}
+            onSimulateDimensions={onSimulateDimensions}
+            onClearSimulation={onClearSimulation}
+            simulatedLabel={simulated?.label ?? null}
           />
         )}
       </div>
