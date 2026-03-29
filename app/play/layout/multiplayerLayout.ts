@@ -76,56 +76,17 @@ const PLAYER_LOB_RATIO = 0.09;
 const PLAYER_TERRITORY_RATIO = 0.2775;
 const PLAYER_HAND_RATIO = 0.18;
 
-// Card sizing ratios
-const MAIN_CARD_WIDTH_RATIO = 0.06;
-const MAIN_CARD_HAND_HEADROOM = 0.82;
-const LOB_CARD_HEADROOM = 0.85;
-const OPP_HAND_HEADROOM = 0.78;
-const OPP_HAND_SCALE = 0.75;
 const PILE_LABEL_RATIO = 0.15;
-const TOOLBAR_RESERVED = 48; // toolbar height + padding, so hand cards render above it
 
-// ── Private card sizing functions ───────────────────────────────────────
-
-function getMainCardDimensions(
-  playWidth: number,
-  stageHeight: number
-): CardDimensions {
-  const widthBased = playWidth * MAIN_CARD_WIDTH_RATIO;
-  const playerHandHeight = stageHeight * PLAYER_HAND_RATIO;
-  const heightBased = (playerHandHeight * MAIN_CARD_HAND_HEADROOM) / CARD_ASPECT_RATIO;
-  // On squarer displays (low aspect ratio), allow cards to be slightly taller
-  // by relaxing the height constraint headroom
-  const aspectRatio = playWidth / stageHeight;
-  const adjustedHeadroom = aspectRatio < 1.2 ? 0.92 : MAIN_CARD_HAND_HEADROOM;
-  const adjustedHeightBased = (playerHandHeight * adjustedHeadroom) / CARD_ASPECT_RATIO;
-  const w = Math.round(Math.min(widthBased, adjustedHeightBased));
-  return { cardWidth: w, cardHeight: Math.round(w * CARD_ASPECT_RATIO) };
-}
-
-function getLobCardDimensions(
-  mainCard: CardDimensions,
-  lobZoneHeight: number
-): CardDimensions {
-  // If the main card fits inside the LOB zone, reuse it
-  if (mainCard.cardHeight <= lobZoneHeight * LOB_CARD_HEADROOM) {
-    return { ...mainCard };
-  }
-  // Otherwise scale to fit
-  const h = lobZoneHeight * LOB_CARD_HEADROOM;
-  const w = Math.round(h / CARD_ASPECT_RATIO);
-  return { cardWidth: w, cardHeight: Math.round(h) };
-}
-
-function getOpponentHandCardDimensions(
-  mainCard: CardDimensions,
-  oppHandHeight: number
-): CardDimensions {
-  const scaledWidth = mainCard.cardWidth * OPP_HAND_SCALE;
-  const heightBased = (oppHandHeight * OPP_HAND_HEADROOM) / CARD_ASPECT_RATIO;
-  const w = Math.round(Math.min(scaledWidth, heightBased));
-  return { cardWidth: w, cardHeight: Math.round(w * CARD_ASPECT_RATIO) };
-}
+// ── Fixed card dimensions (computed for 1920×1080 virtual canvas) ───────
+// play area width = 1920 * (1 - 0.15) = 1632
+// main card width = 1632 * 0.06 = 98, height = 98 * 1.4 = 137
+// opp hand card   = 98 * 0.75 = 74 wide, 74 * 1.4 = 104 tall
+// LOB zone height = 1080 * 0.09 = 97.2; max usable = 97.2 * 0.85 = 82.6
+//   → main card (137) > 82.6, so scale down: w = round(82.6/1.4) = 59, h = round(82.6) = 83
+export const MAIN_CARD: CardDimensions = { cardWidth: 98, cardHeight: 137 };
+export const LOB_CARD: CardDimensions = { cardWidth: 59, cardHeight: 83 };
+export const OPP_HAND_CARD: CardDimensions = { cardWidth: 74, cardHeight: 104 };
 
 function getPileCardDimensions(slotHeight: number): CardDimensions {
   const usable = slotHeight * (1 - PILE_LABEL_RATIO);
@@ -300,9 +261,9 @@ export function calculateMultiplayerLayout(
   );
 
   // ── Card dimensions (four tiers) ────────────────────────────────────
-  const mainCard = getMainCardDimensions(playAreaWidth, stageHeight);
-  const lobCard = getLobCardDimensions(mainCard, playerLobHeight);
-  const opponentHandCard = getOpponentHandCardDimensions(mainCard, oppHandHeight);
+  const mainCard = MAIN_CARD;
+  const lobCard = LOB_CARD;
+  const opponentHandCard = OPP_HAND_CARD;
 
   // Pile card size based on a single sidebar slot height (use the smaller half)
   const pileSlotCount = isParagon ? 6 : 5;
