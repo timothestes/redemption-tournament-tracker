@@ -621,6 +621,9 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     stageRef,
     zoneLayout: myZones as Partial<Record<ZoneId, GoldfishZoneRect>>,
     findZoneAtPosition: findZoneForModalDrag,
+    scale,
+    offsetX,
+    offsetY,
     moveCard: (id: string, toZone: ZoneId, _idx?: number, posX?: number, posY?: number) => {
       // Determine which player's zone was hit so we can normalize correctly
       const hit = posX != null && posY != null
@@ -666,6 +669,9 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     stageRef,
     zoneLayout: { ...myZones, ...opponentZones } as Partial<Record<ZoneId, GoldfishZoneRect>>,
     findZoneAtPosition: findZoneForOpponentDrag,
+    scale,
+    offsetX,
+    offsetY,
     moveCard: (id: string, toZone: ZoneId, _idx?: number, posX?: number, posY?: number) => {
       if (approvedSearchRequest) {
         // Determine which player's zone was hit so we can normalize correctly

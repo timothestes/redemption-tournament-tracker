@@ -8,7 +8,7 @@ import { useGame } from '../state/GameContext';
 import { calculateZoneLayout, calculateCardPositionsInZone, type ZoneRect } from '../layout/zoneLayout';
 import { CARD_WIDTH, CARD_HEIGHT } from '../layout/zoneLayout';
 import { calculateHandPositions } from '../layout/handLayout';
-import { VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen, screenToVirtual } from '@/app/shared/layout/virtualCanvas';
+import { VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen } from '@/app/shared/layout/virtualCanvas';
 import { GameCard, ZoneId, ZONE_LABELS } from '../types';
 import { GameCardNode, CardBackShape, cardBackListeners, cardBackLoaded } from '../../shared/components/GameCardNode';
 import { PhaseBar } from './PhaseBar';
@@ -325,15 +325,6 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     setBatchDeckDropIds(cardInstanceIds);
   }, []);
 
-  // Wrapper: convert container-pixel coords to virtual coords for modal drag hit-testing
-  const findZoneAtScreenPosition = useCallback(
-    (screenX: number, screenY: number): ZoneId | null => {
-      const virt = screenToVirtual(screenX, screenY, scale, offsetX, offsetY);
-      return findZoneAtPosition(virt.x, virt.y);
-    },
-    [findZoneAtPosition, scale, offsetX, offsetY]
-  );
-
   // Modal card drag (drag from search/peek/browse modals to canvas zones)
   const {
     dragState: modalDrag,
@@ -345,13 +336,16 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   } = useModalCardDrag({
     stageRef,
     zoneLayout,
-    findZoneAtPosition: findZoneAtScreenPosition,
+    findZoneAtPosition,
     moveCard,
     moveCardsBatch,
     onDeckDrop: handleDeckDrop,
     onBatchDeckDrop: handleBatchDeckDrop,
     cardWidth,
     cardHeight,
+    scale,
+    offsetX,
+    offsetY,
   });
 
   // Clear hover state and mark dragging on drag start

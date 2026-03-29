@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import type Konva from 'konva';
 import { GameCard, ZoneId } from '@/app/shared/types/gameCard';
 import type { ZoneRect } from '@/app/goldfish/layout/zoneLayout';
+import { screenToVirtual } from '@/app/shared/layout/virtualCanvas';
 
 export interface ModalDragState {
   isDragging: boolean;
@@ -26,6 +27,10 @@ interface UseModalCardDragOptions {
   onBatchDeckDrop?: (cardInstanceIds: string[]) => void;
   cardWidth: number;
   cardHeight: number;
+  // Virtual canvas scaling — converts container-relative pixels to virtual coords
+  scale: number;
+  offsetX: number;
+  offsetY: number;
 }
 
 const INITIAL_STATE: ModalDragState = {
@@ -47,6 +52,9 @@ export function useModalCardDrag({
   onBatchDeckDrop,
   cardWidth,
   cardHeight,
+  scale,
+  offsetX,
+  offsetY,
 }: UseModalCardDragOptions) {
   const [dragState, setDragState] = useState<ModalDragState>(INITIAL_STATE);
   const [hoveredZone, setHoveredZone] = useState<ZoneId | null>(null);
@@ -132,9 +140,10 @@ export function useModalCardDrag({
         const stage = stageRef.current;
         if (stage) {
           const rect = stage.container().getBoundingClientRect();
-          const canvasX = e.clientX - rect.left;
-          const canvasY = e.clientY - rect.top;
-          const zone = findZoneAtPosition(canvasX, canvasY);
+          const stageX = e.clientX - rect.left;
+          const stageY = e.clientY - rect.top;
+          const virt = screenToVirtual(stageX, stageY, scale, offsetX, offsetY);
+          const zone = findZoneAtPosition(virt.x, virt.y);
           setHoveredZone(zone);
         }
       }
@@ -152,9 +161,10 @@ export function useModalCardDrag({
         const stage = stageRef.current;
         if (stage) {
           const rect = stage.container().getBoundingClientRect();
-          const canvasX = e.clientX - rect.left;
-          const canvasY = e.clientY - rect.top;
-          const targetZone = findZoneAtPosition(canvasX, canvasY);
+          const stageX = e.clientX - rect.left;
+          const stageY = e.clientY - rect.top;
+          const virt = screenToVirtual(stageX, stageY, scale, offsetX, offsetY);
+          const targetZone = findZoneAtPosition(virt.x, virt.y);
 
           if (targetZone) {
             const primary = dragRef.current.card;
@@ -169,12 +179,13 @@ export function useModalCardDrag({
                 onBatchDeckDrop(allIds);
               }
               if (onDeckDrop) {
+                // Keep screen coords for HTML popup positioning
                 onDeckDrop(primary.instanceId, e.clientX, e.clientY);
               }
             } else if (targetZone === 'territory' || targetZone === 'land-of-bondage') {
               if (isMulti) {
-                const baseX = canvasX - cardWidth / 2;
-                const baseY = canvasY - cardHeight / 2;
+                const baseX = virt.x - cardWidth / 2;
+                const baseY = virt.y - cardHeight / 2;
                 const FAN_OFFSET = 20;
                 const positions: Record<string, { posX: number; posY: number }> = {};
                 allIds.forEach((id, i) => {
@@ -182,7 +193,7 @@ export function useModalCardDrag({
                 });
                 moveCardsBatch(allIds, targetZone, positions);
               } else {
-                moveCard(primary.instanceId, targetZone, undefined, canvasX - cardWidth / 2, canvasY - cardHeight / 2);
+                moveCard(primary.instanceId, targetZone, undefined, virt.x - cardWidth / 2, virt.y - cardHeight / 2);
               }
             } else {
               if (isMulti) {
@@ -207,7 +218,7 @@ export function useModalCardDrag({
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
     };
-  }, [stageRef, findZoneAtPosition, moveCard, moveCardsBatch, onDeckDrop, onBatchDeckDrop, cardWidth, cardHeight]);
+  }, [stageRef, findZoneAtPosition, moveCard, moveCardsBatch, onDeckDrop, onBatchDeckDrop, cardWidth, cardHeight, scale, offsetX, offsetY]);
 
   return { dragState, startDrag, startMultiDrag, hoveredZone, ghostRef, didDragRef };
 }
