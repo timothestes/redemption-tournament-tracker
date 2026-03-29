@@ -573,6 +573,42 @@ export const pregame_acknowledge_first = spacetimedb.reducer(
 );
 
 // ---------------------------------------------------------------------------
+// Reducer: pregame_skip_to_reveal
+// Roll winner can acknowledge the roll AND choose who goes first in one step,
+// skipping the choosing phase entirely. Both players' roll acknowledgments
+// are force-set so the phase transition is immediate.
+// ---------------------------------------------------------------------------
+export const pregame_skip_to_reveal = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    chosenSeat: t.u64(),
+  },
+  (ctx, { gameId, chosenSeat }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'pregame') throw new SenderError('Game is not in pregame');
+    if (game.pregamePhase !== 'rolling') throw new SenderError('Not in rolling phase');
+    if (chosenSeat !== 0n && chosenSeat !== 1n) throw new SenderError('Invalid seat');
+
+    const player = findPlayerBySender(ctx, gameId);
+    if (player.seat.toString() !== game.rollWinner) {
+      throw new SenderError('Only the roll winner can choose');
+    }
+
+    // Skip rolling acknowledgment + choosing phase → go straight to revealing
+    const latestGame = ctx.db.Game.id.find(gameId);
+    if (!latestGame) throw new SenderError('Game not found');
+    ctx.db.Game.id.update({
+      ...latestGame,
+      pregamePhase: 'revealing',
+      currentTurn: chosenSeat,
+      pregameReady0: false,
+      pregameReady1: false,
+    });
+  }
+);
+
+// ---------------------------------------------------------------------------
 // Reducer: pregame_change_deck
 // ---------------------------------------------------------------------------
 export const pregame_change_deck = spacetimedb.reducer(
@@ -1152,7 +1188,8 @@ export const move_card = spacetimedb.reducer(
     if (card.gameId !== gameId) throw new SenderError('Card not in this game');
 
     const fromZone = card.zone;
-    const isFlipped = toZone === 'deck';
+    // Moving to deck = face-down; leaving deck = face-up; otherwise preserve
+    const isFlipped = toZone === 'deck' ? true : (fromZone === 'deck' ? false : card.isFlipped);
     // Optionally transfer ownership (e.g. rescue lost soul, capture hero)
     const newOwnerId = targetOwnerId ? BigInt(targetOwnerId) : card.ownerId;
 
@@ -1199,7 +1236,8 @@ export const move_cards_batch = spacetimedb.reducer(
       if (card.gameId !== gameId) throw new SenderError('Card not in this game: ' + idStr);
 
       const pos = posMap[idStr] || { posX: '', posY: '' };
-      const isFlipped = toZone === 'deck';
+      // Moving to deck = face-down; leaving deck = face-up; otherwise preserve
+      const isFlipped = toZone === 'deck' ? true : (card.zone === 'deck' ? false : card.isFlipped);
 
       ctx.db.CardInstance.id.update({
         ...card,
@@ -2146,7 +2184,8 @@ export const move_opponent_card = spacetimedb.reducer(
     if (card.gameId !== gameId) throw new SenderError('Card not in this game');
 
     const fromZone = card.zone;
-    const isFlipped = toZone === 'deck';
+    // Moving to deck = face-down; leaving deck = face-up; otherwise preserve
+    const isFlipped = toZone === 'deck' ? true : (fromZone === 'deck' ? false : card.isFlipped);
     ctx.db.CardInstance.id.update({
       ...card,
       zone: toZone,

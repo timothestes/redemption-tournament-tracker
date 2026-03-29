@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Settings, RotateCcw } from 'lucide-react';
+import { Settings, RotateCcw, RefreshCw } from 'lucide-react';
 
 interface CardScaleControlProps {
   cardScale: number;
@@ -10,6 +10,8 @@ interface CardScaleControlProps {
   minScale: number;
   maxScale: number;
   step: number;
+  /** Called to trigger mid-game deck reload (multiplayer only). */
+  onLoadDeck?: () => void;
 }
 
 export function CardScaleControl({
@@ -19,6 +21,7 @@ export function CardScaleControl({
   minScale,
   maxScale,
   step,
+  onLoadDeck,
 }: CardScaleControlProps) {
   const [open, setOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -172,6 +175,49 @@ export function CardScaleControl({
               {Math.round(maxScale * 100)}%
             </span>
           </div>
+
+          {/* Load Deck — multiplayer only */}
+          {onLoadDeck && (
+            <>
+              <div style={{
+                height: 1,
+                background: 'var(--gf-border, #3d2e1f)',
+                margin: '4px 0',
+              }} />
+              <button
+                onClick={() => {
+                  onLoadDeck();
+                  setOpen(false);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  width: '100%',
+                  padding: '6px 4px',
+                  background: 'transparent',
+                  border: 'none',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  color: 'var(--gf-text, #e8d5a3)',
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  fontSize: 11,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--gf-hover, #2a1f12)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                }}
+              >
+                <RefreshCw size={14} />
+                Load Deck
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>

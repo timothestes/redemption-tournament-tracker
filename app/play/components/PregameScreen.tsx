@@ -42,6 +42,13 @@ export default function PregameScreen({ gameId, gameState, code }: PregameScreen
 
   // rolling/choosing/revealing render as modal content (parent provides the overlay)
   if (phase === 'rolling') {
+    // If this player already acknowledged the roll (skip or auto), show a
+    // preview of the choosing phase so it feels like we've moved forward.
+    const isSeat0 = myPlayer.seat.toString() === '0';
+    const myRollAcked = isSeat0 ? game.pregameReady0 : game.pregameReady1;
+    if (myRollAcked) {
+      return <ChoosingPreview gameState={gameState} />;
+    }
     return <RollingPhase gameState={gameState} gameId={gameId} />;
   }
   if (phase === 'choosing') {
@@ -265,20 +272,31 @@ function RitualDie({
   size,
   isWinner,
   revealed,
+  skipAnimation,
 }: {
   finalValue: number;
   accentColor: string;
   size: number;
   isWinner: boolean;
   revealed: boolean;
+  skipAnimation?: boolean;
 }) {
   const [displayValue, setDisplayValue] = useState<number | '?'>('?');
   const [isTumbling, setIsTumbling] = useState(false);
   const [showSparks, setShowSparks] = useState(false);
 
+  // Skip: immediately land on final value
   useEffect(() => {
-    if (!revealed) {
-      setDisplayValue('?');
+    if (skipAnimation && displayValue !== finalValue) {
+      setIsTumbling(false);
+      setDisplayValue(finalValue);
+      setShowSparks(true);
+    }
+  }, [skipAnimation, finalValue, displayValue]);
+
+  useEffect(() => {
+    if (!revealed || skipAnimation) {
+      if (!skipAnimation) setDisplayValue('?');
       return;
     }
 
@@ -297,7 +315,7 @@ function RitualDie({
     }, RITUAL_TUMBLE_MS / RITUAL_TUMBLE_FRAMES);
 
     return () => clearInterval(interval);
-  }, [revealed, finalValue]);
+  }, [revealed, finalValue, skipAnimation]);
 
   return (
     <div style={{ position: 'relative', width: size, height: size, margin: '0 auto' }}>
@@ -366,30 +384,36 @@ const ROLLING_TOTAL_MS = ROLLING_PAUSE_MS + RITUAL_TUMBLE_MS + ROLLING_RESULT_DI
 function RollingPhase({ gameState, gameId }: { gameState: GameState; gameId: bigint }) {
   const { game, myPlayer, opponentPlayer } = gameState;
   const [revealed, setRevealed] = useState(false);
-  const hasSkippedRef = useRef(false);
+  const [skipped, setSkipped] = useState(false);
 
   // Start the tumble after a brief dramatic pause
   useEffect(() => {
+    if (skipped) return;
     const timer = setTimeout(() => setRevealed(true), ROLLING_PAUSE_MS);
     return () => clearTimeout(timer);
-  }, []);
+  }, [skipped]);
 
   // Auto-advance after tumble + display time
   const alreadyAcknowledged = game && myPlayer
     ? (myPlayer.seat.toString() === '0' ? game.pregameReady0 : game.pregameReady1)
     : false;
 
+  // Auto-advance only for the loser — the winner chooses manually via buttons
+  const iAmWinner = game && myPlayer ? myPlayer.seat.toString() === game.rollWinner : false;
   useEffect(() => {
-    if (!revealed || alreadyAcknowledged) return;
+    if (iAmWinner || skipped || alreadyAcknowledged) return;
+    if (!revealed) return;
     const timer = setTimeout(() => {
       gameState.pregameAcknowledgeRoll();
     }, RITUAL_TUMBLE_MS + ROLLING_RESULT_DISPLAY_MS);
     return () => clearTimeout(timer);
-  }, [revealed, alreadyAcknowledged, gameState]);
+  }, [revealed, skipped, alreadyAcknowledged, iAmWinner, gameState]);
 
+  // Loser skip — just acknowledge the roll
   const handleSkip = () => {
-    if (hasSkippedRef.current || alreadyAcknowledged) return;
-    hasSkippedRef.current = true;
+    if (skipped || alreadyAcknowledged) return;
+    setSkipped(true);
+    setRevealed(true);
     gameState.pregameAcknowledgeRoll();
   };
 
@@ -402,13 +426,25 @@ function RollingPhase({ gameState, gameId }: { gameState: GameState; gameId: big
   const iWon = mySeat.toString() === game.rollWinner;
   const winnerName = iWon ? myPlayer.displayName : (opponentPlayer?.displayName || 'Opponent');
 
-  // Show results = tumble finished (revealed + tumble duration elapsed)
+  // Winner choose — acknowledge roll + choose first in one step, skip to revealing
+  const hasChosenRef = useRef(false);
+  const handleChooseFirst = (seat: bigint) => {
+    if (hasChosenRef.current) return;
+    hasChosenRef.current = true;
+    gameState.pregameSkipToReveal(seat);
+  };
+
+  // Show results = tumble finished (revealed + tumble duration elapsed), or skipped
   const [showResults, setShowResults] = useState(false);
   useEffect(() => {
+    if (skipped) {
+      setShowResults(true);
+      return;
+    }
     if (!revealed) return;
     const timer = setTimeout(() => setShowResults(true), RITUAL_TUMBLE_MS + 100);
     return () => clearTimeout(timer);
-  }, [revealed]);
+  }, [revealed, skipped]);
 
   const dieSize = 88;
 
@@ -480,6 +516,7 @@ function RollingPhase({ gameState, gameId }: { gameState: GameState; gameId: big
             size={dieSize}
             isWinner={iWon}
             revealed={revealed}
+            skipAnimation={skipped}
           />
         </motion.div>
 
@@ -520,15 +557,16 @@ function RollingPhase({ gameState, gameId }: { gameState: GameState; gameId: big
             size={dieSize}
             isWinner={!iWon}
             revealed={revealed}
+            skipAnimation={skipped}
           />
         </motion.div>
       </div>
 
-      {/* Winner announcement — always rendered to reserve layout space, fades in after dice land */}
+      {/* Winner announcement + action area — fades in after dice land */}
       <motion.div
         animate={showResults ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
         transition={{ duration: 0.5, delay: showResults ? 0.2 : 0 }}
-        style={{ marginTop: 24 }}
+        style={{ marginTop: 24, pointerEvents: showResults ? 'auto' : 'none' }}
       >
         <p style={{
           fontFamily: 'var(--font-cinzel), Georgia, serif',
@@ -540,34 +578,56 @@ function RollingPhase({ gameState, gameId }: { gameState: GameState; gameId: big
         }}>
           {winnerName} wins the roll!
         </p>
-      </motion.div>
 
-      {/* Countdown bar + skip */}
-      <div style={{ marginTop: 20 }}>
-        <div style={{
-          width: '100%',
-          height: 3,
-          borderRadius: 2,
-          backgroundColor: 'rgba(232,213,163,0.08)',
-          overflow: 'hidden',
-        }}>
-          <motion.div
-            initial={{ width: '100%' }}
-            animate={{ width: '0%' }}
-            transition={{ duration: ROLLING_TOTAL_MS / 1000, ease: 'linear' }}
-            style={{
-              height: '100%',
-              borderRadius: 2,
-              backgroundColor: 'rgba(196, 149, 90, 0.4)',
-            }}
-          />
-        </div>
-        {!alreadyAcknowledged && (
+        {/* Winner gets choice buttons immediately; loser sees skip */}
+        {iWon ? (
+          <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <button
+              onClick={() => handleChooseFirst(mySeat)}
+              style={{
+                padding: '10px 20px',
+                borderRadius: 4,
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+                border: '1px solid rgba(196, 149, 90, 0.45)',
+                background: 'rgba(196, 149, 90, 0.15)',
+                color: '#e8d5a3',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              I&apos;ll go first
+            </button>
+            <button
+              onClick={() => handleChooseFirst(mySeat.toString() === '0' ? BigInt(1) : BigInt(0))}
+              style={{
+                padding: '10px 20px',
+                borderRadius: 4,
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+                border: '1px solid rgba(107, 78, 39, 0.3)',
+                background: 'transparent',
+                color: 'rgba(196, 149, 90, 0.6)',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              {opponentPlayer?.displayName || 'Opponent'} goes first
+            </button>
+          </div>
+        ) : (
           <motion.button
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.8 }}
+            transition={{ delay: 0.5 }}
             onClick={handleSkip}
+            disabled={alreadyAcknowledged}
             style={{
               marginTop: 12,
               background: 'none',
@@ -575,14 +635,96 @@ function RollingPhase({ gameState, gameId }: { gameState: GameState; gameId: big
               fontFamily: 'Georgia, serif',
               fontSize: 11,
               color: 'rgba(196, 149, 90, 0.35)',
-              cursor: 'pointer',
+              cursor: alreadyAcknowledged ? 'default' : 'pointer',
               letterSpacing: '0.06em',
               padding: '4px 8px',
             }}
           >
-            Skip
+            {alreadyAcknowledged ? 'Waiting for opponent to choose...' : 'Skip'}
           </motion.button>
         )}
+      </motion.div>
+
+      {/* Countdown bar — only before results are shown */}
+      {!showResults && !skipped && (
+        <div style={{ marginTop: 20 }}>
+          <div style={{
+            width: '100%',
+            height: 3,
+            borderRadius: 2,
+            backgroundColor: 'rgba(232,213,163,0.08)',
+            overflow: 'hidden',
+          }}>
+            <motion.div
+              initial={{ width: '100%' }}
+              animate={{ width: '0%' }}
+              transition={{ duration: ROLLING_TOTAL_MS / 1000, ease: 'linear' }}
+              style={{
+                height: '100%',
+                borderRadius: 2,
+                backgroundColor: 'rgba(196, 149, 90, 0.4)',
+              }}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Choosing preview — shown when player acknowledged roll but opponent hasn't yet.
+// Mirrors the choosing phase layout so the transition feels seamless.
+// ---------------------------------------------------------------------------
+
+function ChoosingPreview({ gameState }: { gameState: GameState }) {
+  const { game, myPlayer, opponentPlayer } = gameState;
+  if (!game || !myPlayer) return null;
+
+  const iWon = myPlayer.seat.toString() === game.rollWinner;
+  const winnerName = iWon ? 'You' : (opponentPlayer?.displayName || 'Opponent');
+
+  return (
+    <div style={{
+      background: 'rgba(14, 10, 6, 0.97)',
+      border: '1px solid rgba(107, 78, 39, 0.3)',
+      borderRadius: 8,
+      padding: '40px 48px',
+      textAlign: 'center',
+      maxWidth: 420,
+      width: '100%',
+      boxShadow: '0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(196, 149, 90, 0.08)',
+    }}>
+      <p style={{
+        fontFamily: 'var(--font-cinzel), Georgia, serif',
+        fontSize: 10,
+        letterSpacing: '0.18em',
+        textTransform: 'uppercase',
+        color: 'rgba(196, 149, 90, 0.5)',
+      }}>First Player</p>
+
+      <h2 style={{
+        fontFamily: 'var(--font-cinzel), Georgia, serif',
+        fontSize: 22,
+        fontWeight: 700,
+        color: '#e8d5a3',
+        marginTop: 8,
+        textShadow: '0 1px 6px rgba(0,0,0,0.9)',
+      }}>{winnerName} Won the Roll{iWon ? '!' : ''}</h2>
+
+      <p style={{
+        marginTop: 16,
+        fontSize: 13,
+        color: 'rgba(196, 149, 90, 0.45)',
+        fontFamily: 'Georgia, serif',
+      }}>
+        {iWon ? 'Waiting for opponent to finish rolling...' : 'Waiting for them to choose who goes first...'}
+      </p>
+
+      <div style={{ marginTop: 12, display: 'flex', justifyContent: 'center', gap: 6 }}>
+        <span className="animate-bounce [animation-delay:-0.3s]" style={{ width: 6, height: 6, borderRadius: '50%', background: '#c4955a' }} />
+        <span className="animate-bounce [animation-delay:-0.15s]" style={{ width: 6, height: 6, borderRadius: '50%', background: '#c4955a' }} />
+        <span className="animate-bounce" style={{ width: 6, height: 6, borderRadius: '50%', background: '#c4955a' }} />
       </div>
     </div>
   );
@@ -785,10 +927,24 @@ function RevealingPhase({ gameState, gameId }: { gameState: GameState; gameId: b
 
   const firstSeat = game.currentTurn;
   const iGoFirst = myPlayer.seat === firstSeat;
-  const firstPlayerName = iGoFirst
-    ? myPlayer.displayName
-    : (opponentPlayer?.displayName || 'Opponent');
+  const iWonRoll = myPlayer.seat.toString() === game.rollWinner;
+  const opponentName = opponentPlayer?.displayName || 'Opponent';
   const accentColor = iGoFirst ? '#c4955a' : '#4a7ab5';
+
+  // Build contextual message based on who won the roll and who goes first
+  let headline: string;
+  let subtitle: string;
+  if (iWonRoll) {
+    // I won the roll and made the choice
+    headline = iGoFirst ? 'You chose to go first' : `You chose ${opponentName}`;
+    subtitle = iGoFirst ? 'Draw your opening hand' : `${opponentName} will go first`;
+  } else {
+    // Opponent won the roll and made the choice
+    headline = iGoFirst
+      ? `${opponentName} chose you to go first`
+      : `${opponentName} chose to go first`;
+    subtitle = iGoFirst ? 'Draw your opening hand' : `${opponentName} will draw first`;
+  }
 
   return (
     <div style={{
@@ -855,14 +1011,14 @@ function RevealingPhase({ gameState, gameId }: { gameState: GameState; gameId: b
         transition={{ duration: 0.5, delay: 0.4 }}
         style={{
           fontFamily: 'var(--font-cinzel), Georgia, serif',
-          fontSize: 22,
+          fontSize: 20,
           fontWeight: 700,
           color: '#e8d5a3',
           marginTop: 16,
           textShadow: '0 1px 6px rgba(0,0,0,0.5)',
         }}
       >
-        {firstPlayerName}
+        {headline}
       </motion.h2>
 
       <motion.p
@@ -876,17 +1032,39 @@ function RevealingPhase({ gameState, gameId }: { gameState: GameState; gameId: b
           marginTop: 6,
         }}
       >
-        {iGoFirst ? 'You go first' : 'goes first'}
+        {subtitle}
       </motion.p>
 
-      {/* Subtle progress bar before auto-advance */}
+      {/* Continue button + progress bar */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.8 }}
-        style={{ marginTop: 28 }}
+        style={{ marginTop: 24 }}
       >
+        {!alreadyAcknowledged && (
+          <button
+            onClick={() => gameState.pregameAcknowledgeFirst()}
+            style={{
+              padding: '8px 24px',
+              borderRadius: 4,
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+              border: '1px solid rgba(196, 149, 90, 0.35)',
+              background: 'rgba(196, 149, 90, 0.1)',
+              color: 'rgba(232, 213, 163, 0.7)',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            Continue
+          </button>
+        )}
         <div style={{
+          marginTop: 12,
           width: '100%',
           height: 2,
           borderRadius: 1,

@@ -30,6 +30,7 @@ import PregameAcknowledgeRollReducer from "../pregame_acknowledge_roll_reducer";
 import PregameChangeDeckReducer from "../pregame_change_deck_reducer";
 import PregameChooseFirstReducer from "../pregame_choose_first_reducer";
 import PregameReadyReducer from "../pregame_ready_reducer";
+import PregameSkipToRevealReducer from "../pregame_skip_to_reveal_reducer";
 import RandomHandToZoneReducer from "../random_hand_to_zone_reducer";
 import ReloadDeckReducer from "../reload_deck_reducer";
 import RemoveCounterReducer from "../remove_counter_reducer";
@@ -75,6 +76,7 @@ export type PregameAcknowledgeRollParams = __Infer<typeof PregameAcknowledgeRoll
 export type PregameChangeDeckParams = __Infer<typeof PregameChangeDeckReducer>;
 export type PregameChooseFirstParams = __Infer<typeof PregameChooseFirstReducer>;
 export type PregameReadyParams = __Infer<typeof PregameReadyReducer>;
+export type PregameSkipToRevealParams = __Infer<typeof PregameSkipToRevealReducer>;
 export type RandomHandToZoneParams = __Infer<typeof RandomHandToZoneReducer>;
 export type ReloadDeckParams = __Infer<typeof ReloadDeckReducer>;
 export type RemoveCounterParams = __Infer<typeof RemoveCounterReducer>;

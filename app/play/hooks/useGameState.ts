@@ -90,6 +90,7 @@ export interface GameState {
   pregameAcknowledgeRoll: () => void;
   pregameChooseFirst: (chosenSeat: bigint) => void;
   pregameAcknowledgeFirst: () => void;
+  pregameSkipToReveal: (chosenSeat: bigint) => void;
   pregameChangeDeck: (deckId: string, deckData: string) => void;
   // Rematch actions
   requestRematch: (deckId: string, deckData: string) => void;
@@ -463,6 +464,10 @@ export function useGameState(gameId: bigint): GameState {
     conn?.reducers.pregameAcknowledgeFirst({ gameId });
   }, [conn, gameId]);
 
+  const pregameSkipToReveal = useCallback((chosenSeat: bigint) => {
+    conn?.reducers.pregameSkipToReveal({ gameId, chosenSeat });
+  }, [conn, gameId]);
+
   const pregameChangeDeck = useCallback((deckId: string, deckData: string) => {
     conn?.reducers.pregameChangeDeck({ gameId, deckId, deckData });
   }, [conn, gameId]);
@@ -569,6 +574,7 @@ export function useGameState(gameId: bigint): GameState {
     pregameAcknowledgeRoll,
     pregameChooseFirst,
     pregameAcknowledgeFirst,
+    pregameSkipToReveal,
     pregameChangeDeck,
     requestRematch,
     respondRematch,

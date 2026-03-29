@@ -143,13 +143,14 @@ function isAutoArrangeZone(zone: string): boolean {
 
 interface MultiplayerCanvasProps {
   gameId: bigint;
+  onLoadDeck?: () => void;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
+export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCanvasProps) {
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
 
   // ---- Container sizing (respects flex layout) ----
@@ -559,6 +560,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
 
   // ---- Drag state ----
   const isDraggingRef = useRef(false);
+  const dragEndTimeRef = useRef<number>(0);
   const dragSourceZoneRef = useRef<string | null>(null);
   const dragOriginalPosRef = useRef<{ x: number; y: number } | null>(null);
   const dragOriginalParentRef = useRef<Konva.Container | null>(null);
@@ -823,6 +825,9 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
 
       // Clear hover state
       setHoveredInstanceId(null);
+      setHoveredCard(null);
+      setHoverReady(false);
+      if (hoverTimerRef.current) { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = null; }
       stopHoverAnimation();
 
       // Multi-card drag: build a rasterized ghost of follower cards
@@ -976,6 +981,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
 
       // Reset drag state
       isDraggingRef.current = false;
+      dragEndTimeRef.current = performance.now();
       dragSourceZoneRef.current = null;
       dragOriginalPosRef.current = null;
       dragOriginalParentRef.current = null;
@@ -1281,6 +1287,8 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
   const handleMouseEnter = useCallback(
     (card: GameCard, e: Konva.KonvaEventObject<MouseEvent>) => {
       if (isDraggingRef.current) return;
+      // Ignore Konva re-firing mouseEnter immediately after a drag ends
+      if (performance.now() - dragEndTimeRef.current < 100) return;
       setHoveredInstanceId(card.instanceId);
       startHoverAnimation();
 
@@ -2472,6 +2480,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
         minScale={MIN_SCALE}
         maxScale={MAX_SCALE}
         step={STEP}
+        onLoadDeck={onLoadDeck}
       />
 
       {/* ================================================================

@@ -950,7 +950,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         </div>
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           {gameId !== null && (
-            <MultiplayerCanvas gameId={gameId} />
+            <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} />
           )}
           {/* Quick action toolbar — floating above hand area */}
           <GameToolbar
@@ -982,7 +982,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             onRollDice={() => gameState.rollDice(BigInt(20))}
             onShowToast={showGameToast}
             onEndTurn={gameState.endTurn}
-            onLoadDeck={() => setShowReloadDeckPicker(true)}
           />
           <GameToastContainer />
         </div>
