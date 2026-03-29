@@ -79,7 +79,7 @@ function GoldfishGameArea({ deck }: { deck: DeckDataForGoldfish }) {
       />
 
       {/* Game area container — ref measures available space after loupe */}
-      <div ref={containerRef} style={{ position: 'relative', flex: 1, height: '100%' }}>
+      <div ref={containerRef} style={{ position: 'relative', flex: 1, minWidth: 0, height: '100%', overflow: 'hidden' }}>
         {containerWidth > 0 && containerHeight > 0 && (
           <GoldfishCanvas
             containerWidth={containerWidth}
