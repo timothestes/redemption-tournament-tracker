@@ -219,7 +219,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   useKeyboardShortcuts({ onZoomIn: zoomIn, onZoomOut: zoomOut });
 
   const isParagon = false; // TODO: re-enable paragon zone later
-  const zoneLayout = useMemo(() => calculateZoneLayout(virtualWidth, VIRTUAL_HEIGHT, isParagon), [isParagon, virtualWidth]);
+  const zoneLayout = useMemo(() => calculateZoneLayout(virtualWidth, VIRTUAL_HEIGHT, isParagon, scale), [isParagon, virtualWidth, scale]);
   const cardWidth = Math.round(CARD_WIDTH * cardScale);
   const cardHeight = Math.round(CARD_HEIGHT * cardScale);
   // Sidebar pile cards are capped to fit within the sidebar zone height
@@ -1039,7 +1039,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                   stroke="#6b4e27"
                   strokeWidth={1}
                   cornerRadius={3}
-                  opacity={0.35}
+                  opacity={0.45}
                 />
                 <Text
                   x={rect.x + 8}

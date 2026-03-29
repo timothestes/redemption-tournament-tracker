@@ -1535,7 +1535,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                   stroke="#6b4e27"
                   strokeWidth={1}
                   cornerRadius={3}
-                  opacity={0.35}
+                  opacity={0.45}
                   onContextMenu={isLob ? (e: Konva.KonvaEventObject<PointerEvent>) => {
                     e.evt.preventDefault();
                     // Compute spawn position as normalized 0-1 within the LOB zone
@@ -1587,7 +1587,7 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
                   stroke="#27456b"
                   strokeWidth={1}
                   cornerRadius={3}
-                  opacity={0.35}
+                  opacity={0.45}
                 />
                 {/* Label + badge — skip for LOB/territory zones (rendered as overlay after cards) */}
                 {!skipLabel && (

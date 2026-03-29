@@ -34,22 +34,32 @@ export const CARD_HEIGHT = 168;  // 120 * 1.4
 export function calculateZoneLayout(
   stageWidth: number,
   stageHeight: number,
-  isParagon: boolean = false
+  isParagon: boolean = false,
+  /** Current scale factor (real pixels / virtual pixels). Used to convert
+   *  fixed-pixel HTML overlays (PhaseBar, GameToolbar) into virtual space
+   *  so zone content never renders behind them. */
+  scale: number = 1,
 ): Record<ZoneId, ZoneRect> {
   const sidebarWidth = stageWidth * 0.17;
   const sidebarX = stageWidth - sidebarWidth;
   const mainWidth = stageWidth - sidebarWidth;
 
-  const phaseBarHeight = stageHeight * 0.02; // small top gap (phase bar is HTML above canvas)
+  // PhaseBar is a 40px fixed-height HTML overlay at the top of the canvas.
+  // GameToolbar is ~48px at the bottom. Convert real pixels → virtual coords.
+  const PHASE_BAR_REAL_PX = 44; // 40px bar + 4px breathing room
+  const TOOLBAR_REAL_PX = 56;   // ~48px toolbar + 8px bottom offset
+  const phaseBarHeight = scale > 0 ? Math.ceil(PHASE_BAR_REAL_PX / scale) : 50;
+  const toolbarHeight = scale > 0 ? Math.ceil(TOOLBAR_REAL_PX / scale) : 60;
   const handHeight = stageHeight * 0.22; // bottom hand area
-  const playAreaHeight = stageHeight - phaseBarHeight - handHeight;
+  const effectiveHandHeight = Math.max(handHeight, toolbarHeight + 80); // ensure hand clears toolbar
+  const playAreaHeight = stageHeight - phaseBarHeight - effectiveHandHeight;
 
   const lobHeight = playAreaHeight * 0.22; // Land of Bondage at the bottom of play area
   const territoryHeight = playAreaHeight - lobHeight;
 
   const territoryY = phaseBarHeight;
   const lobY = territoryY + territoryHeight;
-  const handY = stageHeight - handHeight;
+  const handY = stageHeight - effectiveHandHeight;
 
   const pad = 6;
   const zonePad = 4;
@@ -105,7 +115,7 @@ export function calculateZoneLayout(
     x: 0,
     y: handY,
     width: stageWidth,
-    height: handHeight,
+    height: effectiveHandHeight,
     label: 'Hand',
   };
 

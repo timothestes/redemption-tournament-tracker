@@ -62,7 +62,7 @@ function GoldfishArea() {
       />
 
       {/* Game area */}
-      <div ref={containerRef} style={{ position: 'relative', flex: 1, height: '100%' }}>
+      <div ref={containerRef} style={{ position: 'relative', flex: 1, minWidth: 0, height: '100%', overflow: 'hidden' }}>
         {containerWidth > 0 && containerHeight > 0 && (
           <DynamicGoldfishCanvas
             containerWidth={containerWidth}
