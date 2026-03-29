@@ -338,6 +338,10 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     }
   });
 
+  // Must be declared before the reducer effect so isGamesReady is available
+  // in the dependency array (which is evaluated during render).
+  const gameState = useGameState(gameId ?? BigInt(0));
+
   // Once subscription data is ready, call the appropriate reducer once.
   // Gate on isGamesReady (subscription applied) instead of isConnected (WebSocket open)
   // to eliminate the race where allGames is empty and createGame re-fires.
@@ -411,9 +415,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       setLifecycle('error');
     }
   }, [gameState.isGamesReady, conn, code, gameParams]);
-
-  // Discover gameId by scanning all games for our code
-  const gameState = useGameState(gameId ?? BigInt(0));
 
   // Also get raw game list to find our game by code before we know the ID
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
