@@ -944,8 +944,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
 
       const x = node.x();
       const y = node.y();
-      const centerX = x + cardWidth / 2;
-      const centerY = y + cardHeight / 2;
+      // For rotation=180 cards (opponent territory), the node position is
+      // the bottom-right corner, so compute center accordingly.
+      const rot = (node as Konva.Group).rotation?.() ?? 0;
+      const isRotated = Math.abs(rot) > 90;
+      const centerX = isRotated ? x - cardWidth / 2 : x + cardWidth / 2;
+      const centerY = isRotated ? y - cardHeight / 2 : y + cardHeight / 2;
       const hit = findZoneAtPosition(centerX, centerY);
       const zoneKey = hit ? `${hit.owner}:${hit.zone}` : null;
 
@@ -1003,8 +1007,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       const node = e.target;
       const dropX = node.x();
       const dropY = node.y();
-      const centerX = dropX + cardWidth / 2;
-      const centerY = dropY + cardHeight / 2;
+      // For rotation=180 cards (opponent territory), the node position is
+      // the bottom-right corner, so compute center accordingly.
+      const dropRot = (node as Konva.Group).rotation?.() ?? 0;
+      const isDropRotated = Math.abs(dropRot) > 90;
+      const centerX = isDropRotated ? dropX - cardWidth / 2 : dropX + cardWidth / 2;
+      const centerY = isDropRotated ? dropY - cardHeight / 2 : dropY + cardHeight / 2;
       const hit = findZoneAtPosition(centerX, centerY);
 
       const isGroupDrag = selectedIds.has(card.instanceId) && selectedIds.size > 1;
