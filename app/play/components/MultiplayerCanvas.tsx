@@ -50,6 +50,8 @@ import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import DiceOverlay from './DiceOverlay';
 import { getCardImageUrl as getSharedCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import { useVirtualCanvas, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen } from '@/app/shared/layout/virtualCanvas';
+import { useCardScale } from '@/app/shared/hooks/useCardScale';
+import { CardScaleControl } from '@/app/shared/components/CardScaleControl';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -179,12 +181,19 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
     [],
   );
 
-  // Four-tier card dimensions
-  const { cardWidth, cardHeight } = mpLayout?.mainCard ?? { cardWidth: 0, cardHeight: 0 };
-  const lobCard = mpLayout?.lobCard ?? { cardWidth: 0, cardHeight: 0 };
-  const oppHandCard = mpLayout?.opponentHandCard ?? { cardWidth: 0, cardHeight: 0 };
-  const pileCardWidth = mpLayout?.pileCard.cardWidth ?? 0;
-  const pileCardHeight = mpLayout?.pileCard.cardHeight ?? 0;
+  // Card scale preference
+  const { cardScale, zoomIn, zoomOut, resetScale, MIN_SCALE, MAX_SCALE, STEP, setCardScale } = useCardScale();
+
+  // Four-tier card dimensions (scaled)
+  const rawMain = mpLayout?.mainCard ?? { cardWidth: 0, cardHeight: 0 };
+  const cardWidth = Math.round(rawMain.cardWidth * cardScale);
+  const cardHeight = Math.round(rawMain.cardHeight * cardScale);
+  const rawLob = mpLayout?.lobCard ?? { cardWidth: 0, cardHeight: 0 };
+  const lobCard = { cardWidth: Math.round(rawLob.cardWidth * cardScale), cardHeight: Math.round(rawLob.cardHeight * cardScale) };
+  const rawOppHand = mpLayout?.opponentHandCard ?? { cardWidth: 0, cardHeight: 0 };
+  const oppHandCard = { cardWidth: Math.round(rawOppHand.cardWidth * cardScale), cardHeight: Math.round(rawOppHand.cardHeight * cardScale) };
+  const pileCardWidth = Math.round((mpLayout?.pileCard.cardWidth ?? 0) * cardScale);
+  const pileCardHeight = Math.round((mpLayout?.pileCard.cardHeight ?? 0) * cardScale);
 
   const myZones: Record<string, ZoneRect> = useMemo(() => {
     if (!mpLayout) return {};
@@ -309,6 +318,23 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
 
   // ---- Hand spread toggle (fan vs flat) ----
   const { isSpreadHand } = useSpreadHand();
+
+  // ---- Card scale keyboard shortcuts (+/-) ----
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
+        zoomIn();
+      } else if (e.key === '-') {
+        e.preventDefault();
+        zoomOut();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [zoomIn, zoomOut]);
 
   // ---- Mouse position tracking for hover preview ----
   const mousePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -2433,6 +2459,16 @@ export default function MultiplayerCanvas({ gameId }: MultiplayerCanvasProps) {
           />
         </Layer>
       </Stage>
+
+      {/* Card size settings gear */}
+      <CardScaleControl
+        cardScale={cardScale}
+        setCardScale={setCardScale}
+        resetScale={resetScale}
+        minScale={MIN_SCALE}
+        maxScale={MAX_SCALE}
+        step={STEP}
+      />
 
       {/* ================================================================
           Zone highlight overlay during drag

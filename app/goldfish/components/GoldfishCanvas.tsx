@@ -25,6 +25,8 @@ import { ModalGameProvider, type ModalGameContextValue } from '@/app/shared/cont
 import { ZoneContextMenu } from '@/app/shared/components/ZoneContextMenu';
 import { LorContextMenu } from '@/app/shared/components/LorContextMenu';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
+import { useCardScale } from '@/app/shared/hooks/useCardScale';
+import { CardScaleControl } from '@/app/shared/components/CardScaleControl';
 import { useModalCardDrag } from '@/app/shared/hooks/useModalCardDrag';
 import { useSelectionState, type CardBound } from '../hooks/useSelectionState';
 import { MultiCardContextMenu } from '@/app/shared/components/MultiCardContextMenu';
@@ -212,12 +214,13 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     layer.batchDraw();
   }, []);
 
-  useKeyboardShortcuts();
+  const { cardScale, zoomIn, zoomOut, resetScale, MIN_SCALE, MAX_SCALE, STEP, setCardScale } = useCardScale();
+  useKeyboardShortcuts({ onZoomIn: zoomIn, onZoomOut: zoomOut });
 
   const isParagon = false; // TODO: re-enable paragon zone later
   const zoneLayout = useMemo(() => calculateZoneLayout(VIRTUAL_WIDTH, VIRTUAL_HEIGHT, isParagon), [isParagon]);
-  const cardWidth = CARD_WIDTH;
-  const cardHeight = CARD_HEIGHT;
+  const cardWidth = Math.round(CARD_WIDTH * cardScale);
+  const cardHeight = Math.round(CARD_HEIGHT * cardScale);
   // Virtual canvas is always 16:9 — no need to rotate sidebar piles
   const rotateSidebarPiles = false;
 
@@ -1535,6 +1538,14 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
 
       <PhaseBar />
       <GameToolbar />
+      <CardScaleControl
+        cardScale={cardScale}
+        setCardScale={setCardScale}
+        resetScale={resetScale}
+        minScale={MIN_SCALE}
+        maxScale={MAX_SCALE}
+        step={STEP}
+      />
 
       {contextMenu && (
         <CardContextMenu

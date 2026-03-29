@@ -23,6 +23,10 @@ export interface GameHotkeysConfig {
   onUndo?: () => void;
   /** Advance the current phase (Enter). */
   onAdvancePhase?: () => void;
+  /** Zoom in card size (+/= key). */
+  onZoomIn?: () => void;
+  /** Zoom out card size (- key). */
+  onZoomOut?: () => void;
   /** Master switch — set to false to suppress all hotkeys. */
   enabled?: boolean;
   /**
@@ -48,6 +52,8 @@ export interface GameHotkeysConfig {
  *   H         — toggle hand spread
  *   Tab       — toggle loupe / card preview
  *   Enter     — advance phase (turn-gated in multiplayer)
+ *   +/=       — zoom in (increase card size)
+ *   -         — zoom out (decrease card size)
  *   Ctrl/Cmd+Z — undo (goldfish only)
  *   Escape    — handled separately by the selection system
  */
@@ -61,6 +67,8 @@ export function useGameHotkeys(config: GameHotkeysConfig) {
     onRollDice,
     onUndo,
     onAdvancePhase,
+    onZoomIn,
+    onZoomOut,
     enabled = true,
     handSize = 0,
     deckSize = 0,
@@ -150,6 +158,19 @@ export function useGameHotkeys(config: GameHotkeysConfig) {
             onAdvancePhase?.();
           }
           break;
+
+        // + or = — zoom in card size
+        case '+':
+        case '=':
+          e.preventDefault();
+          onZoomIn?.();
+          break;
+
+        // - — zoom out card size
+        case '-':
+          e.preventDefault();
+          onZoomOut?.();
+          break;
       }
     };
 
@@ -167,5 +188,7 @@ export function useGameHotkeys(config: GameHotkeysConfig) {
     onRollDice,
     onUndo,
     onAdvancePhase,
+    onZoomIn,
+    onZoomOut,
   ]);
 }

@@ -7,7 +7,12 @@ import { triggerDiceRoll } from '../components/DiceRollOverlay';
 import { useGameHotkeys } from '../../shared/hooks/useGameHotkeys';
 import type { GameActions } from '../../shared/types/gameActions';
 
-export function useKeyboardShortcuts() {
+interface KeyboardShortcutOptions {
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
+}
+
+export function useKeyboardShortcuts(options?: KeyboardShortcutOptions) {
   const { state, drawCard, shuffleDeck, undo, advancePhase, toggleSpreadHand } = useGame();
   const { toggleLoupe } = useCardPreview();
 
@@ -42,6 +47,8 @@ export function useKeyboardShortcuts() {
     onRollDice: triggerDiceRoll,
     onUndo: undo,
     onAdvancePhase: advancePhase,
+    onZoomIn: options?.onZoomIn,
+    onZoomOut: options?.onZoomOut,
     handSize: state.zones.hand.length,
     deckSize: state.zones.deck.length,
   });
