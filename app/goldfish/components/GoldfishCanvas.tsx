@@ -6,7 +6,7 @@ import type Konva from 'konva';
 import KonvaLib from 'konva';
 import { useGame } from '../state/GameContext';
 import { calculateZoneLayout, calculateCardPositionsInZone, type ZoneRect } from '../layout/zoneLayout';
-import { CARD_WIDTH, CARD_HEIGHT } from '../layout/zoneLayout';
+import { CARD_WIDTH, CARD_HEIGHT, CARD_ASPECT_RATIO } from '../layout/zoneLayout';
 import { calculateHandPositions } from '../layout/handLayout';
 import { VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen } from '@/app/shared/layout/virtualCanvas';
 import { GameCard, ZoneId, ZONE_LABELS } from '../types';
