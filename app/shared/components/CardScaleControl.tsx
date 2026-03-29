@@ -3,15 +3,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Settings, RotateCcw } from 'lucide-react';
 
-const DIMENSION_PRESETS = [
-  { label: '4:3 (1440x1080)', width: 1440, height: 1080 },
-  { label: '16:10 (1680x1050)', width: 1680, height: 1050 },
-  { label: '16:9 (1920x1080)', width: 1920, height: 1080 },
-  { label: '21:9 Ultrawide (2560x1080)', width: 2560, height: 1080 },
-  { label: '32:9 Super UW (3440x1080)', width: 3440, height: 1080 },
-  { label: 'iPad (1024x768)', width: 1024, height: 768 },
-] as const;
-
 interface CardScaleControlProps {
   cardScale: number;
   setCardScale: (scale: number) => void;
@@ -19,12 +10,6 @@ interface CardScaleControlProps {
   minScale: number;
   maxScale: number;
   step: number;
-  /** When set, overrides the container with a simulated size */
-  onSimulateDimensions?: (width: number, height: number) => void;
-  /** Clear the simulation, return to real container size */
-  onClearSimulation?: () => void;
-  /** Currently simulating? */
-  simulatedLabel?: string | null;
 }
 
 export function CardScaleControl({
@@ -34,9 +19,6 @@ export function CardScaleControl({
   minScale,
   maxScale,
   step,
-  onSimulateDimensions,
-  onClearSimulation,
-  simulatedLabel,
 }: CardScaleControlProps) {
   const [open, setOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -190,79 +172,6 @@ export function CardScaleControl({
               {Math.round(maxScale * 100)}%
             </span>
           </div>
-          {/* Dimension simulation (dev tool) */}
-          {onSimulateDimensions && (
-            <>
-              <div style={{ borderTop: '1px solid var(--gf-border, #3d2e1f)', margin: '4px 0' }} />
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span
-                  style={{
-                    fontFamily: 'var(--font-cinzel), Georgia, serif',
-                    fontSize: 11,
-                    letterSpacing: '0.06em',
-                    textTransform: 'uppercase',
-                    color: 'var(--gf-text, #e8d5a3)',
-                  }}
-                >
-                  Test Display
-                </span>
-                {simulatedLabel && onClearSimulation && (
-                  <button
-                    onClick={onClearSimulation}
-                    style={{
-                      fontSize: 10,
-                      padding: '1px 6px',
-                      background: 'transparent',
-                      border: '1px solid var(--gf-border, #3d2e1f)',
-                      borderRadius: 4,
-                      cursor: 'pointer',
-                      color: 'var(--gf-text, #e8d5a3)',
-                      fontFamily: 'var(--font-cinzel), Georgia, serif',
-                      letterSpacing: '0.04em',
-                      textTransform: 'uppercase',
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover, #2a1f12)'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {DIMENSION_PRESETS.map((preset) => (
-                  <button
-                    key={preset.label}
-                    onClick={() => onSimulateDimensions(preset.width, preset.height)}
-                    style={{
-                      padding: '4px 8px',
-                      background: simulatedLabel === preset.label ? 'var(--gf-hover, #2a1f12)' : 'transparent',
-                      border: simulatedLabel === preset.label ? '1px solid #c4955a' : '1px solid transparent',
-                      borderRadius: 4,
-                      cursor: 'pointer',
-                      color: simulatedLabel === preset.label ? '#fff' : 'var(--gf-text-dim, #8a7a66)',
-                      fontSize: 11,
-                      textAlign: 'left',
-                      transition: 'background 0.15s, color 0.15s',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (simulatedLabel !== preset.label) {
-                        e.currentTarget.style.background = 'var(--gf-hover, #2a1f12)';
-                        e.currentTarget.style.color = 'var(--gf-text, #e8d5a3)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (simulatedLabel !== preset.label) {
-                        e.currentTarget.style.background = 'transparent';
-                        e.currentTarget.style.color = 'var(--gf-text-dim, #8a7a66)';
-                      }
-                    }}
-                  >
-                    {preset.label}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
         </div>
       )}
     </div>

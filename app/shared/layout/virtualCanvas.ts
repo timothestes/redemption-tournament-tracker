@@ -85,10 +85,7 @@ export interface VirtualCanvasState extends ScaleResult {
  * Observes a container div and returns the current scale/offset needed to
  * fit the virtual canvas inside it.
  */
-export function useVirtualCanvas(
-  containerRef: RefObject<HTMLDivElement | null>,
-  simulatedSize?: { width: number; height: number } | null,
-): VirtualCanvasState {
+export function useVirtualCanvas(containerRef: RefObject<HTMLDivElement | null>): VirtualCanvasState {
   const [container, setContainer] = useState({ width: 0, height: 0 });
 
   // Re-run when the ref's DOM element appears (handles conditional rendering).
@@ -118,14 +115,10 @@ export function useVirtualCanvas(
     };
   }, [containerRef]);
 
-  // Use simulated dimensions if provided, otherwise real container
-  const effectiveWidth = simulatedSize?.width ?? container.width;
-  const effectiveHeight = simulatedSize?.height ?? container.height;
-
   const scaling = useMemo(
-    () => calculateScale(effectiveWidth, effectiveHeight),
-    [effectiveWidth, effectiveHeight],
+    () => calculateScale(container.width, container.height),
+    [container.width, container.height],
   );
 
-  return { ...scaling, containerWidth: effectiveWidth, containerHeight: effectiveHeight };
+  return { ...scaling, containerWidth: container.width, containerHeight: container.height };
 }
