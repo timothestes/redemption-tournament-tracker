@@ -113,9 +113,14 @@ export const MAIN_CARD: CardDimensions = { cardWidth: 98, cardHeight: 137 };
 export const LOB_CARD: CardDimensions = { cardWidth: 59, cardHeight: 83 };
 export const OPP_HAND_CARD: CardDimensions = { cardWidth: 74, cardHeight: 104 };
 
-function getPileCardDimensions(slotHeight: number): CardDimensions {
-  const usable = slotHeight * (1 - PILE_LABEL_RATIO);
-  const h = Math.min(Math.max(usable, 30), 140);
+function getPileCardDimensions(slotHeight: number, sidebarWidth: number, zonePad: number): CardDimensions {
+  const usableH = slotHeight * (1 - PILE_LABEL_RATIO);
+  // Constrain by both slot height and sidebar width (minus padding + badge space)
+  const usableW = sidebarWidth - zonePad * 2 - 40; // 40px for count badge + label
+  const maxCardW = Math.max(usableW * 0.55, 30); // card takes up to 55% of usable width
+  // Height from width (maintain aspect ratio), capped by slot height
+  const hFromW = maxCardW * CARD_ASPECT_RATIO;
+  const h = Math.round(Math.min(Math.max(Math.min(usableH, hFromW), 30), usableH));
   const w = Math.round(h / CARD_ASPECT_RATIO);
   return { cardWidth: Math.max(w, Math.round(30 / CARD_ASPECT_RATIO)), cardHeight: Math.round(Math.max(h, 30)) };
 }
@@ -298,7 +303,7 @@ export function calculateMultiplayerLayout(
   const pileSlotHeight = Math.round(
     (sidebarHalfHeight - slotPad * (pileSlotCount + 1)) / pileSlotCount
   );
-  const pileCard = getPileCardDimensions(pileSlotHeight);
+  const pileCard = getPileCardDimensions(pileSlotHeight, sidebarWidth, zonePad);
 
   return {
     zones: {
