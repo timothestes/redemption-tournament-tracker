@@ -16,7 +16,7 @@ export function CardHoverPreview({ card, anchorX, anchorY }: CardHoverPreviewPro
   const previewHeight = previewWidth * 1.4;
   const imageUrl = getCardImageUrl(card.cardImgFile);
 
-  if (!imageUrl) return null;
+  if (!imageUrl || !isFinite(anchorX) || !isFinite(anchorY)) return null;
 
   // Position: above-right by default, flip if needed
   let left = anchorX + 12;
