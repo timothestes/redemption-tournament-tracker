@@ -58,6 +58,9 @@ const ABILITY_OVERRIDES: Record<string, string> = {
   // Lost Soul "Hopper" — RR/Matthew 18:12 say "this card", LR/Fundraiser say "this Lost Soul"
   "if drawn, give this lost soul to an opponent's territory.":
     "if drawn, give this card to an opponent's territory.",
+  // Lost Soul "Prosperity" — 2024 promo shortened the ability text
+  "if drawn, you may discard a card from hand to draw 2.":
+    "if drawn (except by your special ability), or if put in play by an opponent's special ability, you may discard a card from hand to draw 2.",
 };
 
 /**
