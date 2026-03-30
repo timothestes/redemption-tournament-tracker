@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/utils/supabase/server';
 import { getSupabaseAdmin } from '@/lib/pricing/supabase-admin';
 import { getShopifyAccessToken, fetchProductInventory } from '@/lib/pricing/shopify';
 import { loadCardData, buildDuplicateGroupIndex } from '@/lib/pricing/matching';
@@ -66,6 +67,8 @@ interface UnmatchedCard {
   card_key: string;
   quantity: number;
   reason: 'no_match' | 'sold_out';
+  /** Human-readable explanation of why matching failed */
+  debug?: string;
   /** When a cheaper version exists on another store (e.g. Fundraiser) */
   cheaper_alternative?: {
     card_name: string;
@@ -84,6 +87,7 @@ interface CartResult {
 
 type CardLookupEntry = {
   shopify_product_id: string;
+  shopify_title: string;
   cached_variant_id: string;
   price: number;
 };
@@ -121,7 +125,7 @@ function buildCardRowNameIndex(cardData: CardRow[]): Map<string, CardRow[]> {
 
 type BudgetSubstituteResult =
   | { found: true; card_key: string; card_name: string; price: number; variant_id: string; shopify_product_id: string }
-  | { found: false; reason: 'no_carddata' | 'no_group' | 'no_equivalents' | 'all_sold_out' };
+  | { found: false; reason: 'no_carddata' | 'no_group' | 'no_equivalents' | 'all_sold_out'; debug: string };
 
 /**
  * Find the cheapest in-stock equivalent for a card from its duplicate group.
@@ -141,22 +145,28 @@ function findBudgetSubstitute(
   // Find the source card in carddata to get its special ability
   const sourceCard = cardData.find(c => c.card_key === cardKey);
   if (!sourceCard) {
-    console.warn(`[ytg-cart] Budget: no carddata match for key "${cardKey}"`);
-    return { found: false, reason: 'no_carddata' };
+    return { found: false, reason: 'no_carddata', debug: `Card key "${cardKey}" not found in card database` };
   }
 
   // Find the duplicate group
   const group = findGroup(sourceCard.name, dupIndex);
   if (!group) {
-    console.warn(`[ytg-cart] Budget: no duplicate group for "${sourceCard.name}"`);
-    return { found: false, reason: 'no_group' };
+    return { found: false, reason: 'no_group', debug: `No duplicate group for "${sourceCard.name}" — only one printing exists, budget substitute not possible` };
   }
 
-  // Collect normalized names of all group members
+  // Collect normalized names of all group members.
+  // Use multiple levels of stripping to handle multi-bracket names like
+  // Lost Souls: 'Lost Soul "Prosperity" [Deuteronomy 30:15] [2024 - 3rd Place]'
+  // → strip once: 'Lost Soul "Prosperity" [Deuteronomy 30:15]'
+  // → strip all brackets: 'Lost Soul "Prosperity"'
   const memberNormalized = new Set<string>();
   for (const member of group.members) {
     memberNormalized.add(normalize(member.cardName));
-    memberNormalized.add(normalize(stripSetSuffix(member.cardName)));
+    const stripped = stripSetSuffix(member.cardName);
+    memberNormalized.add(normalize(stripped));
+    // Also strip ALL trailing brackets/parens for multi-bracket names
+    const fullyStripped = stripped.replace(/(\s*\[[^\]]+\]|\s+\([^)]+\))+\s*$/, '').trim();
+    if (fullyStripped) memberNormalized.add(normalize(fullyStripped));
   }
 
   // Gather candidate CardRows from the name index
@@ -218,8 +228,19 @@ function findBudgetSubstitute(
 
   if (pricedEquivalents.length === 0) {
     const reason = hadPricedButSoldOut ? 'all_sold_out' : 'no_equivalents';
-    console.warn(`[ytg-cart] Budget: ${reason} for "${cardKey}" (candidates: ${candidates.length}, ability-matched: ${equivalents.length}, in cardLookup: ${equivalents.filter(e => cardLookup.has(e.card_key)).length})`);
-    return { found: false, reason };
+    // Build detailed debug listing each equivalent and its status
+    const equivDetails = equivalents.map(e => {
+      const info = cardLookup.get(e.card_key);
+      if (!info) return `${e.name}: no price mapping`;
+      const live = liveInventory?.get(info.shopify_product_id);
+      const stock = live?.tracked ? `${live.inventory} in stock` : 'untracked';
+      return `${e.name}: $${info.price.toFixed(2)} (${stock})`;
+    }).join('; ');
+    const abilityRejected = candidates.length - equivalents.length;
+    const debug = hadPricedButSoldOut
+      ? `All priced equivalents sold out. Equivalents: [${equivDetails}]`
+      : `No priced equivalents. ${abilityRejected > 0 ? `${abilityRejected} candidates rejected (different ability). ` : ''}Equivalents: [${equivDetails}]`;
+    return { found: false, reason, debug };
   }
 
   // Sort by price ascending, return cheapest
@@ -300,6 +321,14 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabaseAdmin();
 
+    // Check if current user is admin (for debug info)
+    let isAdmin = false;
+    try {
+      const userSupabase = await createClient();
+      const { data } = await userSupabase.rpc('check_admin_role');
+      isAdmin = !!data;
+    } catch { /* not logged in or RPC fails — not admin */ }
+
     // Normalize card_keys: strip .jpg/.jpeg extension from the img_file segment.
     // Decks created before img_file normalization may store keys like "...|017-Lost-Soul-Hopper.jpg"
     // while carddata and card_price_mappings use "...|017-Lost-Soul-Hopper".
@@ -365,6 +394,7 @@ export async function POST(request: NextRequest) {
 
       cardLookup.set(mapping.card_key, {
         shopify_product_id: product.id,
+        shopify_title: product.raw_json?.title || '',
         cached_variant_id: String(variant.id),
         price: parseFloat(product.price) || 0,
       });
@@ -407,11 +437,15 @@ export async function POST(request: NextRequest) {
         const group = findGroup(sourceCard.name, dupIndex);
         if (!group) continue;
 
-        // Collect normalized names of all group members
+        // Collect normalized names of all group members (multi-level stripping
+        // for cards with multiple bracket suffixes, e.g. Lost Souls)
         const memberNormalized = new Set<string>();
         for (const member of group.members) {
           memberNormalized.add(normalize(member.cardName));
-          memberNormalized.add(normalize(stripSetSuffix(member.cardName)));
+          const stripped = stripSetSuffix(member.cardName);
+          memberNormalized.add(normalize(stripped));
+          const fullyStripped = stripped.replace(/(\s*\[[^\]]+\]|\s+\([^)]+\))+\s*$/, '').trim();
+          if (fullyStripped) memberNormalized.add(normalize(fullyStripped));
         }
 
         // Find all CardRows matching those names
@@ -476,6 +510,7 @@ export async function POST(request: NextRequest) {
 
           cardLookup.set(mapping.card_key, {
             shopify_product_id: product.id,
+            shopify_title: product.raw_json?.title || '',
             cached_variant_id: String(variant.id),
             price: parseFloat(product.price) || 0,
           });
@@ -518,10 +553,11 @@ export async function POST(request: NextRequest) {
       : cards;
 
     if (useBudget) {
-      console.log(`[ytg-cart] Budget order: ${orderedCards.map(c => `${c.card_name} (inLookup=${cardLookup.has(c.card_key)})`).join(' → ')}`);
     }
 
     for (const card of orderedCards) {
+      let budgetDebug: string | undefined;
+
       // Budget mode: allocate unit-by-unit to respect per-product inventory limits.
       // For a card with quantity N, we call findBudgetSubstitute N times, each time
       // picking the cheapest in-stock equivalent that still has remaining inventory.
@@ -542,6 +578,18 @@ export async function POST(request: NextRequest) {
           );
 
           if (substitute.found) {
+            // Guard: never substitute UP to a more expensive version in budget mode.
+            // If the original card has a known, non-zero price and the substitute costs more,
+            // treat this unit as sold out rather than silently adding an expensive card.
+            // Skip the guard when original price is $0 — that means the product is
+            // unavailable/delisted, not actually free.
+            const originalInfo = cardLookup.get(card.card_key);
+            if (originalInfo && originalInfo.price > 0 && substitute.card_key !== card.card_key && substitute.price > originalInfo.price) {
+              budgetDebug ??= `Cheapest equivalent is ${substitute.card_name} at $${substitute.price.toFixed(2)}, more expensive than original $${originalInfo.price.toFixed(2)}`;
+              soldOutQty += 1;
+              continue;
+            }
+
             // Record allocation in usedInventory
             const pid = substitute.shopify_product_id;
             usedInventory.set(pid, (usedInventory.get(pid) ?? 0) + 1);
@@ -551,7 +599,6 @@ export async function POST(request: NextRequest) {
             if (existing) {
               existing.quantity += 1;
             } else {
-              const originalInfo = cardLookup.get(card.card_key);
               const isSubstitution = substitute.card_key !== card.card_key;
 
               const matchedCard: MatchedCard & { shopify_product_id: string } = {
@@ -582,6 +629,7 @@ export async function POST(request: NextRequest) {
               allocations.set(key, matchedCard);
             }
           } else {
+            budgetDebug ??= 'debug' in substitute ? substitute.debug : undefined;
             soldOutQty += 1;
           }
         }
@@ -593,27 +641,46 @@ export async function POST(request: NextRequest) {
           cartParts.push(`${alloc.variant_id}:${alloc.quantity}`);
         }
 
-        // Emit unmatched for any units that couldn't be allocated
-        if (soldOutQty > 0) {
+        // If we matched at least some units, emit any remaining as sold out and skip
+        if (allocations.size > 0) {
+          if (soldOutQty > 0) {
+            const alt = findCheaperAlternative(card.card_key, cardData, cardNameIndex, dupIndex, nonYtgPrices);
+            unmatched.push({
+              card_name: card.card_name,
+              card_key: card.card_key,
+              quantity: soldOutQty,
+              reason: 'sold_out',
+              debug: budgetDebug,
+              ...(alt && { cheaper_alternative: alt }),
+            });
+          }
+          continue;
+        }
+
+        // ALL units failed budget substitution. If the card has a direct price mapping,
+        // fall through to regular matching — this handles cards without a duplicate group
+        // that still have valid Shopify listings.
+        if (soldOutQty > 0 && cardLookup.has(card.card_key)) {
+          // Don't emit sold-out; let regular matching handle it below
+        } else if (soldOutQty > 0) {
           const alt = findCheaperAlternative(card.card_key, cardData, cardNameIndex, dupIndex, nonYtgPrices);
           unmatched.push({
             card_name: card.card_name,
             card_key: card.card_key,
             quantity: soldOutQty,
             reason: 'sold_out',
+            debug: budgetDebug,
             ...(alt && { cheaper_alternative: alt }),
           });
+          continue;
         }
-
-        // If we matched at least some units (or all were sold out), skip regular matching
-        if (allocations.size > 0 || soldOutQty > 0) continue;
-        // Otherwise fall through to regular matching below
       }
 
       // Regular matching (exact mode, or budget mode fallback)
+      const budgetFallthrough = useBudget && dupIndex && cardNameIndex;
       const info = cardLookup.get(card.card_key);
       if (!info) {
-        const alt = useBudget && dupIndex && cardNameIndex
+        const alt = budgetFallthrough
           ? findCheaperAlternative(card.card_key, cardData, cardNameIndex, dupIndex, nonYtgPrices)
           : undefined;
         unmatched.push({
@@ -621,6 +688,7 @@ export async function POST(request: NextRequest) {
           card_key: card.card_key,
           quantity: card.quantity,
           reason: 'no_match',
+          debug: `No price mapping for key "${card.card_key}"`,
           ...(alt && { cheaper_alternative: alt }),
         });
         continue;
@@ -630,11 +698,13 @@ export async function POST(request: NextRequest) {
       if (liveInventory) {
         const live = liveInventory.get(info.shopify_product_id);
         if (live && live.tracked && live.inventory <= 0 && !live.continuesSelling) {
+          const prefix = budgetFallthrough ? '[budget had no alternatives] ' : '';
           unmatched.push({
             card_name: card.card_name,
             card_key: card.card_key,
             quantity: card.quantity,
             reason: 'sold_out',
+            debug: `${prefix}"${info.shopify_title}" sold out ($${info.price.toFixed(2)}, 0 inventory)${budgetDebug ? `. Budget: ${budgetDebug}` : ''}`,
           });
           continue;
         }
@@ -658,10 +728,15 @@ export async function POST(request: NextRequest) {
       ? `https://www.yourturngames.biz/cart/${cartParts.join(',')}`
       : null;
 
+    // Strip debug info for non-admin users
+    const sanitizedUnmatched = isAdmin
+      ? unmatched
+      : unmatched.map(({ debug: _, ...rest }) => rest);
+
     const result: CartResult = {
       cartUrl,
       matched,
-      unmatched,
+      unmatched: sanitizedUnmatched,
       matchedTotal: matched.reduce((sum, m) => sum + m.quantity, 0),
       unmatchedTotal: unmatched.reduce((sum, u) => sum + u.quantity, 0),
     };

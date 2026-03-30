@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 
 /** Generic card item that both Deck and PublicDeck formats can provide */
 export interface BuyDeckCard {
@@ -29,6 +30,7 @@ interface UnmatchedCard {
   card_key: string;
   quantity: number;
   reason: 'no_match' | 'sold_out';
+  debug?: string;
   cheaper_alternative?: {
     card_name: string;
     price: number;
@@ -55,6 +57,7 @@ interface BuyDeckModalProps {
 }
 
 export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: BuyDeckModalProps) {
+  const { isAdmin } = useIsAdmin();
   const [scope, setScope] = useState<BuyScope>("all");
   const [mode, setMode] = useState<BuyMode>(initialMode ?? "exact");
   const [result, setResult] = useState<CartResult | null>(null);
@@ -323,11 +326,11 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
                     </span>
                   </label>
                   <div className="-mx-1 px-1">
-                    {result.matched.map((card) => {
+                    {result.matched.map((card, i) => {
                       const isSelected = !excludedKeys.has(card.card_key);
                       return (
                         <label
-                          key={card.card_key}
+                          key={`${card.card_key}-${i}`}
                           className="flex items-center gap-2 py-1 cursor-pointer min-h-[32px]"
                         >
                           <input
@@ -367,29 +370,52 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
               {/* Unavailable cards */}
               {result.unmatched.length > 0 && (
                 <div className="mb-3">
-                  <button
-                    onClick={() => setShowUnavailable(!showUnavailable)}
-                    className="text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 flex items-center gap-1"
-                  >
-                    <svg className={`w-3 h-3 transition-transform ${showUnavailable ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                    {result.unmatched.length} card{result.unmatched.length !== 1 ? "s" : ""} unavailable
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowUnavailable(!showUnavailable)}
+                      className="text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 flex items-center gap-1"
+                    >
+                      <svg className={`w-3 h-3 transition-transform ${showUnavailable ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                      {result.unmatched.length} card{result.unmatched.length !== 1 ? "s" : ""} unavailable
+                    </button>
+                    {showUnavailable && isAdmin && (
+                      <button
+                        onClick={() => {
+                          const lines = result.unmatched.map(c => {
+                            const parts = [c.card_name];
+                            if (c.quantity > 1) parts[0] += ` x${c.quantity}`;
+                            parts.push(`  reason: ${c.reason}`);
+                            if (c.debug) parts.push(`  debug: ${c.debug}`);
+                            if (c.cheaper_alternative) parts.push(`  alt: ${c.cheaper_alternative.source} $${c.cheaper_alternative.price.toFixed(2)}`);
+                            return parts.join('\n');
+                          });
+                          navigator.clipboard.writeText(lines.join('\n\n'));
+                        }}
+                        className="text-[10px] text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 underline"
+                      >
+                        Copy debug
+                      </button>
+                    )}
+                  </div>
                   {showUnavailable && (
                     <div className="mt-1.5 max-h-40 overflow-y-auto space-y-0.5">
                       {/* Sold out cards */}
                       {soldOut.length > 0 && (
                         <>
-                          {noMatch.length > 0 && (
-                            <div className="text-[10px] font-semibold text-red-500 dark:text-red-400 uppercase tracking-wide pt-1">Sold Out</div>
-                          )}
+                          <div className="text-[10px] font-semibold text-red-500 dark:text-red-400 uppercase tracking-wide pt-1">
+                            Sold out on YTG ({soldOut.length})
+                          </div>
                           {soldOut.map((card, i) => (
                             <div key={`so-${i}`} className="py-0.5 text-xs text-red-500 dark:text-red-400">
                               <div className="flex items-center justify-between">
                                 <span className="truncate">{card.card_name}</span>
                                 {card.quantity > 1 && <span className="ml-2 flex-shrink-0">x{card.quantity}</span>}
                               </div>
+                              {isAdmin && card.debug && (
+                                <div className="text-[10px] text-gray-500 dark:text-gray-500 mt-0.5">{card.debug}</div>
+                              )}
                               {card.cheaper_alternative && (
                                 <div className="text-[10px] text-muted-foreground mt-0.5">
                                   Available from {card.cheaper_alternative.source} for ${card.cheaper_alternative.price.toFixed(2)}
@@ -402,15 +428,18 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
                       {/* No match cards */}
                       {noMatch.length > 0 && (
                         <>
-                          {soldOut.length > 0 && (
-                            <div className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide pt-1.5">Not Listed</div>
-                          )}
+                          <div className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide pt-1.5">
+                            Not listed on YTG ({noMatch.length})
+                          </div>
                           {noMatch.map((card, i) => (
                             <div key={`nm-${i}`} className="py-0.5 text-xs text-gray-500 dark:text-gray-400">
                               <div className="flex items-center justify-between">
                                 <span className="truncate">{card.card_name}</span>
                                 {card.quantity > 1 && <span className="ml-2 flex-shrink-0">x{card.quantity}</span>}
                               </div>
+                              {isAdmin && card.debug && (
+                                <div className="text-[10px] text-gray-500 dark:text-gray-500 mt-0.5">{card.debug}</div>
+                              )}
                               {card.cheaper_alternative && (
                                 <div className="text-[10px] text-muted-foreground mt-0.5">
                                   Available from {card.cheaper_alternative.source} for ${card.cheaper_alternative.price.toFixed(2)}

@@ -1194,6 +1194,7 @@ export interface LoadPublicDecksParams {
   username?: string;
   tagIds?: string[];
   tournamentOnly?: boolean;
+  excludeFullSize?: boolean;
 }
 
 export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) {
@@ -1208,6 +1209,7 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
       username,
       tagIds,
       tournamentOnly,
+      excludeFullSize,
     } = params;
 
     const offset = (page - 1) * pageSize;
@@ -1260,6 +1262,10 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
       } else {
         query = query.eq("format", format);
       }
+    }
+
+    if (excludeFullSize) {
+      query = query.lt("card_count", 100);
     }
 
     // Filter by exact username (e.g. clicking a username link)
