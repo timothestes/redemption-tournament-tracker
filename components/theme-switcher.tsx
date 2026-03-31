@@ -11,6 +11,7 @@ import {
 import { Laptop, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import Image from "next/image";
 
 const ThemeSwitcher = () => {
   const [mounted, setMounted] = useState(false);
@@ -33,7 +34,7 @@ const ThemeSwitcher = () => {
         <Button 
           variant="outline" 
           size={"sm"} 
-          className="bg-white dark:bg-zinc-800 border border-gray-300 dark:border-zinc-700 shadow-sm rounded-full h-8 w-8 p-0 flex items-center justify-center"
+          className="bg-white border border-gray-300 shadow-sm rounded-full h-8 w-8 p-0 flex items-center justify-center dark:bg-zinc-800 dark:border-zinc-700 [.jayden_&]:bg-zinc-800 [.jayden_&]:border-pink-500/30"
         >
           {theme === "light" ? (
             <Sun
@@ -46,6 +47,15 @@ const ThemeSwitcher = () => {
               key="dark"
               size={ICON_SIZE}
               className={"text-indigo-400"}
+            />
+          ) : theme === "jayden" ? (
+            <Image
+              key="jayden"
+              src="/jayden-icon.png"
+              alt="Jayden"
+              width={ICON_SIZE}
+              height={ICON_SIZE}
+              className="rounded-full"
             />
           ) : (
             <Laptop
@@ -68,6 +78,10 @@ const ThemeSwitcher = () => {
           <DropdownMenuRadioItem className="flex gap-2" value="dark">
             <Moon size={ICON_SIZE} className="text-muted-foreground" />{" "}
             <span>Dark</span>
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem className="flex gap-2" value="jayden">
+            <Image src="/jayden-icon.png" alt="" width={ICON_SIZE} height={ICON_SIZE} className="rounded-full" />{" "}
+            <span>Jayden</span>
           </DropdownMenuRadioItem>
           <DropdownMenuRadioItem className="flex gap-2" value="system">
             <Laptop size={ICON_SIZE} className="text-muted-foreground" />{" "}

@@ -74,6 +74,40 @@
     --dialog-border: 215 10% 20%;
     --dialog-header-accent: 142 71% 45%;
   }
+
+  .jayden {
+    color-scheme: dark;
+    --background: 270 20% 4%;
+    --foreground: 190 30% 93%;
+    --card: 270 25% 8%;
+    --card-foreground: 190 30% 93%;
+    --popover: 270 25% 8%;
+    --popover-foreground: 190 30% 93%;
+    --primary: 330 90% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 260 50% 18%;
+    --secondary-foreground: 190 30% 93%;
+    --muted: 270 20% 15%;
+    --muted-foreground: 280 15% 55%;
+    --accent: 190 95% 50%;
+    --accent-foreground: 270 20% 4%;
+    --destructive: 0 90% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 280 40% 25%;
+    --input: 280 40% 25%;
+    --ring: 330 90% 55%;
+    --chart-1: 330 90% 55%;
+    --chart-2: 190 95% 50%;
+    --chart-3: 270 70% 60%;
+    --chart-4: 350 85% 60%;
+    --chart-5: 200 90% 55%;
+
+    /* Dialog surface tokens (jayden) */
+    --dialog-bg: 270 25% 7%;
+    --dialog-header-bg: 270 30% 10%;
+    --dialog-border: 280 40% 25%;
+    --dialog-header-accent: 330 90% 55%;
+  }
 }
 
 @layer base {
