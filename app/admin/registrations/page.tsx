@@ -565,7 +565,7 @@ export default function AdminRegistrationsPage() {
                   <Button
                     onClick={() => setShowTournamentModal(true)}
                     variant="outline"
-                    className="border-2 border-blue-500 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-950"
+                    className="border-2 border-primary text-primary hover:bg-primary/10"
                   >
                     Create Tournament ({selectedIds.size})
                   </Button>
@@ -651,7 +651,7 @@ export default function AdminRegistrationsPage() {
                   id="thursday"
                   value={thursdayFilter}
                   onChange={(e) => setThursdayFilter(e.target.value)}
-                  className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                  className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
                 >
                   <option value="all">All</option>
                   <option value="booster_draft">Booster Draft</option>
@@ -666,7 +666,7 @@ export default function AdminRegistrationsPage() {
                   id="friday"
                   value={fridayFilter}
                   onChange={(e) => setFridayFilter(e.target.value)}
-                  className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                  className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
                 >
                   <option value="all">All</option>
                   <option value="type1_2player">Type 1 (2-Player)</option>
@@ -681,7 +681,7 @@ export default function AdminRegistrationsPage() {
                   id="saturday"
                   value={saturdayFilter}
                   onChange={(e) => setSaturdayFilter(e.target.value)}
-                  className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                  className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
                 >
                   <option value="all">All</option>
                   <option value="teams">Teams</option>
@@ -699,7 +699,7 @@ export default function AdminRegistrationsPage() {
                   id="firstNats"
                   value={firstNationalsFilter}
                   onChange={(e) => setFirstNationalsFilter(e.target.value)}
-                  className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                  className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
                 >
                   <option value="all">All</option>
                   <option value="yes">Yes</option>
@@ -713,7 +713,7 @@ export default function AdminRegistrationsPage() {
                   id="fantasy"
                   value={fantasyDraftFilter}
                   onChange={(e) => setFantasyDraftFilter(e.target.value)}
-                  className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                  className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
                 >
                   <option value="all">All</option>
                   <option value="yes">Yes</option>
@@ -727,7 +727,7 @@ export default function AdminRegistrationsPage() {
                   id="airport"
                   value={airportTransportFilter}
                   onChange={(e) => setAirportTransportFilter(e.target.value)}
-                  className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                  className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
                 >
                   <option value="all">All</option>
                   <option value="yes">Yes</option>
@@ -741,7 +741,7 @@ export default function AdminRegistrationsPage() {
                   id="hotel"
                   value={hotelTransportFilter}
                   onChange={(e) => setHotelTransportFilter(e.target.value)}
-                  className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                  className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
                 >
                   <option value="all">All</option>
                   <option value="yes">Yes</option>
@@ -755,7 +755,7 @@ export default function AdminRegistrationsPage() {
                   id="overnight"
                   value={overnightStayFilter}
                   onChange={(e) => setOvernightStayFilter(e.target.value)}
-                  className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                  className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
                 >
                   <option value="all">All</option>
                   <option value="yes">Yes</option>
@@ -769,7 +769,7 @@ export default function AdminRegistrationsPage() {
                   id="ironMan"
                   value={ironManFilter}
                   onChange={(e) => setIronManFilter(e.target.value)}
-                  className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                  className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
                 >
                   <option value="all">All</option>
                   <option value="yes">Yes</option>
@@ -783,7 +783,7 @@ export default function AdminRegistrationsPage() {
                   id="photo"
                   value={photoFilter}
                   onChange={(e) => setPhotoFilter(e.target.value)}
-                  className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                  className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
                 >
                   <option value="all">All</option>
                   <option value="yes">Yes</option>
@@ -797,7 +797,7 @@ export default function AdminRegistrationsPage() {
                   id="paid"
                   value={paidFilter}
                   onChange={(e) => setPaidFilter(e.target.value)}
-                  className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                  className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
                 >
                   <option value="all">All</option>
                   <option value="yes">Yes</option>
@@ -809,7 +809,7 @@ export default function AdminRegistrationsPage() {
 
           {loading ? (
             <div className="text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-100"></div>
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
             </div>
           ) : filteredRegistrations.length === 0 ? (
             <div className="text-center py-12 bg-card border rounded-lg">
@@ -818,7 +818,7 @@ export default function AdminRegistrationsPage() {
               </p>
             </div>
           ) : (
-            <div className="bg-card border rounded-lg shadow-sm overflow-hidden">
+            <div className="bg-card border rounded-lg shadow-sm overflow-hidden jayden-gradient-bg">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-muted">
@@ -829,7 +829,7 @@ export default function AdminRegistrationsPage() {
                           className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
                             selectedIds.size === filteredRegistrations.length && filteredRegistrations.length > 0
                               ? 'bg-green-500 border-green-600 hover:bg-green-600'
-                              : 'border-gray-300 hover:border-green-400 hover:bg-green-50 dark:border-gray-600 dark:hover:border-green-400 dark:hover:bg-green-950/20'
+                              : 'border-border hover:border-green-400 hover:bg-green-50 dark:hover:border-green-400 dark:hover:bg-green-950/20'
                           }`}
                         >
                           {selectedIds.size === filteredRegistrations.length && filteredRegistrations.length > 0 && (
@@ -862,7 +862,7 @@ export default function AdminRegistrationsPage() {
                             className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
                               selectedIds.has(reg.id)
                                 ? 'bg-green-500 border-green-600 hover:bg-green-600'
-                                : 'border-gray-300 hover:border-green-400 hover:bg-green-50 dark:border-gray-600 dark:hover:border-green-400 dark:hover:bg-green-950/20'
+                                : 'border-border hover:border-green-400 hover:bg-green-50 dark:hover:border-green-400 dark:hover:bg-green-950/20'
                             }`}
                           >
                             {selectedIds.has(reg.id) && (
@@ -901,10 +901,10 @@ export default function AdminRegistrationsPage() {
                                 };
                                 input.click();
                               }}
-                              className="w-10 h-10 rounded-md flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-950 transition-colors"
+                              className="w-10 h-10 rounded-md flex items-center justify-center border-2 border-dashed border-border hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-950 transition-colors"
                               title="Upload photo"
                             >
-                              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                               </svg>
                             </button>
@@ -931,7 +931,7 @@ export default function AdminRegistrationsPage() {
                               </span>
                             )}
                             {reg.first_nationals && (
-                              <span className="text-blue-600 dark:text-blue-400">
+                              <span className="text-primary">
                                 First Nationals
                               </span>
                             )}
@@ -980,7 +980,7 @@ export default function AdminRegistrationsPage() {
                             className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all mx-auto ${
                               reg.paid
                                 ? 'bg-green-500 border-green-600 hover:bg-green-600'
-                                : 'border-gray-300 hover:border-green-400 hover:bg-green-50 dark:border-gray-600 dark:hover:border-green-400 dark:hover:bg-green-950/20'
+                                : 'border-border hover:border-green-400 hover:bg-green-50 dark:hover:border-green-400 dark:hover:bg-green-950/20'
                             }`}
                           >
                             {reg.paid && (
@@ -993,7 +993,7 @@ export default function AdminRegistrationsPage() {
                         <td className="px-4 py-3 text-sm">
                           <span className={`font-semibold ${
                             calculateTotalOwed(reg.thursday_event, reg.friday_event, reg.saturday_event) > 0
-                              ? 'text-blue-600 dark:text-blue-400'
+                              ? 'text-primary'
                               : 'text-muted-foreground'
                           }`}>
                             ${calculateTotalOwed(reg.thursday_event, reg.friday_event, reg.saturday_event).toFixed(2)}
@@ -1087,7 +1087,7 @@ export default function AdminRegistrationsPage() {
                           value={emailContent}
                           onChange={(e) => setEmailContent(e.target.value)}
                           placeholder="You can use {firstName}, {lastName}, or {fullName} for personalization"
-                          className="mt-1 flex min-h-[300px] w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus-visible:outline-none focus-visible:border-foreground"
+                          className="mt-1 flex min-h-[300px] w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm focus-visible:outline-none focus-visible:border-foreground"
                         />
                         <p className="text-sm text-muted-foreground mt-1">
                           You can use basic HTML tags for formatting. Variables: {"{firstName}"}, {"{lastName}"}, {"{fullName}"}
@@ -1163,7 +1163,7 @@ export default function AdminRegistrationsPage() {
                     onClick={handleCreateTournament}
                     disabled={!tournamentName.trim() || creating}
                     variant="outline"
-                    className="flex-1 border-2 border-blue-500 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-950"
+                    className="flex-1 border-2 border-primary text-primary hover:bg-primary/10"
                   >
                     {creating ? "Creating..." : "Create Tournament"}
                   </Button>
@@ -1256,7 +1256,7 @@ export default function AdminRegistrationsPage() {
                         id="edit-thursday"
                         value={editingRegistration.thursday_event}
                         onChange={(e) => setEditingRegistration({...editingRegistration, thursday_event: e.target.value})}
-                        className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                        className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
                       >
                         <option value="booster_draft">Booster Draft</option>
                         <option value="type2_2player">Type 2 (2-Player)</option>
@@ -1270,7 +1270,7 @@ export default function AdminRegistrationsPage() {
                         id="edit-friday"
                         value={editingRegistration.friday_event}
                         onChange={(e) => setEditingRegistration({...editingRegistration, friday_event: e.target.value})}
-                        className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                        className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
                       >
                         <option value="type1_2player">Type 1 (2-Player)</option>
                         <option value="typeA_2player">Type A (2-Player)</option>
@@ -1284,7 +1284,7 @@ export default function AdminRegistrationsPage() {
                         id="edit-saturday"
                         value={editingRegistration.saturday_event}
                         onChange={(e) => setEditingRegistration({...editingRegistration, saturday_event: e.target.value})}
-                        className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                        className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
                       >
                         <option value="teams">Teams</option>
                         <option value="sealed_deck">Sealed Deck</option>
@@ -1300,7 +1300,7 @@ export default function AdminRegistrationsPage() {
                     <div className="flex items-center space-x-3">
                       <button
                         onClick={() => setEditingRegistration({...editingRegistration, fantasy_draft_opt_in: !editingRegistration.fantasy_draft_opt_in})}
-                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.fantasy_draft_opt_in ? 'bg-green-500 border-green-600' : 'border-gray-300 dark:border-gray-600'}`}
+                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.fantasy_draft_opt_in ? 'bg-green-500 border-green-600' : 'border-border'}`}
                       >
                         {editingRegistration.fantasy_draft_opt_in && (
                           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1316,7 +1316,7 @@ export default function AdminRegistrationsPage() {
                     <div className="flex items-center space-x-3">
                       <button
                         onClick={() => setEditingRegistration({...editingRegistration, first_nationals: !editingRegistration.first_nationals})}
-                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.first_nationals ? 'bg-green-500 border-green-600' : 'border-gray-300 dark:border-gray-600'}`}
+                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.first_nationals ? 'bg-green-500 border-green-600' : 'border-border'}`}
                       >
                         {editingRegistration.first_nationals && (
                           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1332,7 +1332,7 @@ export default function AdminRegistrationsPage() {
                     <div className="flex items-center space-x-3">
                       <button
                         onClick={() => setEditingRegistration({...editingRegistration, needs_airport_transportation: !editingRegistration.needs_airport_transportation})}
-                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.needs_airport_transportation ? 'bg-green-500 border-green-600' : 'border-gray-300 dark:border-gray-600'}`}
+                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.needs_airport_transportation ? 'bg-green-500 border-green-600' : 'border-border'}`}
                       >
                         {editingRegistration.needs_airport_transportation && (
                           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1348,7 +1348,7 @@ export default function AdminRegistrationsPage() {
                     <div className="flex items-center space-x-3">
                       <button
                         onClick={() => setEditingRegistration({...editingRegistration, needs_hotel_transportation: !editingRegistration.needs_hotel_transportation})}
-                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.needs_hotel_transportation ? 'bg-green-500 border-green-600' : 'border-gray-300 dark:border-gray-600'}`}
+                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.needs_hotel_transportation ? 'bg-green-500 border-green-600' : 'border-border'}`}
                       >
                         {editingRegistration.needs_hotel_transportation && (
                           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1364,7 +1364,7 @@ export default function AdminRegistrationsPage() {
                     <div className="flex items-center space-x-3">
                       <button
                         onClick={() => setEditingRegistration({...editingRegistration, iron_man_interest: !editingRegistration.iron_man_interest})}
-                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.iron_man_interest ? 'bg-green-500 border-green-600' : 'border-gray-300 dark:border-gray-600'}`}
+                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.iron_man_interest ? 'bg-green-500 border-green-600' : 'border-border'}`}
                       >
                         {editingRegistration.iron_man_interest && (
                           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1387,7 +1387,7 @@ export default function AdminRegistrationsPage() {
                             overnight_stay_nights: newStayingOvernight ? editingRegistration.overnight_stay_nights : []
                           });
                         }}
-                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.staying_overnight ? 'bg-green-500 border-green-600' : 'border-gray-300 dark:border-gray-600'}`}
+                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.staying_overnight ? 'bg-green-500 border-green-600' : 'border-border'}`}
                       >
                         {editingRegistration.staying_overnight && (
                           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1425,8 +1425,8 @@ export default function AdminRegistrationsPage() {
                               }}
                               className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${
                                 (editingRegistration.overnight_stay_nights || []).includes(night.value) 
-                                  ? 'bg-blue-500 border-blue-600' 
-                                  : 'border-gray-300 dark:border-gray-500'
+                                  ? 'bg-blue-500 border-blue-600'
+                                  : 'border-border'
                               }`}
                             >
                               {(editingRegistration.overnight_stay_nights || []).includes(night.value) && (
@@ -1452,7 +1452,7 @@ export default function AdminRegistrationsPage() {
                     <div className="flex items-center space-x-3">
                       <button
                         onClick={() => setEditingRegistration({...editingRegistration, paid: !editingRegistration.paid})}
-                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.paid ? 'bg-green-500 border-green-600' : 'border-gray-300 dark:border-gray-600'}`}
+                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.paid ? 'bg-green-500 border-green-600' : 'border-border'}`}
                       >
                         {editingRegistration.paid && (
                           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1672,7 +1672,7 @@ export default function AdminRegistrationsPage() {
                       }
                     }}
                     variant="outline"
-                    className="flex-1 border-blue-500 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400"
+                    className="flex-1 border-primary text-primary hover:bg-primary/10"
                   >
                     Replace
                   </Button>

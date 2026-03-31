@@ -21,17 +21,17 @@ export function MobileBottomNav({
   isAuthenticated = false,
 }: MobileBottomNavProps) {
   return (
-    <nav className="md:hidden fixed bottom-0 inset-x-0 z-[70] bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex items-center justify-around h-14 pb-[env(safe-area-inset-bottom)]">
+    <nav className="md:hidden fixed bottom-0 inset-x-0 z-[70] bg-card border-t border-border flex items-center justify-around h-14 pb-[env(safe-area-inset-bottom)]">
       {isAuthenticated && onSaveDeck && deckCardCount > 0 && (
         <button
           onClick={onSaveDeck}
           disabled={isSaving || !hasUnsavedChanges}
           className={`relative flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg transition-colors ${
             isSaving
-              ? "text-gray-400 dark:text-gray-500"
+              ? "text-muted-foreground"
               : hasUnsavedChanges
                 ? "text-green-600 dark:text-green-400"
-                : "text-gray-400 dark:text-gray-500"
+                : "text-muted-foreground"
           }`}
         >
           {isSaving ? (
@@ -57,8 +57,8 @@ export function MobileBottomNav({
         onClick={() => { if (isDeckOpen) onToggleDeck(); }}
         className={`flex flex-col items-center gap-0.5 px-6 py-1.5 rounded-lg transition-colors ${
           !isDeckOpen
-            ? "text-blue-600 dark:text-blue-400"
-            : "text-gray-500 dark:text-gray-400"
+            ? "text-primary"
+            : "text-muted-foreground"
         }`}
       >
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -71,8 +71,8 @@ export function MobileBottomNav({
         onClick={onToggleDeck}
         className={`relative flex flex-col items-center gap-0.5 px-6 py-1.5 rounded-lg transition-colors ${
           isDeckOpen
-            ? "text-purple-600 dark:text-purple-400"
-            : "text-gray-500 dark:text-gray-400"
+            ? "text-accent"
+            : "text-muted-foreground"
         }`}
       >
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

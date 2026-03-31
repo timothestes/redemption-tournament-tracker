@@ -195,7 +195,7 @@ export default function DeckCardList({
                         setOpenMenuCard(null);
                         onMoveCard(card.name, card.set, isReserve, !isReserve);
                       }}
-                      className="w-10 h-10 hover:scale-110 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 flex items-center justify-center text-gray-700 dark:text-gray-200 transition-all"
+                      className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-gray-700 dark:text-gray-200 transition-all"
                       title={isReserve ? "Move to main deck" : "Move to reserve"}
                     >
                       {isReserve ? (
@@ -218,7 +218,7 @@ export default function DeckCardList({
                         onViewCard(card);
                         setOpenMenuCard(null);
                       }}
-                      className="w-10 h-10 hover:scale-110 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 flex items-center justify-center text-gray-700 dark:text-gray-200 transition-all"
+                      className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-gray-700 dark:text-gray-200 transition-all"
                       title="View card details"
                     >
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -234,7 +234,7 @@ export default function DeckCardList({
                       setOpenMenuCard(null);
                       onRemove(card.name, card.set, isReserve);
                     }}
-                    className="w-10 h-10 hover:scale-110 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 flex items-center justify-center text-red-600 dark:text-red-400 transition-all"
+                    className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-red-600 dark:text-red-400 transition-all"
                     title="Remove all copies"
                   >
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -419,7 +419,7 @@ export default function DeckCardList({
         return (
           <div
             key={cardKey}
-            className="flex items-center gap-2 p-2 rounded bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
+            className="flex items-center gap-2 p-2 rounded bg-muted hover:bg-muted/80 transition-colors group"
           >
             {/* Type Icon */}
             {showTypeIcons && (
@@ -715,7 +715,7 @@ export default function DeckCardList({
               {onViewCard && (
                 <button
                   onClick={() => onViewCard(card)}
-                  className="w-6 h-6 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-600 hover:bg-green-600 dark:hover:bg-green-700 text-gray-700 dark:text-gray-200 hover:text-white transition-colors"
+                  className="w-6 h-6 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-600 hover:bg-primary text-gray-700 dark:text-gray-200 hover:text-primary-foreground transition-colors"
                   aria-label="View card details"
                   title="View card details"
                 >

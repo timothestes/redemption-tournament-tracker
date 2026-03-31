@@ -446,7 +446,7 @@ function RulingsPageContent() {
   return (
     <>
       <TopNav />
-      <div className="max-w-3xl mx-auto px-4 py-6">
+      <div className="max-w-3xl mx-auto px-4 py-6 jayden-gradient-bg">
         <div className="mb-6">
           <h1 className="text-2xl font-bold mb-1">Card Rulings</h1>
           <p className="text-sm text-muted-foreground">

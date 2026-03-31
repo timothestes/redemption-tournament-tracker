@@ -34,7 +34,7 @@ const ThemeSwitcher = () => {
         <Button 
           variant="outline" 
           size={"sm"} 
-          className="bg-white border border-gray-300 shadow-sm rounded-full h-8 w-8 p-0 flex items-center justify-center dark:bg-zinc-800 dark:border-zinc-700 [.jayden_&]:bg-zinc-800 [.jayden_&]:border-pink-500/30"
+          className="bg-white border border-gray-300 shadow-sm rounded-full h-8 w-8 p-0 flex items-center justify-center dark:bg-zinc-800 dark:border-zinc-700 [.jayden_&]:bg-zinc-800 [.jayden_&]:border-primary/30"
         >
           {theme === "light" ? (
             <Sun
@@ -53,15 +53,15 @@ const ThemeSwitcher = () => {
               key="jayden"
               src="/jayden-icon.png"
               alt="Jayden"
-              width={ICON_SIZE}
-              height={ICON_SIZE}
+              width={22}
+              height={22}
               className="rounded-full"
             />
           ) : (
             <Laptop
               key="system"
               size={ICON_SIZE}
-              className={"text-gray-600 dark:text-gray-300"}
+              className={"text-muted-foreground"}
             />
           )}
         </Button>
@@ -80,7 +80,7 @@ const ThemeSwitcher = () => {
             <span>Dark</span>
           </DropdownMenuRadioItem>
           <DropdownMenuRadioItem className="flex gap-2" value="jayden">
-            <Image src="/jayden-icon.png" alt="" width={ICON_SIZE} height={ICON_SIZE} className="rounded-full" />{" "}
+            <Image src="/jayden-icon.png" alt="" width={20} height={20} className="rounded-full" />{" "}
             <span>Jayden</span>
           </DropdownMenuRadioItem>
           <DropdownMenuRadioItem className="flex gap-2" value="system">

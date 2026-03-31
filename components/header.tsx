@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { useTheme } from "next-themes";
 import { hasEnvVars } from "../utils/supabase/check-env-vars";
 import { EnvVarWarning } from "./env-var-warning";
 import Link from "next/link";
@@ -7,13 +9,24 @@ import { Button } from "./ui/button";
 
 
 export default function Header() {
+  const { theme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const currentTheme = mounted ? (theme === 'system' ? resolvedTheme : theme) : 'light';
+  const logoSrc = currentTheme === 'light'
+    ? '/lightmode_redemptionccgapp.webp'
+    : '/darkmode_redemptionccgapp.webp';
+
   return (
     <nav className="w-full flex justify-center border-b border-b-foreground/10 h-17">
       <div className="w-full max-w-1xl flex justify-between items-center p-3 px-5 text-sm">
         <div className="flex gap-5 items-center font-semibold">
           <Link href="/decklist/community">
-            <img src="/lightmode_redemptionccgapp.webp" className="w-48 block dark:hidden" alt="RedemptionCCG App Logo" />
-            <img src="/darkmode_redemptionccgapp.webp" className="w-48 hidden dark:block" alt="RedemptionCCG App Logo" />
+            <img src={logoSrc} className="w-48" alt="RedemptionCCG App Logo" />
           </Link>
         </div>
         <div className="flex items-center gap-3">

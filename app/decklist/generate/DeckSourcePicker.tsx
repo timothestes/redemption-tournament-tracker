@@ -165,7 +165,7 @@ export default function DeckSourcePicker({
           Decklist <span className="text-red-500">*</span>
         </label>
         {loadedDeckName && mode === "paste" && (
-          <span className="inline-flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
+          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
@@ -177,7 +177,7 @@ export default function DeckSourcePicker({
                   onClearLoaded();
                   onChange("");
                 }}
-                className="ml-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                className="ml-0.5 text-muted-foreground hover:text-foreground"
               >
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -196,8 +196,8 @@ export default function DeckSourcePicker({
             onClick={() => setMode("paste")}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border transition-colors ${
               mode === "paste"
-                ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-gray-900 dark:border-white"
-                : "bg-transparent text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800"
+                ? "bg-foreground text-background border-foreground"
+                : "bg-transparent text-muted-foreground border-border hover:bg-muted"
             }`}
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -210,8 +210,8 @@ export default function DeckSourcePicker({
             onClick={handleSwitchToDecks}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border transition-colors ${
               mode === "decks"
-                ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-gray-900 dark:border-white"
-                : "bg-transparent text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800"
+                ? "bg-foreground text-background border-foreground"
+                : "bg-transparent text-muted-foreground border-border hover:bg-muted"
             }`}
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -219,7 +219,7 @@ export default function DeckSourcePicker({
             </svg>
             My saved decks
             {deckCount !== null && deckCount > 0 && (
-              <span className="text-[11px] bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-1.5 py-0.5 rounded-full leading-none font-semibold">
+              <span className="text-[11px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full leading-none font-semibold">
                 {deckCount}
               </span>
             )}
@@ -231,7 +231,7 @@ export default function DeckSourcePicker({
       {mode === "paste" && (
         <div>
           {!showDeckOption && (
-            <p className="text-xs text-gray-500 mb-2">
+            <p className="text-xs text-muted-foreground mb-2">
               Paste from{" "}
               <a
                 href="https://landofredemption.com/installing-lackey-with-redemption-plugin/"
@@ -258,11 +258,11 @@ export default function DeckSourcePicker({
 
       {/* Decks mode: inline deck picker */}
       {mode === "decks" && (
-        <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-900">
+        <div className="border border-border rounded-lg overflow-hidden bg-background">
           {/* Search */}
-          <div className="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700">
+          <div className="px-4 py-2.5 border-b border-border">
             <div className="flex items-center gap-2">
-              <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 text-muted-foreground flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <input
@@ -271,7 +271,7 @@ export default function DeckSourcePicker({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 autoFocus
-                className="w-full text-sm bg-transparent border-none outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 text-gray-900 dark:text-white"
+                className="w-full text-sm bg-transparent border-none outline-none placeholder:text-muted-foreground text-foreground"
               />
             </div>
           </div>
@@ -279,7 +279,7 @@ export default function DeckSourcePicker({
           {/* Deck list */}
           <div className="max-h-[17rem] overflow-y-auto">
             {loading ? (
-              <div className="flex items-center justify-center py-10 text-sm text-gray-500">
+              <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
                 <svg className="animate-spin mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
@@ -290,11 +290,11 @@ export default function DeckSourcePicker({
               <div className="py-10 text-center text-sm text-red-500">{error}</div>
             ) : filteredDecks.length === 0 ? (
               <div className="py-10 text-center">
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   {searchQuery ? "No decks match your search" : "No saved decks yet"}
                 </p>
                 {!searchQuery && (
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Build a deck in the{" "}
                     <a href="/decklist/card-search" className="text-blue-500 hover:underline">
                       deck builder
@@ -313,19 +313,19 @@ export default function DeckSourcePicker({
                       type="button"
                       onClick={() => handleSelectDeck(deck)}
                       disabled={!!loadingDeckId}
-                      className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-b border-gray-100 dark:border-gray-800 last:border-b-0 disabled:opacity-50"
+                      className="w-full text-left px-4 py-3 hover:bg-muted transition-colors border-b border-border last:border-b-0 disabled:opacity-50"
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                            <span className="text-sm font-medium text-foreground truncate">
                               {deck.name}
                             </span>
                             <span className={getDeckTypeBadgeClasses(deck.format)}>
                               {formatDeckType(deck.format)}
                             </span>
                           </div>
-                          <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                          <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
                             <span>{deck.card_count || 0} cards</span>
                             {deck.updated_at && (
                               <span>
@@ -335,12 +335,12 @@ export default function DeckSourcePicker({
                           </div>
                         </div>
                         {isLoadingThis ? (
-                          <svg className="animate-spin h-4 w-4 text-gray-400 flex-shrink-0" viewBox="0 0 24 24" fill="none">
+                          <svg className="animate-spin h-4 w-4 text-muted-foreground flex-shrink-0" viewBox="0 0 24 24" fill="none">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                           </svg>
                         ) : (
-                          <svg className="w-4 h-4 text-gray-300 dark:text-gray-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <svg className="w-4 h-4 text-muted-foreground flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                           </svg>
                         )}

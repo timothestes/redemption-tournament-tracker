@@ -34,7 +34,7 @@ export function MobileDrawer({ isOpen, onClose, children, title }: MobileDrawerP
           />
           {/* Drawer - sits above backdrop but leaves room for bottom nav */}
           <motion.div
-            className="md:hidden fixed inset-x-0 z-40 bg-white dark:bg-gray-900 rounded-t-2xl shadow-2xl flex flex-col"
+            className="md:hidden fixed inset-x-0 z-40 bg-background rounded-t-2xl shadow-2xl flex flex-col"
             style={{ bottom: "3.5rem", height: "calc(100dvh - 7rem)" }}
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
@@ -52,7 +52,7 @@ export function MobileDrawer({ isOpen, onClose, children, title }: MobileDrawerP
               <div className="w-10 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600" />
             </div>
             {title && (
-              <div className="px-4 pb-2 text-lg font-semibold text-gray-900 dark:text-white">
+              <div className="px-4 pb-2 text-lg font-semibold text-foreground">
                 {title}
               </div>
             )}

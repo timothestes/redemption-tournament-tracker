@@ -219,18 +219,18 @@ export default function GenerateDeckList() {
     <div className="flex-1 w-full flex flex-col gap-6 max-w-4xl mx-auto p-4">
       <div className="w-full">
         <h2 className="text-3xl font-bold mb-2">Decklist Generator</h2>
-        <p className="text-gray-600 dark:text-gray-400 mb-6">
+        <p className="text-muted-foreground mb-6">
           Generate a formatted PDF for tournament play or create a visual screenshot of your deck
         </p>
 
         {/* Tab Navigation */}
-        <div className="flex space-x-1 rounded-lg bg-gray-100 dark:bg-gray-800 p-1 mb-6">
+        <div className="flex space-x-1 rounded-lg bg-muted p-1 mb-6">
           <button
             onClick={() => setActiveTab('pdf')}
             className={`flex-1 rounded-md py-2 px-4 text-sm font-medium transition-colors ${
               activeTab === 'pdf'
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                ? 'bg-card text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             📄 Tournament PDF
@@ -239,8 +239,8 @@ export default function GenerateDeckList() {
             onClick={() => setActiveTab('screenshot')}
             className={`flex-1 rounded-md py-2 px-4 text-sm font-medium transition-colors ${
               activeTab === 'screenshot'
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                ? 'bg-card text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             📸 Visual Screenshot
@@ -249,14 +249,14 @@ export default function GenerateDeckList() {
 
         {/* Content based on active tab */}
         {activeTab === 'pdf' ? (
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <div className="bg-card rounded-lg border border-border p-6">
             <div className="flex items-center gap-2 mb-4">
               <h3 className="text-xl font-semibold">Generate Tournament PDF</h3>
               <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full">
                 Official Format
               </span>
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+            <p className="text-sm text-muted-foreground mb-6">
               Creates a properly formatted PDF suitable for tournament deck checks with player information and card alignments.
             </p>
 
@@ -271,7 +271,7 @@ export default function GenerateDeckList() {
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full p-3 border rounded-lg bg-background focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full p-3 border rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
                     placeholder="Enter your name"
                     maxLength={50}
                   />
@@ -285,7 +285,7 @@ export default function GenerateDeckList() {
                     type="text"
                     value={event}
                     onChange={(e) => setEvent(e.target.value)}
-                    className="w-full p-3 border rounded-lg bg-background focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full p-3 border rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
                     placeholder="Tournament or event name"
                     maxLength={100}
                   />
@@ -301,7 +301,7 @@ export default function GenerateDeckList() {
                   <select
                     value={deckType}
                     onChange={(e) => setDeckType(e.target.value)}
-                    className="w-full p-3 border rounded-lg bg-background focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full p-3 border rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
                   >
                     <option value="type_1">Type 1</option>
                     <option value="type_2">Type 2</option>
@@ -313,15 +313,15 @@ export default function GenerateDeckList() {
                   <label className="block text-sm font-medium mb-2">Options</label>
                   <div className="flex flex-wrap gap-x-5 gap-y-2">
                     <label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
-                      <input type="checkbox" checked={showAlignment} onChange={(e) => setShowAlignment(e.target.checked)} className="rounded border-gray-300 dark:border-gray-600 text-blue-600 bg-transparent" />
+                      <input type="checkbox" checked={showAlignment} onChange={(e) => setShowAlignment(e.target.checked)} className="rounded border-border text-primary bg-transparent" />
                       Show card alignments
                     </label>
                     <label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none" title="Average number of unique brigades when randomly drawing 8 non-lost soul cards from a deck">
-                      <input type="checkbox" checked={mCount} onChange={(e) => setMCount(e.target.checked)} className="rounded border-gray-300 dark:border-gray-600 text-blue-600 bg-transparent" />
+                      <input type="checkbox" checked={mCount} onChange={(e) => setMCount(e.target.checked)} className="rounded border-border text-primary bg-transparent" />
                       Matthew count
                     </label>
                     <label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none" title="Average number of Daniel cards in the top 9 cards of a randomly shuffled deck">
-                      <input type="checkbox" checked={aodCount} onChange={(e) => setAodCount(e.target.checked)} className="rounded border-gray-300 dark:border-gray-600 text-blue-600 bg-transparent" />
+                      <input type="checkbox" checked={aodCount} onChange={(e) => setAodCount(e.target.checked)} className="rounded border-border text-primary bg-transparent" />
                       AoD count
                     </label>
                   </div>
@@ -338,7 +338,7 @@ export default function GenerateDeckList() {
                 onDeckSelected={handleDeckSelected}
                 loadedDeckName={loadedDeckName}
                 onClearLoaded={() => setLoadedDeckName(null)}
-                textareaClassName="focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                textareaClassName="focus:ring-2 focus:ring-ring focus:border-transparent"
               />
 
               <Button
@@ -364,14 +364,14 @@ export default function GenerateDeckList() {
             </form>
           </div>
         ) : (
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <div className="bg-card rounded-lg border border-border p-6">
             <div className="flex items-center gap-2 mb-4">
               <h3 className="text-xl font-semibold">Generate Visual Screenshot</h3>
               <span className="text-xs bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 px-2 py-1 rounded-full">
                 Visual Format
               </span>
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+            <p className="text-sm text-muted-foreground mb-6">
               Creates a visual screenshot of your deck list. No player information required - just your decklist!
             </p>
 
@@ -415,11 +415,11 @@ export default function GenerateDeckList() {
                   <label className="block text-sm font-medium mb-2">Options</label>
                   <div className="flex flex-wrap gap-x-5 gap-y-2">
                     <label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none" title="Average number of unique brigades when randomly drawing 8 non-lost soul cards from a deck">
-                      <input type="checkbox" checked={mCount} onChange={(e) => setMCount(e.target.checked)} className="rounded border-gray-300 dark:border-gray-600 text-purple-600 bg-transparent" />
+                      <input type="checkbox" checked={mCount} onChange={(e) => setMCount(e.target.checked)} className="rounded border-border text-primary bg-transparent" />
                       Matthew count
                     </label>
                     <label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none" title="Average number of Daniel cards in the top 9 cards of a randomly shuffled deck">
-                      <input type="checkbox" checked={aodCount} onChange={(e) => setAodCount(e.target.checked)} className="rounded border-gray-300 dark:border-gray-600 text-purple-600 bg-transparent" />
+                      <input type="checkbox" checked={aodCount} onChange={(e) => setAodCount(e.target.checked)} className="rounded border-border text-primary bg-transparent" />
                       AoD count
                     </label>
                   </div>

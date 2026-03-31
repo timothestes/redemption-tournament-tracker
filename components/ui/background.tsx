@@ -60,13 +60,16 @@ const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
         />
 
         {/* Overlay for readability */}
-        <div className={`absolute inset-0 ${isLightTheme ? 'bg-white/50 mix-blend-overlay' : isJaydenTheme ? 'bg-[hsl(270,30%,5%)]/70' : 'bg-black/40'}`}></div>
+        <div
+          className={`absolute inset-0 ${isLightTheme ? 'bg-white/50 mix-blend-overlay' : !isJaydenTheme ? 'bg-black/40' : ''}`}
+          style={isJaydenTheme ? { background: 'linear-gradient(135deg, hsla(0, 60%, 15%, 0.7) 0%, hsla(270, 40%, 10%, 0.7) 50%, hsla(230, 50%, 12%, 0.7) 100%)' } : undefined}
+        ></div>
 
         {/* Bottom vignette */}
-        <div className={`absolute inset-0 bg-gradient-to-t ${isJaydenTheme ? 'from-[hsl(270,30%,3%)]/60' : 'from-gray-300/10 dark:from-black/40'} via-transparent to-transparent`}></div>
+        <div className={`absolute inset-0 bg-gradient-to-t ${isJaydenTheme ? 'from-[hsl(230,40%,5%)]/60' : 'from-gray-300/10 dark:from-black/40'} via-transparent to-transparent`}></div>
 
         {/* Bottom gradient */}
-        <div className={`absolute inset-x-0 bottom-0 h-3/4 bg-gradient-to-t ${isJaydenTheme ? 'from-[hsl(270,30%,3%)]/50' : 'from-gray-200/10 dark:from-black/30'} via-transparent to-transparent`}></div>
+        <div className={`absolute inset-x-0 bottom-0 h-3/4 bg-gradient-to-t ${isJaydenTheme ? 'from-[hsl(230,40%,5%)]/50' : 'from-gray-200/10 dark:from-black/30'} via-transparent to-transparent`}></div>
 
         {/* Custom gradient */}
         <div style={{

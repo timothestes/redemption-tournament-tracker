@@ -132,7 +132,17 @@ Update `components/ui/background.tsx` jayden overlays:
 
 ---
 
-## 5. Execution Strategy
+## 5. Theme Switcher — Jayden Icon Fix
+
+The jayden icon in the theme switcher button renders at 16x16px (same as the lucide icons), but because it's a raster PNG with detail, it looks tiny and hard to read inside the 32x32 button.
+
+**Fix:** Increase the jayden icon to 22x22px in both the trigger button and the dropdown item. The `rounded-full` and `object-cover` classes keep it clean. Also update the trigger button border to use `border-primary/30` instead of hardcoded `border-pink-500/30`.
+
+**File:** `components/theme-switcher.tsx`
+
+---
+
+## 6. Execution Strategy
 
 Five parallel agents, each handling one batch. Each receives:
 - The token mapping table (Section 2)

@@ -386,8 +386,8 @@ export default function MyDecksClient() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-gray-100 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading your decks...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-foreground mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading your decks...</p>
         </div>
       </div>
     );
@@ -397,6 +397,7 @@ export default function MyDecksClient() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
+
           <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
           <button
             onClick={loadData}
@@ -410,7 +411,7 @@ export default function MyDecksClient() {
   }
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-3 md:px-4 py-4 md:py-8 overflow-x-hidden">
+    <div className="w-full max-w-7xl mx-auto px-3 md:px-4 py-4 md:py-8 overflow-x-hidden jayden-gradient-bg">
 
       {/* Mobile folder strip (hidden on lg+) */}
       <div className="lg:hidden mb-4">
@@ -419,15 +420,15 @@ export default function MyDecksClient() {
             onClick={() => setSelectedFolder(null)}
             className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
               selectedFolder === null
-                ? "bg-blue-600 text-white"
-                : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-foreground hover:bg-muted/80"
             }`}
           >
             <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
             My Decks
-            <span className={`text-xs ${selectedFolder === null ? "opacity-75" : "text-gray-400 dark:text-gray-500"}`}>
+            <span className={`text-xs ${selectedFolder === null ? "opacity-75" : "text-muted-foreground"}`}>
               {decks.filter(d => !d.folder_id).length}
             </span>
           </button>
@@ -437,22 +438,22 @@ export default function MyDecksClient() {
               onClick={() => setSelectedFolder(folder.id!)}
               className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                 selectedFolder === folder.id
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-foreground hover:bg-muted/80"
               }`}
             >
               <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
               </svg>
               {folder.name}
-              <span className={`text-xs ${selectedFolder === folder.id ? "opacity-75" : "text-gray-400 dark:text-gray-500"}`}>
+              <span className={`text-xs ${selectedFolder === folder.id ? "opacity-75" : "text-muted-foreground"}`}>
                 {decks.filter(d => d.folder_id === folder.id).length}
               </span>
             </button>
           ))}
           <button
             onClick={() => setFolderModal({ mode: "create" })}
-            className="flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border border-dashed border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            className="flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border border-dashed border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground transition-colors"
           >
             + Folder
           </button>
@@ -462,12 +463,12 @@ export default function MyDecksClient() {
       <div className="flex gap-6">
         {/* Left Sidebar - Folders (hidden on mobile) */}
         <div className="hidden lg:block w-64 flex-shrink-0">
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <div className="bg-card rounded-lg border border-border p-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">Folders</h2>
               <button
                 onClick={() => setFolderModal({ mode: "create" })}
-                className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                className="p-1.5 hover:bg-muted rounded transition-colors"
                 title="Create new folder"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -481,15 +482,15 @@ export default function MyDecksClient() {
               onClick={() => setSelectedFolder(null)}
               className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition-colors flex items-center gap-2 cursor-pointer ${
                 selectedFolder === null
-                  ? "bg-blue-100 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100"
-                  : "hover:bg-gray-100 dark:hover:bg-gray-700"
+                  ? "bg-primary/10 text-primary"
+                  : "hover:bg-muted"
               }`}
             >
               <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
               </svg>
               <span className="flex-1">My Decks</span>
-              <span className="text-sm text-gray-500">
+              <span className="text-sm text-muted-foreground">
                 {decks.filter(d => !d.folder_id).length}
               </span>
             </div>
@@ -510,7 +511,7 @@ export default function MyDecksClient() {
             </div>
 
             {folders.length === 0 && (
-              <p className="text-sm text-gray-500 dark:text-gray-400 text-center mt-4">
+              <p className="text-sm text-muted-foreground text-center mt-4">
                 No folders yet.
                 <br />
                 Create one to organize your decks!
@@ -525,14 +526,14 @@ export default function MyDecksClient() {
           <div className="flex items-center justify-between mb-4 md:mb-8 gap-2">
             <div className="min-w-0">
               <h1 className="text-2xl md:text-3xl font-bold mb-1 md:mb-2 truncate">{selectedFolderName}</h1>
-              <p className="text-sm md:text-base text-gray-600 dark:text-gray-400">
+              <p className="text-sm md:text-base text-muted-foreground">
                 {filteredDecks.length} {filteredDecks.length === 1 ? "deck" : "decks"}
                 {selectedTagIds.length > 0 && ` · ${selectedTagIds.length} tag${selectedTagIds.length > 1 ? "s" : ""} selected`}
               </p>
             </div>
             <button
               onClick={handleNewDeck}
-              className="flex-shrink-0 px-3 md:px-6 py-2 md:py-3 border-2 border-blue-500 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg text-sm md:text-base font-medium transition-colors"
+              className="flex-shrink-0 px-3 md:px-6 py-2 md:py-3 border-2 border-primary bg-primary/10 hover:bg-primary/20 text-primary rounded-lg text-sm md:text-base font-medium transition-colors"
             >
               + New
               <span className="hidden md:inline"> Deck</span>
@@ -541,7 +542,7 @@ export default function MyDecksClient() {
 
           {/* Search Bar */}
           <div className="relative mb-3" ref={searchScopeRef}>
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
@@ -549,13 +550,13 @@ export default function MyDecksClient() {
               placeholder={searchAllFolders ? "Search all folders..." : `Search ${selectedFolderName.toLowerCase()}...`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-28 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-9 pr-28 py-2 text-sm border border-border rounded-lg bg-card focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
             />
             <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery("")}
-                  className="p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  className="p-0.5 text-muted-foreground hover:text-foreground"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -564,7 +565,7 @@ export default function MyDecksClient() {
               )}
               <button
                 onClick={() => setSearchScopeOpen(prev => !prev)}
-                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-600"
+                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors border border-border bg-muted text-muted-foreground hover:bg-muted/80"
               >
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
@@ -576,11 +577,11 @@ export default function MyDecksClient() {
               </button>
             </div>
             {searchScopeOpen && (
-              <div className="absolute z-50 top-full mt-1 right-0 w-48 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl overflow-hidden">
+              <div className="absolute z-50 top-full mt-1 right-0 w-48 bg-background border border-border rounded-lg shadow-xl overflow-hidden">
                 <button
                   onClick={() => { setSearchAllFolders(true); setSearchScopeOpen(false); }}
                   className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-left transition-colors ${
-                    searchAllFolders ? "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100" : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
+                    searchAllFolders ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted"
                   }`}
                 >
                   <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -588,7 +589,7 @@ export default function MyDecksClient() {
                   </svg>
                   All folders
                   {searchAllFolders && (
-                    <svg className="w-4 h-4 ml-auto text-gray-700 dark:text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <svg className="w-4 h-4 ml-auto text-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
                   )}
@@ -596,7 +597,7 @@ export default function MyDecksClient() {
                 <button
                   onClick={() => { setSearchAllFolders(false); setSearchScopeOpen(false); }}
                   className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-left transition-colors ${
-                    !searchAllFolders ? "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100" : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
+                    !searchAllFolders ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted"
                   }`}
                 >
                   <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -604,7 +605,7 @@ export default function MyDecksClient() {
                   </svg>
                   Current folder only
                   {!searchAllFolders && (
-                    <svg className="w-4 h-4 ml-auto text-gray-700 dark:text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <svg className="w-4 h-4 ml-auto text-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
                   )}
@@ -616,11 +617,11 @@ export default function MyDecksClient() {
           {/* Controls */}
           <div className="flex items-center justify-between mb-3 gap-2 md:gap-4">
             <div className="flex items-center gap-1.5 md:gap-2 min-w-0 flex-1">
-              <label className="text-sm text-gray-600 dark:text-gray-400 hidden md:inline flex-shrink-0">Sort by:</label>
+              <label className="text-sm text-muted-foreground hidden md:inline flex-shrink-0">Sort by:</label>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
-                className="px-2 md:px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-xs md:text-sm min-w-0"
+                className="px-2 md:px-3 py-1.5 border border-border rounded-md bg-card text-xs md:text-sm min-w-0"
               >
                 <option value="updated">Last Modified</option>
                 <option value="created">Date Created</option>
@@ -634,8 +635,8 @@ export default function MyDecksClient() {
                     onClick={() => { setTagDropdownOpen((o) => !o); setTagFilterInput(""); }}
                     className={`flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 border rounded-lg text-xs md:text-sm transition-colors ${
                       selectedTagIds.length > 0
-                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
-                        : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-card text-foreground hover:bg-muted"
                     }`}
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -643,7 +644,7 @@ export default function MyDecksClient() {
                     </svg>
                     <span className="hidden sm:inline">Tags</span>
                     {selectedTagIds.length > 0 && (
-                      <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-blue-600 text-white">
+                      <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-primary text-primary-foreground">
                         {selectedTagIds.length}
                       </span>
                     )}
@@ -653,20 +654,20 @@ export default function MyDecksClient() {
                   </button>
 
                   {tagDropdownOpen && (
-                    <div className="fixed sm:absolute inset-x-3 sm:inset-x-auto z-50 top-auto sm:top-full mt-1.5 sm:left-0 w-auto sm:w-64 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl">
-                      <div className="px-3 pt-3 pb-2 border-b border-gray-100 dark:border-gray-800">
+                    <div className="fixed sm:absolute inset-x-3 sm:inset-x-auto z-50 top-auto sm:top-full mt-1.5 sm:left-0 w-auto sm:w-64 bg-background border border-border rounded-xl shadow-xl">
+                      <div className="px-3 pt-3 pb-2 border-b border-border">
                         <input
                           autoFocus
                           type="text"
                           placeholder="Filter tags…"
                           value={tagFilterInput}
                           onChange={(e) => setTagFilterInput(e.target.value)}
-                          className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-border bg-card focus:outline-none focus:ring-2 focus:ring-ring"
                         />
                       </div>
                       <div className="max-h-64 overflow-y-auto">
                         {globalTags.filter((t) => t.name.toLowerCase().includes(tagFilterInput.toLowerCase())).length === 0 ? (
-                          <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-4">No matches</p>
+                          <p className="text-xs text-muted-foreground text-center py-4">No matches</p>
                         ) : (
                           globalTags
                             .filter((t) => t.name.toLowerCase().includes(tagFilterInput.toLowerCase()))
@@ -676,27 +677,27 @@ export default function MyDecksClient() {
                                 <button
                                   key={tag.id}
                                   onClick={() => toggleTagFilter(tag.id)}
-                                  className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-muted transition-colors text-left"
                                 >
                                   <span className="w-4 flex-shrink-0 flex items-center justify-center">
                                     {active && (
-                                      <svg className="w-3.5 h-3.5 text-gray-700 dark:text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <svg className="w-3.5 h-3.5 text-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                                       </svg>
                                     )}
                                   </span>
                                   <span className="w-3 h-3 rounded-full flex-shrink-0 border border-black/10" style={{ backgroundColor: tag.color }} />
-                                  <span className="text-sm text-gray-800 dark:text-gray-200">{tag.name}</span>
+                                  <span className="text-sm text-foreground">{tag.name}</span>
                                 </button>
                               );
                             })
                         )}
                       </div>
                       {selectedTagIds.length > 0 && (
-                        <div className="border-t border-gray-100 dark:border-gray-800">
+                        <div className="border-t border-border">
                           <button
                             onClick={() => setSelectedTagIds([])}
-                            className="w-full px-3 py-2 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                            className="w-full px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors text-left"
                           >
                             Clear all tags
                           </button>
@@ -713,8 +714,8 @@ export default function MyDecksClient() {
                 onClick={() => setViewMode("grid")}
                 className={`p-1.5 md:p-2 rounded ${
                   viewMode === "grid"
-                    ? "bg-gray-200 dark:bg-gray-700"
-                    : "hover:bg-gray-100 dark:hover:bg-gray-800"
+                    ? "bg-muted"
+                    : "hover:bg-muted"
                 }`}
                 title="Grid view"
               >
@@ -726,8 +727,8 @@ export default function MyDecksClient() {
                 onClick={() => setViewMode("list")}
                 className={`p-1.5 md:p-2 rounded ${
                   viewMode === "list"
-                    ? "bg-gray-200 dark:bg-gray-700"
-                    : "hover:bg-gray-100 dark:hover:bg-gray-800"
+                    ? "bg-muted"
+                    : "hover:bg-muted"
                 }`}
                 title="List view"
               >
@@ -745,7 +746,7 @@ export default function MyDecksClient() {
           {/* Active tag pills banner */}
           {selectedTagIds.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 mb-4">
-              <span className="text-xs text-gray-500 dark:text-gray-400">Filtered by:</span>
+              <span className="text-xs text-muted-foreground">Filtered by:</span>
               {selectedTagIds.map((id) => {
                 const tag = globalTags.find((t) => t.id === id);
                 if (!tag) return null;
@@ -770,7 +771,7 @@ export default function MyDecksClient() {
           {filteredDecks.length === 0 ? (
             <div className="text-center py-16">
               <svg
-                className="mx-auto h-24 w-24 text-gray-400"
+                className="mx-auto h-24 w-24 text-muted-foreground"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -782,14 +783,14 @@ export default function MyDecksClient() {
                   d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
                 />
               </svg>
-              <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-gray-100">
+              <h3 className="mt-4 text-lg font-medium text-foreground">
                 {searchQuery.trim()
                   ? `No decks matching "${searchQuery.trim()}"${searchAllFolders ? " across all folders" : ""}`
                   : selectedTagIds.length > 0
                     ? "No decks match the selected tags"
                     : `No decks in ${selectedFolderName.toLowerCase()}`}
               </h3>
-              <p className="mt-2 text-gray-600 dark:text-gray-400">
+              <p className="mt-2 text-muted-foreground">
                 {searchQuery.trim()
                   ? "Try a different search term."
                   : selectedTagIds.length > 0
@@ -952,22 +953,22 @@ function FolderItem({
         onClick={onSelect}
         className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex items-center gap-2 cursor-pointer ${
           isSelected
-            ? "bg-blue-100 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100"
-            : "hover:bg-gray-100 dark:hover:bg-gray-700"
+            ? "bg-primary/10 text-primary"
+            : "hover:bg-muted"
         }`}
       >
         <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
         </svg>
         <span className="flex-1 truncate">{folder.name}</span>
-        <span className="text-sm text-gray-500">{deckCount}</span>
+        <span className="text-sm text-muted-foreground">{deckCount}</span>
         <button
           onClick={(e) => {
             e.stopPropagation();
             setShowMenu(!showMenu);
           }}
           aria-label="Folder menu"
-          className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+          className="p-1 hover:bg-muted rounded"
         >
           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
             <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
@@ -978,13 +979,13 @@ function FolderItem({
       {showMenu && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-          <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 z-20">
+          <div className="absolute right-0 mt-1 w-48 bg-card rounded-md shadow-lg border border-border z-20">
             <button
               onClick={() => {
                 onRename();
                 setShowMenu(false);
               }}
-              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 first:rounded-t-md"
+              className="w-full text-left px-4 py-2 hover:bg-muted first:rounded-t-md"
             >
               Rename
             </button>
@@ -1045,7 +1046,7 @@ function DeckCard({
   const updatedDate = formatDateTime(deck.updated_at!);
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow flex flex-col">
+    <div className="bg-card rounded-lg border border-border hover:shadow-lg transition-shadow flex flex-col jayden-gradient-bg">
       {/* Image Header */}
       {formatDeckType(deck.format) === "Paragon" && deck.paragon ? (
         <div className="h-32 overflow-hidden rounded-t-lg cursor-pointer" onClick={() => onEdit(deck.id!)}>
@@ -1058,7 +1059,7 @@ function DeckCard({
           />
         </div>
       ) : (getCardImageUrl(deck.preview_card_1) || getCardImageUrl(deck.preview_card_2)) ? (
-        <div className="relative h-32 overflow-hidden rounded-t-lg bg-gray-100 dark:bg-gray-900 flex items-center justify-center gap-1 px-2 py-2 cursor-pointer" onClick={() => onEdit(deck.id!)}>
+        <div className="relative h-32 overflow-hidden rounded-t-lg bg-muted flex items-center justify-center gap-1 px-2 py-2 cursor-pointer" onClick={() => onEdit(deck.id!)}>
           {getCardImageUrl(deck.preview_card_1) && <img src={getCardImageUrl(deck.preview_card_1)!} alt="" className="h-full object-contain rounded" />}
           {getCardImageUrl(deck.preview_card_2) && <img src={getCardImageUrl(deck.preview_card_2)!} alt="" className="h-full object-contain rounded" />}
           <button
@@ -1072,10 +1073,10 @@ function DeckCard({
           </button>
         </div>
       ) : formatDeckType(deck.format) !== "Paragon" ? (
-        <div className="h-12 rounded-t-lg bg-gray-50 dark:bg-gray-800/50 flex items-center justify-center">
+        <div className="h-12 rounded-t-lg bg-muted flex items-center justify-center">
           <button
             onClick={() => onEditCover(deck.id!)}
-            className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
             title="Set cover cards"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1093,7 +1094,7 @@ function DeckCard({
             <span className={`px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
               deck.is_public
                 ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300"
-                : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                : "bg-muted text-muted-foreground"
             }`}>
               {deck.is_public ? "Public" : "Private"}
             </span>
@@ -1120,7 +1121,7 @@ function DeckCard({
             <span className={getDeckTypeBadgeClasses(deck.format)}>
               {formatDeckType(deck.format)}
             </span>
-            <span className="text-gray-600 dark:text-gray-400">
+            <span className="text-muted-foreground">
               {deck.card_count || 0} cards
             </span>
             {deck.total_price != null && deck.total_price > 0 && (
@@ -1146,21 +1147,21 @@ function DeckCard({
               </span>
             ))
           ) : (
-            <span className="text-xs text-gray-400 dark:text-gray-500 italic">No tags yet...</span>
+            <span className="text-xs text-muted-foreground italic">No tags yet...</span>
           )}
         </div>
 
-        <div className="mt-auto pt-3 border-t border-gray-200 dark:border-gray-700">
-          <p className="text-xs text-gray-500 dark:text-gray-500">
+        <div className="mt-auto pt-3 border-t border-border">
+          <p className="text-xs text-muted-foreground">
             Updated {updatedDate}
           </p>
         </div>
       </div>
 
-      <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3 flex gap-2">
+      <div className="border-t border-border px-4 py-3 flex gap-2">
         <button
           onClick={() => onEdit(deck.id!)}
-          className="flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 font-medium transition-colors"
+          className="flex-1 px-4 py-2 bg-muted text-foreground rounded-md hover:bg-muted/80 font-medium transition-colors"
         >
           Open Deck
         </button>
@@ -1201,7 +1202,7 @@ function DeckListItem({
   const updatedDate = formatDateTime(deck.updated_at!);
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
+    <div className="bg-card rounded-lg border border-border hover:bg-muted transition-colors">
       <div className="flex items-center gap-2 md:gap-4 p-3 md:p-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 md:gap-3">
@@ -1212,12 +1213,12 @@ function DeckListItem({
             <span className={`px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
               deck.is_public
                 ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300"
-                : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                : "bg-muted text-muted-foreground"
             }`}>
               {deck.is_public ? "Public" : "Private"}
             </span>
           </div>
-          <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400 md:hidden">
+          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground md:hidden">
             <span>{deck.card_count || 0} cards</span>
             {deck.total_price != null && deck.total_price > 0 && (
               <span className="text-green-600 dark:text-green-400">${deck.total_price.toFixed(2)}</span>
@@ -1243,7 +1244,7 @@ function DeckListItem({
           )}
         </div>
 
-        <div className="hidden md:flex items-center gap-6 text-sm text-gray-600 dark:text-gray-400">
+        <div className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
           <span>{deck.card_count || 0} cards</span>
           {deck.total_price != null && deck.total_price > 0 && (
             <span className="text-green-600 dark:text-green-400">${deck.total_price.toFixed(2)}</span>
@@ -1370,7 +1371,7 @@ function DropdownMenu({
       <button
         ref={buttonRef}
         onClick={handleToggle}
-        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+        className="p-1 hover:bg-muted rounded"
       >
         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
           <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
@@ -1389,16 +1390,16 @@ function DropdownMenu({
           <div
             ref={menuRef}
             style={menuStyle}
-            className="w-52 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700"
+            className="w-52 bg-card rounded-md shadow-lg border border-border"
           >
             <button
               onClick={() => {
                 onEdit();
                 setIsOpen(false);
               }}
-              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 first:rounded-t-md flex items-center gap-2"
+              className="w-full text-left px-4 py-2 hover:bg-muted first:rounded-t-md flex items-center gap-2"
             >
-              <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
               Edit
@@ -1408,9 +1409,9 @@ function DropdownMenu({
                 onDuplicate();
                 setIsOpen(false);
               }}
-              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+              className="w-full text-left px-4 py-2 hover:bg-muted flex items-center gap-2"
             >
-              <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
               Duplicate
@@ -1420,9 +1421,9 @@ function DropdownMenu({
                 onGeneratePDF();
                 setIsOpen(false);
               }}
-              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+              className="w-full text-left px-4 py-2 hover:bg-muted flex items-center gap-2"
             >
-              <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
               </svg>
               Generate PDF
@@ -1432,9 +1433,9 @@ function DropdownMenu({
                 onGenerateImage();
                 setIsOpen(false);
               }}
-              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+              className="w-full text-left px-4 py-2 hover:bg-muted flex items-center gap-2"
             >
-              <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
               Generate Image
@@ -1444,33 +1445,33 @@ function DropdownMenu({
                 onDownload();
                 setIsOpen(false);
               }}
-              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+              className="w-full text-left px-4 py-2 hover:bg-muted flex items-center gap-2"
             >
-              <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
               Download .txt
             </button>
 
             {/* Sharing section */}
-            <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+            <div className="border-t border-border my-1"></div>
             <button
               onClick={() => {
                 onTogglePublic();
                 setIsOpen(false);
               }}
-              className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+              className="w-full text-left px-4 py-2 hover:bg-muted flex items-center gap-2"
             >
               {isPublic ? (
                 <>
-                  <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
                   Make Private
                 </>
               ) : (
                 <>
-                  <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   Make Public
@@ -1485,9 +1486,9 @@ function DropdownMenu({
                     setLinkCopied(true);
                     setTimeout(() => setLinkCopied(false), 2000);
                   }}
-                  className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                  className="w-full text-left px-4 py-2 hover:bg-muted flex items-center gap-2"
                 >
-                  <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                   </svg>
                   {linkCopied ? "Link Copied!" : "Copy Share Link"}
@@ -1497,9 +1498,9 @@ function DropdownMenu({
                     onViewPublic();
                     setIsOpen(false);
                   }}
-                  className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                  className="w-full text-left px-4 py-2 hover:bg-muted flex items-center gap-2"
                 >
-                  <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                   </svg>
@@ -1509,13 +1510,13 @@ function DropdownMenu({
             )}
 
             {/* Move to Folder submenu */}
-            <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+            <div className="border-t border-border my-1"></div>
             <div className="relative">
               <button
                 onClick={() => setShowMoveMenu(!showMoveMenu)}
-                className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                className="w-full text-left px-4 py-2 hover:bg-muted flex items-center gap-2"
               >
-                <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                 </svg>
                 <span className="flex-1">Move to...</span>
@@ -1525,15 +1526,15 @@ function DropdownMenu({
               </button>
 
               {showMoveMenu && (
-                <div className="absolute left-full top-0 ml-1 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 max-h-60 overflow-y-auto">
+                <div className="absolute left-full top-0 ml-1 w-48 bg-card rounded-md shadow-lg border border-border max-h-60 overflow-y-auto">
                   <button
                     onClick={() => {
                       onMove(null);
                       setIsOpen(false);
                       setShowMoveMenu(false);
                     }}
-                    className={`w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 first:rounded-t-md ${
-                      !currentFolderId ? "bg-blue-50 dark:bg-blue-900/20" : ""
+                    className={`w-full text-left px-4 py-2 hover:bg-muted first:rounded-t-md ${
+                      !currentFolderId ? "bg-primary/10" : ""
                     }`}
                   >
                     My Decks
@@ -1546,15 +1547,15 @@ function DropdownMenu({
                         setIsOpen(false);
                         setShowMoveMenu(false);
                       }}
-                      className={`w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 last:rounded-b-md ${
-                        currentFolderId === folder.id ? "bg-blue-50 dark:bg-blue-900/20" : ""
+                      className={`w-full text-left px-4 py-2 hover:bg-muted last:rounded-b-md ${
+                        currentFolderId === folder.id ? "bg-primary/10" : ""
                       }`}
                     >
                       {folder.name}
                     </button>
                   ))}
                   {folders.length === 0 && (
-                    <div className="px-4 py-2 text-sm text-gray-500">
+                    <div className="px-4 py-2 text-sm text-muted-foreground">
                       No folders available
                     </div>
                   )}
@@ -1562,7 +1563,7 @@ function DropdownMenu({
               )}
             </div>
 
-            <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+            <div className="border-t border-border my-1"></div>
             <button
               onClick={() => {
                 onDelete();
@@ -1643,11 +1644,11 @@ function CoverPickerModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/60" onClick={onClose}>
-      <div className="bg-white dark:bg-gray-900 rounded-t-xl sm:rounded-xl shadow-2xl w-full sm:max-w-2xl flex flex-col max-h-[95vh] sm:max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-background rounded-t-xl sm:rounded-xl shadow-2xl w-full sm:max-w-2xl flex flex-col max-h-[95vh] sm:max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+        <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-border flex-shrink-0">
           <h2 className="text-base sm:text-lg font-semibold">Cover Cards</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1">
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -1667,14 +1668,14 @@ function CoverPickerModal({
                   onClick={() => setActiveSlot(slot)}
                   className={`relative w-16 sm:w-24 aspect-[2.5/3.5] rounded-lg overflow-hidden border-2 transition-all ${
                     isActive
-                      ? "border-blue-500 ring-2 ring-blue-300 dark:ring-blue-700"
-                      : "border-gray-300 dark:border-gray-600 hover:border-gray-400"
-                  } bg-gray-100 dark:bg-gray-800`}
+                      ? "border-primary ring-2 ring-ring"
+                      : "border-border hover:border-foreground/50"
+                  } bg-muted`}
                 >
                   {imgUrl ? (
                     <img src={imgUrl} alt={`Cover ${slot}`} className="w-full h-full object-cover" />
                   ) : (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
                       <svg className="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
                       </svg>
@@ -1685,7 +1686,7 @@ function CoverPickerModal({
               );
             })}
           </div>
-          <p className="text-center text-xs text-gray-500 dark:text-gray-400">
+          <p className="text-center text-xs text-muted-foreground">
             {saving ? "Saving..." : `Click a card below to set cover card ${activeSlot}`}
           </p>
         </div>
@@ -1693,7 +1694,7 @@ function CoverPickerModal({
         {/* Search */}
         <div className="px-4 sm:px-6 pb-3 flex-shrink-0">
           <div className="relative">
-            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
@@ -1701,10 +1702,10 @@ function CoverPickerModal({
               placeholder="Search cards..."
               value={coverSearch}
               onChange={(e) => setCoverSearch(e.target.value)}
-              className="w-full pl-8 pr-8 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full pl-8 pr-8 py-1.5 text-sm border border-border rounded-lg bg-card focus:outline-none focus:ring-1 focus:ring-ring"
             />
             {coverSearch && (
-              <button onClick={() => setCoverSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <button onClick={() => setCoverSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -1716,17 +1717,17 @@ function CoverPickerModal({
         <div className="flex-1 overflow-y-auto px-4 sm:px-6 pb-4 min-h-0">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="w-6 h-6 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
+              <div className="w-6 h-6 border-2 border-border border-t-primary rounded-full animate-spin" />
             </div>
           ) : cards.length === 0 ? (
-            <p className="text-center text-sm text-gray-500 py-8">No cards in this deck yet.</p>
+            <p className="text-center text-sm text-muted-foreground py-8">No cards in this deck yet.</p>
           ) : (
             <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 gap-2">
               {sortedCards.map((card) => (
                 <button
                   key={`${card.card_name}|${card.card_set}`}
                   onClick={() => handleSelect(card.card_img_file || "")}
-                  className="relative rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600 hover:border-blue-500 hover:scale-105 transition-all"
+                  className="relative rounded-lg overflow-hidden border border-border hover:border-primary hover:scale-105 transition-all"
                   style={{ aspectRatio: "2.5/3.5" }}
                   title={card.card_name}
                 >
