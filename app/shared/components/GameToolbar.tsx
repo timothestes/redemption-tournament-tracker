@@ -8,6 +8,7 @@ import {
   PanelBottomOpen,
   Dices,
   SkipForward,
+  HandMetal,
 } from 'lucide-react';
 import type { GameActions } from '../types/gameActions';
 
@@ -40,6 +41,10 @@ export interface GameToolbarProps {
   onNewGame?: () => void;
   /** Called for end turn (multiplayer only). */
   onEndTurn?: () => void;
+  /** Called to request action priority (multiplayer, non-active player). */
+  onRequestPriority?: () => void;
+  /** Whether a priority request is currently pending. */
+  hasPendingPriority?: boolean;
   /** Game is finished — keep toolbar active for review but disable end turn. */
   isFinished?: boolean;
 }
@@ -61,6 +66,8 @@ export function GameToolbar({
   onUndo,
   onNewGame,
   onEndTurn,
+  onRequestPriority,
+  hasPendingPriority,
   isFinished,
 }: GameToolbarProps) {
   const isMultiplayer = mode === 'multiplayer';
@@ -127,15 +134,20 @@ export function GameToolbar({
       shortcut: '',
       hidden: isMultiplayer,
     },
-    // End Turn — multiplayer only, always disabled when finished
-    {
+    // End Turn (active player) or Request Priority (non-active player) — multiplayer only
+    ...(isMultiplayer && isMyTurn ? [{
       icon: SkipForward,
       label: 'End Turn',
       onClick: onEndTurn ?? (() => {}),
       shortcut: '',
-      hidden: !isMultiplayer,
-      disabled: disabled || !!isFinished,
-    },
+      disabled: !!isFinished,
+    }] : isMultiplayer && !isMyTurn && !isFinished ? [{
+      icon: HandMetal,
+      label: hasPendingPriority ? 'Pending...' : 'Priority',
+      onClick: onRequestPriority ?? (() => {}),
+      shortcut: '',
+      disabled: !!hasPendingPriority,
+    }] : []),
   ];
 
   const visibleButtons = buttons.filter(b => !b.hidden);

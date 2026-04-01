@@ -380,52 +380,6 @@ export default function TurnIndicator({
             Play Again
           </button>
         )}
-        {!isFinished && !isMyTurn && onRequestPriority && (
-          <button
-            onClick={onRequestPriority}
-            disabled={hasPendingPriority}
-            title={hasPendingPriority ? 'Priority request pending...' : 'Ask opponent for action priority'}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '5px 12px',
-              background: hasPendingPriority ? 'rgba(196, 149, 90, 0.08)' : 'rgba(196, 149, 90, 0.12)',
-              border: `1px solid ${hasPendingPriority ? 'rgba(196, 149, 90, 0.2)' : 'rgba(196, 149, 90, 0.4)'}`,
-              borderRadius: 4,
-              cursor: hasPendingPriority ? 'default' : 'pointer',
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 10,
-              letterSpacing: '0.07em',
-              textTransform: 'uppercase',
-              color: hasPendingPriority ? 'rgba(196, 149, 90, 0.4)' : '#c4955a',
-              transition: 'background 0.15s, border-color 0.15s, color 0.15s',
-            }}
-            onMouseEnter={(e) => {
-              if (!hasPendingPriority) {
-                e.currentTarget.style.background = 'rgba(196, 149, 90, 0.22)';
-                e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.6)';
-                e.currentTarget.style.color = '#e8d5a3';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!hasPendingPriority) {
-                e.currentTarget.style.background = 'rgba(196, 149, 90, 0.12)';
-                e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.4)';
-                e.currentTarget.style.color = '#c4955a';
-              }
-            }}
-          >
-            {/* Raised hand icon */}
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 11V6a2 2 0 0 0-4 0" />
-              <path d="M14 10V4a2 2 0 0 0-4 0v2" />
-              <path d="M10 10.5V6a2 2 0 0 0-4 0v8" />
-              <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
-            </svg>
-            {hasPendingPriority ? 'Requested...' : 'Priority'}
-          </button>
-        )}
         {!isFinished && onConcede && (
           <button
             onClick={() => setShowConcedeConfirm(true)}

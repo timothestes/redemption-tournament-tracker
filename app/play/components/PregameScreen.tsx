@@ -1085,46 +1085,54 @@ function RevealingPhase({ gameState, gameId }: { gameState: GameState; gameId: b
         transition={{ delay: 0.8 }}
         style={{ marginTop: 24 }}
       >
-        {!alreadyAcknowledged && (
-          <button
-            onClick={() => gameState.pregameAcknowledgeFirst()}
-            style={{
-              padding: '8px 24px',
-              borderRadius: 4,
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              cursor: 'pointer',
-              border: '1px solid rgba(196, 149, 90, 0.35)',
-              background: 'rgba(196, 149, 90, 0.1)',
-              color: 'rgba(232, 213, 163, 0.7)',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            Continue
-          </button>
-        )}
-        <div style={{
-          marginTop: 12,
-          width: '100%',
-          height: 2,
-          borderRadius: 1,
-          backgroundColor: 'rgba(232,213,163,0.06)',
-          overflow: 'hidden',
-        }}>
-          <motion.div
-            initial={{ width: '100%' }}
-            animate={{ width: '0%' }}
-            transition={{ duration: REVEAL_AUTO_ACK_MS / 1000, ease: 'linear' }}
-            style={{
-              height: '100%',
+        {!alreadyAcknowledged ? (
+          <>
+            <button
+              onClick={() => gameState.pregameAcknowledgeFirst()}
+              style={{
+                padding: '8px 24px',
+                borderRadius: 4,
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+                border: '1px solid rgba(196, 149, 90, 0.35)',
+                background: 'rgba(196, 149, 90, 0.1)',
+                color: 'rgba(232, 213, 163, 0.7)',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              Continue
+            </button>
+            <div style={{
+              marginTop: 12,
+              width: '100%',
+              height: 2,
               borderRadius: 1,
-              backgroundColor: `${accentColor}40`,
-            }}
-          />
-        </div>
+              backgroundColor: 'rgba(232,213,163,0.06)',
+              overflow: 'hidden',
+            }}>
+              <motion.div
+                initial={{ width: '100%' }}
+                animate={{ width: '0%' }}
+                transition={{ duration: REVEAL_AUTO_ACK_MS / 1000, ease: 'linear' }}
+                style={{
+                  height: '100%',
+                  borderRadius: 1,
+                  backgroundColor: `${accentColor}40`,
+                }}
+              />
+            </div>
+          </>
+        ) : (
+          <p style={{
+            fontSize: 12,
+            color: 'rgba(196, 149, 90, 0.45)',
+            fontFamily: 'Georgia, serif',
+          }}>Waiting for opponent...</p>
+        )}
       </motion.div>
     </div>
   );

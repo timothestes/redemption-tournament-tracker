@@ -557,29 +557,42 @@ export const pregame_acknowledge_first = spacetimedb.reducer(
     const freshGame = ctx.db.Game.id.find(gameId);
     if (freshGame && freshGame.status === 'playing') return;
 
-    // Either player acknowledging starts the game immediately
-    const chosenSeat = game.currentTurn;
-
-    // Find the chosen player's name
-    let chosenName = 'Player ' + (Number(chosenSeat) + 1);
-    for (const p of [...ctx.db.Player.player_game_id.filter(gameId)]) {
-      if (p.seat === chosenSeat) {
-        chosenName = p.displayName;
-        break;
-      }
-    }
-
-    ctx.db.Game.id.update({
+    // Mark this player as having acknowledged
+    const isSeat0 = player.seat === 0n;
+    const updatedGame = {
       ...game,
-      status: 'playing',
-      pregamePhase: '',
-      currentPhase: 'draw',
-      turnNumber: 1n,
-    });
+      pregameReady0: isSeat0 ? true : game.pregameReady0,
+      pregameReady1: isSeat0 ? game.pregameReady1 : true,
+    };
 
-    logAction(ctx, gameId, player.id, 'GAME_STARTED',
-      JSON.stringify({ chosenSeat: chosenSeat.toString(), chosenName }),
-      1n, 'draw');
+    const bothReady = updatedGame.pregameReady0 && updatedGame.pregameReady1;
+
+    if (bothReady) {
+      // Both players acknowledged — start the game
+      const chosenSeat = game.currentTurn;
+      let chosenName = 'Player ' + (Number(chosenSeat) + 1);
+      for (const p of [...ctx.db.Player.player_game_id.filter(gameId)]) {
+        if (p.seat === chosenSeat) {
+          chosenName = p.displayName;
+          break;
+        }
+      }
+
+      ctx.db.Game.id.update({
+        ...updatedGame,
+        status: 'playing',
+        pregamePhase: '',
+        currentPhase: 'draw',
+        turnNumber: 1n,
+      });
+
+      logAction(ctx, gameId, player.id, 'GAME_STARTED',
+        JSON.stringify({ chosenSeat: chosenSeat.toString(), chosenName }),
+        1n, 'draw');
+    } else {
+      // Only one player acknowledged so far — wait for the other
+      ctx.db.Game.id.update(updatedGame);
+    }
   }
 );
 

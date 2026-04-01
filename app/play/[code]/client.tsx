@@ -1021,6 +1021,10 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             onRollDice={() => gameState.rollDice(BigInt(20))}
             onShowToast={showGameToast}
             onEndTurn={gameState.endTurn}
+            onRequestPriority={() => gameState.requestZoneSearch('action-priority')}
+            hasPendingPriority={gameState.zoneSearchRequests.some(
+              (r: any) => r.zone === 'action-priority' && r.status === 'pending' && r.requesterId === gameState.myPlayer?.id
+            )}
           />
           <GameToastContainer />
         </div>
