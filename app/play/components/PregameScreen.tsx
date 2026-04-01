@@ -446,6 +446,15 @@ function RollingPhase({ gameState, gameId }: { gameState: GameState; gameId: big
     return () => clearTimeout(timer);
   }, [revealed, skipped]);
 
+  // Auto-choose when timer expires — winner defaults to going first
+  useEffect(() => {
+    if (!showResults || !iWon) return;
+    const timer = setTimeout(() => {
+      handleChooseFirst(mySeat);
+    }, CHOOSE_TIME_LIMIT_S * 1000);
+    return () => clearTimeout(timer);
+  }, [showResults, iWon]);
+
   const dieSize = 88;
 
   return (
@@ -645,17 +654,18 @@ function RollingPhase({ gameState, gameId }: { gameState: GameState; gameId: big
         )}
       </motion.div>
 
-      {/* Countdown bar — only before results are shown */}
-      {!showResults && !skipped && (
-        <div style={{ marginTop: 20 }}>
-          <div style={{
-            width: '100%',
-            height: 3,
-            borderRadius: 2,
-            backgroundColor: 'rgba(232,213,163,0.08)',
-            overflow: 'hidden',
-          }}>
+      {/* Countdown bar — rolling animation timer (before results) or choosing timer (after results) */}
+      <div style={{ marginTop: 20 }}>
+        <div style={{
+          width: '100%',
+          height: 3,
+          borderRadius: 2,
+          backgroundColor: 'rgba(232,213,163,0.08)',
+          overflow: 'hidden',
+        }}>
+          {!showResults && !skipped ? (
             <motion.div
+              key="rolling-bar"
               initial={{ width: '100%' }}
               animate={{ width: '0%' }}
               transition={{ duration: ROLLING_TOTAL_MS / 1000, ease: 'linear' }}
@@ -665,9 +675,21 @@ function RollingPhase({ gameState, gameId }: { gameState: GameState; gameId: big
                 backgroundColor: 'rgba(196, 149, 90, 0.4)',
               }}
             />
-          </div>
+          ) : (
+            <motion.div
+              key="choosing-bar"
+              initial={{ width: '100%' }}
+              animate={{ width: '0%' }}
+              transition={{ duration: CHOOSE_TIME_LIMIT_S, ease: 'linear' }}
+              style={{
+                height: '100%',
+                borderRadius: 2,
+                backgroundColor: 'rgba(196, 149, 90, 0.4)',
+              }}
+            />
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -679,10 +701,26 @@ function RollingPhase({ gameState, gameId }: { gameState: GameState; gameId: big
 
 function ChoosingPreview({ gameState }: { gameState: GameState }) {
   const { game, myPlayer, opponentPlayer } = gameState;
+  const [secondsLeft, setSecondsLeft] = useState(CHOOSE_TIME_LIMIT_S);
   if (!game || !myPlayer) return null;
 
   const iWon = myPlayer.seat.toString() === game.rollWinner;
   const winnerName = iWon ? 'You' : (opponentPlayer?.displayName || 'Opponent');
+
+  // Countdown for the loser's waiting view
+  useEffect(() => {
+    if (iWon) return;
+    const interval = setInterval(() => {
+      setSecondsLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [iWon]);
 
   return (
     <div style={{
@@ -726,6 +764,30 @@ function ChoosingPreview({ gameState }: { gameState: GameState }) {
         <span className="animate-bounce [animation-delay:-0.15s]" style={{ width: 6, height: 6, borderRadius: '50%', background: '#c4955a' }} />
         <span className="animate-bounce" style={{ width: 6, height: 6, borderRadius: '50%', background: '#c4955a' }} />
       </div>
+
+      {!iWon && (
+        <div style={{ marginTop: 20 }}>
+          <div style={{
+            width: '100%',
+            height: 3,
+            borderRadius: 2,
+            backgroundColor: 'rgba(232,213,163,0.08)',
+            overflow: 'hidden',
+          }}>
+            <motion.div
+              initial={{ width: '100%' }}
+              animate={{ width: '0%' }}
+              transition={{ duration: CHOOSE_TIME_LIMIT_S, ease: 'linear' }}
+              style={{
+                height: '100%',
+                borderRadius: 2,
+                backgroundColor: secondsLeft <= 10 ? 'rgba(220, 120, 80, 0.6)' : 'rgba(196, 149, 90, 0.4)',
+                transition: 'background-color 0.5s ease',
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -22,4 +22,5 @@ export default __t.row({
   autoRouteLostSouls: __t.bool().name("auto_route_lost_souls"),
   handRevealed: __t.bool().name("hand_revealed"),
   pendingDeckData: __t.string().name("pending_deck_data"),
+  revealedCards: __t.string().name("revealed_cards"),
 });

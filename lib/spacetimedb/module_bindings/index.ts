@@ -36,6 +36,7 @@ import {
 // Import all reducer arg schemas
 import AddCounterReducer from "./add_counter_reducer";
 import ApproveZoneSearchReducer from "./approve_zone_search_reducer";
+import ClearRevealedCardsReducer from "./clear_revealed_cards_reducer";
 import CompleteZoneSearchReducer from "./complete_zone_search_reducer";
 import CreateGameReducer from "./create_game_reducer";
 import DenyZoneSearchReducer from "./deny_zone_search_reducer";
@@ -67,6 +68,7 @@ import RequestRematchReducer from "./request_rematch_reducer";
 import RequestZoneSearchReducer from "./request_zone_search_reducer";
 import ResignGameReducer from "./resign_game_reducer";
 import RespondRematchReducer from "./respond_rematch_reducer";
+import RevealCardsReducer from "./reveal_cards_reducer";
 import RollDiceReducer from "./roll_dice_reducer";
 import SendChatReducer from "./send_chat_reducer";
 import SetNoteReducer from "./set_note_reducer";
@@ -86,6 +88,7 @@ import UpdateLobbyMessageReducer from "./update_lobby_message_reducer";
 import CardCounterRow from "./card_counter_table";
 import CardInstanceRow from "./card_instance_table";
 import ChatMessageRow from "./chat_message_table";
+import ChooseFirstTimeoutRow from "./choose_first_timeout_table";
 import CleanupScheduleRow from "./cleanup_schedule_table";
 import DisconnectTimeoutRow from "./disconnect_timeout_table";
 import GameRow from "./game_table";
@@ -143,6 +146,17 @@ const tablesSchema = __schema({
       { name: 'chat_message_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ChatMessageRow),
+  ChooseFirstTimeout: __table({
+    name: 'choose_first_timeout',
+    indexes: [
+      { accessor: 'scheduledId', name: 'choose_first_timeout_scheduled_id_idx_btree', algorithm: 'btree', columns: [
+        'scheduledId',
+      ] },
+    ],
+    constraints: [
+      { name: 'choose_first_timeout_scheduled_id_key', constraint: 'unique', columns: ['scheduledId'] },
+    ],
+  }, ChooseFirstTimeoutRow),
   CleanupSchedule: __table({
     name: 'cleanup_schedule',
     indexes: [
@@ -241,6 +255,7 @@ const tablesSchema = __schema({
 const reducersSchema = __reducers(
   __reducerSchema("add_counter", AddCounterReducer),
   __reducerSchema("approve_zone_search", ApproveZoneSearchReducer),
+  __reducerSchema("clear_revealed_cards", ClearRevealedCardsReducer),
   __reducerSchema("complete_zone_search", CompleteZoneSearchReducer),
   __reducerSchema("create_game", CreateGameReducer),
   __reducerSchema("deny_zone_search", DenyZoneSearchReducer),
@@ -272,6 +287,7 @@ const reducersSchema = __reducers(
   __reducerSchema("request_zone_search", RequestZoneSearchReducer),
   __reducerSchema("resign_game", ResignGameReducer),
   __reducerSchema("respond_rematch", RespondRematchReducer),
+  __reducerSchema("reveal_cards", RevealCardsReducer),
   __reducerSchema("roll_dice", RollDiceReducer),
   __reducerSchema("send_chat", SendChatReducer),
   __reducerSchema("set_note", SetNoteReducer),

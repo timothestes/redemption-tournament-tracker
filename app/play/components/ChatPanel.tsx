@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -73,7 +74,33 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   REMATCH_RESPONSE: 'responded to rematch',
 };
 
-function formatActionType(actionType: string, payload?: string, playerNames?: Record<string, string>): string {
+function HoverableCard({ name, img }: { name: string; img?: string }) {
+  const { setPreviewCard } = useCardPreview();
+  return (
+    <span
+      style={{ textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 2, cursor: 'pointer' }}
+      onMouseEnter={() => setPreviewCard({ cardName: name, cardImgFile: img ?? '' })}
+      onMouseLeave={() => setPreviewCard(null)}
+    >
+      {name}
+    </span>
+  );
+}
+
+function CardNameList({ cards }: { cards: { name: string; img: string }[] }) {
+  return (
+    <>
+      {cards.map((c, i) => (
+        <span key={i}>
+          {i > 0 && ', '}
+          <HoverableCard name={c.name} img={c.img} />
+        </span>
+      ))}
+    </>
+  );
+}
+
+function formatActionType(actionType: string, payload?: string, playerNames?: Record<string, string>): ReactNode {
   if (actionType === 'ROLL_DICE' && payload) {
     try {
       const data = JSON.parse(payload);
@@ -91,6 +118,31 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
     try {
       const data = JSON.parse(payload);
       return `rolled ${data.result0} vs ${data.result1}`;
+    } catch { /* fall through */ }
+  }
+  if (actionType === 'MOVE_CARD' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      if (data.redirected && data.cardName) {
+        return <>{data.redirected} <HoverableCard name={data.cardName} img={data.cardImgFile} /> but it went into play instead</>;
+      }
+      if (data.to === 'reserve' && data.cardName) {
+        return <>placed <HoverableCard name={data.cardName} img={data.cardImgFile} /> in reserve</>;
+      }
+    } catch { /* fall through */ }
+  }
+  if (actionType === 'MOVE_CARDS_BATCH' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const parts: ReactNode[] = [];
+      if (data.toZone === 'reserve' && data.cards?.length) {
+        parts.push(<span key="reserve">placed <CardNameList cards={data.cards} /> in reserve</span>);
+      }
+      if (data.redirectedLostSouls?.length) {
+        const actionWord = data.toZone === 'discard' ? 'discarded' : data.toZone === 'reserve' ? 'reserved' : 'banished';
+        parts.push(<span key="redirect">{actionWord} <CardNameList cards={data.redirectedLostSouls} /> but went into play instead</span>);
+      }
+      if (parts.length) return <>{parts.map((p, i) => <span key={i}>{i > 0 && '; '}{p}</span>)}</>;
     } catch { /* fall through */ }
   }
   return ACTION_TYPE_LABELS[actionType] ?? actionType.toLowerCase().replace(/_/g, ' ');
@@ -138,11 +190,15 @@ export default function ChatPanel({
     }
   }, [chatMessages, isOpen, activeTab]);
 
-  // Auto-scroll log to bottom when new actions arrive
+  // Auto-scroll log to bottom when new actions arrive or tab switches
+  const prevLogTab = useRef(activeTab);
   useEffect(() => {
     if (isOpen && activeTab === 'log') {
-      logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      // Instant scroll when first switching to log tab, smooth for new entries
+      const justSwitched = prevLogTab.current !== 'log';
+      logEndRef.current?.scrollIntoView({ behavior: justSwitched ? 'instant' : 'smooth' });
     }
+    prevLogTab.current = activeTab;
   }, [gameActions, isOpen, activeTab]);
 
   const handleSend = () => {

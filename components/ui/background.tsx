@@ -27,7 +27,7 @@ const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
 
   if (skipBackground) {
     return (
-      <div className={`min-h-screen w-full ${isJaydenTheme ? 'bg-[hsl(270,20%,4%)]' : 'bg-white dark:bg-gray-900'}`}>
+      <div className="min-h-screen w-full bg-background">
         {children}
       </div>
     );

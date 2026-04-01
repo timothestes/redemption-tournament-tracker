@@ -9,7 +9,7 @@ interface DeckDropPopupProps {
   onShuffleIn: () => void;
   onTopDeck: () => void;
   onBottomDeck: () => void;
-  onExchange: () => void;
+  onExchange?: () => void;
   onCancel: () => void;
 }
 
@@ -97,15 +97,19 @@ export function DeckDropPopup({ x, y, onShuffleIn, onTopDeck, onBottomDeck, onEx
       >
         <ArrowDown size={13} /> Bottom of Deck
       </button>
-      <div style={{ height: 1, background: 'var(--gf-border)', margin: '4px 8px', opacity: 0.5 }} />
-      <button
-        style={btnStyle}
-        onClick={onExchange}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-      >
-        <ArrowLeftRight size={13} /> Exchange
-      </button>
+      {onExchange && (
+        <>
+          <div style={{ height: 1, background: 'var(--gf-border)', margin: '4px 8px', opacity: 0.5 }} />
+          <button
+            style={btnStyle}
+            onClick={onExchange}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          >
+            <ArrowLeftRight size={13} /> Exchange
+          </button>
+        </>
+      )}
     </div>
   );
 }

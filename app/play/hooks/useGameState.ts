@@ -81,7 +81,7 @@ export interface GameState {
   revealHand: (revealed: boolean) => void;
   moveCardToTopOfDeck: (cardInstanceId: bigint) => void;
   moveCardToBottomOfDeck: (cardInstanceId: bigint) => void;
-  spawnLostSoul: (testament: string, posX: string, posY: string) => void;
+  spawnLostSoul: (testament: string, posX: string, posY: string, targetPlayerId?: string) => void;
   removeToken: (cardInstanceId: bigint) => void;
   resignGame: () => void;
   leaveGame: () => void;
@@ -95,6 +95,8 @@ export interface GameState {
   // Rematch actions
   requestRematch: (deckId: string, deckData: string) => void;
   respondRematch: (accepted: boolean, deckId: string, deckData: string) => void;
+  revealCards: (cardIds: string) => void;
+  clearRevealedCards: () => void;
   requestZoneSearch: (zone: string) => void;
   approveZoneSearch: (requestId: bigint) => void;
   denyZoneSearch: (requestId: bigint) => void;
@@ -270,7 +272,7 @@ export function useGameState(gameId: bigint): GameState {
         gameId,
         cardInstanceId,
         toZone,
-        zoneIndex: zoneIndex || '0',
+        zoneIndex: zoneIndex || '',
         posX: posX || '',
         posY: posY || '',
         targetOwnerId: targetOwnerId || '',
@@ -412,6 +414,20 @@ export function useGameState(gameId: bigint): GameState {
     [conn, gameId],
   );
 
+  const revealCards = useCallback(
+    (cardIds: string) => {
+      conn?.reducers.revealCards({ gameId, cardIds });
+    },
+    [conn, gameId],
+  );
+
+  const clearRevealedCards = useCallback(
+    () => {
+      conn?.reducers.clearRevealedCards({ gameId });
+    },
+    [conn, gameId],
+  );
+
   const moveCardToTopOfDeck = useCallback(
     (cardInstanceId: bigint) => {
       conn?.reducers.moveCardToTopOfDeck({ gameId, cardInstanceId });
@@ -427,8 +443,8 @@ export function useGameState(gameId: bigint): GameState {
   );
 
   const spawnLostSoul = useCallback(
-    (testament: string, posX: string, posY: string) => {
-      conn?.reducers.spawnLostSoul({ gameId, testament, posX, posY });
+    (testament: string, posX: string, posY: string, targetPlayerId?: string) => {
+      conn?.reducers.spawnLostSoul({ gameId, testament, posX, posY, targetPlayerId: targetPlayerId ?? '' });
     },
     [conn, gameId],
   );
@@ -564,6 +580,8 @@ export function useGameState(gameId: bigint): GameState {
     sendChat,
     setPlayerOption,
     revealHand,
+    revealCards,
+    clearRevealedCards,
     moveCardToTopOfDeck,
     moveCardToBottomOfDeck,
     spawnLostSoul,

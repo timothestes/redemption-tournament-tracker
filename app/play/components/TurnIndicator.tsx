@@ -50,6 +50,7 @@ export default function TurnIndicator({
   onPlayAgain,
 }: TurnIndicatorProps) {
   const [showConcedeConfirm, setShowConcedeConfirm] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const currentPhase: string = game?.currentPhase ?? 'draw';
   const turnNumber: number = game?.turnNumber ? Number(game.turnNumber) : 1;
   const currentIdx = PHASE_ORDER.indexOf(currentPhase as GamePhase);
@@ -89,6 +90,41 @@ export default function TurnIndicator({
         gap: 0,
       }}
     >
+      {/* Exit to lobby */}
+      <button
+        onClick={() => isFinished ? window.location.href = '/play' : setShowLeaveConfirm(true)}
+        title="Back to lobby"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: 28,
+          height: 28,
+          borderRadius: 4,
+          marginRight: 8,
+          flexShrink: 0,
+          border: 'none',
+          background: 'transparent',
+          cursor: 'pointer',
+          color: 'rgba(232, 213, 163, 0.35)',
+          transition: 'color 0.15s, background 0.15s',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = '#e8d5a3';
+          e.currentTarget.style.background = 'rgba(196, 149, 90, 0.1)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = 'rgba(232, 213, 163, 0.35)';
+          e.currentTarget.style.background = 'transparent';
+        }}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M15 21H19a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H15" />
+          <polyline points="8 17 3 12 8 7" />
+          <line x1="3" y1="12" x2="15" y2="12" />
+        </svg>
+      </button>
+
       {/* ================================================================
           LEFT — Turn counter + whose turn it is
           ================================================================ */}
@@ -431,6 +467,104 @@ export default function TurnIndicator({
                 }}
               >
                 Concede
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Leave game confirmation modal */}
+      {showLeaveConfirm && (
+        <div
+          onClick={() => setShowLeaveConfirm(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 900,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(6, 4, 2, 0.7)',
+            backdropFilter: 'blur(3px)',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'rgba(14, 10, 6, 0.97)',
+              border: '1px solid rgba(107, 78, 39, 0.3)',
+              borderRadius: 10,
+              padding: '32px 36px',
+              textAlign: 'center',
+              maxWidth: 340,
+              width: '100%',
+              boxShadow: '0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(196, 149, 90, 0.08)',
+            }}
+          >
+            <p style={{
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: 10,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: 'rgba(196, 149, 90, 0.5)',
+            }}>Leave Game</p>
+            <h2 style={{
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: 18,
+              fontWeight: 700,
+              color: '#e8d5a3',
+              marginTop: 8,
+              textShadow: '0 1px 4px rgba(0,0,0,0.5)',
+            }}>Return to lobby?</h2>
+            <p style={{
+              marginTop: 8,
+              fontFamily: 'Georgia, serif',
+              fontSize: 13,
+              color: 'rgba(196, 149, 90, 0.5)',
+            }}>This will end the game and count as a resignation.</p>
+
+            <div style={{ marginTop: 24, display: 'flex', gap: 12 }}>
+              <button
+                onClick={() => setShowLeaveConfirm(false)}
+                style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  borderRadius: 4,
+                  border: '1px solid rgba(107, 78, 39, 0.3)',
+                  background: 'transparent',
+                  color: 'rgba(196, 149, 90, 0.6)',
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowLeaveConfirm(false);
+                  onConcede?.();
+                  window.location.href = '/play';
+                }}
+                style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  borderRadius: 4,
+                  border: '1px solid rgba(180, 60, 60, 0.45)',
+                  background: 'rgba(180, 60, 60, 0.15)',
+                  color: '#dc7878',
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                }}
+              >
+                Leave
               </button>
             </div>
           </div>

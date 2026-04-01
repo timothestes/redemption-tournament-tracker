@@ -80,7 +80,7 @@ export function GameClient({ code }: GameClientProps) {
 
   return (
     <SpacetimeProvider connectionBuilder={connectionBuilder}>
-      <CardPreviewProvider storageKey="multiplayer-loupe-visible">
+      <CardPreviewProvider storageKey="multiplayer-loupe-visible" defaultVisible>
         <SpreadHandProvider>
           <GameInner code={code} isConnected={isConnected} />
         </SpreadHandProvider>
@@ -484,9 +484,11 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     }
   }, [gameState.game, lifecycle]);
 
-  // Clean up waiting-status games when the user leaves the page.
-  // Uses refs so handlers always read the latest values without causing
-  // the effect to re-run (which would trigger the cleanup and call leaveGame).
+  // Clean up waiting-status games when the user navigates away (component unmount).
+  // We intentionally do NOT use beforeunload — it fires on page refresh, which
+  // would kill the game immediately. Instead, the server's 30-second disconnect
+  // timeout (DisconnectTimeout) handles tab close / crashes, giving enough time
+  // for page refreshes and WebSocket reconnections.
   const lifecycleRef = useRef(lifecycle);
   lifecycleRef.current = lifecycle;
   const gameStateRef = useRef(gameState);
@@ -494,14 +496,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
 
   useEffect(() => {
     if (gameId === null) return;
-    const handleBeforeUnload = () => {
-      if (lifecycleRef.current === 'waiting') {
-        gameStateRef.current.leaveGame();
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
       // Component unmount (navigation away) — clean up if still waiting
       if (lifecycleRef.current === 'waiting') {
         gameStateRef.current.leaveGame();
@@ -790,10 +785,42 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             borderBottom: '1px solid rgba(107, 78, 39, 0.3)',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
+            paddingLeft: 12,
+            paddingRight: 12,
             gap: 8,
           }}>
+            <a
+              href="/play"
+              title="Back to lobby"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 28,
+                height: 28,
+                borderRadius: 4,
+                flexShrink: 0,
+                color: 'rgba(232, 213, 163, 0.35)',
+                transition: 'color 0.15s, background 0.15s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = '#e8d5a3';
+                e.currentTarget.style.background = 'rgba(196, 149, 90, 0.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = 'rgba(232, 213, 163, 0.35)';
+                e.currentTarget.style.background = 'transparent';
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 21H19a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H15" />
+                <polyline points="8 17 3 12 8 7" />
+                <line x1="3" y1="12" x2="15" y2="12" />
+              </svg>
+            </a>
             <span style={{
+              flex: 1,
+              textAlign: 'center',
               fontFamily: 'var(--font-cinzel), Georgia, serif',
               fontSize: 11,
               letterSpacing: '0.12em',
@@ -802,6 +829,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             }}>
               {phase === 'rolling' ? 'Rolling for first player...' : 'Choosing who goes first...'}
             </span>
+            {/* Spacer to keep text centered */}
+            <div style={{ width: 28, flexShrink: 0 }} />
           </div>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
             {gameId !== null && (

@@ -65,20 +65,26 @@ export default function GameOverOverlay({
   const oppName: string = opponentPlayer?.displayName ?? 'Opponent';
   const mySeat = myPlayer?.seat?.toString() ?? '0';
 
+  // Determine if the game ended because of opponent action (resign/disconnect)
+  const isOpponentLeft = label === 'Opponent resigned' || label === 'Opponent disconnected';
+
   // Rematch state from game (derived before effects that use it)
   const rematchRequestedBy = game?.rematchRequestedBy ?? '';
   const rematchResponse = game?.rematchResponse ?? '';
   const iRequested = rematchRequestedBy === mySeat;
   const opponentRequested = rematchRequestedBy !== '' && !iRequested;
 
-  // Toast visibility
+  // Toast visibility (only for non-opponent-left cases)
   const [toastVisible, setToastVisible] = useState(true);
+  // Modal dismissed state
+  const [modalDismissed, setModalDismissed] = useState(false);
 
-  // Auto-dismiss toast after 4 seconds
+  // Auto-dismiss toast after 4 seconds (only when not showing modal)
   useEffect(() => {
+    if (isOpponentLeft) return;
     const timer = setTimeout(() => setToastVisible(false), 4000);
     return () => clearTimeout(timer);
-  }, []);
+  }, [isOpponentLeft]);
 
   // Open deck picker when Play Again is triggered from TurnIndicator
   useEffect(() => {
@@ -133,8 +139,79 @@ export default function GameOverOverlay({
 
   return (
     <>
-      {/* Temporary toast — auto-dismisses */}
-      {toastVisible && (
+      {/* Opponent left/resigned — blocking modal */}
+      {isOpponentLeft && !modalDismissed && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 900,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(6, 4, 2, 0.7)',
+            backdropFilter: 'blur(3px)',
+          }}
+        >
+          <div style={{
+            background: 'rgba(14, 10, 6, 0.97)',
+            border: '1px solid rgba(107, 78, 39, 0.3)',
+            borderRadius: 10,
+            padding: '32px 36px',
+            textAlign: 'center',
+            maxWidth: 340,
+            width: '100%',
+            boxShadow: '0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(196, 149, 90, 0.08)',
+          }}>
+            <p style={{
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: 10,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: 'rgba(196, 149, 90, 0.5)',
+            }}>Game Over</p>
+            <h2 style={{
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: 18,
+              fontWeight: 700,
+              color: '#e8d5a3',
+              marginTop: 8,
+              textShadow: '0 1px 4px rgba(0,0,0,0.5)',
+            }}>{label}</h2>
+            <p style={{
+              marginTop: 8,
+              fontFamily: 'Georgia, serif',
+              fontSize: 13,
+              color: 'rgba(196, 149, 90, 0.5)',
+            }}>The game has ended.</p>
+
+            <div style={{ marginTop: 24, display: 'flex', gap: 12 }}>
+              <button
+                onClick={() => setModalDismissed(true)}
+                style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  borderRadius: 4,
+                  border: '1px solid rgba(196, 149, 90, 0.45)',
+                  background: 'rgba(196, 149, 90, 0.15)',
+                  color: '#e8d5a3',
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                }}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Temporary toast — auto-dismisses (for self-resign / generic end) */}
+      {!isOpponentLeft && toastVisible && (
         <div style={{
           position: 'fixed',
           top: 60,

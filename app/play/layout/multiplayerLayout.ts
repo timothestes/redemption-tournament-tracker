@@ -163,7 +163,7 @@ function getPileCardDimensions(slotHeight: number, sidebarWidth: number, zonePad
   const usableH = slotHeight * (1 - pileLabelRatio);
   // Constrain by both slot height and sidebar width (minus padding + badge space)
   const usableW = sidebarWidth - zonePad * 2 - 40; // 40px for count badge + label
-  const maxCardW = Math.max(usableW * 0.55, 30); // card takes up to 55% of usable width
+  const maxCardW = Math.max(usableW * 0.75, 30); // card takes up to 75% of usable width
   // Height from width (maintain aspect ratio), capped by slot height
   const hFromW = maxCardW * CARD_ASPECT_RATIO;
   const h = Math.round(Math.min(Math.max(Math.min(usableH, hFromW), 30), usableH));
@@ -183,21 +183,88 @@ function buildSidebar(
   zonePad: number,
   pad: number
 ): Partial<Record<PileZone, ZoneRect>> {
-  const count = labels.length;
   const slotPad = 4;
-  const slotHeight = Math.round(
-    (areaHeight - slotPad * (count + 1)) / count
-  );
+  const usableWidth = sidebarWidth - zonePad * 2;
   const result: Partial<Record<PileZone, ZoneRect>> = {};
-  labels.forEach((label, i) => {
-    result[keys[i]] = {
-      x: sidebarX + zonePad,
-      y: sidebarAreaY + slotPad * (i + 1) + slotHeight * i,
-      width: sidebarWidth - zonePad * 2,
-      height: slotHeight,
-      label,
-    };
-  });
+
+  // Find LOR index — it gets a full-width row on top (or bottom for opponent)
+  const lorIdx = keys.indexOf('lor');
+
+  if (lorIdx !== -1 && keys.length >= 5) {
+    // Layout: LOR as full-width row, remaining 4 zones in 2×2 grid
+    const lorIsFirst = lorIdx === 0;
+    const gridKeys = keys.filter((_, i) => i !== lorIdx);
+    const gridLabels = labels.filter((_, i) => i !== lorIdx);
+
+    // Split height: LOR gets 1 row, grid gets 2 rows → 3 equal rows total
+    const totalGaps = slotPad * 4; // gaps between 3 rows + top/bottom
+    const rowHeight = Math.round((areaHeight - totalGaps) / 3);
+    const colWidth = Math.round((usableWidth - slotPad) / 2);
+
+    if (lorIsFirst) {
+      // Player sidebar: LOR on top, 2×2 grid below
+      const lorY = sidebarAreaY + slotPad;
+      result[keys[lorIdx]] = {
+        x: sidebarX + zonePad,
+        y: lorY,
+        width: usableWidth,
+        height: rowHeight,
+        label: labels[lorIdx],
+      };
+
+      const gridY = lorY + rowHeight + slotPad;
+      for (let i = 0; i < gridKeys.length; i++) {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        result[gridKeys[i]] = {
+          x: sidebarX + zonePad + col * (colWidth + slotPad),
+          y: gridY + row * (rowHeight + slotPad),
+          width: colWidth,
+          height: rowHeight,
+          label: gridLabels[i],
+        };
+      }
+    } else {
+      // Opponent sidebar: 2×2 grid on top, LOR on bottom
+      const gridY = sidebarAreaY + slotPad;
+      for (let i = 0; i < gridKeys.length; i++) {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        result[gridKeys[i]] = {
+          x: sidebarX + zonePad + col * (colWidth + slotPad),
+          y: gridY + row * (rowHeight + slotPad),
+          width: colWidth,
+          height: rowHeight,
+          label: gridLabels[i],
+        };
+      }
+
+      const lorY = gridY + 2 * (rowHeight + slotPad);
+      result[keys[lorIdx]] = {
+        x: sidebarX + zonePad,
+        y: lorY,
+        width: usableWidth,
+        height: rowHeight,
+        label: labels[lorIdx],
+      };
+    }
+  } else {
+    // Fallback: simple vertical stack (e.g. paragon format with 6 zones)
+    const count = labels.length;
+    const slotHeight = Math.round(
+      (areaHeight - slotPad * (count + 1)) / count
+    );
+    labels.forEach((label, i) => {
+      result[keys[i]] = {
+        x: sidebarX + zonePad,
+        y: sidebarAreaY + slotPad * (i + 1) + slotHeight * i,
+        width: usableWidth,
+        height: slotHeight,
+        label,
+      };
+    });
+  }
+
   return result;
 }
 
@@ -343,14 +410,16 @@ export function calculateMultiplayerLayout(
   const lobCard = computed.lobCard;
   const opponentHandCard = computed.oppHandCard;
 
-  // Pile card size based on a single sidebar slot height (use the smaller half)
-  const pileSlotCount = isParagon ? 6 : 5;
+  // Pile card size based on grid slot height (3 rows: LOR + 2×2 grid)
   const slotPad = 4;
   const sidebarHalfHeight = Math.min(oppSidebarHeight, playerSidebarHeight);
+  const pileRowCount = isParagon ? 6 : 3; // 2×2 grid = 3 rows (LOR + 2 grid rows), paragon falls back to 6
   const pileSlotHeight = Math.round(
-    (sidebarHalfHeight - slotPad * (pileSlotCount + 1)) / pileSlotCount
+    (sidebarHalfHeight - slotPad * (pileRowCount + 1)) / pileRowCount
   );
-  const pileCard = getPileCardDimensions(pileSlotHeight, sidebarWidth, zonePad, profile.pileLabelRatio);
+  // For 2×2 grid, use half the sidebar width for card sizing
+  const pileEffectiveWidth = isParagon ? sidebarWidth : Math.round((sidebarWidth - zonePad * 2 - slotPad) / 2 + zonePad * 2);
+  const pileCard = getPileCardDimensions(pileSlotHeight, pileEffectiveWidth, zonePad, profile.pileLabelRatio);
 
   return {
     zones: {

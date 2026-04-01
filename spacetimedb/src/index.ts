@@ -1,6 +1,6 @@
 import spacetimedb from './schema';
 export default spacetimedb;
-import { DisconnectTimeout, setDisconnectTimeoutReducer, CleanupSchedule, setCleanupStaleGamesReducer } from './schema';
+import { DisconnectTimeout, setDisconnectTimeoutReducer, ChooseFirstTimeout, setChooseFirstTimeoutReducer, CleanupSchedule, setCleanupStaleGamesReducer } from './schema';
 import { t, SenderError } from 'spacetimedb/server';
 import { ScheduleAt } from 'spacetimedb';
 import { makeSeed, seededShuffle, seededDiceRoll, xorshift64, generateGameCode } from './utils';
@@ -241,6 +241,7 @@ export const create_game = spacetimedb.reducer(
       autoRouteLostSouls: true,
       handRevealed: false,
       pendingDeckData: deckData,
+      revealedCards: '',
     });
 
     // Log action
@@ -294,6 +295,7 @@ export const join_game = spacetimedb.reducer(
       autoRouteLostSouls: true,
       handRevealed: false,
       pendingDeckData: deckData,
+      revealedCards: '',
     });
 
     // Log join
@@ -484,6 +486,15 @@ export const pregame_acknowledge_roll = spacetimedb.reducer(
       ...latestGame,
       pregamePhase: 'choosing',
     });
+
+    // Schedule server-side timeout — auto-choose if winner doesn't pick in 30s
+    const CHOOSE_TIMEOUT_MICROS = 30_000_000n; // 30 seconds
+    const futureTime = ctx.timestamp.microsSinceUnixEpoch + CHOOSE_TIMEOUT_MICROS;
+    ctx.db.ChooseFirstTimeout.insert({
+      scheduledId: 0n,
+      scheduledAt: ScheduleAt.time(futureTime),
+      gameId,
+    });
   }
 );
 
@@ -505,6 +516,13 @@ export const pregame_choose_first = spacetimedb.reducer(
     const player = findPlayerBySender(ctx, gameId);
     if (player.seat.toString() !== game.rollWinner) {
       throw new SenderError('Only the roll winner can choose');
+    }
+
+    // Cancel the server-side choose timeout
+    for (const timeout of ctx.db.ChooseFirstTimeout.iter()) {
+      if (timeout.gameId === gameId) {
+        ctx.db.ChooseFirstTimeout.scheduledId.delete(timeout.scheduledId);
+      }
     }
 
     // Transition to revealing phase — show who goes first before starting
@@ -534,20 +552,13 @@ export const pregame_acknowledge_first = spacetimedb.reducer(
     if (game.pregamePhase !== 'revealing') throw new SenderError('Not in revealing phase');
 
     const player = findPlayerBySender(ctx, gameId);
-    const updates: any = { ...game };
-    if (player.seat === 0n) {
-      updates.pregameReady0 = true;
-    } else {
-      updates.pregameReady1 = true;
-    }
-    ctx.db.Game.id.update(updates);
 
-    const latestGame = ctx.db.Game.id.find(gameId);
-    if (!latestGame) return;
-    if (!latestGame.pregameReady0 || !latestGame.pregameReady1) return;
+    // If already playing (other player beat us to it), just return
+    const freshGame = ctx.db.Game.id.find(gameId);
+    if (freshGame && freshGame.status === 'playing') return;
 
-    // Both acknowledged — start the game
-    const chosenSeat = latestGame.currentTurn;
+    // Either player acknowledging starts the game immediately
+    const chosenSeat = game.currentTurn;
 
     // Find the chosen player's name
     let chosenName = 'Player ' + (Number(chosenSeat) + 1);
@@ -559,7 +570,7 @@ export const pregame_acknowledge_first = spacetimedb.reducer(
     }
 
     ctx.db.Game.id.update({
-      ...latestGame,
+      ...game,
       status: 'playing',
       pregamePhase: '',
       currentPhase: 'draw',
@@ -964,8 +975,36 @@ export const handle_disconnect_timeout = spacetimedb.reducer(
 setDisconnectTimeoutReducer(handle_disconnect_timeout);
 
 // ---------------------------------------------------------------------------
+// Scheduled reducer: handle_choose_first_timeout
+// If the roll winner hasn't chosen in time, auto-select them to go first.
+// ---------------------------------------------------------------------------
+export const handle_choose_first_timeout = spacetimedb.reducer(
+  { arg: ChooseFirstTimeout.rowType },
+  (ctx, { arg }) => {
+    const game = ctx.db.Game.id.find(arg.gameId);
+    if (!game) return;
+
+    // Only act if game is still in choosing phase
+    if (game.status !== 'pregame' || game.pregamePhase !== 'choosing') return;
+
+    // Auto-choose: roll winner goes first
+    const winnerSeat = BigInt(game.rollWinner);
+    ctx.db.Game.id.update({
+      ...game,
+      pregamePhase: 'revealing',
+      currentTurn: winnerSeat,
+      pregameReady0: false,
+      pregameReady1: false,
+    });
+  }
+);
+
+setChooseFirstTimeoutReducer(handle_choose_first_timeout);
+
+// ---------------------------------------------------------------------------
 // Scheduled reducer: cleanup_stale_games
 // ---------------------------------------------------------------------------
+const FIVE_MIN_MICROS = 300_000_000n;
 const ONE_HOUR_MICROS = 3_600_000_000n;
 const THIRTY_MIN_MICROS = 1_800_000_000n;
 const TWENTY_FOUR_HOURS_MICROS = 86_400_000_000n;
@@ -1188,25 +1227,59 @@ export const move_card = spacetimedb.reducer(
     if (card.gameId !== gameId) throw new SenderError('Card not in this game');
 
     const fromZone = card.zone;
-    // Moving to deck = face-down; leaving deck = face-up; otherwise preserve
-    const isFlipped = toZone === 'deck' ? true : (fromZone === 'deck' ? false : card.isFlipped);
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+
+    // Lost souls sent to discard or reserve go to land-of-bondage instead
+    const isLostSoul = card.cardType === 'LS' || card.cardName.toLowerCase().includes('lost soul');
+    if (isLostSoul && (toZone === 'discard' || toZone === 'reserve' || toZone === 'banish')) {
+      const lobIndex = BigInt(
+        [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+          (c: any) => c.ownerId === card.ownerId && c.zone === 'land-of-bondage'
+        ).length
+      );
+      ctx.db.CardInstance.id.update({
+        ...card,
+        zone: 'land-of-bondage',
+        zoneIndex: lobIndex,
+        posX: '',
+        posY: '',
+        isFlipped: false,
+        ownerId: card.ownerId,
+      });
+      const actionWord = toZone === 'discard' ? 'discarded' : toZone === 'reserve' ? 'reserved' : 'banished';
+      logAction(ctx, gameId, player.id, 'MOVE_CARD', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), from: fromZone, to: 'land-of-bondage', cardName: card.cardName, cardImgFile: card.cardImgFile, redirected: actionWord }), game.turnNumber, game.currentPhase);
+      return;
+    }
+
+    // Moving to deck = face-down; leaving deck or reserve = face-up; otherwise preserve
+    const isFlipped = toZone === 'deck' ? true : (fromZone === 'deck' || fromZone === 'reserve') ? false : card.isFlipped;
     // Optionally transfer ownership (e.g. rescue lost soul, capture hero)
     const newOwnerId = targetOwnerId ? BigInt(targetOwnerId) : card.ownerId;
+
+    // For free-form zones (territory), auto-assign highest zoneIndex so new cards render on top
+    let finalZoneIndex = zoneIndex ? BigInt(zoneIndex) : 0n;
+    if (!zoneIndex && toZone !== 'deck' && toZone !== 'hand') {
+      let maxIdx = -1n;
+      for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+        if (c.ownerId === (newOwnerId) && c.zone === toZone && c.zoneIndex > maxIdx) {
+          maxIdx = c.zoneIndex;
+        }
+      }
+      finalZoneIndex = maxIdx + 1n;
+    }
 
     ctx.db.CardInstance.id.update({
       ...card,
       zone: toZone,
-      zoneIndex: zoneIndex ? BigInt(zoneIndex) : 0n,
+      zoneIndex: finalZoneIndex,
       posX,
       posY,
       isFlipped,
       ownerId: newOwnerId,
     });
 
-    const game = ctx.db.Game.id.find(gameId);
-    if (!game) throw new SenderError('Game not found');
-
-    logAction(ctx, gameId, player.id, 'MOVE_CARD', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), from: fromZone, to: toZone }), game.turnNumber, game.currentPhase);
+    logAction(ctx, gameId, player.id, 'MOVE_CARD', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), from: fromZone, to: toZone, cardName: card.cardName, cardImgFile: card.cardImgFile }), game.turnNumber, game.currentPhase);
   }
 );
 
@@ -1227,6 +1300,11 @@ export const move_cards_batch = spacetimedb.reducer(
     const ids: string[] = JSON.parse(cardInstanceIds);
     const posMap: Record<string, { posX: string; posY: string }> = positions ? JSON.parse(positions) : {};
     const newOwnerId = targetOwnerId ? BigInt(targetOwnerId) : null;
+    const cards: { name: string; img: string }[] = [];
+    const redirectedLostSouls: { name: string; img: string }[] = [];
+
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
 
     for (const idStr of ids) {
       const cardId = BigInt(idStr);
@@ -1234,6 +1312,29 @@ export const move_cards_batch = spacetimedb.reducer(
       if (!card) throw new SenderError('Card not found: ' + idStr);
       // Allow moves by either player in the game (cards move between zones during battles)
       if (card.gameId !== gameId) throw new SenderError('Card not in this game: ' + idStr);
+
+      cards.push({ name: card.cardName, img: card.cardImgFile });
+
+      // Lost souls sent to discard or reserve go to land-of-bondage instead
+      const isLostSoul = card.cardType === 'LS' || card.cardName.toLowerCase().includes('lost soul');
+      if (isLostSoul && (toZone === 'discard' || toZone === 'reserve' || toZone === 'banish')) {
+        const lobIndex = BigInt(
+          [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+            (c: any) => c.ownerId === card.ownerId && c.zone === 'land-of-bondage'
+          ).length
+        );
+        ctx.db.CardInstance.id.update({
+          ...card,
+          zone: 'land-of-bondage',
+          zoneIndex: lobIndex,
+          posX: '',
+          posY: '',
+          isFlipped: false,
+          ownerId: card.ownerId,
+        });
+        redirectedLostSouls.push({ name: card.cardName, img: card.cardImgFile });
+        continue;
+      }
 
       const pos = posMap[idStr] || { posX: '', posY: '' };
       // Moving to deck = face-down; leaving deck = face-up; otherwise preserve
@@ -1249,10 +1350,7 @@ export const move_cards_batch = spacetimedb.reducer(
       });
     }
 
-    const game = ctx.db.Game.id.find(gameId);
-    if (!game) throw new SenderError('Game not found');
-
-    logAction(ctx, gameId, player.id, 'MOVE_CARDS_BATCH', JSON.stringify({ count: ids.length, toZone }), game.turnNumber, game.currentPhase);
+    logAction(ctx, gameId, player.id, 'MOVE_CARDS_BATCH', JSON.stringify({ count: ids.length, toZone, cards, redirectedLostSouls }), game.turnNumber, game.currentPhase);
   }
 );
 
@@ -1835,13 +1933,23 @@ export const spawn_lost_soul = spacetimedb.reducer(
     testament: t.string(),
     posX: t.string(),
     posY: t.string(),
+    targetPlayerId: t.string(), // "" = self, otherwise player ID to spawn in their LOB
   },
-  (ctx, { gameId, testament, posX, posY }) => {
+  (ctx, { gameId, testament, posX, posY, targetPlayerId }) => {
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
     if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
 
     const player = findPlayerBySender(ctx, gameId);
+
+    // Determine owner: self or target player
+    let ownerId = player.id;
+    if (targetPlayerId) {
+      const target = ctx.db.Player.id.find(BigInt(targetPlayerId));
+      if (!target) throw new SenderError('Target player not found');
+      if (target.gameId !== gameId) throw new SenderError('Target player not in this game');
+      ownerId = target.id;
+    }
 
     const isNT = testament === 'NT';
     const cardName = isNT
@@ -1853,7 +1961,7 @@ export const spawn_lost_soul = spacetimedb.reducer(
     ctx.db.CardInstance.insert({
       id: 0n,
       gameId,
-      ownerId: player.id,
+      ownerId,
       zone: 'land-of-bondage',
       zoneIndex: 0n,
       posX,
@@ -2018,9 +2126,47 @@ export const toggle_reveal_hand = spacetimedb.reducer(
 );
 
 // ---------------------------------------------------------------------------
+// Reducer: reveal_cards — broadcast revealed card IDs to all players
+// ---------------------------------------------------------------------------
+export const reveal_cards = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardIds: t.string(), // JSON array of card instance ID strings
+  },
+  (ctx, { gameId, cardIds }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    ctx.db.Player.id.update({ ...player, revealedCards: cardIds });
+
+    const game = ctx.db.Game.id.find(gameId);
+    logAction(
+      ctx,
+      gameId,
+      player.id,
+      'REVEAL_CARDS',
+      cardIds,
+      game ? game.currentTurn : 0n,
+      game ? game.currentPhase : 'draw',
+    );
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: clear_revealed_cards — dismiss the reveal
+// ---------------------------------------------------------------------------
+export const clear_revealed_cards = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+  },
+  (ctx, { gameId }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    ctx.db.Player.id.update({ ...player, revealedCards: '' });
+  }
+);
+
+// ---------------------------------------------------------------------------
 // Lifecycle: clientConnected
 // ---------------------------------------------------------------------------
-spacetimedb.clientConnected((ctx) => {
+export const onConnect = spacetimedb.clientConnected((ctx) => {
   console.log('[stdb-debug] clientConnected:', ctx.sender.toHexString());
   // Find all player rows for this identity and set connected
   for (const player of ctx.db.Player.iter()) {
@@ -2184,8 +2330,8 @@ export const move_opponent_card = spacetimedb.reducer(
     if (card.gameId !== gameId) throw new SenderError('Card not in this game');
 
     const fromZone = card.zone;
-    // Moving to deck = face-down; leaving deck = face-up; otherwise preserve
-    const isFlipped = toZone === 'deck' ? true : (fromZone === 'deck' ? false : card.isFlipped);
+    // Moving to deck = face-down; leaving deck or reserve = face-up; otherwise preserve
+    const isFlipped = toZone === 'deck' ? true : (fromZone === 'deck' || fromZone === 'reserve') ? false : card.isFlipped;
     ctx.db.CardInstance.id.update({
       ...card,
       zone: toZone,
@@ -2204,7 +2350,7 @@ export const move_opponent_card = spacetimedb.reducer(
 // ---------------------------------------------------------------------------
 // Lifecycle: clientDisconnected
 // ---------------------------------------------------------------------------
-spacetimedb.clientDisconnected((ctx) => {
+export const onDisconnect = spacetimedb.clientDisconnected((ctx) => {
   console.log('[stdb-debug] clientDisconnected:', ctx.sender.toHexString());
   // Find all player rows for this identity and set disconnected
   for (const player of ctx.db.Player.iter()) {

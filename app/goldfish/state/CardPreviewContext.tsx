@@ -25,14 +25,18 @@ const CardPreviewContext = createContext<CardPreviewContextValue | null>(null);
 
 export function CardPreviewProvider({
   children,
-  storageKey = DEFAULT_STORAGE_KEY
+  storageKey = DEFAULT_STORAGE_KEY,
+  defaultVisible,
 }: {
   children: ReactNode;
   storageKey?: string;
+  /** When true, always start expanded (on desktop) regardless of stored preference */
+  defaultVisible?: boolean;
 }) {
   const [previewCard, setPreviewCard] = useState<PreviewCard | null>(null);
   const [isLoupeVisible, setIsLoupeVisible] = useState(() => {
     if (typeof window === 'undefined') return false;
+    if (defaultVisible) return window.innerWidth >= 1200;
     const stored = localStorage.getItem(storageKey);
     // Default to true for first-time users on desktop
     if (stored === null) return window.innerWidth >= 1200;

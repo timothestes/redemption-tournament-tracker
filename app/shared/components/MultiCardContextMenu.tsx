@@ -25,6 +25,23 @@ export function MultiCardContextMenu({ selectedIds, x, y, actions, onClose, onCl
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number; ready: boolean }>({ left: x, top: y, ready: false });
 
+  // Determine zones of selected cards to filter move targets
+  const selectedZones = new Set<string>();
+  if (zones) {
+    for (const [zoneName, cards] of Object.entries(zones)) {
+      for (const card of cards) {
+        if (selectedIds.includes(card.instanceId)) {
+          selectedZones.add(zoneName);
+        }
+      }
+    }
+  }
+  const allInHand = selectedZones.size === 1 && selectedZones.has('hand');
+  const HAND_EXCLUDED_TARGETS: ZoneId[] = ['land-of-bondage', 'land-of-redemption'];
+  const filteredTargets = allInHand
+    ? MOVE_TARGETS.filter(z => !HAND_EXCLUDED_TARGETS.includes(z))
+    : MOVE_TARGETS;
+
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -176,7 +193,7 @@ export function MultiCardContextMenu({ selectedIds, x, y, actions, onClose, onCl
 
       {/* Move to zones */}
       <div style={labelStyle}>Move to...</div>
-      {MOVE_TARGETS.map(zoneId => (
+      {filteredTargets.map(zoneId => (
         <button
           key={zoneId}
           style={itemStyle}

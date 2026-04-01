@@ -51,6 +51,13 @@ export const ChatMessage = __t.object("ChatMessage", {
 });
 export type ChatMessage = __Infer<typeof ChatMessage>;
 
+export const ChooseFirstTimeout = __t.object("ChooseFirstTimeout", {
+  scheduledId: __t.u64(),
+  scheduledAt: __t.scheduleAt(),
+  gameId: __t.u64(),
+});
+export type ChooseFirstTimeout = __Infer<typeof ChooseFirstTimeout>;
+
 export const CleanupSchedule = __t.object("CleanupSchedule", {
   scheduledId: __t.u64(),
   scheduledAt: __t.scheduleAt(),
@@ -120,6 +127,7 @@ export const Player = __t.object("Player", {
   autoRouteLostSouls: __t.bool(),
   handRevealed: __t.bool(),
   pendingDeckData: __t.string(),
+  revealedCards: __t.string(),
 });
 export type Player = __Infer<typeof Player>;
 

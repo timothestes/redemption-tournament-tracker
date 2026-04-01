@@ -65,6 +65,7 @@ export const Player = table(
     autoRouteLostSouls: t.bool(),
     handRevealed: t.bool(),       // When true, hand is visible to opponent
     pendingDeckData: t.string(),  // JSON deck data, stored until game starts
+    revealedCards: t.string(),    // JSON array of card instance IDs revealed from deck, "" when none
   }
 );
 
@@ -237,7 +238,31 @@ export const ZoneSearchRequest = table(
 );
 
 // ---------------------------------------------------------------------------
-// 10. CleanupSchedule (scheduled table)
+// 10. ChooseFirstTimeout (scheduled table)
+//     Server-side enforcement of the 30-second choosing phase timer.
+//     If the roll winner doesn't choose in time, auto-selects them to go first.
+// ---------------------------------------------------------------------------
+
+let _handleChooseFirstTimeout: any;
+export const setChooseFirstTimeoutReducer = (reducer: any) => {
+  _handleChooseFirstTimeout = reducer;
+};
+
+export const ChooseFirstTimeout = table(
+  {
+    name: 'choose_first_timeout',
+    public: true,
+    scheduled: () => _handleChooseFirstTimeout,
+  },
+  {
+    scheduledId: t.u64().primaryKey().autoInc(),
+    scheduledAt: t.scheduleAt(),
+    gameId: t.u64(),
+  }
+);
+
+// ---------------------------------------------------------------------------
+// 11. CleanupSchedule (scheduled table)
 // ---------------------------------------------------------------------------
 
 let _handleCleanupStaleGames: any;
@@ -270,6 +295,7 @@ const spacetimedb = schema({
   Spectator,
   DisconnectTimeout,
   ZoneSearchRequest,
+  ChooseFirstTimeout,
   CleanupSchedule,
 });
 
