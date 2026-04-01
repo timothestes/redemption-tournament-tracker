@@ -3094,11 +3094,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
         <ConsentDialog
           requesterName={gameState.opponentPlayer?.displayName ?? 'Opponent'}
           zoneName={incomingSearchRequest.zone === 'hand-reveal' ? 'hand' : incomingSearchRequest.zone}
-          requestType={incomingSearchRequest.zone === 'hand-reveal' ? 'reveal' : 'search'}
+          requestType={
+            incomingSearchRequest.zone === 'action-priority' ? 'priority'
+            : incomingSearchRequest.zone === 'hand-reveal' ? 'reveal'
+            : 'search'
+          }
           onAllow={() => {
             approveZoneSearch(BigInt(incomingSearchRequest.id));
             if (incomingSearchRequest.zone === 'hand-reveal') {
               gameState.revealHand(true);
+            }
+            if (incomingSearchRequest.zone === 'action-priority') {
+              showGameToast('Action priority granted');
             }
           }}
           onDeny={() => denyZoneSearch(BigInt(incomingSearchRequest.id))}

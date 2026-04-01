@@ -979,6 +979,10 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             onSetPhase={gameState.setPhase}
             onEndTurn={gameState.endTurn}
             onConcede={gameState.resignGame}
+            onRequestPriority={() => gameState.requestZoneSearch('action-priority')}
+            hasPendingPriority={gameState.zoneSearchRequests.some(
+              (r: any) => r.zone === 'action-priority' && r.status === 'pending' && r.requesterId === gameState.myPlayer?.id
+            )}
             myScore={gameState.myCards['land-of-redemption']?.length ?? 0}
             opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}
           />

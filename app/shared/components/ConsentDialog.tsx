@@ -3,7 +3,7 @@
 interface ConsentDialogProps {
   requesterName: string;
   zoneName: string;
-  requestType?: 'search' | 'reveal';
+  requestType?: 'search' | 'reveal' | 'priority';
   onAllow: () => void;
   onDeny: () => void;
 }
@@ -33,7 +33,9 @@ export function ConsentDialog({ requesterName, zoneName, requestType = 'search',
         }}
       >
         <div style={{ fontSize: 13, color: 'var(--gf-text)', lineHeight: 1.4 }}>
-          {requestType === 'reveal' ? (
+          {requestType === 'priority' ? (
+            <><strong style={{ color: 'var(--gf-accent)' }}>{requesterName}</strong> is requesting <strong style={{ color: 'var(--gf-text-bright)' }}>action priority</strong></>
+          ) : requestType === 'reveal' ? (
             <><strong style={{ color: 'var(--gf-accent)' }}>{requesterName}</strong> wants to reveal your <strong style={{ color: 'var(--gf-text-bright)' }}>hand</strong></>
           ) : (
             <><strong style={{ color: 'var(--gf-accent)' }}>{requesterName}</strong> wants to search your <strong style={{ color: 'var(--gf-text-bright)' }}>{zoneName}</strong></>
@@ -55,7 +57,7 @@ export function ConsentDialog({ requesterName, zoneName, requestType = 'search',
             onMouseEnter={(e) => { e.currentTarget.style.background = '#3a7332'; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = '#2d5a27'; }}
           >
-            Allow
+            {requestType === 'priority' ? 'Grant' : 'Allow'}
           </button>
           <button
             onClick={onDeny}
