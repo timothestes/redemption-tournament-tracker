@@ -48,6 +48,13 @@ import type { ZoneId } from '@/app/shared/types/gameCard';
 import type { ZoneRect as GoldfishZoneRect } from '@/app/goldfish/layout/zoneLayout';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import DiceOverlay from './DiceOverlay';
+import { BattleZoneLayer } from './BattleZoneLayer';
+import {
+  getCharacterSnapPosition,
+  getEnhancementSnapPosition,
+  absoluteToNormalized,
+  normalizedToAbsolute,
+} from '../layout/battleZoneSnap';
 import { getCardImageUrl as getSharedCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import { useVirtualCanvas, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen } from '@/app/shared/layout/virtualCanvas';
 import { useCardScale } from '@/app/shared/hooks/useCardScale';
@@ -129,7 +136,7 @@ function pointInRect(px: number, py: number, rect: ZoneRect): boolean {
 
 /** Determine if a zone key is a free-form zone (cards positioned at arbitrary x/y). */
 function isFreeFormZone(zone: string): boolean {
-  return zone === 'territory';
+  return zone === 'territory' || zone === 'field-of-battle';
 }
 
 /** Determine if a zone key is an auto-arrange zone (horizontal strip layout). */
@@ -176,10 +183,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
     zoneSearchRequests,
   } = gameState;
 
+  // ---- Battle phase detection ----
+  const currentPhase = gameState.game?.currentPhase ?? 'draw';
+  const isBattlePhase = currentPhase === 'battle';
+
   // ---- Layout ----
   const mpLayout = useMemo(
-    () => calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT),
-    [virtualWidth],
+    () => calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT, false, isBattlePhase),
+    [virtualWidth, isBattlePhase],
   );
 
   // Card scale preference
@@ -207,6 +218,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       deck: mpLayout.sidebar.player.deck!,
       discard: mpLayout.sidebar.player.discard!,
       ...(mpLayout.sidebar.player.paragon ? { paragon: mpLayout.sidebar.player.paragon } : {}),
+      ...(mpLayout.zones.fieldOfBattle ? { 'field-of-battle': mpLayout.zones.fieldOfBattle } : {}),
     };
   }, [mpLayout]);
 
@@ -221,6 +233,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       deck: mpLayout.sidebar.opponent.deck!,
       discard: mpLayout.sidebar.opponent.discard!,
       ...(mpLayout.sidebar.opponent.paragon ? { paragon: mpLayout.sidebar.opponent.paragon } : {}),
+      ...(mpLayout.zones.fieldOfBattle ? { 'field-of-battle': mpLayout.zones.fieldOfBattle } : {}),
     };
   }, [mpLayout]);
 
@@ -603,6 +616,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       // Check opponent hand zone
       if (opponentHandRect && pointInRect(x, y, opponentHandRect)) {
         return { zone: 'hand', owner: 'opponent' };
+      }
+
+      // Check field of battle zone (shared — determine side by y position)
+      if (mpLayout.zones.fieldOfBattle) {
+        const fob = mpLayout.zones.fieldOfBattle;
+        if (pointInRect(x, y, fob)) {
+          const midY = fob.y + fob.height / 2;
+          const owner = y < midY ? 'opponent' : 'my';
+          return { zone: 'field-of-battle', owner };
+        }
       }
 
       // Check my zones (all: free-form + sidebar piles)
@@ -1578,6 +1601,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
           y={offsetY}
         >
           {/* ================================================================
+              Battle Zone background — rendered when in battle phase
+              ================================================================ */}
+          {mpLayout.zones.fieldOfBattle && (
+            <BattleZoneLayer
+              zone={mpLayout.zones.fieldOfBattle}
+              cardWidth={cardWidth}
+              cardHeight={cardHeight}
+              playerCardCount={(myCards['field-of-battle'] ?? []).length}
+              opponentCardCount={(opponentCards['field-of-battle'] ?? []).length}
+            />
+          )}
+
+          {/* ================================================================
               Zone backgrounds — My zones
               ================================================================ */}
           {Object.entries(myZones).map(([key, zone]) => {
@@ -1883,6 +1919,104 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
               </Group>
             );
           })}
+
+          {/* ================================================================
+              Cards in field of battle — My cards
+              ================================================================ */}
+          {mpLayout.zones.fieldOfBattle && (() => {
+            const cards = myCards['field-of-battle'];
+            if (!cards || cards.length === 0) return null;
+            const zone = mpLayout.zones.fieldOfBattle!;
+            const sorted = [...cards].sort((a, b) => Number(a.zoneIndex) - Number(b.zoneIndex));
+            return (
+              <Group
+                key="my-cards-field-of-battle"
+                clipX={zone.x}
+                clipY={zone.y}
+                clipWidth={zone.width}
+                clipHeight={zone.height}
+              >
+                {sorted.map((card) => {
+                  const gameCard = adaptCard(card, 'player1');
+                  const x = card.posX ? parseFloat(card.posX) * zone.width + zone.x : zone.x + zone.width / 2 - cardWidth / 2;
+                  const y = card.posY ? parseFloat(card.posY) * zone.height + zone.y : zone.y + zone.height * 0.75 - cardHeight / 2;
+                  return (
+                    <GameCardNode
+                      key={String(card.id)}
+                      card={gameCard}
+                      x={x}
+                      y={y}
+                      rotation={0}
+                      cardWidth={cardWidth}
+                      cardHeight={cardHeight}
+                      image={getCardImage(card)}
+                      isSelected={isSelected(String(card.id))}
+                      isDraggable={true}
+                      hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
+                      nodeRef={registerCardNode}
+                      onClick={handleCardClick}
+                      onDragStart={handleCardDragStart}
+                      onDragMove={handleCardDragMove}
+                      onDragEnd={handleCardDragEnd}
+                      onContextMenu={handleCardContextMenu}
+                      onDblClick={handleDblClick}
+                      onMouseEnter={handleMouseEnter}
+                      onMouseLeave={handleMouseLeave}
+                    />
+                  );
+                })}
+              </Group>
+            );
+          })()}
+
+          {/* ================================================================
+              Cards in field of battle — Opponent cards
+              ================================================================ */}
+          {mpLayout.zones.fieldOfBattle && (() => {
+            const cards = opponentCards['field-of-battle'];
+            if (!cards || cards.length === 0) return null;
+            const zone = mpLayout.zones.fieldOfBattle!;
+            const sorted = [...cards].sort((a, b) => Number(a.zoneIndex) - Number(b.zoneIndex));
+            return (
+              <Group
+                key="opp-cards-field-of-battle"
+                clipX={zone.x}
+                clipY={zone.y}
+                clipWidth={zone.width}
+                clipHeight={zone.height}
+              >
+                {sorted.map((card) => {
+                  const gameCard = adaptCard(card, 'player2');
+                  const x = card.posX ? parseFloat(card.posX) * zone.width + zone.x : zone.x + zone.width / 2 - cardWidth / 2;
+                  const y = card.posY ? parseFloat(card.posY) * zone.height + zone.y : zone.y + zone.height * 0.25 - cardHeight / 2;
+                  return (
+                    <GameCardNode
+                      key={String(card.id)}
+                      card={gameCard}
+                      x={x}
+                      y={y}
+                      rotation={0}
+                      cardWidth={cardWidth}
+                      cardHeight={cardHeight}
+                      image={getCardImage(card)}
+                      isSelected={isSelected(String(card.id))}
+                      isDraggable={true}
+                      hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
+                      nodeRef={registerCardNode}
+                      onClick={handleCardClick}
+                      onDragStart={handleCardDragStart}
+                      onDragMove={handleCardDragMove}
+                      onDragEnd={handleCardDragEnd}
+                      onContextMenu={handleCardContextMenu}
+                      onDblClick={noopDblClick}
+                      onMouseEnter={handleMouseEnter}
+                      onMouseLeave={handleMouseLeave}
+                    />
+                  );
+                })}
+              </Group>
+            );
+          })()}
 
           {/* ================================================================
               Cards in auto-arrange zones — My LOB (draggable, horizontal strip)
