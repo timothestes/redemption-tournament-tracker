@@ -875,6 +875,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                 isFinished
                 winnerName={winnerName}
                 onPlayAgain={() => setPlayAgainTriggered(true)}
+                myScore={gameState.myCards['land-of-redemption']?.length ?? 0}
+                opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}
               />
             </div>
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
@@ -943,6 +945,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               isFinished
               winnerName={winnerName}
               onPlayAgain={() => setPlayAgainTriggered(true)}
+              myScore={gameState.myCards['land-of-redemption']?.length ?? 0}
+              opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}
             />
           </div>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
@@ -975,6 +979,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             onSetPhase={gameState.setPhase}
             onEndTurn={gameState.endTurn}
             onConcede={gameState.resignGame}
+            myScore={gameState.myCards['land-of-redemption']?.length ?? 0}
+            opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}
           />
         </div>
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>

@@ -31,6 +31,8 @@ interface TurnIndicatorProps {
   isFinished?: boolean;
   winnerName?: string;
   onPlayAgain?: () => void;
+  myScore?: number;
+  opponentScore?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -48,6 +50,8 @@ export default function TurnIndicator({
   isFinished,
   winnerName,
   onPlayAgain,
+  myScore = 0,
+  opponentScore = 0,
 }: TurnIndicatorProps) {
   const [showConcedeConfirm, setShowConcedeConfirm] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
@@ -126,15 +130,22 @@ export default function TurnIndicator({
       </button>
 
       {/* ================================================================
-          LEFT — Turn counter + whose turn it is
+          LEFT — Turn counter + whose turn + score
           ================================================================ */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          flexShrink: 0,
+        }}
+      >
       <div
         style={{
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'flex-start',
-          minWidth: 120,
-          flexShrink: 0,
+          minWidth: 100,
         }}
       >
         {isFinished ? (
@@ -183,6 +194,27 @@ export default function TurnIndicator({
             </span>
           </>
         )}
+      </div>
+
+      {/* Score */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          fontFamily: 'var(--font-cinzel), Georgia, serif',
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <span style={{ color: '#c4955a', fontSize: 20, fontWeight: 700, lineHeight: 1 }}>{myScore}</span>
+          <span style={{ color: 'rgba(196, 149, 90, 0.45)', fontSize: 8, letterSpacing: '0.08em', textTransform: 'uppercase', lineHeight: 1, marginTop: 2 }}>you</span>
+        </div>
+        <span style={{ color: 'rgba(232, 213, 163, 0.2)', fontSize: 10, fontWeight: 400 }}>vs</span>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <span style={{ color: '#4a7ab5', fontSize: 20, fontWeight: 700, lineHeight: 1 }}>{opponentScore}</span>
+          <span style={{ color: 'rgba(74, 122, 181, 0.45)', fontSize: 8, letterSpacing: '0.08em', textTransform: 'uppercase', lineHeight: 1, marginTop: 2 }}>opp</span>
+        </div>
+      </div>
       </div>
 
       {/* ================================================================

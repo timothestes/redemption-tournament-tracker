@@ -1111,7 +1111,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       // player territory cards render with rotation=0 (anchor at top-left).
       // When crossing between them, offset by card dimensions so the visual
       // position stays consistent.
-      const sourceIsRotated = sourceOwner === 'opponent' && isFreeFormZone(sourceZone ?? '');
+      const sourceIsRotated = sourceOwner === 'opponent' && (isFreeFormZone(sourceZone ?? '') || SIDEBAR_PILE_ZONES.includes(sourceZone as any));
       const targetIsRotated = isOpponentTarget && isFreeFormZone(targetZone);
       let adjDropX = dropX;
       let adjDropY = dropY;
@@ -1338,6 +1338,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
     }
   }, [multiplayerActions]);
   const noopDblClick = useCallback((_card: GameCard) => {}, []);
+  const noopContextMenu = useCallback((_card: GameCard, _e: Konva.KonvaEventObject<PointerEvent>) => {}, []);
 
   const handleMouseEnter = useCallback(
     (card: GameCard, e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -2111,7 +2112,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
               ? [...cards].sort((a, b) => (a.cardType ?? '').localeCompare(b.cardType ?? '') || (a.cardName ?? '').localeCompare(b.cardName ?? ''))
               : cards;
             const topCard = sortedCards[sortedCards.length - 1];
-            const showFace = topCard && ((zoneKey === 'discard' || zoneKey === 'land-of-redemption') ? !topCard.isFlipped : zoneKey === 'reserve');
+            const showFace = topCard && ((zoneKey === 'discard' || zoneKey === 'land-of-redemption' || zoneKey === 'banish') ? !topCard.isFlipped : zoneKey === 'reserve');
 
             return (
               <Group
@@ -2209,78 +2210,44 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
                         <CardBackShape width={pileCardWidth} height={pileCardHeight} />
                       </Group>
                     )}
-                    {/* Second card underneath for face-up piles (visible when top card is dragged) */}
-                    {count > 1 && showFace && (() => {
-                      const secondCard = sortedCards[sortedCards.length - 2];
-                      if (!secondCard) return null;
-                      const effectiveSecond = zoneKey === 'reserve' && secondCard.isFlipped
-                        ? { ...secondCard, isFlipped: false }
-                        : secondCard;
-                      const secondImg = getCardImage(effectiveSecond);
-                      return secondImg ? (
-                        <GameCardNode
-                          card={adaptCard(effectiveSecond, 'player1')}
-                          x={0}
-                          y={0}
-                          rotation={0}
-                          cardWidth={pileCardWidth}
-                          cardHeight={pileCardHeight}
-                          image={secondImg}
-                          isSelected={false}
-                          isDraggable={zoneKey === 'discard' || zoneKey === 'reserve'}
-                          nodeRef={(zoneKey === 'discard' || zoneKey === 'reserve') ? registerCardNode : undefined}
-                          hoverProgress={hoveredInstanceId === String(secondCard.id) ? hoverProgress : 0}
-                          onDragStart={(zoneKey === 'discard' || zoneKey === 'reserve') ? handleCardDragStart : noopCardDrag}
-                          onDragMove={(zoneKey === 'discard' || zoneKey === 'reserve') ? handleCardDragMove : noopDrag}
-                          onDragEnd={(zoneKey === 'discard' || zoneKey === 'reserve') ? handleCardDragEnd : noopCardDragEnd}
-                          onContextMenu={handleCardContextMenu}
-                          onDblClick={noopDblClick}
-                          onMouseEnter={handleMouseEnter}
-                          onMouseLeave={handleMouseLeave}
-                        />
-                      ) : (
-                        <CardBackShape width={pileCardWidth} height={pileCardHeight} />
-                      );
-                    })()}
-                    {showFace && topCard ? (
-                      (() => {
-                        // For reserve, force face-up image even if card.isFlipped is true
-                        const effectiveCard = zoneKey === 'reserve' && topCard.isFlipped
-                          ? { ...topCard, isFlipped: false }
-                          : topCard;
-                        const img = getCardImage(effectiveCard);
+                    {showFace ? (
+                      // Render all cards stacked — each is independently draggable.
+                      // Only the topmost is visible, but when dragged away the next
+                      // card is already rendered underneath with its own node ref.
+                      sortedCards.map((c) => {
+                        const effective = zoneKey === 'reserve' && c.isFlipped
+                          ? { ...c, isFlipped: false }
+                          : c;
+                        const img = getCardImage(effective);
+                        const isDraggableZone = zoneKey === 'discard' || zoneKey === 'reserve' || zoneKey === 'banish';
                         return img ? (
-                          <Group>
-                            <Rect
-                              width={pileCardWidth}
-                              height={pileCardHeight}
-                              cornerRadius={4}
-                            />
-                            <GameCardNode
-                              card={adaptCard(effectiveCard, 'player1')}
-                              x={0}
-                              y={0}
-                              rotation={0}
-                              cardWidth={pileCardWidth}
-                              cardHeight={pileCardHeight}
-                              image={img}
-                              isSelected={false}
-                              isDraggable={zoneKey === 'discard' || zoneKey === 'reserve' || zoneKey === 'deck'}
-                              nodeRef={(zoneKey === 'discard' || zoneKey === 'reserve' || zoneKey === 'deck') ? registerCardNode : undefined}
-                              hoverProgress={hoveredInstanceId === String(topCard.id) ? hoverProgress : 0}
-                              onDragStart={(zoneKey === 'discard' || zoneKey === 'reserve' || zoneKey === 'deck') ? handleCardDragStart : noopCardDrag}
-                              onDragMove={(zoneKey === 'discard' || zoneKey === 'reserve' || zoneKey === 'deck') ? handleCardDragMove : noopDrag}
-                              onDragEnd={(zoneKey === 'discard' || zoneKey === 'reserve' || zoneKey === 'deck') ? handleCardDragEnd : noopCardDragEnd}
-                              onContextMenu={handleCardContextMenu}
-                              onDblClick={noopDblClick}
-                              onMouseEnter={handleMouseEnter}
-                              onMouseLeave={handleMouseLeave}
-                            />
-                          </Group>
+                          <GameCardNode
+                            key={String(c.id)}
+                            card={adaptCard(effective, 'player1')}
+                            x={0}
+                            y={0}
+                            rotation={0}
+                            cardWidth={pileCardWidth}
+                            cardHeight={pileCardHeight}
+                            image={img}
+                            isSelected={false}
+                            isDraggable={isDraggableZone}
+                            nodeRef={isDraggableZone ? registerCardNode : undefined}
+                            hoverProgress={hoveredInstanceId === String(c.id) ? hoverProgress : 0}
+                            onDragStart={isDraggableZone ? handleCardDragStart : noopCardDrag}
+                            onDragMove={isDraggableZone ? handleCardDragMove : noopDrag}
+                            onDragEnd={isDraggableZone ? handleCardDragEnd : noopCardDragEnd}
+                            onContextMenu={noopContextMenu}
+                            onDblClick={noopDblClick}
+                            onMouseEnter={handleMouseEnter}
+                            onMouseLeave={handleMouseLeave}
+                          />
                         ) : (
-                          <CardBackShape width={pileCardWidth} height={pileCardHeight} />
+                          <Group key={String(c.id)}>
+                            <CardBackShape width={pileCardWidth} height={pileCardHeight} />
+                          </Group>
                         );
-                      })()
+                      })
                     ) : zoneKey === 'deck' && topCard ? (
                       <GameCardNode
                         card={adaptCard(topCard, 'player1')}
@@ -2297,7 +2264,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
                         onDragStart={handleCardDragStart}
                         onDragMove={handleCardDragMove}
                         onDragEnd={handleCardDragEnd}
-                        onContextMenu={handleCardContextMenu}
+                        onContextMenu={noopContextMenu}
                         onDblClick={noopDblClick}
                         onMouseEnter={handleMouseEnter}
                         onMouseLeave={handleMouseLeave}
@@ -2407,9 +2374,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
 
                 {/* Non-LOR pile visual — rotated 180° for opponent */}
                 {zoneKey !== 'land-of-redemption' && count > 0 && (
-                  <Group x={cx + pileCardWidth} y={cy + pileCardHeight} rotation={180}>
+                  <Group x={cx} y={cy}>
                     {count > 1 && !showFace && (
-                      <Group x={-2} y={-2}>
+                      <Group x={pileCardWidth - 2} y={pileCardHeight - 2} rotation={180}>
                         <CardBackShape width={pileCardWidth} height={pileCardHeight} />
                       </Group>
                     )}
@@ -2417,34 +2384,36 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
                       (() => {
                         const img = getCardImage(topCard);
                         return img ? (
-                          <Group>
-                            <GameCardNode
-                              card={adaptCard(topCard, 'player2')}
-                              x={0}
-                              y={0}
-                              rotation={0}
-                              cardWidth={pileCardWidth}
-                              cardHeight={pileCardHeight}
-                              image={img}
-                              isSelected={false}
-                              isDraggable={zoneKey === 'discard'}
-                              nodeRef={zoneKey === 'discard' ? registerCardNode : undefined}
-                              hoverProgress={hoveredInstanceId === String(topCard.id) ? hoverProgress : 0}
-                              onDragStart={zoneKey === 'discard' ? handleCardDragStart : noopCardDrag}
-                              onDragMove={zoneKey === 'discard' ? handleCardDragMove : noopDrag}
-                              onDragEnd={zoneKey === 'discard' ? handleCardDragEnd : noopCardDragEnd}
-                              onContextMenu={handleCardContextMenu}
-                              onDblClick={noopDblClick}
-                              onMouseEnter={handleMouseEnter}
-                              onMouseLeave={handleMouseLeave}
-                            />
-                          </Group>
+                          <GameCardNode
+                            card={adaptCard(topCard, 'player2')}
+                            x={pileCardWidth}
+                            y={pileCardHeight}
+                            rotation={180}
+                            cardWidth={pileCardWidth}
+                            cardHeight={pileCardHeight}
+                            image={img}
+                            isSelected={false}
+                            isDraggable={zoneKey === 'discard'}
+                            nodeRef={zoneKey === 'discard' ? registerCardNode : undefined}
+                            hoverProgress={hoveredInstanceId === String(topCard.id) ? hoverProgress : 0}
+                            onDragStart={zoneKey === 'discard' ? handleCardDragStart : noopCardDrag}
+                            onDragMove={zoneKey === 'discard' ? handleCardDragMove : noopDrag}
+                            onDragEnd={zoneKey === 'discard' ? handleCardDragEnd : noopCardDragEnd}
+                            onContextMenu={handleCardContextMenu}
+                            onDblClick={noopDblClick}
+                            onMouseEnter={handleMouseEnter}
+                            onMouseLeave={handleMouseLeave}
+                          />
                         ) : (
-                          <CardBackShape width={pileCardWidth} height={pileCardHeight} />
+                          <Group x={pileCardWidth} y={pileCardHeight} rotation={180}>
+                            <CardBackShape width={pileCardWidth} height={pileCardHeight} />
+                          </Group>
                         );
                       })()
                     ) : (
-                      <CardBackShape width={pileCardWidth} height={pileCardHeight} />
+                      <Group x={pileCardWidth} y={pileCardHeight} rotation={180}>
+                        <CardBackShape width={pileCardWidth} height={pileCardHeight} />
+                      </Group>
                     )}
                   </Group>
                 )}
