@@ -30,10 +30,6 @@ interface TurnIndicatorProps {
   onConcede?: () => void;
   onRequestPriority?: () => void;
   hasPendingPriority?: boolean;
-  /** Incoming priority request from opponent — render inline in the phase bar */
-  incomingPriorityFrom?: string | null;
-  onGrantPriority?: () => void;
-  onDenyPriority?: () => void;
   isFinished?: boolean;
   winnerName?: string;
   onPlayAgain?: () => void;
@@ -55,9 +51,6 @@ export default function TurnIndicator({
   onConcede,
   onRequestPriority,
   hasPendingPriority,
-  incomingPriorityFrom,
-  onGrantPriority,
-  onDenyPriority,
   isFinished,
   winnerName,
   onPlayAgain,
@@ -386,64 +379,6 @@ export default function TurnIndicator({
           >
             Play Again
           </button>
-        )}
-        {/* Incoming priority request — inline in phase bar */}
-        {!isFinished && incomingPriorityFrom && onGrantPriority && onDenyPriority && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '4px 10px',
-              background: 'rgba(196, 149, 90, 0.1)',
-              border: '1px solid rgba(196, 149, 90, 0.3)',
-              borderRadius: 6,
-            }}
-          >
-            <span style={{
-              fontSize: 10,
-              color: 'var(--gf-text, #d4c4a0)',
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              letterSpacing: '0.04em',
-              whiteSpace: 'nowrap',
-            }}>
-              <strong style={{ color: '#c4955a' }}>{incomingPriorityFrom}</strong> wants priority
-            </span>
-            <button
-              onClick={onGrantPriority}
-              style={{
-                padding: '3px 10px',
-                background: '#2d5a27',
-                border: '1px solid #4a8a42',
-                borderRadius: 4,
-                color: '#c4e8bf',
-                fontSize: 10,
-                fontFamily: 'var(--font-cinzel), Georgia, serif',
-                cursor: 'pointer',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#3a7332'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = '#2d5a27'; }}
-            >
-              Grant
-            </button>
-            <button
-              onClick={onDenyPriority}
-              style={{
-                padding: '3px 10px',
-                background: '#5a2727',
-                border: '1px solid #8a4242',
-                borderRadius: 4,
-                color: '#e8bfbf',
-                fontSize: 10,
-                fontFamily: 'var(--font-cinzel), Georgia, serif',
-                cursor: 'pointer',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#733232'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = '#5a2727'; }}
-            >
-              Deny
-            </button>
-          </div>
         )}
         {!isFinished && onConcede && (
           <button

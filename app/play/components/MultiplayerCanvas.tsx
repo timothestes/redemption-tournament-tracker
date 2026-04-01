@@ -3097,7 +3097,89 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
         />
       )}
 
-      {/* Priority requests are handled inline in TurnIndicator — only show ConsentDialog for search/reveal */}
+      {/* Priority request — floating in center of board between territories */}
+      {incomingSearchRequest && incomingSearchRequest.zone === 'action-priority' && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '40%',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 300,
+            pointerEvents: 'auto',
+          }}
+        >
+          <div
+            style={{
+              background: 'rgba(14, 10, 6, 0.95)',
+              border: '1px solid rgba(196, 149, 90, 0.35)',
+              borderRadius: 10,
+              padding: '16px 24px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 12,
+              boxShadow: '0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(196, 149, 90, 0.08)',
+            }}
+          >
+            <div style={{
+              fontSize: 12,
+              color: '#e8d5a3',
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              letterSpacing: '0.06em',
+              textAlign: 'center',
+            }}>
+              <strong style={{ color: '#c4955a' }}>
+                {gameState.opponentPlayer?.displayName ?? 'Opponent'}
+              </strong>{' '}
+              requests priority
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => {
+                  approveZoneSearch(BigInt(incomingSearchRequest.id));
+                  showGameToast('Action priority granted');
+                }}
+                style={{
+                  padding: '6px 18px',
+                  background: '#2d5a27',
+                  border: '1px solid #4a8a42',
+                  borderRadius: 6,
+                  color: '#c4e8bf',
+                  fontSize: 11,
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  letterSpacing: '0.06em',
+                  cursor: 'pointer',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#3a7332'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#2d5a27'; }}
+              >
+                Grant
+              </button>
+              <button
+                onClick={() => denyZoneSearch(BigInt(incomingSearchRequest.id))}
+                style={{
+                  padding: '6px 18px',
+                  background: '#5a2727',
+                  border: '1px solid #8a4242',
+                  borderRadius: 6,
+                  color: '#e8bfbf',
+                  fontSize: 11,
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  letterSpacing: '0.06em',
+                  cursor: 'pointer',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#733232'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#5a2727'; }}
+              >
+                Deny
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Search/reveal requests — floating top-center banner */}
       {incomingSearchRequest && incomingSearchRequest.zone !== 'action-priority' && (
         <ConsentDialog
           requesterName={gameState.opponentPlayer?.displayName ?? 'Opponent'}
