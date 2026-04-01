@@ -15,4 +15,5 @@ export default {
   testament: __t.string(),
   posX: __t.string(),
   posY: __t.string(),
+  targetPlayerId: __t.string(),
 };
