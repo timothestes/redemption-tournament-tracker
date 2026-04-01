@@ -1251,18 +1251,41 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
         const existingCards = hit.owner === 'my'
           ? (myCards['field-of-battle'] ?? [])
           : (opponentCards['field-of-battle'] ?? []);
-        const cardType = card.type;
-        const isEnhancement = cardType === 'GE' || cardType === 'EE';
+        const isEnhancement = card.type === 'GE' || card.type === 'EE';
 
         let snapX: number;
         let snapY: number;
 
         if (isEnhancement) {
-          const existingEnhancements = existingCards.filter(
-            (c) => c.cardType === 'GE' || c.cardType === 'EE'
+          // Find the nearest character to the drop point for enhancement targeting
+          const existingChars = existingCards.filter(
+            (c) => c.cardType !== 'GE' && c.cardType !== 'EE'
           );
+          let nearestCharIdx = 0;
+          if (existingChars.length > 1) {
+            let minDist = Infinity;
+            for (let i = 0; i < existingChars.length; i++) {
+              const charSnap = getCharacterSnapPosition(side, i, fob, cardWidth, cardHeight);
+              const charCenterX = charSnap.x + cardWidth / 2;
+              const dist = Math.abs(centerX - charCenterX);
+              if (dist < minDist) {
+                minDist = dist;
+                nearestCharIdx = i;
+              }
+            }
+          }
+          // Count existing enhancements on this specific character
+          const charSnap = getCharacterSnapPosition(side, nearestCharIdx, fob, cardWidth, cardHeight);
+          const charNorm = absoluteToNormalized(charSnap.x, charSnap.y, fob);
+          const enhOnChar = existingCards.filter((c) => {
+            if (c.cardType !== 'GE' && c.cardType !== 'EE') return false;
+            // Check if this enhancement is near the target character's snap column
+            if (!c.posX) return nearestCharIdx === 0;
+            const enhX = parseFloat(c.posX) * fob.width + fob.x;
+            return Math.abs(enhX - charSnap.x) < cardWidth * 1.5;
+          });
           const snap = getEnhancementSnapPosition(
-            side, 0, existingEnhancements.length, fob, cardWidth, cardHeight
+            side, nearestCharIdx, enhOnChar.length, fob, cardWidth, cardHeight
           );
           snapX = snap.x;
           snapY = snap.y;
@@ -2065,7 +2088,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
           })()}
 
           {/* ================================================================
-              Cards in field of battle — Opponent cards
+              Cards in field of battle — Opponent cards (Y mirrored)
               ================================================================ */}
           {mpLayout.zones.fieldOfBattle && (() => {
             const cards = opponentCards['field-of-battle'];
@@ -2082,8 +2105,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
               >
                 {sorted.map((card) => {
                   const gameCard = adaptCard(card, 'player2');
+                  // Mirror Y: opponent stored posY relative to their view (bottom=their side),
+                  // but we render their cards in the top half (1 - posY flips it)
                   const x = card.posX ? parseFloat(card.posX) * zone.width + zone.x : zone.x + zone.width / 2 - cardWidth / 2;
-                  const y = card.posY ? parseFloat(card.posY) * zone.height + zone.y : zone.y + zone.height * 0.25 - cardHeight / 2;
+                  const rawPosY = card.posY ? parseFloat(card.posY) : 0.75;
+                  const y = (1 - rawPosY) * zone.height + zone.y;
                   return (
                     <GameCardNode
                       key={String(card.id)}
