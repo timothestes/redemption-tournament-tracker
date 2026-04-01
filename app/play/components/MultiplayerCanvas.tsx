@@ -190,6 +190,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
   const prevBattlePhaseRef = useRef(false);
   const myCardsRef = useRef(myCards);
   myCardsRef.current = myCards;
+  const opponentCardsRef = useRef(opponentCards);
+  opponentCardsRef.current = opponentCards;
   const moveCardRef = useRef(moveCard);
   moveCardRef.current = moveCard;
   useEffect(() => {
@@ -199,7 +201,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
     // Only trigger on transition FROM battle to non-battle
     if (!wasBattle || isBattlePhase) return;
 
-    // Return my cards from field of battle to my territory, spread horizontally
+    // Return ALL cards from field of battle to their owner's territory
     const myBattleCards = myCardsRef.current['field-of-battle'] ?? [];
     for (let i = 0; i < myBattleCards.length; i++) {
       const card = myBattleCards[i];
@@ -207,7 +209,15 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       moveCardRef.current(card.id, 'territory', undefined, String(offsetX), '0.05');
     }
 
-    if (myBattleCards.length > 0) {
+    // Opponent cards go back to opponent's territory (ownerId stays the same)
+    const oppBattleCards = opponentCardsRef.current['field-of-battle'] ?? [];
+    for (let i = 0; i < oppBattleCards.length; i++) {
+      const card = oppBattleCards[i];
+      const offsetX = 0.35 + i * 0.05;
+      moveCardRef.current(card.id, 'territory', undefined, String(offsetX), '0.95');
+    }
+
+    if (myBattleCards.length > 0 || oppBattleCards.length > 0) {
       showGameToast('Battle ended — cards returned to territory');
     }
   }, [isBattlePhase]);
