@@ -813,8 +813,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       (r: any) => r.requesterId === gameState.myPlayer?.id && r.status === 'pending'
     );
     if (pendingSearchRef.current && !myPending && !approvedSearchRequest) {
-      const wasReveal = pendingSearchRef.current.zone === 'hand-reveal';
-      showGameToast(wasReveal ? 'Reveal request denied' : 'Search request denied');
+      const zone = pendingSearchRef.current.zone;
+      const msg = zone === 'hand-reveal' ? 'Reveal request denied'
+        : zone === 'action-priority' ? 'Priority request denied'
+        : 'Search request denied';
+      showGameToast(msg);
     }
     pendingSearchRef.current = myPending ?? null;
   }, [zoneSearchRequests, gameState.myPlayer, approvedSearchRequest]);
