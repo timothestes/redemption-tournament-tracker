@@ -13,12 +13,11 @@ export function ConsentDialog({ requesterName, zoneName, requestType = 'search',
     <div
       style={{
         position: 'fixed',
-        inset: 0,
+        top: 12,
+        left: '50%',
+        transform: 'translateX(-50%)',
         zIndex: 900,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(0,0,0,0.7)',
+        pointerEvents: 'auto',
       }}
     >
       <div
@@ -26,47 +25,30 @@ export function ConsentDialog({ requesterName, zoneName, requestType = 'search',
           background: 'var(--gf-bg)',
           border: '1px solid var(--gf-border)',
           borderRadius: 8,
-          padding: '24px 32px',
-          maxWidth: 360,
-          textAlign: 'center',
-          boxShadow: '0 12px 40px rgba(0,0,0,0.8)',
+          padding: '12px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.7)',
         }}
       >
-        <div
-          style={{
-            fontFamily: 'var(--font-cinzel), Georgia, serif',
-            fontSize: 16,
-            color: 'var(--gf-text-bright)',
-            marginBottom: 8,
-            letterSpacing: '0.05em',
-          }}
-        >
-          {requestType === 'reveal' ? 'Reveal Hand Request' : 'Zone Search Request'}
-        </div>
-        <div
-          style={{
-            fontSize: 14,
-            color: 'var(--gf-text)',
-            marginBottom: 20,
-            lineHeight: 1.5,
-          }}
-        >
+        <div style={{ fontSize: 13, color: 'var(--gf-text)', lineHeight: 1.4 }}>
           {requestType === 'reveal' ? (
-            <><strong style={{ color: 'var(--gf-accent)' }}>{requesterName}</strong> is asking you to reveal your <strong style={{ color: 'var(--gf-text-bright)' }}>hand</strong>.</>
+            <><strong style={{ color: 'var(--gf-accent)' }}>{requesterName}</strong> wants to reveal your <strong style={{ color: 'var(--gf-text-bright)' }}>hand</strong></>
           ) : (
-            <><strong style={{ color: 'var(--gf-accent)' }}>{requesterName}</strong> wants to search your <strong style={{ color: 'var(--gf-text-bright)' }}>{zoneName}</strong>.</>
+            <><strong style={{ color: 'var(--gf-accent)' }}>{requesterName}</strong> wants to search your <strong style={{ color: 'var(--gf-text-bright)' }}>{zoneName}</strong></>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           <button
             onClick={onAllow}
             style={{
-              padding: '8px 24px',
+              padding: '6px 16px',
               background: '#2d5a27',
               border: '1px solid #4a8a42',
               borderRadius: 6,
               color: '#c4e8bf',
-              fontSize: 13,
+              fontSize: 12,
               fontFamily: 'var(--font-cinzel), Georgia, serif',
               cursor: 'pointer',
             }}
@@ -78,12 +60,12 @@ export function ConsentDialog({ requesterName, zoneName, requestType = 'search',
           <button
             onClick={onDeny}
             style={{
-              padding: '8px 24px',
+              padding: '6px 16px',
               background: '#5a2727',
               border: '1px solid #8a4242',
               borderRadius: 6,
               color: '#e8bfbf',
-              fontSize: 13,
+              fontSize: 12,
               fontFamily: 'var(--font-cinzel), Georgia, serif',
               cursor: 'pointer',
             }}
