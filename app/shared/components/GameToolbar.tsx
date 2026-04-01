@@ -8,7 +8,7 @@ import {
   PanelBottomOpen,
   Dices,
   SkipForward,
-  HandMetal,
+  Hand,
 } from 'lucide-react';
 import type { GameActions } from '../types/gameActions';
 
@@ -142,7 +142,7 @@ export function GameToolbar({
       shortcut: '',
       disabled: !!isFinished,
     }] : isMultiplayer && !isMyTurn && !isFinished ? [{
-      icon: HandMetal,
+      icon: Hand,
       label: hasPendingPriority ? 'Pending...' : 'Priority',
       onClick: onRequestPriority ?? (() => {}),
       shortcut: '',
