@@ -30,7 +30,7 @@ export default async function PlayPage({ searchParams }: { searchParams: Promise
     <>
     <TopNav />
     <div className="container mx-auto px-4 py-8 max-w-lg">
-      <h1 className="text-3xl font-bold mb-8 font-cinzel">Play Online</h1>
+      <h1 className="text-3xl font-bold mb-8 font-cinzel jayden-gradient-text">Play Online</h1>
       <GameLobby
         decks={decks || []}
         userId={user.id}

@@ -174,7 +174,7 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
   return (
     <div className="flex flex-col gap-5">
       {/* Deck selection — matches community/my-decks card preview style */}
-      <section className="rounded-lg border border-border bg-card overflow-hidden">
+      <section className="rounded-lg border border-border bg-card overflow-hidden [.jayden_&]:border-primary/30 [.jayden_&]:bg-gradient-to-br [.jayden_&]:from-[hsla(0,80%,25%,0.15)] [.jayden_&]:via-[hsla(270,60%,20%,0.1)] [.jayden_&]:to-[hsla(230,80%,30%,0.15)]">
         {selectedDeck ? (
           <>
             {/* Card preview header — same style as community DeckCard */}
@@ -190,7 +190,7 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
                 />
               </div>
             ) : hasPreview ? (
-              <div className="h-32 overflow-hidden bg-gray-100 dark:bg-gray-900 flex items-center justify-center gap-1 px-2 py-2">
+              <div className="h-32 overflow-hidden bg-muted flex items-center justify-center gap-1 px-2 py-2">
                 {img1Url && (
                   <img src={img1Url} alt="" className="h-full object-contain rounded" />
                 )}
@@ -199,7 +199,7 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
                 )}
               </div>
             ) : (
-              <div className="h-20 bg-gray-100 dark:bg-gray-900 flex items-center justify-center">
+              <div className="h-20 bg-muted flex items-center justify-center">
                 <img
                   src="/gameplay/cardback.webp"
                   alt=""

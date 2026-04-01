@@ -6,7 +6,7 @@ import { useTheme } from "next-themes";
 import Image from "next/image";
 
 // Routes where the background image is fully covered and doesn't need to render
-const SKIP_BACKGROUND_PREFIXES = ["/decklist/", "/tracker/", "/admin/"];
+const SKIP_BACKGROUND_PREFIXES = ["/decklist/", "/tracker/", "/admin/", "/play"];
 
 const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const pathname = usePathname();
@@ -56,7 +56,7 @@ const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
             filter: isLightTheme
               ? 'brightness(1.8) contrast(0.7) saturate(0.3) blur(1.5px)'
               : isJaydenTheme
-              ? 'brightness(0.6) contrast(1.2) saturate(1.8) hue-rotate(280deg)'
+              ? 'brightness(0.7) contrast(1.15) saturate(2.2) hue-rotate(280deg)'
               : 'brightness(1.05) contrast(0.95)'
           }}
           priority
@@ -65,7 +65,7 @@ const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
         {/* Overlay for readability */}
         <div
           className={`absolute inset-0 ${isLightTheme ? 'bg-white/50 mix-blend-overlay' : !isJaydenTheme ? 'bg-black/40' : ''}`}
-          style={isJaydenTheme ? { background: 'linear-gradient(135deg, hsla(0, 60%, 15%, 0.7) 0%, hsla(270, 40%, 10%, 0.7) 50%, hsla(230, 50%, 12%, 0.7) 100%)' } : undefined}
+          style={isJaydenTheme ? { background: 'linear-gradient(135deg, hsla(0, 90%, 30%, 0.7) 0%, hsla(330, 85%, 35%, 0.55) 35%, hsla(270, 70%, 30%, 0.45) 60%, hsla(230, 85%, 35%, 0.7) 100%)' } : undefined}
         ></div>
 
         {/* Bottom vignette */}
@@ -84,7 +84,7 @@ const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
             backgroundImage: isLightTheme
               ? 'linear-gradient(to top, rgba(0, 0, 0, 0.08) 0%, rgba(0, 0, 0, 0.03) 35%, transparent 65%)'
               : isJaydenTheme
-              ? 'linear-gradient(to top, rgba(30, 0, 50, 0.5) 0%, rgba(20, 0, 40, 0.25) 40%, transparent 80%)'
+              ? 'linear-gradient(135deg, rgba(120, 0, 0, 0.35) 0%, rgba(140, 0, 80, 0.15) 40%, rgba(60, 0, 120, 0.15) 60%, rgba(0, 20, 120, 0.35) 100%)'
               : 'linear-gradient(to top, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.15) 40%, transparent 80%)',
             pointerEvents: 'none',
           }}></div>

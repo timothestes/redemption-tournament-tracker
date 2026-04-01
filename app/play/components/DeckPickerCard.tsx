@@ -51,16 +51,16 @@ export function DeckPickerCard({ deck, onClick, selected }: DeckPickerCardProps)
         "w-full text-left rounded-lg border",
         selected
           ? "border-primary"
-          : "border-gray-200 dark:border-gray-700",
-        "bg-white dark:bg-gray-800",
-        "hover:border-primary/70 dark:hover:border-primary/70",
+          : "border-border",
+        "bg-card",
+        "hover:border-primary/70",
         "transition-colors cursor-pointer",
         "flex flex-col overflow-hidden",
       )}
     >
       {/* Image Header */}
       {isParagon ? (
-        <div className="h-24 overflow-hidden bg-gray-100 dark:bg-gray-900">
+        <div className="h-24 overflow-hidden bg-muted">
           <img
             src={`/paragons/Paragon ${deck.paragon}.png`}
             alt={deck.paragon!}
@@ -71,7 +71,7 @@ export function DeckPickerCard({ deck, onClick, selected }: DeckPickerCardProps)
           />
         </div>
       ) : hasPreviewImages ? (
-        <div className="relative h-24 overflow-hidden bg-gray-100 dark:bg-gray-900 flex items-center justify-center gap-1 px-2 py-2">
+        <div className="relative h-24 overflow-hidden bg-muted flex items-center justify-center gap-1 px-2 py-2">
           {img1Url && !img1Error && (
             <img
               src={img1Url}
@@ -90,9 +90,9 @@ export function DeckPickerCard({ deck, onClick, selected }: DeckPickerCardProps)
           )}
         </div>
       ) : (
-        <div className="h-12 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-center">
+        <div className="h-12 bg-muted flex items-center justify-center">
           <svg
-            className="w-5 h-5 text-gray-300 dark:text-gray-600"
+            className="w-5 h-5 text-muted-foreground"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -109,10 +109,10 @@ export function DeckPickerCard({ deck, onClick, selected }: DeckPickerCardProps)
 
       {/* Body */}
       <div className="px-3 py-2 flex flex-col gap-0.5 min-w-0">
-        <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+        <span className="text-sm font-medium text-foreground truncate">
           {deck.name}
         </span>
-        <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Badge
             variant="secondary"
             className="text-[10px] px-1.5 py-0 leading-4"
@@ -124,7 +124,7 @@ export function DeckPickerCard({ deck, onClick, selected }: DeckPickerCardProps)
           )}
         </div>
         {deck.username && (
-          <span className="text-xs text-gray-400 dark:text-gray-500 truncate">
+          <span className="text-xs text-muted-foreground truncate">
             by {deck.username}
           </span>
         )}
