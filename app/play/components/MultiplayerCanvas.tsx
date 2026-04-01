@@ -187,6 +187,26 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
   const currentPhase = gameState.game?.currentPhase ?? 'draw';
   const isBattlePhase = currentPhase === 'battle';
 
+  // ---- Auto-return cards from field of battle when exiting battle phase ----
+  const prevBattlePhaseRef = useRef(false);
+  useEffect(() => {
+    const wasBattle = prevBattlePhaseRef.current;
+    prevBattlePhaseRef.current = isBattlePhase;
+
+    // Only trigger on transition FROM battle to non-battle
+    if (!wasBattle || isBattlePhase) return;
+
+    // Return my cards from field of battle to my territory
+    const myBattleCards = myCards['field-of-battle'] ?? [];
+    for (const card of myBattleCards) {
+      gameState.moveCard(card.id, 'territory', undefined, '0.45', '0.05');
+    }
+
+    if (myBattleCards.length > 0) {
+      showGameToast('Battle ended — cards returned to territory');
+    }
+  }, [isBattlePhase, myCards, gameState]);
+
   // ---- Layout ----
   const mpLayout = useMemo(
     () => calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT, false, isBattlePhase),
@@ -1219,6 +1239,55 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
         }
       }
 
+      // Special handling for field-of-battle zone: snap to structured position
+      if (targetZone === 'field-of-battle' && mpLayout.zones.fieldOfBattle) {
+        const fob = mpLayout.zones.fieldOfBattle;
+        const side = hit.owner === 'my' ? 'player' : 'opponent';
+        const existingCards = hit.owner === 'my'
+          ? (myCards['field-of-battle'] ?? [])
+          : (opponentCards['field-of-battle'] ?? []);
+        const cardType = card.type;
+        const isEnhancement = cardType === 'GE' || cardType === 'EE';
+
+        let snapX: number;
+        let snapY: number;
+
+        if (isEnhancement) {
+          const existingEnhancements = existingCards.filter(
+            (c) => c.cardType === 'GE' || c.cardType === 'EE'
+          );
+          const snap = getEnhancementSnapPosition(
+            side, 0, existingEnhancements.length, fob, cardWidth, cardHeight
+          );
+          snapX = snap.x;
+          snapY = snap.y;
+        } else {
+          const existingChars = existingCards.filter(
+            (c) => c.cardType !== 'GE' && c.cardType !== 'EE'
+          );
+          const snap = getCharacterSnapPosition(
+            side, existingChars.length, fob, cardWidth, cardHeight
+          );
+          snapX = snap.x;
+          snapY = snap.y;
+        }
+
+        const normalized = absoluteToNormalized(snapX, snapY, fob);
+
+        if (isGroupDrag) {
+          moveCardsBatch(
+            JSON.stringify(cardIds),
+            'field-of-battle',
+            JSON.stringify({ [card.instanceId]: { posX: parseFloat(normalized.posX), posY: parseFloat(normalized.posY) } }),
+            targetOwnerId,
+          );
+          clearSelection();
+        } else {
+          moveCard(cardId, 'field-of-battle', '', normalized.posX, normalized.posY, targetOwnerId);
+        }
+        return;
+      }
+
       if (isGroupDrag) {
         if (targetZone === 'deck') {
           // Show deck drop popup for batch
@@ -1292,6 +1361,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       scale,
       offsetX,
       offsetY,
+      mpLayout,
+      myCards,
+      opponentCards,
     ],
   );
 
@@ -1422,6 +1494,24 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
         const zoneY = zone?.y ?? 0;
         const x = card.posX ? parseFloat(card.posX) * (zone?.width ?? 0) + zoneX : zoneX + 20;
         const y = card.posY ? parseFloat(card.posY) * (zone?.height ?? 0) + zoneY : zoneY + 24;
+        bounds.push({
+          instanceId: String(card.id),
+          x,
+          y,
+          width: cardWidth,
+          height: cardHeight,
+          rotation: 0,
+        });
+      }
+    }
+
+    // My cards in field of battle
+    if (mpLayout?.zones.fieldOfBattle) {
+      const cards = myCards['field-of-battle'] ?? [];
+      const zone = mpLayout.zones.fieldOfBattle;
+      for (const card of cards) {
+        const x = card.posX ? parseFloat(card.posX) * zone.width + zone.x : zone.x;
+        const y = card.posY ? parseFloat(card.posY) * zone.height + zone.y : zone.y;
         bounds.push({
           instanceId: String(card.id),
           x,
