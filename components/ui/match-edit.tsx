@@ -157,8 +157,8 @@ export default function MatchEditModal({
               onClick={() => setScore(score)}
               className={`w-10 h-10 rounded-md flex items-center justify-center transition-colors border ${
                 selectedScore === score
-                  ? "bg-blue-600 text-white border-blue-400"
-                  : "bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 hover:bg-gray-200 dark:hover:bg-zinc-700 border-gray-300 dark:border-zinc-400"
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-muted text-foreground hover:bg-muted border-border"
               }`}
             >
               {score}
@@ -187,7 +187,7 @@ export default function MatchEditModal({
       </div>
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-white dark:bg-[#1F2937] border-2 border-gray-200 dark:border-zinc-300/10 py-8 px-8 rounded-lg shadow-lg max-w-md w-full">
+          <div className="bg-card border-2 border-border py-8 px-8 rounded-lg shadow-lg max-w-md w-full">
             <h2 className="text-xl font-bold mb-6 text-foreground">Edit Match</h2>
             <form onSubmit={handleSubmit} className="flex flex-col gap-6">
               <div className="block space-y-5">

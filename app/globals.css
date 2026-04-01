@@ -74,6 +74,49 @@
     --dialog-border: 215 10% 20%;
     --dialog-header-accent: 142 71% 45%;
   }
+
+  .jayden {
+    color-scheme: dark;
+    --background: 270 20% 4%;
+    --foreground: 190 30% 93%;
+    --card: 270 25% 8%;
+    --card-foreground: 190 30% 93%;
+    --popover: 270 25% 8%;
+    --popover-foreground: 190 30% 93%;
+    --primary: 330 75% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 60% 22%;
+    --secondary-foreground: 190 30% 93%;
+    --muted: 270 20% 15%;
+    --muted-foreground: 280 15% 65%;
+    --accent: 230 90% 55%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 90% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 280 40% 25%;
+    --input: 280 40% 25%;
+    --ring: 330 90% 55%;
+    --chart-1: 0 90% 55%;
+    --chart-2: 330 90% 55%;
+    --chart-3: 270 70% 60%;
+    --chart-4: 240 90% 55%;
+    --chart-5: 200 90% 55%;
+
+    /* Gradient spectrum: red (top) → pink → blue (bottom) */
+    --gradient-red: hsl(0, 90%, 55%);
+    --gradient-pink: hsl(330, 90%, 55%);
+    --gradient-purple: hsl(270, 70%, 50%);
+    --gradient-blue: hsl(230, 90%, 55%);
+    --jayden-gradient: linear-gradient(135deg, var(--gradient-red), var(--gradient-pink), var(--gradient-purple), var(--gradient-blue));
+    --jayden-gradient-subtle: linear-gradient(135deg, hsla(0, 80%, 50%, 0.06), hsla(330, 80%, 50%, 0.04), hsla(270, 60%, 50%, 0.04), hsla(230, 80%, 50%, 0.06));
+    --jayden-border-gradient: linear-gradient(135deg, hsla(0, 90%, 55%, 0.3), hsla(330, 90%, 55%, 0.2), hsla(270, 70%, 50%, 0.2), hsla(230, 90%, 55%, 0.3));
+
+    /* Dialog surface tokens (jayden) */
+    --dialog-bg: 270 25% 7%;
+    --dialog-header-bg: 270 30% 10%;
+    --dialog-border: 280 40% 25%;
+    --dialog-header-accent: 330 90% 55%;
+  }
 }
 
 @layer base {
@@ -86,6 +129,23 @@
   html {
     --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
   }
+}
+
+/* Jayden theme gradient utilities */
+.jayden .jayden-gradient-bg {
+  background: var(--jayden-gradient-subtle);
+}
+.jayden .jayden-gradient-border {
+  border-image: var(--jayden-border-gradient) 1;
+}
+.jayden .jayden-gradient-text {
+  background: var(--jayden-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.jayden .jayden-gradient-accent {
+  background: var(--jayden-gradient);
 }
 
 /* Suppress focus rings globally — placed outside @layer so it overrides utilities */

@@ -65,12 +65,12 @@ function ColorPickerPopover({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-9 h-9 rounded-lg border-2 border-gray-300 dark:border-gray-600 shadow-sm flex-shrink-0 transition-transform hover:scale-105"
+        className="w-9 h-9 rounded-lg border-2 border-border shadow-sm flex-shrink-0 transition-transform hover:scale-105"
         style={{ backgroundColor: color }}
         title="Pick color"
       />
       {open && (
-        <div className="absolute z-50 mt-2 left-0 shadow-xl rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3">
+        <div className="absolute z-50 mt-2 left-0 shadow-xl rounded-xl border border-border bg-card p-3">
           <HexColorPicker color={color} onChange={onChange} />
           <div className="mt-2 flex items-center gap-2">
             <div
@@ -84,7 +84,7 @@ function ColorPickerPopover({
               onBlur={() => setHexInput(color)} // reset display if invalid on blur
               placeholder="#6366f1"
               maxLength={7}
-              className="flex-1 px-2 py-1 text-xs font-mono rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-2 py-1 text-xs font-mono rounded border border-border bg-card focus:outline-none focus:ring-2 focus:ring-ring"
               spellCheck={false}
             />
           </div>
@@ -191,16 +191,16 @@ export default function AdminTagsPage() {
   if (!canManageTags) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="min-h-screen bg-background">
       <TopNav />
       <div className="max-w-2xl mx-auto px-4 py-10">
         <h1 className="text-2xl font-bold mb-1">Manage Tags</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">
+        <p className="text-sm text-muted-foreground mb-8">
           These tags are available for deck owners to apply to their decks.
         </p>
 
         {/* Create new tag */}
-        <form onSubmit={handleCreate} className="mb-10 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+        <form onSubmit={handleCreate} className="mb-10 bg-card rounded-xl border border-border p-5 jayden-gradient-bg">
           <h2 className="text-base font-semibold mb-4">New Tag</h2>
           <div className="flex items-center gap-3">
             <ColorPickerPopover color={newColor} onChange={setNewColor} />
@@ -210,7 +210,7 @@ export default function AdminTagsPage() {
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               maxLength={50}
-              className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-3 py-2 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
             <div
               className="px-3 py-1.5 rounded-full text-sm font-medium flex-shrink-0"
@@ -224,7 +224,7 @@ export default function AdminTagsPage() {
             <button
               type="submit"
               disabled={creating || !newName.trim()}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex-shrink-0"
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50 flex-shrink-0"
             >
               {creating ? "Creating…" : "Create"}
             </button>
@@ -235,13 +235,13 @@ export default function AdminTagsPage() {
         </form>
 
         {/* Tag list */}
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-800">
+        <div className="bg-card rounded-xl border border-border divide-y divide-border jayden-gradient-bg">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400" />
             </div>
           ) : tags.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-10">
+            <p className="text-sm text-muted-foreground text-center py-10">
               No tags yet. Create one above.
             </p>
           ) : (
@@ -256,7 +256,7 @@ export default function AdminTagsPage() {
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
                       maxLength={50}
-                      className="flex-1 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                       onKeyDown={(e) => {
                         if (e.key === "Enter") handleSaveEdit();
                         if (e.key === "Escape") setEditingId(null);
@@ -277,13 +277,13 @@ export default function AdminTagsPage() {
                     <button
                       onClick={handleSaveEdit}
                       disabled={saving}
-                      className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                      className="px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
                     >
                       {saving ? "Saving…" : "Save"}
                     </button>
                     <button
                       onClick={() => setEditingId(null)}
-                      className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                      className="px-3 py-1.5 border border-border rounded-lg text-sm hover:bg-muted"
                     >
                       Cancel
                     </button>
@@ -306,7 +306,7 @@ export default function AdminTagsPage() {
                     <span className="flex-1" />
                     <button
                       onClick={() => startEdit(tag)}
-                      className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                      className="px-3 py-1.5 border border-border rounded-lg text-sm hover:bg-muted transition-colors"
                     >
                       Edit
                     </button>

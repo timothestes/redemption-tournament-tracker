@@ -292,7 +292,7 @@ export default function FilterGrid({
             className={clsx(
               'px-2.5 py-0.5 md:px-3 md:py-1.5 border text-sm font-semibold transition-colors',
               advancedOpen
-                ? 'bg-emerald-600 text-white border-emerald-600 rounded rounded-b-none'
+                ? 'bg-destructive text-destructive-foreground border-destructive rounded rounded-b-none'
                 : 'bg-muted text-foreground border-border rounded hover:bg-muted/80'
             )}
             onClick={() => setAdvancedOpen(!advancedOpen)}
@@ -318,7 +318,7 @@ export default function FilterGrid({
 
       {/* Advanced Filters panel — full width when open */}
       {advancedOpen && (
-        <div className="p-2 border border-emerald-600 rounded rounded-tl-none space-y-2">
+        <div className="p-2 border border-destructive rounded rounded-tl-none space-y-2">
           <p className="font-bold text-base md:text-lg text-foreground rounded px-2 py-1 inline-block shadow-none">Testament</p>
           <div className="flex flex-wrap gap-1.5 mb-2">
             {['OT','NT'].map((t) => {

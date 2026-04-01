@@ -476,7 +476,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   }
 
   return (
-    <div className={`w-full mx-auto py-8 ${viewMode === "stacked" ? "max-w-full px-2" : "max-w-7xl px-4"}`}>
+    <div className={`w-full mx-auto py-8 jayden-gradient-bg ${viewMode === "stacked" ? "max-w-full px-2" : "max-w-7xl px-4"}`}>
       {/* Card detail modal — no add/remove buttons */}
       {modalCard && (
         <ModalWithClose
@@ -503,7 +503,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
           >
             <button
               onClick={() => setShowParagonModal(false)}
-              className="absolute -top-4 -right-4 w-10 h-10 bg-white dark:bg-gray-800 rounded-full shadow-lg flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors z-10"
+              className="absolute -top-4 -right-4 w-10 h-10 bg-card rounded-full shadow-lg flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors z-10"
               aria-label="Close"
             >
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -522,14 +522,14 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
       )}
 
       {/* Breadcrumb */}
-      <nav className="mb-4 flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
-        <a href="/decklist/community" className="hover:text-gray-800 dark:hover:text-gray-200 transition-colors">
+      <nav className="mb-4 flex items-center gap-1.5 text-sm text-muted-foreground">
+        <a href="/decklist/community" className="hover:text-foreground transition-colors">
           Community Decks
         </a>
         <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
-        <span className="text-gray-800 dark:text-gray-200 truncate">{deckName}</span>
+        <span className="text-foreground truncate">{deckName}</span>
       </nav>
 
       {/* Header */}
@@ -562,22 +562,22 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                 {formatDeckType(deck.format)}
               </span>
               {deck.paragon && formatDeckType(deck.format) === "Paragon" && (
-                <span className="text-sm text-gray-600 dark:text-gray-400">
+                <span className="text-sm text-muted-foreground">
                   Paragon: <strong>{deck.paragon}</strong>
                 </span>
               )}
               {deck.username && (
-                <span className="text-sm text-gray-600 dark:text-gray-400">
+                <span className="text-sm text-muted-foreground">
                   by{" "}
                   <Link
                     href={`/decklist/community?username=${encodeURIComponent(deck.username)}`}
-                    className="font-medium text-gray-600 dark:text-gray-400 underline hover:text-gray-900 dark:hover:text-gray-200"
+                    className="font-medium text-muted-foreground underline hover:text-foreground"
                   >
                     {deck.username}
                   </Link>
                 </span>
               )}
-              <span className="text-sm text-gray-500 dark:text-gray-400">
+              <span className="text-sm text-muted-foreground">
                 {mainDeckCount} cards{reserveCount > 0 && ` + ${reserveCount} reserve`}
                 {totalDeckPrice !== null && (
                   <button
@@ -602,14 +602,14 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                   </button>
                 )}
               </span>
-              <span className="text-sm text-gray-400 dark:text-gray-500">
+              <span className="text-sm text-muted-foreground">
                 Created {new Date(deck.created_at).toLocaleDateString()}
               </span>
-              <span className="text-sm text-gray-400 dark:text-gray-500">
+              <span className="text-sm text-muted-foreground">
                 Updated {new Date(deck.updated_at).toLocaleDateString()}
               </span>
               {(deck.view_count ?? 0) > 0 && (
-                <span className="text-sm text-gray-400 dark:text-gray-500">{deck.view_count} views</span>
+                <span className="text-sm text-muted-foreground">{deck.view_count} views</span>
               )}
             </div>
 
@@ -651,7 +651,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                   <div className="relative" ref={tagPickerRef}>
                     <button
                       onClick={() => { setTagPickerOpen((o) => !o); setTagFilter(""); }}
-                      className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-dashed border-gray-400 dark:border-gray-500 text-xs text-gray-500 dark:text-gray-400 hover:border-gray-600 dark:hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                      className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-dashed border-border text-xs text-muted-foreground hover:border-foreground/50 hover:text-foreground transition-colors"
                     >
                       <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -661,7 +661,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                     </button>
 
                     {tagPickerOpen && (
-                      <div className="absolute z-50 top-full mt-1.5 left-0 w-72 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl">
+                      <div className="absolute z-50 top-full mt-1.5 left-0 w-72 bg-background border border-border rounded-xl shadow-xl">
 
                         {createMode ? (
                           /* ── Inline create form ── */
@@ -671,7 +671,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                               <button
                                 type="button"
                                 onClick={() => setCreateColorOpen((o) => !o)}
-                                className="w-7 h-7 rounded-md border-2 border-gray-300 dark:border-gray-600 shadow-sm flex-shrink-0 hover:scale-110 transition-transform"
+                                className="w-7 h-7 rounded-md border-2 border-border shadow-sm flex-shrink-0 hover:scale-110 transition-transform"
                                 style={{ backgroundColor: createColor }}
                                 title={createColorOpen ? "Close color picker" : "Pick color"}
                               />
@@ -682,7 +682,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                                 value={createName}
                                 onChange={(e) => setCreateName(e.target.value)}
                                 maxLength={50}
-                                className="flex-1 px-2.5 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="flex-1 px-2.5 py-1.5 text-sm rounded-lg border border-border bg-card focus:outline-none focus:ring-2 focus:ring-blue-500"
                               />
                             </div>
 
@@ -690,14 +690,14 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                             {createColorOpen && (
                               <div className="flex flex-col items-center gap-1.5">
                                 <HexColorPicker color={createColor} onChange={setCreateColor} style={{ width: "100%" }} />
-                                <span className="font-mono text-xs text-gray-400 dark:text-gray-500">{createColor}</span>
+                                <span className="font-mono text-xs text-muted-foreground">{createColor}</span>
                               </div>
                             )}
 
                             {/* Preview pill */}
                             {createName.trim() && (
                               <div className="flex items-center gap-1.5">
-                                <span className="text-xs text-gray-400 dark:text-gray-500">Preview:</span>
+                                <span className="text-xs text-muted-foreground">Preview:</span>
                                 <span
                                   className="px-2.5 py-0.5 rounded-full text-xs font-medium"
                                   style={{ backgroundColor: createColor, color: getContrastColor(createColor) }}
@@ -722,7 +722,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                               <button
                                 type="button"
                                 onClick={() => { setCreateMode(false); setCreateError(null); setCreateName(""); setCreateColorOpen(false); }}
-                                className="flex-1 py-1.5 border border-gray-300 dark:border-gray-600 text-sm rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                                className="flex-1 py-1.5 border border-border text-sm rounded-lg hover:bg-muted transition-colors"
                               >
                                 Cancel
                               </button>
@@ -731,21 +731,21 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                         ) : (
                           <>
                             {/* Filter input */}
-                            <div className="px-3 pt-3 pb-2 border-b border-gray-100 dark:border-gray-800">
+                            <div className="px-3 pt-3 pb-2 border-b border-border">
                               <input
                                 autoFocus
                                 type="text"
                                 placeholder="Filter tags…"
                                 value={tagFilter}
                                 onChange={(e) => setTagFilter(e.target.value)}
-                                className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-border bg-card focus:outline-none focus:ring-2 focus:ring-blue-500"
                               />
                             </div>
 
                             {/* Tag list */}
                             <div className="max-h-56 overflow-y-auto">
                               {filteredGlobalTags.length === 0 ? (
-                                <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-4">
+                                <p className="text-xs text-muted-foreground text-center py-4">
                                   {allGlobalTags.length === 0 ? "No tags available yet" : "No matches"}
                                 </p>
                               ) : (
@@ -755,11 +755,11 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                                     <button
                                       key={tag.id}
                                       onClick={() => toggleTag(tag)}
-                                      className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                                      className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-muted transition-colors text-left"
                                     >
                                       <span className="w-4 flex-shrink-0 flex items-center justify-center">
                                         {selected && (
-                                          <svg className="w-3.5 h-3.5 text-gray-700 dark:text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <svg className="w-3.5 h-3.5 text-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                                           </svg>
                                         )}
@@ -768,7 +768,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                                         className="w-3 h-3 rounded-full flex-shrink-0 border border-black/10"
                                         style={{ backgroundColor: tag.color }}
                                       />
-                                      <span className="text-sm text-gray-800 dark:text-gray-200">{tag.name}</span>
+                                      <span className="text-sm text-foreground">{tag.name}</span>
                                     </button>
                                   );
                                 })
@@ -777,7 +777,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
 
                             {/* Admin: create new tag footer */}
                             {canManageTags && (
-                              <div className="border-t border-gray-100 dark:border-gray-800">
+                              <div className="border-t border-border">
                                 <button
                                   onClick={() => {
                                     setCreateName(tagFilter);
@@ -785,7 +785,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                                     setCreateError(null);
                                     setCreateMode(true);
                                   }}
-                                  className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                                  className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-muted-foreground hover:bg-muted transition-colors"
                                 >
                                   <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -808,7 +808,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={handleCopyLink}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2"
+              className="px-4 py-2 border border-border rounded-lg text-sm font-medium hover:bg-muted transition-colors flex items-center gap-2"
             >
               {linkCopied ? (
                 <>
@@ -833,7 +833,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
             <div className="relative">
               <button
                 onClick={() => setShowExportMenu(!showExportMenu)}
-                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2"
+                className="px-4 py-2 border border-border rounded-lg text-sm font-medium hover:bg-muted transition-colors flex items-center gap-2"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -844,30 +844,30 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                 </svg>
               </button>
               {showExportMenu && (
-                <div className="absolute left-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50 min-w-[160px]">
+                <div className="absolute left-0 top-full mt-1 bg-card border border-border rounded-lg shadow-lg py-1 z-50 min-w-[160px]">
                   <button
                     onClick={() => { setShowPDFModal(true); setShowExportMenu(false); }}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-muted flex items-center gap-2"
                   >
-                    <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                     </svg>
                     Generate PDF
                   </button>
                   <button
                     onClick={() => { setShowImageModal(true); setShowExportMenu(false); }}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-muted flex items-center gap-2"
                   >
-                    <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                     Generate Image
                   </button>
                   <button
                     onClick={() => { handleDownloadTxt(); setShowExportMenu(false); }}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-muted flex items-center gap-2"
                   >
-                    <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
                     Download .txt
@@ -902,7 +902,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
               <>
                 <button
                   onClick={() => { setCoverEditorOpen(true); setCoverPickerSlot(1); }}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2"
+                  className="px-4 py-2 border border-border rounded-lg text-sm font-medium hover:bg-muted transition-colors flex items-center gap-2"
                   title="Edit cover cards"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -964,15 +964,15 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
         const close = () => { setCoverEditorOpen(false); setCoverPickerSlot(null); };
         return (
           <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/60" onClick={close}>
-            <div className="bg-white dark:bg-gray-900 rounded-t-xl sm:rounded-xl shadow-2xl w-full sm:max-w-2xl flex flex-col max-h-[95vh] sm:max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-background rounded-t-xl sm:rounded-xl shadow-2xl w-full sm:max-w-2xl flex flex-col max-h-[95vh] sm:max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
 
               {/* Header */}
-              <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+              <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4 border-b border-border flex-shrink-0">
                 <div>
                   <h2 className="text-base sm:text-lg font-semibold">Cover Cards</h2>
-                  <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-0.5">Choose thumbnail cards for the Community page.</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">Choose thumbnail cards for the Community page.</p>
                 </div>
-                <button onClick={close} className="ml-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 flex-shrink-0">
+                <button onClick={close} className="ml-4 text-muted-foreground hover:text-foreground p-1 flex-shrink-0">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -993,15 +993,15 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                           className={`relative rounded-xl overflow-hidden border-2 transition-all ${
                             isActive
                               ? "border-blue-500 ring-4 ring-blue-200 dark:ring-blue-800 scale-105"
-                              : "border-gray-300 dark:border-gray-600 hover:border-green-600 hover:scale-102"
-                          } bg-gray-100 dark:bg-gray-800 w-20 sm:w-[130px]`}
+                              : "border-border hover:border-green-600 hover:scale-102"
+                          } bg-muted w-20 sm:w-[130px]`}
                           style={{ aspectRatio: "2.5/3.5" }}
                           title={`Set cover card ${slot}`}
                         >
                           {imgUrl ? (
                             <img src={imgUrl} alt={`Cover ${slot}`} className="w-full h-full object-cover" />
                           ) : (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
+                            <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
                               <svg className="w-8 h-8 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
                               </svg>
@@ -1014,14 +1014,14 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                             </div>
                           )}
                         </button>
-                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Card {slot}</span>
+                        <span className="text-xs font-medium text-muted-foreground">Card {slot}</span>
                       </div>
                     );
                   })}
                 </div>
 
                 {/* Instruction */}
-                <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-center text-sm text-muted-foreground">
                   {coverPickerSlot
                     ? `Click a card below to set it as cover card ${coverPickerSlot}`
                     : "Click a slot above to start"}
@@ -1031,11 +1031,11 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
               {/* Sort + Search */}
               <div className="px-4 sm:px-6 pb-2 flex-shrink-0 space-y-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500 dark:text-gray-400">Sort:</span>
+                  <span className="text-xs text-muted-foreground">Sort:</span>
                   <select
                     value={coverPickerSort}
                     onChange={(e) => setCoverPickerSort(e.target.value as any)}
-                    className="text-xs px-1.5 py-0.5 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                    className="text-xs px-1.5 py-0.5 border border-border rounded bg-card text-muted-foreground"
                   >
                     <option value="default">Default</option>
                     <option value="name">Name</option>
@@ -1044,7 +1044,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                   </select>
                 </div>
                 <div className="relative">
-                  <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                   <input
@@ -1052,10 +1052,10 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                     placeholder="Search cards..."
                     value={coverPickerSearch}
                     onChange={(e) => setCoverPickerSearch(e.target.value)}
-                    className="w-full pl-8 pr-8 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="w-full pl-8 pr-8 py-1.5 text-sm border border-border rounded-lg bg-card focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                   {coverPickerSearch && (
-                    <button onClick={() => setCoverPickerSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    <button onClick={() => setCoverPickerSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                       </svg>
@@ -1091,8 +1091,8 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                       disabled={!coverPickerSlot}
                       className={`relative rounded-lg overflow-hidden border transition-all ${
                         coverPickerSlot
-                          ? "border-gray-200 dark:border-gray-600 hover:border-blue-500 hover:scale-105 cursor-pointer"
-                          : "border-gray-200 dark:border-gray-700 opacity-50 cursor-default"
+                          ? "border-border hover:border-blue-500 hover:scale-105 cursor-pointer"
+                          : "border-border opacity-50 cursor-default"
                       }`}
                       style={{ aspectRatio: "2.5/3.5" }}
                       title={card.card_name}
@@ -1104,8 +1104,8 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
               </div>
 
               {/* Footer status */}
-              <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex-shrink-0 h-12 flex items-center justify-center">
-                {coverSaving && <p className="text-sm text-gray-500 dark:text-gray-400">Saving…</p>}
+              <div className="px-6 py-3 border-t border-border flex-shrink-0 h-12 flex items-center justify-center">
+                {coverSaving && <p className="text-sm text-muted-foreground">Saving…</p>}
                 {coverSaved && <p className="text-sm text-green-600 dark:text-green-400 font-medium">Saved!</p>}
               </div>
 
@@ -1119,7 +1119,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
         <div className="mb-6">
           <button
             onClick={() => setParagonVisible((v) => !v)}
-            className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors mb-2"
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-2"
           >
             <svg className={`w-4 h-4 transition-transform ${paragonVisible ? 'rotate-0' : '-rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -1146,9 +1146,9 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
       <div className="flex items-center gap-2 md:gap-3 mb-6 flex-wrap">
         <button
           onClick={() => setViewMode(viewMode === "normal" ? "stacked" : "normal")}
-          className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-xs md:text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 border border-border rounded-lg text-xs md:text-sm hover:bg-muted transition-colors"
         >
-          <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             {viewMode === "normal" ? (
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
             ) : (
@@ -1161,7 +1161,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
         <select
           value={groupBy}
           onChange={(e) => setGroupBy(e.target.value as "type" | "alignment" | "none")}
-          className="px-2.5 md:px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-xs md:text-sm"
+          className="px-2.5 md:px-3 py-1.5 border border-border rounded-lg bg-card text-xs md:text-sm"
         >
           <option value="type">Group by Type</option>
           <option value="alignment">Group by Alignment</option>
@@ -1174,7 +1174,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
           className={`hidden lg:flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm transition-colors ${
             showPreview
               ? 'border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-              : 'border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+              : 'border-border text-muted-foreground hover:bg-muted'
           }`}
           title={showPreview ? 'Hide card preview' : 'Show card preview'}
         >
@@ -1194,7 +1194,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
           className={`flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 border rounded-lg text-xs md:text-sm transition-colors ${
             showStats
               ? 'border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-              : 'border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+              : 'border-border text-muted-foreground hover:bg-muted'
           }`}
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1206,11 +1206,11 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
 
       {/* Stats Panel — collapsible */}
       {showStats && cardDatabase && (
-        <div className="mb-6 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-4">
+        <div className="mb-6 rounded-lg border border-border bg-muted p-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Alignment Breakdown */}
             <div>
-              <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-3">
+              <h3 className="font-semibold text-foreground mb-3">
                 Alignment Breakdown
               </h3>
               <div className="grid grid-cols-2 gap-3">
@@ -1245,10 +1245,10 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
 
             {/* Deck Statistics */}
             <div>
-              <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-3">
+              <h3 className="font-semibold text-foreground mb-3">
                 Deck Statistics
               </h3>
-              <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+              <div className="space-y-1 text-sm text-muted-foreground">
                 <div className="flex justify-between">
                   <span>Total Cards:</span>
                   <span className="font-medium">{mainDeckCount + reserveCount}</span>
@@ -1267,7 +1267,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                     <span className="font-medium">{reserveCount}</span>
                   </div>
                 )}
-                <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                <div className="border-t border-border my-2 pt-2">
                   <div className="flex justify-between">
                     <span>Lost Souls:</span>
                     <span className="font-medium">
@@ -1283,7 +1283,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                   {totalDeckPrice !== null && (
                     <button
                       onClick={() => { setBuyModalMode("exact"); setShowBuyDeckModal(true); }}
-                      className="flex justify-between w-full text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 -mx-1 px-1 py-0.5 rounded transition-colors group"
+                      className="flex justify-between w-full text-left hover:bg-muted -mx-1 px-1 py-0.5 rounded transition-colors group"
                     >
                       <span className="flex items-center gap-1.5">
                         <img src="/sponsors/ytg-dark.png" alt="" className="h-3.5 w-3.5 object-contain hidden dark:block" />
@@ -1296,7 +1296,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                   {deck.budget_price != null && deck.total_price != null && deck.budget_price < deck.total_price - 0.005 && (
                     <button
                       onClick={() => { setBuyModalMode("budget"); setShowBuyDeckModal(true); }}
-                      className="flex justify-between w-full text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 -mx-1 px-1 py-0.5 rounded transition-colors group"
+                      className="flex justify-between w-full text-left hover:bg-muted -mx-1 px-1 py-0.5 rounded transition-colors group"
                     >
                       <span className="text-xs text-muted-foreground flex items-center gap-1.5">
                         <span className="w-3.5" />
@@ -1314,10 +1314,10 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
 
             {/* Card Type Breakdown */}
             <div>
-              <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-3">
+              <h3 className="font-semibold text-foreground mb-3">
                 Card Types
               </h3>
-              <div className="space-y-0.5 text-sm text-gray-600 dark:text-gray-400">
+              <div className="space-y-0.5 text-sm text-muted-foreground">
                 {(() => {
                   const typeCounts = enrichedCards.reduce((acc, card) => {
                     const type = prettifyTypeName(card.type || "Unknown");
@@ -1344,8 +1344,8 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
       {!cardDatabase && deck.cards.length > 0 && (
         <div className="flex items-center justify-center py-16">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-400 mx-auto"></div>
-            <p className="mt-4 text-gray-500 dark:text-gray-400 text-sm">Loading deck...</p>
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-muted-foreground mx-auto"></div>
+            <p className="mt-4 text-muted-foreground text-sm">Loading deck...</p>
           </div>
         </div>
       )}
@@ -1356,13 +1356,13 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
       <div className="mb-8">
         <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
           Main Deck
-          <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
+          <span className="text-sm font-normal text-muted-foreground">
             ({mainDeckCount} cards)
           </span>
         </h2>
 
         {mainCards.length === 0 ? (
-          <p className="text-gray-500 dark:text-gray-400 italic">No cards in main deck.</p>
+          <p className="text-muted-foreground italic">No cards in main deck.</p>
         ) : viewMode === "stacked" ? (
           /* Stacked view — matches FullDeckView layout exactly */
           <div className="flex gap-4 items-start flex-wrap">
@@ -1372,8 +1372,8 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                 <div key={`${groupName}-${colIndex}`} className="flex flex-col">
                   {groupBy === "alignment" && colIndex === 0 && (
                     <div className="mb-2 flex items-center gap-2">
-                      <h3 className="text-lg font-semibold text-gray-400">{groupName}</h3>
-                      <span className="text-xs text-gray-500">({cards.reduce((s, c) => s + c.quantity, 0)})</span>
+                      <h3 className="text-lg font-semibold text-muted-foreground">{groupName}</h3>
+                      <span className="text-xs text-muted-foreground">({cards.reduce((s, c) => s + c.quantity, 0)})</span>
                     </div>
                   )}
                   <div className="flex flex-col gap-2 items-center">
@@ -1413,7 +1413,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                 {colIndex === 0 && (
                   <div className="mb-2 flex items-center gap-2">
                     <h3 className="text-lg font-semibold text-purple-400">Reserve</h3>
-                    <span className="text-xs text-gray-500">({reserveCount})</span>
+                    <span className="text-xs text-muted-foreground">({reserveCount})</span>
                   </div>
                 )}
                 <div className="flex flex-col gap-2 items-center">
@@ -1454,7 +1454,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
               return (
                 <div key={groupName}>
                   {groupBy !== "none" && (
-                    <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
                       {getGroupDisplayName(groupName)}
                       <span className="ml-1.5 font-normal">({groupCount})</span>
                     </h3>
@@ -1482,7 +1482,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
         <div className="mb-8">
           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
             Reserve
-            <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
+            <span className="text-sm font-normal text-muted-foreground">
               ({reserveCount} cards)
             </span>
           </h2>
@@ -1515,7 +1515,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                 }}
                 rows={3}
                 placeholder="Write a description for your deck... (Markdown supported)"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none overflow-hidden"
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none overflow-hidden"
               />
               <div className="flex items-center gap-2 mt-2">
                 <button
@@ -1526,28 +1526,28 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                 </button>
                 <button
                   onClick={() => { setDescriptionInput(description); setEditingDescription(false); }}
-                  className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                  className="px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Cancel
                 </button>
-                <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto">Markdown supported</span>
+                <span className="text-xs text-muted-foreground ml-auto">Markdown supported</span>
               </div>
             </div>
           ) : description ? (
             <div
-              className={`rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3 ${isOwner ? "cursor-pointer hover:border-blue-300 dark:hover:border-blue-500 transition-colors" : ""}`}
+              className={`rounded-lg border border-border bg-muted px-4 py-3 ${isOwner ? "cursor-pointer hover:border-primary/50 transition-colors" : ""}`}
               onClick={isOwner ? () => { setDescriptionInput(description); setEditingDescription(true); } : undefined}
               title={isOwner ? "Click to edit description" : undefined}
             >
-              <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Description</h3>
-              <div className="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Description</h3>
+              <div className="prose prose-sm dark:prose-invert max-w-none text-foreground">
                 <ReactMarkdown>{description}</ReactMarkdown>
               </div>
             </div>
           ) : isOwner ? (
             <button
               onClick={() => setEditingDescription(true)}
-              className="w-full rounded-lg border border-dashed border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-gray-400 dark:text-gray-500 hover:border-blue-400 hover:text-blue-500 dark:hover:border-blue-500 dark:hover:text-blue-400 transition-colors text-left"
+              className="w-full rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors text-left"
             >
               + Add a description...
             </button>
@@ -1569,8 +1569,8 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                     className="w-full h-full object-cover"
                   />
                 </div>
-                <p className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">{hoveredCard.name}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="mt-2 text-sm font-semibold text-foreground">{hoveredCard.name}</p>
+                <p className="text-xs text-muted-foreground">
                   {hoveredCard.set}{hoveredCard.type ? ` · ${prettifyTypeName(hoveredCard.type)}` : ''}
                   {(() => {
                     const priceKey = `${hoveredCard.name}|${hoveredCard.set}|${hoveredCard.imgFile}`;
@@ -1582,8 +1582,8 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                 </p>
               </div>
             ) : (
-              <div className="aspect-[2.5/3.5] rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 flex items-center justify-center">
-                <p className="text-sm text-gray-400 dark:text-gray-500 text-center px-4">Hover over a card to preview</p>
+              <div className="aspect-[2.5/3.5] rounded-lg border-2 border-dashed border-border flex items-center justify-center">
+                <p className="text-sm text-muted-foreground text-center px-4">Hover over a card to preview</p>
               </div>
             )}
           </div>
@@ -1729,9 +1729,9 @@ function CardTile({ card, onClick, onHover, compact }: { card: EnrichedCard | De
       onMouseEnter={onHover ? () => onHover({ name: card.card_name, imgFile: card.card_img_file || "", set: card.card_set, type: (card as EnrichedCard).type }) : undefined}
       onMouseLeave={onHover ? () => onHover(null) : undefined}
     >
-      <div className="relative w-full aspect-[2.5/3.5] bg-gray-100 dark:bg-gray-800 rounded-md overflow-hidden shadow-sm hover:shadow-md transition-all hover:ring-2 hover:ring-blue-500">
+      <div className="relative w-full aspect-[2.5/3.5] bg-muted rounded-md overflow-hidden shadow-sm hover:shadow-md transition-all hover:ring-2 hover:ring-blue-500">
         {imgError ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 text-xs p-1">
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground text-xs p-1">
             <div className="text-center font-medium text-[10px] leading-tight">{card.card_name}</div>
           </div>
         ) : (

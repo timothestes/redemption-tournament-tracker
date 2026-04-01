@@ -34,7 +34,7 @@ export function GoldfishButton({ deckId, deckName, format, iconOnly = false }: G
         onClick={handleClick}
         disabled={loading}
         title="Practice this deck"
-        className="inline-flex items-center justify-center rounded-lg px-2.5 self-stretch border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+        className="inline-flex items-center justify-center rounded-lg px-2.5 self-stretch border border-border hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors disabled:opacity-50"
       >
         {icon}
       </button>
@@ -46,7 +46,7 @@ export function GoldfishButton({ deckId, deckName, format, iconOnly = false }: G
       onClick={handleClick}
       disabled={loading}
       title="Practice this deck"
-      className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+      className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium border border-border hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors disabled:opacity-50"
     >
       {icon}
       {loading ? 'Loading...' : 'Practice'}

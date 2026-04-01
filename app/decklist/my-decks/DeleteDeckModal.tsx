@@ -25,16 +25,16 @@ export default function DeleteDeckModal({ deckName, onConfirm, onClose }: Delete
         </svg>
       }
     >
-      <p className="text-gray-700 dark:text-gray-300 mb-2">
+      <p className="text-foreground mb-2">
         Are you sure you want to delete this deck?
       </p>
-      <div className="bg-gray-100 dark:bg-gray-700/50 rounded-lg px-4 py-3 mt-3">
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Deck name:</p>
-        <p className="font-semibold text-gray-900 dark:text-white break-words">
+      <div className="bg-muted rounded-lg px-4 py-3 mt-3">
+        <p className="text-sm text-muted-foreground mb-1">Deck name:</p>
+        <p className="font-semibold text-foreground break-words">
           {deckName}
         </p>
       </div>
-      <p className="text-sm text-gray-600 dark:text-gray-400 mt-3">
+      <p className="text-sm text-muted-foreground mt-3">
         All cards and deck data will be permanently deleted.
       </p>
     </ConfirmationDialog>

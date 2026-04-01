@@ -335,7 +335,7 @@ export default function RegistrationPage() {
               </div>
             </div>
           ) : (
-            <div className="bg-card border border-border rounded-lg shadow-sm p-8">
+            <div className="bg-card border border-border rounded-lg shadow-sm p-8 jayden-gradient-bg">
               <form onSubmit={handleSubmit} className="space-y-6">
             {/* Personal Information */}
             <div className="space-y-4">
@@ -448,7 +448,7 @@ export default function RegistrationPage() {
               </h2>
 
               {/* Thursday */}
-              <div className="space-y-3 p-4 bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600">
+              <div className="space-y-3 p-4 bg-card rounded-lg border-2 border-border">
                 <h3 className="font-semibold">
                   Thursday <span className="text-red-500">*</span> <span className="text-sm text-muted-foreground font-normal">({NATIONALS_CONFIG.eventDates.thursday})</span>
                 </h3>
@@ -465,17 +465,17 @@ export default function RegistrationPage() {
                       }
                       className={`w-full flex items-start space-x-3 p-3 transition-all ${
                         formData.thursdayEvent === event.value
-                          ? 'text-blue-600 dark:text-blue-400'
-                          : 'hover:text-blue-500 dark:hover:text-blue-400'
+                          ? 'text-primary'
+                          : 'hover:text-primary'
                       }`}
                     >
                       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
                         formData.thursdayEvent === event.value
-                          ? 'bg-blue-500 border-blue-600'
-                          : 'border-gray-400 dark:border-gray-500'
+                          ? 'bg-primary border-primary'
+                          : 'border-muted-foreground'
                       }`}>
                         {formData.thursdayEvent === event.value && (
-                          <div className="w-2 h-2 bg-white rounded-full"></div>
+                          <div className="w-2 h-2 bg-primary-foreground rounded-full"></div>
                         )}
                       </div>
                       <span className="text-left">
@@ -492,7 +492,7 @@ export default function RegistrationPage() {
               </div>
 
               {/* Friday */}
-              <div className="space-y-3 p-4 bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600">
+              <div className="space-y-3 p-4 bg-card rounded-lg border-2 border-border">
                 <h3 className="font-semibold">
                   Friday <span className="text-red-500">*</span> <span className="text-sm text-muted-foreground font-normal">({NATIONALS_CONFIG.eventDates.friday})</span>
                 </h3>
@@ -509,17 +509,17 @@ export default function RegistrationPage() {
                       }
                       className={`w-full flex items-start space-x-3 p-3 transition-all ${
                         formData.fridayEvent === event.value
-                          ? 'text-blue-600 dark:text-blue-400'
-                          : 'hover:text-blue-500 dark:hover:text-blue-400'
+                          ? 'text-primary'
+                          : 'hover:text-primary'
                       }`}
                     >
                       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
                         formData.fridayEvent === event.value
-                          ? 'bg-blue-500 border-blue-600'
-                          : 'border-gray-400 dark:border-gray-500'
+                          ? 'bg-primary border-primary'
+                          : 'border-muted-foreground'
                       }`}>
                         {formData.fridayEvent === event.value && (
-                          <div className="w-2 h-2 bg-white rounded-full"></div>
+                          <div className="w-2 h-2 bg-primary-foreground rounded-full"></div>
                         )}
                       </div>
                       <span className="text-left">
@@ -536,7 +536,7 @@ export default function RegistrationPage() {
               </div>
 
               {/* Saturday */}
-              <div className="space-y-3 p-4 bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600">
+              <div className="space-y-3 p-4 bg-card rounded-lg border-2 border-border">
                 <h3 className="font-semibold">
                   Saturday <span className="text-red-500">*</span> <span className="text-sm text-muted-foreground font-normal">({NATIONALS_CONFIG.eventDates.saturday})</span>
                 </h3>
@@ -553,17 +553,17 @@ export default function RegistrationPage() {
                       }
                       className={`w-full flex items-start space-x-3 p-3 transition-all ${
                         formData.saturdayEvent === event.value
-                          ? 'text-blue-600 dark:text-blue-400'
-                          : 'hover:text-blue-500 dark:hover:text-blue-400'
+                          ? 'text-primary'
+                          : 'hover:text-primary'
                       }`}
                     >
                       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
                         formData.saturdayEvent === event.value
-                          ? 'bg-blue-500 border-blue-600'
-                          : 'border-gray-400 dark:border-gray-500'
+                          ? 'bg-primary border-primary'
+                          : 'border-muted-foreground'
                       }`}>
                         {formData.saturdayEvent === event.value && (
-                          <div className="w-2 h-2 bg-white rounded-full"></div>
+                          <div className="w-2 h-2 bg-primary-foreground rounded-full"></div>
                         )}
                       </div>
                       <span className="text-left">
@@ -744,7 +744,7 @@ export default function RegistrationPage() {
 
                 {/* Overnight Stay Nights Selection */}
                 {formData.stayingOvernight && (
-                  <div className="ml-9 mt-3 space-y-2 p-4 bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-200 dark:border-gray-600">
+                  <div className="ml-9 mt-3 space-y-2 p-4 bg-card rounded-lg border-2 border-border">
                     <p className="text-sm font-medium text-muted-foreground mb-3">
                       Which nights do you plan to stay?
                     </p>
@@ -762,8 +762,8 @@ export default function RegistrationPage() {
                           }}
                           className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                             formData.overnightStayNights.includes(night.value)
-                              ? 'bg-blue-500 border-blue-600'
-                              : 'border-gray-300 dark:border-gray-500'
+                              ? 'bg-primary border-primary'
+                              : 'border-muted-foreground'
                           }`}
                         >
                           {formData.overnightStayNights.includes(night.value) && (
@@ -787,7 +787,7 @@ export default function RegistrationPage() {
               <h2 className="text-xl font-semibold">
                 Payment Information
               </h2>
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 text-blue-900 dark:text-blue-100 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="p-4 bg-primary/10 text-foreground rounded-lg border border-primary/30">
                 <p className="font-medium mb-2">💳 Payment at Venue</p>
                 <p className="text-sm">
                   Payment is to be received at the venue (no pre-payment options). Accepted payment methods:
@@ -822,7 +822,7 @@ export default function RegistrationPage() {
                   type="submit"
                   disabled={isSubmitting || isUploadingPhoto}
                   variant="outline"
-                  className="border-2 border-blue-500 text-blue-600 hover:bg-blue-50 hover:border-blue-600 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-950"
+                  className="border-2 border-primary text-primary hover:bg-primary/10 hover:border-primary/80"
                   size="lg"
                 >
                   {isUploadingPhoto ? "Uploading picture..." : isSubmitting ? "Submitting..." : "Submit Registration"}

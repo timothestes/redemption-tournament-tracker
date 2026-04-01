@@ -665,13 +665,13 @@ export default function DeckBuilderPanel({
             onChange={(e) => setEditedName(e.target.value)}
             onBlur={handleNameSubmit}
             onKeyDown={handleNameKeyDown}
-            className="w-full text-lg md:text-xl font-semibold px-2 py-1 rounded border border-ring bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-ring"
+            className="w-full text-lg md:text-xl font-semibold px-2 py-1 rounded border border-ring bg-card text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             autoFocus
           />
         ) : (
           <div className="flex items-center gap-2 min-w-0">
             <h2
-              className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate min-w-0 flex-shrink"
+              className="text-lg md:text-xl font-semibold text-foreground cursor-pointer hover:text-primary transition-colors truncate min-w-0 flex-shrink"
               onClick={() => {
                 setIsEditingName(true);
                 setEditedName(deck.name);
@@ -685,7 +685,7 @@ export default function DeckBuilderPanel({
               <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${
                 deck.isPublic
                   ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300"
-                  : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                  : "bg-muted text-muted-foreground"
               }`}>
                 {deck.isPublic ? "Public" : "Private"}
               </span>
@@ -753,12 +753,12 @@ export default function DeckBuilderPanel({
         {/* Mobile: Unified toolbar — format selector left, actions right */}
         <div className="md:hidden mt-1.5 flex items-center gap-1.5">
           {/* Format Selector (T1/T2/Paragon) */}
-          <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-full p-0.5">
+          <div className="flex items-center bg-muted rounded-full p-0.5">
             <button
               onClick={() => handleDeckTypeChange('T1')}
               className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
                 deckType === 'T1'
-                  ? 'bg-blue-600 dark:bg-blue-500 text-white'
+                  ? 'bg-accent text-accent-foreground'
                   : 'text-gray-600 dark:text-gray-400 cursor-pointer'
               }`}
             >
@@ -805,7 +805,7 @@ export default function DeckBuilderPanel({
                   syncStatus?.isSaving
                     ? 'text-gray-400 dark:text-gray-500'
                     : hasUnsavedChanges
-                    ? 'bg-green-600 text-white shadow-sm'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
                     : 'text-gray-400 dark:text-gray-500'
                 }`}
                 title={hasUnsavedChanges ? 'Save deck' : 'All changes saved'}
@@ -863,11 +863,11 @@ export default function DeckBuilderPanel({
                 <>
                   <div className="fixed inset-0 z-[40]" onClick={() => setShowMenu(false)} />
                   <div
-                    className="absolute top-full right-0 mt-1 z-[50] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-[180px] max-h-[70vh] overflow-y-auto"
+                    className="absolute top-full right-0 mt-1 z-[50] bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[180px] max-h-[70vh] overflow-y-auto"
                   >
                   <button
                     onClick={() => { onImport(); setShowMenu(false); }}
-                    className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-gray-900 dark:text-white text-sm"
+                    className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
                   >
                     <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -876,7 +876,7 @@ export default function DeckBuilderPanel({
                   </button>
                   <button
                     onClick={() => { onExport(); setShowMenu(false); }}
-                    className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-gray-900 dark:text-white text-sm"
+                    className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
                   >
                     <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
@@ -886,7 +886,7 @@ export default function DeckBuilderPanel({
                   {onDownload && (
                     <button
                       onClick={() => { onDownload(); setShowMenu(false); }}
-                      className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-gray-900 dark:text-white text-sm"
+                      className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
                     >
                       <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -894,7 +894,7 @@ export default function DeckBuilderPanel({
                       Download .txt
                     </button>
                   )}
-                  <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+                  <div className="border-t border-border my-1" />
                   {onDuplicate && isAuthenticated && deck.id && (
                     <button
                       onClick={async () => {
@@ -907,7 +907,7 @@ export default function DeckBuilderPanel({
                           onNotify?.(result.error || 'Failed to duplicate deck', 'error');
                         }
                       }}
-                      className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-gray-900 dark:text-white text-sm"
+                      className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
                     >
                       <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -918,7 +918,7 @@ export default function DeckBuilderPanel({
                   {onLoadDeck && isAuthenticated && (
                     <button
                       onClick={() => { setShowLoadDeckModal(true); setShowMenu(false); }}
-                      className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-gray-900 dark:text-white text-sm"
+                      className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
                     >
                       <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
@@ -928,7 +928,7 @@ export default function DeckBuilderPanel({
                   )}
                   {isAuthenticated && deck.id && (
                     <>
-                      <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+                      <div className="border-t border-border my-1" />
                       <button
                         onClick={async () => {
                           setShowMenu(false);
@@ -943,7 +943,7 @@ export default function DeckBuilderPanel({
                             onNotify?.(result.error || 'Failed to change visibility', 'error');
                           }
                         }}
-                        className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-gray-900 dark:text-white text-sm"
+                        className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
                       >
                         {deck.isPublic ? (
                           <>
@@ -970,7 +970,7 @@ export default function DeckBuilderPanel({
                               setLinkCopied(true);
                               setTimeout(() => setLinkCopied(false), 2000);
                             }}
-                            className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
                           >
                             <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
@@ -982,7 +982,7 @@ export default function DeckBuilderPanel({
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={() => setShowMenu(false)}
-                            className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-gray-900 dark:text-white text-sm"
+                            className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
                           >
                             <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -994,10 +994,10 @@ export default function DeckBuilderPanel({
                       )}
                     </>
                   )}
-                  <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+                  <div className="border-t border-border my-1" />
                   <button
                     onClick={() => { setShowGeneratePDFModal(true); setShowMenu(false); }}
-                    className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-gray-900 dark:text-white text-sm"
+                    className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
                   >
                     <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -1006,18 +1006,18 @@ export default function DeckBuilderPanel({
                   </button>
                   <button
                     onClick={() => { setShowGenerateImageModal(true); setShowMenu(false); }}
-                    className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-gray-900 dark:text-white text-sm"
+                    className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
                   >
                     <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                     Generate Image
                   </button>
-                  <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+                  <div className="border-t border-border my-1" />
                   {totalDeckPrice !== null && (
                     <button
                       onClick={() => { setBuyModalMode("exact"); setShowBuyDeckModal(true); setShowMenu(false); }}
-                      className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-gray-900 dark:text-white text-sm"
+                      className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
                     >
                       <img src="/sponsors/ytg-dark.png" alt="" className="w-4 h-4 object-contain hidden dark:block" />
                       <img src="/sponsors/ytg-light.png" alt="" className="w-4 h-4 object-contain dark:hidden" />
@@ -1026,10 +1026,10 @@ export default function DeckBuilderPanel({
                   )}
                   {isAuthenticated && (
                     <>
-                      <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+                      <div className="border-t border-border my-1" />
                       <button
                         onClick={() => { setShowDeleteDeckModal(true); setShowMenu(false); }}
-                        className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2.5 text-red-600 dark:text-red-400 text-sm"
+                        className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-red-600 dark:text-red-400 text-sm"
                       >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -1085,13 +1085,13 @@ export default function DeckBuilderPanel({
             </button>
 
             {showParagonDropdown && (
-              <div className="absolute top-full mt-1 left-0 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto">
+              <div className="absolute top-full mt-1 left-0 right-0 bg-popover border border-border rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto">
                 <button
                   onClick={() => {
                     onParagonChange?.(undefined);
                     setShowParagonDropdown(false);
                   }}
-                  className="w-full px-3 py-2 text-left text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  className="w-full px-3 py-2 text-left text-xs text-gray-500 dark:text-gray-400 hover:bg-muted transition-colors"
                 >
                   Choose a Paragon...
                 </button>
@@ -1133,12 +1133,12 @@ export default function DeckBuilderPanel({
         <div className="hidden md:flex mt-2 flex-col md:flex-row md:items-center md:justify-between gap-3 min-w-0">
           <div className="flex items-center gap-2 md:gap-3 text-sm flex-wrap min-w-0" suppressHydrationWarning>
             {/* Desktop: Format Selector (T1/T2/Paragon) */}
-            <div className="hidden md:flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-full p-0.5">
+            <div className="hidden md:flex items-center gap-1 bg-muted rounded-full p-0.5">
               <button
                 onClick={() => handleDeckTypeChange('T1')}
                 className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
                   deckType === 'T1'
-                    ? 'bg-blue-600 dark:bg-blue-500 text-white'
+                    ? 'bg-accent text-accent-foreground'
                     : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 cursor-pointer'
                 }`}
               >
@@ -1210,13 +1210,13 @@ export default function DeckBuilderPanel({
 
                   {/* Custom Dropdown Menu */}
                   {showParagonDropdown && (
-                    <div className="absolute top-full mt-1 left-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto min-w-[240px]">
+                    <div className="absolute top-full mt-1 left-0 bg-popover border border-border rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto min-w-[240px]">
                       <button
                         onClick={() => {
                           onParagonChange?.(undefined);
                           setShowParagonDropdown(false);
                         }}
-                        className="w-full px-3 py-2 text-left text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        className="w-full px-3 py-2 text-left text-xs text-gray-500 dark:text-gray-400 hover:bg-muted transition-colors"
                       >
                         Choose a Paragon...
                       </button>
@@ -1277,7 +1277,7 @@ export default function DeckBuilderPanel({
                   syncStatus?.isSaving || !isAuthenticated
                     ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-500 cursor-not-allowed'
                     : hasUnsavedChanges
-                    ? 'bg-green-600 hover:bg-green-700 text-white shadow-sm'
+                    ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm'
                     : 'bg-gray-500 hover:bg-gray-600 text-white'
                 }`}
                 title={
@@ -1322,7 +1322,7 @@ export default function DeckBuilderPanel({
             {onNewDeck && (
               <button
                 onClick={() => onNewDeck(undefined, deck.folderId)}
-                className="px-3 py-1.5 text-sm font-medium rounded border border-blue-500 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 transition-colors flex items-center gap-2 flex-shrink-0"
+                className="px-3 py-1.5 text-sm font-medium rounded border border-primary bg-primary/10 hover:bg-primary/20 text-primary transition-colors flex items-center gap-2 flex-shrink-0"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -1343,21 +1343,21 @@ export default function DeckBuilderPanel({
                   e.stopPropagation();
                   setShowMenu(!showMenu);
                 }}
-                className="px-3 py-1.5 text-sm font-medium rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors flex items-center gap-2"
+                className="px-3 py-1.5 text-sm font-medium rounded border border-border bg-card hover:bg-muted text-muted-foreground transition-colors flex items-center gap-2"
               >
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
               </svg>
             </button>
             {showMenu && (
-              <div className="absolute top-full mt-1 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50 min-w-[160px] max-h-[70vh] overflow-y-auto">
+              <div className="absolute top-full mt-1 right-0 bg-popover border border-border rounded-lg shadow-lg py-1 z-50 min-w-[160px] max-h-[70vh] overflow-y-auto">
               {/* Import/Export Section */}
               <button
                 onClick={() => {
                   onImport();
                   setShowMenu(false);
                 }}
-                className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
+                className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-foreground text-sm"
                 title="Import deck from clipboard (Ctrl+I / Cmd+I)"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1370,7 +1370,7 @@ export default function DeckBuilderPanel({
                   onExport();
                   setShowMenu(false);
                 }}
-                className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
+                className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-foreground text-sm"
                 title="Copy deck to clipboard (Ctrl+E / Cmd+E)"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1384,7 +1384,7 @@ export default function DeckBuilderPanel({
                     onDownload();
                     setShowMenu(false);
                   }}
-                  className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
+                  className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-foreground text-sm"
                   title="Download deck as .txt file"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1394,7 +1394,7 @@ export default function DeckBuilderPanel({
                 </button>
               )}
               
-              <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+              <div className="border-t border-border my-1"></div>
               
               {/* Duplicate/Load Section */}
               {onDuplicate && isAuthenticated && deck.id && (
@@ -1412,7 +1412,7 @@ export default function DeckBuilderPanel({
                       onNotify?.(result.error || 'Failed to duplicate deck', 'error');
                     }
                   }}
-                  className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
+                  className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-foreground text-sm"
                   title="Create a copy of this deck"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1427,7 +1427,7 @@ export default function DeckBuilderPanel({
                     setShowLoadDeckModal(true);
                     setShowMenu(false);
                   }}
-                  className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
+                  className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-foreground text-sm"
                   title="Load a saved deck from the cloud"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1440,7 +1440,7 @@ export default function DeckBuilderPanel({
               {/* Sharing Section */}
               {isAuthenticated && deck.id && (
                 <>
-                  <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+                  <div className="border-t border-border my-1"></div>
                   <button
                     onClick={async () => {
                       setShowMenu(false);
@@ -1455,7 +1455,7 @@ export default function DeckBuilderPanel({
                         onNotify?.(result.error || 'Failed to change visibility', 'error');
                       }
                     }}
-                    className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
+                    className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-foreground text-sm"
                   >
                     {deck.isPublic ? (
                       <>
@@ -1482,7 +1482,7 @@ export default function DeckBuilderPanel({
                           setLinkCopied(true);
                           setTimeout(() => setLinkCopied(false), 2000);
                         }}
-                        className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
+                        className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-foreground text-sm"
                       >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
@@ -1494,7 +1494,7 @@ export default function DeckBuilderPanel({
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={() => setShowMenu(false)}
-                        className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
+                        className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-foreground text-sm"
                       >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -1507,7 +1507,7 @@ export default function DeckBuilderPanel({
                 </>
               )}
 
-              <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+              <div className="border-t border-border my-1"></div>
 
               {/* Generate Section */}
               <button
@@ -1515,7 +1515,7 @@ export default function DeckBuilderPanel({
                   setShowGeneratePDFModal(true);
                   setShowMenu(false);
                 }}
-                className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
+                className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-foreground text-sm"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -1527,18 +1527,18 @@ export default function DeckBuilderPanel({
                   setShowGenerateImageModal(true);
                   setShowMenu(false);
                 }}
-                className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
+                className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-foreground text-sm"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
                 Generate Image
               </button>
-              <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+              <div className="border-t border-border my-1"></div>
               {totalDeckPrice !== null && (
                 <button
                   onClick={() => { setBuyModalMode("exact"); setShowBuyDeckModal(true); setShowMenu(false); }}
-                  className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-900 dark:text-white text-sm"
+                  className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-foreground text-sm"
                 >
                   <img src="/sponsors/ytg-dark.png" alt="" className="w-4 h-4 object-contain hidden dark:block" />
                   <img src="/sponsors/ytg-light.png" alt="" className="w-4 h-4 object-contain dark:hidden" />
@@ -1548,13 +1548,13 @@ export default function DeckBuilderPanel({
 
               {isAuthenticated && (
                 <>
-                  <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+                  <div className="border-t border-border my-1"></div>
                   <button
                     onClick={() => {
                       setShowDeleteDeckModal(true);
                       setShowMenu(false);
                     }}
-                    className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-red-600 dark:text-red-400 text-sm"
+                    className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-red-600 dark:text-red-400 text-sm"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -1573,10 +1573,10 @@ export default function DeckBuilderPanel({
       {/* ...existing code... */}
       {/* Tabs - Hide when expanded (full screen view) */}
       {!isExpanded && (
-      <div ref={tabBarRef} className="flex-shrink-0 flex items-center border-b border-gray-200/60 dark:border-gray-700/60 bg-white dark:bg-gray-800 relative z-20">
+      <div ref={tabBarRef} className="flex-shrink-0 flex items-center border-b border-border bg-card relative z-20">
         {/* Sliding tab indicator */}
         <div
-          className="absolute bottom-0 h-0.5 bg-blue-600 dark:bg-blue-500 transition-all duration-200"
+          className="absolute bottom-0 h-0.5 bg-primary transition-all duration-200"
           style={{
             transitionTimingFunction: 'var(--ease-out-quart)',
             width: tabIndicator.width,
@@ -1743,7 +1743,7 @@ export default function DeckBuilderPanel({
                 className="
                   md:hidden
                   fixed bottom-14 left-0 right-0 pb-[env(safe-area-inset-bottom)] rounded-t-2xl max-h-[70vh] overflow-y-auto
-                  bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl py-2 z-[70]
+                  bg-popover border border-border shadow-xl py-2 z-[70]
                 "
                 style={{
                   transform: sheetTranslateY > 0 ? `translateY(${sheetTranslateY}px)` : undefined,
@@ -1772,18 +1772,18 @@ export default function DeckBuilderPanel({
               >
                 {/* Drag handle */}
                 <div className="flex justify-center py-2">
-                  <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
+                  <div className="w-10 h-1 rounded-full bg-border" />
                 </div>
                 {/* Layout */}
                 <div className="px-3 py-2">
-                  <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Layout</div>
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Layout</div>
                   <div className="flex gap-2">
                     <button
                       onClick={(e) => { e.stopPropagation(); setViewLayout('grid'); }}
                       className={`flex-1 p-2 rounded flex flex-col items-center gap-1 transition-colors ${
                         viewLayout === 'grid'
-                          ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
-                          : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                          ? 'bg-primary/15 text-primary'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
                       }`}
                       title="Grid view"
                     >
@@ -1796,8 +1796,8 @@ export default function DeckBuilderPanel({
                       onClick={(e) => { e.stopPropagation(); setViewLayout('list'); }}
                       className={`flex-1 p-2 rounded flex flex-col items-center gap-1 transition-colors ${
                         viewLayout === 'list'
-                          ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
-                          : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                          ? 'bg-primary/15 text-primary'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
                       }`}
                       title="List view"
                     >
@@ -1808,17 +1808,17 @@ export default function DeckBuilderPanel({
                     </button>
                   </div>
                 </div>
-                <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
+                <div className="border-t border-border my-2"></div>
                 {/* Group By */}
                 <div className="px-3 py-2">
-                  <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Group by</div>
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Group by</div>
                   <div className="space-y-1">
                     <button
                       onClick={(e) => { e.stopPropagation(); setGroupBy('type'); }}
                       className={`w-full px-3 py-2 text-left text-sm rounded transition-colors flex items-center justify-between ${
                         groupBy === 'type'
-                          ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-medium'
-                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                          ? 'bg-primary/15 text-primary font-medium'
+                          : 'text-foreground hover:bg-muted'
                       }`}
                     >
                       <span>Type</span>
@@ -1828,8 +1828,8 @@ export default function DeckBuilderPanel({
                       onClick={(e) => { e.stopPropagation(); setGroupBy('alignment'); }}
                       className={`w-full px-3 py-2 text-left text-sm rounded transition-colors flex items-center justify-between ${
                         groupBy === 'alignment'
-                          ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-medium'
-                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                          ? 'bg-primary/15 text-primary font-medium'
+                          : 'text-foreground hover:bg-muted'
                       }`}
                     >
                       <span>Alignment</span>
@@ -1837,12 +1837,12 @@ export default function DeckBuilderPanel({
                     </button>
                   </div>
                 </div>
-                <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
+                <div className="border-t border-border my-2"></div>
                 {/* Show Prices */}
                 <div className="px-3 py-2">
                   <button
                     onClick={(e) => { e.stopPropagation(); setShowPrices(!showPrices); }}
-                    className="w-full px-3 py-2 text-left text-sm rounded transition-colors flex items-center justify-between text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    className="w-full px-3 py-2 text-left text-sm rounded transition-colors flex items-center justify-between text-foreground hover:bg-muted"
                   >
                     <span>Show Prices</span>
                     {showPrices && <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
@@ -1853,7 +1853,7 @@ export default function DeckBuilderPanel({
                   <div className="hidden md:block px-3 py-2">
                     <button
                       onClick={(e) => { e.stopPropagation(); onSpotlightToggle(); setShowViewDropdown(false); }}
-                      className="w-full px-3 py-2 text-left text-sm rounded transition-colors flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      className="w-full px-3 py-2 text-left text-sm rounded transition-colors flex items-center gap-2 text-foreground hover:bg-muted"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -1863,10 +1863,10 @@ export default function DeckBuilderPanel({
                   </div>
                 )}
                 {/* Full Deck View (mobile only) */}
-                <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
+                <div className="border-t border-border my-2"></div>
                 <button
                   onClick={(e) => { e.stopPropagation(); setShowMobileFullDeckView(true); setShowViewDropdown(false); }}
-                  className="w-full px-3 py-2.5 text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+                  className="w-full px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-muted transition-colors flex items-center gap-2"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
@@ -1877,7 +1877,7 @@ export default function DeckBuilderPanel({
               </div>
               {/* Desktop: positioned dropdown below button */}
               <div
-                className="hidden md:block fixed z-[70] rounded-lg min-w-[220px] max-h-[70vh] overflow-y-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl py-2"
+                className="hidden md:block fixed z-[70] rounded-lg min-w-[220px] max-h-[70vh] overflow-y-auto bg-popover border border-border shadow-xl py-2"
                 style={(() => {
                   const rect = viewDropdownBtnRef.current?.getBoundingClientRect();
                   if (!rect) return {};
@@ -1886,14 +1886,14 @@ export default function DeckBuilderPanel({
               >
                 {/* Layout */}
                 <div className="px-3 py-2">
-                  <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Layout</div>
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Layout</div>
                   <div className="flex gap-2">
                     <button
                       onClick={(e) => { e.stopPropagation(); setViewLayout('grid'); }}
                       className={`flex-1 p-2 rounded flex flex-col items-center gap-1 transition-colors ${
                         viewLayout === 'grid'
-                          ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
-                          : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                          ? 'bg-primary/15 text-primary'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
                       }`}
                       title="Grid view"
                     >
@@ -1906,8 +1906,8 @@ export default function DeckBuilderPanel({
                       onClick={(e) => { e.stopPropagation(); setViewLayout('list'); }}
                       className={`flex-1 p-2 rounded flex flex-col items-center gap-1 transition-colors ${
                         viewLayout === 'list'
-                          ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
-                          : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                          ? 'bg-primary/15 text-primary'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
                       }`}
                       title="List view"
                     >
@@ -1918,31 +1918,31 @@ export default function DeckBuilderPanel({
                     </button>
                   </div>
                 </div>
-                <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
+                <div className="border-t border-border my-2"></div>
                 {/* Card Hover Preview Toggle */}
                 <div className="flex px-3 py-2 items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Card Hover Preview</span>
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Card Hover Preview</span>
                   <Switch
                     checked={!disableHoverPreview}
                     onChange={() => setDisableHoverPreview((v) => !v)}
-                    className={`${!disableHoverPreview ? 'bg-green-700' : 'bg-gray-300 dark:bg-gray-700'} relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2`}
+                    className={`${!disableHoverPreview ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-700'} relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2`}
                   >
                     <span
                       className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${!disableHoverPreview ? 'translate-x-5' : 'translate-x-1'}`}
                     />
                   </Switch>
                 </div>
-                <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
+                <div className="border-t border-border my-2"></div>
                 {/* Group By */}
                 <div className="px-3 py-2">
-                  <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Group by</div>
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Group by</div>
                   <div className="space-y-1">
                     <button
                       onClick={(e) => { e.stopPropagation(); setGroupBy('type'); }}
                       className={`w-full px-3 py-2 text-left text-sm rounded transition-colors flex items-center justify-between ${
                         groupBy === 'type'
-                          ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-medium'
-                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                          ? 'bg-primary/15 text-primary font-medium'
+                          : 'text-foreground hover:bg-muted'
                       }`}
                     >
                       <span>Type</span>
@@ -1952,8 +1952,8 @@ export default function DeckBuilderPanel({
                       onClick={(e) => { e.stopPropagation(); setGroupBy('alignment'); }}
                       className={`w-full px-3 py-2 text-left text-sm rounded transition-colors flex items-center justify-between ${
                         groupBy === 'alignment'
-                          ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-medium'
-                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                          ? 'bg-primary/15 text-primary font-medium'
+                          : 'text-foreground hover:bg-muted'
                       }`}
                     >
                       <span>Alignment</span>
@@ -1961,12 +1961,12 @@ export default function DeckBuilderPanel({
                     </button>
                   </div>
                 </div>
-                <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
+                <div className="border-t border-border my-2"></div>
                 {/* Show Prices */}
                 <div className="px-3 py-2">
                   <button
                     onClick={(e) => { e.stopPropagation(); setShowPrices(!showPrices); }}
-                    className="w-full px-3 py-2 text-left text-sm rounded transition-colors flex items-center justify-between text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    className="w-full px-3 py-2 text-left text-sm rounded transition-colors flex items-center justify-between text-foreground hover:bg-muted"
                   >
                     <span>Show Prices</span>
                     {showPrices && <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
@@ -1977,7 +1977,7 @@ export default function DeckBuilderPanel({
                   <div className="px-3 py-2">
                     <button
                       onClick={(e) => { e.stopPropagation(); onSpotlightToggle(); setShowViewDropdown(false); }}
-                      className="w-full px-3 py-2 text-left text-sm rounded transition-colors flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      className="w-full px-3 py-2 text-left text-sm rounded transition-colors flex items-center gap-2 text-foreground hover:bg-muted"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -1987,7 +1987,7 @@ export default function DeckBuilderPanel({
                   </div>
                 )}
                 {/* Full Deck View */}
-                <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
+                <div className="border-t border-border my-2"></div>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -1996,7 +1996,7 @@ export default function DeckBuilderPanel({
                     }
                     setShowViewDropdown(false);
                   }}
-                  className="w-full px-3 py-2.5 text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+                  className="w-full px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-muted transition-colors flex items-center gap-2"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d={isExpanded
@@ -2067,14 +2067,14 @@ export default function DeckBuilderPanel({
         {isExpanded ? (
           <div className="flex flex-col h-full">
             {/* View Controls */}
-            <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-              <div className="flex items-center gap-1 bg-gray-200 dark:bg-gray-700 rounded-lg p-0.5">
+            <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 border-b border-border bg-card">
+              <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
                 <button
                   onClick={() => setExpandedViewMode('stacked')}
                   className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
                     expandedViewMode === 'stacked'
-                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-600 dark:text-gray-400'
+                      ? 'bg-card text-card-foreground shadow-sm'
+                      : 'text-muted-foreground'
                   }`}
                 >
                   Stacked
@@ -2083,20 +2083,20 @@ export default function DeckBuilderPanel({
                   onClick={() => setExpandedViewMode('normal')}
                   className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
                     expandedViewMode === 'normal'
-                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-600 dark:text-gray-400'
+                      ? 'bg-card text-card-foreground shadow-sm'
+                      : 'text-muted-foreground'
                   }`}
                 >
                   Normal
                 </button>
               </div>
-              <div className="flex items-center gap-1 bg-gray-200 dark:bg-gray-700 rounded-lg p-0.5">
+              <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
                 <button
                   onClick={() => setExpandedGroupBy('type')}
                   className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
                     expandedGroupBy === 'type'
-                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-600 dark:text-gray-400'
+                      ? 'bg-card text-card-foreground shadow-sm'
+                      : 'text-muted-foreground'
                   }`}
                 >
                   Type
@@ -2105,8 +2105,8 @@ export default function DeckBuilderPanel({
                   onClick={() => setExpandedGroupBy('alignment')}
                   className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
                     expandedGroupBy === 'alignment'
-                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-600 dark:text-gray-400'
+                      ? 'bg-card text-card-foreground shadow-sm'
+                      : 'text-muted-foreground'
                   }`}
                 >
                   Align
@@ -2115,8 +2115,8 @@ export default function DeckBuilderPanel({
                   onClick={() => setExpandedGroupBy('none')}
                   className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
                     expandedGroupBy === 'none'
-                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-600 dark:text-gray-400'
+                      ? 'bg-card text-card-foreground shadow-sm'
+                      : 'text-muted-foreground'
                   }`}
                 >
                   None
@@ -2241,7 +2241,7 @@ export default function DeckBuilderPanel({
                       }
                     }, 150);
                   }}
-                  className="px-4 py-2 border-2 border-blue-500 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2"
+                  className="px-4 py-2 border-2 border-primary bg-primary/10 hover:bg-primary/20 text-primary rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -2339,9 +2339,9 @@ export default function DeckBuilderPanel({
                         onClick={() => setCoverPickerSlot(coverPickerSlot === slot ? null : slot)}
                         className={`relative w-full aspect-[2.5/3.5] rounded-lg overflow-hidden border-2 transition-all ${
                           coverPickerSlot === slot
-                            ? 'border-blue-500 ring-2 ring-blue-300 dark:ring-blue-700'
-                            : 'border-gray-300 dark:border-gray-600 hover:border-green-600'
-                        } bg-gray-100 dark:bg-gray-800`}
+                            ? 'border-primary ring-2 ring-ring'
+                            : 'border-border hover:border-primary/50'
+                        } bg-muted`}
                         title={`Pick cover card ${slot}`}
                       >
                         {imgUrl ? (
@@ -2388,7 +2388,7 @@ export default function DeckBuilderPanel({
                 });
                 return (
                   <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                    <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                    <div className="px-3 py-2 bg-muted border-b border-border flex items-center justify-between">
                       <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
                         Select card for slot {coverPickerSlot}
                       </span>
@@ -2396,7 +2396,7 @@ export default function DeckBuilderPanel({
                         <select
                           value={coverPickerSort}
                           onChange={(e) => setCoverPickerSort(e.target.value as any)}
-                          className="text-xs px-1.5 py-0.5 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                          className="text-xs px-1.5 py-0.5 border border-border rounded bg-card text-muted-foreground"
                         >
                           <option value="default">Default</option>
                           <option value="name">Name</option>
@@ -2420,7 +2420,7 @@ export default function DeckBuilderPanel({
                           placeholder="Search cards..."
                           value={coverPickerSearch}
                           onChange={(e) => setCoverPickerSearch(e.target.value)}
-                          className="w-full pl-7 pr-7 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-ring"
+                          className="w-full pl-7 pr-7 py-1 text-xs border border-border rounded bg-card focus:outline-none focus:ring-1 focus:ring-ring"
                         />
                         {coverPickerSearch && (
                           <button onClick={() => setCoverPickerSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
@@ -2460,7 +2460,7 @@ export default function DeckBuilderPanel({
 
             {/* Tags Section */}
             {isAuthenticated && (
-              <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="mt-6 pt-4 border-t border-border">
                 <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">Tags</h3>
 
                 {!deck.id ? (
@@ -2502,7 +2502,7 @@ export default function DeckBuilderPanel({
                       </button>
 
                       {tagPickerOpen && (
-                        <div className="absolute z-50 top-full mt-1.5 left-0 w-64 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl">
+                        <div className="absolute z-50 top-full mt-1.5 left-0 w-64 bg-popover border border-border rounded-xl shadow-xl">
                           {createMode ? (
                             <form onSubmit={handleCreateTagInBuilder} className="p-3 flex flex-col gap-3">
                               <div className="flex items-center gap-2">
@@ -2519,7 +2519,7 @@ export default function DeckBuilderPanel({
                                   value={createName}
                                   onChange={(e) => setCreateName(e.target.value)}
                                   maxLength={50}
-                                  className="flex-1 px-2.5 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-ring"
+                                  className="flex-1 px-2.5 py-1.5 text-sm rounded-lg border border-border bg-card focus:outline-none focus:ring-2 focus:ring-ring"
                                 />
                               </div>
                               {createColorOpen && (
@@ -2553,7 +2553,7 @@ export default function DeckBuilderPanel({
                                   placeholder="Filter tags…"
                                   value={tagFilter}
                                   onChange={(e) => setTagFilter(e.target.value)}
-                                  className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-ring"
+                                  className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-border bg-card focus:outline-none focus:ring-2 focus:ring-ring"
                                 />
                               </div>
                               <div className="max-h-52 overflow-y-auto">
@@ -2615,7 +2615,7 @@ export default function DeckBuilderPanel({
             )}
 
             {/* Description Section */}
-            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="mt-6 pt-4 border-t border-border">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="font-semibold text-gray-700 dark:text-gray-300">Description</h3>
                 <div className="flex rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600">
@@ -2623,8 +2623,8 @@ export default function DeckBuilderPanel({
                     onClick={() => setDescriptionPreview(false)}
                     className={`px-3 py-1 text-xs font-medium transition-colors ${
                       !descriptionPreview
-                        ? 'bg-green-600 text-white'
-                        : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-card text-muted-foreground hover:bg-muted'
                     }`}
                   >
                     Edit
@@ -2633,8 +2633,8 @@ export default function DeckBuilderPanel({
                     onClick={() => setDescriptionPreview(true)}
                     className={`px-3 py-1 text-xs font-medium transition-colors border-l border-gray-300 dark:border-gray-600 ${
                       descriptionPreview
-                        ? 'bg-green-600 text-white'
-                        : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-card text-muted-foreground hover:bg-muted'
                     }`}
                   >
                     Preview
@@ -2645,7 +2645,7 @@ export default function DeckBuilderPanel({
                 Add notes or strategy for your deck (supports Markdown).
               </p>
               {descriptionPreview ? (
-                <div className="w-full min-h-[8rem] p-3 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white overflow-auto prose prose-sm dark:prose-invert max-w-none">
+                <div className="w-full min-h-[8rem] p-3 text-sm border border-border rounded-lg bg-card text-card-foreground overflow-auto prose prose-sm dark:prose-invert max-w-none">
                   {deck.description ? (
                     <ReactMarkdown>{deck.description}</ReactMarkdown>
                   ) : (
@@ -2657,7 +2657,7 @@ export default function DeckBuilderPanel({
                   value={deck.description || ""}
                   onChange={(e) => onDescriptionChange?.(e.target.value)}
                   placeholder="Deck strategy, card choices, matchup notes..."
-                  className="w-full h-32 p-3 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                  className="w-full h-32 p-3 text-sm border border-border rounded-lg bg-card text-card-foreground placeholder-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
                 />
               )}
             </div>
@@ -2726,7 +2726,7 @@ export default function DeckBuilderPanel({
 
             {/* Alignment Breakdown */}
             <div>
-              <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-3">
+              <h3 className="font-semibold text-foreground mb-3">
                 Alignment Breakdown
               </h3>
               <div className="grid grid-cols-2 gap-3">
@@ -2762,10 +2762,10 @@ export default function DeckBuilderPanel({
                   }
 
                   const alignmentConfig = [
-                    { name: 'Good', color: 'bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-800 dark:text-blue-200' },
-                    { name: 'Evil', color: 'bg-red-100 dark:bg-red-900/30 border-red-300 dark:border-red-700 text-red-800 dark:text-red-200' },
-                    { name: 'Neutral', color: 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200' },
-                    { name: 'Dual', color: 'bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700 text-purple-800 dark:text-purple-200' },
+                    { name: 'Good', color: 'bg-blue-500/10 border-blue-500/30 text-blue-700 dark:text-blue-300' },
+                    { name: 'Evil', color: 'bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300' },
+                    { name: 'Neutral', color: 'bg-muted border-border text-foreground' },
+                    { name: 'Dual', color: 'bg-purple-500/10 border-purple-500/30 text-purple-700 dark:text-purple-300' },
                   ];
 
                   return alignmentConfig.map(({ name, color }) => {
@@ -2822,7 +2822,7 @@ export default function DeckBuilderPanel({
                     <span className="font-medium">{reserveCount}</span>
                   </div>
                 )}
-                <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                <div className="border-t border-border my-2 pt-2">
                   <div className="flex justify-between">
                     <span>Lost Souls:</span>
                     <span className={`font-medium ${
@@ -2843,7 +2843,7 @@ export default function DeckBuilderPanel({
 
                 {/* Deck Price */}
                 {totalDeckPrice !== null && (
-                  <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                  <div className="border-t border-border my-2 pt-2">
                     <button
                       onClick={() => { setBuyModalMode("exact"); setShowBuyDeckModal(true); }}
                       className="flex justify-between w-full text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 -mx-1 px-1 py-0.5 rounded transition-colors group"
@@ -2874,8 +2874,8 @@ export default function DeckBuilderPanel({
                 )}
 
                 {/* Card Type Breakdown */}
-                <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
-                  <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">
+                <div className="border-t border-border my-2 pt-2">
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
                     Card Types
                   </div>
                   <div className="space-y-0.5">
@@ -2985,7 +2985,7 @@ export default function DeckBuilderPanel({
             {/* Close button */}
             <button
               onClick={() => setShowParagonModal(false)}
-              className="absolute -top-4 -right-4 w-10 h-10 bg-white dark:bg-gray-800 rounded-full shadow-lg flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors z-10"
+              className="absolute -top-4 -right-4 w-10 h-10 bg-card rounded-full shadow-lg flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors z-10"
               aria-label="Close"
             >
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -3044,15 +3044,15 @@ export default function DeckBuilderPanel({
 
       {/* Mobile Full Deck View Overlay — portaled to body to escape stacking contexts */}
       {showMobileFullDeckView && createPortal(
-        <div className="md:hidden fixed inset-0 z-[100] bg-white dark:bg-gray-900 flex flex-col pt-[env(safe-area-inset-top)]">
+        <div className="md:hidden fixed inset-0 z-[100] bg-background flex flex-col pt-[env(safe-area-inset-top)]">
           {/* Header + View Controls — single compact row */}
-          <div className="flex-shrink-0 flex items-center gap-1.5 px-2 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-            <div className="flex items-center gap-0.5 bg-gray-200 dark:bg-gray-700 rounded-lg p-0.5">
+          <div className="flex-shrink-0 flex items-center gap-1.5 px-2 py-2 border-b border-border bg-card">
+            <div className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5">
               <button
                 onClick={() => setExpandedViewMode('stacked')}
                 className={`px-2 py-1 text-[11px] font-medium rounded-md transition-colors ${
                   expandedViewMode === 'stacked'
-                    ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                    ? 'bg-card text-card-foreground shadow-sm'
                     : 'text-gray-600 dark:text-gray-400'
                 }`}
               >
@@ -3062,19 +3062,19 @@ export default function DeckBuilderPanel({
                 onClick={() => setExpandedViewMode('normal')}
                 className={`px-2 py-1 text-[11px] font-medium rounded-md transition-colors ${
                   expandedViewMode === 'normal'
-                    ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                    ? 'bg-card text-card-foreground shadow-sm'
                     : 'text-gray-600 dark:text-gray-400'
                 }`}
               >
                 Normal
               </button>
             </div>
-            <div className="flex items-center gap-0.5 bg-gray-200 dark:bg-gray-700 rounded-lg p-0.5">
+            <div className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5">
               <button
                 onClick={() => setExpandedGroupBy('type')}
                 className={`px-2 py-1 text-[11px] font-medium rounded-md transition-colors ${
                   expandedGroupBy === 'type'
-                    ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                    ? 'bg-card text-card-foreground shadow-sm'
                     : 'text-gray-600 dark:text-gray-400'
                 }`}
               >
@@ -3084,7 +3084,7 @@ export default function DeckBuilderPanel({
                 onClick={() => setExpandedGroupBy('alignment')}
                 className={`px-2 py-1 text-[11px] font-medium rounded-md transition-colors ${
                   expandedGroupBy === 'alignment'
-                    ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                    ? 'bg-card text-card-foreground shadow-sm'
                     : 'text-gray-600 dark:text-gray-400'
                 }`}
               >
@@ -3094,7 +3094,7 @@ export default function DeckBuilderPanel({
                 onClick={() => setExpandedGroupBy('none')}
                 className={`px-2 py-1 text-[11px] font-medium rounded-md transition-colors ${
                   expandedGroupBy === 'none'
-                    ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                    ? 'bg-card text-card-foreground shadow-sm'
                     : 'text-gray-600 dark:text-gray-400'
                 }`}
               >

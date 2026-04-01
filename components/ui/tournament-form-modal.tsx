@@ -58,7 +58,7 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
               required
               maxLength={35}
               ref={inputRef}
-              className="w-full rounded-lg border border-gray-300 dark:border-zinc-600 bg-gray-50 dark:bg-zinc-800 text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:outline-none"
+              className="w-full rounded-lg border border-border bg-card text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:outline-none"
             />
           </DialogBody>
           <DialogFooter className="justify-end">

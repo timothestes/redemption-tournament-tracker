@@ -951,7 +951,7 @@ export default function ModalWithClose({
                   {getCardQuantity(modalCard.name, modalCard.set, false) > 0 && (
                     <button
                       onClick={() => onRemoveCard(modalCard.name, modalCard.set, false)}
-                      className="h-10 w-8 flex items-center justify-center rounded-l-lg bg-green-700 active:bg-green-800 text-white"
+                      className="h-10 w-8 flex items-center justify-center rounded-l-lg bg-primary active:bg-primary/90 text-primary-foreground"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
@@ -960,9 +960,9 @@ export default function ModalWithClose({
                   )}
                   <button
                     onClick={() => onAddCard(modalCard, false)}
-                    className={`h-10 px-3 bg-green-600 active:bg-green-700 text-white flex items-center gap-1.5 font-medium text-sm transition-colors ${
+                    className={`h-10 px-3 bg-primary active:bg-primary/90 text-primary-foreground flex items-center gap-1.5 font-medium text-sm transition-colors ${
                       getCardQuantity(modalCard.name, modalCard.set, false) > 0
-                        ? 'rounded-r-lg border-l border-green-500/30'
+                        ? 'rounded-r-lg border-l border-primary/30'
                         : 'rounded-lg'
                     }`}
                   >
@@ -1322,7 +1322,7 @@ export default function ModalWithClose({
                       const isReserve = activeDeckTab === "reserve";
                       onAddCard(modalCard, isReserve);
                     }}
-                    className="px-4 h-10 bg-green-700 hover:bg-green-800 text-white rounded-l-lg flex items-center gap-1.5 font-semibold transition-colors text-sm whitespace-nowrap"
+                    className="px-4 h-10 bg-primary hover:bg-primary/90 text-primary-foreground rounded-l-lg flex items-center gap-1.5 font-semibold transition-colors text-sm whitespace-nowrap"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -1332,7 +1332,7 @@ export default function ModalWithClose({
                       const isReserve = activeDeckTab === "reserve";
                       const quantity = getCardQuantity(modalCard.name, modalCard.set, isReserve);
                       return quantity > 0 && (
-                        <span className="bg-white/20 text-white px-2 py-0.5 rounded-md font-bold text-xs">
+                        <span className="bg-primary-foreground/20 text-primary-foreground px-2 py-0.5 rounded-md font-bold text-xs">
                           ×{quantity}
                         </span>
                       );
@@ -1344,7 +1344,7 @@ export default function ModalWithClose({
                       e.stopPropagation();
                       setShowMenu(!showMenu);
                     }}
-                    className="px-2.5 h-10 bg-green-700 hover:bg-green-800 text-white rounded-r-lg border-l border-green-600/30 transition-colors"
+                    className="px-2.5 h-10 bg-primary hover:bg-primary/90 text-primary-foreground rounded-r-lg border-l border-primary/30 transition-colors"
                   >
                     <svg className={`w-4 h-4 transition-transform ${showMenu ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
