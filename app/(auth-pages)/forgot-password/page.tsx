@@ -14,7 +14,7 @@ export default async function ForgotPassword(props: {
       <h1 className="text-2xl font-semibold mb-3 text-foreground">Reset Password</h1>
       <p className="text-sm text-muted-foreground mb-6">
         Already have an account?{" "}
-        <Link className="text-blue-500 hover:text-blue-400 font-medium underline" href="/sign-in">
+        <Link className="text-primary hover:text-primary/80 font-medium underline" href="/sign-in">
           Sign in
         </Link>
       </p>

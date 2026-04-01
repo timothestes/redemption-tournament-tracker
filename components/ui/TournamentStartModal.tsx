@@ -55,7 +55,7 @@ export default function TournamentStartModal({
     setNumberOfRounds(prev => Math.max(1, prev - 1));
   };
 
-  const inputClasses = "w-full bg-white dark:bg-gray-900/50 border border-gray-300 dark:border-gray-600 text-foreground rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5";
+  const inputClasses = "w-full bg-card border border-border text-foreground rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5";
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -64,8 +64,8 @@ export default function TournamentStartModal({
           <DialogTitle className="text-xl">Start Tournament</DialogTitle>
         </DialogHeader>
 
-        <DialogBody className="bg-gray-50 dark:bg-gray-800 space-y-6">
-          <div className="bg-white/90 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+        <DialogBody className="bg-muted space-y-6">
+          <div className="bg-muted border border-border rounded-lg p-4">
             <h4 className="text-lg font-medium text-foreground mb-4">Tournament Settings</h4>
 
             <div className="grid gap-6">
@@ -85,16 +85,16 @@ export default function TournamentStartModal({
                   <button
                     onClick={handleDecrement}
                     disabled={numberOfRounds <= 1}
-                    className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 w-10 h-10 rounded-md flex items-center justify-center text-foreground disabled:opacity-50"
+                    className="bg-muted hover:bg-muted/80 w-10 h-10 rounded-md flex items-center justify-center text-foreground disabled:opacity-50"
                   >
                     <span className="text-lg">&minus;</span>
                   </button>
-                  <span className="text-xl font-semibold text-foreground bg-gray-100 dark:bg-gray-900/50 min-w-[3ch] text-center py-1.5 px-3 rounded">
+                  <span className="text-xl font-semibold text-foreground bg-muted min-w-[3ch] text-center py-1.5 px-3 rounded">
                     {numberOfRounds}
                   </span>
                   <button
                     onClick={handleIncrement}
-                    className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 w-10 h-10 rounded-md flex items-center justify-center text-foreground"
+                    className="bg-muted hover:bg-muted/80 w-10 h-10 rounded-md flex items-center justify-center text-foreground"
                   >
                     <span className="text-lg">+</span>
                   </button>
@@ -116,7 +116,7 @@ export default function TournamentStartModal({
                     }}
                     min="0"
                     max="120"
-                    className="w-24 bg-white dark:bg-gray-900/50 border border-gray-300 dark:border-gray-600 text-foreground rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 text-center"
+                    className="w-24 bg-card border border-border text-foreground rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 text-center"
                     placeholder="Minutes"
                   />
                   <span className="text-sm text-muted-foreground">max 120</span>
@@ -124,7 +124,7 @@ export default function TournamentStartModal({
               </div>
 
               {/* Advanced Settings Section */}
-              <div className="border-t border-gray-200 dark:border-gray-600 pt-4">
+              <div className="border-t border-border pt-4">
                 <button
                   onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
                   className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -211,7 +211,7 @@ export default function TournamentStartModal({
                           setStartingTableNumber(value);
                         }}
                         min="1"
-                        className="w-24 bg-white dark:bg-gray-900/50 border border-gray-300 dark:border-gray-600 text-foreground rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 text-center"
+                        className="w-24 bg-card border border-border text-foreground rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 text-center"
                         placeholder="Table #"
                       />
                       <span className="text-sm text-muted-foreground">
@@ -230,7 +230,7 @@ export default function TournamentStartModal({
                         type="checkbox"
                         checked={soundNotifications}
                         onChange={(e) => setSoundNotifications(e.target.checked)}
-                        className="mr-3 h-4 w-4 rounded border-2 border-gray-300 dark:border-gray-600 text-blue-600 dark:text-blue-500 dark:bg-gray-800 focus:outline-none focus:ring-0"
+                        className="mr-3 h-4 w-4 rounded border-2 border-border text-primary bg-card focus:outline-none focus:ring-0"
                       />
                       <div>
                         <span className="text-sm text-foreground">
@@ -248,7 +248,7 @@ export default function TournamentStartModal({
           </div>
         </DialogBody>
 
-        <DialogFooter className="bg-gray-50 dark:bg-gray-800 justify-end">
+        <DialogFooter className="bg-muted justify-end">
           <Button
             onClick={() => onConfirm(numberOfRounds, roundLength, maxScore, byePoints, byeDifferential, startingTableNumber, soundNotifications)}
             variant="success"

@@ -250,7 +250,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Community Decks</h1>
-        <p className="text-gray-600 dark:text-gray-400">
+        <p className="text-muted-foreground">
           Browse public decks shared by the community.
         </p>
       </div>
@@ -265,18 +265,18 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
             placeholder="Search decks, players, or tournaments..."
-            className="flex-1 min-w-0 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm"
+            className="flex-1 min-w-0 px-3 py-2 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           />
           <button
             onClick={handleSearch}
-            className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-medium hover:bg-green-800 transition-colors flex-shrink-0"
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors flex-shrink-0"
           >
             Search
           </button>
           {search && (
             <button
               onClick={handleClearSearch}
-              className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white flex-shrink-0"
+              className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground flex-shrink-0"
             >
               Clear
             </button>
@@ -289,7 +289,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
           <select
             value={format}
             onChange={(e) => handleFormatChange(e.target.value)}
-            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm"
+            className="px-3 py-2 border border-border rounded-lg bg-card text-sm"
           >
             <option value="">All Formats</option>
             <option value="Type 1">Type 1</option>
@@ -301,7 +301,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
           <select
             value={sort}
             onChange={(e) => handleSortChange(e.target.value as typeof sort)}
-            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm"
+            className="px-3 py-2 border border-border rounded-lg bg-card text-sm"
           >
             <option value="newest">Newest</option>
             <option value="most_viewed">Most Viewed</option>
@@ -314,7 +314,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
             className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm transition-colors ${
               tournamentOnly
                 ? "border-amber-500 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300"
-                : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                : "border-border bg-card text-foreground hover:bg-muted"
             }`}
           >
             <TrophyIcon place={1} className="w-3.5 h-3.5" />
@@ -327,7 +327,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
             className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm transition-colors ${
               excludeFullSize
                 ? "border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"
-                : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                : "border-border bg-card text-foreground hover:bg-muted"
             }`}
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -343,8 +343,8 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
                 onClick={() => { setTagDropdownOpen((o) => !o); setTagFilterInput(""); }}
                 className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm transition-colors ${
                   selectedTagIds.length > 0
-                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
-                    : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border bg-card text-foreground hover:bg-muted"
                 }`}
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -352,7 +352,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
                 </svg>
                 Tags
                 {selectedTagIds.length > 0 && (
-                  <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-blue-600 text-white">
+                  <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-primary text-primary-foreground">
                     {selectedTagIds.length}
                   </span>
                 )}
@@ -362,23 +362,23 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
               </button>
 
               {tagDropdownOpen && (
-                <div className="absolute z-50 top-full mt-1.5 left-0 w-64 max-w-[calc(100vw-2rem)] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl">
+                <div className="absolute z-50 top-full mt-1.5 left-0 w-64 max-w-[calc(100vw-2rem)] bg-background border border-border rounded-xl shadow-xl">
                 {/* Filter input */}
-                <div className="px-3 pt-3 pb-2 border-b border-gray-100 dark:border-gray-800">
+                <div className="px-3 pt-3 pb-2 border-b border-border">
                   <input
                     autoFocus
                     type="text"
                     placeholder="Filter tags…"
                     value={tagFilterInput}
                     onChange={(e) => setTagFilterInput(e.target.value)}
-                    className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-border bg-card focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
 
                 {/* Tag list */}
                 <div className="max-h-64 overflow-y-auto">
                   {globalTags.filter((t) => t.name.toLowerCase().includes(tagFilterInput.toLowerCase())).length === 0 ? (
-                    <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-4">No matches</p>
+                    <p className="text-xs text-muted-foreground text-center py-4">No matches</p>
                   ) : (
                     globalTags
                       .filter((t) => t.name.toLowerCase().includes(tagFilterInput.toLowerCase()))
@@ -388,17 +388,17 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
                           <button
                             key={tag.id}
                             onClick={() => toggleTagFilter(tag.id)}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                            className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-muted transition-colors text-left"
                           >
                             <span className="w-4 flex-shrink-0 flex items-center justify-center">
                               {active && (
-                                <svg className="w-3.5 h-3.5 text-gray-700 dark:text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg className="w-3.5 h-3.5 text-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                                 </svg>
                               )}
                             </span>
                             <span className="w-3 h-3 rounded-full flex-shrink-0 border border-black/10" style={{ backgroundColor: tag.color }} />
-                            <span className="text-sm text-gray-800 dark:text-gray-200">{tag.name}</span>
+                            <span className="text-sm text-foreground">{tag.name}</span>
                           </button>
                         );
                       })
@@ -407,10 +407,10 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
 
                 {/* Footer: clear all */}
                 {selectedTagIds.length > 0 && (
-                  <div className="border-t border-gray-100 dark:border-gray-800">
+                  <div className="border-t border-border">
                     <button
                       onClick={() => { setSelectedTagIds([]); setPage(1); }}
-                      className="w-full px-3 py-2 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                      className="w-full px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors text-left"
                     >
                       Clear all tags
                     </button>
@@ -426,7 +426,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
       {/* Active tag pills banner */}
       {selectedTagIds.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 mb-4">
-          <span className="text-xs text-gray-500 dark:text-gray-400">Filtered by:</span>
+          <span className="text-xs text-muted-foreground">Filtered by:</span>
           {selectedTagIds.map((id) => {
             const tag = globalTags.find((t) => t.id === id);
             if (!tag) return null;
@@ -449,13 +449,13 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
 
       {/* Username filter banner */}
       {usernameFilter && (
-        <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm">
-          <span className="text-blue-800 dark:text-blue-200">
+        <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-primary/10 border border-primary/30 rounded-lg text-sm">
+          <span className="text-primary">
             Showing decks by <strong>{usernameFilter}</strong>
           </span>
           <button
             onClick={handleClearUsername}
-            className="ml-auto text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 font-medium"
+            className="ml-auto text-primary hover:text-primary/80 font-medium"
           >
             Show all decks
           </button>
@@ -464,7 +464,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
 
       {/* Results count */}
       {!loading && (
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+        <p className="text-sm text-muted-foreground mb-4">
           {totalCount} {totalCount === 1 ? "deck" : "decks"} found
           {search && ` for "${search}"`}
           {format && ` in ${format}`}
@@ -476,17 +476,17 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
       {loading ? (
         <div className="flex items-center justify-center min-h-[300px]">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-900 dark:border-gray-100 mx-auto"></div>
-            <p className="mt-4 text-gray-600 dark:text-gray-400">Loading decks...</p>
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-foreground mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading decks...</p>
           </div>
         </div>
       ) : decks.length === 0 ? (
         <div className="text-center py-16">
-          <svg className="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="mx-auto h-16 w-16 text-muted-foreground mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
           </svg>
           <h3 className="text-lg font-medium mb-2">No public decks found</h3>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-muted-foreground">
             {search || format
               ? "Try adjusting your search or filters."
               : "Be the first to share a deck! Go to My Decks and make one public."}
@@ -507,17 +507,17 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
               <button
                 onClick={() => setPage(Math.max(1, page - 1))}
                 disabled={page === 1}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                className="px-3 py-2 border border-border rounded-lg text-sm disabled:opacity-40 hover:bg-muted transition-colors"
               >
                 Previous
               </button>
-              <span className="text-sm text-gray-600 dark:text-gray-400 px-4">
+              <span className="text-sm text-muted-foreground px-4">
                 Page {page} of {totalPages}
               </span>
               <button
                 onClick={() => setPage(Math.min(totalPages, page + 1))}
                 disabled={page === totalPages}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                className="px-3 py-2 border border-border rounded-lg text-sm disabled:opacity-40 hover:bg-muted transition-colors"
               >
                 Next
               </button>
@@ -617,7 +617,7 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
   }
 
   return (
-    <div className="flex flex-col bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow overflow-hidden">
+    <div className="flex flex-col bg-card rounded-lg border border-border hover:shadow-lg transition-shadow overflow-hidden jayden-gradient-bg">
       {/* Clickable preview area */}
       <Link href={`/decklist/${deck.id}`} className="flex-1 block group">
         {/* Card preview */}
@@ -626,13 +626,13 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
             <Image src={`/paragons/Paragon ${deck.paragon}.png`} alt={deck.paragon} width={400} height={560} className="w-full h-full object-cover object-top group-hover:brightness-90 transition-[filter]" />
           </div>
         ) : hasPreview ? (
-          <div className="h-36 overflow-hidden bg-gray-100 dark:bg-gray-900 flex items-center justify-center gap-1 px-2 py-2 group-hover:bg-gray-200 dark:group-hover:bg-gray-800 transition-colors">
+          <div className="h-36 overflow-hidden bg-muted flex items-center justify-center gap-1 px-2 py-2 group-hover:bg-muted/80 transition-colors">
             {img1 && <img src={img1} alt="" className="h-full object-contain rounded group-hover:brightness-90 transition-[filter]" />}
             {img2 && <img src={img2} alt="" className="h-full object-contain rounded group-hover:brightness-90 transition-[filter]" />}
           </div>
         ) : (
-          <div className="h-36 bg-gray-100 dark:bg-gray-900 flex items-center justify-center group-hover:bg-gray-200 dark:group-hover:bg-gray-800 transition-colors">
-            <svg className="w-12 h-12 text-gray-300 dark:text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="h-36 bg-muted flex items-center justify-center group-hover:bg-muted/80 transition-colors">
+            <svg className="w-12 h-12 text-muted-foreground/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
           </div>
@@ -647,10 +647,10 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
               deck.tournament.placement === 1
                 ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-700/60"
                 : deck.tournament.placement === 2
-                ? "bg-gray-50 dark:bg-gray-700/30 border-gray-300 dark:border-gray-600"
+                ? "bg-gray-50 dark:bg-gray-700/30 border-border"
                 : deck.tournament.placement === 3
                 ? "bg-orange-50 dark:bg-orange-900/15 border-orange-300 dark:border-orange-800/50"
-                : "bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700"
+                : "bg-muted border-border"
             }`}>
               {deck.tournament.placement <= 3 && (
                 <TrophyIcon place={deck.tournament.placement} className="w-4 h-4 flex-shrink-0" />
@@ -662,11 +662,11 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
                   ? "text-gray-600 dark:text-gray-300"
                   : deck.tournament.placement === 3
                   ? "text-orange-700 dark:text-orange-300"
-                  : "text-gray-600 dark:text-gray-400"
+                  : "text-muted-foreground"
               }`}>
                 {getPlacementLabel(deck.tournament.placement)}
               </span>
-              <span className="text-gray-500 dark:text-gray-400 truncate">
+              <span className="text-muted-foreground truncate">
                 {deck.tournament.tournament_name}
                 {deck.tournament.participant_count > 0 && (
                   <> ({deck.tournament.participant_count} players)</>
@@ -677,7 +677,7 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
 
           <div className="flex items-center justify-between mb-2">
             {deck.username && (
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-sm text-muted-foreground">
                 by{" "}
                 <span
                   role="link"
@@ -686,13 +686,13 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
                     e.stopPropagation();
                     router.push(`/decklist/community?username=${encodeURIComponent(deck.username!)}`);
                   }}
-                  className="text-gray-600 dark:text-gray-400 underline hover:text-gray-900 dark:hover:text-gray-200 cursor-pointer"
+                  className="text-muted-foreground underline hover:text-foreground cursor-pointer"
                 >
                   {deck.username}
                 </span>
               </p>
             )}
-            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-500">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
               {(deck.view_count ?? 0) > 0 && <span>{deck.view_count} views</span>}
               <span>{timeAgo(deck.updated_at)}</span>
             </div>
@@ -700,7 +700,7 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
 
           <div className="flex items-center gap-3 text-sm mb-3">
             <span className={getDeckTypeBadgeClasses(deck.format)}>{formatDeckType(deck.format)}</span>
-            <span className="text-gray-600 dark:text-gray-400">{deck.card_count || 0} cards</span>
+            <span className="text-muted-foreground">{deck.card_count || 0} cards</span>
             {deck.is_legal === false && (
               <span className="text-[10px] font-medium text-red-600 dark:text-red-400">Not Legal</span>
             )}
@@ -734,7 +734,7 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
       <div className="flex gap-2 px-4 pb-4">
         <Link
           href={`/decklist/${deck.id}`}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium"
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm border border-border rounded-lg hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors font-medium"
         >
           <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -746,7 +746,7 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
         {currentUserId && (isOwner ? (
           <Link
             href={`/decklist/card-search?deckId=${deck.id}`}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium"
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm border border-border rounded-lg hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors font-medium"
           >
             <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -757,10 +757,10 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
           <button
             onClick={handleCopyAndEdit}
             disabled={copying}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium disabled:opacity-60 whitespace-nowrap"
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors font-medium disabled:opacity-60 whitespace-nowrap"
           >
             {copying ? (
-              <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+              <div className="w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
             ) : (
               <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -777,10 +777,10 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
           <button
             onClick={() => setShowExportMenu(!showExportMenu)}
             title="Export"
-            className="flex items-center justify-center px-2.5 h-full border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            className="flex items-center justify-center px-2.5 h-full border border-border rounded-lg hover:bg-muted transition-colors"
           >
             {loadingGenerate || downloading ? (
-              <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+              <div className="w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
             ) : (
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
@@ -788,13 +788,13 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
             )}
           </button>
           {showExportMenu && (
-            <div className="absolute right-0 bottom-full mb-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50 min-w-[140px]">
+            <div className="absolute right-0 bottom-full mb-1 bg-card border border-border rounded-lg shadow-lg py-1 z-50 min-w-[140px]">
               <button
                 onClick={() => { handleGenerate("pdf"); setShowExportMenu(false); }}
                 disabled={loadingGenerate}
-                className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted flex items-center gap-2"
               >
-                <svg className="w-3.5 h-3.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                 </svg>
                 Generate PDF
@@ -802,9 +802,9 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
               <button
                 onClick={() => { handleGenerate("image"); setShowExportMenu(false); }}
                 disabled={loadingGenerate}
-                className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted flex items-center gap-2"
               >
-                <svg className="w-3.5 h-3.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
                 Generate Image
@@ -812,9 +812,9 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
               <button
                 onClick={() => { handleDownload(new MouseEvent("click") as any); setShowExportMenu(false); }}
                 disabled={downloading}
-                className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted flex items-center gap-2"
               >
-                <svg className="w-3.5 h-3.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
                 Download .txt

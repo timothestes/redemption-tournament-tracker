@@ -209,17 +209,17 @@ export default function RepairPairingModal({
           </div>
         </DialogHeader>
         <DialogBody className="space-y-6">
-          <div className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 mb-4">
+          <div className="p-4 border border-border rounded-lg bg-muted mb-4">
             <h3 className="text-lg font-medium text-foreground mb-3">Current Pairing</h3>
             <div className="flex items-center justify-between gap-4">
-              <div className="text-center flex-1 p-2 bg-white dark:bg-gray-800 rounded-lg">
+              <div className="text-center flex-1 p-2 bg-card rounded-lg">
                 <p className="text-foreground font-medium">{match?.player1_id?.name}</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {match?.player1_match_points} points | {match?.differential} diff
                 </p>
               </div>
               <span className="text-muted-foreground">vs</span>
-              <div className="text-center flex-1 p-2 bg-white dark:bg-gray-800 rounded-lg">
+              <div className="text-center flex-1 p-2 bg-card rounded-lg">
                 <p className="text-foreground font-medium">{match?.player2_id?.name}</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {match?.player2_match_points} points | {match?.differential2} diff
@@ -241,14 +241,14 @@ export default function RepairPairingModal({
             ) : participants.length === 0 ? (
               <p className="text-center text-muted-foreground py-4">No available participants</p>
             ) : (
-              <div className="max-h-60 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-lg">
+              <div className="max-h-60 overflow-y-auto border border-border rounded-lg">
                 {participants.map((participant) => (
                   <button
                     key={participant.id}
                     onClick={() => setSelectedParticipant(participant.id)}
-                    className={`w-full text-left px-4 py-3 border-b border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                    className={`w-full text-left px-4 py-3 border-b border-border hover:bg-muted transition-colors ${
                       selectedParticipant === participant.id
-                        ? "bg-blue-50 dark:bg-blue-900/40 border-blue-300 dark:border-blue-700"
+                        ? "bg-primary/10 border-primary/30"
                         : ""
                     }`}
                   >

@@ -565,7 +565,7 @@ export default function TournamentPage({
   }, [id]);
 
   return (
-    <div className="flex min-h-screen px-5 w-full">
+    <div className="flex min-h-screen px-5 w-full jayden-gradient-bg">
       <div className="max-w-4xl max-md:max-w-full mx-auto space-y-5">
         <Breadcrumb
           items={[

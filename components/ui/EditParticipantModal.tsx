@@ -71,7 +71,7 @@ const EditParticipantModal: React.FC<EditParticipantModalProps> = ({
                 onChange={(e) => setNewParticipantName(e.target.value)}
                 required
                 ref={inputRef}
-                className="w-full rounded-lg border border-gray-300 dark:border-zinc-600 bg-gray-50 dark:bg-zinc-800 text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:outline-none"
+                className="w-full rounded-lg border border-border bg-card text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:outline-none"
               />
             </div>
             <div className="space-y-1">
@@ -83,7 +83,7 @@ const EditParticipantModal: React.FC<EditParticipantModalProps> = ({
                 value={newMatchPoints}
                 onChange={(e) => setNewMatchPoints(e.target.value)}
                 disabled={!isTournamentStarted}
-                className="w-full rounded-lg border border-gray-300 dark:border-zinc-600 bg-gray-50 dark:bg-zinc-800 text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:outline-none disabled:opacity-50"
+                className="w-full rounded-lg border border-border bg-card text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:outline-none disabled:opacity-50"
               />
             </div>
             <div className="space-y-1">
@@ -95,7 +95,7 @@ const EditParticipantModal: React.FC<EditParticipantModalProps> = ({
                 value={newDifferential}
                 onChange={(e) => setNewDifferential(e.target.value)}
                 disabled={!isTournamentStarted}
-                className="w-full rounded-lg border border-gray-300 dark:border-zinc-600 bg-gray-50 dark:bg-zinc-800 text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:outline-none disabled:opacity-50"
+                className="w-full rounded-lg border border-border bg-card text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:outline-none disabled:opacity-50"
               />
             </div>
           </DialogBody>

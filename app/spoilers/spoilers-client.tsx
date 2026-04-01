@@ -423,7 +423,7 @@ function SpoilersPageInner({ initialSpoilers }: { initialSpoilers: PublicSpoiler
 
   return (
     <>
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-4 py-8 jayden-gradient-bg">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
           <div>

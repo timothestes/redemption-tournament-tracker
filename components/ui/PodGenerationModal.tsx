@@ -68,7 +68,7 @@ export default function PodGenerationModal({ show, participants, onClose }: PodG
               id="pod-size"
               value={podSize.toString()}
               onChange={(e) => setPodSize(Number(e.target.value))}
-              className="w-full rounded-lg border border-gray-300 dark:border-zinc-600 bg-gray-50 dark:bg-zinc-800 text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:outline-none"
+              className="w-full rounded-lg border border-border bg-card text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:outline-none"
             >
               {Array.from({ length: Math.min(participants.length, 8) }, (_, i) => (
                 <option key={i + 1} value={i + 1}>

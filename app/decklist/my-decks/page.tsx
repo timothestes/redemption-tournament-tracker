@@ -29,19 +29,19 @@ export default async function MyDecksPage() {
           />
         </svg>
         <h1 className="text-3xl font-bold mb-3">My Decks</h1>
-        <p className="text-gray-600 dark:text-gray-400 text-lg mb-6">
+        <p className="text-muted-foreground text-lg mb-6">
           Sign in to save, manage, and share your Redemption decks.
         </p>
         <div className="flex items-center justify-center gap-3">
           <Link
             href="/sign-in"
-            className="px-6 py-3 bg-green-700 text-white rounded-lg font-medium hover:bg-green-800 transition-colors"
+            className="px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
           >
             Sign in
           </Link>
           <Link
             href="/sign-up"
-            className="px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            className="px-6 py-3 border border-border rounded-lg font-medium hover:bg-muted transition-colors"
           >
             Create an account
           </Link>

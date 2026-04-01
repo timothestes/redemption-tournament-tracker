@@ -763,7 +763,7 @@ export default function TournamentRounds({
 
   return (
     <div className="w-[800px] max-xl:w-full mx-auto overflow-x-auto">
-      <Card>
+      <Card theme={{ root: { base: "flex rounded-lg border border-border bg-card shadow-sm", children: "flex h-full flex-col justify-center gap-4 p-6" } }}>
         {error.message && (
           <div className="p-4 mb-4 text-sm text-red-800 dark:text-red-300 rounded-lg bg-red-50 dark:bg-red-900/20">
             {error.message}
@@ -771,7 +771,7 @@ export default function TournamentRounds({
         )}
         {isLoading ? (
           <div className="flex items-center justify-center p-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-600 dark:border-gray-400"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
           </div>
         ) : (
           <div className="mt-4 max-w-full">
@@ -872,20 +872,20 @@ export default function TournamentRounds({
                       {matches.length > 0 &&
                         matches.map((match, index) => (
                           <Fragment key={match.id}>
-                            <tr className={`border-b border-gray-200 dark:border-gray-400/70 ${matchErrorIndex.includes(index) ? "bg-red-600/20" : "bg-gray-50 dark:bg-slate-800"}`}>
-                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-gray-200 dark:border-zinc-400"}`}>
+                            <tr className={`border-b border-border ${matchErrorIndex.includes(index) ? "bg-red-600/20" : "bg-muted/50"}`}>
+                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
                                 {index + (tournamentInfo.starting_table_number || 1)}
                               </td>
-                              <td className={`px-4 py-2 text-center border-r text-gray-800 dark:text-zinc-200 ${matchErrorIndex.includes(index) ? "border-red-400" : "border-gray-200 dark:border-zinc-400"}`}>
+                              <td className={`px-4 py-2 text-center border-r text-foreground ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
                                 {match.player1_id.name}
                               </td>
-                              <td className={`px-4 py-2 text-center border-r text-gray-800 dark:text-zinc-200 ${matchErrorIndex.includes(index) ? "border-red-400" : "border-gray-200 dark:border-zinc-400"}`}>
+                              <td className={`px-4 py-2 text-center border-r text-foreground ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
                                 {match.player2_id.name}
                               </td>
-                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-gray-200 dark:border-zinc-400"}`}>
+                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
                                 {match.player1_match_points}
                               </td>
-                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-gray-200 dark:border-zinc-400"}`}>
+                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
                                 {match.differential ?? "N/A"}
                               </td>
                               <td className="px-2">
@@ -909,9 +909,9 @@ export default function TournamentRounds({
                                             : (repairSourceMatch.match && repairSourceMatch.match.id === match.id && !repairSourceMatch.isPlayer2))
                                           ? "text-yellow-600 dark:text-yellow-400 bg-primary/15 hover:bg-primary/25 hover:text-yellow-700 dark:hover:text-yellow-300 cursor-pointer"
                                           : repairMode
-                                            ? "text-green-600 dark:text-green-400 hover:bg-muted hover:text-green-700 dark:hover:text-green-300 cursor-pointer"
+                                            ? "text-primary hover:bg-muted hover:text-primary/80 cursor-pointer"
                                             : "text-primary hover:bg-muted hover:text-primary/80 cursor-pointer"
-                                        : "text-gray-400 dark:text-gray-600 cursor-not-allowed"
+                                        : "text-muted-foreground cursor-not-allowed"
                                     }`}
                                     onClick={() => {
                                       if (currentPage === tournamentInfo.current_round && !roundInfo.started_at) {
@@ -925,20 +925,20 @@ export default function TournamentRounds({
                                 </div>
                               </td>
                             </tr>
-                            <tr className={`border-b border-gray-200 dark:border-gray-300 ${matchErrorIndex.includes(index) ? "bg-red-600/20" : "bg-white dark:bg-slate-700"}`}>
-                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-gray-200 dark:border-zinc-400"}`}>
+                            <tr className={`border-b border-border ${matchErrorIndex.includes(index) ? "bg-red-600/20" : "bg-card"}`}>
+                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
                                 {index + (tournamentInfo.starting_table_number || 1)}
                               </td>
-                              <td className={`px-4 py-2 text-center border-r text-gray-800 dark:text-zinc-200 ${matchErrorIndex.includes(index) ? "border-red-400" : "border-gray-200 dark:border-zinc-400"}`}>
+                              <td className={`px-4 py-2 text-center border-r text-foreground ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
                                 {match.player2_id.name}
                               </td>
-                              <td className={`px-4 py-2 text-center border-r text-gray-800 dark:text-zinc-200 ${matchErrorIndex.includes(index) ? "border-red-400" : "border-gray-200 dark:border-zinc-400"}`}>
+                              <td className={`px-4 py-2 text-center border-r text-foreground ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
                                 {match.player1_id.name}
                               </td>
-                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-gray-200 dark:border-zinc-400"}`}>
+                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
                                 {match.player2_match_points}
                               </td>
-                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-gray-200 dark:border-zinc-400"}`}>
+                              <td className={`px-4 py-2 text-center border-r ${matchErrorIndex.includes(index) ? "border-red-400" : "border-border"}`}>
                                 {match.differential2 ?? "N/A"}
                               </td>
                               <td className="px-2">
@@ -962,9 +962,9 @@ export default function TournamentRounds({
                                             : (repairSourceMatch.match && repairSourceMatch.match.id === match.id && repairSourceMatch.isPlayer2))
                                           ? "text-yellow-600 dark:text-yellow-400 bg-primary/15 hover:bg-primary/25 hover:text-yellow-700 dark:hover:text-yellow-300 cursor-pointer"
                                           : repairMode
-                                            ? "text-green-600 dark:text-green-400 hover:bg-muted hover:text-green-700 dark:hover:text-green-300 cursor-pointer"
+                                            ? "text-primary hover:bg-muted hover:text-primary/80 cursor-pointer"
                                             : "text-primary hover:bg-muted hover:text-primary/80 cursor-pointer"
-                                        : "text-gray-400 dark:text-gray-600 cursor-not-allowed"
+                                        : "text-muted-foreground cursor-not-allowed"
                                     }`}
                                     onClick={() => {
                                       if (currentPage === tournamentInfo.current_round && !roundInfo.started_at) {
@@ -986,9 +986,9 @@ export default function TournamentRounds({
 
                 {byes && byes.length > 0 && <>
                   <h3 className="text-foreground text-lg font-semibold mt-7 mb-3 text-center">Game Byes</h3>
-                  <div className="overflow-x-auto max-w-full bg-white dark:bg-gray-800 text-gray-800 dark:text-white">
-                    <table className="min-w-full text-sm text-left text-gray-600 dark:text-gray-400 border-2 border-gray-200 dark:border-gray-300">
-                      <thead className="text-xs uppercase font-normal text-gray-700 dark:text-zinc-100 bg-gray-100 dark:bg-gray-900 border-b-2 border-gray-200 dark:border-gray-300 rounded-t-lg">
+                  <div className="overflow-x-auto max-w-full bg-card text-foreground">
+                    <table className="min-w-full text-sm text-left text-muted-foreground border-2 border-border">
+                      <thead className="text-xs uppercase font-normal text-foreground bg-muted border-b-2 border-border rounded-t-lg">
                         <tr>
                           <th scope="col" className="px-4 py-2 text-center">
                             Table
@@ -1013,20 +1013,20 @@ export default function TournamentRounds({
                         {byes.length > 0 &&
                           byes.map((bye, index) => (
                             <Fragment key={bye.id}>
-                              <tr className="border-b border-gray-200 dark:border-gray-400/70 bg-gray-50 dark:bg-slate-800">
-                                <td className="px-4 py-2 text-center border-r border-gray-200 dark:border-zinc-400">
+                              <tr className="border-b border-border bg-muted/50">
+                                <td className="px-4 py-2 text-center border-r border-border">
                                   N/A
                                 </td>
-                                <td className="px-4 py-2 text-center border-r border-gray-200 dark:border-zinc-400">
+                                <td className="px-4 py-2 text-center border-r border-border">
                                   {bye.participant_id.name}
                                 </td>
-                                <td className="px-4 py-2 text-center border-r border-gray-200 dark:border-zinc-400">
+                                <td className="px-4 py-2 text-center border-r border-border">
                                   N/A
                                 </td>
-                                <td className="px-4 py-2 text-center border-r border-gray-200 dark:border-zinc-400">
+                                <td className="px-4 py-2 text-center border-r border-border">
                                   {bye.match_points}
                                 </td>
-                                <td className="px-4 py-2 text-center border-r border-gray-200 dark:border-zinc-400">
+                                <td className="px-4 py-2 text-center border-r border-border">
                                   {bye.differential}
                                 </td>
                                 <td className="px-2">
@@ -1037,9 +1037,9 @@ export default function TournamentRounds({
                                         ? repairMode && repairSourceMatch && repairSourceMatch.isBye && repairSourceMatch.byeId === bye.id
                                           ? "text-yellow-600 dark:text-yellow-400 bg-primary/15 hover:bg-primary/25 hover:text-yellow-700 dark:hover:text-yellow-300 cursor-pointer"
                                           : repairMode
-                                            ? "text-green-600 dark:text-green-400 hover:bg-muted hover:text-green-700 dark:hover:text-green-300 cursor-pointer"
+                                            ? "text-primary hover:bg-muted hover:text-primary/80 cursor-pointer"
                                             : "text-primary hover:bg-muted hover:text-primary/80 cursor-pointer"
-                                        : "text-gray-400 dark:text-gray-600 cursor-not-allowed"
+                                        : "text-muted-foreground cursor-not-allowed"
                                     }`}
                                     onClick={() => {
                                       if (currentPage === tournamentInfo.current_round && !roundInfo.started_at) {

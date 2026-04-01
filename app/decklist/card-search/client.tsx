@@ -1429,7 +1429,7 @@ export default function CardSearchClient() {
         />
       )}
       
-    <div ref={containerRef} className="flex w-full h-screen overflow-hidden bg-background">
+    <div ref={containerRef} className="flex w-full h-screen overflow-hidden bg-background jayden-gradient-bg">
       {/* Left panel: Card search */}
       {showSearch && (
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
@@ -2146,7 +2146,7 @@ export default function CardSearchClient() {
       {/* Central Divider with Toggle Buttons */}
       {showSearch && showDeckBuilder && (
         <div
-          className="hidden md:flex relative bg-gradient-to-b from-transparent via-gray-300 to-transparent dark:via-gray-700 hover:via-blue-400 dark:hover:via-blue-500 items-center justify-center cursor-ew-resize select-none transition-colors flex-shrink-0"
+          className="hidden md:flex relative bg-gradient-to-b from-transparent via-border to-transparent hover:via-primary/50 items-center justify-center cursor-ew-resize select-none transition-colors flex-shrink-0 [.jayden_&]:via-primary/30 [.jayden_&]:hover:via-primary/60"
           style={{ width: '6px' }}
           onMouseDown={handleResizeStart}
           title="Drag to resize panels"
@@ -2156,10 +2156,10 @@ export default function CardSearchClient() {
             {/* Hide Search Button */}
             <button
               onClick={() => setShowSearch(false)}
-              className="group relative w-7 h-7 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 hover:border-blue-500 dark:hover:border-green-600 flex items-center justify-center"
+              className="group relative w-7 h-7 bg-card border border-border rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 hover:border-primary flex items-center justify-center"
               title="Hide search panel"
             >
-              <svg className="w-3 h-3 text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-3 h-3 text-muted-foreground group-hover:text-primary transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M15 19l-7-7 7-7" />
               </svg>
               {/* Tooltip */}
@@ -2171,10 +2171,10 @@ export default function CardSearchClient() {
             {/* Hide Deck Button */}
             <button
               onClick={() => setShowDeckBuilder(false)}
-              className="group relative w-7 h-7 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 hover:border-blue-500 dark:hover:border-green-600 flex items-center justify-center"
+              className="group relative w-7 h-7 bg-card border border-border rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 hover:border-primary flex items-center justify-center"
               title="Hide deck builder"
             >
-              <svg className="w-3 h-3 text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-3 h-3 text-muted-foreground group-hover:text-primary transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M9 5l7 7-7 7" />
               </svg>
               {/* Tooltip */}
@@ -2190,7 +2190,7 @@ export default function CardSearchClient() {
       {!showSearch && (
         <button
           onClick={() => setShowSearch(true)}
-          className="hidden md:flex fixed left-0 top-1/2 -translate-y-1/2 z-50 flex-col items-center gap-2 px-2 py-4 bg-gradient-to-r from-blue-600 to-blue-500 dark:from-blue-700 dark:to-blue-600 rounded-r-xl shadow-2xl hover:shadow-blue-500/50 dark:hover:shadow-blue-700/50 transition-all hover:pl-3 text-white font-medium group border-r-4 border-green-600 dark:border-blue-500"
+          className="hidden md:flex fixed left-0 top-1/2 -translate-y-1/2 z-50 flex-col items-center gap-2 px-2 py-4 bg-primary rounded-r-xl shadow-2xl hover:shadow-primary/50 transition-all hover:pl-3 text-primary-foreground font-medium group border-r-4 border-primary/60"
           title="Show search panel"
         >
           <svg className="w-4 h-4 group-hover:scale-105 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -2203,7 +2203,7 @@ export default function CardSearchClient() {
       {!showDeckBuilder && (
         <button
           onClick={() => setShowDeckBuilder(true)}
-          className="hidden md:flex fixed right-0 top-1/2 -translate-y-1/2 z-50 flex-col items-center gap-3 px-4 py-8 bg-gradient-to-l from-purple-600 to-purple-500 dark:from-purple-700 dark:to-purple-600 rounded-l-2xl shadow-2xl hover:shadow-purple-500/50 dark:hover:shadow-purple-700/50 transition-all hover:pr-6 text-white font-medium group border-l-4 border-purple-400 dark:border-purple-500"
+          className="hidden md:flex fixed right-0 top-1/2 -translate-y-1/2 z-50 flex-col items-center gap-3 px-4 py-8 bg-accent rounded-l-2xl shadow-2xl hover:shadow-accent/50 transition-all hover:pr-6 text-accent-foreground font-medium group border-l-4 border-accent/60"
           title="Show deck builder"
         >
           <svg className="w-6 h-6 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -2475,7 +2475,7 @@ export default function CardSearchClient() {
                 Cancel
               </button>
               <button
-                className="px-4 py-2 bg-green-700 text-white rounded hover:bg-green-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => handleImportDeck(importText)}
                 disabled={!importText.trim()}
               >

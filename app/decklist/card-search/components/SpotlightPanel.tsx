@@ -165,7 +165,7 @@ export default function SpotlightPanel({
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8">
         <div
-          className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl"
+          className="border-2 border-dashed border-border rounded-xl"
           style={{ width: "min(100%, 400px)", aspectRatio: "5 / 7" }}
         />
         <Scoreboard

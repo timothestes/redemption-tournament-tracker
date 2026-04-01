@@ -428,7 +428,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
         onMouseLeave={() => setHoveredCard(null)}
       >
         {/* Card image - compact */}
-        <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-gray-800 hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer shadow-md">
+        <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-gray-800 hover:ring-2 hover:ring-primary transition-all cursor-pointer shadow-md">
           {imageUrl ? (
             <img
               src={imageUrl}
@@ -438,7 +438,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gray-700">
-              <span className="text-xs text-gray-400 text-center px-1">{card.name}</span>
+              <span className="text-xs text-muted-foreground text-center px-1">{card.name}</span>
             </div>
           )}
           
@@ -464,7 +464,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
   };
 
   const tagsBarContent = (deckTags.length > 0 || (isAuthenticated && deck.id)) ? (
-      <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-b border-gray-200/60 dark:border-gray-700/60">
+      <div className="bg-background/95 backdrop-blur-sm border-b border-border/60">
         <div className="px-3 md:px-4 py-1 md:py-1.5">
           <div className="flex items-center gap-2">
               {/* Scrollable tag pills */}
@@ -500,7 +500,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                 <div className="relative flex-shrink-0" ref={tagPickerRef}>
                   <button
                     onClick={() => { setTagPickerOpen((o) => !o); setTagFilter(""); setCreateMode(false); }}
-                    className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-dashed border-gray-400 dark:border-gray-500 text-xs text-gray-500 dark:text-gray-400 hover:border-gray-600 dark:hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200 transition-colors whitespace-nowrap"
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-dashed border-border text-xs text-muted-foreground hover:border-foreground/50 hover:text-foreground transition-colors whitespace-nowrap"
                   >
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -510,14 +510,14 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                   </button>
 
                   {tagPickerOpen && (
-                    <div className="absolute z-50 top-full mt-1.5 left-0 w-64 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl">
+                    <div className="absolute z-50 top-full mt-1.5 left-0 w-64 bg-card border border-border rounded-xl shadow-xl">
                       {createMode ? (
                         <form onSubmit={handleCreateTag} className="p-3 flex flex-col gap-3">
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
                               onClick={() => setCreateColorOpen((o) => !o)}
-                              className="w-7 h-7 rounded-md border-2 border-gray-300 dark:border-gray-600 shadow-sm flex-shrink-0 hover:scale-110 transition-transform"
+                              className="w-7 h-7 rounded-md border-2 border-border shadow-sm flex-shrink-0 hover:scale-110 transition-transform"
                               style={{ backgroundColor: createColor }}
                             />
                             <input
@@ -527,53 +527,53 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                               value={createName}
                               onChange={(e) => setCreateName(e.target.value)}
                               maxLength={50}
-                              className="flex-1 px-2.5 py-1.5 text-sm rounded-lg border border-gray-600 bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-ring"
+                              className="flex-1 px-2.5 py-1.5 text-sm rounded-lg border border-border bg-muted text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                             />
                           </div>
                           {createColorOpen && (
                             <div className="flex flex-col items-center gap-1.5">
                               <HexColorPicker color={createColor} onChange={setCreateColor} style={{ width: "100%" }} />
-                              <span className="font-mono text-xs text-gray-400">{createColor}</span>
+                              <span className="font-mono text-xs text-muted-foreground">{createColor}</span>
                             </div>
                           )}
                           {createName.trim() && (
                             <div className="flex items-center gap-1.5">
-                              <span className="text-xs text-gray-400">Preview:</span>
+                              <span className="text-xs text-muted-foreground">Preview:</span>
                               <span className="px-2.5 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: createColor, color: getTagContrastColor(createColor) }}>{createName}</span>
                             </div>
                           )}
                           {createError && <p className="text-xs text-red-400">{createError}</p>}
                           <div className="flex gap-2">
-                            <button type="submit" disabled={creating || !createName.trim()} className="flex-1 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                            <button type="submit" disabled={creating || !createName.trim()} className="flex-1 py-1.5 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50">
                               {creating ? "Creating…" : "Create tag"}
                             </button>
-                            <button type="button" onClick={() => { setCreateMode(false); setCreateError(null); setCreateName(""); setCreateColorOpen(false); }} className="flex-1 py-1.5 border border-gray-600 text-gray-300 text-sm rounded-lg hover:bg-gray-800">
+                            <button type="button" onClick={() => { setCreateMode(false); setCreateError(null); setCreateName(""); setCreateColorOpen(false); }} className="flex-1 py-1.5 border border-border text-muted-foreground text-sm rounded-lg hover:bg-muted">
                               Cancel
                             </button>
                           </div>
                         </form>
                       ) : (
                         <>
-                          <div className="px-3 pt-3 pb-2 border-b border-gray-800">
+                          <div className="px-3 pt-3 pb-2 border-b border-border">
                             <input
                               autoFocus
                               type="text"
                               placeholder="Filter tags…"
                               value={tagFilter}
                               onChange={(e) => setTagFilter(e.target.value)}
-                              className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-gray-600 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-ring"
+                              className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-border bg-muted text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                             />
                           </div>
                           <div className="max-h-52 overflow-y-auto">
                             {tagsLoading ? (
                               <div className="flex justify-center py-4">
-                                <svg className="animate-spin w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24">
+                                <svg className="animate-spin w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24">
                                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
                                 </svg>
                               </div>
                             ) : filteredGlobalTags.length === 0 ? (
-                              <p className="text-xs text-gray-500 text-center py-4">
+                              <p className="text-xs text-muted-foreground text-center py-4">
                                 {allGlobalTags.length === 0 ? "No tags available yet" : "No matches"}
                               </p>
                             ) : (
@@ -583,27 +583,27 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                                   <button
                                     key={tag.id}
                                     onClick={() => toggleTag(tag)}
-                                    className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-800 transition-colors text-left"
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-muted transition-colors text-left"
                                   >
                                     <span className="w-4 flex-shrink-0 flex items-center justify-center">
                                       {selected && (
-                                        <svg className="w-3.5 h-3.5 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <svg className="w-3.5 h-3.5 text-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                                         </svg>
                                       )}
                                     </span>
                                     <span className="w-3 h-3 rounded-full flex-shrink-0 border border-black/10" style={{ backgroundColor: tag.color }} />
-                                    <span className="text-sm text-gray-200">{tag.name}</span>
+                                    <span className="text-sm text-foreground">{tag.name}</span>
                                   </button>
                                 );
                               })
                             )}
                           </div>
                           {canManageTags && (
-                            <div className="border-t border-gray-800">
+                            <div className="border-t border-border">
                               <button
                                 onClick={() => { setCreateName(tagFilter); setCreateColor("#6366f1"); setCreateError(null); setCreateMode(true); }}
-                                className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-gray-400 hover:bg-gray-800 transition-colors"
+                                className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-muted-foreground hover:bg-muted transition-colors"
                               >
                                 <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -626,7 +626,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
   return (
     <>
       {tagsBarContainer ? (tagsBarContent && createPortal(tagsBarContent, tagsBarContainer)) : tagsBarContent}
-      <div className="h-full w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
+      <div className="h-full w-full bg-background text-foreground">
       {/* Main content area */}
       <div className="px-3 py-3 md:px-4 md:py-3 lg:flex lg:gap-4">
         {/* Deck cards */}
@@ -638,8 +638,8 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
               <div>
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-3">
-                    <h2 className="text-xl font-bold text-blue-400">Main Deck</h2>
-                    <span className="text-sm text-gray-500">({mainDeckCount} cards)</span>
+                    <h2 className="text-xl font-bold text-primary">Main Deck</h2>
+                    <span className="text-sm text-muted-foreground">({mainDeckCount} cards)</span>
                   </div>
                 </div>
                 
@@ -658,7 +658,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                             {groupBy === 'alignment' && (
                               <div className="mb-1.5 flex items-center gap-2">
                                 <h3 className={`text-sm font-semibold ${getAlignmentColor(groupName)}`}>{groupName}</h3>
-                                <span className="text-xs text-gray-500">({cards.reduce((sum, dc) => sum + dc.quantity, 0)})</span>
+                                <span className="text-xs text-muted-foreground">({cards.reduce((sum, dc) => sum + dc.quantity, 0)})</span>
                               </div>
                             )}
                             <div className="flex flex-wrap gap-2 items-start">
@@ -678,7 +678,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                               {groupBy === 'alignment' && colIndex === 0 && (
                                 <div className="mb-2 flex items-center gap-2">
                                   <h3 className={`text-lg font-semibold ${getAlignmentColor(groupName)}`}>{groupName}</h3>
-                                  <span className="text-xs text-gray-500">({cards.reduce((sum, dc) => sum + dc.quantity, 0)})</span>
+                                  <span className="text-xs text-muted-foreground">({cards.reduce((sum, dc) => sum + dc.quantity, 0)})</span>
                                 </div>
                               )}
                               <div className="flex flex-col gap-2 items-center">
@@ -703,7 +703,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                         <div className="md:hidden">
                           <div className="mb-1.5 flex items-center gap-2">
                             <h3 className="text-sm font-semibold text-purple-400">Reserve</h3>
-                            <span className="text-xs text-gray-500">({reserveCount})</span>
+                            <span className="text-xs text-muted-foreground">({reserveCount})</span>
                           </div>
                           <div className="flex flex-wrap gap-2 items-start">
                             {sortCards(reserveCards).flatMap((deckCard) =>
@@ -719,7 +719,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                         <div className="hidden md:flex flex-col ml-4">
                           <div className="mb-2 flex items-center gap-2">
                             <h3 className="text-lg font-semibold text-purple-400">Reserve</h3>
-                            <span className="text-xs text-gray-500">({reserveCount})</span>
+                            <span className="text-xs text-muted-foreground">({reserveCount})</span>
                           </div>
                           <div className="flex flex-col gap-2 items-center">
                             {sortCards(reserveCards).flatMap((deckCard) =>
@@ -735,7 +735,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                     )}
                   </div>
                 ) : (
-                  <div className="text-center py-12 text-gray-500">
+                  <div className="text-center py-12 text-muted-foreground">
                     <p>No cards in main deck</p>
                   </div>
                 )}
@@ -744,8 +744,8 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
               // Non-type grouping layout with stacked headers
               <div>
                 <div className="flex items-center gap-3 mb-2">
-                  <h2 className="text-xl font-bold text-blue-400">Main Deck</h2>
-                  <span className="text-sm text-gray-500">({mainDeckCount} cards)</span>
+                  <h2 className="text-xl font-bold text-primary">Main Deck</h2>
+                  <span className="text-sm text-muted-foreground">({mainDeckCount} cards)</span>
                 </div>
                 
                 {mainDeckCards.length > 0 ? (
@@ -764,7 +764,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-12 text-gray-500">
+                  <div className="text-center py-12 text-muted-foreground">
                     <p>No cards in main deck</p>
                   </div>
                 )}
@@ -777,7 +777,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
             <div className="mt-20 pt-6">
               <div className="flex items-center gap-3 mb-2">
                 <h2 className="text-xl font-bold text-purple-400">Reserve</h2>
-                <span className="text-sm text-gray-500">({reserveCount} cards)</span>
+                <span className="text-sm text-muted-foreground">({reserveCount} cards)</span>
               </div>
               
               <div>
@@ -811,8 +811,8 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <p className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">{hoveredCard.name}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="mt-2 text-sm font-semibold text-foreground">{hoveredCard.name}</p>
+                  <p className="text-xs text-muted-foreground">
                     {hoveredCard.set}{hoveredCard.type ? ` · ${hoveredCard.type}` : ''}
                     {(() => {
                       const priceKey = `${hoveredCard.name}|${hoveredCard.set}|${hoveredCard.imgFile}`;
@@ -824,8 +824,8 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                   </p>
                 </div>
               ) : (
-                <div className="aspect-[2.5/3.5] rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 flex items-center justify-center">
-                  <p className="text-sm text-gray-400 dark:text-gray-500 text-center px-4">Hover over a card to preview</p>
+                <div className="aspect-[2.5/3.5] rounded-lg border-2 border-dashed border-primary/30 flex items-center justify-center">
+                  <p className="text-sm text-muted-foreground text-center px-4">Hover over a card to preview</p>
                 </div>
               )}
             </div>

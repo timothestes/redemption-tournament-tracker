@@ -137,7 +137,7 @@ export default function AttachDeckDialog({
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Search by deck name..."
-              className="w-full pl-9 pr-9 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm"
+              className="w-full pl-9 pr-9 py-2.5 border border-border rounded-lg bg-card text-sm"
             />
             {query && (
               <button
@@ -153,7 +153,7 @@ export default function AttachDeckDialog({
           <div ref={listRef} className="flex-1 overflow-y-auto min-h-[300px] -mx-6 px-6">
             {loading && (
               <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900 dark:border-gray-100" />
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-foreground" />
               </div>
             )}
 
@@ -181,12 +181,12 @@ export default function AttachDeckDialog({
                     onClick={() => selectDeck(deck)}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-left group ${
                       focusedIndex === index
-                        ? "bg-gray-100 dark:bg-gray-700/50"
-                        : "hover:bg-gray-100 dark:hover:bg-gray-700/50"
+                        ? "bg-muted"
+                        : "hover:bg-muted"
                     }`}
                   >
                     {/* Preview thumbnail */}
-                    <div className="w-10 h-14 rounded bg-gray-200 dark:bg-gray-700 flex-shrink-0 overflow-hidden flex items-center justify-center">
+                    <div className="w-10 h-14 rounded bg-muted flex-shrink-0 overflow-hidden flex items-center justify-center">
                       {deck.preview_card_1 ? (
                         <img
                           src={getCardImageUrl(deck.preview_card_1)}

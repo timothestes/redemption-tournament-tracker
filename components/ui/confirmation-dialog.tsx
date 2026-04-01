@@ -85,11 +85,11 @@ export default function ConfirmationDialog({
               {icon ?? <WarningIcon />}
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <h3 className="text-lg font-semibold text-foreground">
                 {title}
               </h3>
               {description && (
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-sm text-muted-foreground">
                   {description}
                 </p>
               )}
@@ -102,7 +102,7 @@ export default function ConfirmationDialog({
         <DialogFooter className="justify-end">
           <button
             onClick={() => onOpenChange(false)}
-            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            className="px-4 py-2 text-sm font-medium text-foreground bg-card border border-border rounded-lg hover:bg-muted transition-colors"
           >
             {cancelLabel}
           </button>

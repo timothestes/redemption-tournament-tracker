@@ -35,6 +35,7 @@ export default function RootLayout({
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
+          themes={["light", "dark", "jayden", "system"]}
         >
           <Background>
             <main className="min-h-screen flex flex-col">{children}</main>

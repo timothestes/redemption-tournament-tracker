@@ -125,7 +125,7 @@ export default function PublishDecklistsSection({
               <select
                 value={selectedFormat}
                 onChange={(e) => setSelectedFormat(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm"
+                className="w-full px-3 py-2 border border-border rounded-lg bg-card text-sm"
               >
                 <option value="Type 1">Type 1</option>
                 <option value="Type 2">Type 2</option>
