@@ -86,7 +86,9 @@ yarn-error.log*
 next-env.d.ts
 .aider*
 tmp/*
-.claude
+.claude/settings.json
+.claude/settings.local.json
+.claude/worktrees
 # claude.md
 test_shopify.py
 .mcp.json
