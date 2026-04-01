@@ -14,12 +14,14 @@ export type ZoneId =
   | 'land-of-bondage'
   | 'territory'
   | 'land-of-redemption'
-  | 'banish';
+  | 'banish'
+  | 'field-of-battle';
 
 export const ALL_ZONES: ZoneId[] = [
   'deck', 'hand', 'reserve', 'discard', 'paragon',
   'land-of-bondage', 'territory',
   'land-of-redemption', 'banish',
+  'field-of-battle',
 ];
 
 export const ZONE_LABELS: Record<ZoneId, string> = {
@@ -32,6 +34,7 @@ export const ZONE_LABELS: Record<ZoneId, string> = {
   'territory': 'Territory',
   'land-of-redemption': 'Land of Redemption',
   'banish': 'Banish Zone',
+  'field-of-battle': 'Field of Battle',
 };
 
 export type GamePhase = 'setup' | 'draw' | 'upkeep' | 'preparation' | 'battle' | 'discard';

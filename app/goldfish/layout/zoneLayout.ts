@@ -129,6 +129,7 @@ export function calculateZoneLayout(
     'territory': territoryZone,
     'land-of-redemption': landOfRedemptionZone,
     'banish': banishZone,
+    'field-of-battle': { x: -1000, y: -1000, width: 0, height: 0, label: 'Field of Battle' }, // not used in goldfish mode
   };
 }
 
