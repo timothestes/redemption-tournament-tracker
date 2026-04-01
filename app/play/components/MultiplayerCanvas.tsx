@@ -53,7 +53,6 @@ import {
   getCharacterSnapPosition,
   getEnhancementSnapPosition,
   absoluteToNormalized,
-  normalizedToAbsolute,
 } from '../layout/battleZoneSnap';
 import { getCardImageUrl as getSharedCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import { useVirtualCanvas, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen } from '@/app/shared/layout/virtualCanvas';
@@ -189,6 +188,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
 
   // ---- Auto-return cards from field of battle when exiting battle phase ----
   const prevBattlePhaseRef = useRef(false);
+  const myCardsRef = useRef(myCards);
+  myCardsRef.current = myCards;
+  const moveCardRef = useRef(moveCard);
+  moveCardRef.current = moveCard;
   useEffect(() => {
     const wasBattle = prevBattlePhaseRef.current;
     prevBattlePhaseRef.current = isBattlePhase;
@@ -196,16 +199,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
     // Only trigger on transition FROM battle to non-battle
     if (!wasBattle || isBattlePhase) return;
 
-    // Return my cards from field of battle to my territory
-    const myBattleCards = myCards['field-of-battle'] ?? [];
-    for (const card of myBattleCards) {
-      gameState.moveCard(card.id, 'territory', undefined, '0.45', '0.05');
+    // Return my cards from field of battle to my territory, spread horizontally
+    const myBattleCards = myCardsRef.current['field-of-battle'] ?? [];
+    for (let i = 0; i < myBattleCards.length; i++) {
+      const card = myBattleCards[i];
+      const offsetX = 0.35 + i * 0.05;
+      moveCardRef.current(card.id, 'territory', undefined, String(offsetX), '0.05');
     }
 
     if (myBattleCards.length > 0) {
       showGameToast('Battle ended — cards returned to territory');
     }
-  }, [isBattlePhase, myCards, gameState]);
+  }, [isBattlePhase]);
 
   // ---- Layout ----
   const mpLayout = useMemo(
