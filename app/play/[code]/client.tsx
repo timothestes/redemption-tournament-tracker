@@ -983,6 +983,28 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             hasPendingPriority={gameState.zoneSearchRequests.some(
               (r: any) => r.zone === 'action-priority' && r.status === 'pending' && r.requesterId === gameState.myPlayer?.id
             )}
+            incomingPriorityFrom={(() => {
+              const req = gameState.zoneSearchRequests.find(
+                (r: any) => r.zone === 'action-priority' && r.status === 'pending' && r.targetPlayerId === gameState.myPlayer?.id
+              );
+              if (!req) return null;
+              return gameState.opponentPlayer?.displayName ?? 'Opponent';
+            })()}
+            onGrantPriority={() => {
+              const req = gameState.zoneSearchRequests.find(
+                (r: any) => r.zone === 'action-priority' && r.status === 'pending' && r.targetPlayerId === gameState.myPlayer?.id
+              );
+              if (req) {
+                gameState.approveZoneSearch(BigInt(req.id));
+                showGameToast('Action priority granted');
+              }
+            }}
+            onDenyPriority={() => {
+              const req = gameState.zoneSearchRequests.find(
+                (r: any) => r.zone === 'action-priority' && r.status === 'pending' && r.targetPlayerId === gameState.myPlayer?.id
+              );
+              if (req) gameState.denyZoneSearch(BigInt(req.id));
+            }}
             myScore={gameState.myCards['land-of-redemption']?.length ?? 0}
             opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}
           />

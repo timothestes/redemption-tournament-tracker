@@ -819,11 +819,15 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
     pendingSearchRef.current = myPending ?? null;
   }, [zoneSearchRequests, gameState.myPlayer, approvedSearchRequest]);
 
-  // Auto-complete hand-reveal requests — no browse modal needed
+  // Auto-complete hand-reveal and action-priority requests — no browse modal needed
   useEffect(() => {
     if (approvedSearchRequest && approvedSearchRequest.zone === 'hand-reveal') {
       completeZoneSearch(BigInt(approvedSearchRequest.id));
       showGameToast('Opponent revealed their hand');
+    }
+    if (approvedSearchRequest && approvedSearchRequest.zone === 'action-priority') {
+      completeZoneSearch(BigInt(approvedSearchRequest.id));
+      showGameToast('Action priority granted — take your action');
     }
   }, [approvedSearchRequest, completeZoneSearch]);
 
@@ -3090,29 +3094,23 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
         />
       )}
 
-      {incomingSearchRequest && (
+      {/* Priority requests are handled inline in TurnIndicator — only show ConsentDialog for search/reveal */}
+      {incomingSearchRequest && incomingSearchRequest.zone !== 'action-priority' && (
         <ConsentDialog
           requesterName={gameState.opponentPlayer?.displayName ?? 'Opponent'}
           zoneName={incomingSearchRequest.zone === 'hand-reveal' ? 'hand' : incomingSearchRequest.zone}
-          requestType={
-            incomingSearchRequest.zone === 'action-priority' ? 'priority'
-            : incomingSearchRequest.zone === 'hand-reveal' ? 'reveal'
-            : 'search'
-          }
+          requestType={incomingSearchRequest.zone === 'hand-reveal' ? 'reveal' : 'search'}
           onAllow={() => {
             approveZoneSearch(BigInt(incomingSearchRequest.id));
             if (incomingSearchRequest.zone === 'hand-reveal') {
               gameState.revealHand(true);
-            }
-            if (incomingSearchRequest.zone === 'action-priority') {
-              showGameToast('Action priority granted');
             }
           }}
           onDeny={() => denyZoneSearch(BigInt(incomingSearchRequest.id))}
         />
       )}
 
-      {approvedSearchRequest && approvedSearchRequest.zone !== 'hand-reveal' && (() => {
+      {approvedSearchRequest && approvedSearchRequest.zone !== 'hand-reveal' && approvedSearchRequest.zone !== 'action-priority' && (() => {
         const zoneCards = (opponentCards[approvedSearchRequest.zone] ?? [])
           .map((c: any) => cardInstanceToGameCard(c, counters.get(c.id) ?? [], 'player2'));
         return (
