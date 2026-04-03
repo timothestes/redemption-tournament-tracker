@@ -1031,7 +1031,7 @@ export default function ModalWithClose({
                         ? window.open(productUrl, '_blank', 'noopener,noreferrer')
                         : openYTGSearchPage(modalCard.name)
                     }
-                    className="h-10 px-3 flex-shrink-0 rounded-lg flex items-center gap-1.5 font-semibold text-sm border border-green-600/30 dark:border-green-500/25 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 active:translate-y-[1px] transition-all duration-100"
+                    className="h-10 px-3 flex-shrink-0 rounded-lg flex items-center gap-1.5 font-semibold text-sm border border-green-600/30 dark:border-green-500/25 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 active:translate-y-[1px] transition-all duration-100 [.jayden_&]:border-blue-500/30 [.jayden_&]:bg-blue-950/40 [.jayden_&]:text-blue-300"
                   >
                     <img src="/sponsors/ytg-dark.png" alt="YTG" className="h-4 w-4 object-contain hidden dark:block" />
                     <img src="/sponsors/ytg-light.png" alt="YTG" className="h-4 w-4 object-contain dark:hidden" />
@@ -1101,7 +1101,7 @@ export default function ModalWithClose({
                         ? window.open(productUrl, '_blank', 'noopener,noreferrer')
                         : openYTGSearchPage(modalCard.name)
                     }
-                    className="h-9 px-3 rounded-lg flex items-center gap-1.5 font-semibold text-sm border border-green-600/30 dark:border-green-500/25 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 active:translate-y-[1px] transition-all duration-100"
+                    className="h-9 px-3 rounded-lg flex items-center gap-1.5 font-semibold text-sm border border-green-600/30 dark:border-green-500/25 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 active:translate-y-[1px] transition-all duration-100 [.jayden_&]:border-blue-500/30 [.jayden_&]:bg-blue-950/40 [.jayden_&]:text-blue-300"
                   >
                     <img src="/sponsors/ytg-dark.png" alt="YTG" className="h-4 w-4 object-contain hidden dark:block" />
                     <img src="/sponsors/ytg-light.png" alt="YTG" className="h-4 w-4 object-contain dark:hidden" />
@@ -1439,7 +1439,7 @@ export default function ModalWithClose({
                     ? window.open(productUrl, '_blank', 'noopener,noreferrer')
                     : openYTGSearchPage(modalCard.name)
                   }
-                  className="px-4 h-10 border border-emerald-600/30 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 rounded-lg flex items-center gap-1.5 font-medium transition-colors text-sm whitespace-nowrap active:translate-y-[1px]"
+                  className="px-4 h-10 border border-emerald-600/30 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 rounded-lg flex items-center gap-1.5 font-medium transition-colors text-sm whitespace-nowrap active:translate-y-[1px] [.jayden_&]:border-blue-500/30 [.jayden_&]:bg-blue-950/30 [.jayden_&]:text-blue-300 [.jayden_&]:hover:bg-blue-900/40"
                 >
                   <img src="/sponsors/ytg-dark.png" alt="YTG" className="h-[18px] w-[18px] object-contain hidden dark:block" />
                   <img src="/sponsors/ytg-light.png" alt="YTG" className="h-[18px] w-[18px] object-contain dark:hidden" />
