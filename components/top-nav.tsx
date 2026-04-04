@@ -124,7 +124,7 @@ const TopNav: React.FC = () => {
   const isActive = (path: string) => pathname?.startsWith(path);
 
   const navLinks = [
-    { href: "/play", label: "Play", icon: GiCrossedSwords, authRequired: true },
+    { href: "/play", label: "Play", icon: GiCrossedSwords },
     { href: "/register", label: NATIONALS_CONFIG.adminOnly ? `${NATIONALS_CONFIG.displayName} (Admin Only)` : `${NATIONALS_CONFIG.displayName}`, icon: HiUserAdd, highlight: true },
     { href: "/decklist/card-search?new=true", label: "Deck Builder", icon: TbSearch },
     { href: "/spoilers", label: "Spoilers", icon: HiSparkles },
@@ -179,16 +179,15 @@ const TopNav: React.FC = () => {
                 width={120}
                 height={32}
                 style={{ width: "auto", height: "auto", maxHeight: "32px" }}
-                className={`transition-opacity duration-150 ${navReady ? 'opacity-100' : 'opacity-0'}`}
+                className={`transition-opacity duration-150 ${mounted ? 'opacity-100' : 'opacity-0'}`}
                 priority
               />
             </div>
           </Link>
 
           {/* Desktop Navigation - Center */}
-          <div className={`hidden lg:flex lg:items-center lg:space-x-1 flex-1 justify-center transition-opacity duration-150 ${navReady ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="hidden lg:flex lg:items-center lg:space-x-1 flex-1 justify-center">
             {navLinks.slice(0, 2).map((link) => {
-              if (link.authRequired && !user) return null;
               const Icon = link.icon;
               const isHighlight = link.highlight;
               return (
@@ -515,9 +514,14 @@ const TopNav: React.FC = () => {
           </div>
 
           {/* Auth Section - Right Side */}
-          <div className={`hidden lg:flex lg:items-center lg:gap-3 transition-opacity duration-150 ${navReady ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="hidden lg:flex lg:items-center lg:gap-3">
             <ThemeSwitcher />
-            {user ? (
+            {authLoading ? (
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-16 rounded-md bg-muted animate-pulse" />
+                <div className="h-8 w-16 rounded-md bg-muted animate-pulse" />
+              </div>
+            ) : user ? (
               <>
                 <span className="text-sm text-muted-foreground">
                   {user.email}
