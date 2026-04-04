@@ -471,6 +471,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
   const [opponentPeekState, setOpponentPeekState] = useState<{ position: 'top' | 'bottom' | 'random'; count: number } | null>(null);
   const [opponentRevealDismissed, setOpponentRevealDismissed] = useState(false);
   const [handMenu, setHandMenu] = useState<{ x: number; y: number } | null>(null);
+  const revealAutoHideRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [revealBarShrinking, setRevealBarShrinking] = useState(false);
 
   // ---- Multiplayer GameActions adapter ----
   const multiplayerActions: GameActions = useMemo(() => ({
@@ -834,6 +836,26 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
     }
   }, [approvedSearchRequest, completeZoneSearch]);
 
+  // Track opponent hand reveal — show/hide countdown bar
+  const oppHandRevealed = gameState.opponentPlayer?.handRevealed ?? false;
+  useEffect(() => {
+    if (oppHandRevealed) {
+      setRevealBarShrinking(false);
+      // Start shrinking after a frame so the transition animates
+      const frame = requestAnimationFrame(() => setRevealBarShrinking(true));
+      return () => cancelAnimationFrame(frame);
+    } else {
+      setRevealBarShrinking(false);
+    }
+  }, [oppHandRevealed]);
+
+  // Cleanup auto-hide timer on unmount
+  useEffect(() => {
+    return () => {
+      if (revealAutoHideRef.current) clearTimeout(revealAutoHideRef.current);
+    };
+  }, []);
+
   // ---- Peek card IDs for DeckPeekModal ----
   const peekCardIds = useMemo(() => {
     if (!peekState) return [];
@@ -970,7 +992,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
               ctx.scale(2, 2);
               ctx.globalAlpha = 0.5;
               for (const f of followers) {
-                const cardCanvas = f.node.toCanvas({ pixelRatio: 1 });
+                // Use explicit x/y/width/height so the rasterized canvas matches
+                // exactly cardWidth × cardHeight. Without these, toCanvas() uses
+                // getClientRect() which includes selection highlights and shadows,
+                // producing a larger canvas that gets squished into cardWidth × cardHeight.
+                const cardCanvas = f.node.toCanvas({
+                  pixelRatio: 1,
+                  x: 0,
+                  y: 0,
+                  width: cardWidth,
+                  height: cardHeight,
+                });
                 ctx.drawImage(cardCanvas, f.dx - minX, f.dy - minY, cardWidth, cardHeight);
               }
 
@@ -2744,11 +2776,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
                         cardWidth={oppHandCard.cardWidth}
                         cardHeight={oppHandCard.cardHeight}
                         image={getCardImage(card)}
-                        isDraggable={false}
+                        isDraggable={true}
                         hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
-                        onDragStart={noopCardDrag}
-                        onDragMove={noopDrag}
-                        onDragEnd={noopCardDragEnd}
+                        nodeRef={registerCardNode}
+                        onDragStart={handleCardDragStart}
+                        onDragMove={handleCardDragMove}
+                        onDragEnd={handleCardDragEnd}
                         onContextMenu={handleCardContextMenu}
                         onDblClick={noopDblClick}
                         onMouseEnter={handleMouseEnter}
@@ -3016,6 +3049,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
           y={opponentDeckMenu.y}
           deckSize={(opponentCards['deck'] ?? []).length}
           onClose={() => setOpponentDeckMenu(null)}
+          hideDrawActions
           onSearchDeck={() => {
             setOpponentDeckMenu(null);
             requestZoneSearch('deck');
@@ -3189,11 +3223,50 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
             approveZoneSearch(BigInt(incomingSearchRequest.id));
             if (incomingSearchRequest.zone === 'hand-reveal') {
               gameState.revealHand(true);
+              // Auto-hide hand after 30 seconds
+              if (revealAutoHideRef.current) clearTimeout(revealAutoHideRef.current);
+              revealAutoHideRef.current = setTimeout(() => {
+                gameState.revealHand(false);
+                revealAutoHideRef.current = null;
+              }, 30_000);
             }
           }}
           onDeny={() => denyZoneSearch(BigInt(incomingSearchRequest.id))}
         />
       )}
+
+      {/* Countdown bar — shrinks over 30s while opponent hand is revealed */}
+      {oppHandRevealed && opponentHandRect && mpLayout && (() => {
+        // Bar spans only the play area (excludes sidebar) and stays inside the hand zone
+        const barVirtualWidth = mpLayout.playAreaWidth;
+        const barTopLeft = virtualToScreen(
+          opponentHandRect.x,
+          opponentHandRect.y + opponentHandRect.height - 8,
+          scale, offsetX, offsetY,
+        );
+        const barBottomRight = virtualToScreen(
+          opponentHandRect.x + barVirtualWidth,
+          opponentHandRect.y + opponentHandRect.height - 4,
+          scale, offsetX, offsetY,
+        );
+        const screenWidth = barBottomRight.x - barTopLeft.x;
+        return (
+          <div
+            style={{
+              position: 'absolute',
+              left: barTopLeft.x,
+              top: barTopLeft.y,
+              width: revealBarShrinking ? 0 : screenWidth,
+              height: barBottomRight.y - barTopLeft.y,
+              background: 'linear-gradient(90deg, #c8a84e, #f0d878)',
+              transition: revealBarShrinking ? 'width 30s linear' : 'none',
+              borderRadius: 2,
+              zIndex: 100,
+              pointerEvents: 'none',
+            }}
+          />
+        );
+      })()}
 
       {approvedSearchRequest && approvedSearchRequest.zone !== 'hand-reveal' && approvedSearchRequest.zone !== 'action-priority' && (() => {
         const zoneCards = (opponentCards[approvedSearchRequest.zone] ?? [])

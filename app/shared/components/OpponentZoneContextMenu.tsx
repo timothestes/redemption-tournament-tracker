@@ -63,16 +63,7 @@ export function OpponentZoneContextMenu({ x, y, zoneName, zone, onSearch, onReve
         whiteSpace: 'nowrap',
       }}
     >
-      <button
-        onClick={onSearch}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-        style={btnStyle}
-      >
-        <Search size={14} />
-        Search {zoneName}
-      </button>
-      {zone === 'hand' && onRevealHand && (
+      {zone === 'hand' && onRevealHand ? (
         <button
           onClick={onRevealHand}
           onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
@@ -81,6 +72,16 @@ export function OpponentZoneContextMenu({ x, y, zoneName, zone, onSearch, onReve
         >
           <Eye size={14} />
           Request Reveal Hand
+        </button>
+      ) : (
+        <button
+          onClick={onSearch}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          style={btnStyle}
+        >
+          <Search size={14} />
+          Search {zoneName}
         </button>
       )}
     </div>

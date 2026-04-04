@@ -35,6 +35,8 @@ interface DeckContextMenuProps {
   onRevealRandom: (count: number) => void;
   onDiscardRandom: (count: number) => void;
   onReserveRandom: (count: number) => void;
+  /** When true, hides all draw-related actions (for opponent's deck) */
+  hideDrawActions?: boolean;
 }
 
 const ITEM_STYLE: React.CSSProperties = {
@@ -334,6 +336,7 @@ export function DeckContextMenu({
   onDrawTop, onRevealTop, onDiscardTop, onReserveTop,
   onDrawBottom, onRevealBottom, onDiscardBottom, onReserveBottom,
   onDrawRandom, onRevealRandom, onDiscardRandom, onReserveRandom,
+  hideDrawActions,
 }: DeckContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [showDrawX, setShowDrawX] = useState(false);
@@ -384,51 +387,55 @@ export function DeckContextMenu({
         <Search size={14} />
         Search Deck
       </button>
-      <button style={ITEM_STYLE} onClick={() => onDrawTop(1)} onMouseEnter={hoverEnter} onMouseLeave={hoverLeave}>
-        <Play size={14} />
-        Draw 1
-      </button>
-      <button style={ITEM_STYLE} onClick={() => setShowDrawX(!showDrawX)} onMouseEnter={hoverEnter} onMouseLeave={hoverLeave}>
-        <Play size={14} />
-        Draw X...
-      </button>
-      {showDrawX && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 14px 6px' }}>
-          <button
-            style={{ ...STEPPER_BTN_STYLE, opacity: drawXCount <= 1 ? 0.3 : 1 }}
-            onClick={() => setDrawXCount(Math.max(1, drawXCount - 1))}
-          >
-            &minus;
+      {!hideDrawActions && (
+        <>
+          <button style={ITEM_STYLE} onClick={() => onDrawTop(1)} onMouseEnter={hoverEnter} onMouseLeave={hoverLeave}>
+            <Play size={14} />
+            Draw 1
           </button>
-          <span style={{ width: 24, textAlign: 'center', color: 'var(--gf-text-bright)', fontSize: 13, fontWeight: 'bold', fontFamily: 'var(--font-cinzel), Georgia, serif' }}>
-            {drawXCount}
-          </span>
-          <button
-            style={{ ...STEPPER_BTN_STYLE, opacity: drawXCount >= deckSize ? 0.3 : 1 }}
-            onClick={() => setDrawXCount(Math.min(deckSize, drawXCount + 1))}
-          >
-            +
+          <button style={ITEM_STYLE} onClick={() => setShowDrawX(!showDrawX)} onMouseEnter={hoverEnter} onMouseLeave={hoverLeave}>
+            <Play size={14} />
+            Draw X...
           </button>
-          <button style={GO_BTN_STYLE} onClick={() => onDrawTop(drawXCount)}>Go</button>
-        </div>
+          {showDrawX && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 14px 6px' }}>
+              <button
+                style={{ ...STEPPER_BTN_STYLE, opacity: drawXCount <= 1 ? 0.3 : 1 }}
+                onClick={() => setDrawXCount(Math.max(1, drawXCount - 1))}
+              >
+                &minus;
+              </button>
+              <span style={{ width: 24, textAlign: 'center', color: 'var(--gf-text-bright)', fontSize: 13, fontWeight: 'bold', fontFamily: 'var(--font-cinzel), Georgia, serif' }}>
+                {drawXCount}
+              </span>
+              <button
+                style={{ ...STEPPER_BTN_STYLE, opacity: drawXCount >= deckSize ? 0.3 : 1 }}
+                onClick={() => setDrawXCount(Math.min(deckSize, drawXCount + 1))}
+              >
+                +
+              </button>
+              <button style={GO_BTN_STYLE} onClick={() => onDrawTop(drawXCount)}>Go</button>
+            </div>
+          )}
+        </>
       )}
 
       <div style={SEPARATOR_STYLE} />
       <ActiveSubmenuContext.Provider value={{ active: activeSubmenu, setActive: setActiveSubmenu, closeTimerRef: submenuCloseTimerRef }}>
         <SubmenuTrigger label="Top Card">
-          <SubMenuActionRow icon={<Play size={14} />} label="Draw" max={deckSize} onAction={onDrawTop} />
+          {!hideDrawActions && <SubMenuActionRow icon={<Play size={14} />} label="Draw" max={deckSize} onAction={onDrawTop} />}
           <SubMenuActionRow icon={<Eye size={14} />} label="Reveal" max={deckSize} onAction={onRevealTop} />
           <SubMenuActionRow icon={<Trash2 size={14} />} label="Discard" max={deckSize} onAction={onDiscardTop} />
           <SubMenuActionRow icon={<Archive size={14} />} label="Reserve" max={deckSize} onAction={onReserveTop} />
         </SubmenuTrigger>
         <SubmenuTrigger label="Bottom Card">
-          <SubMenuActionRow icon={<Play size={14} />} label="Draw" max={deckSize} onAction={onDrawBottom} />
+          {!hideDrawActions && <SubMenuActionRow icon={<Play size={14} />} label="Draw" max={deckSize} onAction={onDrawBottom} />}
           <SubMenuActionRow icon={<Eye size={14} />} label="Reveal" max={deckSize} onAction={onRevealBottom} />
           <SubMenuActionRow icon={<Trash2 size={14} />} label="Discard" max={deckSize} onAction={onDiscardBottom} />
           <SubMenuActionRow icon={<Archive size={14} />} label="Reserve" max={deckSize} onAction={onReserveBottom} />
         </SubmenuTrigger>
         <SubmenuTrigger label="Random Card">
-          <SubMenuActionRow icon={<Play size={14} />} label="Draw" max={deckSize} onAction={onDrawRandom} />
+          {!hideDrawActions && <SubMenuActionRow icon={<Play size={14} />} label="Draw" max={deckSize} onAction={onDrawRandom} />}
           <SubMenuActionRow icon={<Eye size={14} />} label="Reveal" max={deckSize} onAction={onRevealRandom} />
           <SubMenuActionRow icon={<Trash2 size={14} />} label="Discard" max={deckSize} onAction={onDiscardRandom} />
           <SubMenuActionRow icon={<Archive size={14} />} label="Reserve" max={deckSize} onAction={onReserveRandom} />

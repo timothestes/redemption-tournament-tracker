@@ -414,8 +414,17 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             ctx.scale(2, 2);
             ctx.globalAlpha = 0.5;
             for (const f of followers) {
-              // Rasterize this individual card node
-              const cardCanvas = f.node.toCanvas({ pixelRatio: 1 });
+              // Use explicit x/y/width/height so the rasterized canvas matches
+              // exactly cardWidth × cardHeight. Without these, toCanvas() uses
+              // getClientRect() which includes selection highlights and shadows,
+              // producing a larger canvas that gets squished into cardWidth × cardHeight.
+              const cardCanvas = f.node.toCanvas({
+                pixelRatio: 1,
+                x: 0,
+                y: 0,
+                width: cardWidth,
+                height: cardHeight,
+              });
               ctx.drawImage(cardCanvas, f.dx - minX, f.dy - minY, cardWidth, cardHeight);
             }
 
