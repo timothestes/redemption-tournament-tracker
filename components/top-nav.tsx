@@ -513,7 +513,7 @@ const TopNav: React.FC = () => {
           {/* Auth Section - Right Side */}
           <div className="hidden lg:flex lg:items-center lg:gap-3">
             <ThemeSwitcher />
-            {authLoading ? (
+            {!navReady ? (
               <div className="flex items-center gap-2">
                 <div className="h-8 w-16 rounded-md bg-muted animate-pulse" />
                 <div className="h-8 w-16 rounded-md bg-muted animate-pulse" />
