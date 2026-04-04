@@ -112,9 +112,10 @@ function Lightbox({
     >
       {/* Close button */}
       <button
-        onClick={onClose}
+        onClick={(e) => { e.stopPropagation(); onClose(); }}
+        onTouchEnd={(e) => e.stopPropagation()}
         aria-label="Close"
-        className="absolute top-3 right-3 z-10 min-w-[44px] min-h-[44px] flex items-center justify-center text-white/70 hover:text-white transition-colors"
+        className="absolute top-3 right-3 z-30 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
       >
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -404,14 +405,6 @@ function SpoilersPageInner({ initialSpoilers }: { initialSpoilers: PublicSpoiler
 
   const spoilers = initialSpoilers;
 
-  useEffect(() => {
-    const cardId = searchParams.get("card");
-    if (cardId) {
-      const index = spoilers.findIndex((s) => s.id === cardId);
-      if (index !== -1) setLightboxIndex(index);
-    }
-  }, [searchParams, spoilers]);
-
   // Group by set
   const sets = [...new Set(spoilers.map((s) => s.set_name))];
   const filteredSets = setFilter ? sets.filter((s) => s === setFilter) : sets;
@@ -434,13 +427,22 @@ function SpoilersPageInner({ initialSpoilers }: { initialSpoilers: PublicSpoiler
     }
   }
 
-  // Flat list for "latest" view — all filtered cards sorted by spoil_date desc
+  // Flat list — respects current sort and filter for lightbox navigation
   const flatSpoilers = filteredSets.flatMap((setName) => spoilersBySet[setName] || []);
   if (sortBy === "latest") {
     flatSpoilers.sort(
       (a, b) => new Date(b.spoil_date).getTime() - new Date(a.spoil_date).getTime()
     );
   }
+
+  // Deep-link: open card from URL
+  useEffect(() => {
+    const cardId = searchParams.get("card");
+    if (cardId) {
+      const index = flatSpoilers.findIndex((s) => s.id === cardId);
+      if (index !== -1) setLightboxIndex(index);
+    }
+  }, [searchParams, flatSpoilers]);
 
   const now = Date.now();
   const threeDaysAgo = now - 3 * 24 * 60 * 60 * 1000;
@@ -491,15 +493,14 @@ function SpoilersPageInner({ initialSpoilers }: { initialSpoilers: PublicSpoiler
           </div>
         ) : sortBy === "latest" ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            {flatSpoilers.map((spoiler) => {
-              const globalIndex = spoilers.findIndex((s) => s.id === spoiler.id);
+            {flatSpoilers.map((spoiler, index) => {
               const isNew = new Date(spoiler.spoil_date).getTime() >= threeDaysAgo;
               return (
                 <SpoilerCard
                   key={spoiler.id}
                   spoiler={spoiler}
                   isNew={isNew}
-                  onClick={() => setLightboxIndex(globalIndex)}
+                  onClick={() => setLightboxIndex(index)}
                 />
               );
             })}
@@ -511,7 +512,7 @@ function SpoilersPageInner({ initialSpoilers }: { initialSpoilers: PublicSpoiler
                 key={setName}
                 setName={setName}
                 spoilers={spoilersBySet[setName]}
-                allSpoilers={spoilers}
+                allSpoilers={flatSpoilers}
                 defaultExpanded={i === 0}
                 onCardClick={setLightboxIndex}
               />
@@ -523,7 +524,7 @@ function SpoilersPageInner({ initialSpoilers }: { initialSpoilers: PublicSpoiler
       {/* Lightbox */}
       {lightboxIndex !== null && (
         <Lightbox
-          spoilers={spoilers}
+          spoilers={flatSpoilers}
           currentIndex={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
           onNavigate={setLightboxIndex}

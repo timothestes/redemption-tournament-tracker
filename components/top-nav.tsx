@@ -177,14 +177,14 @@ const TopNav: React.FC = () => {
                 width={120}
                 height={32}
                 style={{ width: "auto", height: "auto", maxHeight: "32px" }}
-                className={`transition-opacity duration-150 ${navReady ? 'opacity-100' : 'opacity-0'}`}
+                className={`transition-opacity duration-150 ${mounted ? 'opacity-100' : 'opacity-0'}`}
                 priority
               />
             </div>
           </Link>
 
           {/* Desktop Navigation - Center */}
-          <div className={`hidden lg:flex lg:items-center lg:space-x-1 flex-1 justify-center transition-opacity duration-150 ${navReady ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="hidden lg:flex lg:items-center lg:space-x-1 flex-1 justify-center">
             {navLinks.slice(0, 1).map((link) => {
               const Icon = link.icon;
               const isHighlight = link.highlight;
@@ -511,9 +511,14 @@ const TopNav: React.FC = () => {
           </div>
 
           {/* Auth Section - Right Side */}
-          <div className={`hidden lg:flex lg:items-center lg:gap-3 transition-opacity duration-150 ${navReady ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="hidden lg:flex lg:items-center lg:gap-3">
             <ThemeSwitcher />
-            {user ? (
+            {authLoading ? (
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-16 rounded-md bg-muted animate-pulse" />
+                <div className="h-8 w-16 rounded-md bg-muted animate-pulse" />
+              </div>
+            ) : user ? (
               <>
                 <span className="text-sm text-muted-foreground">
                   {user.email}
