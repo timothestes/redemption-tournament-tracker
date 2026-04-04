@@ -399,6 +399,7 @@ function AdminManageFab() {
 function SpoilersPageInner({ initialSpoilers }: { initialSpoilers: PublicSpoiler[] }) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [setFilter, setSetFilter] = useState<string>("");
+  const [sortBy, setSortBy] = useState<"latest" | "set-number">("latest");
   const searchParams = useSearchParams();
 
   const spoilers = initialSpoilers;
@@ -421,6 +422,29 @@ function SpoilersPageInner({ initialSpoilers }: { initialSpoilers: PublicSpoiler
     spoilersBySet[s.set_name].push(s);
   }
 
+  // Sort cards within each set by set_number when in set-number mode
+  if (sortBy === "set-number") {
+    for (const setName of Object.keys(spoilersBySet)) {
+      spoilersBySet[setName].sort((a, b) => {
+        const numA = a.set_number ? parseInt(a.set_number, 10) : Infinity;
+        const numB = b.set_number ? parseInt(b.set_number, 10) : Infinity;
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        return (a.set_number ?? "").localeCompare(b.set_number ?? "");
+      });
+    }
+  }
+
+  // Flat list for "latest" view — all filtered cards sorted by spoil_date desc
+  const flatSpoilers = filteredSets.flatMap((setName) => spoilersBySet[setName] || []);
+  if (sortBy === "latest") {
+    flatSpoilers.sort(
+      (a, b) => new Date(b.spoil_date).getTime() - new Date(a.spoil_date).getTime()
+    );
+  }
+
+  const now = Date.now();
+  const threeDaysAgo = now - 3 * 24 * 60 * 60 * 1000;
+
   return (
     <>
       <div className="max-w-6xl mx-auto px-4 py-8 jayden-gradient-bg">
@@ -432,20 +456,30 @@ function SpoilersPageInner({ initialSpoilers }: { initialSpoilers: PublicSpoiler
               Preview cards from upcoming sets.
             </p>
           </div>
-          {sets.length > 1 && (
+          <div className="flex items-center gap-2 self-start">
             <select
-              value={setFilter}
-              onChange={(e) => setSetFilter(e.target.value)}
-              className="h-9 rounded-md border-2 border-input bg-background px-3 text-sm self-start"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as "latest" | "set-number")}
+              className="h-9 rounded-md border-2 border-input bg-background px-3 text-sm"
             >
-              <option value="">All sets</option>
-              {sets.map((s) => (
-                <option key={s} value={s}>
-                  {s} ({spoilersBySet[s]?.length || 0})
-                </option>
-              ))}
+              <option value="latest">Latest</option>
+              <option value="set-number">Set Number</option>
             </select>
-          )}
+            {sets.length > 1 && (
+              <select
+                value={setFilter}
+                onChange={(e) => setSetFilter(e.target.value)}
+                className="h-9 rounded-md border-2 border-input bg-background px-3 text-sm"
+              >
+                <option value="">All sets</option>
+                {sets.map((s) => (
+                  <option key={s} value={s}>
+                    {s} ({spoilersBySet[s]?.length || 0})
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
         </div>
 
         {/* Content */}
@@ -454,6 +488,21 @@ function SpoilersPageInner({ initialSpoilers }: { initialSpoilers: PublicSpoiler
             <p className="text-muted-foreground">
               No spoilers right now. Check back when a new set is announced.
             </p>
+          </div>
+        ) : sortBy === "latest" ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            {flatSpoilers.map((spoiler) => {
+              const globalIndex = spoilers.findIndex((s) => s.id === spoiler.id);
+              const isNew = new Date(spoiler.spoil_date).getTime() >= threeDaysAgo;
+              return (
+                <SpoilerCard
+                  key={spoiler.id}
+                  spoiler={spoiler}
+                  isNew={isNew}
+                  onClick={() => setLightboxIndex(globalIndex)}
+                />
+              );
+            })}
           </div>
         ) : (
           <div className="space-y-6">
