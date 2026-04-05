@@ -98,6 +98,9 @@ export const iconPredicates: Record<string, (c: Card) => boolean> = {
 };
 
 // Brigade normalization helpers
+// Known multi-word brigade names that should NOT be split on space
+const KNOWN_MULTI_WORD_BRIGADES = new Set(["Pale Green", "Good Gold", "Evil Gold", "Good Multi", "Evil Multi"]);
+
 export function handleSimpleBrigades(brigade: string) {
   if (!brigade) return [];
   if (brigade.includes("and")) {
@@ -107,10 +110,23 @@ export function handleSimpleBrigades(brigade: string) {
     const [mainBrigade, subBrigades] = brigade.split(" (");
     return mainBrigade.trim().split("/").concat(subBrigades.replace(")", "").split("/"));
   }
+  let parts: string[];
   if (brigade.includes("/")) {
-    return brigade.split("/");
+    parts = brigade.split("/");
+  } else {
+    parts = [brigade];
   }
-  return [brigade];
+  // Split any piece that contains a space but isn't a known multi-word brigade
+  // e.g. "Teal Gold" -> ["Teal", "Gold"]
+  const result: string[] = [];
+  for (const part of parts) {
+    if (part.includes(" ") && !KNOWN_MULTI_WORD_BRIGADES.has(part)) {
+      result.push(...part.split(" "));
+    } else {
+      result.push(part);
+    }
+  }
+  return result;
 }
 
 export function replaceBrigades(brigades: string[], target: string, replacement: string) {
