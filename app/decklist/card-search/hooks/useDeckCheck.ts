@@ -6,7 +6,7 @@ import type { DeckCheckResult, DeckCheckCard } from "@/utils/deckcheck/types";
 
 const DEBOUNCE_MS = 800;
 
-export function useDeckCheck(deck: Deck) {
+export function useDeckCheck(deck: Deck, enabled: boolean = true) {
   const [result, setResult] = useState<DeckCheckResult | null>(null);
   const [isChecking, setIsChecking] = useState(false);
 
@@ -63,8 +63,8 @@ export function useDeckCheck(deck: Deck) {
       debounceTimerRef.current = null;
     }
 
-    // No cards — reset result and skip the check
-    if (deck.cards.length === 0) {
+    // Disabled or no cards — reset result and skip the check
+    if (!enabled || deck.cards.length === 0) {
       setResult(null);
       setIsChecking(false);
       return;
@@ -99,7 +99,7 @@ export function useDeckCheck(deck: Deck) {
         debounceTimerRef.current = null;
       }
     };
-  }, [deck.cards, deck.format, runDeckCheck]);
+  }, [deck.cards, deck.format, enabled, runDeckCheck]);
 
   // Cleanup on unmount: cancel pending timer and in-flight request
   useEffect(() => {
