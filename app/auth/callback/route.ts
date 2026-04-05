@@ -14,11 +14,21 @@ export async function GET(request: Request) {
 
   const supabase = await createClient();
 
+  let authError: string | null = null;
+
   if (token_hash && type) {
     // PKCE-style token_hash flow (used by custom email templates)
-    await supabase.auth.verifyOtp({ token_hash, type: type as any });
+    const { error } = await supabase.auth.verifyOtp({ token_hash, type: type as any });
+    if (error) authError = error.message;
   } else if (code) {
-    await supabase.auth.exchangeCodeForSession(code);
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) authError = error.message;
+  }
+
+  if (authError) {
+    const signInUrl = new URL("/sign-in", origin);
+    signInUrl.searchParams.set("error", "Authentication failed. Please try again.");
+    return NextResponse.redirect(signInUrl.toString());
   }
 
   if (redirectTo) {

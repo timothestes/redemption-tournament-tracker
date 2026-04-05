@@ -83,11 +83,15 @@ const TopNav: React.FC = () => {
     setIsTournamentsOpen(next);
   };
 
+  // Theme / logo effect — runs when theme changes
   useEffect(() => {
     setMounted(true);
     const currentTheme = theme === 'system' ? resolvedTheme : theme;
     setLogoSrc(currentTheme === 'light' ? '/lightmode_redemptionccgapp.webp' : '/darkmode_redemptionccgapp.webp');
+  }, [theme, resolvedTheme]);
 
+  // Auth effect — runs once on mount, listens for session changes
+  useEffect(() => {
     const getUser = async () => {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       setUser(currentUser);
@@ -101,7 +105,7 @@ const TopNav: React.FC = () => {
     });
 
     return () => subscription.unsubscribe();
-  }, [theme, resolvedTheme]);
+  }, [supabase]);
 
   // Close dropdowns on outside click
   useEffect(() => {
