@@ -6,7 +6,7 @@ import { SyncStatus } from "../hooks/useDeckState";
 import DeckCardList from "./DeckCardList";
 import FullDeckView from "./FullDeckView";
 import { Switch } from "@headlessui/react";
-import { Card } from "../utils";
+import { Card, normalizeBrigadeField } from "../utils";
 import { validateDeck } from "../utils/deckValidation";
 import GeneratePDFModal from "./GeneratePDFModal";
 import GenerateDeckImageModal from "./GenerateDeckImageModal";
@@ -101,6 +101,10 @@ interface DeckBuilderPanelProps {
   allCards: BudgetCard[];
   /** Callback to enter spotlight mode */
   onSpotlightToggle?: () => void;
+  /** Whether legality checks are currently suppressed */
+  ignoreLegalityChecks?: boolean;
+  /** Callback to toggle legality check suppression */
+  onIgnoreLegalityChecksChange?: (value: boolean) => void;
 }
 
 /**
@@ -138,6 +142,8 @@ export default function DeckBuilderPanel({
   isDeckChecking,
   allCards,
   onSpotlightToggle,
+  ignoreLegalityChecks = false,
+  onIgnoreLegalityChecksChange,
 }: DeckBuilderPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>(defaultTab ?? "main");
   const [isEditingName, setIsEditingName] = useState(false);
@@ -1620,7 +1626,7 @@ export default function DeckBuilderPanel({
         >
           <span className="flex items-center justify-center gap-1.5">
             Stats
-            {validation.stats.totalCards > 0 && (
+            {validation.stats.totalCards > 0 && !ignoreLegalityChecks && (
               isDeckChecking ? (
                 <span className="hidden md:inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-500">
                   <svg className="w-2.5 h-2.5 text-white animate-spin" viewBox="0 0 12 12" fill="none">
@@ -1643,7 +1649,7 @@ export default function DeckBuilderPanel({
           </span>
 
           {/* Validation Tooltip — compact pill, details live in Stats tab */}
-          {showValidationTooltip && validation.stats.totalCards > 0 && (() => {
+          {showValidationTooltip && !ignoreLegalityChecks && validation.stats.totalCards > 0 && (() => {
             const valid = deckCheckResult?.valid ?? validation.isValid;
             const errCount = deckCheckResult
               ? deckCheckResult.issues.filter(i => i.type === "error").length
@@ -1848,6 +1854,16 @@ export default function DeckBuilderPanel({
                     {showPrices && <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
                   </button>
                 </div>
+                {/* Ignore Legality Checks */}
+                <div className="px-3 py-2">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onIgnoreLegalityChecksChange?.(!ignoreLegalityChecks); }}
+                    className="w-full px-3 py-2 text-left text-sm rounded transition-colors flex items-center justify-between text-foreground hover:bg-muted"
+                  >
+                    <span>Ignore Legality Checks</span>
+                    {ignoreLegalityChecks && <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
+                  </button>
+                </div>
                 {/* Spotlight Mode (desktop only) */}
                 {onSpotlightToggle && (
                   <div className="hidden md:block px-3 py-2">
@@ -1970,6 +1986,16 @@ export default function DeckBuilderPanel({
                   >
                     <span>Show Prices</span>
                     {showPrices && <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
+                  </button>
+                </div>
+                {/* Ignore Legality Checks */}
+                <div className="px-3 py-2">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onIgnoreLegalityChecksChange?.(!ignoreLegalityChecks); }}
+                    className="w-full px-3 py-2 text-left text-sm rounded transition-colors flex items-center justify-between text-foreground hover:bg-muted"
+                  >
+                    <span>Ignore Legality Checks</span>
+                    {ignoreLegalityChecks && <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
                   </button>
                 </div>
                 {/* Spotlight Mode */}
@@ -2716,13 +2742,19 @@ export default function DeckBuilderPanel({
             )}
             
             {/* Validation Status */}
-            <DeckLegalityChecklist
-              clientValidation={validation}
-              serverResult={deckCheckResult ?? null}
-              isChecking={isDeckChecking ?? false}
-              totalCards={validation.stats.totalCards}
-              format={deck.format}
-            />
+            {ignoreLegalityChecks ? (
+              <div className="rounded-lg border border-border bg-muted/30 p-3">
+                <p className="text-sm text-muted-foreground">Legality checks disabled</p>
+              </div>
+            ) : (
+              <DeckLegalityChecklist
+                clientValidation={validation}
+                serverResult={deckCheckResult ?? null}
+                isChecking={isDeckChecking ?? false}
+                totalCards={validation.stats.totalCards}
+                format={deck.format}
+              />
+            )}
 
             {/* Alignment Breakdown */}
             <div>
@@ -2890,17 +2922,58 @@ export default function DeckBuilderPanel({
                         acc[prettyType] += deckCard.quantity;
                         return acc;
                       }, {} as Record<string, number>);
-                      
+
                       // Sort by count (descending) then by name
                       const sortedTypes = Object.entries(typeCounts)
                         .sort(([nameA, countA], [nameB, countB]) => {
                           if (countB !== countA) return countB - countA;
                           return nameA.localeCompare(nameB);
                         });
-                      
+
                       return sortedTypes.map(([type, count]) => (
                         <div key={type} className="flex justify-between gap-2 text-sm">
                           <span className="flex-shrink-0">{type}:</span>
+                          <span className="font-medium ml-auto">{count}</span>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </div>
+
+                {/* Brigade Breakdown */}
+                <div className="border-t border-border my-2 pt-2">
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+                    Brigades
+                  </div>
+                  <div className="space-y-0.5">
+                    {(() => {
+                      const brigadeCounts: Record<string, number> = {};
+                      for (const deckCard of deck.cards) {
+                        const raw = deckCard.card.brigade;
+                        if (!raw) continue;
+                        try {
+                          const brigades = normalizeBrigadeField(raw, deckCard.card.alignment || "", deckCard.card.name);
+                          for (const b of brigades) {
+                            brigadeCounts[b] = (brigadeCounts[b] || 0) + deckCard.quantity;
+                          }
+                        } catch {
+                          // Fallback for cards that fail normalization
+                          brigadeCounts[raw] = (brigadeCounts[raw] || 0) + deckCard.quantity;
+                        }
+                      }
+
+                      const sorted = Object.entries(brigadeCounts)
+                        .sort(([, a], [, b]) => b - a);
+
+                      return sorted.map(([brigade, count]) => (
+                        <div key={brigade} className="flex items-center justify-between gap-2 text-sm">
+                          <span className="flex items-center gap-1.5 flex-shrink-0">
+                            <span
+                              className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0 border border-black/10 dark:border-white/20"
+                              style={{ backgroundColor: getBrigadeColor(brigade) }}
+                            />
+                            {brigade}:
+                          </span>
                           <span className="font-medium ml-auto">{count}</span>
                         </div>
                       ));
@@ -2925,7 +2998,7 @@ export default function DeckBuilderPanel({
         <GeneratePDFModal
           deck={deck}
           onClose={() => setShowGeneratePDFModal(false)}
-          isLegal={deckCheckResult?.valid ?? null}
+          isLegal={ignoreLegalityChecks ? null : (deckCheckResult?.valid ?? null)}
         />
       )}
 
@@ -2934,7 +3007,7 @@ export default function DeckBuilderPanel({
         <GenerateDeckImageModal
           deck={deck}
           onClose={() => setShowGenerateImageModal(false)}
-          isLegal={deckCheckResult?.valid ?? null}
+          isLegal={ignoreLegalityChecks ? null : (deckCheckResult?.valid ?? null)}
         />
       )}
 

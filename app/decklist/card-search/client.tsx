@@ -376,7 +376,16 @@ export default function CardSearchClient() {
     clearUnsavedChanges,
   } = useDeckState(deckIdFromUrl, folderIdFromUrl, isNewDeck);
 
-  const { result: deckCheckResult, isChecking: isDeckChecking, setResult: setDeckCheckResult } = useDeckCheck(deck);
+  const [ignoreLegalityChecks, setIgnoreLegalityChecksRaw] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('deck-ignore-legality') === 'true';
+  });
+  const setIgnoreLegalityChecks = (val: boolean) => {
+    setIgnoreLegalityChecksRaw(val);
+    localStorage.setItem('deck-ignore-legality', String(val));
+  };
+
+  const { result: deckCheckResult, isChecking: isDeckChecking, setResult: setDeckCheckResult } = useDeckCheck(deck, !ignoreLegalityChecks);
 
   const { getPrice } = useCardPrices();
 
@@ -2291,6 +2300,8 @@ export default function CardSearchClient() {
             }}
             onPreviewCardsChange={setPreviewCards}
             onDescriptionChange={setDeckDescription}
+            ignoreLegalityChecks={ignoreLegalityChecks}
+            onIgnoreLegalityChecksChange={setIgnoreLegalityChecks}
             onSpotlightToggle={() => {
               setMode("spotlight");
               setShowDeckBuilder(true);
@@ -2300,7 +2311,7 @@ export default function CardSearchClient() {
           )}
         </div>
       )}
-      
+
       {/* Mobile Reserve Indicator - shows on Search tab when Reserve is active */}
       {!isMobileDeckDrawerOpen && activeDeckTab === "reserve" && (
         <div className="md:hidden fixed bottom-14 inset-x-0 z-50 flex justify-center pointer-events-none pb-[env(safe-area-inset-bottom)]">
@@ -2382,6 +2393,8 @@ export default function CardSearchClient() {
               }}
               onPreviewCardsChange={setPreviewCards}
               onDescriptionChange={setDeckDescription}
+              ignoreLegalityChecks={ignoreLegalityChecks}
+              onIgnoreLegalityChecksChange={setIgnoreLegalityChecks}
             />
           )}
         </div>
