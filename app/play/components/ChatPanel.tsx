@@ -124,7 +124,7 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
     try {
       const data = JSON.parse(payload);
       if (data.redirected && data.cardName) {
-        return <>{data.redirected} <HoverableCard name={data.cardName} img={data.cardImgFile} /> but it went into play instead</>;
+        return <>{data.redirected} <HoverableCard name={data.cardName} img={data.cardImgFile} /> but went to land of bondage instead</>;
       }
       if (data.to === 'reserve' && data.cardName) {
         return <>placed <HoverableCard name={data.cardName} img={data.cardImgFile} /> in reserve</>;
@@ -140,7 +140,7 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       }
       if (data.redirectedLostSouls?.length) {
         const actionWord = data.toZone === 'discard' ? 'discarded' : data.toZone === 'reserve' ? 'reserved' : 'banished';
-        parts.push(<span key="redirect">{actionWord} <CardNameList cards={data.redirectedLostSouls} /> but went into play instead</span>);
+        parts.push(<span key="redirect">{actionWord} <CardNameList cards={data.redirectedLostSouls} /> but went to land of bondage instead</span>);
       }
       if (parts.length) return <>{parts.map((p, i) => <span key={i}>{i > 0 && '; '}{p}</span>)}</>;
     } catch { /* fall through */ }

@@ -129,7 +129,5 @@ think about positions of ^ zones.
 have battle zone, remove current battle implementation
 allow cmd + d draw option
 card placement mismatches?
-cards in opponents land of bondage should be draggable
-banished souls in logs show they went to play
 clicking and dragging mutliple cards around doesnt make the bottom ones more visible.
 clicking and dragging multiple cards make the non dragged card invisible

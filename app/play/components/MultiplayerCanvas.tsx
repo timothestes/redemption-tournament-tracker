@@ -2264,7 +2264,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
           })}
 
           {/* ================================================================
-              Cards in auto-arrange zones — Opponent LOB (NOT draggable, horizontal strip)
+              Cards in auto-arrange zones — Opponent LOB (draggable, horizontal strip)
               ================================================================ */}
           {AUTO_ARRANGE_ZONES.map((zoneKey) => {
             const cards = opponentCards[zoneKey];
@@ -2288,14 +2288,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
                       cardWidth={lobCard.cardWidth}
                       cardHeight={lobCard.cardHeight}
                       image={getCardImage(card)}
-                      isSelected={false}
-                      isDraggable={false}
+                      isSelected={isSelected(String(card.id))}
+                      isDraggable={true}
                       hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
-                      onDragStart={noopCardDrag}
-                      onDragMove={noopDrag}
-                      onDragEnd={noopCardDragEnd}
+                      nodeRef={registerCardNode}
+                      onClick={handleCardClick}
+                      onDragStart={handleCardDragStart}
+                      onDragMove={handleCardDragMove}
+                      onDragEnd={handleCardDragEnd}
                       onContextMenu={handleCardContextMenu}
-                      onDblClick={noopDblClick}
+                      onDblClick={handleDblClick}
                       onMouseEnter={handleMouseEnter}
                       onMouseLeave={handleMouseLeave}
                     />
