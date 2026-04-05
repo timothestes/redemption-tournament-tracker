@@ -21,6 +21,7 @@ import { SpreadHandProvider, useSpreadHand } from '../contexts/SpreadHandContext
 import { convertToGoldfishDeck, type GameCardData } from '../utils/convertToGoldfishDeck';
 import PregameScreen from '../components/PregameScreen';
 import { DeckPickerModal } from '../components/DeckPickerModal';
+import { getRandomLoadingMessage } from '@/app/shared/constants/loadingMessages';
 import type { DeckOption } from '../components/DeckPickerCard';
 import { loadUserDecks, loadDeckForGame } from '../actions';
 
@@ -179,21 +180,31 @@ function WaitingScreen({ code, goldfishDeck, onPractice, onUpdateMessage }: {
   return (
     <>
     <TopNav />
-    <div className="flex min-h-[calc(100vh-56px)] items-center justify-center px-4">
-      <div className="rounded-xl border border-border bg-card/95 backdrop-blur-sm p-8 sm:p-10 text-center max-w-md w-full">
+    <div className="fixed inset-0 flex flex-col items-center justify-center bg-black">
+      {/* Cave background — continuous with loading overlay */}
+      <div
+        className="absolute inset-0 bg-cover bg-no-repeat opacity-40"
+        style={{ backgroundImage: 'url(/gameplay/cave_background.png)', backgroundPosition: 'center 70%' }}
+      />
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{ background: 'radial-gradient(ellipse 90% 85% at 50% 50%, transparent 60%, rgba(0,0,0,0.85) 100%)' }}
+      />
+
+      <div className="relative z-10 rounded-xl border border-amber-200/10 bg-black/60 backdrop-blur-sm p-8 sm:p-10 text-center max-w-md w-full mx-4">
         {/* Code display */}
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground font-cinzel">Game Code</p>
+        <p className="text-xs uppercase tracking-[0.2em] text-amber-200/50 font-cinzel">Game Code</p>
         <div className="flex items-center justify-center gap-3 mt-2">
-          <p className="font-mono text-5xl sm:text-6xl font-bold tracking-wider text-foreground">{code}</p>
+          <p className="font-mono text-5xl sm:text-6xl font-bold tracking-wider text-amber-200/90">{code}</p>
           <CopyButton text={code} label="Copy code" icon="copy" inline />
         </div>
 
         {/* Status */}
-        <p className="mt-5 text-sm text-muted-foreground">Waiting for opponent to join...</p>
+        <p className="mt-5 text-sm text-amber-200/50 font-cinzel tracking-wide">Waiting for opponent to join...</p>
         <div className="mt-3 flex justify-center gap-1.5">
-          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:-0.3s]" />
-          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:-0.15s]" />
-          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary" />
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-amber-200/60 [animation-delay:-0.3s]" />
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-amber-200/60 [animation-delay:-0.15s]" />
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-amber-200/60" />
         </div>
 
         {/* Lobby message */}
@@ -205,12 +216,12 @@ function WaitingScreen({ code, goldfishDeck, onPractice, onUpdateMessage }: {
                 onChange={(e) => setMessage(e.target.value.slice(0, 100))}
                 placeholder="Lobby message (optional)"
                 maxLength={100}
-                className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-primary"
+                className="flex-1 rounded-md border border-amber-200/15 bg-black/40 px-3 py-2 text-sm text-amber-200/80 placeholder:text-amber-200/25 focus-visible:outline-none focus-visible:border-amber-200/30"
               />
               <button
                 onClick={handleSaveMessage}
                 disabled={messageSaved}
-                className="shrink-0 rounded-md border border-border px-3 py-2 text-sm hover:bg-muted transition-colors disabled:opacity-50"
+                className="shrink-0 rounded-md border border-amber-200/15 px-3 py-2 text-sm text-amber-200/60 hover:bg-amber-200/5 transition-colors disabled:opacity-50"
               >
                 {messageSaved ? 'Saved' : 'Set'}
               </button>
@@ -220,20 +231,28 @@ function WaitingScreen({ code, goldfishDeck, onPractice, onUpdateMessage }: {
 
         {/* Share actions */}
         <div className="mt-6 flex justify-center gap-2">
-          <CopyButton
-            text={typeof window !== 'undefined' ? `${window.location.origin}/play?join=${code}` : code}
-            label="Copy invite link"
-            icon="link"
-          />
+          <button
+            onClick={() => {
+              const url = typeof window !== 'undefined' ? `${window.location.origin}/play?join=${code}` : code;
+              navigator.clipboard.writeText(url);
+            }}
+            title="Copy invite link"
+            className="flex items-center gap-2 px-4 py-2 rounded-md text-sm border border-amber-200/15 bg-black/40 text-amber-200/60 hover:bg-amber-200/5 transition-colors"
+          >
+            <svg className="w-4 h-4 text-amber-200/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
+            </svg>
+            <span>Invite Link</span>
+          </button>
         </div>
 
         {/* Practice */}
         {goldfishDeck && (
           <>
-            <div className="my-6 h-px bg-border" />
+            <div className="my-6 h-px bg-amber-200/10" />
             <button
               onClick={onPractice}
-              className="w-full py-3 rounded-lg border border-border hover:bg-muted/50 transition-colors font-cinzel tracking-wide text-sm"
+              className="w-full py-3 rounded-lg border border-amber-200/15 hover:bg-amber-200/5 transition-colors font-cinzel tracking-wide text-sm text-amber-200/60"
             >
               Practice While You Wait
             </button>
@@ -242,7 +261,7 @@ function WaitingScreen({ code, goldfishDeck, onPractice, onUpdateMessage }: {
 
         <a
           href="/play"
-          className="mt-4 inline-block text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+          className="mt-4 inline-block text-xs text-amber-200/25 hover:text-amber-200/50 transition-colors"
         >
           Back to lobby
         </a>
@@ -268,6 +287,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const router = useRouter();
 
   const [lifecycle, setLifecycle] = useState<LifecycleState>('creating');
+  const loadingMessage = useMemo(() => getRandomLoadingMessage(), []);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isPracticing, setIsPracticing] = useState(false);
   const [playAgainTriggered, setPlayAgainTriggered] = useState(false);
@@ -582,17 +602,22 @@ function GameInner({ code, isConnected }: GameInnerProps) {
 
   if (lifecycle === 'creating' || lifecycle === 'joining' || (!isConnected && !isActive)) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-        <div className="text-center">
-          <div className="mb-4 h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" />
-          <p className="text-sm text-foreground">
-            {lifecycle === 'joining' ? `Joining game ${code}...` : 'Setting up game...'}
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black">
+        {/* Cave background */}
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-40"
+          style={{ backgroundImage: 'url(/gameplay/cave_background.png)', backgroundPosition: 'center 70%' }}
+        />
+        {/* Vignette */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: 'radial-gradient(ellipse 90% 85% at 50% 50%, transparent 60%, rgba(0,0,0,0.85) 100%)' }}
+        />
+        <div className="relative z-10 text-center">
+          <p className="font-cinzel text-xl tracking-wide text-amber-200/90 mb-6">
+            {loadingMessage}
           </p>
-          {lifecycle === 'joining' && (
-            <p className="text-xs text-muted-foreground mt-2">
-              Looking for game room...
-            </p>
-          )}
+          <div className="mb-4 h-8 w-8 animate-spin rounded-full border-2 border-amber-200/50 border-t-transparent mx-auto" />
         </div>
       </div>
     );

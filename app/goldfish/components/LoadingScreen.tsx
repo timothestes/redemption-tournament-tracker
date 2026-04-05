@@ -1,42 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-
-const LOADING_MESSAGES = [
-  'Unfurling Scrolls...',
-  'Dusting off Scrolls...',
-  'Consulting the Divine Council...',
-  'Gathering Lost Souls...',
-  'Sanhedrin voting...',
-  'Council of Jerusalem debating...',
-  'Parting the Red Sea...',
-  'Waiting on Balaam\'s donkey to move...',
-  'Rebuilding the Temple...',
-  'Counting the tribes...',
-  'Rolling away the stone...',
-  'Loading the Ark...',
-  'Wandering in the wilderness...',
-  'Casting lots...',
-  'Feeding the five thousand...',
-  'Preparing a scarlet line...',
-  'Wrestling an angel...',
-  'Escaping from a big fish...',
-  'Cleaning out the Lion\s den...',
-  'Interpreting Pharaoh\'s dream...',
-  'Plotting against Fortress Alstad...',
-  'Stoking a really big fire...',
-  'Gathering manna...',
-  'Taking a dip in the pool of Bethesda...',
-  'Fleeing from Potiphar\'s Wife...',
-  'Walking on water...',
-  'Sailing to Rome...',
-  'Preparing the last supper...',
-  'Downloading some heavy revies at Patmos...',
-  'Drafting up Darius\'s Decree...',
-  'Studying ancient Ugarit...',
-  'Dusting out the manger...',
-  'Consulting the wise men...',
-];
+import { LOADING_MESSAGES } from '@/app/shared/constants/loadingMessages';
 
 export function LoadingScreen({ progress }: { progress: number }) {
   const message = useMemo(

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import { SpacetimeProvider } from '../lib/spacetimedb-provider';
 import { DeckPickerModal } from './DeckPickerModal';
 import { LobbyList } from './LobbyList';
 import type { DeckOption } from './DeckPickerCard';
+import { getRandomLoadingMessage } from '@/app/shared/constants/loadingMessages';
 
 interface GameLobbyProps {
   decks: DeckOption[];
@@ -40,6 +41,10 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
 
   // Spectate toggle
   const [isSpectate, setIsSpectate] = useState(false);
+
+  // Full-screen loading overlay
+  const isNavigating = isCreating || isJoining;
+  const [loadingMessage] = useState(() => getRandomLoadingMessage());
 
   // Show error from redirect (e.g. stale lobby join attempt)
   useEffect(() => {
@@ -173,6 +178,26 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
 
   return (
     <div className="flex flex-col gap-5">
+      {/* Full-screen loading overlay */}
+      {isNavigating && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black">
+          <div
+            className="absolute inset-0 bg-cover bg-no-repeat opacity-40"
+            style={{ backgroundImage: 'url(/gameplay/cave_background.png)', backgroundPosition: 'center 70%' }}
+          />
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{ background: 'radial-gradient(ellipse 90% 85% at 50% 50%, transparent 60%, rgba(0,0,0,0.85) 100%)' }}
+          />
+          <div className="relative z-10 text-center">
+            <p className="font-cinzel text-xl tracking-wide text-amber-200/90 mb-6">
+              {loadingMessage}
+            </p>
+            <div className="mb-4 h-8 w-8 animate-spin rounded-full border-2 border-amber-200/50 border-t-transparent mx-auto" />
+          </div>
+        </div>
+      )}
+
       {/* Deck selection — matches community/my-decks card preview style */}
       <section className="rounded-lg border border-border bg-card overflow-hidden [.jayden_&]:border-primary/30 [.jayden_&]:bg-gradient-to-br [.jayden_&]:from-[hsla(0,80%,25%,0.15)] [.jayden_&]:via-[hsla(270,60%,20%,0.1)] [.jayden_&]:to-[hsla(230,80%,30%,0.15)]">
         {selectedDeck ? (
@@ -190,7 +215,7 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
                 />
               </div>
             ) : hasPreview ? (
-              <div className="h-32 overflow-hidden bg-muted flex items-center justify-center gap-1 px-2 py-2">
+              <div className="h-32 overflow-hidden bg-card flex items-center justify-center gap-1 px-2 py-2">
                 {img1Url && (
                   <img src={img1Url} alt="" className="h-full object-contain rounded" />
                 )}

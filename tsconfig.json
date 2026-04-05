@@ -17,10 +17,9 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
-      "@spacetimedb/*": ["lib/spacetimedb/module_bindings/*"]
+      "@spacetimedb/*": ["./lib/spacetimedb/module_bindings/*"]
     },
     "plugins": [
       {

@@ -282,6 +282,11 @@ export const join_game = spacetimedb.reducer(
       throw new SenderError('No waiting game found with that code');
     }
 
+    // Prevent a player from joining their own game
+    if (creator && creator.supabaseUserId === supabaseUserId) {
+      throw new SenderError('You cannot join your own game');
+    }
+
     // Insert player (seat=1) with pending deck data (cards loaded later during pregame)
     const player = ctx.db.Player.insert({
       id: 0n,
