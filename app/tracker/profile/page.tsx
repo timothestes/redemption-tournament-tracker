@@ -3,10 +3,9 @@
 import { useEffect, useState } from "react";
 import { createClient } from "../../../utils/supabase/client";
 
-const supabase = createClient();
-
 export default function ProfilePage() {
   const [user, setUser] = useState(null);
+  const supabase = createClient();
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -19,7 +18,13 @@ export default function ProfilePage() {
     };
 
     fetchUser();
-  }, []);
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase]);
 
   return (
     <div className="px-6 mx-auto">

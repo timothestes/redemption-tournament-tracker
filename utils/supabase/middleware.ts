@@ -44,28 +44,38 @@ export const updateSession = async (request: NextRequest) => {
       },
     );
 
+    // Always refresh the session on every request to keep the server-side
+    // cookie in sync with the browser client. This prevents client-server
+    // cookie desync that causes random logouts.
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+
     const pathname = request.nextUrl.pathname;
 
-    // Only call getUser() for protected routes and root redirect.
-    // Public pages skip the Supabase network call entirely.
-    if (needsAuth(pathname) || pathname === "/") {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser();
+    // Protected routes: redirect to sign-in if no session
+    if (needsAuth(pathname) && !user && error) {
+      const fullPath = request.nextUrl.pathname + request.nextUrl.search;
+      const signInUrl = new URL("/sign-in", request.url);
+      signInUrl.searchParams.set("redirectTo", fullPath);
+      const redirectResponse = NextResponse.redirect(signInUrl);
+      // Copy refreshed auth cookies onto the redirect so they aren't lost
+      response.cookies.getAll().forEach((cookie) => {
+        redirectResponse.cookies.set(cookie.name, cookie.value);
+      });
+      return redirectResponse;
+    }
 
-      // Protected routes: redirect to sign-in if no session
-      if (needsAuth(pathname) && !user && error) {
-        const fullPath = request.nextUrl.pathname + request.nextUrl.search;
-        const signInUrl = new URL("/sign-in", request.url);
-        signInUrl.searchParams.set("redirectTo", fullPath);
-        return NextResponse.redirect(signInUrl);
-      }
-
-      // Logged-in users hitting root get sent to the tracker
-      if (pathname === "/" && user) {
-        return NextResponse.redirect(new URL("/tracker", request.url));
-      }
+    // Logged-in users hitting root get sent to the tracker
+    if (pathname === "/" && user) {
+      const redirectResponse = NextResponse.redirect(
+        new URL("/tracker", request.url),
+      );
+      response.cookies.getAll().forEach((cookie) => {
+        redirectResponse.cookies.set(cookie.name, cookie.value);
+      });
+      return redirectResponse;
     }
 
     return response;
