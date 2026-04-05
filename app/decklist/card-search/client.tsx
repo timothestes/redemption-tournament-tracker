@@ -377,13 +377,24 @@ export default function CardSearchClient() {
   } = useDeckState(deckIdFromUrl, folderIdFromUrl, isNewDeck);
 
   const [ignoreLegalityChecks, setIgnoreLegalityChecksRaw] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return localStorage.getItem('deck-ignore-legality') === 'true';
+    if (typeof window === 'undefined' || !deck.id) return false;
+    return localStorage.getItem(`deck-ignore-legality-${deck.id}`) === 'true';
   });
   const setIgnoreLegalityChecks = (val: boolean) => {
     setIgnoreLegalityChecksRaw(val);
-    localStorage.setItem('deck-ignore-legality', String(val));
+    if (deck.id) {
+      localStorage.setItem(`deck-ignore-legality-${deck.id}`, String(val));
+    }
   };
+
+  // Sync ignore state when deck changes (e.g., loading a different deck)
+  useEffect(() => {
+    if (!deck.id) {
+      setIgnoreLegalityChecksRaw(false);
+      return;
+    }
+    setIgnoreLegalityChecksRaw(localStorage.getItem(`deck-ignore-legality-${deck.id}`) === 'true');
+  }, [deck.id]);
 
   const { result: deckCheckResult, isChecking: isDeckChecking, setResult: setDeckCheckResult } = useDeckCheck(deck, !ignoreLegalityChecks);
 
