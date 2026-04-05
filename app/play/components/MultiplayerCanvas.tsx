@@ -470,6 +470,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
   const [opponentDeckMenu, setOpponentDeckMenu] = useState<{ x: number; y: number } | null>(null);
   const [opponentPeekState, setOpponentPeekState] = useState<{ position: 'top' | 'bottom' | 'random'; count: number } | null>(null);
   const [opponentRevealDismissed, setOpponentRevealDismissed] = useState(false);
+  const [opponentRevealSnapshot, setOpponentRevealSnapshot] = useState<string[]>([]);
   const [handMenu, setHandMenu] = useState<{ x: number; y: number } | null>(null);
   const revealAutoHideRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [revealBarShrinking, setRevealBarShrinking] = useState(false);
@@ -892,9 +893,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
     try { return JSON.parse(raw) as string[]; } catch { return []; }
   }, [gameState.opponentPlayer?.revealedCards]);
 
-  // Reset dismissed state when opponent reveals new cards
+  // Snapshot revealed card IDs when they arrive — persist until opponent dismisses
   useEffect(() => {
     if (opponentRevealedCardIds.length > 0) {
+      setOpponentRevealSnapshot(opponentRevealedCardIds);
       setOpponentRevealDismissed(false);
     }
   }, [opponentRevealedCardIds]);
@@ -3488,12 +3490,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
         )}
       </ModalGameProvider>
 
-      {/* Opponent's server-revealed cards (read-only view) */}
-      {opponentRevealedCardIds.length > 0 && !opponentRevealDismissed && (
+      {/* Opponent's server-revealed cards — shown from snapshot so it persists even after revealer closes their peek */}
+      {opponentRevealSnapshot.length > 0 && !opponentRevealDismissed && (
         <ModalGameProvider value={opponentModalGameValue}>
           <DeckPeekModal
-            cardIds={opponentRevealedCardIds}
-            title={`${gameState.opponentPlayer?.displayName ?? 'Opponent'} Revealed ${opponentRevealedCardIds.length}`}
+            cardIds={opponentRevealSnapshot}
+            title={`${gameState.opponentPlayer?.displayName ?? 'Opponent'} Revealed ${opponentRevealSnapshot.length}`}
             onClose={() => setOpponentRevealDismissed(true)}
             onStartDrag={modalStartDrag}
             onStartMultiDrag={modalStartMultiDrag}
