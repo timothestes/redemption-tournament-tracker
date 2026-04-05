@@ -191,7 +191,7 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
     <div className="flex flex-col gap-5">
       {/* Full-screen loading overlay */}
       {isNavigating && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black">
+        <div className="fixed inset-0 z-30 flex flex-col items-center justify-center bg-black">
           <div
             className="absolute inset-0 bg-cover bg-no-repeat opacity-40"
             style={{ backgroundImage: 'url(/gameplay/cave_background.png)', backgroundPosition: 'center 70%' }}
@@ -378,8 +378,8 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
                     {isCreating ? 'Loading deck...' : 'Create Game'}
                   </Button>
                   {/* Private game toggle — visually belongs to Create Game */}
-                  <div className="flex items-center gap-2 justify-center">
-                    <label htmlFor="private-toggle" className="text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2.5 justify-center">
+                    <label htmlFor="private-toggle" className="text-sm text-muted-foreground">
                       Private game
                     </label>
                     <button
@@ -387,13 +387,13 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
                       role="switch"
                       aria-checked={isPrivate}
                       onClick={() => setIsPrivate(!isPrivate)}
-                      className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${
+                      className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors ${
                         isPrivate ? 'bg-primary' : 'bg-muted'
                       }`}
                     >
                       <span
-                        className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                          isPrivate ? 'translate-x-[14px]' : 'translate-x-[2px]'
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          isPrivate ? 'translate-x-[22px]' : 'translate-x-[3px]'
                         }`}
                       />
                     </button>
@@ -423,14 +423,14 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
                       variant="outline"
                       onClick={handleJoinGame}
                       disabled={isJoining || gameCode.length !== 4 || (!isSpectate && !selectedDeck)}
-                      className="shrink-0 h-12 px-6"
+                      className="shrink-0 h-12 w-20"
                     >
                       {isJoining ? 'Joining...' : isSpectate ? 'Watch' : 'Join'}
                     </Button>
                   </div>
                   {/* Spectate toggle — mirrors Private game toggle on Create side */}
-                  <div className="flex items-center gap-2 justify-center">
-                    <label htmlFor="spectate-toggle" className="text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2.5 justify-center">
+                    <label htmlFor="spectate-toggle" className="text-sm text-muted-foreground">
                       Spectate
                     </label>
                     <button
@@ -438,13 +438,13 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
                       role="switch"
                       aria-checked={isSpectate}
                       onClick={() => setIsSpectate(!isSpectate)}
-                      className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${
+                      className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors ${
                         isSpectate ? 'bg-primary' : 'bg-muted'
                       }`}
                     >
                       <span
-                        className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                          isSpectate ? 'translate-x-[14px]' : 'translate-x-[2px]'
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          isSpectate ? 'translate-x-[22px]' : 'translate-x-[3px]'
                         }`}
                       />
                     </button>

@@ -95,195 +95,7 @@ export function GameClient({ code }: GameClientProps) {
 // ---------------------------------------------------------------------------
 type LifecycleState = 'creating' | 'joining' | 'waiting' | 'pregame' | 'playing' | 'finished' | 'error';
 
-// ---------------------------------------------------------------------------
-// Waiting screen — shown while waiting for opponent
-// ---------------------------------------------------------------------------
-
-function CopyButton({ text, label, icon, inline }: { text: string; label: string; icon: 'copy' | 'link'; inline?: boolean }) {
-  const [copied, setCopied] = useState(false);
-  const handleCopy = () => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  if (inline) {
-    return (
-      <button
-        onClick={handleCopy}
-        title={label}
-        className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-      >
-        {copied ? (
-          <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-          </svg>
-        ) : (
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-          </svg>
-        )}
-      </button>
-    );
-  }
-
-  return (
-    <button
-      onClick={handleCopy}
-      title={label}
-      className="flex items-center gap-2 px-4 py-2 rounded-md text-sm border border-border bg-card hover:bg-muted transition-colors"
-    >
-      {copied ? (
-        <>
-          <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-          </svg>
-          <span className="text-primary">Copied!</span>
-        </>
-      ) : icon === 'copy' ? (
-        <>
-          <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-          </svg>
-          <span>Copy Code</span>
-        </>
-      ) : (
-        <>
-          <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
-          </svg>
-          <span>Invite Link</span>
-        </>
-      )}
-    </button>
-  );
-}
-
-function WaitingScreen({ code, goldfishDeck, onPractice, onUpdateMessage }: {
-  code: string;
-  goldfishDeck: import('@/app/goldfish/types').DeckDataForGoldfish | null;
-  onPractice: () => void;
-  onUpdateMessage?: (message: string) => void;
-}) {
-  const [message, setMessage] = useState('');
-  const [messageSaved, setMessageSaved] = useState(false);
-  const [inviteCopied, setInviteCopied] = useState(false);
-
-  function handleSaveMessage() {
-    if (!onUpdateMessage) return;
-    onUpdateMessage(message);
-    setMessageSaved(true);
-    setTimeout(() => setMessageSaved(false), 2000);
-  }
-
-  return (
-    <>
-    <TopNav />
-    <div className="fixed inset-0 flex flex-col items-center justify-center bg-black">
-      {/* Cave background — continuous with loading overlay */}
-      <div
-        className="absolute inset-0 bg-cover bg-no-repeat opacity-40"
-        style={{ backgroundImage: 'url(/gameplay/cave_background.png)', backgroundPosition: 'center 70%' }}
-      />
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{ background: 'radial-gradient(ellipse 90% 85% at 50% 50%, transparent 60%, rgba(0,0,0,0.85) 100%)' }}
-      />
-
-      <div className="relative z-10 rounded-xl border border-amber-200/10 bg-black/60 backdrop-blur-sm p-8 sm:p-10 text-center max-w-md w-full mx-4">
-        {/* Code display */}
-        <p className="text-xs uppercase tracking-[0.2em] text-amber-200/50 font-cinzel">Game Code</p>
-        <div className="flex items-center justify-center gap-3 mt-2">
-          <p className="font-mono text-5xl sm:text-6xl font-bold tracking-wider text-amber-200/90">{code}</p>
-          <CopyButton text={code} label="Copy code" icon="copy" inline />
-        </div>
-
-        {/* Status */}
-        <p className="mt-5 text-sm text-amber-200/50 font-cinzel tracking-wide">Waiting for opponent to join...</p>
-        <div className="mt-3 flex justify-center gap-1.5">
-          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-amber-200/60 [animation-delay:-0.3s]" />
-          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-amber-200/60 [animation-delay:-0.15s]" />
-          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-amber-200/60" />
-        </div>
-
-        {/* Lobby message */}
-        {onUpdateMessage && (
-          <div className="mt-5">
-            <div className="flex gap-2">
-              <input
-                value={message}
-                onChange={(e) => setMessage(e.target.value.slice(0, 100))}
-                placeholder="Lobby message (optional)"
-                maxLength={100}
-                className="flex-1 rounded-md border border-amber-200/15 bg-black/40 px-3 py-2 text-sm text-amber-200/80 placeholder:text-amber-200/25 focus-visible:outline-none focus-visible:border-amber-200/30"
-              />
-              <button
-                onClick={handleSaveMessage}
-                disabled={messageSaved}
-                className="shrink-0 rounded-md border border-amber-200/15 px-3 py-2 text-sm text-amber-200/60 hover:bg-amber-200/5 transition-colors disabled:opacity-50"
-              >
-                {messageSaved ? 'Saved' : 'Set'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Share actions */}
-        <div className="mt-6 flex justify-center gap-2">
-          <button
-            onClick={() => {
-              const url = typeof window !== 'undefined' ? `${window.location.origin}/play?join=${code}` : code;
-              navigator.clipboard.writeText(url);
-              setInviteCopied(true);
-              setTimeout(() => setInviteCopied(false), 2000);
-            }}
-            title="Copy invite link"
-            className="flex items-center gap-2 px-4 py-2 rounded-md text-sm border border-amber-200/15 bg-black/40 text-amber-200/60 hover:bg-amber-200/5 transition-colors"
-          >
-            {inviteCopied ? (
-              <>
-                <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                </svg>
-                <span className="text-green-400">Copied!</span>
-              </>
-            ) : (
-              <>
-                <svg className="w-4 h-4 text-amber-200/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
-                </svg>
-                <span>Invite Link</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Practice */}
-        {goldfishDeck && (
-          <>
-            <div className="my-6 h-px bg-amber-200/10" />
-            <button
-              onClick={onPractice}
-              className="w-full py-3 rounded-lg border border-amber-200/15 hover:bg-amber-200/5 transition-colors font-cinzel tracking-wide text-sm text-amber-200/60"
-            >
-              Practice While You Wait
-            </button>
-          </>
-        )}
-
-        <a
-          href="/play"
-          className="mt-4 inline-block text-xs text-amber-200/25 hover:text-amber-200/50 transition-colors"
-        >
-          Back to lobby
-        </a>
-      </div>
-    </div>
-    </>
-  );
-}
+// WaitingScreen and CopyButton removed — now handled by unified PregameScreen
 
 // ---------------------------------------------------------------------------
 // Inner component — must live inside SpacetimeProvider to use SpacetimeDB hooks
@@ -640,7 +452,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     );
   }
 
-  if (lifecycle === 'waiting') {
+  if (lifecycle === 'waiting' || lifecycle === 'pregame') {
     if (isPracticing && goldfishDeck) {
       return (
         <div className="fixed inset-0 bg-background">
@@ -670,8 +482,13 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     }
 
     return (
-      <WaitingScreen
+      <PregameScreen
         code={code}
+        lifecycle={lifecycle}
+        gameId={gameId}
+        gameState={gameState}
+        myDisplayName={gameParams?.displayName ?? ''}
+        myDeckName={gameParams?.deckName}
         goldfishDeck={goldfishDeck}
         onPractice={() => setIsPracticing(true)}
         onUpdateMessage={gameId && conn ? (message: string) => {
@@ -810,91 +627,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       )}
     </div>
   );
-
-  if (lifecycle === 'pregame') {
-    const phase = gameState.game?.pregamePhase;
-
-    // rolling / choosing: render game canvas with pregame overlay
-    // Cards are already loaded — players can see their hand
-    return (
-      <div style={{ display: 'flex', width: '100vw', height: '100dvh', backgroundImage: 'url(/gameplay/cave_background.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          {/* Pregame status bar instead of TurnIndicator */}
-          <div style={{
-            flexShrink: 0,
-            height: 48,
-            background: 'rgba(10, 8, 5, 0.96)',
-            borderBottom: '1px solid rgba(107, 78, 39, 0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            paddingLeft: 12,
-            paddingRight: 12,
-            gap: 8,
-          }}>
-            <a
-              href="/play"
-              title="Back to lobby"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 28,
-                height: 28,
-                borderRadius: 4,
-                flexShrink: 0,
-                color: 'rgba(232, 213, 163, 0.35)',
-                transition: 'color 0.15s, background 0.15s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = '#e8d5a3';
-                e.currentTarget.style.background = 'rgba(196, 149, 90, 0.1)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = 'rgba(232, 213, 163, 0.35)';
-                e.currentTarget.style.background = 'transparent';
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M15 21H19a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H15" />
-                <polyline points="8 17 3 12 8 7" />
-                <line x1="3" y1="12" x2="15" y2="12" />
-              </svg>
-            </a>
-            <span style={{
-              flex: 1,
-              textAlign: 'center',
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 11,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              color: 'rgba(196, 149, 90, 0.6)',
-            }}>
-              {phase === 'rolling' ? 'Rolling for first player...' : 'Choosing who goes first...'}
-            </span>
-            {/* Spacer to keep text centered */}
-            <div style={{ width: 28, flexShrink: 0 }} />
-          </div>
-          <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-            {gameId !== null && (
-              <MultiplayerCanvas gameId={gameId} />
-            )}
-            {/* Pregame overlay — pointer events pass through backdrop, only modal blocks */}
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, pointerEvents: 'none' }}>
-              <div style={{ pointerEvents: 'auto' }}>
-                <PregameScreen
-                  gameId={gameId!}
-                  gameState={gameState}
-                  code={code}
-                />
-              </div>
-            </div>
-            <GameToastContainer />
-          </div>
-        </div>
-        {rightPanel}
-      </div>
-    );
-  }
 
   // lifecycle === 'finished' — show canvas (frozen) with GameOverOverlay on top,
   // or render the overlay standalone if canvas data is unavailable.

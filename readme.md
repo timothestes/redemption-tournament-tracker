@@ -103,17 +103,18 @@ We will want to let the host print it out easily
 
 ## long term
 add maybeboard
-add animations to goldfish mode
+add animations to goldfish/play mode
 Collection Tracker
+Cube builder
 add wishlist
 Teaching new players how to play
-Comprehensive Deck Legality Validation (Type 1 complete with 14 rules and 206 tests; Type 2 in progress)
 misc tournament tracker improvements
 Joining a tournament via QR code
 metagame snapshot
 tournament tracker mobile ux support
 Deck upvoting
 Offline intallable app on phone (Progressive Web app with offline capabilities)
+Fallow audit: https://github.com/fallow-rs/fallow
 
 
 # play features
@@ -125,3 +126,14 @@ probably improve right click top/bottom/random menu
 when revealing cards, reveal them to ALL players
 audit banish, discard, reserve, deck zones all the same size
 think about positions of ^ zones.
+have battle zone, remove current battle implementation
+allow cmd + d draw option
+card placement mismatches?
+cards in opponents land of bondage should be draggable
+banished souls in logs show they went to play
+search deck menu: leave open button seems to be broken
+clicking and dragging mutliple cards around doesnt make the bottom ones more visible.
+clicking and dragging multiple cards make the non dragged card invisible
+dragging a card to opponent's discard doesn't make that card get placed on top of the discard pile.
+Sometimes when drawing cards, the cards will go to the middle of the hand, (ie when holding one of your opponent's cards)
+Need to rethink the way cards in hand are ordered.

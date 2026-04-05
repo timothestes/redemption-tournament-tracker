@@ -9,25 +9,54 @@ import type { DeckOption } from './DeckPickerCard';
 import { loadUserDecks, loadDeckForGame } from '../actions';
 import type { GameState } from '../hooks/useGameState';
 
+// ---------------------------------------------------------------------------
+// Timing constants
+// ---------------------------------------------------------------------------
+
+const RITUAL_TUMBLE_MS = 1200;
+const RITUAL_TUMBLE_FRAMES = 18;
+const ROLLING_RESULT_DISPLAY_MS = 2200;
+const CHOOSE_TIME_LIMIT_S = 30;
+const REVEAL_AUTO_ACK_MS = 2500;
+
+// ---------------------------------------------------------------------------
+// Props
+// ---------------------------------------------------------------------------
+
 interface PregameScreenProps {
-  gameId: bigint;
-  gameState: GameState;
   code: string;
+  lifecycle: 'waiting' | 'pregame';
+  gameId: bigint | null;
+  gameState: GameState;
+  myDisplayName: string;
+  myDeckName?: string;
+  goldfishDeck: import('@/app/goldfish/types').DeckDataForGoldfish | null;
+  onPractice: () => void;
+  onUpdateMessage?: (message: string) => void;
 }
 
-export default function PregameScreen({ gameId, gameState, code }: PregameScreenProps) {
+// ---------------------------------------------------------------------------
+// PregameScreen — default export, unified layout shell
+// ---------------------------------------------------------------------------
+
+export default function PregameScreen({
+  code,
+  lifecycle,
+  gameId,
+  gameState,
+  myDisplayName,
+  myDeckName,
+  goldfishDeck,
+  onPractice,
+  onUpdateMessage,
+}: PregameScreenProps) {
   const { game, myPlayer, opponentPlayer } = gameState;
 
-  if (!game) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-      </div>
-    );
-  }
+  const phase = game?.pregamePhase ?? 'deck_select';
+  const isWaiting = lifecycle === 'waiting';
 
-  // Spectator view — no myPlayer means we're watching
-  if (!myPlayer) {
+  // During pregame, if there's no myPlayer, show spectator view
+  if (lifecycle === 'pregame' && !myPlayer && game) {
     return (
       <>
         <TopNav />
@@ -38,58 +67,205 @@ export default function PregameScreen({ gameId, gameState, code }: PregameScreen
     );
   }
 
-  const phase = game.pregamePhase;
+  // Derive ready state from game flags
+  const isSeat0 = myPlayer ? myPlayer.seat.toString() === '0' : false;
+  const myReady = game ? (isSeat0 ? game.pregameReady0 : game.pregameReady1) : false;
+  const opponentReady = game ? (isSeat0 ? game.pregameReady1 : game.pregameReady0) : false;
 
-  // rolling/choosing/revealing render as modal content (parent provides the overlay)
-  if (phase === 'rolling') {
-    // If this player already acknowledged the roll (skip or auto), show a
-    // preview of the choosing phase so it feels like we've moved forward.
-    const isSeat0 = myPlayer.seat.toString() === '0';
-    const myRollAcked = isSeat0 ? game.pregameReady0 : game.pregameReady1;
-    if (myRollAcked) {
-      return <ChoosingPreview gameState={gameState} />;
-    }
-    return <RollingPhase gameState={gameState} gameId={gameId} />;
-  }
-  if (phase === 'choosing') {
-    return <ChoosingPhase gameState={gameState} gameId={gameId} />;
-  }
-  if (phase === 'revealing') {
-    return <RevealingPhase gameState={gameState} gameId={gameId} />;
-  }
+  // Derive roll results
+  const myRoll = game ? (isSeat0 ? Number(game.rollResult0) : Number(game.rollResult1)) : 0;
+  const opponentRoll = game ? (isSeat0 ? Number(game.rollResult1) : Number(game.rollResult0)) : 0;
+  const iWonRoll = myPlayer && game ? myPlayer.seat.toString() === game.rollWinner : false;
+  const opponentName = opponentPlayer?.displayName || 'Opponent';
 
-  // deck_select: full-screen with TopNav
   return (
     <>
       <TopNav />
-      <div className="flex min-h-[calc(100vh-56px)] items-center justify-center px-4">
-        <DeckSelectPhase gameState={gameState} gameId={gameId} />
+      <div className="fixed inset-0 flex flex-col items-center justify-center bg-black">
+        {/* Cave background */}
+        <div
+          className="absolute inset-0 bg-cover bg-no-repeat opacity-40"
+          style={{ backgroundImage: 'url(/gameplay/cave_background.png)', backgroundPosition: 'center 70%' }}
+        />
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: 'radial-gradient(ellipse 90% 85% at 50% 50%, transparent 60%, rgba(0,0,0,0.85) 100%)' }}
+        />
+
+        <div className="relative z-10 rounded-xl border border-amber-200/10 bg-black/60 backdrop-blur-sm p-6 sm:p-8 text-center max-w-md w-full mx-4">
+          {/* Game code header — always visible */}
+          <GameCodeHeader code={code} />
+
+          {/* Player cards */}
+          <PlayerCards
+            isWaiting={isWaiting}
+            phase={phase}
+            myDisplayName={myPlayer?.displayName ?? myDisplayName}
+            myDeckName={myDeckName}
+            myReady={myReady}
+            opponentName={opponentName}
+            opponentReady={opponentReady}
+            hasOpponent={!!opponentPlayer}
+            myRoll={myRoll}
+            opponentRoll={opponentRoll}
+            iWonRoll={iWonRoll}
+            myPlayer={myPlayer}
+            gameState={gameState}
+            showDice={phase === 'rolling' || phase === 'choosing' || phase === 'revealing'}
+          />
+
+          {/* Action area — contextual */}
+          <div className="mt-5">
+            {isWaiting ? (
+              <WaitingActions
+                code={code}
+                goldfishDeck={goldfishDeck}
+                onPractice={onPractice}
+                onUpdateMessage={onUpdateMessage}
+              />
+            ) : phase === 'deck_select' ? (
+              // Nothing extra — player cards have the ready button
+              myReady && !opponentReady ? (
+                <p className="text-xs text-amber-200/40 font-cinzel tracking-wide">
+                  Waiting for opponent to ready up...
+                </p>
+              ) : null
+            ) : phase === 'rolling' || phase === 'choosing' ? (
+              <RollAndChooseArea
+                gameState={gameState}
+                phase={phase}
+                iWonRoll={iWonRoll}
+                opponentName={opponentName}
+                myPlayer={myPlayer}
+              />
+            ) : phase === 'revealing' ? (
+              <RevealArea
+                gameState={gameState}
+                myPlayer={myPlayer}
+                opponentName={opponentName}
+                iWonRoll={iWonRoll}
+              />
+            ) : null}
+          </div>
+
+          {/* Back to lobby */}
+          <a
+            href="/play"
+            className="mt-4 inline-block text-xs text-amber-200/25 hover:text-amber-200/50 transition-colors"
+          >
+            Back to lobby
+          </a>
+        </div>
       </div>
     </>
   );
 }
 
-function DeckSelectPhase({ gameState, gameId }: { gameState: GameState; gameId: bigint }) {
-  const { game, myPlayer, opponentPlayer } = gameState;
+// ---------------------------------------------------------------------------
+// GameCodeHeader — game code display + copy buttons
+// ---------------------------------------------------------------------------
+
+function GameCodeHeader({ code }: { code: string }) {
+  const [codeCopied, setCodeCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const copyCode = () => {
+    navigator.clipboard.writeText(code);
+    setCodeCopied(true);
+    setTimeout(() => setCodeCopied(false), 2000);
+  };
+
+  const copyLink = () => {
+    const url = typeof window !== 'undefined' ? `${window.location.origin}/play?join=${code}` : code;
+    navigator.clipboard.writeText(url);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
+
+  return (
+    <div className="mb-5">
+      <p className="text-[10px] uppercase tracking-[0.2em] text-amber-200/50 font-cinzel">Game Code</p>
+      <div className="flex items-center justify-center gap-2 mt-1">
+        <p className="font-mono text-4xl sm:text-5xl font-bold tracking-wider text-amber-200/90">{code}</p>
+        <button
+          onClick={copyCode}
+          title="Copy code"
+          className="p-1.5 rounded-md text-amber-200/40 hover:text-amber-200/80 transition-colors"
+        >
+          {codeCopied ? (
+            <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+              <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+            </svg>
+          )}
+        </button>
+        <button
+          onClick={copyLink}
+          title="Copy invite link"
+          className="p-1.5 rounded-md text-amber-200/40 hover:text-amber-200/80 transition-colors"
+        >
+          {linkCopied ? (
+            <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
+            </svg>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// PlayerCards — two-column grid with player info, dice, ready button
+// ---------------------------------------------------------------------------
+
+function PlayerCards({
+  isWaiting,
+  phase,
+  myDisplayName,
+  myDeckName,
+  myReady,
+  opponentName,
+  opponentReady,
+  hasOpponent,
+  myRoll,
+  opponentRoll,
+  iWonRoll,
+  myPlayer,
+  gameState,
+  showDice,
+}: {
+  isWaiting: boolean;
+  phase: string;
+  myDisplayName: string;
+  myDeckName?: string;
+  myReady: boolean;
+  opponentName: string;
+  opponentReady: boolean;
+  hasOpponent: boolean;
+  myRoll: number;
+  opponentRoll: number;
+  iWonRoll: boolean;
+  myPlayer: any;
+  gameState: GameState;
+  showDice: boolean;
+}) {
   const [myDecks, setMyDecks] = useState<DeckOption[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [isChangingDeck, setIsChangingDeck] = useState(false);
 
-  // Load user's decks on mount
+  // Load user's decks on mount (for deck picker)
   useEffect(() => {
     loadUserDecks().then(setMyDecks).catch(() => {});
   }, []);
-
-  if (!game || !myPlayer) return null;
-
-  const mySeat = myPlayer.seat;
-  const isSeat0 = mySeat.toString() === '0';
-  const myReady = isSeat0 ? game.pregameReady0 : game.pregameReady1;
-  const opponentReady = isSeat0 ? game.pregameReady1 : game.pregameReady0;
-
-  const handleToggleReady = () => {
-    gameState.pregameReady(!myReady);
-  };
 
   const handleDeckSelected = async (deck: DeckOption) => {
     setPickerOpen(false);
@@ -104,76 +280,485 @@ function DeckSelectPhase({ gameState, gameId }: { gameState: GameState; gameId: 
     }
   };
 
+  const handleToggleReady = () => {
+    gameState.pregameReady(!myReady);
+  };
+
+  const isDeckSelect = phase === 'deck_select' && !isWaiting;
+
+  // Die animation state — track whether dice have been revealed for this session
+  const [diceRevealed, setDiceRevealed] = useState(false);
+  const [diceSkipped, setDiceSkipped] = useState(false);
+  useEffect(() => {
+    if (!showDice) return;
+    // Start tumbling after a brief pause
+    const timer = setTimeout(() => setDiceRevealed(true), 600);
+    return () => clearTimeout(timer);
+  }, [showDice]);
+
   return (
-    <div className="rounded-xl border border-border bg-card/95 backdrop-blur-sm p-8 sm:p-10 text-center max-w-md w-full">
-      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground font-cinzel">Pre-Game</p>
-      <h2 className="text-2xl font-bold font-cinzel mt-2">Get Ready</h2>
-
-      {/* My player section */}
-      <div className="mt-6 p-4 rounded-lg border border-border bg-background/50">
-        <div className="flex items-center justify-between">
-          <div className="text-left">
-            <p className="font-semibold">{myPlayer.displayName} <span className="text-xs text-muted-foreground">(you)</span></p>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Deck: {myPlayer.deckId ? 'Selected' : 'None'}
+    <>
+      <div className="grid grid-cols-2 gap-3">
+        {/* My card */}
+        <div className="rounded-lg border border-[#c4955a]/30 bg-black/40 p-3 text-left">
+          <p className="text-xs font-cinzel text-[#c4955a] truncate">{myDisplayName}</p>
+          {isDeckSelect && (
+            <p className="text-[10px] text-amber-200/40 mt-0.5 truncate">
+              {myPlayer?.deckId ? (myDeckName || 'Deck selected') : 'No deck'}
             </p>
-          </div>
-          {myReady ? (
-            <span className="text-xs font-medium text-primary px-2 py-1 rounded-full bg-primary/10">Ready</span>
-          ) : (
-            <span className="text-xs text-muted-foreground">Not ready</span>
+          )}
+
+          {/* Dice during rolling+ phases */}
+          {showDice && (
+            <div className="mt-2 flex justify-center">
+              <InlineDie
+                finalValue={myRoll}
+                accentColor="#c4955a"
+                isWinner={iWonRoll}
+                revealed={diceRevealed}
+                skipAnimation={diceSkipped}
+              />
+            </div>
+          )}
+
+          {/* Ready button in deck_select */}
+          {isDeckSelect && (
+            <div className="mt-2 flex flex-col gap-1.5">
+              {!myReady && (
+                <button
+                  onClick={() => setPickerOpen(true)}
+                  disabled={isChangingDeck}
+                  className="text-[10px] text-amber-200/40 hover:text-amber-200/70 transition-colors disabled:opacity-50"
+                >
+                  {isChangingDeck ? 'Loading...' : 'Change deck'}
+                </button>
+              )}
+              <Button
+                variant={myReady ? 'outline' : 'default'}
+                size="sm"
+                onClick={handleToggleReady}
+                className={myReady
+                  ? 'h-7 text-xs border-[#c4955a]/30 text-[#c4955a]/70 bg-[#c4955a]/10 hover:bg-[#c4955a]/20'
+                  : 'h-7 text-xs bg-[#c4955a]/80 text-black hover:bg-[#c4955a]'
+                }
+              >
+                {myReady ? 'Ready' : 'Ready up'}
+              </Button>
+            </div>
           )}
         </div>
 
-        <div className="flex gap-2 mt-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPickerOpen(true)}
-            disabled={myReady || isChangingDeck}
-          >
-            {isChangingDeck ? 'Loading...' : 'Change Deck'}
-          </Button>
-          <Button
-            variant={myReady ? 'outline' : 'default'}
-            size="sm"
-            onClick={handleToggleReady}
-          >
-            {myReady ? 'Un-ready' : 'Ready'}
-          </Button>
-        </div>
-      </div>
-
-      {/* Opponent section */}
-      <div className="mt-3 p-4 rounded-lg border border-border bg-background/50">
-        <div className="flex items-center justify-between">
-          <p className="font-semibold">{opponentPlayer?.displayName || 'Opponent'}</p>
-          {opponentReady ? (
-            <span className="text-xs font-medium text-primary px-2 py-1 rounded-full bg-primary/10">Ready</span>
+        {/* Opponent card */}
+        <div className="rounded-lg border border-[#4a7ab5]/30 bg-black/40 p-3 text-left">
+          {isWaiting || !hasOpponent ? (
+            <>
+              <p className="text-xs font-cinzel text-[#4a7ab5]/60">Waiting</p>
+              <div className="mt-2 flex gap-1">
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#4a7ab5]/50 [animation-delay:-0.3s]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#4a7ab5]/50 [animation-delay:-0.15s]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#4a7ab5]/50" />
+              </div>
+            </>
           ) : (
-            <span className="text-xs text-muted-foreground">Selecting deck...</span>
+            <>
+              <p className="text-xs font-cinzel text-[#4a7ab5] truncate">{opponentName}</p>
+              {isDeckSelect && (
+                <p className="text-[10px] text-amber-200/40 mt-0.5">
+                  {opponentReady ? 'Ready' : 'Selecting deck...'}
+                </p>
+              )}
+
+              {/* Dice during rolling+ phases */}
+              {showDice && (
+                <div className="mt-2 flex justify-center">
+                  <InlineDie
+                    finalValue={opponentRoll}
+                    accentColor="#4a7ab5"
+                    isWinner={!iWonRoll}
+                    revealed={diceRevealed}
+                    skipAnimation={diceSkipped}
+                  />
+                </div>
+              )}
+
+              {isDeckSelect && opponentReady && (
+                <div className="mt-2">
+                  <span className="inline-block text-[10px] font-medium text-[#4a7ab5]/70 px-2 py-0.5 rounded-full bg-[#4a7ab5]/10">
+                    Ready
+                  </span>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
-
-      {/* Status hint */}
-      {myReady && !opponentReady && (
-        <p className="mt-4 text-sm text-muted-foreground">Waiting for opponent to ready up...</p>
-      )}
 
       <DeckPickerModal
         open={pickerOpen}
         onOpenChange={setPickerOpen}
         onSelect={handleDeckSelected}
         myDecks={myDecks}
-        selectedDeckId={myPlayer.deckId}
+        selectedDeckId={myPlayer?.deckId}
       />
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// InlineDie — wraps RitualDie at size 56, with "Winner" label
+// ---------------------------------------------------------------------------
+
+function InlineDie({
+  finalValue,
+  accentColor,
+  isWinner,
+  revealed,
+  skipAnimation,
+}: {
+  finalValue: number;
+  accentColor: string;
+  isWinner: boolean;
+  revealed: boolean;
+  skipAnimation?: boolean;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <RitualDie
+        finalValue={finalValue}
+        accentColor={accentColor}
+        size={56}
+        isWinner={isWinner}
+        revealed={revealed}
+        skipAnimation={skipAnimation}
+      />
+      {isWinner && revealed && (
+        <motion.span
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="text-[9px] font-cinzel uppercase tracking-widest"
+          style={{ color: accentColor }}
+        >
+          Winner
+        </motion.span>
+      )}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Pregame D20 face — reuses the same hexagonal SVG from DiceOverlay
+// WaitingActions — lobby message + practice + invite link
+// ---------------------------------------------------------------------------
+
+function WaitingActions({
+  code,
+  goldfishDeck,
+  onPractice,
+  onUpdateMessage,
+}: {
+  code: string;
+  goldfishDeck: import('@/app/goldfish/types').DeckDataForGoldfish | null;
+  onPractice: () => void;
+  onUpdateMessage?: (message: string) => void;
+}) {
+  const [message, setMessage] = useState('');
+  const [messageSaved, setMessageSaved] = useState(false);
+  const [inviteCopied, setInviteCopied] = useState(false);
+
+  function handleSaveMessage() {
+    if (!onUpdateMessage) return;
+    onUpdateMessage(message);
+    setMessageSaved(true);
+    setTimeout(() => setMessageSaved(false), 2000);
+  }
+
+  return (
+    <div>
+      {/* Status text */}
+      <p className="text-xs text-amber-200/50 font-cinzel tracking-wide">Waiting for opponent to join...</p>
+      <div className="mt-2 flex justify-center gap-1.5">
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-amber-200/60 [animation-delay:-0.3s]" />
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-amber-200/60 [animation-delay:-0.15s]" />
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-amber-200/60" />
+      </div>
+
+      {/* Lobby message */}
+      {onUpdateMessage && (
+        <div className="mt-4">
+          <div className="flex gap-2">
+            <input
+              value={message}
+              onChange={(e) => setMessage(e.target.value.slice(0, 100))}
+              placeholder="Lobby message (optional)"
+              maxLength={100}
+              className="flex-1 rounded-md border border-amber-200/15 bg-black/40 px-3 py-2 text-sm text-amber-200/80 placeholder:text-amber-200/25 focus-visible:outline-none focus-visible:border-amber-200/30"
+            />
+            <button
+              onClick={handleSaveMessage}
+              disabled={messageSaved}
+              className="shrink-0 w-16 rounded-md border border-amber-200/15 px-3 py-2 text-sm text-amber-200/60 hover:bg-amber-200/5 transition-colors disabled:opacity-50"
+            >
+              {messageSaved ? 'Saved' : 'Set'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Invite link */}
+      <div className="mt-4 flex justify-center">
+        <button
+          onClick={() => {
+            const url = typeof window !== 'undefined' ? `${window.location.origin}/play?join=${code}` : code;
+            navigator.clipboard.writeText(url);
+            setInviteCopied(true);
+            setTimeout(() => setInviteCopied(false), 2000);
+          }}
+          title="Copy invite link"
+          className="flex items-center gap-2 px-4 py-2 rounded-md text-sm border border-amber-200/15 bg-black/40 text-amber-200/60 hover:bg-amber-200/5 transition-colors"
+        >
+          {inviteCopied ? (
+            <>
+              <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+              <span className="text-green-400">Copied!</span>
+            </>
+          ) : (
+            <>
+              <svg className="w-4 h-4 text-amber-200/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
+              </svg>
+              <span>Invite Link</span>
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Practice */}
+      {goldfishDeck && (
+        <>
+          <div className="my-4 h-px bg-amber-200/10" />
+          <button
+            onClick={onPractice}
+            className="w-full py-2.5 rounded-lg border border-amber-200/15 hover:bg-amber-200/5 transition-colors font-cinzel tracking-wide text-sm text-amber-200/60"
+          >
+            Practice While You Wait
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// RollAndChooseArea — winner announcement, choose buttons, timer
+// ---------------------------------------------------------------------------
+
+function RollAndChooseArea({
+  gameState,
+  phase,
+  iWonRoll,
+  opponentName,
+  myPlayer,
+}: {
+  gameState: GameState;
+  phase: string;
+  iWonRoll: boolean;
+  opponentName: string;
+  myPlayer: any;
+}) {
+  const { game } = gameState;
+  const hasChosenRef = useRef(false);
+  const [secondsLeft, setSecondsLeft] = useState(CHOOSE_TIME_LIMIT_S);
+
+  const mySeat = myPlayer?.seat;
+  const isSeat0 = mySeat?.toString() === '0';
+  const myRollAcked = game ? (isSeat0 ? game.pregameReady0 : game.pregameReady1) : false;
+
+  // Winner name for announcement
+  const winnerName = iWonRoll ? 'You win' : `${opponentName} wins`;
+
+  // Show results = dice have landed (we track this via a brief delay)
+  const [showResults, setShowResults] = useState(false);
+  useEffect(() => {
+    // Show results after tumble animation completes
+    const timer = setTimeout(() => setShowResults(true), RITUAL_TUMBLE_MS + 700);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Auto-acknowledge roll for the loser (after tumble + display time)
+  useEffect(() => {
+    if (iWonRoll || myRollAcked) return;
+    if (phase !== 'rolling') return;
+    const timer = setTimeout(() => {
+      gameState.pregameAcknowledgeRoll();
+    }, RITUAL_TUMBLE_MS + ROLLING_RESULT_DISPLAY_MS);
+    return () => clearTimeout(timer);
+  }, [iWonRoll, myRollAcked, phase, gameState]);
+
+  // Countdown timer
+  useEffect(() => {
+    if (!showResults) return;
+    const interval = setInterval(() => {
+      setSecondsLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [showResults]);
+
+  // Auto-choose when timer expires — winner defaults to going first
+  useEffect(() => {
+    if (secondsLeft === 0 && iWonRoll && mySeat !== undefined) {
+      handleChoose(mySeat);
+    }
+  }, [secondsLeft, iWonRoll]);
+
+  const handleChoose = (seat: bigint) => {
+    if (hasChosenRef.current) return;
+    hasChosenRef.current = true;
+    if (phase === 'rolling') {
+      // Skip to reveal — roll + choose in one step
+      gameState.pregameSkipToReveal(seat);
+    } else {
+      // Choosing phase
+      gameState.pregameChooseFirst(seat);
+    }
+  };
+
+  if (!game || !myPlayer || mySeat === undefined) return null;
+
+  return (
+    <motion.div
+      animate={showResults ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
+      transition={{ duration: 0.5, delay: showResults ? 0.2 : 0 }}
+      style={{ pointerEvents: showResults ? 'auto' : 'none' }}
+    >
+      <p className="font-cinzel text-sm font-bold text-amber-200/90 tracking-wide">
+        {winnerName} the roll!
+      </p>
+
+      {iWonRoll ? (
+        <div className="mt-3 flex flex-col gap-2">
+          <button
+            onClick={() => handleChoose(mySeat)}
+            className="w-full py-2.5 rounded border border-[#c4955a]/45 bg-[#c4955a]/15 font-cinzel text-xs font-bold uppercase tracking-wider text-amber-200/90 hover:bg-[#c4955a]/25 transition-colors"
+          >
+            I&apos;ll go first
+          </button>
+          <button
+            onClick={() => handleChoose(isSeat0 ? BigInt(1) : BigInt(0))}
+            className="w-full py-2.5 rounded border border-amber-200/15 bg-transparent font-cinzel text-xs font-bold uppercase tracking-wider text-amber-200/50 hover:text-amber-200/70 transition-colors"
+          >
+            {opponentName} goes first
+          </button>
+        </div>
+      ) : (
+        <p className="mt-2 text-xs text-amber-200/40">
+          {myRollAcked ? 'Waiting for them to choose...' : 'Waiting...'}
+        </p>
+      )}
+
+      {/* Timer bar */}
+      {showResults && (
+        <div className="mt-4">
+          <div className="w-full h-[3px] rounded-sm bg-amber-200/[0.08] overflow-hidden">
+            <motion.div
+              initial={{ width: '100%' }}
+              animate={{ width: '0%' }}
+              transition={{ duration: CHOOSE_TIME_LIMIT_S, ease: 'linear' }}
+              className="h-full rounded-sm"
+              style={{
+                backgroundColor: secondsLeft <= 10 ? 'rgba(220, 120, 80, 0.6)' : 'rgba(196, 149, 90, 0.4)',
+                transition: 'background-color 0.5s ease',
+              }}
+            />
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// RevealArea — brief result message, auto-acknowledge after 2.5s
+// ---------------------------------------------------------------------------
+
+function RevealArea({
+  gameState,
+  myPlayer,
+  opponentName,
+  iWonRoll,
+}: {
+  gameState: GameState;
+  myPlayer: any;
+  opponentName: string;
+  iWonRoll: boolean;
+}) {
+  const { game } = gameState;
+  if (!game || !myPlayer) return null;
+
+  const isSeat0 = myPlayer.seat.toString() === '0';
+  const alreadyAcked = isSeat0 ? game.pregameReady0 : game.pregameReady1;
+
+  const firstSeat = game.currentTurn;
+  const iGoFirst = myPlayer.seat === firstSeat;
+
+  // Build contextual headline
+  let headline: string;
+  if (iWonRoll) {
+    headline = iGoFirst ? 'You chose to go first' : `You chose ${opponentName} to go first`;
+  } else {
+    headline = iGoFirst
+      ? `${opponentName} chose you to go first`
+      : `${opponentName} chose to go first`;
+  }
+
+  // Auto-acknowledge after display time
+  useEffect(() => {
+    if (alreadyAcked) return;
+    const timer = setTimeout(() => {
+      gameState.pregameAcknowledgeFirst();
+    }, REVEAL_AUTO_ACK_MS);
+    return () => clearTimeout(timer);
+  }, [alreadyAcked, gameState]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+    >
+      <p className="font-cinzel text-sm font-bold text-amber-200/90 tracking-wide">
+        {headline}
+      </p>
+      <p className="mt-2 text-xs text-amber-200/40">
+        {alreadyAcked ? 'Waiting for opponent...' : 'Starting game...'}
+      </p>
+
+      {/* Progress bar */}
+      {!alreadyAcked && (
+        <div className="mt-3">
+          <div className="w-full h-[2px] rounded-sm bg-amber-200/[0.06] overflow-hidden">
+            <motion.div
+              initial={{ width: '100%' }}
+              animate={{ width: '0%' }}
+              transition={{ duration: REVEAL_AUTO_ACK_MS / 1000, ease: 'linear' }}
+              className="h-full rounded-sm bg-[#c4955a]/40"
+            />
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Pregame D20 face — hexagonal d20 SVG face
 // ---------------------------------------------------------------------------
 
 function PregameD20({ value, size, accentColor }: { value: number | '?'; size: number; accentColor: string }) {
@@ -262,9 +847,6 @@ function SparkBurst({ color, size }: { color: string; size: number }) {
 // ---------------------------------------------------------------------------
 // Animated tumbling die for the ritual
 // ---------------------------------------------------------------------------
-
-const RITUAL_TUMBLE_MS = 1200;
-const RITUAL_TUMBLE_FRAMES = 18;
 
 function RitualDie({
   finalValue,
@@ -374,769 +956,8 @@ function RitualDie({
 }
 
 // ---------------------------------------------------------------------------
-// Rolling phase — animated ritual
+// SpectatorPregameView — keep exactly as-is from existing file
 // ---------------------------------------------------------------------------
-
-const ROLLING_PAUSE_MS = 600;
-const ROLLING_RESULT_DISPLAY_MS = 2200;
-const ROLLING_TOTAL_MS = ROLLING_PAUSE_MS + RITUAL_TUMBLE_MS + ROLLING_RESULT_DISPLAY_MS;
-
-function RollingPhase({ gameState, gameId }: { gameState: GameState; gameId: bigint }) {
-  const { game, myPlayer, opponentPlayer } = gameState;
-  const [revealed, setRevealed] = useState(false);
-  const [skipped, setSkipped] = useState(false);
-
-  // Start the tumble after a brief dramatic pause
-  useEffect(() => {
-    if (skipped) return;
-    const timer = setTimeout(() => setRevealed(true), ROLLING_PAUSE_MS);
-    return () => clearTimeout(timer);
-  }, [skipped]);
-
-  // Auto-advance after tumble + display time
-  const alreadyAcknowledged = game && myPlayer
-    ? (myPlayer.seat.toString() === '0' ? game.pregameReady0 : game.pregameReady1)
-    : false;
-
-  // Auto-advance only for the loser — the winner chooses manually via buttons
-  const iAmWinner = game && myPlayer ? myPlayer.seat.toString() === game.rollWinner : false;
-  useEffect(() => {
-    if (iAmWinner || skipped || alreadyAcknowledged) return;
-    if (!revealed) return;
-    const timer = setTimeout(() => {
-      gameState.pregameAcknowledgeRoll();
-    }, RITUAL_TUMBLE_MS + ROLLING_RESULT_DISPLAY_MS);
-    return () => clearTimeout(timer);
-  }, [revealed, skipped, alreadyAcknowledged, iAmWinner, gameState]);
-
-  // Loser skip — just acknowledge the roll
-  const handleSkip = () => {
-    if (skipped || alreadyAcknowledged) return;
-    setSkipped(true);
-    setRevealed(true);
-    gameState.pregameAcknowledgeRoll();
-  };
-
-  if (!game || !myPlayer) return null;
-
-  const mySeat = myPlayer.seat;
-  const isSeat0 = mySeat.toString() === '0';
-  const myRoll = isSeat0 ? Number(game.rollResult0) : Number(game.rollResult1);
-  const opponentRoll = isSeat0 ? Number(game.rollResult1) : Number(game.rollResult0);
-  const iWon = mySeat.toString() === game.rollWinner;
-  const winnerName = iWon ? myPlayer.displayName : (opponentPlayer?.displayName || 'Opponent');
-
-  // Winner choose — acknowledge roll + choose first in one step, skip to revealing
-  const hasChosenRef = useRef(false);
-  const handleChooseFirst = (seat: bigint) => {
-    if (hasChosenRef.current) return;
-    hasChosenRef.current = true;
-    gameState.pregameSkipToReveal(seat);
-  };
-
-  // Show results = tumble finished (revealed + tumble duration elapsed), or skipped
-  const [showResults, setShowResults] = useState(false);
-  useEffect(() => {
-    if (skipped) {
-      setShowResults(true);
-      return;
-    }
-    if (!revealed) return;
-    const timer = setTimeout(() => setShowResults(true), RITUAL_TUMBLE_MS + 100);
-    return () => clearTimeout(timer);
-  }, [revealed, skipped]);
-
-  // Auto-choose when timer expires — winner defaults to going first
-  useEffect(() => {
-    if (!showResults || !iWon) return;
-    const timer = setTimeout(() => {
-      handleChooseFirst(mySeat);
-    }, CHOOSE_TIME_LIMIT_S * 1000);
-    return () => clearTimeout(timer);
-  }, [showResults, iWon]);
-
-  const dieSize = 88;
-
-  return (
-    <div style={{
-      background: 'rgba(14, 10, 6, 0.97)',
-      border: '1px solid rgba(107, 78, 39, 0.3)',
-      borderRadius: 10,
-      padding: '36px 32px',
-      textAlign: 'center',
-      maxWidth: 400,
-      width: '100%',
-      boxShadow: '0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(196, 149, 90, 0.08)',
-    }}>
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.4 }}
-        style={{
-          fontFamily: 'var(--font-cinzel), Georgia, serif',
-          fontSize: 10,
-          letterSpacing: '0.18em',
-          textTransform: 'uppercase',
-          color: 'rgba(196, 149, 90, 0.5)',
-        }}
-      >Dice Roll</motion.p>
-      <motion.h2
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.1 }}
-        style={{
-          fontFamily: 'var(--font-cinzel), Georgia, serif',
-          fontSize: 22,
-          fontWeight: 700,
-          color: '#e8d5a3',
-          marginTop: 8,
-          textShadow: '0 1px 6px rgba(0,0,0,0.5)',
-        }}
-      >Who Goes First?</motion.h2>
-
-      {/* 3-column grid */}
-      <div style={{
-        marginTop: 28,
-        display: 'grid',
-        gridTemplateColumns: '1fr auto 1fr',
-        alignItems: 'center',
-        gap: 16,
-      }}>
-        {/* My die column */}
-        <motion.div
-          initial={{ opacity: 0, x: -16 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.4, delay: 0.2 }}
-          style={{ textAlign: 'center' }}
-        >
-          <p style={{
-            fontFamily: 'Georgia, serif',
-            fontSize: 12,
-            color: '#c4955a',
-            marginBottom: 10,
-            letterSpacing: '0.06em',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}>{myPlayer.displayName}</p>
-          <RitualDie
-            finalValue={myRoll}
-            accentColor="#c4955a"
-            size={dieSize}
-            isWinner={iWon}
-            revealed={revealed}
-            skipAnimation={skipped}
-          />
-        </motion.div>
-
-        {/* VS divider */}
-        <motion.span
-          initial={{ opacity: 0, scale: 0.5 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.3, delay: 0.3 }}
-          style={{
-            fontFamily: 'var(--font-cinzel), Georgia, serif',
-            fontSize: 11,
-            color: 'rgba(196, 149, 90, 0.3)',
-            letterSpacing: '0.1em',
-            userSelect: 'none',
-          }}
-        >VS</motion.span>
-
-        {/* Opponent die column */}
-        <motion.div
-          initial={{ opacity: 0, x: 16 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.4, delay: 0.2 }}
-          style={{ textAlign: 'center' }}
-        >
-          <p style={{
-            fontFamily: 'Georgia, serif',
-            fontSize: 12,
-            color: '#4a7ab5',
-            marginBottom: 10,
-            letterSpacing: '0.06em',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}>{opponentPlayer?.displayName || 'Opponent'}</p>
-          <RitualDie
-            finalValue={opponentRoll}
-            accentColor="#4a7ab5"
-            size={dieSize}
-            isWinner={!iWon}
-            revealed={revealed}
-            skipAnimation={skipped}
-          />
-        </motion.div>
-      </div>
-
-      {/* Winner announcement + action area — fades in after dice land */}
-      <motion.div
-        animate={showResults ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
-        transition={{ duration: 0.5, delay: showResults ? 0.2 : 0 }}
-        style={{ marginTop: 24, pointerEvents: showResults ? 'auto' : 'none' }}
-      >
-        <p style={{
-          fontFamily: 'var(--font-cinzel), Georgia, serif',
-          fontSize: 15,
-          fontWeight: 700,
-          color: '#e8d5a3',
-          letterSpacing: '0.06em',
-          textShadow: '0 1px 4px rgba(0,0,0,0.5)',
-        }}>
-          {winnerName} wins the roll!
-        </p>
-
-        {/* Winner gets choice buttons immediately; loser sees skip */}
-        {iWon ? (
-          <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <button
-              onClick={() => handleChooseFirst(mySeat)}
-              style={{
-                padding: '10px 20px',
-                borderRadius: 4,
-                fontFamily: 'var(--font-cinzel), Georgia, serif',
-                fontSize: 12,
-                fontWeight: 700,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                cursor: 'pointer',
-                border: '1px solid rgba(196, 149, 90, 0.45)',
-                background: 'rgba(196, 149, 90, 0.15)',
-                color: '#e8d5a3',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              I&apos;ll go first
-            </button>
-            <button
-              onClick={() => handleChooseFirst(mySeat.toString() === '0' ? BigInt(1) : BigInt(0))}
-              style={{
-                padding: '10px 20px',
-                borderRadius: 4,
-                fontFamily: 'var(--font-cinzel), Georgia, serif',
-                fontSize: 12,
-                fontWeight: 700,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                cursor: 'pointer',
-                border: '1px solid rgba(107, 78, 39, 0.3)',
-                background: 'transparent',
-                color: 'rgba(196, 149, 90, 0.6)',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              {opponentPlayer?.displayName || 'Opponent'} goes first
-            </button>
-          </div>
-        ) : (
-          <motion.button
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            onClick={handleSkip}
-            disabled={alreadyAcknowledged}
-            style={{
-              marginTop: 12,
-              background: 'none',
-              border: 'none',
-              fontFamily: 'Georgia, serif',
-              fontSize: 11,
-              color: 'rgba(196, 149, 90, 0.35)',
-              cursor: alreadyAcknowledged ? 'default' : 'pointer',
-              letterSpacing: '0.06em',
-              padding: '4px 8px',
-            }}
-          >
-            {alreadyAcknowledged ? 'Waiting for opponent to choose...' : 'Skip'}
-          </motion.button>
-        )}
-      </motion.div>
-
-      {/* Countdown bar — rolling animation timer (before results) or choosing timer (after results) */}
-      <div style={{ marginTop: 20 }}>
-        <div style={{
-          width: '100%',
-          height: 3,
-          borderRadius: 2,
-          backgroundColor: 'rgba(232,213,163,0.08)',
-          overflow: 'hidden',
-        }}>
-          {!showResults && !skipped ? (
-            <motion.div
-              key="rolling-bar"
-              initial={{ width: '100%' }}
-              animate={{ width: '0%' }}
-              transition={{ duration: ROLLING_TOTAL_MS / 1000, ease: 'linear' }}
-              style={{
-                height: '100%',
-                borderRadius: 2,
-                backgroundColor: 'rgba(196, 149, 90, 0.4)',
-              }}
-            />
-          ) : (
-            <motion.div
-              key="choosing-bar"
-              initial={{ width: '100%' }}
-              animate={{ width: '0%' }}
-              transition={{ duration: CHOOSE_TIME_LIMIT_S, ease: 'linear' }}
-              style={{
-                height: '100%',
-                borderRadius: 2,
-                backgroundColor: 'rgba(196, 149, 90, 0.4)',
-              }}
-            />
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Choosing preview — shown when player acknowledged roll but opponent hasn't yet.
-// Mirrors the choosing phase layout so the transition feels seamless.
-// ---------------------------------------------------------------------------
-
-function ChoosingPreview({ gameState }: { gameState: GameState }) {
-  const { game, myPlayer, opponentPlayer } = gameState;
-  const [secondsLeft, setSecondsLeft] = useState(CHOOSE_TIME_LIMIT_S);
-  if (!game || !myPlayer) return null;
-
-  const iWon = myPlayer.seat.toString() === game.rollWinner;
-  const winnerName = iWon ? 'You' : (opponentPlayer?.displayName || 'Opponent');
-
-  // Countdown for the loser's waiting view
-  useEffect(() => {
-    if (iWon) return;
-    const interval = setInterval(() => {
-      setSecondsLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [iWon]);
-
-  return (
-    <div style={{
-      background: 'rgba(14, 10, 6, 0.97)',
-      border: '1px solid rgba(107, 78, 39, 0.3)',
-      borderRadius: 8,
-      padding: '40px 48px',
-      textAlign: 'center',
-      maxWidth: 420,
-      width: '100%',
-      boxShadow: '0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(196, 149, 90, 0.08)',
-    }}>
-      <p style={{
-        fontFamily: 'var(--font-cinzel), Georgia, serif',
-        fontSize: 10,
-        letterSpacing: '0.18em',
-        textTransform: 'uppercase',
-        color: 'rgba(196, 149, 90, 0.5)',
-      }}>First Player</p>
-
-      <h2 style={{
-        fontFamily: 'var(--font-cinzel), Georgia, serif',
-        fontSize: 22,
-        fontWeight: 700,
-        color: '#e8d5a3',
-        marginTop: 8,
-        textShadow: '0 1px 6px rgba(0,0,0,0.9)',
-      }}>{winnerName} Won the Roll{iWon ? '!' : ''}</h2>
-
-      <p style={{
-        marginTop: 16,
-        fontSize: 13,
-        color: 'rgba(196, 149, 90, 0.45)',
-        fontFamily: 'Georgia, serif',
-      }}>
-        {iWon ? 'Waiting for opponent to finish rolling...' : 'Waiting for them to choose who goes first...'}
-      </p>
-
-      <div style={{ marginTop: 12, display: 'flex', justifyContent: 'center', gap: 6 }}>
-        <span className="animate-bounce [animation-delay:-0.3s]" style={{ width: 6, height: 6, borderRadius: '50%', background: '#c4955a' }} />
-        <span className="animate-bounce [animation-delay:-0.15s]" style={{ width: 6, height: 6, borderRadius: '50%', background: '#c4955a' }} />
-        <span className="animate-bounce" style={{ width: 6, height: 6, borderRadius: '50%', background: '#c4955a' }} />
-      </div>
-
-      {!iWon && (
-        <div style={{ marginTop: 20 }}>
-          <div style={{
-            width: '100%',
-            height: 3,
-            borderRadius: 2,
-            backgroundColor: 'rgba(232,213,163,0.08)',
-            overflow: 'hidden',
-          }}>
-            <motion.div
-              initial={{ width: '100%' }}
-              animate={{ width: '0%' }}
-              transition={{ duration: CHOOSE_TIME_LIMIT_S, ease: 'linear' }}
-              style={{
-                height: '100%',
-                borderRadius: 2,
-                backgroundColor: secondsLeft <= 10 ? 'rgba(220, 120, 80, 0.6)' : 'rgba(196, 149, 90, 0.4)',
-                transition: 'background-color 0.5s ease',
-              }}
-            />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-const CHOOSE_TIME_LIMIT_S = 30;
-
-function ChoosingPhase({ gameState, gameId }: { gameState: GameState; gameId: bigint }) {
-  const { game, myPlayer, opponentPlayer } = gameState;
-  const [secondsLeft, setSecondsLeft] = useState(CHOOSE_TIME_LIMIT_S);
-  const hasChosenRef = useRef(false);
-
-  const mySeat = myPlayer?.seat;
-  const iWon = mySeat !== undefined && game ? mySeat.toString() === game.rollWinner : false;
-  const winnerSeat = game ? BigInt(game.rollWinner) : 0n;
-
-  const handleChoose = (seat: bigint) => {
-    if (hasChosenRef.current) return;
-    hasChosenRef.current = true;
-    gameState.pregameChooseFirst(seat);
-  };
-
-  // Countdown timer — ticks every second
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setSecondsLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Auto-choose when timer expires (only the winner's client fires this)
-  useEffect(() => {
-    if (secondsLeft === 0 && iWon) {
-      handleChoose(winnerSeat);
-    }
-  }, [secondsLeft, iWon, winnerSeat]);
-
-  if (!game || !myPlayer || mySeat === undefined) return null;
-
-  const winnerName = iWon ? 'You' : (opponentPlayer?.displayName || 'Opponent');
-
-  const btnBase: React.CSSProperties = {
-    padding: '12px 24px',
-    borderRadius: 4,
-    fontFamily: 'var(--font-cinzel), Georgia, serif',
-    fontSize: 13,
-    fontWeight: 700,
-    letterSpacing: '0.1em',
-    textTransform: 'uppercase',
-    cursor: 'pointer',
-    width: '100%',
-    transition: 'all 0.15s ease',
-  };
-
-  const timerBar = (
-    <div style={{ marginTop: 20 }}>
-      <div style={{
-        width: '100%',
-        height: 3,
-        borderRadius: 2,
-        backgroundColor: 'rgba(232,213,163,0.08)',
-        overflow: 'hidden',
-      }}>
-        <motion.div
-          initial={{ width: '100%' }}
-          animate={{ width: '0%' }}
-          transition={{ duration: CHOOSE_TIME_LIMIT_S, ease: 'linear' }}
-          style={{
-            height: '100%',
-            borderRadius: 2,
-            backgroundColor: secondsLeft <= 10 ? 'rgba(220, 120, 80, 0.6)' : 'rgba(196, 149, 90, 0.4)',
-            transition: 'background-color 0.5s ease',
-          }}
-        />
-      </div>
-    </div>
-  );
-
-  return (
-    <div style={{
-      background: 'rgba(14, 10, 6, 0.97)',
-      border: '1px solid rgba(107, 78, 39, 0.3)',
-      borderRadius: 8,
-      padding: '40px 48px',
-      textAlign: 'center',
-      maxWidth: 420,
-      width: '100%',
-      boxShadow: '0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(196, 149, 90, 0.08)',
-    }}>
-      <p style={{
-        fontFamily: 'var(--font-cinzel), Georgia, serif',
-        fontSize: 10,
-        letterSpacing: '0.18em',
-        textTransform: 'uppercase',
-        color: 'rgba(196, 149, 90, 0.5)',
-      }}>First Player</p>
-
-      {iWon ? (
-        <>
-          <h2 style={{
-            fontFamily: 'var(--font-cinzel), Georgia, serif',
-            fontSize: 22,
-            fontWeight: 700,
-            color: '#e8d5a3',
-            marginTop: 8,
-            textShadow: '0 1px 6px rgba(0,0,0,0.9)',
-          }}>You Won the Roll!</h2>
-          <p style={{
-            marginTop: 8,
-            fontSize: 13,
-            color: 'rgba(196, 149, 90, 0.5)',
-            fontFamily: 'Georgia, serif',
-          }}>Who should go first?</p>
-
-          <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <button
-              onClick={() => handleChoose(mySeat)}
-              style={{
-                ...btnBase,
-                border: '1px solid rgba(196, 149, 90, 0.45)',
-                background: 'rgba(196, 149, 90, 0.15)',
-                color: '#e8d5a3',
-              }}
-            >
-              I&apos;ll go first
-            </button>
-            <button
-              onClick={() => handleChoose(mySeat.toString() === '0' ? BigInt(1) : BigInt(0))}
-              style={{
-                ...btnBase,
-                border: '1px solid rgba(107, 78, 39, 0.3)',
-                background: 'transparent',
-                color: 'rgba(196, 149, 90, 0.6)',
-              }}
-            >
-              {opponentPlayer?.displayName || 'Opponent'} goes first
-            </button>
-          </div>
-
-          {timerBar}
-        </>
-      ) : (
-        <>
-          <h2 style={{
-            fontFamily: 'var(--font-cinzel), Georgia, serif',
-            fontSize: 22,
-            fontWeight: 700,
-            color: '#e8d5a3',
-            marginTop: 8,
-            textShadow: '0 1px 6px rgba(0,0,0,0.9)',
-          }}>{winnerName} Won the Roll</h2>
-          <p style={{
-            marginTop: 16,
-            fontSize: 13,
-            color: 'rgba(196, 149, 90, 0.45)',
-            fontFamily: 'Georgia, serif',
-          }}>Waiting for them to choose who goes first...</p>
-          <div style={{ marginTop: 12, display: 'flex', justifyContent: 'center', gap: 6 }}>
-            <span className="animate-bounce [animation-delay:-0.3s]" style={{ width: 6, height: 6, borderRadius: '50%', background: '#c4955a' }} />
-            <span className="animate-bounce [animation-delay:-0.15s]" style={{ width: 6, height: 6, borderRadius: '50%', background: '#c4955a' }} />
-            <span className="animate-bounce" style={{ width: 6, height: 6, borderRadius: '50%', background: '#c4955a' }} />
-          </div>
-
-          {timerBar}
-        </>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Revealing phase — announce who goes first
-// ---------------------------------------------------------------------------
-
-const REVEAL_AUTO_ACK_MS = 3500;
-
-function RevealingPhase({ gameState, gameId }: { gameState: GameState; gameId: bigint }) {
-  const { game, myPlayer, opponentPlayer } = gameState;
-
-  const alreadyAcknowledged = game && myPlayer
-    ? (myPlayer.seat.toString() === '0' ? game.pregameReady0 : game.pregameReady1)
-    : false;
-
-  // Auto-acknowledge after display time
-  useEffect(() => {
-    if (alreadyAcknowledged) return;
-    const timer = setTimeout(() => {
-      gameState.pregameAcknowledgeFirst();
-    }, REVEAL_AUTO_ACK_MS);
-    return () => clearTimeout(timer);
-  }, [alreadyAcknowledged, gameState]);
-
-  if (!game || !myPlayer) return null;
-
-  const firstSeat = game.currentTurn;
-  const iGoFirst = myPlayer.seat === firstSeat;
-  const iWonRoll = myPlayer.seat.toString() === game.rollWinner;
-  const opponentName = opponentPlayer?.displayName || 'Opponent';
-  const accentColor = iGoFirst ? '#c4955a' : '#4a7ab5';
-
-  // Build contextual message based on who won the roll and who goes first
-  let headline: string;
-  if (iWonRoll) {
-    headline = iGoFirst ? 'You chose to go first' : `You chose ${opponentName} to go first`;
-  } else {
-    headline = iGoFirst
-      ? `${opponentName} chose you to go first`
-      : `${opponentName} chose to go first`;
-  }
-
-  return (
-    <div style={{
-      background: 'rgba(14, 10, 6, 0.97)',
-      border: '1px solid rgba(107, 78, 39, 0.3)',
-      borderRadius: 10,
-      padding: '44px 36px',
-      textAlign: 'center',
-      maxWidth: 400,
-      width: '100%',
-      boxShadow: '0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(196, 149, 90, 0.08)',
-    }}>
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.4 }}
-        style={{
-          fontFamily: 'var(--font-cinzel), Georgia, serif',
-          fontSize: 10,
-          letterSpacing: '0.18em',
-          textTransform: 'uppercase',
-          color: 'rgba(196, 149, 90, 0.5)',
-        }}
-      >First Player</motion.p>
-
-      {/* Shield / icon accent */}
-      <motion.div
-        initial={{ scale: 0.5, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.2, ease: 'easeOut' }}
-        style={{ marginTop: 20 }}
-      >
-        <svg width="56" height="56" viewBox="0 0 56 56" style={{ margin: '0 auto', display: 'block' }}>
-          <path
-            d="M28 4 L50 16 L50 32 C50 42 40 50 28 54 C16 50 6 42 6 32 L6 16 Z"
-            fill="none"
-            stroke={accentColor}
-            strokeWidth={1.5}
-            opacity={0.6}
-          />
-          <path
-            d="M28 12 L44 20 L44 32 C44 39 37 45 28 48 C19 45 12 39 12 32 L12 20 Z"
-            fill={`${accentColor}15`}
-            stroke={`${accentColor}30`}
-            strokeWidth={1}
-          />
-          <text
-            x="28"
-            y="36"
-            textAnchor="middle"
-            fontFamily="Georgia, serif"
-            fontSize="20"
-            fontWeight="bold"
-            fill={accentColor}
-          >
-            1
-          </text>
-        </svg>
-      </motion.div>
-
-      <motion.h2
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.4 }}
-        style={{
-          fontFamily: 'var(--font-cinzel), Georgia, serif',
-          fontSize: 20,
-          fontWeight: 700,
-          color: '#e8d5a3',
-          marginTop: 16,
-          textShadow: '0 1px 6px rgba(0,0,0,0.5)',
-        }}
-      >
-        {headline}
-      </motion.h2>
-
-      {/* Continue button + progress bar */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.8 }}
-        style={{ marginTop: 24 }}
-      >
-        {!alreadyAcknowledged ? (
-          <>
-            <button
-              onClick={() => gameState.pregameAcknowledgeFirst()}
-              style={{
-                padding: '8px 24px',
-                borderRadius: 4,
-                fontFamily: 'var(--font-cinzel), Georgia, serif',
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                cursor: 'pointer',
-                border: '1px solid rgba(196, 149, 90, 0.35)',
-                background: 'rgba(196, 149, 90, 0.1)',
-                color: 'rgba(232, 213, 163, 0.7)',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              Continue
-            </button>
-            <div style={{
-              marginTop: 12,
-              width: '100%',
-              height: 2,
-              borderRadius: 1,
-              backgroundColor: 'rgba(232,213,163,0.06)',
-              overflow: 'hidden',
-            }}>
-              <motion.div
-                initial={{ width: '100%' }}
-                animate={{ width: '0%' }}
-                transition={{ duration: REVEAL_AUTO_ACK_MS / 1000, ease: 'linear' }}
-                style={{
-                  height: '100%',
-                  borderRadius: 1,
-                  backgroundColor: `${accentColor}40`,
-                }}
-              />
-            </div>
-          </>
-        ) : (
-          <p style={{
-            fontSize: 12,
-            color: 'rgba(196, 149, 90, 0.45)',
-            fontFamily: 'Georgia, serif',
-          }}>Waiting for opponent...</p>
-        )}
-      </motion.div>
-    </div>
-  );
-}
 
 function SpectatorPregameView({ game }: { game: any }) {
   const phase = game.pregamePhase;
