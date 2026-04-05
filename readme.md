@@ -129,5 +129,3 @@ think about positions of ^ zones.
 have battle zone, remove current battle implementation
 allow cmd + d draw option
 card placement mismatches?
-clicking and dragging mutliple cards around doesnt make the bottom ones more visible.
-clicking and dragging multiple cards make the non dragged card invisible

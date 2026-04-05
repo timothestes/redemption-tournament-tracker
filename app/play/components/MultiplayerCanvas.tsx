@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Stage, Layer, Rect, Text, Group, Circle } from 'react-konva';
 import type Konva from 'konva';
-import KonvaLib from 'konva';
 import { useGameState } from '../hooks/useGameState';
 import { useSpreadHand } from '../contexts/SpreadHandContext';
 import { useMultiplayerImagePreloader } from '../hooks/useMultiplayerImagePreloader';
@@ -631,10 +630,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
 
   // Multi-card drag: offsets of follower cards relative to the dragged card
   const dragFollowerOffsets = useRef<Map<string, { dx: number; dy: number }> | null>(null);
-  // Ghost image for multi-card drag
-  const dragGhostRef = useRef<Konva.Image | null>(null);
-  const dragGhostLayerRef = useRef<Konva.Layer | null>(null);
-  const dragGhostOffsetRef = useRef<{ dx: number; dy: number } | null>(null);
 
   // ---- Zone hit-testing ----
   /**
@@ -949,104 +944,27 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       if (hoverTimerRef.current) { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = null; }
       stopHoverAnimation();
 
-      // Multi-card drag: build a rasterized ghost of follower cards
+      // Multi-card drag: record offsets so followers move with the dragged card
       if (selectedIds.has(card.instanceId) && selectedIds.size > 1) {
         const dragNode = cardNodeRefs.current.get(card.instanceId);
         if (dragNode) {
           const offsets = new Map<string, { dx: number; dy: number }>();
           const baseX = dragNode.x();
           const baseY = dragNode.y();
-
-          const followers: { id: string; node: Konva.Group; dx: number; dy: number }[] = [];
           for (const id of selectedIds) {
             if (id === card.instanceId) continue;
             const fNode = cardNodeRefs.current.get(id);
             if (fNode) {
-              const dx = fNode.x() - baseX;
-              const dy = fNode.y() - baseY;
-              offsets.set(id, { dx, dy });
-              followers.push({ id, node: fNode, dx, dy });
+              offsets.set(id, { dx: fNode.x() - baseX, dy: fNode.y() - baseY });
             }
           }
           dragFollowerOffsets.current = offsets;
-
-          if (followers.length > 0) {
-            let minX = Infinity,
-              minY = Infinity,
-              maxX = -Infinity,
-              maxY = -Infinity;
-            for (const f of followers) {
-              minX = Math.min(minX, f.dx);
-              minY = Math.min(minY, f.dy);
-              maxX = Math.max(maxX, f.dx + cardWidth);
-              maxY = Math.max(maxY, f.dy + cardHeight);
-            }
-            const ghostW = maxX - minX;
-            const ghostH = maxY - minY;
-
-            const offscreen = document.createElement('canvas');
-            offscreen.width = ghostW * 2;
-            offscreen.height = ghostH * 2;
-            const ctx = offscreen.getContext('2d');
-            if (ctx) {
-              ctx.scale(2, 2);
-              ctx.globalAlpha = 0.5;
-              for (const f of followers) {
-                // Use explicit x/y/width/height so the rasterized canvas matches
-                // exactly cardWidth × cardHeight. Without these, toCanvas() uses
-                // getClientRect() which includes selection highlights and shadows,
-                // producing a larger canvas that gets squished into cardWidth × cardHeight.
-                const cardCanvas = f.node.toCanvas({
-                  pixelRatio: 1,
-                  x: 0,
-                  y: 0,
-                  width: cardWidth,
-                  height: cardHeight,
-                });
-                ctx.drawImage(cardCanvas, f.dx - minX, f.dy - minY, cardWidth, cardHeight);
-              }
-
-              const ghostImage = new KonvaLib.Image({
-                image: offscreen,
-                x: baseX + minX,
-                y: baseY + minY,
-                width: ghostW,
-                height: ghostH,
-                listening: false,
-                opacity: 1,
-              }) as Konva.Image;
-
-              const stage = stageRef.current;
-              if (stage) {
-                let ghostLayer = dragGhostLayerRef.current;
-                if (!ghostLayer) {
-                  ghostLayer = new KonvaLib.Layer({ listening: false }) as Konva.Layer;
-                  dragGhostLayerRef.current = ghostLayer;
-                  stage.add(ghostLayer);
-                }
-                ghostLayer.scaleX(scale);
-                ghostLayer.scaleY(scale);
-                ghostLayer.x(offsetX);
-                ghostLayer.y(offsetY);
-                ghostLayer.add(ghostImage);
-                ghostLayer.moveToTop();
-                ghostLayer.batchDraw();
-                dragGhostRef.current = ghostImage;
-              }
-
-              // Hide follower nodes
-              for (const f of followers) {
-                f.node.visible(false);
-              }
-              dragNode.getLayer()?.batchDraw();
-            }
-          }
         }
       } else {
         dragFollowerOffsets.current = null;
       }
     },
-    [selectedIds, cardWidth, cardHeight, stopHoverAnimation, scale, offsetX, offsetY],
+    [selectedIds, stopHoverAnimation],
   );
 
   const handleCardDragMove = useCallback(
@@ -1088,18 +1006,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
         setDragHoverZone(zoneKey);
       }
 
-      // Move ghost for multi-card drag
-      const ghost = dragGhostRef.current;
-      if (ghost) {
-        if (!dragGhostOffsetRef.current) {
-          dragGhostOffsetRef.current = {
-            dx: ghost.x() - x,
-            dy: ghost.y() - y,
-          };
+      // Move follower cards for multi-card drag
+      const followerOffsets = dragFollowerOffsets.current;
+      if (followerOffsets) {
+        for (const [id, offset] of followerOffsets) {
+          const fNode = cardNodeRefs.current.get(id);
+          if (fNode) {
+            fNode.x(x + offset.dx);
+            fNode.y(y + offset.dy);
+          }
         }
-        ghost.x(x + dragGhostOffsetRef.current.dx);
-        ghost.y(y + dragGhostOffsetRef.current.dy);
-        dragGhostLayerRef.current?.batchDraw();
       }
     },
     [findZoneAtPosition, cardWidth, cardHeight],
@@ -1120,18 +1036,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       dragOriginalParentRef.current = null;
       dragHoverZoneRef.current = null;
       dragFollowerOffsets.current = null;
-      dragGhostOffsetRef.current = null;
       setDragHoverZone(null);
-
-      // Clean up ghost image
-      if (dragGhostRef.current) {
-        dragGhostRef.current.destroy();
-        dragGhostRef.current = null;
-        dragGhostLayerRef.current?.batchDraw();
-      }
-      // NOTE: Follower visibility is NOT restored here. Instead it is
-      // restored later based on the drop outcome so that followers appear
-      // at the correct position (avoiding the jump-back visual glitch).
 
       const node = e.target;
       const dropX = node.x();
@@ -1166,11 +1071,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       };
 
       if (!hit) {
-        // No valid drop zone — snap back; restore followers at original positions
-        if (followerOffsets) {
-          for (const [id] of followerOffsets) {
+        // No valid drop zone — snap primary and followers back to original positions
+        if (followerOffsets && originalPos) {
+          for (const [id, offset] of followerOffsets) {
             const fNode = cardNodeRefs.current.get(id);
-            if (fNode) fNode.visible(true);
+            if (fNode) {
+              fNode.x(originalPos.x + offset.dx);
+              fNode.y(originalPos.y + offset.dy);
+            }
           }
         }
         snapBack();
@@ -1235,15 +1143,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       // Same free-form zone: just update position
       if (isSameZone && isFreeFormZone(targetZone)) {
         if (isGroupDrag) {
-          // Move follower nodes to their drop positions so they appear
-          // exactly where the ghost image was — no jump-back flicker.
+          // Followers are already at drop positions from handleCardDragMove; confirm positions
           if (followerOffsets) {
             for (const [id, offset] of followerOffsets) {
               const fNode = cardNodeRefs.current.get(id);
               if (fNode) {
                 fNode.x(dropX + offset.dx);
                 fNode.y(dropY + offset.dy);
-                fNode.visible(true);
               }
             }
           }
@@ -1300,11 +1206,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
             }
           }
         }
-        // Restore follower visibility
-        if (followerOffsets) {
-          for (const [id] of followerOffsets) {
+        // Snap followers back to their original positions
+        if (followerOffsets && originalPos) {
+          for (const [id, offset] of followerOffsets) {
             const fNode = cardNodeRefs.current.get(id);
-            if (fNode) fNode.visible(true);
+            if (fNode) {
+              fNode.x(originalPos.x + offset.dx);
+              fNode.y(originalPos.y + offset.dy);
+            }
           }
         }
         snapBack();
