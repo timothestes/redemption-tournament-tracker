@@ -102,6 +102,7 @@ export interface GameState {
   denyZoneSearch: (requestId: bigint) => void;
   completeZoneSearch: (requestId: bigint) => void;
   moveOpponentCard: (requestId: bigint, cardInstanceId: bigint, toZone: string, posX?: string, posY?: string) => void;
+  reorderHand: (cardIds: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -538,6 +539,13 @@ export function useGameState(gameId: bigint): GameState {
     [conn, gameId],
   );
 
+  const reorderHand = useCallback(
+    (cardIds: string) => {
+      conn?.reducers.reorderHand({ gameId, cardIds });
+    },
+    [conn, gameId],
+  );
+
   // ---------------------------------------------------------------------------
   // Return
   // ---------------------------------------------------------------------------
@@ -604,6 +612,7 @@ export function useGameState(gameId: bigint): GameState {
     denyZoneSearch,
     completeZoneSearch,
     moveOpponentCard,
+    reorderHand,
   };
 }
 
@@ -623,6 +632,14 @@ function groupCardsByZone(cards: CardInstanceRow[]): Record<string, CardInstance
   // Sort deck cards by zoneIndex to preserve shuffled order
   if (result['deck']) {
     result['deck'].sort((a, b) => {
+      const ai = typeof a.zoneIndex === 'bigint' ? a.zoneIndex : BigInt(a.zoneIndex ?? 0);
+      const bi = typeof b.zoneIndex === 'bigint' ? b.zoneIndex : BigInt(b.zoneIndex ?? 0);
+      return ai < bi ? -1 : ai > bi ? 1 : 0;
+    });
+  }
+  // Sort hand cards by zoneIndex to preserve player-arranged order
+  if (result['hand']) {
+    result['hand'].sort((a, b) => {
       const ai = typeof a.zoneIndex === 'bigint' ? a.zoneIndex : BigInt(a.zoneIndex ?? 0);
       const bi = typeof b.zoneIndex === 'bigint' ? b.zoneIndex : BigInt(b.zoneIndex ?? 0);
       return ai < bi ? -1 : ai > bi ? 1 : 0;

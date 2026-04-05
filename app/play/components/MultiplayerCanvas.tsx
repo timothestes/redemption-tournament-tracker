@@ -1268,8 +1268,39 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
         return;
       }
 
-      // Same non-free-form zone — snap back (no meaningful action)
+      // Same non-free-form zone
       if (isSameZone && !isFreeFormZone(targetZone)) {
+        // Hand: compute drop index and reorder
+        if (targetZone === 'hand' && hit.owner === 'my' && myHandRect) {
+          const handCards = myCards['hand'] ?? [];
+          if (handCards.length > 1) {
+            const positions = calculateHandPositions(
+              handCards.length,
+              myHandRect,
+              cardWidth,
+              cardHeight,
+              isSpreadHand,
+            );
+            let targetIdx = 0;
+            let minDist = Infinity;
+            for (let i = 0; i < positions.length; i++) {
+              const dist = Math.abs(positions[i].x + cardWidth / 2 - centerX);
+              if (dist < minDist) {
+                minDist = dist;
+                targetIdx = i;
+              }
+            }
+            const draggedCardId = card.instanceId;
+            const currentIdx = handCards.findIndex((c) => String(c.id) === draggedCardId);
+            if (currentIdx !== -1 && currentIdx !== targetIdx) {
+              const newOrder = [...handCards];
+              const [dragged] = newOrder.splice(currentIdx, 1);
+              newOrder.splice(targetIdx, 0, dragged);
+              gameState.reorderHand(JSON.stringify(newOrder.map((c) => String(c.id))));
+            }
+          }
+        }
+        // Restore follower visibility
         if (followerOffsets) {
           for (const [id] of followerOffsets) {
             const fNode = cardNodeRefs.current.get(id);

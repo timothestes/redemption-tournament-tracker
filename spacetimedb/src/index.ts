@@ -1286,6 +1286,13 @@ export const move_card = spacetimedb.reducer(
       }
       finalZoneIndex = maxIdx + 1n;
     }
+    if (!zoneIndex && toZone === 'hand') {
+      finalZoneIndex = BigInt(
+        [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+          (c: any) => c.ownerId === newOwnerId && c.zone === 'hand'
+        ).length
+      );
+    }
 
     ctx.db.CardInstance.id.update({
       ...card,
@@ -1357,18 +1364,56 @@ export const move_cards_batch = spacetimedb.reducer(
       const pos = posMap[idStr] || { posX: '', posY: '' };
       // Moving to deck = face-down; leaving deck = face-up; otherwise preserve
       const isFlipped = toZone === 'deck' ? true : (card.zone === 'deck' ? false : card.isFlipped);
+      const cardOwnerId = newOwnerId ?? card.ownerId;
+
+      // For hand zone, assign sequential zoneIndex (count of existing hand cards for this owner)
+      const handZoneIndex = toZone === 'hand' ? BigInt(
+        [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+          (c: any) => c.ownerId === cardOwnerId && c.zone === 'hand'
+        ).length
+      ) : card.zoneIndex;
 
       ctx.db.CardInstance.id.update({
         ...card,
         zone: toZone,
+        zoneIndex: toZone === 'hand' ? handZoneIndex : card.zoneIndex,
         posX: pos.posX,
         posY: pos.posY,
         isFlipped,
-        ownerId: newOwnerId ?? card.ownerId,
+        ownerId: cardOwnerId,
       });
     }
 
     logAction(ctx, gameId, player.id, 'MOVE_CARDS_BATCH', JSON.stringify({ count: ids.length, toZone, cards, redirectedLostSouls }), game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: reorder_hand
+// ---------------------------------------------------------------------------
+export const reorder_hand = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardIds: t.string(), // JSON array of card instance IDs as strings, in desired order
+  },
+  (ctx, { gameId, cardIds }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+
+    const ids: string[] = JSON.parse(cardIds);
+
+    for (let i = 0; i < ids.length; i++) {
+      const cardId = BigInt(ids[i]);
+      const card = ctx.db.CardInstance.id.find(cardId);
+      if (!card) continue;
+      if (card.gameId !== gameId) continue;
+      if (card.ownerId !== player.id) continue; // Only reorder own cards
+      if (card.zone !== 'hand') continue; // Only reorder hand cards
+      ctx.db.CardInstance.id.update({ ...card, zoneIndex: BigInt(i) });
+    }
+
+    logAction(ctx, gameId, player.id, 'REORDER_HAND', JSON.stringify({ count: ids.length }), game.turnNumber, game.currentPhase);
   }
 );
 
