@@ -27,10 +27,18 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
   // Pre-fill game code from ?join=XXXX invite link
   const joinCode = searchParams.get('join')?.toUpperCase().slice(0, 4) ?? '';
 
-  // Auto-select most recent deck (list is sorted by updated_at DESC)
-  const [selectedDeck, setSelectedDeck] = useState<DeckOption | null>(
-    decks.length > 0 ? decks[0] : null
-  );
+  // Auto-select last-played deck (from localStorage), fall back to most recently edited
+  const [selectedDeck, setSelectedDeck] = useState<DeckOption | null>(() => {
+    if (decks.length === 0) return null;
+    if (typeof window !== 'undefined') {
+      const lastPlayedId = localStorage.getItem('lastPlayedDeckId');
+      if (lastPlayedId) {
+        const found = decks.find(d => d.id === lastPlayedId);
+        if (found) return found;
+      }
+    }
+    return decks[0];
+  });
   const [pickerOpen, setPickerOpen] = useState(false);
 
   // Game state
@@ -79,6 +87,7 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
     setError(null);
     try {
       const { deckData } = await loadDeckForGame(selectedDeck.id);
+      localStorage.setItem('lastPlayedDeckId', selectedDeck.id);
       sessionStorage.setItem(
         `stdb_game_params_${code}`,
         JSON.stringify({
@@ -108,6 +117,7 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
     setError(null);
     try {
       const { deckData } = await loadDeckForGame(selectedDeck.id);
+      localStorage.setItem('lastPlayedDeckId', selectedDeck.id);
       const code = Math.random().toString(36).slice(2, 6).toUpperCase();
       sessionStorage.setItem(
         `stdb_game_params_${code}`,
@@ -149,6 +159,7 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
     setError(null);
     try {
       const { deckData } = await loadDeckForGame(selectedDeck.id);
+      localStorage.setItem('lastPlayedDeckId', selectedDeck.id);
       sessionStorage.setItem(
         `stdb_game_params_${code}`,
         JSON.stringify({

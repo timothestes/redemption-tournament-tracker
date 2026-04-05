@@ -14,6 +14,7 @@ export type DeckOption = {
   preview_card_1?: string | null;
   preview_card_2?: string | null;
   paragon?: string | null;
+  last_played_at?: string | null;
 };
 
 interface DeckPickerCardProps {

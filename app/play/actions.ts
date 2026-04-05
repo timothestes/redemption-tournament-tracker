@@ -146,6 +146,14 @@ export async function loadDeckForGame(deckId: string): Promise<LoadDeckResult> {
     }
   }
 
+  // Stamp last_played_at if this is the user's own deck
+  if (ownDeck) {
+    await supabase
+      .from('decks')
+      .update({ last_played_at: new Date().toISOString() })
+      .eq('id', deckId);
+  }
+
   return { deck, deckData };
 }
 
@@ -203,7 +211,7 @@ export async function loadUserDecks(): Promise<DeckOption[]> {
 
   const { data: decks } = await supabase
     .from('decks')
-    .select('id, name, format, card_count, preview_card_1, preview_card_2, paragon')
+    .select('id, name, format, card_count, preview_card_1, preview_card_2, paragon, last_played_at')
     .eq('user_id', user.id)
     .order('updated_at', { ascending: false });
 

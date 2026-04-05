@@ -55,6 +55,7 @@ function DeckPickerContent({
 
   // ── My Decks state ──
   const [mySearch, setMySearch] = useState("");
+  const [mySort, setMySort] = useState<"latest" | "last_played" | "name">("latest");
   const [myPage, setMyPage] = useState(1);
 
   // ── Community state ──
@@ -133,18 +134,30 @@ function DeckPickerContent({
     }
   }, [activeTab, hasSearched, fetchCommunity]);
 
-  // ── My Decks filtering + pagination ──
+  // ── My Decks sorting, filtering + pagination ──
+  const sortedMyDecks = [...myDecks].sort((a, b) => {
+    if (mySort === "last_played") {
+      // Decks with last_played_at first, then by date descending
+      const aTime = a.last_played_at ? new Date(a.last_played_at).getTime() : 0;
+      const bTime = b.last_played_at ? new Date(b.last_played_at).getTime() : 0;
+      return bTime - aTime;
+    }
+    if (mySort === "name") {
+      return a.name.localeCompare(b.name);
+    }
+    return 0; // "latest" — keep server order (updated_at DESC)
+  });
   const filteredMyDecks = mySearch.length > 0
-    ? myDecks.filter((d) => d.name.toLowerCase().includes(mySearch.toLowerCase()))
-    : myDecks;
+    ? sortedMyDecks.filter((d) => d.name.toLowerCase().includes(mySearch.toLowerCase()))
+    : sortedMyDecks;
   const myTotalPages = Math.max(1, Math.ceil(filteredMyDecks.length / MY_DECKS_PAGE_SIZE));
   const myPagedDecks = filteredMyDecks.slice(
     (myPage - 1) * MY_DECKS_PAGE_SIZE,
     myPage * MY_DECKS_PAGE_SIZE
   );
 
-  // Reset my decks page when search changes
-  useEffect(() => { setMyPage(1); }, [mySearch]);
+  // Reset my decks page when search or sort changes
+  useEffect(() => { setMyPage(1); }, [mySearch, mySort]);
 
   // Scroll grid to top on page change
   useEffect(() => {
@@ -199,6 +212,19 @@ function DeckPickerContent({
             className="pl-9 h-9 text-sm focus-visible:ring-0 focus-visible:border-primary"
           />
         </div>
+
+        {/* My Decks sort */}
+        {activeTab === "my" && (
+          <select
+            value={mySort}
+            onChange={(e) => setMySort(e.target.value as any)}
+            className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground"
+          >
+            <option value="latest">Latest</option>
+            <option value="last_played">Last Played</option>
+            <option value="name">Name</option>
+          </select>
+        )}
 
         {/* Community-only filters */}
         {activeTab === "community" && (

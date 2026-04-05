@@ -42,7 +42,7 @@ export default async function PlayPage({ searchParams }: { searchParams: Promise
 
   const { data: decks } = await supabase
     .from('decks')
-    .select('id, name, format, card_count, preview_card_1, preview_card_2, paragon')
+    .select('id, name, format, card_count, preview_card_1, preview_card_2, paragon, last_played_at')
     .eq('user_id', user.id)
     .order('updated_at', { ascending: false });
 

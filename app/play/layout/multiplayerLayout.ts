@@ -410,21 +410,21 @@ export function calculateMultiplayerLayout(
   const playerSidebarY = dividerY + dividerHeight;
   const playerSidebarHeight = playerHandY - playerSidebarY;
 
-  // Opponent piles: reversed order — Discard (top) → Deck → Reserve → Banish → LOR (bottom)
+  // Opponent piles: Deck (top) → Discard → Reserve → Banish → LOR (bottom)
   const oppPileLabels = isParagon
-    ? ['Paragon', 'Discard', 'Deck', 'Reserve', 'Banish', 'Land of Redemption']
-    : ['Discard', 'Deck', 'Reserve', 'Banish', 'Land of Redemption'];
+    ? ['Paragon', 'Deck', 'Discard', 'Reserve', 'Banish', 'Land of Redemption']
+    : ['Deck', 'Discard', 'Reserve', 'Banish', 'Land of Redemption'];
   const oppPileKeys: PileZone[] = isParagon
-    ? ['paragon', 'discard', 'deck', 'reserve', 'banish', 'lor']
-    : ['discard', 'deck', 'reserve', 'banish', 'lor'];
+    ? ['paragon', 'deck', 'discard', 'reserve', 'banish', 'lor']
+    : ['deck', 'discard', 'reserve', 'banish', 'lor'];
 
-  // Player piles: LOR (top) → Banish → Reserve → Deck → Discard (bottom)
+  // Player piles: LOR (top) → Reserve → Banish → Deck → Discard (bottom)
   const playerPileLabels = isParagon
-    ? ['Land of Redemption', 'Banish', 'Reserve', 'Deck', 'Discard', 'Paragon']
-    : ['Land of Redemption', 'Banish', 'Reserve', 'Deck', 'Discard'];
+    ? ['Land of Redemption', 'Reserve', 'Banish', 'Deck', 'Discard', 'Paragon']
+    : ['Land of Redemption', 'Reserve', 'Banish', 'Deck', 'Discard'];
   const playerPileKeys: PileZone[] = isParagon
-    ? ['lor', 'banish', 'reserve', 'deck', 'discard', 'paragon']
-    : ['lor', 'banish', 'reserve', 'deck', 'discard'];
+    ? ['lor', 'reserve', 'banish', 'deck', 'discard', 'paragon']
+    : ['lor', 'reserve', 'banish', 'deck', 'discard'];
 
   const opponentSidebar = buildSidebar(
     sidebarX, oppSidebarY, oppSidebarHeight,

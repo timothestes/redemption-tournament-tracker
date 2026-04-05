@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import type { IconType } from "react-icons";
 import { HiMenu, HiDocumentText, HiArrowSmRight, HiUserAdd, HiShieldCheck, HiGlobeAlt, HiSparkles, HiCalendar, HiCollection } from "react-icons/hi";
 import { GiCrossedSwords } from "react-icons/gi";
 import { IoClose } from "react-icons/io5";
@@ -123,19 +124,21 @@ const TopNav: React.FC = () => {
 
   const isActive = (path: string) => pathname?.startsWith(path);
 
-  const navLinks = [
+  type NavLink = { href: string; label: string; icon: IconType; highlight?: boolean; authRequired?: boolean; isNew?: boolean };
+
+  const navLinks: NavLink[] = [
     { href: "/play", label: "Play", icon: GiCrossedSwords },
     { href: "/register", label: NATIONALS_CONFIG.adminOnly ? `${NATIONALS_CONFIG.displayName} (Admin Only)` : `${NATIONALS_CONFIG.displayName}`, icon: HiUserAdd, highlight: true },
     { href: "/decklist/card-search?new=true", label: "Deck Builder", icon: TbSearch },
     { href: "/spoilers", label: "Spoilers", icon: HiSparkles },
   ];
 
-  const tournamentLinks = [
+  const tournamentLinks: NavLink[] = [
     { href: "/tournaments", label: "Upcoming Events", icon: HiCalendar },
     { href: "/tracker/tournaments", label: "My Tournaments", icon: FaTrophy, authRequired: true },
   ];
 
-  const deckLinks = [
+  const deckLinks: NavLink[] = [
     { href: "/decklist/community", label: "Community Decks", icon: HiGlobeAlt, isNew: true },
     { href: "/decklist/my-decks", label: "My Decks", icon: TbCardsFilled, authRequired: true },
     { href: "/decklist/generate", label: "Deck Check PDF", icon: TbCardsFilled },

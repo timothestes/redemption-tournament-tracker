@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { GameProvider } from '../state/GameContext';
 import { CardPreviewProvider } from '../state/CardPreviewContext';
@@ -99,6 +99,10 @@ function GoldfishGameArea({ deck }: { deck: DeckDataForGoldfish }) {
 }
 
 export default function GoldfishClient({ deck }: GoldfishClientProps) {
+  useEffect(() => {
+    localStorage.setItem('lastPlayedDeckId', deck.id);
+  }, [deck.id]);
+
   return (
     <CardPreviewProvider>
       <GameProvider deck={deck}>
