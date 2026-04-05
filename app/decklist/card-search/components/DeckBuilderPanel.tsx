@@ -367,6 +367,8 @@ export default function DeckBuilderPanel({
       'Pale Green': '#bfdb9e', // pale green color
       'Purple': '#b75ba9',   // custom purple color
       'Gold': '#ffda5b',     // custom gold color
+      'Good Gold': '#ffda5b', // good gold color
+      'Evil Gold': '#ffda5b', // evil gold color
       'White': '#ffffff',    // custom white color
       'Black': '#020406',    // custom black color
       'Brown': '#a97b27',    // custom brown color
