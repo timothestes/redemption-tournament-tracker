@@ -131,9 +131,5 @@ allow cmd + d draw option
 card placement mismatches?
 cards in opponents land of bondage should be draggable
 banished souls in logs show they went to play
-search deck menu: leave open button seems to be broken
 clicking and dragging mutliple cards around doesnt make the bottom ones more visible.
 clicking and dragging multiple cards make the non dragged card invisible
-dragging a card to opponent's discard doesn't make that card get placed on top of the discard pile.
-Sometimes when drawing cards, the cards will go to the middle of the hand, (ie when holding one of your opponent's cards)
-Need to rethink the way cards in hand are ordered.
