@@ -123,8 +123,8 @@ let fan/unfan be a personal global setting
 right click card menu for opponent's revealed cards
 remove battle phase implementation, maybe just put it to part of the territory
 probably improve right click top/bottom/random menu
-audit banish, discard, reserve, deck zones all the same size
-think about positions of ^ zones.
+when revealing cards, reveal them to ALL players
+think about positions of banish, discard, reserve, deck zones.
 have battle zone, remove current battle implementation
 allow cmd + d draw option
 card placement mismatches?
