@@ -131,7 +131,6 @@ export default function PregameScreen({
           <div className="mt-5">
             {isWaiting ? (
               <WaitingActions
-                code={code}
                 goldfishDeck={goldfishDeck}
                 onPractice={onPractice}
                 onUpdateMessage={onUpdateMessage}
@@ -451,100 +450,85 @@ function InlineDie({
 // ---------------------------------------------------------------------------
 
 function WaitingActions({
-  code,
   goldfishDeck,
   onPractice,
   onUpdateMessage,
 }: {
-  code: string;
   goldfishDeck: import('@/app/goldfish/types').DeckDataForGoldfish | null;
   onPractice: () => void;
   onUpdateMessage?: (message: string) => void;
 }) {
   const [message, setMessage] = useState('');
   const [messageSaved, setMessageSaved] = useState(false);
-  const [inviteCopied, setInviteCopied] = useState(false);
+  const [messageExpanded, setMessageExpanded] = useState(false);
+  const [savedMessage, setSavedMessage] = useState('');
 
   function handleSaveMessage() {
     if (!onUpdateMessage) return;
     onUpdateMessage(message);
+    setSavedMessage(message);
     setMessageSaved(true);
+    setMessageExpanded(false);
     setTimeout(() => setMessageSaved(false), 2000);
   }
 
   return (
     <div>
-      {/* Status text */}
-      <p className="text-xs text-amber-200/50 font-cinzel tracking-wide">Waiting for opponent to join...</p>
-      <div className="mt-2 flex justify-center gap-1.5">
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-amber-200/60 [animation-delay:-0.3s]" />
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-amber-200/60 [animation-delay:-0.15s]" />
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-amber-200/60" />
-      </div>
-
-      {/* Lobby message */}
+      {/* Lobby message — pencil icon, expands on click */}
       {onUpdateMessage && (
-        <div className="mt-4">
-          <div className="flex gap-2">
-            <input
-              value={message}
-              onChange={(e) => setMessage(e.target.value.slice(0, 100))}
-              placeholder="Lobby message (optional)"
-              maxLength={100}
-              className="flex-1 rounded-md border border-amber-200/15 bg-black/40 px-3 py-2 text-sm text-amber-200/80 placeholder:text-amber-200/25 focus-visible:outline-none focus-visible:border-amber-200/30"
-            />
-            <button
-              onClick={handleSaveMessage}
-              disabled={messageSaved}
-              className="shrink-0 w-16 rounded-md border border-amber-200/15 px-3 py-2 text-sm text-amber-200/60 hover:bg-amber-200/5 transition-colors disabled:opacity-50"
-            >
-              {messageSaved ? 'Saved' : 'Set'}
-            </button>
-          </div>
+        <div className="mt-2">
+          {messageExpanded ? (
+            <div className="flex gap-2">
+              <input
+                value={message}
+                onChange={(e) => setMessage(e.target.value.slice(0, 100))}
+                placeholder="Lobby message (optional)"
+                maxLength={100}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveMessage();
+                  if (e.key === 'Escape') setMessageExpanded(false);
+                }}
+                className="flex-1 rounded-md border border-amber-200/15 bg-black/40 px-3 py-2 text-sm text-amber-200/80 placeholder:text-amber-200/25 focus-visible:outline-none focus-visible:border-amber-200/30"
+              />
+              <button
+                onClick={handleSaveMessage}
+                className="shrink-0 rounded-md border border-amber-200/15 px-3 py-2 text-sm text-amber-200/60 hover:bg-amber-200/5 transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-2">
+              <button
+                onClick={() => setMessageExpanded(true)}
+                title="Set lobby message"
+                className="flex items-center gap-1.5 text-xs text-amber-200/40 hover:text-amber-200/60 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                </svg>
+                {savedMessage ? (
+                  <span className="max-w-[200px] truncate">{savedMessage}</span>
+                ) : messageSaved ? (
+                  <span className="text-green-400">Saved!</span>
+                ) : (
+                  <span>Set lobby message</span>
+                )}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Invite link */}
-      <div className="mt-4 flex justify-center">
-        <button
-          onClick={() => {
-            const url = typeof window !== 'undefined' ? `${window.location.origin}/play?join=${code}` : code;
-            navigator.clipboard.writeText(url);
-            setInviteCopied(true);
-            setTimeout(() => setInviteCopied(false), 2000);
-          }}
-          title="Copy invite link"
-          className="flex items-center gap-2 px-4 py-2 rounded-md text-sm border border-amber-200/15 bg-black/40 text-amber-200/60 hover:bg-amber-200/5 transition-colors"
-        >
-          {inviteCopied ? (
-            <>
-              <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-              </svg>
-              <span className="text-green-400">Copied!</span>
-            </>
-          ) : (
-            <>
-              <svg className="w-4 h-4 text-amber-200/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
-              </svg>
-              <span>Invite Link</span>
-            </>
-          )}
-        </button>
-      </div>
-
       {/* Practice */}
       {goldfishDeck && (
-        <>
-          <div className="my-4 h-px bg-amber-200/10" />
-          <button
-            onClick={onPractice}
-            className="w-full py-2.5 rounded-lg border border-amber-200/15 hover:bg-amber-200/5 transition-colors font-cinzel tracking-wide text-sm text-amber-200/60"
-          >
-            Practice While You Wait
-          </button>
-        </>
+        <button
+          onClick={onPractice}
+          className="mt-4 w-full py-2.5 rounded-lg border border-amber-200/15 hover:bg-amber-200/5 transition-colors font-cinzel tracking-wide text-sm text-amber-200/60"
+        >
+          Practice While You Wait
+        </button>
       )}
     </div>
   );
