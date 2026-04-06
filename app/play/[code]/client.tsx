@@ -137,43 +137,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const { isLoupeVisible, toggleLoupe, previewCard } = useCardPreview();
   const { isSpreadHand, toggleSpreadHand } = useSpreadHand();
 
-  // Keyboard shortcuts — active only during a live game.
-  // The hook handles D/Cmd+D→draw, S→shuffle, R→dice, H→hand spread,
-  // Tab→loupe, Enter→end turn. e.preventDefault() in the D case also
-  // prevents the browser's default Cmd+D bookmark dialog.
-  const hotkeysActions = useMemo<GameActions>(() => ({
-    drawCard: () => gameState.drawCard(),
-    shuffleDeck: () => gameState.shuffleDeck(),
-    moveCard: () => {},
-    moveCardsBatch: () => {},
-    flipCard: () => {},
-    meekCard: () => {},
-    unmeekCard: () => {},
-    addCounter: () => {},
-    removeCounter: () => {},
-    shuffleCardIntoDeck: () => {},
-    setNote: () => {},
-    exchangeCards: () => {},
-    drawMultiple: () => {},
-    moveCardToTopOfDeck: () => {},
-    moveCardToBottomOfDeck: () => {},
-    randomHandToZone: () => {},
-    reloadDeck: () => {},
-  }), [gameState]);
-
-  useGameHotkeys({
-    actions: hotkeysActions,
-    mode: 'multiplayer',
-    isMyTurn: gameState.isMyTurn,
-    enabled: lifecycle === 'playing',
-    handSize: gameState.myCards['hand']?.length ?? 0,
-    deckSize: gameState.myCards['deck']?.length ?? 0,
-    onRollDice: () => gameState.rollDice(BigInt(20)),
-    onToggleSpreadHand: toggleSpreadHand,
-    onToggleLoupe: toggleLoupe,
-    onAdvancePhase: gameState.endTurn,
-  });
-
   // Phase 1: Subscribe to game table filtered by code so we can discover the
   // numeric gameId. This avoids sequential scans on unfiltered SELECT * queries.
   useEffect(() => {
@@ -225,6 +188,40 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // Must be declared before the reducer effect so isGamesReady is available
   // in the dependency array (which is evaluated during render).
   const gameState = useGameState(gameId ?? BigInt(0));
+
+  // Keyboard shortcuts — active only during a live game.
+  const hotkeysActions = useMemo<GameActions>(() => ({
+    drawCard: () => gameState.drawCard(),
+    shuffleDeck: () => gameState.shuffleDeck(),
+    moveCard: () => {},
+    moveCardsBatch: () => {},
+    flipCard: () => {},
+    meekCard: () => {},
+    unmeekCard: () => {},
+    addCounter: () => {},
+    removeCounter: () => {},
+    shuffleCardIntoDeck: () => {},
+    setNote: () => {},
+    exchangeCards: () => {},
+    drawMultiple: () => {},
+    moveCardToTopOfDeck: () => {},
+    moveCardToBottomOfDeck: () => {},
+    randomHandToZone: () => {},
+    reloadDeck: () => {},
+  }), [gameState]);
+
+  useGameHotkeys({
+    actions: hotkeysActions,
+    mode: 'multiplayer',
+    isMyTurn: gameState.isMyTurn,
+    enabled: lifecycle === 'playing',
+    handSize: gameState.myCards['hand']?.length ?? 0,
+    deckSize: gameState.myCards['deck']?.length ?? 0,
+    onRollDice: () => gameState.rollDice(BigInt(20)),
+    onToggleSpreadHand: toggleSpreadHand,
+    onToggleLoupe: toggleLoupe,
+    onAdvancePhase: gameState.endTurn,
+  });
 
   // Once subscription data is ready, call the appropriate reducer once.
   // Gate on isGamesReady (subscription applied) instead of isConnected (WebSocket open)
