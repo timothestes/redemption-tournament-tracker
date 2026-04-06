@@ -171,20 +171,13 @@ export default function PregameScreen({
 // ---------------------------------------------------------------------------
 
 function GameCodeHeader({ code }: { code: string }) {
-  const [codeCopied, setCodeCopied] = useState(false);
-  const [linkCopied, setLinkCopied] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  const copyCode = () => {
-    navigator.clipboard.writeText(code);
-    setCodeCopied(true);
-    setTimeout(() => setCodeCopied(false), 2000);
-  };
-
-  const copyLink = () => {
+  const copyInviteLink = () => {
     const url = typeof window !== 'undefined' ? `${window.location.origin}/play?join=${code}` : code;
     navigator.clipboard.writeText(url);
-    setLinkCopied(true);
-    setTimeout(() => setLinkCopied(false), 2000);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -192,18 +185,18 @@ function GameCodeHeader({ code }: { code: string }) {
       <p className="text-[10px] uppercase tracking-[0.2em] text-amber-200/50 font-cinzel">Game Code</p>
       <div className="flex items-center justify-center gap-2 mt-1">
         <p
-          onClick={copyLink}
-          title="Tap to copy invite link"
+          onClick={copyInviteLink}
+          title="Copy invite link"
           className="font-mono text-4xl sm:text-5xl font-bold tracking-wider text-amber-200/90 cursor-pointer hover:text-amber-200 transition-colors select-none"
         >
           {code}
         </p>
         <button
-          onClick={copyCode}
-          title="Copy code"
+          onClick={copyInviteLink}
+          title="Copy invite link"
           className="p-1.5 rounded-md text-amber-200/40 hover:text-amber-200/80 transition-colors"
         >
-          {codeCopied ? (
+          {copied ? (
             <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
             </svg>
@@ -215,10 +208,10 @@ function GameCodeHeader({ code }: { code: string }) {
           )}
         </button>
       </div>
-      {linkCopied ? (
+      {copied ? (
         <p className="mt-1 text-[10px] text-green-400 font-cinzel tracking-wide">Invite link copied!</p>
       ) : (
-        <p className="mt-1 text-[10px] text-amber-200/25 font-cinzel tracking-wide">Tap code to copy invite link</p>
+        <p className="mt-1 text-[10px] text-amber-200/25 font-cinzel tracking-wide">Tap to copy invite link</p>
       )}
     </div>
   );
