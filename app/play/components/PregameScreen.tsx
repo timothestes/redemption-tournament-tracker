@@ -215,8 +215,10 @@ function GameCodeHeader({ code }: { code: string }) {
           )}
         </button>
       </div>
-      {linkCopied && (
+      {linkCopied ? (
         <p className="mt-1 text-[10px] text-green-400 font-cinzel tracking-wide">Invite link copied!</p>
+      ) : (
+        <p className="mt-1 text-[10px] text-amber-200/25 font-cinzel tracking-wide">Tap code to copy invite link</p>
       )}
     </div>
   );
@@ -499,13 +501,13 @@ function WaitingActions({
               </button>
             </div>
           ) : (
-            <div className="flex items-center justify-center gap-2">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => setMessageExpanded(true)}
                 title="Set lobby message"
-                className="flex items-center gap-1.5 text-xs text-amber-200/40 hover:text-amber-200/60 transition-colors"
+                className="flex items-center gap-1 text-[10px] text-amber-200/30 hover:text-amber-200/50 transition-colors"
               >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
                 </svg>
                 {savedMessage ? (
