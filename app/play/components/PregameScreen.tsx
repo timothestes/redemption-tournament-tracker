@@ -93,6 +93,19 @@ export default function PregameScreen({
         />
 
         <div className="relative z-10 rounded-xl border border-amber-200/10 bg-black/60 backdrop-blur-sm p-6 sm:p-8 text-center max-w-md w-full mx-4">
+          {/* Back to lobby */}
+          <div className="text-left mb-4">
+            <a
+              href="/play"
+              className="inline-flex items-center gap-1 text-xs text-amber-200/40 hover:text-amber-200/60 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+              </svg>
+              Back to lobby
+            </a>
+          </div>
+
           {/* Game code header — always visible */}
           <GameCodeHeader code={code} />
 
@@ -148,13 +161,6 @@ export default function PregameScreen({
             ) : null}
           </div>
 
-          {/* Back to lobby */}
-          <a
-            href="/play"
-            className="mt-4 inline-block text-xs text-amber-200/25 hover:text-amber-200/50 transition-colors"
-          >
-            Back to lobby
-          </a>
         </div>
       </div>
     </>
