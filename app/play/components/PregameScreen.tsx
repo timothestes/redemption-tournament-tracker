@@ -537,6 +537,66 @@ function WaitingActions({
 }
 
 // ---------------------------------------------------------------------------
+// PregameCeremonyOverlay — floating overlay for rolling/choosing/revealing
+// phases, rendered on top of the game board in client.tsx
+// ---------------------------------------------------------------------------
+
+export function PregameCeremonyOverlay({ gameState }: { gameState: GameState }) {
+  const { game, myPlayer, opponentPlayer } = gameState;
+  if (!game || !myPlayer) return null;
+
+  const phase = game.pregamePhase;
+  const isSeat0 = myPlayer.seat.toString() === '0';
+  const myRoll = isSeat0 ? Number(game.rollResult0) : Number(game.rollResult1);
+  const opponentRoll = isSeat0 ? Number(game.rollResult1) : Number(game.rollResult0);
+  const iWonRoll = myPlayer.seat.toString() === game.rollWinner;
+  const opponentName = opponentPlayer?.displayName || 'Opponent';
+
+  return (
+    <div className="absolute inset-0 z-40 flex items-center justify-center pointer-events-none">
+      <div className="pointer-events-auto rounded-xl border border-amber-200/10 bg-black/80 backdrop-blur-md p-6 sm:p-8 text-center max-w-md w-full mx-4">
+        {/* Player cards with dice */}
+        <PlayerCards
+          isWaiting={false}
+          phase={phase}
+          myDisplayName={myPlayer.displayName}
+          opponentName={opponentName}
+          myReady={isSeat0 ? game.pregameReady0 : game.pregameReady1}
+          opponentReady={isSeat0 ? game.pregameReady1 : game.pregameReady0}
+          hasOpponent={!!opponentPlayer}
+          myRoll={myRoll}
+          opponentRoll={opponentRoll}
+          iWonRoll={iWonRoll}
+          myPlayer={myPlayer}
+          gameState={gameState}
+          showDice={true}
+        />
+
+        {/* Action area */}
+        <div className="mt-5">
+          {phase === 'rolling' || phase === 'choosing' ? (
+            <RollAndChooseArea
+              gameState={gameState}
+              phase={phase}
+              iWonRoll={iWonRoll}
+              opponentName={opponentName}
+              myPlayer={myPlayer}
+            />
+          ) : phase === 'revealing' ? (
+            <RevealArea
+              gameState={gameState}
+              myPlayer={myPlayer}
+              opponentName={opponentName}
+              iWonRoll={iWonRoll}
+            />
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // RollAndChooseArea — winner announcement, choose buttons, timer
 // ---------------------------------------------------------------------------
 

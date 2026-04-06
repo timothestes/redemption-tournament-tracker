@@ -20,7 +20,7 @@ import type { GameActions } from '@/app/shared/types/gameActions';
 import WaitingRoomGoldfish from '../components/WaitingRoomGoldfish';
 import { SpreadHandProvider, useSpreadHand } from '../contexts/SpreadHandContext';
 import { convertToGoldfishDeck, type GameCardData } from '../utils/convertToGoldfishDeck';
-import PregameScreen from '../components/PregameScreen';
+import PregameScreen, { PregameCeremonyOverlay } from '../components/PregameScreen';
 import { DeckPickerModal } from '../components/DeckPickerModal';
 import { getRandomLoadingMessage } from '@/app/shared/constants/loadingMessages';
 import type { DeckOption } from '../components/DeckPickerCard';
@@ -487,7 +487,13 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     );
   }
 
-  if (lifecycle === 'waiting' || lifecycle === 'pregame') {
+  // Determine if we're in a ceremony phase (rolling/choosing/revealing) where
+  // the game board should be visible behind the overlay
+  const pregamePhase = gameState.game?.pregamePhase;
+  const isCeremonyPhase = lifecycle === 'pregame' &&
+    (pregamePhase === 'rolling' || pregamePhase === 'choosing' || pregamePhase === 'revealing');
+
+  if ((lifecycle === 'waiting' || lifecycle === 'pregame') && !isCeremonyPhase) {
     if (isPracticing && goldfishDeck) {
       return (
         <div className="fixed inset-0 bg-background">
@@ -662,6 +668,38 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       )}
     </div>
   );
+
+  // lifecycle === 'pregame' ceremony phases (rolling/choosing/revealing) —
+  // show the game board with the roll/choose overlay on top so players
+  // can see their dealt hand while deciding who goes first.
+  if (isCeremonyPhase) {
+    return (
+      <div style={{ display: 'flex', width: '100vw', height: '100dvh', backgroundImage: 'url(/gameplay/cave_background.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ flexShrink: 0, height: 48 }}>
+            <TurnIndicator
+              game={gameState.game}
+              myPlayer={gameState.myPlayer}
+              opponentPlayer={gameState.opponentPlayer}
+              isMyTurn={false}
+              onSetPhase={() => {}}
+              onEndTurn={() => {}}
+              myScore={gameState.myCards['land-of-redemption']?.length ?? 0}
+              opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}
+            />
+          </div>
+          <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+            {gameId !== null && (
+              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} />
+            )}
+            <PregameCeremonyOverlay gameState={gameState} />
+            <GameToastContainer />
+          </div>
+        </div>
+        {rightPanel}
+      </div>
+    );
+  }
 
   // lifecycle === 'finished' — show canvas (frozen) with GameOverOverlay on top,
   // or render the overlay standalone if canvas data is unavailable.
