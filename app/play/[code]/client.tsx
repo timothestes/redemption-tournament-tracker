@@ -23,6 +23,7 @@ import { convertToGoldfishDeck, type GameCardData } from '../utils/convertToGold
 import PregameScreen, { PregameCeremonyOverlay } from '../components/PregameScreen';
 import { DeckPickerModal } from '../components/DeckPickerModal';
 import { getRandomLoadingMessage } from '@/app/shared/constants/loadingMessages';
+import { ArrowLeft } from 'lucide-react';
 import type { DeckOption } from '../components/DeckPickerCard';
 import { loadUserDecks, loadDeckForGame } from '../actions';
 
@@ -114,7 +115,16 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const router = useRouter();
 
   const [lifecycle, setLifecycle] = useState<LifecycleState>('creating');
-  const loadingMessage = useMemo(() => getRandomLoadingMessage(), []);
+  const [loadingMessage] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = sessionStorage.getItem('stdb_loading_message');
+      if (stored) {
+        sessionStorage.removeItem('stdb_loading_message');
+        return stored;
+      }
+    }
+    return getRandomLoadingMessage();
+  });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isPracticing, setIsPracticing] = useState(false);
   const [playAgainTriggered, setPlayAgainTriggered] = useState(false);
@@ -499,6 +509,13 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         <div className="fixed inset-0 bg-background">
           {/* Floating banner */}
           <div className="fixed top-0 inset-x-0 z-50 h-12 flex items-center justify-between px-4 bg-background/90 backdrop-blur-sm border-b border-border">
+            <button
+              onClick={() => setIsPracticing(false)}
+              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Exit Practice
+            </button>
             <div className="flex items-center gap-3">
               <span className="font-mono text-lg font-bold tracking-wider">{code}</span>
               <span className="text-sm text-muted-foreground">Waiting for opponent</span>
@@ -508,12 +525,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                 ))}
               </span>
             </div>
-            <button
-              onClick={() => setIsPracticing(false)}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Exit Practice
-            </button>
           </div>
           <div className="pt-12">
             <WaitingRoomGoldfish deck={goldfishDeck} />

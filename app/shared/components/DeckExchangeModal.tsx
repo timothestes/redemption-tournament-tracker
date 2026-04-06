@@ -144,23 +144,41 @@ export function DeckExchangeModal({
   // When a drag completes (isDragActive goes true→false), the shared hook
   // already moved the dragged card to the target zone at the drop position.
   // We now send the exchange cards to the deck and complete.
+  // Use refs for callbacks so the effect only re-runs when isDragActive changes,
+  // preventing double-fires from subscription-driven reference changes.
+  const dragCompleteRef = useRef(() => {
+    const draggedId = draggedCardIdRef.current;
+    if (draggedId) {
+      for (const id of exchangeCardIds) {
+        moveCardToTopOfDeck(id);
+      }
+      shuffleDeck();
+      draggedCardIdRef.current = null;
+      onComplete();
+    }
+  });
+  dragCompleteRef.current = () => {
+    const draggedId = draggedCardIdRef.current;
+    if (draggedId) {
+      for (const id of exchangeCardIds) {
+        moveCardToTopOfDeck(id);
+      }
+      shuffleDeck();
+      draggedCardIdRef.current = null;
+      onComplete();
+    }
+  };
+
+  const dragEndTimeRef = useRef(0);
   const prevDragActive = useRef(false);
   useEffect(() => {
     if (prevDragActive.current && !isDragActive) {
-      const draggedId = draggedCardIdRef.current;
-      if (draggedId) {
-        // The dragged card was moved by useModalCardDrag to the drop zone.
-        // Now send the exchange cards to the deck.
-        for (const id of exchangeCardIds) {
-          moveCardToTopOfDeck(id);
-        }
-        shuffleDeck();
-        draggedCardIdRef.current = null;
-        onComplete();
-      }
+      dragEndTimeRef.current = Date.now();
+      dragCompleteRef.current();
+      if (didDragRef) didDragRef.current = false;
     }
     prevDragActive.current = !!isDragActive;
-  }, [isDragActive, exchangeCardIds, moveCardToTopOfDeck, shuffleDeck, onComplete]);
+  }, [isDragActive]);
 
   const handleConfirm = useCallback(() => {
     if (selectedIds.size !== needCount) return;
@@ -192,7 +210,7 @@ export function DeckExchangeModal({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.15 }}
-        onClick={onCancel}
+        onClick={() => { if (!didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) onCancel(); }}
         style={{
           position: 'fixed',
           inset: 0,

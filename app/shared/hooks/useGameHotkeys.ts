@@ -46,7 +46,7 @@ export interface GameHotkeysConfig {
  * Shared keyboard-shortcut hook for goldfish and multiplayer game modes.
  *
  * Keybindings:
- *   D / Ctrl+D / Cmd+D — draw a card (turn-gated in multiplayer)
+ *   D / Ctrl+D / Cmd+D — draw a card (always enabled)
  *   S         — shuffle deck (turn-gated in multiplayer)
  *   R         — roll dice (always enabled)
  *   H         — toggle hand spread
@@ -107,13 +107,11 @@ export function useGameHotkeys(config: GameHotkeysConfig) {
           onToggleLoupe?.();
           break;
 
-        // D — draw card (turn-gated)
+        // D — draw card (not turn-gated; either player can draw any time)
         case 'd':
         case 'D':
           e.preventDefault();
-          if (!canAct) {
-            showGameToast("Wait for your turn");
-          } else if (handSize >= 16) {
+          if (handSize >= 16) {
             showGameToast('Hand is full (max 16 cards)');
           } else if (deckSize === 0) {
             showGameToast('Deck is empty');

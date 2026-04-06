@@ -1941,7 +1941,7 @@ export const move_card_to_top_of_deck = spacetimedb.reducer(
       isFlipped: true,
     });
 
-    logAction(ctx, gameId, player.id, 'MOVE_TO_TOP_OF_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString() }), game.turnNumber, game.currentPhase);
+    logAction(ctx, gameId, player.id, 'MOVE_TO_TOP_OF_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: card.cardName, cardImgFile: card.cardImgFile }), game.turnNumber, game.currentPhase);
   }
 );
 
@@ -1983,7 +1983,7 @@ export const move_card_to_bottom_of_deck = spacetimedb.reducer(
       isFlipped: true,
     });
 
-    logAction(ctx, gameId, player.id, 'MOVE_TO_BOTTOM_OF_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString() }), game.turnNumber, game.currentPhase);
+    logAction(ctx, gameId, player.id, 'MOVE_TO_BOTTOM_OF_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: card.cardName, cardImgFile: card.cardImgFile }), game.turnNumber, game.currentPhase);
   }
 );
 

@@ -99,7 +99,31 @@ We will want to let the host print it out easily
 
 # Backlog
 
+# Podcast
+
+## Implemented features:
+Spotlight Mode
+YTG Add to Cart
+Min Price
+Cube Improvements
+Jayden Mode
+Official Deck Checks
+Spoiler
+Upcoming Tournaments
+Tournament Deck Publishing
+Card-specific rulings
+Card groupings
+AoD calculations
+
+## How can you help?
+- spoilers
+- ruling questions
+- publishing decks
+- reporting bugs
+- suggesting features
+
 ## short term
+add aod button
 
 ## long term
 add maybeboard
@@ -118,11 +142,15 @@ Fallow audit: https://github.com/fallow-rs/fallow
 
 
 # play features
-add on hover feedback for who goes first menu
-right click card menu for opponent's revealed cards
 remove battle phase implementation, maybe just put it to part of the territory
 probably improve right click top/bottom/random menu
 when revealing cards, reveal them to ALL players
-think about positions of banish, discard, reserve, deck zones.
 have battle zone, remove current battle implementation
 card placement mismatches?
+dragging cards from hand to territory looks like its going under the territory
+dragging multiple cards feels laggy.
+cant' drag and select opponent's cards
+move to bottom of deck doesn't show car name
+start of game takes a bit to load
+loading into game shows 2 different loading messages (should only show one)
+dice are friggin jacked up

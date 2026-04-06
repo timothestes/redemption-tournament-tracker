@@ -248,7 +248,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     const urlsToLoad: string[] = [];
 
     for (const card of allCards) {
-      if (card.cardImgFile && !card.isFlipped) {
+      if (card.cardImgFile) {
         const url = getCardImageUrl(card.cardImgFile);
         if (!cache.has(url)) {
           urlsToLoad.push(url);

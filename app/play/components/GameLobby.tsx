@@ -52,7 +52,11 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
 
   // Full-screen loading overlay
   const isNavigating = isCreating || isJoining;
-  const [loadingMessage] = useState(() => getRandomLoadingMessage());
+  const [loadingMessage] = useState(() => {
+    const msg = getRandomLoadingMessage();
+    sessionStorage.setItem('stdb_loading_message', msg);
+    return msg;
+  });
 
   // Show error from redirect (e.g. stale lobby join attempt)
   useEffect(() => {

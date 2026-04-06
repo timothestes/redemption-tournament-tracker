@@ -131,6 +131,22 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       }
     } catch { /* fall through */ }
   }
+  if (actionType === 'MOVE_TO_TOP_OF_DECK' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      if (data.cardName) {
+        return <>moved <HoverableCard name={data.cardName} img={data.cardImgFile} /> to top of deck</>;
+      }
+    } catch { /* fall through */ }
+  }
+  if (actionType === 'MOVE_TO_BOTTOM_OF_DECK' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      if (data.cardName) {
+        return <>moved <HoverableCard name={data.cardName} img={data.cardImgFile} /> to bottom of deck</>;
+      }
+    } catch { /* fall through */ }
+  }
   if (actionType === 'MOVE_CARDS_BATCH' && payload) {
     try {
       const data = JSON.parse(payload);

@@ -214,24 +214,43 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
     ? deckCards.filter(c => matchesSearch(c, search))
     : deckCards;
 
+  // Guard ref to ensure we only shuffle+close once (prevents double-shuffle
+  // from effect re-fires when handleClose's dependencies change).
+  const didCloseRef = useRef(false);
   const handleClose = useCallback(() => {
+    if (didCloseRef.current) return;
+    didCloseRef.current = true;
     if (autoShuffle) {
       shuffleDeck();
     }
     onClose();
   }, [autoShuffle, shuffleDeck, onClose]);
 
-  // Close modal after a successful drag-to-canvas completes (unless "leave open" is on)
+  // Close modal after a successful drag-to-canvas completes (unless "leave open" is on).
+  // Use refs for handleClose/leaveOpen so the effect only re-runs when isDragActive
+  // changes — not when callback references are recreated by subscription updates.
+  const handleCloseRef = useRef(handleClose);
+  handleCloseRef.current = handleClose;
+  const leaveOpenRef = useRef(leaveOpen);
+  leaveOpenRef.current = leaveOpen;
+
+  // Timestamp of last drag end — used by the backdrop click handler as a reliable
+  // guard against the spurious click that fires when mousedown-on-card + mouseup-on-backdrop
+  // occur during a drag gesture. didDragRef alone can race with React's re-render cycle.
+  const dragEndTimeRef = useRef(0);
+
   const prevDragActive = useRef(false);
   useEffect(() => {
     if (prevDragActive.current && !isDragActive) {
+      dragEndTimeRef.current = Date.now();
       setSelectedIds(new Set());
-      if (!leaveOpen) {
-        handleClose();
+      if (!leaveOpenRef.current) {
+        handleCloseRef.current();
       }
+      if (didDragRef) didDragRef.current = false;
     }
     prevDragActive.current = !!isDragActive;
-  }, [isDragActive, handleClose, leaveOpen]);
+  }, [isDragActive]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -390,7 +409,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      onClick={() => handleClose()}
+      onClick={() => { if (!didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) handleClose(); }}
       onContextMenu={(e) => e.preventDefault()}
       style={{
         position: 'fixed',

@@ -303,7 +303,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       ...Object.values(opponentCards).flat(),
     ];
     for (const card of allCards) {
-      if (card.cardImgFile && !card.isFlipped) {
+      if (card.cardImgFile) {
         urls.push(getCardImageUrl(card.cardImgFile));
       }
     }
@@ -1415,6 +1415,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
   const handleCardContextMenu = useCallback(
     (card: GameCard, e: Konva.KonvaEventObject<PointerEvent>) => {
       e.evt.preventDefault();
+      e.cancelBubble = true;
       const stage = stageRef.current;
       if (!stage) return;
       const container = stage.container().getBoundingClientRect();
