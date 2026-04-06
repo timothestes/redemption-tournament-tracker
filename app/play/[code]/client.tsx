@@ -14,6 +14,7 @@ import { CardPreviewProvider, useCardPreview } from '@/app/goldfish/state/CardPr
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import TopNav from '@/components/top-nav';
 import { GameToolbar } from '@/app/shared/components/GameToolbar';
+import { useGameHotkeys } from '@/app/shared/hooks/useGameHotkeys';
 import { GameToastContainer, showGameToast } from '@/app/shared/components/GameToast';
 import type { GameActions } from '@/app/shared/types/gameActions';
 import WaitingRoomGoldfish from '../components/WaitingRoomGoldfish';
@@ -135,6 +136,43 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // Card preview hook — must be called before any early returns (Rules of Hooks)
   const { isLoupeVisible, toggleLoupe, previewCard } = useCardPreview();
   const { isSpreadHand, toggleSpreadHand } = useSpreadHand();
+
+  // Keyboard shortcuts — active only during a live game.
+  // The hook handles D/Cmd+D→draw, S→shuffle, R→dice, H→hand spread,
+  // Tab→loupe, Enter→end turn. e.preventDefault() in the D case also
+  // prevents the browser's default Cmd+D bookmark dialog.
+  const hotkeysActions = useMemo<GameActions>(() => ({
+    drawCard: () => gameState.drawCard(),
+    shuffleDeck: () => gameState.shuffleDeck(),
+    moveCard: () => {},
+    moveCardsBatch: () => {},
+    flipCard: () => {},
+    meekCard: () => {},
+    unmeekCard: () => {},
+    addCounter: () => {},
+    removeCounter: () => {},
+    shuffleCardIntoDeck: () => {},
+    setNote: () => {},
+    exchangeCards: () => {},
+    drawMultiple: () => {},
+    moveCardToTopOfDeck: () => {},
+    moveCardToBottomOfDeck: () => {},
+    randomHandToZone: () => {},
+    reloadDeck: () => {},
+  }), [gameState]);
+
+  useGameHotkeys({
+    actions: hotkeysActions,
+    mode: 'multiplayer',
+    isMyTurn: gameState.isMyTurn,
+    enabled: lifecycle === 'playing',
+    handSize: gameState.myCards['hand']?.length ?? 0,
+    deckSize: gameState.myCards['deck']?.length ?? 0,
+    onRollDice: () => gameState.rollDice(BigInt(20)),
+    onToggleSpreadHand: toggleSpreadHand,
+    onToggleLoupe: toggleLoupe,
+    onAdvancePhase: gameState.endTurn,
+  });
 
   // Phase 1: Subscribe to game table filtered by code so we can discover the
   // numeric gameId. This avoids sequential scans on unfiltered SELECT * queries.

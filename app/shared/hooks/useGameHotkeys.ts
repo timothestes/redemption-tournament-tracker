@@ -46,7 +46,7 @@ export interface GameHotkeysConfig {
  * Shared keyboard-shortcut hook for goldfish and multiplayer game modes.
  *
  * Keybindings:
- *   D         — draw a card (turn-gated in multiplayer)
+ *   D / Ctrl+D / Cmd+D — draw a card (turn-gated in multiplayer)
  *   S         — shuffle deck (turn-gated in multiplayer)
  *   R         — roll dice (always enabled)
  *   H         — toggle hand spread

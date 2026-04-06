@@ -126,5 +126,4 @@ probably improve right click top/bottom/random menu
 when revealing cards, reveal them to ALL players
 think about positions of banish, discard, reserve, deck zones.
 have battle zone, remove current battle implementation
-allow cmd + d draw option
 card placement mismatches?
