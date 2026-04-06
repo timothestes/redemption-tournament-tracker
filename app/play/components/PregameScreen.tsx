@@ -192,7 +192,13 @@ function GameCodeHeader({ code }: { code: string }) {
     <div className="mb-5">
       <p className="text-[10px] uppercase tracking-[0.2em] text-amber-200/50 font-cinzel">Game Code</p>
       <div className="flex items-center justify-center gap-2 mt-1">
-        <p className="font-mono text-4xl sm:text-5xl font-bold tracking-wider text-amber-200/90">{code}</p>
+        <p
+          onClick={copyLink}
+          title="Tap to copy invite link"
+          className="font-mono text-4xl sm:text-5xl font-bold tracking-wider text-amber-200/90 cursor-pointer hover:text-amber-200 transition-colors select-none"
+        >
+          {code}
+        </p>
         <button
           onClick={copyCode}
           title="Copy code"
@@ -209,22 +215,10 @@ function GameCodeHeader({ code }: { code: string }) {
             </svg>
           )}
         </button>
-        <button
-          onClick={copyLink}
-          title="Copy invite link"
-          className="p-1.5 rounded-md text-amber-200/40 hover:text-amber-200/80 transition-colors"
-        >
-          {linkCopied ? (
-            <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-            </svg>
-          ) : (
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
-            </svg>
-          )}
-        </button>
       </div>
+      {linkCopied && (
+        <p className="mt-1 text-[10px] text-green-400 font-cinzel tracking-wide">Invite link copied!</p>
+      )}
     </div>
   );
 }
