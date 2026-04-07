@@ -49,7 +49,6 @@ export interface MultiplayerLayout {
     opponentTerritory: ZoneRect;
     opponentLob: ZoneRect;
     divider: ZoneRect;
-    fieldOfBattle?: ZoneRect;
     playerLob: ZoneRect;
     playerTerritory: ZoneRect;
     playerHand: ZoneRect;
@@ -118,21 +117,6 @@ const STANDARD_PROFILE: LayoutProfile = {
   pileLabelRatio: 0.15,
 };
 // Sum check: 0.08 + 0.2775 + 0.09 + 0.005 + 0.09 + 0.2775 + 0.18 = 1.0 ✓
-
-/** Battle-active layout: territory compresses, field-of-battle zone appears. */
-const NARROW_BATTLE_PROFILE: LayoutProfile = {
-  ...NARROW_PROFILE,
-  oppTerritoryRatio: 0.1825,
-  dividerRatio: 0.20,
-  playerTerritoryRatio: 0.1825,
-};
-
-const STANDARD_BATTLE_PROFILE: LayoutProfile = {
-  ...STANDARD_PROFILE,
-  oppTerritoryRatio: 0.18,
-  dividerRatio: 0.20,
-  playerTerritoryRatio: 0.18,
-};
 
 /** Virtual width breakpoint — below this use Narrow, above use Standard. */
 const BREAKPOINT_WIDTH = 1700;
@@ -293,17 +277,13 @@ function buildSidebar(
  * @param stageWidth   Konva canvas width (loupe is outside)
  * @param stageHeight  Konva canvas height
  * @param isParagon    Whether to include the Paragon zone in each sidebar
- * @param battleActive Whether a battle is in progress (expands divider into Field of Battle)
  */
 export function calculateMultiplayerLayout(
   stageWidth: number,
   stageHeight: number,
   isParagon: boolean = false,
-  battleActive: boolean = false,
 ): MultiplayerLayout {
-  const profile = battleActive
-    ? (stageWidth <= BREAKPOINT_WIDTH ? NARROW_BATTLE_PROFILE : STANDARD_BATTLE_PROFILE)
-    : getProfile(stageWidth);
+  const profile = getProfile(stageWidth);
   const pad = 6;
   const zonePad = 4;
 
@@ -334,8 +314,7 @@ export function calculateMultiplayerLayout(
   // ── Zone rects ───────────────────────────────────────────────────────
   // Hands span full stageWidth; territory/LOB span playAreaWidth.
   // Use tight gap (2px) between territory↔LOB↔hand to minimize dead space.
-  // In battle mode gaps are removed — zones are already compressed by the profile.
-  const gap = battleActive ? 0 : 2;
+  const gap = 2;
 
   const opponentHand: ZoneRect = {
     x: 0,
@@ -368,16 +347,6 @@ export function calculateMultiplayerLayout(
     height: dividerHeight,
     label: '',
   };
-
-  const fieldOfBattle: ZoneRect | undefined = battleActive
-    ? {
-        x: pad,
-        y: dividerY,
-        width: playAreaWidth - pad * 2,
-        height: dividerHeight,
-        label: 'Field of Battle',
-      }
-    : undefined;
 
   const playerTerritory: ZoneRect = {
     x: pad,
@@ -458,7 +427,6 @@ export function calculateMultiplayerLayout(
       opponentTerritory,
       opponentLob,
       divider,
-      fieldOfBattle,
       playerLob,
       playerTerritory,
       playerHand,
