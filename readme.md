@@ -145,7 +145,6 @@ Fallow audit: https://github.com/fallow-rs/fallow
 remove battle phase implementation, maybe just put it to part of the territory
 probably improve right click top/bottom/random menu
 when revealing cards, reveal them to ALL players
-have battle zone, remove current battle implementation
 card placement mismatches?
 dragging cards from hand to territory looks like its going under the territory
 dragging multiple cards feels laggy.
@@ -154,3 +153,7 @@ move to bottom of deck doesn't show car name
 start of game takes a bit to load
 loading into game shows 2 different loading messages (should only show one)
 dice are friggin jacked up
+spectate doesn't work?
+Add "ready" text on lobby underneath player name to balance out
+multiple messages still appear during loading in
+make sure to consistently center things. Unify modals/popups/etc
