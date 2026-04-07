@@ -426,20 +426,33 @@ export async function loadDeckByIdAction(deckId: string) {
       };
     }
 
-    // Load deck cards
-    const { data: cards, error: cardsError } = await supabase
-      .from("deck_cards")
-      .select("*")
-      .eq("deck_id", deckId)
-      .order("card_name");
+    // Load deck cards — paginate past Supabase's default 1000-row limit
+    let cards: any[] = [];
+    {
+      const PAGE_SIZE = 1000;
+      let offset = 0;
+      let hasMore = true;
+      while (hasMore) {
+        const { data: batch, error: batchError } = await supabase
+          .from("deck_cards")
+          .select("*")
+          .eq("deck_id", deckId)
+          .order("card_name")
+          .range(offset, offset + PAGE_SIZE - 1);
 
-    if (cardsError) {
-      console.error("Error loading deck cards:", cardsError);
-      return {
-        success: false,
-        error: "Failed to load deck cards",
-        deck: null,
-      };
+        if (batchError) {
+          console.error("Error loading deck cards:", batchError);
+          return {
+            success: false,
+            error: "Failed to load deck cards",
+            deck: null,
+          };
+        }
+
+        cards = cards.concat(batch || []);
+        hasMore = (batch?.length || 0) === PAGE_SIZE;
+        offset += PAGE_SIZE;
+      }
     }
 
     return {
@@ -963,20 +976,34 @@ export async function loadPublicDeckAction(deckId: string) {
       };
     }
 
-    // Load deck cards
-    const { data: cards, error: cardsError } = await supabase
-      .from("deck_cards")
-      .select("*")
-      .eq("deck_id", deckId)
-      .order("card_name");
+    // Load deck cards — Supabase defaults to 1000 rows max, so we must
+    // paginate to ensure large decks (e.g. cubes with 1700+ entries) are fully loaded.
+    let cards: any[] = [];
+    {
+      const PAGE_SIZE = 1000;
+      let offset = 0;
+      let hasMore = true;
+      while (hasMore) {
+        const { data: batch, error: batchError } = await supabase
+          .from("deck_cards")
+          .select("*")
+          .eq("deck_id", deckId)
+          .order("card_name")
+          .range(offset, offset + PAGE_SIZE - 1);
 
-    if (cardsError) {
-      console.error("Error loading deck cards:", cardsError);
-      return {
-        success: false,
-        error: "Failed to load deck cards",
-        deck: null,
-      };
+        if (batchError) {
+          console.error("Error loading deck cards:", batchError);
+          return {
+            success: false,
+            error: "Failed to load deck cards",
+            deck: null,
+          };
+        }
+
+        cards = cards.concat(batch || []);
+        hasMore = (batch?.length || 0) === PAGE_SIZE;
+        offset += PAGE_SIZE;
+      }
     }
 
     // Fetch username for the deck creator
@@ -1093,17 +1120,30 @@ export async function copyPublicDeckAction(sourceDeckId: string) {
       };
     }
 
-    // Load source deck cards
-    const { data: sourceCards, error: cardsError } = await supabase
-      .from("deck_cards")
-      .select("*")
-      .eq("deck_id", sourceDeckId);
+    // Load source deck cards — paginate past Supabase's default 1000-row limit
+    let sourceCards: any[] = [];
+    {
+      const PAGE_SIZE = 1000;
+      let offset = 0;
+      let hasMore = true;
+      while (hasMore) {
+        const { data: batch, error: batchError } = await supabase
+          .from("deck_cards")
+          .select("*")
+          .eq("deck_id", sourceDeckId)
+          .range(offset, offset + PAGE_SIZE - 1);
 
-    if (cardsError) {
-      return {
-        success: false,
-        error: "Failed to load source deck cards",
-      };
+        if (batchError) {
+          return {
+            success: false,
+            error: "Failed to load source deck cards",
+          };
+        }
+
+        sourceCards = sourceCards.concat(batch || []);
+        hasMore = (batch?.length || 0) === PAGE_SIZE;
+        offset += PAGE_SIZE;
+      }
     }
 
     // Create the copy
