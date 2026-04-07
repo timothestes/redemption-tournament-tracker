@@ -47,12 +47,6 @@ import type { ZoneId } from '@/app/shared/types/gameCard';
 import type { ZoneRect as GoldfishZoneRect } from '@/app/goldfish/layout/zoneLayout';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import DiceOverlay from './DiceOverlay';
-import { BattleZoneLayer } from './BattleZoneLayer';
-import {
-  getCharacterSnapPosition,
-  getEnhancementSnapPosition,
-  absoluteToNormalized,
-} from '../layout/battleZoneSnap';
 import { getCardImageUrl as getSharedCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import { useVirtualCanvas, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen } from '@/app/shared/layout/virtualCanvas';
 import { useCardScale } from '@/app/shared/hooks/useCardScale';
@@ -134,7 +128,7 @@ function pointInRect(px: number, py: number, rect: ZoneRect): boolean {
 
 /** Determine if a zone key is a free-form zone (cards positioned at arbitrary x/y). */
 function isFreeFormZone(zone: string): boolean {
-  return zone === 'territory' || zone === 'field-of-battle';
+  return zone === 'territory';
 }
 
 /** Determine if a zone key is an auto-arrange zone (horizontal strip layout). */
@@ -181,50 +175,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
     zoneSearchRequests,
   } = gameState;
 
-  // ---- Battle phase detection ----
-  const currentPhase = gameState.game?.currentPhase ?? 'draw';
-  const isBattlePhase = currentPhase === 'battle';
-
-  // ---- Auto-return cards from field of battle when exiting battle phase ----
-  const prevBattlePhaseRef = useRef(false);
-  const myCardsRef = useRef(myCards);
-  myCardsRef.current = myCards;
-  const opponentCardsRef = useRef(opponentCards);
-  opponentCardsRef.current = opponentCards;
-  const moveCardRef = useRef(moveCard);
-  moveCardRef.current = moveCard;
-  useEffect(() => {
-    const wasBattle = prevBattlePhaseRef.current;
-    prevBattlePhaseRef.current = isBattlePhase;
-
-    // Only trigger on transition FROM battle to non-battle
-    if (!wasBattle || isBattlePhase) return;
-
-    // Return ALL cards from field of battle to their owner's territory
-    const myBattleCards = myCardsRef.current['field-of-battle'] ?? [];
-    for (let i = 0; i < myBattleCards.length; i++) {
-      const card = myBattleCards[i];
-      const offsetX = 0.35 + i * 0.05;
-      moveCardRef.current(card.id, 'territory', undefined, String(offsetX), '0.05');
-    }
-
-    // Opponent cards go back to opponent's territory (ownerId stays the same)
-    const oppBattleCards = opponentCardsRef.current['field-of-battle'] ?? [];
-    for (let i = 0; i < oppBattleCards.length; i++) {
-      const card = oppBattleCards[i];
-      const offsetX = 0.35 + i * 0.05;
-      moveCardRef.current(card.id, 'territory', undefined, String(offsetX), '0.95');
-    }
-
-    if (myBattleCards.length > 0 || oppBattleCards.length > 0) {
-      showGameToast('Battle ended — cards returned to territory');
-    }
-  }, [isBattlePhase]);
-
   // ---- Layout ----
   const mpLayout = useMemo(
-    () => calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT, false, isBattlePhase),
-    [virtualWidth, isBattlePhase],
+    () => calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT, false),
+    [virtualWidth],
   );
 
   // Card scale preference
@@ -252,7 +206,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       deck: mpLayout.sidebar.player.deck!,
       discard: mpLayout.sidebar.player.discard!,
       ...(mpLayout.sidebar.player.paragon ? { paragon: mpLayout.sidebar.player.paragon } : {}),
-      ...(mpLayout.zones.fieldOfBattle ? { 'field-of-battle': mpLayout.zones.fieldOfBattle } : {}),
     };
   }, [mpLayout]);
 
@@ -267,7 +220,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       deck: mpLayout.sidebar.opponent.deck!,
       discard: mpLayout.sidebar.opponent.discard!,
       ...(mpLayout.sidebar.opponent.paragon ? { paragon: mpLayout.sidebar.opponent.paragon } : {}),
-      ...(mpLayout.zones.fieldOfBattle ? { 'field-of-battle': mpLayout.zones.fieldOfBattle } : {}),
     };
   }, [mpLayout]);
 
@@ -649,16 +601,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       // Check opponent hand zone
       if (opponentHandRect && pointInRect(x, y, opponentHandRect)) {
         return { zone: 'hand', owner: 'opponent' };
-      }
-
-      // Check field of battle zone (shared — determine side by y position)
-      if (mpLayout.zones.fieldOfBattle) {
-        const fob = mpLayout.zones.fieldOfBattle;
-        if (pointInRect(x, y, fob)) {
-          const midY = fob.y + fob.height / 2;
-          const owner = y < midY ? 'opponent' : 'my';
-          return { zone: 'field-of-battle', owner };
-        }
       }
 
       // Check my zones (all: free-form + sidebar piles)
@@ -1235,78 +1177,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
         }
       }
 
-      // Special handling for field-of-battle zone: snap to structured position
-      if (targetZone === 'field-of-battle' && mpLayout.zones.fieldOfBattle) {
-        const fob = mpLayout.zones.fieldOfBattle;
-        const side = hit.owner === 'my' ? 'player' : 'opponent';
-        const existingCards = hit.owner === 'my'
-          ? (myCards['field-of-battle'] ?? [])
-          : (opponentCards['field-of-battle'] ?? []);
-        const isEnhancement = card.type === 'GE' || card.type === 'EE';
-
-        let snapX: number;
-        let snapY: number;
-
-        if (isEnhancement) {
-          // Find the nearest character to the drop point for enhancement targeting
-          const existingChars = existingCards.filter(
-            (c) => c.cardType !== 'GE' && c.cardType !== 'EE'
-          );
-          let nearestCharIdx = 0;
-          if (existingChars.length > 1) {
-            let minDist = Infinity;
-            for (let i = 0; i < existingChars.length; i++) {
-              const charSnap = getCharacterSnapPosition(side, i, fob, cardWidth, cardHeight);
-              const charCenterX = charSnap.x + cardWidth / 2;
-              const dist = Math.abs(centerX - charCenterX);
-              if (dist < minDist) {
-                minDist = dist;
-                nearestCharIdx = i;
-              }
-            }
-          }
-          // Count existing enhancements on this specific character
-          const charSnap = getCharacterSnapPosition(side, nearestCharIdx, fob, cardWidth, cardHeight);
-          const charNorm = absoluteToNormalized(charSnap.x, charSnap.y, fob);
-          const enhOnChar = existingCards.filter((c) => {
-            if (c.cardType !== 'GE' && c.cardType !== 'EE') return false;
-            // Check if this enhancement is near the target character's snap column
-            if (!c.posX) return nearestCharIdx === 0;
-            const enhX = parseFloat(c.posX) * fob.width + fob.x;
-            return Math.abs(enhX - charSnap.x) < cardWidth * 1.5;
-          });
-          const snap = getEnhancementSnapPosition(
-            side, nearestCharIdx, enhOnChar.length, fob, cardWidth, cardHeight
-          );
-          snapX = snap.x;
-          snapY = snap.y;
-        } else {
-          const existingChars = existingCards.filter(
-            (c) => c.cardType !== 'GE' && c.cardType !== 'EE'
-          );
-          const snap = getCharacterSnapPosition(
-            side, existingChars.length, fob, cardWidth, cardHeight
-          );
-          snapX = snap.x;
-          snapY = snap.y;
-        }
-
-        const normalized = absoluteToNormalized(snapX, snapY, fob);
-
-        if (isGroupDrag) {
-          moveCardsBatch(
-            JSON.stringify(cardIds),
-            'field-of-battle',
-            JSON.stringify({ [card.instanceId]: { posX: parseFloat(normalized.posX), posY: parseFloat(normalized.posY) } }),
-            targetOwnerId,
-          );
-          clearSelection();
-        } else {
-          moveCard(cardId, 'field-of-battle', '', normalized.posX, normalized.posY, targetOwnerId);
-        }
-        return;
-      }
-
       if (isGroupDrag) {
         if (targetZone === 'deck') {
           // Show deck drop popup for batch
@@ -1380,9 +1250,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       scale,
       offsetX,
       offsetY,
-      mpLayout,
       myCards,
-      opponentCards,
     ],
   );
 
@@ -1514,24 +1382,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
         const zoneY = zone?.y ?? 0;
         const x = card.posX ? parseFloat(card.posX) * (zone?.width ?? 0) + zoneX : zoneX + 20;
         const y = card.posY ? parseFloat(card.posY) * (zone?.height ?? 0) + zoneY : zoneY + 24;
-        bounds.push({
-          instanceId: String(card.id),
-          x,
-          y,
-          width: cardWidth,
-          height: cardHeight,
-          rotation: 0,
-        });
-      }
-    }
-
-    // My cards in field of battle
-    if (mpLayout?.zones.fieldOfBattle) {
-      const cards = myCards['field-of-battle'] ?? [];
-      const zone = mpLayout.zones.fieldOfBattle;
-      for (const card of cards) {
-        const x = card.posX ? parseFloat(card.posX) * zone.width + zone.x : zone.x;
-        const y = card.posY ? parseFloat(card.posY) * zone.height + zone.y : zone.y;
         bounds.push({
           instanceId: String(card.id),
           x,
@@ -1710,19 +1560,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
           x={offsetX}
           y={offsetY}
         >
-          {/* ================================================================
-              Battle Zone background — rendered when in battle phase
-              ================================================================ */}
-          {mpLayout.zones.fieldOfBattle && (
-            <BattleZoneLayer
-              zone={mpLayout.zones.fieldOfBattle}
-              cardWidth={cardWidth}
-              cardHeight={cardHeight}
-              playerCardCount={(myCards['field-of-battle'] ?? []).length}
-              opponentCardCount={(opponentCards['field-of-battle'] ?? []).length}
-            />
-          )}
-
           {/* ================================================================
               Zone backgrounds — My zones
               ================================================================ */}
@@ -2029,107 +1866,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
               </Group>
             );
           })}
-
-          {/* ================================================================
-              Cards in field of battle — My cards
-              ================================================================ */}
-          {mpLayout.zones.fieldOfBattle && (() => {
-            const cards = myCards['field-of-battle'];
-            if (!cards || cards.length === 0) return null;
-            const zone = mpLayout.zones.fieldOfBattle!;
-            const sorted = [...cards].sort((a, b) => Number(a.zoneIndex) - Number(b.zoneIndex));
-            return (
-              <Group
-                key="my-cards-field-of-battle"
-                clipX={zone.x}
-                clipY={zone.y}
-                clipWidth={zone.width}
-                clipHeight={zone.height}
-              >
-                {sorted.map((card) => {
-                  const gameCard = adaptCard(card, 'player1');
-                  const x = card.posX ? parseFloat(card.posX) * zone.width + zone.x : zone.x + zone.width / 2 - cardWidth / 2;
-                  const y = card.posY ? parseFloat(card.posY) * zone.height + zone.y : zone.y + zone.height * 0.75 - cardHeight / 2;
-                  return (
-                    <GameCardNode
-                      key={String(card.id)}
-                      card={gameCard}
-                      x={x}
-                      y={y}
-                      rotation={0}
-                      cardWidth={cardWidth}
-                      cardHeight={cardHeight}
-                      image={getCardImage(card)}
-                      isSelected={isSelected(String(card.id))}
-                      isDraggable={true}
-                      hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
-                      nodeRef={registerCardNode}
-                      onClick={handleCardClick}
-                      onDragStart={handleCardDragStart}
-                      onDragMove={handleCardDragMove}
-                      onDragEnd={handleCardDragEnd}
-                      onContextMenu={handleCardContextMenu}
-                      onDblClick={handleDblClick}
-                      onMouseEnter={handleMouseEnter}
-                      onMouseLeave={handleMouseLeave}
-                    />
-                  );
-                })}
-              </Group>
-            );
-          })()}
-
-          {/* ================================================================
-              Cards in field of battle — Opponent cards (Y mirrored)
-              ================================================================ */}
-          {mpLayout.zones.fieldOfBattle && (() => {
-            const cards = opponentCards['field-of-battle'];
-            if (!cards || cards.length === 0) return null;
-            const zone = mpLayout.zones.fieldOfBattle!;
-            const sorted = [...cards].sort((a, b) => Number(a.zoneIndex) - Number(b.zoneIndex));
-            return (
-              <Group
-                key="opp-cards-field-of-battle"
-                clipX={zone.x}
-                clipY={zone.y}
-                clipWidth={zone.width}
-                clipHeight={zone.height}
-              >
-                {sorted.map((card) => {
-                  const gameCard = adaptCard(card, 'player2');
-                  // Mirror Y: opponent stored posY relative to their view (bottom=their side),
-                  // but we render their cards in the top half (1 - posY flips it)
-                  const x = card.posX ? parseFloat(card.posX) * zone.width + zone.x : zone.x + zone.width / 2 - cardWidth / 2;
-                  const rawPosY = card.posY ? parseFloat(card.posY) : 0.75;
-                  const y = (1 - rawPosY) * zone.height + zone.y;
-                  return (
-                    <GameCardNode
-                      key={String(card.id)}
-                      card={gameCard}
-                      x={x}
-                      y={y}
-                      rotation={0}
-                      cardWidth={cardWidth}
-                      cardHeight={cardHeight}
-                      image={getCardImage(card)}
-                      isSelected={isSelected(String(card.id))}
-                      isDraggable={true}
-                      hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
-                      nodeRef={registerCardNode}
-                      onClick={handleCardClick}
-                      onDragStart={handleCardDragStart}
-                      onDragMove={handleCardDragMove}
-                      onDragEnd={handleCardDragEnd}
-                      onContextMenu={handleCardContextMenu}
-                      onDblClick={noopDblClick}
-                      onMouseEnter={handleMouseEnter}
-                      onMouseLeave={handleMouseLeave}
-                    />
-                  );
-                })}
-              </Group>
-            );
-          })()}
 
           {/* ================================================================
               Cards in auto-arrange zones — My LOB (draggable, horizontal strip)
