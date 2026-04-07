@@ -185,9 +185,8 @@ function DieDisplay({ roll, dieSize }: { roll: ActiveRoll; dieSize: number }) {
             style={{
               position: 'absolute',
               top: dieSize - 6,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: dieSize + 80,
+              left: 0,
+              width: dieSize,
               textAlign: 'center',
               pointerEvents: 'none',
             }}
@@ -223,6 +222,9 @@ function DieDisplay({ roll, dieSize }: { roll: ActiveRoll; dieSize: number }) {
                 color: roll.isMe ? '#c4955a' : '#4a7ab5',
                 textShadow: '0 1px 6px rgba(0,0,0,0.9)',
                 lineHeight: 1.3,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
               }}
             >
               {roll.rollerName}
@@ -262,6 +264,9 @@ export default function DiceOverlay({
 
   const rollIdRef = useRef(0);
   const prevLastDiceRollRef = useRef<string>(lastDiceRoll || '');
+  // Per-slot timer refs so one player's roll can't cancel the other's dismiss
+  const myTimersRef = useRef<{ interval?: ReturnType<typeof setInterval>; dismiss?: ReturnType<typeof setTimeout> }>({});
+  const oppTimersRef = useRef<{ interval?: ReturnType<typeof setInterval>; dismiss?: ReturnType<typeof setTimeout> }>({});
 
   useEffect(() => {
     if (!lastDiceRoll || lastDiceRoll === '' || lastDiceRoll === prevLastDiceRollRef.current) {
@@ -289,6 +294,11 @@ export default function DiceOverlay({
 
     const id = ++rollIdRef.current;
     const setRoll = isMe ? setMyRoll : setOpponentRoll;
+    const timers = isMe ? myTimersRef : oppTimersRef;
+
+    // Clear only THIS slot's previous timers
+    if (timers.current.interval) clearInterval(timers.current.interval);
+    if (timers.current.dismiss) clearTimeout(timers.current.dismiss);
 
     const newRoll: ActiveRoll = {
       id,
@@ -302,7 +312,7 @@ export default function DiceOverlay({
 
     // Tumble through random faces
     let frame = 0;
-    const interval = setInterval(() => {
+    timers.current.interval = setInterval(() => {
       frame++;
       const dv = frame >= TUMBLE_FRAMES
         ? parsed.result
@@ -316,68 +326,76 @@ export default function DiceOverlay({
         };
       });
       if (frame >= TUMBLE_FRAMES) {
-        clearInterval(interval);
+        clearInterval(timers.current.interval);
       }
     }, TUMBLE_DURATION_MS / TUMBLE_FRAMES);
 
     // Auto-dismiss
-    const dismissTimer = setTimeout(() => {
+    timers.current.dismiss = setTimeout(() => {
       setRoll((prev) => (prev?.id === id ? null : prev));
     }, TUMBLE_DURATION_MS + DISPLAY_DURATION_MS);
-
-    return () => {
-      clearInterval(interval);
-      clearTimeout(dismissTimer);
-    };
   }, [lastDiceRoll, identityHex, myPlayer, opponentPlayer]);
+
+  // Cleanup on unmount only
+  useEffect(() => {
+    return () => {
+      if (myTimersRef.current.interval) clearInterval(myTimersRef.current.interval);
+      if (myTimersRef.current.dismiss) clearTimeout(myTimersRef.current.dismiss);
+      if (oppTimersRef.current.interval) clearInterval(oppTimersRef.current.interval);
+      if (oppTimersRef.current.dismiss) clearTimeout(oppTimersRef.current.dismiss);
+    };
+  }, []);
 
   const dieSize = 96;
 
-  return (
-    <>
-      {/* My roll — bottom-left */}
-      <AnimatePresence>
-        {myRoll && (
-          <motion.div
-            key={`my-${myRoll.id}`}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20, transition: { duration: 0.25 } }}
-            transition={{ duration: 0.15 }}
-            style={{
-              position: 'fixed',
-              bottom: 68,
-              left: 16,
-              zIndex: 500,
-              pointerEvents: 'none',
-            }}
-          >
-            <DieDisplay roll={myRoll} dieSize={dieSize} />
-          </motion.div>
-        )}
-      </AnimatePresence>
+  const hasAny = myRoll || opponentRoll;
 
-      {/* Opponent roll — bottom-right */}
-      <AnimatePresence>
-        {opponentRoll && (
-          <motion.div
-            key={`opp-${opponentRoll.id}`}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20, transition: { duration: 0.25 } }}
-            transition={{ duration: 0.15 }}
-            style={{
-              position: 'fixed',
-              bottom: 68,
-              right: 16,
-              zIndex: 500,
-              pointerEvents: 'none',
-            }}
-          >
-            <DieDisplay roll={opponentRoll} dieSize={dieSize} />
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </>
+  return (
+    <AnimatePresence>
+      {hasAny && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0, transition: { duration: 0.25 } }}
+          style={{
+            position: 'fixed',
+            bottom: 68,
+            left: 16,
+            zIndex: 500,
+            pointerEvents: 'none',
+            display: 'flex',
+            gap: 12,
+            alignItems: 'flex-end',
+          }}
+        >
+          <AnimatePresence>
+            {myRoll && (
+              <motion.div
+                key="my"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20, transition: { duration: 0.25 } }}
+                transition={{ duration: 0.15 }}
+              >
+                <DieDisplay roll={myRoll} dieSize={dieSize} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+          <AnimatePresence>
+            {opponentRoll && (
+              <motion.div
+                key="opp"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20, transition: { duration: 0.25 } }}
+                transition={{ duration: 0.15 }}
+              >
+                <DieDisplay roll={opponentRoll} dieSize={dieSize} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
