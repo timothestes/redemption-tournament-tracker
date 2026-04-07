@@ -14,7 +14,7 @@ export default async function Layout({
           {/* Content container with improved background and styling for better readability */}
           <div className="z-10 bg-card p-10 rounded-lg shadow-lg max-w-md w-full
                           border border-border
-                          dark:shadow-black/20 shadow-gray-300/50">
+                          dark:shadow-black/20 [.jayden_&]:shadow-black/20 shadow-gray-300/50">
             {children}
           </div>
         </div>
