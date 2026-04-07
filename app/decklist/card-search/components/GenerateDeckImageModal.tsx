@@ -118,7 +118,7 @@ export default function GenerateDeckImageModal({ deck, onClose, isLegal }: Gener
                 <select
                   value={nCardColumns}
                   onChange={(e) => setNCardColumns(parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm"
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-card text-sm"
                 >
                   <option value={6}>6 columns</option>
                   <option value={8}>8 columns</option>

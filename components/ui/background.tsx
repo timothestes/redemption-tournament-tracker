@@ -38,12 +38,12 @@ const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
       {/* Different background styling based on theme */}
       <div className="fixed inset-0 overflow-hidden">
         {/* Base background color */}
-        <div className={`absolute inset-0 ${isJaydenTheme ? 'bg-[hsl(270,20%,4%)]' : 'bg-white dark:bg-gray-900'}`}></div>
+        <div className={`absolute inset-0 bg-background`}></div>
 
       {/* Hero image container */}
       <div className="fixed inset-x-0 top-14 bottom-0 overflow-hidden">
         {/* Base background color */}
-        <div className="absolute inset-0 bg-white dark:bg-gray-900" />
+        <div className="absolute inset-0 bg-background" />
 
         {/* Hero image */}
         <Image
@@ -51,7 +51,7 @@ const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
           alt=""
           fill
           sizes="100vw"
-          className={`object-cover object-top ${isLightTheme ? 'opacity-10' : isJaydenTheme ? 'opacity-50' : 'opacity-75'}`}
+          className={`object-cover object-top ${isLightTheme ? 'opacity-10' : isJaydenTheme ? 'opacity-40' : 'opacity-75'}`}
           style={{
             filter: isLightTheme
               ? 'brightness(1.8) contrast(0.7) saturate(0.3) blur(1.5px)'
@@ -67,6 +67,11 @@ const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
           className={`absolute inset-0 ${isLightTheme ? 'bg-white/50 mix-blend-overlay' : !isJaydenTheme ? 'bg-black/40' : ''}`}
           style={isJaydenTheme ? { background: 'linear-gradient(135deg, hsla(0, 90%, 30%, 0.7) 0%, hsla(330, 85%, 35%, 0.55) 35%, hsla(270, 70%, 30%, 0.45) 60%, hsla(230, 85%, 35%, 0.7) 100%)' } : undefined}
         ></div>
+
+        {/* Top vignette (darkens the bright top edge in Jayden mode) */}
+        {isJaydenTheme && (
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, hsl(270, 20%, 4%) 0%, hsla(270, 20%, 4%, 0.7) 15%, transparent 45%)' }}></div>
+        )}
 
         {/* Bottom vignette */}
         <div className={`absolute inset-0 bg-gradient-to-t ${isJaydenTheme ? 'from-[hsl(230,40%,5%)]/60' : 'from-gray-300/10 dark:from-black/40'} via-transparent to-transparent`}></div>

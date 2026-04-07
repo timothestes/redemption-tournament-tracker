@@ -115,16 +115,17 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const router = useRouter();
 
   const [lifecycle, setLifecycle] = useState<LifecycleState>('creating');
-  const [loadingMessage] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const stored = sessionStorage.getItem('stdb_loading_message');
-      if (stored) {
-        sessionStorage.removeItem('stdb_loading_message');
-        return stored;
-      }
+  const [loadingMessage, setLoadingMessage] = useState('Loading...');
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem('stdb_loading_message');
+    if (stored) {
+      sessionStorage.removeItem('stdb_loading_message');
+      setLoadingMessage(stored);
+    } else {
+      setLoadingMessage(getRandomLoadingMessage());
     }
-    return getRandomLoadingMessage();
-  });
+  }, []);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isPracticing, setIsPracticing] = useState(false);
   const [playAgainTriggered, setPlayAgainTriggered] = useState(false);

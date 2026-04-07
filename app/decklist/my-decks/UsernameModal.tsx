@@ -103,13 +103,13 @@ export default function UsernameModal({ onSuccess, onClose }: UsernameModalProps
               name="deck-display-alias"
               autoComplete="one-time-code"
               maxLength={24}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             />
             <div className="flex items-center justify-between mt-1">
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-xs text-muted-foreground">
                 Letters, numbers, underscores, and hyphens
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-xs text-muted-foreground">
                 {trimmed.length}/24
               </p>
             </div>
@@ -137,11 +137,11 @@ export default function UsernameModal({ onSuccess, onClose }: UsernameModalProps
             )}
           </div>
 
-          <DialogFooter className="bg-gray-50 dark:bg-gray-900/50 justify-end">
+          <DialogFooter className="bg-muted/50 justify-end">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              className="px-4 py-2 text-sm font-medium text-muted-foreground bg-card border border-border rounded-lg hover:bg-muted transition-colors"
             >
               Cancel
             </button>

@@ -3,7 +3,7 @@ export const LOADING_MESSAGES = [
   'Dusting off the Scrolls...',
   'Consulting the Divine Council...',
   'Gathering Lost Souls...',
-  'Sanhedrin voting...',
+  'Waiting for the Sanhedrin the vote...',
   'Council of Jerusalem debating...',
   'Parting the Red Sea...',
   "Waiting on Balaam's donkey to move...",
@@ -41,6 +41,18 @@ export const LOADING_MESSAGES = [
   'Sewing fig leaves together...',
   'Sending out the dove...',
   'Melting down the golden calf...',
+  'Hunting down the Anakim...',
+  'Chasing an Ethiopian chariot...',
+  'Cleaning up after the 10 plagues...',
+  'Transcribing the 10 commandments...',
+  'Running after Joab...',
+  'Pursuing the Amalekites...',
+  'Composing a Psalm (Selah)',
+  "Clearing out Herod's Temple...",
+  'Praying for you :)',
+  'Building the next 100 card monstrosity...',
+  'Listening to a Threshing Floor podcast...',
+  'Monkeying around...',
 ];
 
 export function getRandomLoadingMessage(): string {
