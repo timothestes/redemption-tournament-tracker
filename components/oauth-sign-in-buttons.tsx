@@ -23,7 +23,7 @@ export function OAuthSignInButtons({ redirectTo }: { redirectTo?: string }) {
       <button
         type="button"
         onClick={() => signInWithProvider("google", redirectTo)}
-        className="w-full flex items-center justify-center gap-3 h-11 px-4 rounded-md border border-border bg-background hover:bg-muted text-foreground font-medium text-sm transition-colors"
+        className="w-full flex items-center justify-center gap-3 h-11 px-4 rounded-md border border-border bg-background [.jayden_&]:bg-muted hover:bg-muted [.jayden_&]:hover:bg-muted/80 text-foreground font-medium text-sm transition-colors"
       >
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
           <path
@@ -49,7 +49,7 @@ export function OAuthSignInButtons({ redirectTo }: { redirectTo?: string }) {
       <button
         type="button"
         onClick={() => signInWithProvider("discord", redirectTo)}
-        className="w-full flex items-center justify-center gap-3 h-11 px-4 rounded-md border border-border bg-background hover:bg-muted text-foreground font-medium text-sm transition-colors"
+        className="w-full flex items-center justify-center gap-3 h-11 px-4 rounded-md border border-border bg-background [.jayden_&]:bg-muted hover:bg-muted [.jayden_&]:hover:bg-muted/80 text-foreground font-medium text-sm transition-colors"
       >
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
           <path
