@@ -5,6 +5,7 @@ import { DeckPickerModal } from './DeckPickerModal';
 import type { DeckOption } from './DeckPickerCard';
 import { loadUserDecks, loadDeckForGame } from '../actions';
 import type { GameState } from '../hooks/useGameState';
+import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -61,6 +62,7 @@ export default function GameOverOverlay({
   playAgainTriggered,
   onPlayAgainHandled,
 }: GameOverOverlayProps) {
+  const { isLoupeVisible } = useCardPreview();
   const { label, winnerName } = deriveEndReason(gameActions, myPlayer);
   const oppName: string = opponentPlayer?.displayName ?? 'Opponent';
   const mySeat = myPlayer?.seat?.toString() ?? '0';
@@ -145,6 +147,7 @@ export default function GameOverOverlay({
           style={{
             position: 'fixed',
             inset: 0,
+            right: isLoupeVisible ? 'clamp(280px, 20vw, 380px)' : '36px',
             zIndex: 900,
             display: 'flex',
             alignItems: 'center',
@@ -343,7 +346,7 @@ export default function GameOverOverlay({
 
       {/* Deck picker — renders above everything */}
       {pickerOpen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 950 }}>
+        <div style={{ position: 'fixed', inset: 0, right: isLoupeVisible ? 'clamp(280px, 20vw, 380px)' : '36px', zIndex: 950 }}>
           <DeckPickerModal
             open={pickerOpen}
             onOpenChange={setPickerOpen}

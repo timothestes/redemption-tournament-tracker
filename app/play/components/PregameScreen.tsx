@@ -296,6 +296,9 @@ function PlayerCards({
         {/* My card */}
         <div className="rounded-lg border border-[#c4955a]/30 bg-black/40 p-3 text-left">
           <p className="text-xs font-cinzel text-[#c4955a] truncate">{myDisplayName}</p>
+          {isWaiting && (
+            <p className="text-[10px] text-[#c4955a]/50 mt-1 font-cinzel tracking-wide">Ready</p>
+          )}
           {isDeckSelect && (
             <p className="text-[10px] text-amber-200/40 mt-0.5 truncate">
               {myPlayer?.deckId ? (myDeckName || 'Deck selected') : 'No deck'}

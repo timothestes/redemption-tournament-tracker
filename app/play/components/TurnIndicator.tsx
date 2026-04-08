@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { PHASE_ORDER } from '@/app/goldfish/types';
+import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import type { GamePhase } from '@/app/shared/types/gameCard';
 
 // ---------------------------------------------------------------------------
@@ -59,6 +60,7 @@ export default function TurnIndicator({
 }: TurnIndicatorProps) {
   const [showConcedeConfirm, setShowConcedeConfirm] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const { isLoupeVisible } = useCardPreview();
   const currentPhase: string = game?.currentPhase ?? 'draw';
   const turnNumber: number = game?.turnNumber ? Number(game.turnNumber) : 1;
   const currentIdx = PHASE_ORDER.indexOf(currentPhase as GamePhase);
@@ -418,7 +420,10 @@ export default function TurnIndicator({
           onClick={() => setShowConcedeConfirm(false)}
           style={{
             position: 'fixed',
-            inset: 0,
+            top: 0,
+            left: 0,
+            bottom: 0,
+            right: isLoupeVisible ? 'clamp(280px, 20vw, 380px)' : '36px',
             zIndex: 900,
             display: 'flex',
             alignItems: 'center',
@@ -515,7 +520,10 @@ export default function TurnIndicator({
           onClick={() => setShowLeaveConfirm(false)}
           style={{
             position: 'fixed',
-            inset: 0,
+            top: 0,
+            left: 0,
+            bottom: 0,
+            right: isLoupeVisible ? 'clamp(280px, 20vw, 380px)' : '36px',
             zIndex: 900,
             display: 'flex',
             alignItems: 'center',

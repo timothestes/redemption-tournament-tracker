@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Stage, Layer, Rect, Text, Group, Circle } from 'react-konva';
 import type Konva from 'konva';
+import KonvaLib from 'konva';
+
 import { useGameState } from '../hooks/useGameState';
 import { useSpreadHand } from '../contexts/SpreadHandContext';
 import { useMultiplayerImagePreloader } from '../hooks/useMultiplayerImagePreloader';
@@ -567,7 +569,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
   const dragEndTimeRef = useRef<number>(0);
   const dragSourceZoneRef = useRef<string | null>(null);
   const dragOriginalPosRef = useRef<{ x: number; y: number } | null>(null);
-  const dragOriginalParentRef = useRef<Konva.Container | null>(null);
   const [dragHoverZone, setDragHoverZone] = useState<DropZoneKey | null>(null);
   const dragHoverZoneRef = useRef<DropZoneKey | null>(null);
 
@@ -583,6 +584,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
 
   // Multi-card drag: offsets of follower cards relative to the dragged card
   const dragFollowerOffsets = useRef<Map<string, { dx: number; dy: number }> | null>(null);
+  // Ghost image for multi-card drag — a single rasterized snapshot of all followers
+  const dragGhostRef = useRef<Konva.Image | null>(null);
+  const dragGhostLayerRef = useRef<Konva.Layer | null>(null);
+  const dragGhostOffsetRef = useRef<{ dx: number; dy: number } | null>(null);
 
   // ---- Zone hit-testing ----
   /**
@@ -830,11 +835,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
     try { return JSON.parse(raw) as string[]; } catch { return []; }
   }, [gameState.opponentPlayer?.revealedCards]);
 
-  // Snapshot revealed card IDs when they arrive — persist until opponent dismisses
+  // Snapshot revealed card IDs when they arrive — persist until opponent dismisses or clears
   useEffect(() => {
     if (opponentRevealedCardIds.length > 0) {
       setOpponentRevealSnapshot(opponentRevealedCardIds);
       setOpponentRevealDismissed(false);
+    } else if (opponentRevealSnapshot.length > 0) {
+      setOpponentRevealSnapshot([]);
+      setOpponentRevealDismissed(true);
     }
   }, [opponentRevealedCardIds]);
 
@@ -868,17 +876,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       const node = cardNodeRefs.current.get(card.instanceId);
       if (node) {
         dragOriginalPosRef.current = { x: node.x(), y: node.y() };
-
-        // Move the card node to the layer root so it escapes any clip groups
-        // and renders on top of all other zones during the drag.
-        const layer = node.getLayer();
-        if (layer && node.parent !== layer) {
-          dragOriginalParentRef.current = node.parent as Konva.Container;
-          node.moveTo(layer);
-          node.moveToTop();
-        } else {
-          dragOriginalParentRef.current = null;
-        }
       }
 
       // Clear hover state
@@ -888,42 +885,97 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       if (hoverTimerRef.current) { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = null; }
       stopHoverAnimation();
 
-      // Multi-card drag: record offsets so followers move with the dragged card
+      // Multi-card drag: rasterize followers into a single ghost image
       if (selectedIds.has(card.instanceId) && selectedIds.size > 1) {
         const dragNode = cardNodeRefs.current.get(card.instanceId);
         if (dragNode) {
           const offsets = new Map<string, { dx: number; dy: number }>();
           const baseX = dragNode.x();
           const baseY = dragNode.y();
+
+          const followers: { id: string; node: Konva.Group; dx: number; dy: number }[] = [];
           for (const id of selectedIds) {
             if (id === card.instanceId) continue;
-            const fNode = cardNodeRefs.current.get(id);
-            if (fNode) {
-              offsets.set(id, { dx: fNode.x() - baseX, dy: fNode.y() - baseY });
+            const node = cardNodeRefs.current.get(id);
+            if (node) {
+              const dx = node.x() - baseX;
+              const dy = node.y() - baseY;
+              offsets.set(id, { dx, dy });
+              followers.push({ id, node, dx, dy });
             }
           }
           dragFollowerOffsets.current = offsets;
+
+          if (followers.length > 0) {
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            for (const f of followers) {
+              minX = Math.min(minX, f.dx);
+              minY = Math.min(minY, f.dy);
+              maxX = Math.max(maxX, f.dx + cardWidth);
+              maxY = Math.max(maxY, f.dy + cardHeight);
+            }
+            const ghostW = maxX - minX;
+            const ghostH = maxY - minY;
+
+            const offscreen = document.createElement('canvas');
+            offscreen.width = ghostW * 2;
+            offscreen.height = ghostH * 2;
+            const ctx = offscreen.getContext('2d');
+            if (ctx) {
+              ctx.scale(2, 2);
+              ctx.globalAlpha = 0.5;
+              for (const f of followers) {
+                // Don't pass x/y — let Konva use getClientRect() defaults
+                // so the card renders correctly regardless of its absolute position
+                const cardCanvas = f.node.toCanvas({ pixelRatio: 1 });
+                ctx.drawImage(cardCanvas, f.dx - minX, f.dy - minY, cardWidth, cardHeight);
+              }
+
+              const ghostImage = new KonvaLib.Image({
+                image: offscreen,
+                x: baseX + minX,
+                y: baseY + minY,
+                width: ghostW,
+                height: ghostH,
+                listening: false,
+                opacity: 1,
+              }) as Konva.Image;
+
+              const stage = stageRef.current;
+              if (stage) {
+                let ghostLayer = dragGhostLayerRef.current;
+                if (!ghostLayer) {
+                  ghostLayer = new KonvaLib.Layer({ listening: false }) as Konva.Layer;
+                  dragGhostLayerRef.current = ghostLayer;
+                  stage.add(ghostLayer);
+                }
+                ghostLayer.scaleX(scale);
+                ghostLayer.scaleY(scale);
+                ghostLayer.x(offsetX);
+                ghostLayer.y(offsetY);
+                ghostLayer.add(ghostImage);
+                ghostLayer.moveToTop();
+                ghostLayer.batchDraw();
+                dragGhostRef.current = ghostImage;
+              }
+
+              for (const f of followers) {
+                f.node.visible(false);
+              }
+              dragNode.getLayer()?.batchDraw();
+            }
+          }
         }
       } else {
         dragFollowerOffsets.current = null;
       }
     },
-    [selectedIds, stopHoverAnimation],
+    [selectedIds, stopHoverAnimation, cardWidth, cardHeight, scale, offsetX, offsetY],
   );
 
   const handleCardDragMove = useCallback(
     (e: Konva.KonvaEventObject<DragEvent>) => {
       const node = e.target;
-
-      // Keep the dragged card at the Layer root so it renders above all
-      // zone clip-groups (territory, LOB, etc.). React re-renders (e.g.
-      // from zone-highlight state changes) can reconcile the node back
-      // into its original parent group, which resets z-ordering.
-      const layer = node.getLayer();
-      if (layer && node.parent !== layer) {
-        node.moveTo(layer);
-        node.moveToTop();
-      }
 
       // Clamp card position to virtual canvas bounds
       const clampedX = Math.max(-cardWidth / 2, Math.min(node.x(), virtualWidth - cardWidth / 2));
@@ -950,16 +1002,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
         setDragHoverZone(zoneKey);
       }
 
-      // Move follower cards for multi-card drag
-      const followerOffsets = dragFollowerOffsets.current;
-      if (followerOffsets) {
-        for (const [id, offset] of followerOffsets) {
-          const fNode = cardNodeRefs.current.get(id);
-          if (fNode) {
-            fNode.x(x + offset.dx);
-            fNode.y(y + offset.dy);
-          }
+      // Multi-card drag: move the single ghost image
+      const ghost = dragGhostRef.current;
+      if (ghost) {
+        if (!dragGhostOffsetRef.current) {
+          dragGhostOffsetRef.current = {
+            dx: ghost.x() - x,
+            dy: ghost.y() - y,
+          };
         }
+        ghost.x(x + dragGhostOffsetRef.current.dx);
+        ghost.y(y + dragGhostOffsetRef.current.dy);
+        dragGhostLayerRef.current?.batchDraw();
       }
     },
     [findZoneAtPosition, cardWidth, cardHeight],
@@ -970,17 +1024,29 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       const followerOffsets = dragFollowerOffsets.current;
       const originalPos = dragOriginalPosRef.current;
       const sourceZone = dragSourceZoneRef.current;
-      const originalParent = dragOriginalParentRef.current;
 
       // Reset drag state
       isDraggingRef.current = false;
       dragEndTimeRef.current = performance.now();
       dragSourceZoneRef.current = null;
       dragOriginalPosRef.current = null;
-      dragOriginalParentRef.current = null;
       dragHoverZoneRef.current = null;
       dragFollowerOffsets.current = null;
+      dragGhostOffsetRef.current = null;
       setDragHoverZone(null);
+
+      // Clean up ghost image and restore follower visibility
+      if (dragGhostRef.current) {
+        dragGhostRef.current.destroy();
+        dragGhostRef.current = null;
+        dragGhostLayerRef.current?.batchDraw();
+      }
+      if (followerOffsets) {
+        for (const [id] of followerOffsets) {
+          const fNode = cardNodeRefs.current.get(id);
+          if (fNode) fNode.visible(true);
+        }
+      }
 
       const node = e.target;
       const dropX = node.x();
@@ -996,14 +1062,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       const isGroupDrag = selectedIds.has(card.instanceId) && selectedIds.size > 1;
       const cardIds = isGroupDrag ? Array.from(selectedIds) : [card.instanceId];
       const cardId = BigInt(card.instanceId);
-
-      // Restore the dragged node to its original parent (clip group) so that
-      // react-konva reconciliation doesn't create an orphaned duplicate.
-      // This must happen after reading dropX/dropY but before any state updates
-      // that would trigger a re-render.
-      if (originalParent && node.parent !== originalParent) {
-        node.moveTo(originalParent);
-      }
 
       // Helper to snap back to original position
       const snapBack = () => {
@@ -1060,7 +1118,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       // player territory cards render with rotation=0 (anchor at top-left).
       // When crossing between them, offset by card dimensions so the visual
       // position stays consistent.
-      const sourceIsRotated = sourceOwner === 'opponent' && (isFreeFormZone(sourceZone ?? '') || SIDEBAR_PILE_ZONES.includes(sourceZone as any));
+      const sourceIsRotated = sourceOwner === 'opponent' && (isFreeFormZone(sourceZone ?? '') || isAutoArrangeZone(sourceZone ?? '') || SIDEBAR_PILE_ZONES.includes(sourceZone as any));
       const targetIsRotated = isOpponentTarget && isFreeFormZone(targetZone);
       let adjDropX = dropX;
       let adjDropY = dropY;
@@ -3136,13 +3194,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
         )}
       </ModalGameProvider>
 
-      {/* Opponent's server-revealed cards — shown from snapshot so it persists even after revealer closes their peek */}
+      {/* Opponent's server-revealed cards — shown from snapshot so it persists even after revealer closes their reveal */}
       {opponentRevealSnapshot.length > 0 && !opponentRevealDismissed && (
         <ModalGameProvider value={opponentModalGameValue}>
           <DeckPeekModal
             cardIds={opponentRevealSnapshot}
             title={`${gameState.opponentPlayer?.displayName ?? 'Opponent'} Revealed ${opponentRevealSnapshot.length}`}
-            onClose={() => setOpponentRevealDismissed(true)}
+            onClose={opponentRevealedCardIds.length > 0 ? undefined : () => setOpponentRevealDismissed(true)}
             onStartDrag={modalStartDrag}
             onStartMultiDrag={modalStartMultiDrag}
             didDragRef={modalDidDragRef}

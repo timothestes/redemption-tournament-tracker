@@ -217,9 +217,8 @@ export function DeckExchangeModal({
           right: isLoupeVisible ? 'clamp(280px, 20vw, 380px)' : '36px',
           background: 'rgba(0,0,0,0.6)',
           display: 'flex',
-          alignItems: 'flex-start',
+          alignItems: 'center',
           justifyContent: 'center',
-          paddingTop: '5vh',
           zIndex: 500,
         }}
       >

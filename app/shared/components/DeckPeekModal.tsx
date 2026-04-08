@@ -2,12 +2,76 @@
 
 import { motion } from 'framer-motion';
 import { useModalGame } from '@/app/shared/contexts/ModalGameContext';
-import { GameCard } from '@/app/shared/types/gameCard';
+import { GameCard, ZoneId } from '@/app/shared/types/gameCard';
 import { X, ArrowUp, ArrowDown, Shuffle } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './ModalCardHoverPreview';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
+
+const MOVE_ZONES: { id: ZoneId; label: string }[] = [
+  { id: 'hand', label: 'Hand' },
+  { id: 'territory', label: 'Territory' },
+  { id: 'discard', label: 'Discard' },
+  { id: 'reserve', label: 'Reserve' },
+];
+
+function PeekCardContextPopup({
+  card, count, x, y, onClose, onMove, onMoveToTop, onMoveToBottom, onShuffleIn,
+}: {
+  card: GameCard; count?: number; x: number; y: number;
+  onClose: () => void; onMove: (zone: ZoneId) => void;
+  onMoveToTop: () => void; onMoveToBottom: () => void; onShuffleIn: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [onClose]);
+
+  const itemStyle: React.CSSProperties = {
+    display: 'block', width: '100%', padding: '5px 12px', background: 'transparent',
+    border: 'none', cursor: 'pointer', color: 'var(--gf-text)', fontSize: 11,
+    textAlign: 'left', fontFamily: 'var(--font-cinzel), Georgia, serif',
+  };
+  const label = count && count > 1 ? `Move ${count} cards to...` : 'Move to...';
+
+  return (
+    <div ref={ref} onClick={(e) => e.stopPropagation()} style={{
+      position: 'fixed', left: Math.min(x, window.innerWidth - 160),
+      top: Math.min(y, window.innerHeight - 300), background: 'var(--gf-bg)',
+      border: '1px solid var(--gf-border)', borderRadius: 6, padding: '4px 0',
+      zIndex: 1000, minWidth: 140, boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+    }}>
+      <div style={{ ...itemStyle, color: 'var(--gf-text-dim)', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', cursor: 'default', padding: '3px 12px' }}>
+        {label}
+      </div>
+      {MOVE_ZONES.map(({ id, label: zoneLabel }) => (
+        <button key={id} style={itemStyle}
+          onClick={() => { onMove(id); onClose(); }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+        >{zoneLabel}</button>
+      ))}
+      <div style={{ height: 1, background: 'var(--gf-border)', margin: '4px 8px', opacity: 0.5 }} />
+      <button style={itemStyle} onClick={() => { onMoveToTop(); onClose(); }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+      >Top of Deck</button>
+      <button style={itemStyle} onClick={() => { onMoveToBottom(); onClose(); }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+      >Bottom of Deck</button>
+      <button style={itemStyle} onClick={() => { onShuffleIn(); onClose(); }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+      >Shuffle into Deck</button>
+    </div>
+  );
+}
 
 function PeekActionButton({ icon, label, onClick, style }: {
   icon?: React.ReactNode;
@@ -59,7 +123,7 @@ function rectsOverlap(
 interface DeckPeekModalProps {
   cardIds: string[];
   title: string;
-  onClose: () => void;
+  onClose?: () => void;
   onStartDrag?: (card: GameCard, imageUrl: string, e: React.PointerEvent) => void;
   onStartMultiDrag?: (cards: { card: GameCard; imageUrl: string }[], e: React.PointerEvent) => void;
   didDragRef?: React.MutableRefObject<boolean>;
@@ -68,7 +132,7 @@ interface DeckPeekModalProps {
 
 export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive }: DeckPeekModalProps) {
   const { zones, actions } = useModalGame();
-  const { moveCardsBatch, shuffleDeck } = actions;
+  const { moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleDeck, shuffleCardIntoDeck } = actions;
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave } = useModalCardHover(200, { setPreviewCard, isLoupeVisible });
 
@@ -81,6 +145,16 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Context menu state
+  const [contextCard, setContextCard] = useState<{ card: GameCard; x: number; y: number } | null>(null);
+
+  const handleCardContextMenu = (card: GameCard, e: React.MouseEvent) => {
+    if (!onClose) return; // Read-only mode (opponent viewing reveal)
+    e.preventDefault();
+    e.stopPropagation();
+    setContextCard({ card, x: e.clientX, y: e.clientY });
+  };
 
   // Refs for card DOM elements (for lasso hit-testing)
   const cardElRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -106,7 +180,15 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
   const remainingIds = peekedCards.map(c => c.instanceId);
   const hasRemaining = remainingIds.length > 0;
 
+  // Auto-close when all revealed cards have been moved
+  useEffect(() => {
+    if (!hasRemaining && peekedIds.length > 0 && onClose) {
+      onClose();
+    }
+  }, [hasRemaining]);
+
   const handleCloseAction = (action: 'top' | 'bottom' | 'shuffle') => {
+    if (!onClose) return;
     if (hasRemaining) {
       if (action === 'bottom') {
         // Remove from current positions and push to bottom of deck
@@ -178,6 +260,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
 
   // Lasso selection: pointer down on empty space in the content area starts lasso
   const handleContentPointerDown = (e: React.PointerEvent) => {
+    if (!onClose) return; // Read-only mode
     if (e.button !== 0) return;
     // Block lasso on interactive elements (buttons, card images, inputs)
     const target = e.target as HTMLElement;
@@ -322,12 +405,14 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
               </div>
             )}
           </div>
-          <button
-            onClick={() => handleCloseAction('top')}
-            style={{ background: 'none', border: 'none', color: 'var(--gf-text)', cursor: 'pointer' }}
-          >
-            <X size={18} />
-          </button>
+          {onClose && (
+            <button
+              onClick={() => handleCloseAction('top')}
+              style={{ background: 'none', border: 'none', color: 'var(--gf-text)', cursor: 'pointer' }}
+            >
+              <X size={18} />
+            </button>
+          )}
         </div>
 
         <p style={{
@@ -336,7 +421,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
           fontSize: 11,
           marginBottom: 12,
         }}>
-          Drag to a zone · Click to select · Lasso to multi-select
+          {onClose ? 'Drag to a zone · Click to select · Lasso to multi-select' : 'Your opponent is revealing cards'}
         </p>
 
         {peekedCards.length === 0 ? (
@@ -347,7 +432,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
             textAlign: 'center',
             padding: 20,
           }}>
-            All peeked cards have been moved
+            All revealed cards have been moved
           </p>
         ) : (
           <div
@@ -368,10 +453,11 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
                   key={card.instanceId}
                   ref={(el) => registerCardEl(card.instanceId, el)}
                   data-card-id={card.instanceId}
-                  style={{ position: 'relative', cursor: 'grab' }}
-                  onPointerDown={(e) => { e.stopPropagation(); handlePointerDown(card, imageUrl, e); }}
-                  onPointerUp={() => handlePointerUp(card)}
+                  style={{ position: 'relative', cursor: onClose ? 'grab' : 'default' }}
+                  onPointerDown={onClose ? (e) => { e.stopPropagation(); handlePointerDown(card, imageUrl, e); } : undefined}
+                  onPointerUp={onClose ? () => handlePointerUp(card) : undefined}
                   onClick={(e) => e.stopPropagation()}
+                  onContextMenu={(e) => handleCardContextMenu(card, e)}
                   onMouseEnter={(e) => onCardMouseEnter(card.cardImgFile, card.cardName, e, card.instanceId)}
                   onMouseLeave={onCardMouseLeave}
                 >
@@ -438,7 +524,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
           </div>
         )}
 
-        {/* Action footer — choose where remaining peeked cards go */}
+        {/* Action footer — choose where remaining revealed cards go */}
         <div style={{
           marginTop: 16,
           paddingTop: 12,
@@ -448,7 +534,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
           gap: 8,
           flexWrap: 'wrap',
         }}>
-          {hasRemaining ? (
+          {hasRemaining && onClose ? (
             <>
               <span style={{
                 fontFamily: 'var(--font-cinzel), Georgia, serif',
@@ -474,17 +560,38 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
                 onClick={() => handleCloseAction('shuffle')}
               />
             </>
-          ) : (
+          ) : onClose ? (
             <PeekActionButton
               label="Close"
               onClick={onClose}
               style={{ marginLeft: 'auto' }}
             />
-          )}
+          ) : null}
         </div>
       </motion.div>
 
       <ModalCardHoverPreview hover={hover} />
+
+      {/* Context menu */}
+      {contextCard && (() => {
+        const isMulti = selectedIds.has(contextCard.card.instanceId) && selectedIds.size > 1;
+        const targetIds = isMulti
+          ? peekedCards.filter(c => selectedIds.has(c.instanceId)).map(c => c.instanceId)
+          : [contextCard.card.instanceId];
+        return (
+          <PeekCardContextPopup
+            card={contextCard.card}
+            count={isMulti ? selectedIds.size : undefined}
+            x={contextCard.x}
+            y={contextCard.y}
+            onClose={() => setContextCard(null)}
+            onMove={(zone) => { for (const id of targetIds) moveCard(id, zone); }}
+            onMoveToTop={() => { for (const id of targetIds) moveCardToTopOfDeck(id); }}
+            onMoveToBottom={() => { for (const id of targetIds) moveCardToBottomOfDeck(id); }}
+            onShuffleIn={() => { for (const id of targetIds) shuffleCardIntoDeck(id); }}
+          />
+        );
+      })()}
     </div>
   );
 }

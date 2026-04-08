@@ -54,7 +54,9 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
   const isNavigating = isCreating || isJoining;
   const [loadingMessage] = useState(() => {
     const msg = getRandomLoadingMessage();
-    sessionStorage.setItem('stdb_loading_message', msg);
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem('stdb_loading_message', msg);
+    }
     return msg;
   });
 

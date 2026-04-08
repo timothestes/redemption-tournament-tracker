@@ -100,7 +100,7 @@ function CardNameList({ cards }: { cards: { name: string; img: string }[] }) {
   );
 }
 
-function formatActionType(actionType: string, payload?: string, playerNames?: Record<string, string>): ReactNode {
+function formatActionType(actionType: string, payload?: string, playerNames?: Record<string, string>, actorPlayerId?: string): ReactNode {
   if (actionType === 'ROLL_DICE' && payload) {
     try {
       const data = JSON.parse(payload);
@@ -126,8 +126,39 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       if (data.redirected && data.cardName) {
         return <>{data.redirected} <HoverableCard name={data.cardName} img={data.cardImgFile} /> but went to land of bondage instead</>;
       }
-      if (data.to === 'reserve' && data.cardName) {
-        return <>placed <HoverableCard name={data.cardName} img={data.cardImgFile} /> in reserve</>;
+      if (data.cardName) {
+        if (data.to === 'discard') return <>discarded <HoverableCard name={data.cardName} img={data.cardImgFile} /></>;
+        if (data.to === 'reserve') return <>placed <HoverableCard name={data.cardName} img={data.cardImgFile} /> in reserve</>;
+        if (data.to === 'banish') return <>banished <HoverableCard name={data.cardName} img={data.cardImgFile} /></>;
+        if (data.to === 'deck') return <>put <HoverableCard name={data.cardName} img={data.cardImgFile} /> into deck</>;
+        if (data.to === 'hand') {
+          const isCrossPlayer = data.targetOwnerId && data.targetOwnerId !== actorPlayerId;
+          const targetName = isCrossPlayer && playerNames?.[data.targetOwnerId];
+          return targetName
+            ? <>moved <HoverableCard name={data.cardName} img={data.cardImgFile} /> to {targetName}&apos;s hand</>
+            : <>moved <HoverableCard name={data.cardName} img={data.cardImgFile} /> to hand</>;
+        }
+        if (data.to === 'territory') {
+          const isCrossPlayer = data.targetOwnerId && data.targetOwnerId !== actorPlayerId;
+          const targetName = isCrossPlayer && playerNames?.[data.targetOwnerId];
+          return targetName
+            ? <>moved <HoverableCard name={data.cardName} img={data.cardImgFile} /> to {targetName}&apos;s territory</>
+            : <>played <HoverableCard name={data.cardName} img={data.cardImgFile} /> to territory</>;
+        }
+        if (data.to === 'land-of-bondage') {
+          const isCrossPlayer = data.targetOwnerId && data.targetOwnerId !== actorPlayerId;
+          const targetName = isCrossPlayer && playerNames?.[data.targetOwnerId];
+          return targetName
+            ? <>sent <HoverableCard name={data.cardName} img={data.cardImgFile} /> to {targetName}&apos;s land of bondage</>
+            : <>sent <HoverableCard name={data.cardName} img={data.cardImgFile} /> to land of bondage</>;
+        }
+        if (data.to === 'land-of-redemption') {
+          const isCrossPlayer = data.targetOwnerId && data.targetOwnerId !== actorPlayerId;
+          const targetName = isCrossPlayer && playerNames?.[data.targetOwnerId];
+          return targetName
+            ? <>moved <HoverableCard name={data.cardName} img={data.cardImgFile} /> to {targetName}&apos;s land of redemption</>
+            : <>rescued <HoverableCard name={data.cardName} img={data.cardImgFile} /></>;
+        }
       }
     } catch { /* fall through */ }
   }
@@ -151,8 +182,31 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
     try {
       const data = JSON.parse(payload);
       const parts: ReactNode[] = [];
-      if (data.toZone === 'reserve' && data.cards?.length) {
-        parts.push(<span key="reserve">placed <CardNameList cards={data.cards} /> in reserve</span>);
+      if (data.cards?.length) {
+        if (data.toZone === 'discard') parts.push(<span key="discard">discarded <CardNameList cards={data.cards} /></span>);
+        if (data.toZone === 'reserve') parts.push(<span key="reserve">placed <CardNameList cards={data.cards} /> in reserve</span>);
+        if (data.toZone === 'banish') parts.push(<span key="banish">banished <CardNameList cards={data.cards} /></span>);
+        if (data.toZone === 'deck') parts.push(<span key="deck">put <CardNameList cards={data.cards} /> into deck</span>);
+        if (data.toZone === 'hand') {
+          const isCrossPlayer = data.targetOwnerId && playerNames?.[data.targetOwnerId] && data.targetOwnerId !== actorPlayerId;
+          const targetName = isCrossPlayer && playerNames?.[data.targetOwnerId];
+          parts.push(<span key="hand">{targetName ? <>moved <CardNameList cards={data.cards} /> to {targetName}&apos;s hand</> : <>moved <CardNameList cards={data.cards} /> to hand</>}</span>);
+        }
+        if (data.toZone === 'territory') {
+          const isCrossPlayer = data.targetOwnerId && data.targetOwnerId !== actorPlayerId;
+          const targetName = isCrossPlayer && playerNames?.[data.targetOwnerId];
+          parts.push(<span key="territory">{targetName ? <>moved <CardNameList cards={data.cards} /> to {targetName}&apos;s territory</> : <>played <CardNameList cards={data.cards} /> to territory</>}</span>);
+        }
+        if (data.toZone === 'land-of-bondage') {
+          const isCrossPlayer = data.targetOwnerId && data.targetOwnerId !== actorPlayerId;
+          const targetName = isCrossPlayer && playerNames?.[data.targetOwnerId];
+          parts.push(<span key="lob">{targetName ? <>sent <CardNameList cards={data.cards} /> to {targetName}&apos;s land of bondage</> : <>sent <CardNameList cards={data.cards} /> to land of bondage</>}</span>);
+        }
+        if (data.toZone === 'land-of-redemption') {
+          const isCrossPlayer = data.targetOwnerId && data.targetOwnerId !== actorPlayerId;
+          const targetName = isCrossPlayer && playerNames?.[data.targetOwnerId];
+          parts.push(<span key="lor">{targetName ? <>moved <CardNameList cards={data.cards} /> to {targetName}&apos;s land of redemption</> : <>rescued <CardNameList cards={data.cards} /></>}</span>);
+        }
       }
       if (data.redirectedLostSouls?.length) {
         const actionWord = data.toZone === 'discard' ? 'discarded' : data.toZone === 'reserve' ? 'reserved' : 'banished';
@@ -572,7 +626,7 @@ export default function ChatPanel({
                 const playerName =
                   playerNames[action.playerId.toString()] ??
                   `Player ${action.playerId}`;
-                const verb = formatActionType(action.actionType, action.payload);
+                const verb = formatActionType(action.actionType, action.payload, playerNames, action.playerId.toString());
                 const time = formatTimestamp(action.timestamp.microsSinceUnixEpoch);
                 const turn = Number(action.turnNumber);
 

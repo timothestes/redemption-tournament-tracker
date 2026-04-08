@@ -1304,7 +1304,7 @@ export const move_card = spacetimedb.reducer(
       ownerId: newOwnerId,
     });
 
-    logAction(ctx, gameId, player.id, 'MOVE_CARD', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), from: fromZone, to: toZone, cardName: card.cardName, cardImgFile: card.cardImgFile }), game.turnNumber, game.currentPhase);
+    logAction(ctx, gameId, player.id, 'MOVE_CARD', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), from: fromZone, to: toZone, cardName: card.cardName, cardImgFile: card.cardImgFile, targetOwnerId: targetOwnerId || '' }), game.turnNumber, game.currentPhase);
   }
 );
 
@@ -1384,7 +1384,7 @@ export const move_cards_batch = spacetimedb.reducer(
       });
     }
 
-    logAction(ctx, gameId, player.id, 'MOVE_CARDS_BATCH', JSON.stringify({ count: ids.length, toZone, cards, redirectedLostSouls }), game.turnNumber, game.currentPhase);
+    logAction(ctx, gameId, player.id, 'MOVE_CARDS_BATCH', JSON.stringify({ count: ids.length, toZone, cards, redirectedLostSouls, targetOwnerId: targetOwnerId || '' }), game.turnNumber, game.currentPhase);
   }
 );
 
