@@ -962,6 +962,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       const node = cardNodeRefs.current.get(card.instanceId);
       if (node) {
         dragOriginalPosRef.current = { x: node.x(), y: node.y() };
+
+        // Move the card node to the top of the game layer so it escapes
+        // any clipped parent Group and renders above all other zones/cards
+        // during the drag. React-Konva reconciliation will restore it to
+        // its proper group on the next render after drag ends.
+        const layer = gameLayerRef.current;
+        if (layer && node.parent !== layer) {
+          node.moveTo(layer);
+        }
+        node.moveToTop();
+        layer?.batchDraw();
       }
 
       // Clear hover state
