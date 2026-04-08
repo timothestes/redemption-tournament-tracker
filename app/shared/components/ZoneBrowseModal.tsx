@@ -363,7 +363,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
         position: 'fixed',
         inset: 0,
         right: panelWidth,
-        background: 'rgba(0,0,0,0.75)',
+        background: 'transparent',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

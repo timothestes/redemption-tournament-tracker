@@ -217,7 +217,7 @@ export function OpponentBrowseModal({
         position: 'fixed',
         inset: 0,
         right: isLoupeVisible ? 'clamp(280px, 20vw, 380px)' : '36px',
-        background: 'rgba(0,0,0,0.75)',
+        background: 'transparent',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,6 @@ import { SpacetimeProvider } from '../lib/spacetimedb-provider';
 import { DeckPickerModal } from './DeckPickerModal';
 import { LobbyList } from './LobbyList';
 import type { DeckOption } from './DeckPickerCard';
-import { getRandomLoadingMessage } from '@/app/shared/constants/loadingMessages';
 
 interface GameLobbyProps {
   decks: DeckOption[];
@@ -49,16 +48,6 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
 
   // Spectate toggle
   const [isSpectate, setIsSpectate] = useState(false);
-
-  // Full-screen loading overlay
-  const isNavigating = isCreating || isJoining;
-  const [loadingMessage] = useState(() => {
-    const msg = getRandomLoadingMessage();
-    if (typeof sessionStorage !== 'undefined') {
-      sessionStorage.setItem('stdb_loading_message', msg);
-    }
-    return msg;
-  });
 
   // Show error from redirect (e.g. stale lobby join attempt)
   useEffect(() => {
@@ -195,26 +184,6 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Full-screen loading overlay */}
-      {isNavigating && (
-        <div className="fixed inset-0 z-30 flex flex-col items-center justify-center bg-black">
-          <div
-            className="absolute inset-0 bg-cover bg-no-repeat opacity-40"
-            style={{ backgroundImage: 'url(/gameplay/cave_background.png)', backgroundPosition: 'center 70%' }}
-          />
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{ background: 'radial-gradient(ellipse 90% 85% at 50% 50%, transparent 60%, rgba(0,0,0,0.85) 100%)' }}
-          />
-          <div className="relative z-10 text-center">
-            <p className="font-cinzel text-xl tracking-wide text-amber-200/90 mb-6">
-              {loadingMessage}
-            </p>
-            <div className="mb-4 h-8 w-8 animate-spin rounded-full border-2 border-amber-200/50 border-t-transparent mx-auto" />
-          </div>
-        </div>
-      )}
-
       {/* Deck selection — matches community/my-decks card preview style */}
       <section className="rounded-lg border border-border bg-card overflow-hidden [.jayden_&]:border-primary/30 [.jayden_&]:bg-gradient-to-br [.jayden_&]:from-[hsla(0,80%,25%,0.15)] [.jayden_&]:via-[hsla(270,60%,20%,0.1)] [.jayden_&]:to-[hsla(230,80%,30%,0.15)]">
         {selectedDeck ? (
@@ -346,16 +315,19 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
             >
               {isJoining ? 'Joining...' : 'Join as Player'}
             </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={() => {
-                router.push(`/play/spectate/${joinCode}`);
-              }}
-              className="flex-1 h-12 text-base"
-            >
-              Watch as Spectator
-            </Button>
+            <div className="relative flex-1 group">
+              <Button
+                size="lg"
+                variant="outline"
+                disabled
+                className="w-full h-12 text-base opacity-50 cursor-not-allowed"
+              >
+                Watch as Spectator
+              </Button>
+              <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs text-muted-foreground bg-popover border rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                Coming soon
+              </span>
+            </div>
           </div>
           <a
             href="/play"
@@ -434,26 +406,25 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
                       {isJoining ? 'Joining...' : isSpectate ? 'Watch' : 'Join'}
                     </Button>
                   </div>
-                  {/* Spectate toggle — mirrors Private game toggle on Create side */}
-                  <div className="flex items-center gap-2.5 justify-center">
+                  {/* Spectate toggle — disabled until spectator mode is ready */}
+                  <div className="relative group flex items-center gap-2.5 justify-center opacity-50">
                     <label htmlFor="spectate-toggle" className="text-sm text-muted-foreground">
                       Spectate
                     </label>
                     <button
                       id="spectate-toggle"
                       role="switch"
-                      aria-checked={isSpectate}
-                      onClick={() => setIsSpectate(!isSpectate)}
-                      className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors ${
-                        isSpectate ? 'bg-primary' : 'bg-muted'
-                      }`}
+                      aria-checked={false}
+                      disabled
+                      className="relative inline-flex h-6 w-10 items-center rounded-full transition-colors bg-muted cursor-not-allowed"
                     >
                       <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          isSpectate ? 'translate-x-[22px]' : 'translate-x-[3px]'
-                        }`}
+                        className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform translate-x-[3px]"
                       />
                     </button>
+                    <span className="absolute -bottom-7 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs text-muted-foreground bg-popover border rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                      Coming soon
+                    </span>
                   </div>
                 </div>
               </div>

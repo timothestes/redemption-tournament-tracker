@@ -512,7 +512,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           <div className="fixed top-0 inset-x-0 z-50 h-12 flex items-center justify-between px-4 bg-background/90 backdrop-blur-sm border-b border-border">
             <button
               onClick={() => setIsPracticing(false)}
-              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             >
               <ArrowLeft className="h-4 w-4" />
               Exit Practice

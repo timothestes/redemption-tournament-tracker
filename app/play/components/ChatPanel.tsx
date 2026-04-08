@@ -215,6 +215,23 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       if (parts.length) return <>{parts.map((p, i) => <span key={i}>{i > 0 && '; '}{p}</span>)}</>;
     } catch { /* fall through */ }
   }
+  if (actionType === 'REQUEST_ZONE_SEARCH' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const zoneName = data.zone === 'hand-reveal' ? 'hand' : data.zone === 'action-priority' ? 'action priority' : data.zone;
+      const targetName = data.targetName ?? 'opponent';
+      if (data.zone === 'hand-reveal') return `requested to reveal ${targetName}'s hand`;
+      if (data.zone === 'action-priority') return `requested action priority`;
+      return `requested to search ${targetName}'s ${zoneName}`;
+    } catch { /* fall through */ }
+  }
+  if (actionType === 'APPROVE_ZONE_SEARCH' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const zoneName = data.zone === 'hand-reveal' ? 'hand reveal' : data.zone === 'action-priority' ? 'action priority' : `${data.zone} search`;
+      return `approved ${zoneName}`;
+    } catch { /* fall through */ }
+  }
   return ACTION_TYPE_LABELS[actionType] ?? actionType.toLowerCase().replace(/_/g, ' ');
 }
 

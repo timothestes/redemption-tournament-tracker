@@ -907,12 +907,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
           dragFollowerOffsets.current = offsets;
 
           if (followers.length > 0) {
+            // Use getClientRect to get the actual visual bounding box of each follower,
+            // which correctly handles rotation=180 (opponent cards).
+            const dragRect = dragNode.getClientRect({ skipTransform: false, skipShadow: true, skipStroke: true });
             let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            const followerRects: { f: typeof followers[0]; rect: { x: number; y: number; width: number; height: number } }[] = [];
             for (const f of followers) {
-              minX = Math.min(minX, f.dx);
-              minY = Math.min(minY, f.dy);
-              maxX = Math.max(maxX, f.dx + cardWidth);
-              maxY = Math.max(maxY, f.dy + cardHeight);
+              const rect = f.node.getClientRect({ skipTransform: false, skipShadow: true, skipStroke: true });
+              // Compute visual offset relative to drag card's visual top-left
+              const relX = rect.x - dragRect.x;
+              const relY = rect.y - dragRect.y;
+              followerRects.push({ f, rect: { x: relX, y: relY, width: rect.width, height: rect.height } });
+              minX = Math.min(minX, relX);
+              minY = Math.min(minY, relY);
+              maxX = Math.max(maxX, relX + rect.width);
+              maxY = Math.max(maxY, relY + rect.height);
             }
             const ghostW = maxX - minX;
             const ghostH = maxY - minY;
@@ -924,19 +933,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
             if (ctx) {
               ctx.scale(2, 2);
               ctx.globalAlpha = 0.5;
-              for (const f of followers) {
-                // Don't pass x/y — let Konva use getClientRect() defaults
-                // so the card renders correctly regardless of its absolute position
+              for (const { f, rect } of followerRects) {
                 const cardCanvas = f.node.toCanvas({ pixelRatio: 1 });
-                ctx.drawImage(cardCanvas, f.dx - minX, f.dy - minY, cardWidth, cardHeight);
+                ctx.drawImage(cardCanvas, rect.x - minX, rect.y - minY, rect.width, rect.height);
               }
 
+              // Position the ghost relative to the drag card's visual top-left
+              // The ghost layer has the same scale/offset as the game layer,
+              // so we need to convert from screen coords back to virtual coords.
               const ghostImage = new KonvaLib.Image({
                 image: offscreen,
-                x: baseX + minX,
-                y: baseY + minY,
-                width: ghostW,
-                height: ghostH,
+                // Convert screen-space offset to virtual coords by dividing by scale
+                x: dragRect.x / scale - offsetX / scale + minX / scale,
+                y: dragRect.y / scale - offsetY / scale + minY / scale,
+                width: ghostW / scale,
+                height: ghostH / scale,
                 listening: false,
                 opacity: 1,
               }) as Konva.Image;
@@ -1035,12 +1046,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       dragGhostOffsetRef.current = null;
       setDragHoverZone(null);
 
-      // Clean up ghost image and restore follower visibility
+      // Clean up ghost image and restore card visibility
       if (dragGhostRef.current) {
         dragGhostRef.current.destroy();
         dragGhostRef.current = null;
         dragGhostLayerRef.current?.batchDraw();
       }
+      // Restore follower visibility
       if (followerOffsets) {
         for (const [id] of followerOffsets) {
           const fNode = cardNodeRefs.current.get(id);
@@ -1426,7 +1438,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
     [counters],
   );
 
-  // ---- Card bounds for marquee selection (my free-form + hand cards) ----
+  // ---- Card bounds for marquee selection (my + opponent free-form, LOB, hand cards) ----
   const allCardBounds = useMemo((): CardBound[] => {
     if (!mpLayout || !myHandRect) return [];
     const bounds: CardBound[] = [];
@@ -1451,6 +1463,28 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       }
     }
 
+    // Opponent free-form zone cards (rotated 180°)
+    for (const zoneKey of FREE_FORM_ZONES) {
+      const cards = opponentCards[zoneKey] ?? [];
+      for (const card of cards) {
+        const zone = opponentZones[zoneKey];
+        if (!zone) continue;
+        const mirroredPosX = card.posX ? 1 - parseFloat(card.posX) : 0;
+        const mirroredPosY = card.posY ? 1 - parseFloat(card.posY) : 0;
+        const x = mirroredPosX * zone.width + zone.x;
+        const y = mirroredPosY * zone.height + zone.y;
+        // Rotation=180 means (x,y) is bottom-right corner; bounding box is (x-w, y-h) to (x, y)
+        bounds.push({
+          instanceId: String(card.id),
+          x: x - cardWidth,
+          y: y - cardHeight,
+          width: cardWidth,
+          height: cardHeight,
+          rotation: 180,
+        });
+      }
+    }
+
     // My auto-arrange zone cards (LOB)
     for (const zoneKey of AUTO_ARRANGE_ZONES) {
       const cards = myCards[zoneKey] ?? [];
@@ -1467,6 +1501,29 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
               width: lobCard.cardWidth,
               height: lobCard.cardHeight,
               rotation: 0,
+            });
+          }
+        });
+      }
+    }
+
+    // Opponent auto-arrange zone cards (LOB, rotated 180°)
+    for (const zoneKey of AUTO_ARRANGE_ZONES) {
+      const cards = opponentCards[zoneKey] ?? [];
+      const zone = opponentZones[zoneKey];
+      if (cards.length > 0 && zone) {
+        const positions = calculateAutoArrangePositions(cards.length, zone, lobCard.cardWidth, lobCard.cardHeight);
+        cards.forEach((card, i) => {
+          const pos = positions[i];
+          if (pos) {
+            // Opponent LOB cards are rendered at (pos.x + w, pos.y + h) with rotation=180
+            bounds.push({
+              instanceId: String(card.id),
+              x: pos.x,
+              y: pos.y,
+              width: lobCard.cardWidth,
+              height: lobCard.cardHeight,
+              rotation: 180,
             });
           }
         });
@@ -1499,7 +1556,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
     }
 
     return bounds;
-  }, [mpLayout, myHandRect, myZones, myCards, cardWidth, cardHeight, lobCard, isSpreadHand]);
+  }, [mpLayout, myHandRect, myZones, myCards, opponentZones, opponentCards, cardWidth, cardHeight, lobCard, isSpreadHand]);
 
   // ---- Stage mouse handlers for marquee selection ----
   const handleStageMouseDown = useCallback(
@@ -3049,7 +3106,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: 'rgba(0,0,0,0.7)',
+            background: 'transparent',
           }}
           onClick={() => setBrowseOpponentZone(null)}
         >

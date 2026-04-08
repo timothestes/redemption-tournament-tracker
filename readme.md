@@ -142,14 +142,9 @@ Fallow audit: https://github.com/fallow-rs/fallow
 
 
 # play features
-consider battle zone in territory
 probably improve right click top/bottom/random menu
 card placement mismatches? hard to replicate
-dragging multiple cards feels laggy.
 start of game takes a bit to load
-loading into game shows 2 different loading messages (should only show one)
-multiple messages still appear during loading in
-spectate doesn't work? (disable to add later?)
 add feature for t1 reserve access
 redemptionccg app logo takes a while to load in 
 create system where cards can have custom abilities coded

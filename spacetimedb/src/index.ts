@@ -2300,7 +2300,7 @@ export const request_zone_search = spacetimedb.reducer(
       createdAt: ctx.timestamp,
     });
 
-    logAction(ctx, gameId, player.id, 'REQUEST_ZONE_SEARCH', JSON.stringify({ zone }), game.turnNumber, game.currentPhase);
+    logAction(ctx, gameId, player.id, 'REQUEST_ZONE_SEARCH', JSON.stringify({ zone, targetName: opponent.displayName }), game.turnNumber, game.currentPhase);
   }
 );
 
@@ -2321,6 +2321,11 @@ export const approve_zone_search = spacetimedb.reducer(
     if (req.status !== 'pending') throw new SenderError('Request is not pending');
 
     ctx.db.ZoneSearchRequest.id.update({ ...req, status: 'approved' });
+
+    const game = ctx.db.Game.id.find(gameId);
+    if (game) {
+      logAction(ctx, gameId, player.id, 'APPROVE_ZONE_SEARCH', JSON.stringify({ zone: req.zone }), game.turnNumber, game.currentPhase);
+    }
   }
 );
 

@@ -1,10 +1,10 @@
-import { SpectatorClient } from './client';
+import { redirect } from 'next/navigation';
 
 interface Props {
   params: Promise<{ code: string }>;
 }
 
 export default async function SpectatePage({ params }: Props) {
-  const { code } = await params;
-  return <SpectatorClient code={code} />;
+  // Spectator mode is postponed — redirect to play lobby
+  redirect('/play');
 }

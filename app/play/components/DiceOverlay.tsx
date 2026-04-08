@@ -184,7 +184,7 @@ function DieDisplay({ roll, dieSize }: { roll: ActiveRoll; dieSize: number }) {
             transition={{ duration: 0.2, delay: 0.05 }}
             style={{
               position: 'absolute',
-              top: dieSize - 6,
+              top: dieSize + 4,
               left: 0,
               width: dieSize,
               textAlign: 'center',
@@ -359,9 +359,9 @@ export default function DiceOverlay({
           exit={{ opacity: 0, transition: { duration: 0.25 } }}
           style={{
             position: 'fixed',
-            bottom: 68,
+            bottom: 80,
             left: 16,
-            zIndex: 500,
+            zIndex: 950,
             pointerEvents: 'none',
             display: 'flex',
             gap: 12,
