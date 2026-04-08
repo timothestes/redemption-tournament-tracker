@@ -648,6 +648,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
   const dragEndTimeRef = useRef<number>(0);
   const dragSourceZoneRef = useRef<string | null>(null);
   const dragOriginalPosRef = useRef<{ x: number; y: number } | null>(null);
+  /** Tracks the rendered card dimensions during drag (pile vs territory vs LOB). */
+  const dragCardSizeRef = useRef<{ w: number; h: number } | null>(null);
+  /** Tracks the original parent Group so we can move the node back on snap-back. */
+  const dragOriginalParentRef = useRef<Konva.Container | null>(null);
   const [dragHoverZone, setDragHoverZone] = useState<DropZoneKey | null>(null);
   const dragHoverZoneRef = useRef<DropZoneKey | null>(null);
 
@@ -749,8 +753,15 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
 
       const execute = () => {
         if (zone && posX != null && posY != null) {
-          const rawX = (posX - zone.x) / zone.width;
-          const rawY = (posY - zone.y) / zone.height;
+          let rawX = (posX - zone.x) / zone.width;
+          let rawY = (posY - zone.y) / zone.height;
+          // Clamp so the entire card stays within the zone bounds
+          if (isFreeFormZone(String(toZone))) {
+            const maxX = Math.max(0, 1 - cardWidth / zone.width);
+            const maxY = Math.max(0, 1 - cardHeight / zone.height);
+            rawX = Math.max(0, Math.min(rawX, maxX));
+            rawY = Math.max(0, Math.min(rawY, maxY));
+          }
           const normX = isOppZone ? 1 - rawX : rawX;
           const normY = isOppZone ? 1 - rawY : rawY;
           gameState.moveCard(BigInt(id), String(toZone), undefined, normX.toString(), normY.toString(), ownerId);
@@ -810,8 +821,15 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
         let normX = posX?.toString();
         let normY = posY?.toString();
         if (zone && posX != null && posY != null) {
-          const rawX = (posX - zone.x) / zone.width;
-          const rawY = (posY - zone.y) / zone.height;
+          let rawX = (posX - zone.x) / zone.width;
+          let rawY = (posY - zone.y) / zone.height;
+          // Clamp so the entire card stays within the zone bounds
+          if (isFreeFormZone(String(toZone))) {
+            const maxX = Math.max(0, 1 - cardWidth / zone.width);
+            const maxY = Math.max(0, 1 - cardHeight / zone.height);
+            rawX = Math.max(0, Math.min(rawX, maxX));
+            rawY = Math.max(0, Math.min(rawY, maxY));
+          }
           // Inverse-mirror for opponent zones (they render with 1-posX, 1-posY)
           normX = (isOppZone ? 1 - rawX : rawX).toString();
           normY = (isOppZone ? 1 - rawY : rawY).toString();
@@ -958,19 +976,40 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       isDraggingRef.current = true;
       dragSourceZoneRef.current = card.zone;
 
-      // Store original position for snap-back
+      // Determine the card's rendered dimensions based on its source zone.
+      // Pile zones render at pileCardWidth/pileCardHeight, LOB at lobCard size,
+      // everything else at the main cardWidth/cardHeight.
+      if (SIDEBAR_PILE_ZONES.includes(card.zone as any)) {
+        dragCardSizeRef.current = { w: pileCardWidth, h: pileCardHeight };
+      } else if (isAutoArrangeZone(card.zone)) {
+        dragCardSizeRef.current = { w: lobCard.cardWidth, h: lobCard.cardHeight };
+      } else {
+        dragCardSizeRef.current = { w: cardWidth, h: cardHeight };
+      }
+
+      // Store original position for snap-back (updated below after reparenting)
       const node = cardNodeRefs.current.get(card.instanceId);
       if (node) {
-        dragOriginalPosRef.current = { x: node.x(), y: node.y() };
-
         // Move the card node to the top of the game layer so it escapes
         // any clipped parent Group and renders above all other zones/cards
-        // during the drag. React-Konva reconciliation will restore it to
-        // its proper group on the next render after drag ends.
+        // during the drag.
         const layer = gameLayerRef.current;
         if (layer && node.parent !== layer) {
+          // Save original parent so we can restore on snap-back
+          dragOriginalParentRef.current = node.parent as Konva.Container;
+          // Convert the node's position from its current parent's coordinate
+          // space to the layer's coordinate space. Without this, cards nested
+          // in offset Groups (e.g. sidebar pile cards at local (0,0) inside a
+          // Group at (cx, cy)) would jump to (0,0) in layer coords and become
+          // unable to drag left due to the canvas-bounds clamp.
+          const absPos = node.getAbsolutePosition();
           node.moveTo(layer);
+          node.setAbsolutePosition(absPos);
+        } else {
+          dragOriginalParentRef.current = null;
         }
+        // Capture position after reparenting so snap-back uses layer coords
+        dragOriginalPosRef.current = { x: node.x(), y: node.y() };
         node.moveToTop();
         layer?.batchDraw();
       }
@@ -1078,16 +1117,20 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
         dragFollowerOffsets.current = null;
       }
     },
-    [selectedIds, stopHoverAnimation, cardWidth, cardHeight, scale, offsetX, offsetY],
+    [selectedIds, stopHoverAnimation, cardWidth, cardHeight, pileCardWidth, pileCardHeight, lobCard.cardWidth, lobCard.cardHeight, scale, offsetX, offsetY],
   );
 
   const handleCardDragMove = useCallback(
     (e: Konva.KonvaEventObject<DragEvent>) => {
       const node = e.target;
 
+      // Use the dragged card's actual rendered size, not the territory default
+      const dragW = dragCardSizeRef.current?.w ?? cardWidth;
+      const dragH = dragCardSizeRef.current?.h ?? cardHeight;
+
       // Clamp card position to virtual canvas bounds
-      const clampedX = Math.max(-cardWidth / 2, Math.min(node.x(), virtualWidth - cardWidth / 2));
-      const clampedY = Math.max(-cardHeight / 2, Math.min(node.y(), VIRTUAL_HEIGHT - cardHeight / 2));
+      const clampedX = Math.max(-dragW / 2, Math.min(node.x(), virtualWidth - dragW / 2));
+      const clampedY = Math.max(-dragH / 2, Math.min(node.y(), VIRTUAL_HEIGHT - dragH / 2));
       if (clampedX !== node.x() || clampedY !== node.y()) {
         node.x(clampedX);
         node.y(clampedY);
@@ -1099,8 +1142,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       // the bottom-right corner, so compute center accordingly.
       const rot = (node as Konva.Group).rotation?.() ?? 0;
       const isRotated = Math.abs(rot) > 90;
-      const centerX = isRotated ? x - cardWidth / 2 : x + cardWidth / 2;
-      const centerY = isRotated ? y - cardHeight / 2 : y + cardHeight / 2;
+      const centerX = isRotated ? x - dragW / 2 : x + dragW / 2;
+      const centerY = isRotated ? y - dragH / 2 : y + dragH / 2;
       const hit = findZoneAtPosition(centerX, centerY);
       const zoneKey = hit ? `${hit.owner}:${hit.zone}` : null;
 
@@ -1132,12 +1175,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       const followerOffsets = dragFollowerOffsets.current;
       const originalPos = dragOriginalPosRef.current;
       const sourceZone = dragSourceZoneRef.current;
+      const originalParent = dragOriginalParentRef.current;
+      // Capture the dragged card's actual rendered size before resetting
+      const dragW = dragCardSizeRef.current?.w ?? cardWidth;
+      const dragH = dragCardSizeRef.current?.h ?? cardHeight;
 
       // Reset drag state
       isDraggingRef.current = false;
       dragEndTimeRef.current = performance.now();
       dragSourceZoneRef.current = null;
       dragOriginalPosRef.current = null;
+      dragCardSizeRef.current = null;
+      dragOriginalParentRef.current = null;
       dragHoverZoneRef.current = null;
       dragFollowerOffsets.current = null;
       dragGhostOffsetRef.current = null;
@@ -1162,23 +1211,32 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       const dropY = node.y();
       // For rotation=180 cards (opponent territory), the node position is
       // the bottom-right corner, so compute center accordingly.
+      // Use the actual dragged card dimensions, not the territory default.
       const dropRot = (node as Konva.Group).rotation?.() ?? 0;
       const isDropRotated = Math.abs(dropRot) > 90;
-      const centerX = isDropRotated ? dropX - cardWidth / 2 : dropX + cardWidth / 2;
-      const centerY = isDropRotated ? dropY - cardHeight / 2 : dropY + cardHeight / 2;
+      const centerX = isDropRotated ? dropX - dragW / 2 : dropX + dragW / 2;
+      const centerY = isDropRotated ? dropY - dragH / 2 : dropY + dragH / 2;
       const hit = findZoneAtPosition(centerX, centerY);
 
       const isGroupDrag = selectedIds.has(card.instanceId) && selectedIds.size > 1;
       const cardIds = isGroupDrag ? Array.from(selectedIds) : [card.instanceId];
       const cardId = BigInt(card.instanceId);
 
-      // Helper to snap back to original position
+      // Helper to snap back to original position and restore to original parent.
+      // During dragStart the node was reparented from its clipped Group to the
+      // layer so it renders above everything. On snap-back we need to reverse
+      // that — move it back to the original parent and convert position from
+      // layer coords back to the parent's local coords.
       const snapBack = () => {
-        if (originalPos) {
+        if (originalParent && node.parent !== originalParent) {
+          const absPos = node.getAbsolutePosition();
+          node.moveTo(originalParent);
+          node.setAbsolutePosition(absPos);
+        } else if (originalPos) {
           node.x(originalPos.x);
           node.y(originalPos.y);
-          node.getLayer()?.batchDraw();
         }
+        node.getLayer()?.batchDraw();
       };
 
       if (!hit) {
@@ -1233,32 +1291,56 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       let adjDropY = dropY;
       if (sourceIsRotated && !targetIsRotated) {
         // rotation 180→0: shift anchor from bottom-right to top-left
-        adjDropX -= cardWidth;
-        adjDropY -= cardHeight;
+        adjDropX -= dragW;
+        adjDropY -= dragH;
       } else if (!sourceIsRotated && targetIsRotated) {
         // rotation 0→180: shift anchor from top-left to bottom-right
-        adjDropX += cardWidth;
-        adjDropY += cardHeight;
+        adjDropX += dragW;
+        adjDropY += dragH;
       }
 
-      // Helper: normalize pixel position to 0–1 and apply opponent mirror if needed
+      // Helper: normalize pixel position to 0–1, clamp so the entire card stays
+      // within the territory zone bounds, and apply opponent mirror if needed.
+      // Without clamping, cards dragged to the edge can end up outside the
+      // clipped territory region and become invisible/unreachable.
+      const maxNormX = Math.max(0, 1 - cardWidth / zoneW);
+      const maxNormY = Math.max(0, 1 - cardHeight / zoneH);
       const normX = (px: number) => {
         const raw = (px - zoneOffX) / zoneW;
-        return isOpponentTarget ? 1 - raw : raw;
+        const clamped = isFreeFormZone(targetZone)
+          ? Math.max(0, Math.min(raw, maxNormX))
+          : raw;
+        return isOpponentTarget ? 1 - clamped : clamped;
       };
       const normY = (py: number) => {
         const raw = (py - zoneOffY) / zoneH;
-        return isOpponentTarget ? 1 - raw : raw;
+        const clamped = isFreeFormZone(targetZone)
+          ? Math.max(0, Math.min(raw, maxNormY))
+          : raw;
+        return isOpponentTarget ? 1 - clamped : clamped;
       };
 
-      // Same free-form zone: just update position
+      // Same free-form zone: just update position.
+      // Restore the node to its original parent Group first — it was reparented
+      // to the layer during dragStart and needs to go back so React-Konva's tree
+      // stays in sync and the clipping Group works correctly.
       if (isSameZone && isFreeFormZone(targetZone)) {
+        if (originalParent && node.parent !== originalParent) {
+          const absPos = node.getAbsolutePosition();
+          node.moveTo(originalParent);
+          node.setAbsolutePosition(absPos);
+        }
         if (isGroupDrag) {
           // Followers are already at drop positions from handleCardDragMove; confirm positions
           if (followerOffsets) {
             for (const [id, offset] of followerOffsets) {
               const fNode = cardNodeRefs.current.get(id);
               if (fNode) {
+                if (originalParent && fNode.parent !== originalParent) {
+                  const fAbsPos = fNode.getAbsolutePosition();
+                  fNode.moveTo(originalParent);
+                  fNode.setAbsolutePosition(fAbsPos);
+                }
                 fNode.x(dropX + offset.dx);
                 fNode.y(dropY + offset.dy);
               }
@@ -1365,18 +1447,29 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
         return;
       }
 
-      // Different zone — perform move
-      // Hide dragged card to avoid visual flicker while state updates
-      if (!isFreeFormZone(targetZone) && !isAutoArrangeZone(targetZone)) {
-        let cardGroup: Konva.Node | null = node;
-        while (cardGroup && !cardGroup.draggable?.()) {
-          cardGroup = cardGroup.parent;
-        }
-        if (cardGroup) {
-          cardGroup.visible(false);
-          cardGroup.getLayer()?.batchDraw();
+      // Different zone — perform move.
+      // The dragged node was reparented to the layer during dragStart (moveTo).
+      // React-Konva won't be able to reconcile it back into the old parent Group
+      // when the card's zone changes, leaving an orphaned node on the layer with
+      // stale dimensions (e.g. pile size instead of territory size). Destroy the
+      // reparented node now and remove it from cardNodeRefs so React-Konva creates
+      // a completely fresh node in the correct parent Group with correct dimensions.
+      const draggedNode = cardNodeRefs.current.get(card.instanceId);
+      if (draggedNode) {
+        cardNodeRefs.current.delete(card.instanceId);
+        draggedNode.destroy();
+      }
+      // Also clean up any follower nodes that were reparented
+      if (followerOffsets) {
+        for (const [id] of followerOffsets) {
+          const fNode = cardNodeRefs.current.get(id);
+          if (fNode) {
+            cardNodeRefs.current.delete(id);
+            fNode.destroy();
+          }
         }
       }
+      gameLayerRef.current?.batchDraw();
 
       if (isGroupDrag) {
         if (targetZone === 'deck') {

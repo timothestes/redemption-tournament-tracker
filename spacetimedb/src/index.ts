@@ -1331,6 +1331,27 @@ export const move_cards_batch = spacetimedb.reducer(
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
 
+    // For free-form zones (territory), pre-compute the current max zoneIndex
+    // so new cards render on top of existing ones. Each card in the batch
+    // gets an incrementing index starting from maxIdx + 1.
+    const isFreeFormTarget = toZone !== 'deck' && toZone !== 'hand';
+    let nextFreeFormIndex = 0n;
+    if (isFreeFormTarget) {
+      let maxIdx = -1n;
+      // Determine the owner we'll compute max against (use first card's resolved owner)
+      let resolvedOwner = newOwnerId;
+      if (resolvedOwner === null) {
+        const firstCard = ctx.db.CardInstance.id.find(BigInt(ids[0]));
+        resolvedOwner = firstCard ? firstCard.ownerId : 0n;
+      }
+      for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+        if (c.ownerId === resolvedOwner && c.zone === toZone && c.zoneIndex > maxIdx) {
+          maxIdx = c.zoneIndex;
+        }
+      }
+      nextFreeFormIndex = maxIdx + 1n;
+    }
+
     for (const idStr of ids) {
       const cardId = BigInt(idStr);
       const card = ctx.db.CardInstance.id.find(cardId);
@@ -1373,10 +1394,25 @@ export const move_cards_batch = spacetimedb.reducer(
         ).length
       ) : card.zoneIndex;
 
+      // Determine the zoneIndex for this card:
+      // - hand: use computed sequential index
+      // - free-form zones (territory): assign incrementing index so cards render on top
+      // - same zone (repositioning): preserve existing zoneIndex
+      // - other zones: preserve existing zoneIndex
+      let finalZoneIndex = card.zoneIndex;
+      if (toZone === 'hand') {
+        finalZoneIndex = handZoneIndex;
+      } else if (isFreeFormTarget && card.zone !== toZone) {
+        // Only assign new ascending index when moving INTO the zone (cross-zone move),
+        // not when repositioning within the same zone
+        finalZoneIndex = nextFreeFormIndex;
+        nextFreeFormIndex += 1n;
+      }
+
       ctx.db.CardInstance.id.update({
         ...card,
         zone: toZone,
-        zoneIndex: toZone === 'hand' ? handZoneIndex : card.zoneIndex,
+        zoneIndex: finalZoneIndex,
         posX: pos.posX,
         posY: pos.posY,
         isFlipped,
