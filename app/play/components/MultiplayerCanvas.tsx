@@ -428,12 +428,83 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
   const revealAutoHideRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [revealBarShrinking, setRevealBarShrinking] = useState(false);
 
+  // ---- Turn 1 reserve protection ----
+  // On each player's first turn, cards should not leave the reserve zone.
+  // We show a gentle confirmation dialog instead of hard-blocking.
+  type PendingReserveMove =
+    | { kind: 'single'; execute: () => void }
+    | { kind: 'batch'; execute: () => void };
+  const [pendingReserveMove, setPendingReserveMove] = useState<PendingReserveMove | null>(null);
+
+  const isMyFirstTurn = useMemo(() => {
+    const { game, myPlayer } = gameState;
+    if (!game || !myPlayer) return false;
+    // Seat 0 plays on turnNumber 1, seat 1 plays on turnNumber 2
+    return myPlayer.seat === BigInt(0) ? game.turnNumber === BigInt(1) : game.turnNumber === BigInt(2);
+  }, [gameState]);
+
+  // Skip reserve protection in goldfish/practice mode (no opponent)
+  const hasOpponent = !!gameState.opponentPlayer;
+
+  /** Look up a card instance by its string ID across my cards. */
+  const findMyCardById = useCallback((id: string): CardInstance | undefined => {
+    for (const cards of Object.values(myCards)) {
+      const found = cards.find(c => String(c.id) === id);
+      if (found) return found;
+    }
+    return undefined;
+  }, [myCards]);
+
+  /**
+   * Check if a move should be intercepted by the Turn 1 reserve protection rule.
+   * Returns true if the move was intercepted (dialog shown), false if it should proceed.
+   */
+  const checkReserveProtection = useCallback((
+    fromZone: string | undefined,
+    toZone: string,
+    execute: () => void,
+  ): boolean => {
+    if (!isMyFirstTurn || !hasOpponent) return false;
+    if (fromZone !== 'reserve' || toZone === 'reserve') return false;
+    setPendingReserveMove({ kind: 'single', execute });
+    return true;
+  }, [isMyFirstTurn, hasOpponent]);
+
+  /**
+   * Check if a batch move contains any cards leaving the reserve on Turn 1.
+   * Returns true if intercepted.
+   */
+  const checkReserveBatchProtection = useCallback((
+    cardIds: string[],
+    toZone: string,
+    execute: () => void,
+  ): boolean => {
+    if (!isMyFirstTurn || !hasOpponent) return false;
+    if (toZone === 'reserve') return false;
+    const anyFromReserve = cardIds.some(id => {
+      const card = findMyCardById(id);
+      return card?.zone === 'reserve';
+    });
+    if (!anyFromReserve) return false;
+    setPendingReserveMove({ kind: 'batch', execute });
+    return true;
+  }, [isMyFirstTurn, hasOpponent, findMyCardById]);
+
   // ---- Multiplayer GameActions adapter ----
+  // Wraps moveCard/moveCardsBatch with Turn 1 reserve protection.
   const multiplayerActions: GameActions = useMemo(() => ({
-    moveCard: (cardId, toZone, posX, posY) =>
-      gameState.moveCard(BigInt(cardId), toZone, undefined, posX, posY),
-    moveCardsBatch: (cardIds, toZone) =>
-      gameState.moveCardsBatch(JSON.stringify(cardIds), toZone),
+    moveCard: (cardId, toZone, posX, posY) => {
+      const card = findMyCardById(cardId);
+      const fromZone = card?.zone;
+      const execute = () => gameState.moveCard(BigInt(cardId), toZone, undefined, posX, posY);
+      if (checkReserveProtection(fromZone, toZone, execute)) return;
+      execute();
+    },
+    moveCardsBatch: (cardIds, toZone) => {
+      const execute = () => gameState.moveCardsBatch(JSON.stringify(cardIds), toZone);
+      if (checkReserveBatchProtection(cardIds, toZone, execute)) return;
+      execute();
+    },
     flipCard: (cardId) => gameState.flipCard(BigInt(cardId)),
     meekCard: (cardId) => gameState.meekCard(BigInt(cardId)),
     unmeekCard: (cardId) => gameState.unmeekCard(BigInt(cardId)),
@@ -454,7 +525,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
     randomHandToZone: (count, toZone, deckPosition) =>
       gameState.randomHandToZone(count, toZone, deckPosition),
     reloadDeck: (deckId, deckData) => gameState.reloadDeck(deckId, deckData),
-  }), [gameState]);
+  }), [gameState, findMyCardById, checkReserveProtection, checkReserveBatchProtection]);
 
   // ---- ModalGameProvider value (for shared deck modals) ----
   const modalGameValue = useMemo<ModalGameContextValue>(() => ({
@@ -465,16 +536,24 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       ])
     ),
     actions: {
-      moveCard: (id, toZone, _idx, posX, posY) =>
-        gameState.moveCard(BigInt(id), String(toZone), undefined, posX?.toString(), posY?.toString()),
-      moveCardsBatch: (ids, toZone) =>
-        gameState.moveCardsBatch(JSON.stringify(ids), String(toZone)),
+      moveCard: (id, toZone, _idx, posX, posY) => {
+        const card = findMyCardById(String(id));
+        const fromZone = card?.zone;
+        const execute = () => gameState.moveCard(BigInt(id), String(toZone), undefined, posX?.toString(), posY?.toString());
+        if (checkReserveProtection(fromZone, String(toZone), execute)) return;
+        execute();
+      },
+      moveCardsBatch: (ids, toZone) => {
+        const execute = () => gameState.moveCardsBatch(JSON.stringify(ids), String(toZone));
+        if (checkReserveBatchProtection(ids.map(String), String(toZone), execute)) return;
+        execute();
+      },
       moveCardToTopOfDeck: (id) => gameState.moveCardToTopOfDeck(BigInt(id)),
       moveCardToBottomOfDeck: (id) => gameState.moveCardToBottomOfDeck(BigInt(id)),
       shuffleDeck: () => gameState.shuffleDeck(),
       shuffleCardIntoDeck: (id) => gameState.shuffleCardIntoDeck(BigInt(id)),
     },
-  }), [myCards, counters, gameState]);
+  }), [myCards, counters, gameState, findMyCardById, checkReserveProtection, checkReserveBatchProtection]);
 
   // ---- ModalGameProvider value for opponent deck modals (peek/search operate on opponent cards) ----
   const opponentModalGameValue = useMemo<ModalGameContextValue>(() => ({
@@ -668,19 +747,26 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
         ? String(gameState.opponentPlayer.id)
         : gameState.myPlayer ? String(gameState.myPlayer.id) : '';
 
-      if (zone && posX != null && posY != null) {
-        const rawX = (posX - zone.x) / zone.width;
-        const rawY = (posY - zone.y) / zone.height;
-        // Inverse-mirror for opponent zones (they render with 1-posX, 1-posY)
-        const normX = isOppZone ? 1 - rawX : rawX;
-        const normY = isOppZone ? 1 - rawY : rawY;
-        gameState.moveCard(BigInt(id), String(toZone), undefined, normX.toString(), normY.toString(), ownerId);
-      } else {
-        gameState.moveCard(BigInt(id), String(toZone), undefined, posX?.toString(), posY?.toString(), ownerId);
-      }
+      const execute = () => {
+        if (zone && posX != null && posY != null) {
+          const rawX = (posX - zone.x) / zone.width;
+          const rawY = (posY - zone.y) / zone.height;
+          const normX = isOppZone ? 1 - rawX : rawX;
+          const normY = isOppZone ? 1 - rawY : rawY;
+          gameState.moveCard(BigInt(id), String(toZone), undefined, normX.toString(), normY.toString(), ownerId);
+        } else {
+          gameState.moveCard(BigInt(id), String(toZone), undefined, posX?.toString(), posY?.toString(), ownerId);
+        }
+      };
+      const card = findMyCardById(id);
+      if (checkReserveProtection(card?.zone, String(toZone), execute)) return;
+      execute();
     },
-    moveCardsBatch: (ids: string[], toZone: ZoneId) =>
-      gameState.moveCardsBatch(JSON.stringify(ids), String(toZone)),
+    moveCardsBatch: (ids: string[], toZone: ZoneId) => {
+      const execute = () => gameState.moveCardsBatch(JSON.stringify(ids), String(toZone));
+      if (checkReserveBatchProtection(ids, String(toZone), execute)) return;
+      execute();
+    },
     onDeckDrop: (cardId, screenX, screenY) => {
       // Defer so batch callback (called first) can store IDs
       pendingBatchRef.current = null;
@@ -1234,6 +1320,40 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
         return;
       }
 
+      // Turn 1 reserve protection — check before executing the move
+      if (sourceZone === 'reserve' && targetZone !== 'reserve' && isMyFirstTurn && hasOpponent) {
+        const executeDragMove = () => {
+          // Re-execute the move logic without protection check
+          if (isGroupDrag) {
+            if (targetZone === 'deck') {
+              moveCardsBatch(JSON.stringify(cardIds), targetZone, undefined, targetOwnerId);
+            } else if (isFreeFormZone(targetZone)) {
+              const positions: Record<string, { posX: number; posY: number }> = {
+                [card.instanceId]: { posX: normX(adjDropX), posY: normY(adjDropY) },
+              };
+              if (followerOffsets) {
+                for (const [id, offset] of followerOffsets) {
+                  positions[id] = { posX: normX(adjDropX + offset.dx), posY: normY(adjDropY + offset.dy) };
+                }
+              }
+              moveCardsBatch(JSON.stringify(cardIds), targetZone, JSON.stringify(positions), targetOwnerId);
+            } else {
+              moveCardsBatch(JSON.stringify(cardIds), targetZone, undefined, targetOwnerId);
+            }
+          } else if (isFreeFormZone(targetZone)) {
+            moveCard(cardId, targetZone, '', String(normX(adjDropX)), String(normY(adjDropY)), targetOwnerId);
+          } else if (isAutoArrangeZone(targetZone)) {
+            moveCard(cardId, targetZone, '', '0', '0', targetOwnerId);
+          } else {
+            moveCard(cardId, targetZone, '0', undefined, undefined, targetOwnerId);
+          }
+          if (isGroupDrag) clearSelection();
+        };
+        setPendingReserveMove({ kind: isGroupDrag ? 'batch' : 'single', execute: executeDragMove });
+        snapBack();
+        return;
+      }
+
       // Different zone — perform move
       // Hide dragged card to avoid visual flicker while state updates
       if (!isFreeFormZone(targetZone) && !isAutoArrangeZone(targetZone)) {
@@ -1321,6 +1441,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       offsetX,
       offsetY,
       myCards,
+      isMyFirstTurn,
+      hasOpponent,
     ],
   );
 
@@ -3367,6 +3489,87 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
             opacity: 0.9,
           }}
         />
+      )}
+
+      {/* ================================================================
+          Turn 1 reserve protection confirmation dialog
+          ================================================================ */}
+      {pendingReserveMove && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 950,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.4)',
+          }}
+          onClick={() => setPendingReserveMove(null)}
+        >
+          <div
+            style={{
+              background: 'var(--gf-bg, #1a1510)',
+              border: '1px solid var(--gf-border, #3a3428)',
+              borderRadius: 10,
+              padding: '20px 28px',
+              maxWidth: 360,
+              boxShadow: '0 12px 48px rgba(0,0,0,0.8)',
+              textAlign: 'center',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{
+              fontSize: 14,
+              color: 'var(--gf-text, #c8b89a)',
+              lineHeight: 1.5,
+              marginBottom: 18,
+            }}>
+              Cards typically cannot leave the reserve on <strong style={{ color: 'var(--gf-text-bright, #e8d5a3)' }}>Turn 1</strong>. Move anyway?
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+              <button
+                onClick={() => {
+                  pendingReserveMove.execute();
+                  setPendingReserveMove(null);
+                }}
+                style={{
+                  padding: '7px 20px',
+                  background: '#2d5a27',
+                  border: '1px solid #4a8a42',
+                  borderRadius: 6,
+                  color: '#c4e8bf',
+                  fontSize: 12,
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  cursor: 'pointer',
+                  letterSpacing: 0.5,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#3a7332'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#2d5a27'; }}
+              >
+                Move Anyway
+              </button>
+              <button
+                onClick={() => setPendingReserveMove(null)}
+                style={{
+                  padding: '7px 20px',
+                  background: '#5a2727',
+                  border: '1px solid #8a4242',
+                  borderRadius: 6,
+                  color: '#e8bfbf',
+                  fontSize: 12,
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  cursor: 'pointer',
+                  letterSpacing: 0.5,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#733232'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#5a2727'; }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ================================================================
