@@ -94,4 +94,12 @@ export const actions = {
   addPlayerLostSoul(): GameAction {
     return createAction('ADD_PLAYER_LOST_SOUL');
   },
+
+  reorderHand(cardInstanceIds: string[]): GameAction {
+    return createAction('REORDER_HAND', { cardInstanceIds });
+  },
+
+  reorderLob(cardInstanceIds: string[]): GameAction {
+    return createAction('REORDER_LOB', { cardInstanceIds });
+  },
 };

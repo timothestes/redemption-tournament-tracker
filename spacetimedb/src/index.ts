@@ -42,6 +42,42 @@ function findPlayerBySender(ctx: any, gameId: bigint) {
 }
 
 // ---------------------------------------------------------------------------
+// Helper: compactHandIndices
+// After a card leaves the hand, re-index remaining hand cards to close gaps
+// so zoneIndex values are always sequential: 0, 1, 2, ...
+// ---------------------------------------------------------------------------
+function compactHandIndices(ctx: any, gameId: bigint, playerId: bigint) {
+  const handCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+    (c: any) => c.ownerId === playerId && c.zone === 'hand'
+  );
+  // Sort by current zoneIndex to preserve order
+  handCards.sort((a: any, b: any) => (a.zoneIndex < b.zoneIndex ? -1 : a.zoneIndex > b.zoneIndex ? 1 : 0));
+  // Re-index sequentially
+  for (let i = 0; i < handCards.length; i++) {
+    if (handCards[i].zoneIndex !== BigInt(i)) {
+      ctx.db.CardInstance.id.update({ ...handCards[i], zoneIndex: BigInt(i) });
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Helper: compactLobIndices
+// After a card leaves the LOB, re-index remaining LOB cards to close gaps
+// so zoneIndex values are always sequential: 0, 1, 2, ...
+// ---------------------------------------------------------------------------
+function compactLobIndices(ctx: any, gameId: bigint, playerId: bigint) {
+  const lobCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+    (c: any) => c.ownerId === playerId && c.zone === 'land-of-bondage'
+  );
+  lobCards.sort((a: any, b: any) => (a.zoneIndex < b.zoneIndex ? -1 : a.zoneIndex > b.zoneIndex ? 1 : 0));
+  for (let i = 0; i < lobCards.length; i++) {
+    if (lobCards[i].zoneIndex !== BigInt(i)) {
+      ctx.db.CardInstance.id.update({ ...lobCards[i], zoneIndex: BigInt(i) });
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Helper: drawCardsForPlayer
 // ---------------------------------------------------------------------------
 function drawCardsForPlayer(ctx: any, game: any, player: any, count: number): number {
@@ -1266,7 +1302,17 @@ export const move_card = spacetimedb.reducer(
         ownerId: card.ownerId,
       });
       const actionWord = toZone === 'discard' ? 'discarded' : toZone === 'reserve' ? 'reserved' : 'banished';
-      logAction(ctx, gameId, player.id, 'MOVE_CARD', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), from: fromZone, to: 'land-of-bondage', cardName: card.cardName, cardImgFile: card.cardImgFile, redirected: actionWord }), game.turnNumber, game.currentPhase);
+      const redirectLogName = card.cardName;
+      const redirectLogImg = card.cardImgFile;
+      logAction(ctx, gameId, player.id, 'MOVE_CARD', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), from: fromZone, to: 'land-of-bondage', cardName: redirectLogName, cardImgFile: redirectLogImg, redirected: actionWord }), game.turnNumber, game.currentPhase);
+      // Compact hand indices if card left hand
+      if (fromZone === 'hand') {
+        compactHandIndices(ctx, gameId, card.ownerId);
+      }
+      // Compact LOB indices if card left LOB
+      if (fromZone === 'land-of-bondage') {
+        compactLobIndices(ctx, gameId, card.ownerId);
+      }
       return;
     }
 
@@ -1306,7 +1352,17 @@ export const move_card = spacetimedb.reducer(
 
     // Only log when the card actually changes zones (not repositioning within the same zone)
     if (fromZone !== toZone) {
-      logAction(ctx, gameId, player.id, 'MOVE_CARD', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), from: fromZone, to: toZone, cardName: card.cardName, cardImgFile: card.cardImgFile, targetOwnerId: targetOwnerId || '' }), game.turnNumber, game.currentPhase);
+      const logName = isFlipped ? 'a face-down card' : card.cardName;
+      const logImg = isFlipped ? '' : card.cardImgFile;
+      logAction(ctx, gameId, player.id, 'MOVE_CARD', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), from: fromZone, to: toZone, cardName: logName, cardImgFile: logImg, targetOwnerId: targetOwnerId || '' }), game.turnNumber, game.currentPhase);
+      // Compact hand indices if card left hand
+      if (fromZone === 'hand') {
+        compactHandIndices(ctx, gameId, card.ownerId);
+      }
+      // Compact LOB indices if card left LOB
+      if (fromZone === 'land-of-bondage') {
+        compactLobIndices(ctx, gameId, card.ownerId);
+      }
     }
   }
 );
@@ -1331,6 +1387,8 @@ export const move_cards_batch = spacetimedb.reducer(
     const cards: { name: string; img: string }[] = [];
     const movedCards: { name: string; img: string }[] = [];
     const redirectedLostSouls: { name: string; img: string }[] = [];
+    const handCompactOwners = new Set<bigint>(); // Track owners whose hand needs compaction
+    const lobCompactOwners = new Set<bigint>(); // Track owners whose LOB needs compaction
 
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
@@ -1363,9 +1421,20 @@ export const move_cards_batch = spacetimedb.reducer(
       // Allow moves by either player in the game (cards move between zones during battles)
       if (card.gameId !== gameId) throw new SenderError('Card not in this game: ' + idStr);
 
-      cards.push({ name: card.cardName, img: card.cardImgFile });
+      // Moving to deck = face-down; leaving deck = face-up; otherwise preserve
+      const isFlipped = toZone === 'deck' ? true : (card.zone === 'deck' ? false : card.isFlipped);
+
+      const logName = isFlipped ? 'a face-down card' : card.cardName;
+      const logImg = isFlipped ? '' : card.cardImgFile;
+      cards.push({ name: logName, img: logImg });
       if (card.zone !== toZone) {
-        movedCards.push({ name: card.cardName, img: card.cardImgFile });
+        movedCards.push({ name: logName, img: logImg });
+        if (card.zone === 'hand') {
+          handCompactOwners.add(card.ownerId);
+        }
+        if (card.zone === 'land-of-bondage') {
+          lobCompactOwners.add(card.ownerId);
+        }
       }
 
       // Lost souls sent to discard or reserve go to land-of-bondage instead
@@ -1385,13 +1454,13 @@ export const move_cards_batch = spacetimedb.reducer(
           isFlipped: false,
           ownerId: card.ownerId,
         });
-        redirectedLostSouls.push({ name: card.cardName, img: card.cardImgFile });
+        redirectedLostSouls.push({ name: logName, img: logImg });
         continue;
       }
 
-      const pos = posMap[idStr] || { posX: '', posY: '' };
-      // Moving to deck = face-down; leaving deck = face-up; otherwise preserve
-      const isFlipped = toZone === 'deck' ? true : (card.zone === 'deck' ? false : card.isFlipped);
+      const rawPos = posMap[idStr] || { posX: '', posY: '' };
+      // Ensure posX/posY are strings — client may send numbers via JSON positions map
+      const pos = { posX: String(rawPos.posX ?? ''), posY: String(rawPos.posY ?? '') };
       const cardOwnerId = newOwnerId ?? card.ownerId;
 
       // For hand zone, assign sequential zoneIndex (count of existing hand cards for this owner)
@@ -1431,6 +1500,15 @@ export const move_cards_batch = spacetimedb.reducer(
     if (movedCards.length > 0 || redirectedLostSouls.length > 0) {
       logAction(ctx, gameId, player.id, 'MOVE_CARDS_BATCH', JSON.stringify({ count: movedCards.length, toZone, cards: movedCards, redirectedLostSouls, targetOwnerId: targetOwnerId || '' }), game.turnNumber, game.currentPhase);
     }
+
+    // Compact hand indices for any owners whose hand had cards removed
+    for (const ownerId of handCompactOwners) {
+      compactHandIndices(ctx, gameId, ownerId);
+    }
+    // Compact LOB indices for any owners whose LOB had cards removed
+    for (const ownerId of lobCompactOwners) {
+      compactLobIndices(ctx, gameId, ownerId);
+    }
   }
 );
 
@@ -1459,7 +1537,35 @@ export const reorder_hand = spacetimedb.reducer(
       ctx.db.CardInstance.id.update({ ...card, zoneIndex: BigInt(i) });
     }
 
-    logAction(ctx, gameId, player.id, 'REORDER_HAND', JSON.stringify({ count: ids.length }), game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: reorder_lob
+// ---------------------------------------------------------------------------
+export const reorder_lob = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardIds: t.string(), // JSON array of card instance IDs as strings, in desired order
+  },
+  (ctx, { gameId, cardIds }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+
+    const ids: string[] = JSON.parse(cardIds);
+
+    for (let i = 0; i < ids.length; i++) {
+      const cardId = BigInt(ids[i]);
+      const card = ctx.db.CardInstance.id.find(cardId);
+      if (!card) continue;
+      if (card.gameId !== gameId) continue;
+      if (card.ownerId !== player.id) continue; // Only reorder own cards
+      if (card.zone !== 'land-of-bondage') continue; // Only reorder LOB cards
+      ctx.db.CardInstance.id.update({ ...card, zoneIndex: BigInt(i) });
+    }
+
+    logAction(ctx, gameId, player.id, 'REORDER_LOB', JSON.stringify({ count: ids.length }), game.turnNumber, game.currentPhase);
   }
 );
 
@@ -1516,25 +1622,28 @@ export const shuffle_card_into_deck = spacetimedb.reducer(
     if (!card) throw new SenderError('Card not found');
     if (card.gameId !== gameId) throw new SenderError('Card not in this game');
 
-    // Move card to deck
+    const fromZone = card.zone;
+
+    // Move card to deck (card keeps its ownerId — it goes into that player's deck)
+    const deckOwnerId = card.ownerId;
     ctx.db.CardInstance.id.update({
       ...card,
       zone: 'deck',
       isFlipped: true,
     });
 
-    // Now shuffle entire deck (same logic as shuffle_deck)
+    // Now shuffle the deck owner's entire deck (same logic as shuffle_deck)
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
 
     const deckCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
-      (c: any) => c.ownerId === player.id && c.zone === 'deck'
+      (c: any) => c.ownerId === deckOwnerId && c.zone === 'deck'
     );
 
     const newRngCounter = game.rngCounter + 1n;
     ctx.db.Game.id.update({ ...game, rngCounter: newRngCounter });
 
-    const seed = makeSeed(ctx.timestamp.microsSinceUnixEpoch, gameId, player.id, newRngCounter);
+    const seed = makeSeed(ctx.timestamp.microsSinceUnixEpoch, gameId, deckOwnerId, newRngCounter);
 
     const indices = deckCards.map((_: any, idx: number) => idx);
     seededShuffle(indices, seed);
@@ -1546,7 +1655,16 @@ export const shuffle_card_into_deck = spacetimedb.reducer(
       });
     }
 
-    logAction(ctx, gameId, player.id, 'SHUFFLE_INTO_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString() }), game.turnNumber, game.currentPhase);
+    // Compact hand indices if card left hand
+    if (fromZone === 'hand') {
+      compactHandIndices(ctx, gameId, deckOwnerId);
+    }
+    // Compact LOB indices if card left LOB
+    if (fromZone === 'land-of-bondage') {
+      compactLobIndices(ctx, gameId, deckOwnerId);
+    }
+
+    logAction(ctx, gameId, player.id, 'SHUFFLE_INTO_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: card.cardName, cardImgFile: card.cardImgFile, deckOwnerId: deckOwnerId.toString() }), game.turnNumber, game.currentPhase);
   }
 );
 
@@ -1638,6 +1756,9 @@ export const random_hand_to_zone = spacetimedb.reducer(
         ctx.db.CardInstance.id.update({ ...allDeckCards[i], zoneIndex: BigInt(shuffleIndices[i]) });
       }
     }
+
+    // Compact hand indices after cards were removed from hand
+    compactHandIndices(ctx, gameId, player.id);
 
     const destLabel = toZone === 'deck' ? `deck (${deckPosition})` : toZone;
     logAction(ctx, gameId, player.id, 'RANDOM_HAND_TO_ZONE',
@@ -1758,7 +1879,14 @@ export const flip_card = spacetimedb.reducer(
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
 
-    logAction(ctx, gameId, player.id, 'FLIP', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), isFlipped: !card.isFlipped }), game.turnNumber, game.currentPhase);
+    const newFlipped = !card.isFlipped;
+    const flipPayload: Record<string, string | boolean> = { cardInstanceId: cardInstanceId.toString(), isFlipped: newFlipped };
+    if (!newFlipped) {
+      // Flipping face-up — include card identity
+      flipPayload.cardName = card.cardName;
+      flipPayload.cardImgFile = card.cardImgFile;
+    }
+    logAction(ctx, gameId, player.id, 'FLIP', JSON.stringify(flipPayload), game.turnNumber, game.currentPhase);
   }
 );
 
@@ -1939,6 +2067,9 @@ export const exchange_cards = spacetimedb.reducer(
       });
     }
 
+    // Compact hand indices before drawing replacements so new cards get correct indices
+    compactHandIndices(ctx, gameId, player.id);
+
     // Draw same number of replacement cards
     const latestGame = ctx.db.Game.id.find(gameId);
     if (latestGame) {
@@ -1968,6 +2099,8 @@ export const move_card_to_top_of_deck = spacetimedb.reducer(
     if (!card) throw new SenderError('Card not found');
     if (card.gameId !== gameId) throw new SenderError('Card not in this game');
 
+    const fromZone = card.zone;
+
     // Shift all existing deck cards' zoneIndex += 1
     const deckCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
       (c: any) => c.ownerId === player.id && c.zone === 'deck'
@@ -1987,7 +2120,18 @@ export const move_card_to_top_of_deck = spacetimedb.reducer(
       isFlipped: true,
     });
 
-    logAction(ctx, gameId, player.id, 'MOVE_TO_TOP_OF_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: card.cardName, cardImgFile: card.cardImgFile }), game.turnNumber, game.currentPhase);
+    // Compact hand indices if card left hand
+    if (fromZone === 'hand') {
+      compactHandIndices(ctx, gameId, card.ownerId);
+    }
+    // Compact LOB indices if card left LOB
+    if (fromZone === 'land-of-bondage') {
+      compactLobIndices(ctx, gameId, card.ownerId);
+    }
+
+    const topLogName = card.isFlipped ? 'a face-down card' : card.cardName;
+    const topLogImg = card.isFlipped ? '' : card.cardImgFile;
+    logAction(ctx, gameId, player.id, 'MOVE_TO_TOP_OF_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: topLogName, cardImgFile: topLogImg }), game.turnNumber, game.currentPhase);
   }
 );
 
@@ -2010,6 +2154,8 @@ export const move_card_to_bottom_of_deck = spacetimedb.reducer(
     if (!card) throw new SenderError('Card not found');
     if (card.gameId !== gameId) throw new SenderError('Card not in this game');
 
+    const fromZone = card.zone;
+
     // Find max zoneIndex among player's deck cards
     const deckCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
       (c: any) => c.ownerId === player.id && c.zone === 'deck'
@@ -2029,7 +2175,18 @@ export const move_card_to_bottom_of_deck = spacetimedb.reducer(
       isFlipped: true,
     });
 
-    logAction(ctx, gameId, player.id, 'MOVE_TO_BOTTOM_OF_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: card.cardName, cardImgFile: card.cardImgFile }), game.turnNumber, game.currentPhase);
+    // Compact hand indices if card left hand
+    if (fromZone === 'hand') {
+      compactHandIndices(ctx, gameId, card.ownerId);
+    }
+    // Compact LOB indices if card left LOB
+    if (fromZone === 'land-of-bondage') {
+      compactLobIndices(ctx, gameId, card.ownerId);
+    }
+
+    const bottomLogName = card.isFlipped ? 'a face-down card' : card.cardName;
+    const bottomLogImg = card.isFlipped ? '' : card.cardImgFile;
+    logAction(ctx, gameId, player.id, 'MOVE_TO_BOTTOM_OF_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: bottomLogName, cardImgFile: bottomLogImg }), game.turnNumber, game.currentPhase);
   }
 );
 
@@ -2391,7 +2548,11 @@ export const deny_zone_search = spacetimedb.reducer(
     if (req.targetPlayerId !== player.id) throw new SenderError('Only the target player can deny');
     if (req.status !== 'pending') throw new SenderError('Request is not pending');
 
+    const game = ctx.db.Game.id.find(gameId);
+    const zone = req.zone;
     ctx.db.ZoneSearchRequest.id.delete(requestId);
+
+    logAction(ctx, gameId, player.id, 'DENY_ZONE_SEARCH', JSON.stringify({ zone }), game ? game.turnNumber : 0n, game ? game.currentPhase : 'draw');
   }
 );
 
@@ -2411,7 +2572,16 @@ export const complete_zone_search = spacetimedb.reducer(
     if (req.requesterId !== player.id) throw new SenderError('Only the requester can complete');
     if (req.status !== 'approved') throw new SenderError('Request is not approved');
 
+    const game = ctx.db.Game.id.find(gameId);
+    const allPlayers = [...ctx.db.Player.player_game_id.filter(gameId)];
+    const opponent = allPlayers.find(p => p.id !== player.id);
+    const targetName = opponent ? opponent.displayName : 'opponent';
+
     ctx.db.ZoneSearchRequest.id.delete(requestId);
+
+    if (game) {
+      logAction(ctx, gameId, player.id, 'COMPLETE_ZONE_SEARCH', JSON.stringify({ zone: req.zone, targetName }), game.turnNumber, game.currentPhase);
+    }
   }
 );
 
@@ -2454,6 +2624,15 @@ export const move_opponent_card = spacetimedb.reducer(
       posY,
       isFlipped,
     });
+
+    // Compact hand indices if card left hand
+    if (fromZone === 'hand') {
+      compactHandIndices(ctx, gameId, card.ownerId);
+    }
+    // Compact LOB indices if card left LOB
+    if (fromZone === 'land-of-bondage') {
+      compactLobIndices(ctx, gameId, card.ownerId);
+    }
 
     logAction(ctx, gameId, player.id, 'MOVE_OPPONENT_CARD',
       JSON.stringify({ requestId: requestId.toString(), cardInstanceId: cardInstanceId.toString(), from: fromZone, to: toZone }),

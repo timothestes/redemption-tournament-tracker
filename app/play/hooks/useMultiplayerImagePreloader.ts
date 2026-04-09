@@ -36,6 +36,9 @@ export function useMultiplayerImagePreloader(
   // Single numeric state — bumped to force one re-render when a batch finishes.
   const [version, setVersion] = useState(0);
 
+  // Track in-flight batch loads to prevent duplicate requests
+  const batchLoadingSetRef = useRef<Set<string>>(new Set());
+
   // Load a single URL; updates counters and optionally bumps version on batch end.
   const loadUrl = useCallback((url: string, onBatchComplete?: () => void) => {
     if (imageMapRef.current.has(url)) {
@@ -45,10 +48,19 @@ export function useMultiplayerImagePreloader(
       return;
     }
 
+    if (batchLoadingSetRef.current.has(url)) {
+      // Already in-flight — count it but don't create another Image
+      loadedCountRef.current++;
+      onBatchComplete?.();
+      return;
+    }
+
+    batchLoadingSetRef.current.add(url);
     const img = new Image();
     img.crossOrigin = 'anonymous';
 
     const finish = () => {
+      batchLoadingSetRef.current.delete(url);
       loadedCountRef.current++;
       onBatchComplete?.();
     };
@@ -103,6 +115,9 @@ export function useMultiplayerImagePreloader(
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urls, loadUrl]);
 
+  // Track in-flight loads to prevent duplicate requests
+  const loadingSetRef = useRef<Set<string>>(new Set());
+
   /**
    * Returns the cached HTMLImageElement for a URL, or null if not yet loaded.
    * If the URL is unknown, kicks off a lazy load and returns null immediately.
@@ -113,12 +128,20 @@ export function useMultiplayerImagePreloader(
       const cached = imageMapRef.current.get(url);
       if (cached) return cached;
 
+      // Already loading — don't create another Image
+      if (loadingSetRef.current.has(url)) return null;
+
       // Lazy Phase 3 load — not part of any pre-known batch.
+      loadingSetRef.current.add(url);
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
         imageMapRef.current.set(url, img);
+        loadingSetRef.current.delete(url);
         setVersion((v) => v + 1);
+      };
+      img.onerror = () => {
+        loadingSetRef.current.delete(url);
       };
       img.src = url;
 

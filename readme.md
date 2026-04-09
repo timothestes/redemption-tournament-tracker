@@ -148,4 +148,3 @@ start of game takes a bit to load
 add feature for t1 reserve access
 redemptionccg app logo takes a while to load in 
 create system where cards can have custom abilities coded
-soften up lost soul and hand ordering

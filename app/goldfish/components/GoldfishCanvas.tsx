@@ -8,6 +8,7 @@ import { useGame } from '../state/GameContext';
 import { calculateZoneLayout, calculateCardPositionsInZone, type ZoneRect } from '../layout/zoneLayout';
 import { CARD_WIDTH, CARD_HEIGHT, CARD_ASPECT_RATIO } from '../layout/zoneLayout';
 import { calculateHandPositions } from '../layout/handLayout';
+import { calculateAutoArrangePositions } from '../../play/layout/multiplayerAutoArrange';
 import { VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen } from '@/app/shared/layout/virtualCanvas';
 import { GameCard, ZoneId, ZONE_LABELS } from '../types';
 import { GameCardNode, CardBackShape, cardBackListeners, cardBackLoaded } from '../../shared/components/GameCardNode';
@@ -47,7 +48,7 @@ interface GoldfishCanvasProps {
 }
 
 export default function GoldfishCanvas({ containerWidth, containerHeight, scale, offsetX, offsetY, virtualWidth }: GoldfishCanvasProps) {
-  const { state, dispatch, drawCard, drawMultiple, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck, shuffleDeck, meekCard, unmeekCard, flipCard, addCounter, removeCounter, addNote, addOpponentLostSoul, removeOpponentToken, addPlayerLostSoul } = useGame();
+  const { state, dispatch, drawCard, drawMultiple, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck, shuffleDeck, meekCard, unmeekCard, flipCard, addCounter, removeCounter, addNote, addOpponentLostSoul, removeOpponentToken, addPlayerLostSoul, reorderHand } = useGame();
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const stageRef = useRef<Konva.Stage>(null);
   const gameLayerRef = useRef<Konva.Layer>(null);
@@ -545,7 +546,43 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       const isGroupDrag = selectedIds.has(card.instanceId) && selectedIds.size > 1;
       const cardIds = isGroupDrag ? Array.from(selectedIds) : [card.instanceId];
 
-      if (targetZone === 'deck' && card.zone !== 'deck') {
+      // Hand-to-hand reorder: when a hand card is dropped back on the hand zone
+      if (targetZone === 'hand' && card.zone === 'hand' && state.zones.hand.length > 1) {
+        // Calculate current hand positions to find the closest slot to the drop point
+        const currentHandPositions = calculateHandPositions(
+          state.zones.hand.length, virtualWidth, VIRTUAL_HEIGHT, state.isSpreadHand, cardWidth, cardHeight
+        );
+        let targetIdx = 0;
+        let minDist = Infinity;
+        for (let i = 0; i < currentHandPositions.length; i++) {
+          const dist = Math.abs(currentHandPositions[i].x + cardWidth / 2 - centerX);
+          if (dist < minDist) {
+            minDist = dist;
+            targetIdx = i;
+          }
+        }
+        const currentIdx = state.zones.hand.findIndex(c => c.instanceId === card.instanceId);
+        if (currentIdx !== -1 && currentIdx !== targetIdx) {
+          const newOrder = [...state.zones.hand];
+          const [dragged] = newOrder.splice(currentIdx, 1);
+          newOrder.splice(targetIdx, 0, dragged);
+          reorderHand(newOrder.map(c => c.instanceId));
+        }
+      } else if (targetZone === 'land-of-bondage' && card.zone === 'land-of-bondage') {
+        // LOB-to-LOB: snap back to auto-arranged position
+        const lobZone = zoneLayout['land-of-bondage'];
+        if (lobZone) {
+          const lobPositions = calculateAutoArrangePositions(
+            state.zones['land-of-bondage'].length, lobZone, cardWidth, cardHeight
+          );
+          const idx = state.zones['land-of-bondage'].findIndex(c => c.instanceId === card.instanceId);
+          if (idx !== -1 && lobPositions[idx]) {
+            node.x(lobPositions[idx].x);
+            node.y(lobPositions[idx].y);
+          }
+        }
+        node.getLayer()?.batchDraw();
+      } else if (targetZone === 'deck' && card.zone !== 'deck') {
         // Hide the card so it doesn't awkwardly sit at the deck position while the popup is open
         let cardGroup: Konva.Node | null = node;
         while (cardGroup && !cardGroup.draggable()) {
@@ -564,12 +601,12 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
           const screenPos = virtualToScreen(centerX, centerY, scale, offsetX, offsetY);
           handleDeckDrop(card.instanceId, rect.left + screenPos.x, rect.top + screenPos.y);
         }
-      } else if (targetZone && (targetZone !== card.zone || targetZone === 'territory' || targetZone === 'land-of-bondage')) {
+      } else if (targetZone && (targetZone !== card.zone || targetZone === 'territory')) {
         // Hide the dragged card group immediately so it doesn't linger at the drop position
         // while React processes the state update and re-renders the card in its new zone.
         // Walk up from e.target to find the draggable Group (the card-level container).
         // Skip hiding for free-form zones where repositioning within the same zone is allowed.
-        const freeFormZones: ZoneId[] = ['territory', 'land-of-bondage'];
+        const freeFormZones: ZoneId[] = ['territory'];
         if (!freeFormZones.includes(targetZone)) {
           let cardGroup: Konva.Node | null = node;
           while (cardGroup && !cardGroup.draggable()) {
@@ -596,7 +633,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
         } else if (freeFormZones.includes(targetZone)) {
           moveCard(card.instanceId, targetZone, undefined, dropX, dropY);
         } else {
-          moveCard(card.instanceId, targetZone, undefined, dropX, dropY);
+          moveCard(card.instanceId, targetZone);
         }
       }
 
@@ -616,7 +653,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
         }, 700);
       }
     },
-    [findZoneAtPosition, moveCard, moveCardsBatch, handleDeckDrop, cardWidth, cardHeight, selectedIds, clearSelection, state.turn, scale, offsetX, offsetY]
+    [findZoneAtPosition, moveCard, moveCardsBatch, handleDeckDrop, cardWidth, cardHeight, selectedIds, clearSelection, state.turn, scale, offsetX, offsetY, state.zones.hand, state.zones['land-of-bondage'], state.isSpreadHand, virtualWidth, reorderHand, zoneLayout]
   );
 
   const handleCardContextMenu = useCallback(
@@ -849,13 +886,13 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       });
     }
 
-    // Land of bondage (free-form)
+    // Land of bondage (auto-arrange)
     const lobZone = zoneLayout['land-of-bondage'];
-    if (lobZone) {
+    if (lobZone && state.zones['land-of-bondage'].length > 0) {
+      const lobPositions = calculateAutoArrangePositions(state.zones['land-of-bondage'].length, lobZone, cardWidth, cardHeight);
       state.zones['land-of-bondage'].forEach((card, i) => {
-        const x = card.posX ?? (lobZone.x + 8 + (i % 8) * (cardWidth + 4));
-        const y = card.posY ?? (lobZone.y + 20 + Math.floor(i / 8) * (cardHeight * 0.35));
-        bounds.push({ instanceId: card.instanceId, x, y, width: cardWidth, height: cardHeight, rotation: 0 });
+        const pos = lobPositions[i];
+        if (pos) bounds.push({ instanceId: card.instanceId, x: pos.x, y: pos.y, width: cardWidth, height: cardHeight, rotation: 0 });
       });
     }
 
@@ -1353,26 +1390,27 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
               );
             }
 
-            // Land of Bondage: free-form placement using stored positions
+            // Land of Bondage: auto-arrange horizontal strip with drag-to-reorder
             if (zoneId === 'land-of-bondage') {
               const zone = zoneLayout[zoneId];
+              const lobPositions = calculateAutoArrangePositions(cards.length, zone, cardWidth, cardHeight);
               return (
                 <Group key={zoneId} clipX={zone.x} clipY={zone.y} clipWidth={zone.width} clipHeight={zone.height}>
                   {cards.map((card, i) => {
-                    const x = card.posX ?? (zone.x + 8 + (i % 8) * (cardWidth + 4));
-                    const y = card.posY ?? (zone.y + 20 + Math.floor(i / 8) * (cardHeight * 0.35));
+                    const pos = lobPositions[i];
+                    if (!pos) return null;
                     return (
                       <GameCardNode
                         key={card.instanceId}
                         card={card}
-                        x={x}
-                        y={y}
+                        x={pos.x}
+                        y={pos.y}
                         rotation={0}
                         cardWidth={cardWidth}
                         cardHeight={cardHeight}
                         image={getImage(card.cardImgFile)}
                         isSelected={selectedIds.has(card.instanceId)}
-                      hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
+                        hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
                         nodeRef={registerCardNode}
                         onDragStart={handleCardDragStart}
                         onDragMove={handleCardDragMove}

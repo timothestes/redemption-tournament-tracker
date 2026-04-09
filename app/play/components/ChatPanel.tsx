@@ -80,6 +80,7 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
 
 function HoverableCard({ name, img }: { name: string; img?: string }) {
   const { setPreviewCard } = useCardPreview();
+  if (name === 'a face-down card') return <span>{name}</span>;
   return (
     <span
       style={{ textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 2, cursor: 'pointer' }}
@@ -134,6 +135,13 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
     try {
       const data = JSON.parse(payload);
       if (data.cardName) return <>converted <HoverableCard name={data.cardName} img={data.cardImgFile} /> from meek</>;
+    } catch { /* fall through */ }
+  }
+  if ((actionType === 'FLIP' || actionType === 'FLIP_CARD') && payload) {
+    try {
+      const data = JSON.parse(payload);
+      if (!data.isFlipped && data.cardName) return <>flipped <HoverableCard name={data.cardName} img={data.cardImgFile} /> face up</>;
+      return data.isFlipped ? 'turned a card face down' : 'flipped a card face up';
     } catch { /* fall through */ }
   }
   if (actionType === 'SET_PHASE' && payload) {
@@ -240,6 +248,21 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       if (parts.length) return <>{parts.map((p, i) => <span key={i}>{i > 0 && '; '}{p}</span>)}</>;
     } catch { /* fall through */ }
   }
+  if ((actionType === 'SHUFFLE_INTO_DECK' || actionType === 'SHUFFLE_CARD_INTO_DECK') && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const isCrossPlayer = data.deckOwnerId && data.deckOwnerId !== actorPlayerId;
+      const targetName = isCrossPlayer && playerNames?.[data.deckOwnerId];
+      if (data.cardName) {
+        return targetName
+          ? <>shuffled <HoverableCard name={data.cardName} img={data.cardImgFile} /> into {targetName}&apos;s deck</>
+          : <>shuffled <HoverableCard name={data.cardName} img={data.cardImgFile} /> into their deck</>;
+      }
+      return targetName ? `shuffled a card into ${targetName}'s deck` : 'shuffled a card into their deck';
+    } catch { /* fall through */ }
+  }
+  if (actionType === 'REVEAL_HAND') return 'revealed their hand for 30 seconds';
+  if (actionType === 'HIDE_HAND') return 'hid their hand';
   if (actionType === 'REQUEST_ZONE_SEARCH' && payload) {
     try {
       const data = JSON.parse(payload);
@@ -253,8 +276,26 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
   if (actionType === 'APPROVE_ZONE_SEARCH' && payload) {
     try {
       const data = JSON.parse(payload);
-      const zoneName = data.zone === 'hand-reveal' ? 'hand reveal' : data.zone === 'action-priority' ? 'action priority' : `${data.zone} search`;
-      return `approved ${zoneName}`;
+      if (data.zone === 'hand-reveal') return 'approved hand reveal';
+      if (data.zone === 'action-priority') return 'granted action priority';
+      return `allowed ${data.zone} search`;
+    } catch { /* fall through */ }
+  }
+  if (actionType === 'DENY_ZONE_SEARCH' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      if (data.zone === 'hand-reveal') return 'denied hand reveal';
+      if (data.zone === 'action-priority') return 'denied action priority';
+      return `denied ${data.zone} search`;
+    } catch { /* fall through */ }
+  }
+  if (actionType === 'COMPLETE_ZONE_SEARCH' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const targetName = data.targetName ?? 'opponent';
+      if (data.zone === 'hand-reveal') return `finished viewing ${targetName}'s hand`;
+      if (data.zone === 'action-priority') return 'finished action priority';
+      return `finished searching ${targetName}'s ${data.zone}`;
     } catch { /* fall through */ }
   }
   return ACTION_TYPE_LABELS[actionType] ?? actionType.toLowerCase().replace(/_/g, ' ');

@@ -723,7 +723,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // lifecycle === 'finished' — show canvas (frozen) with GameOverOverlay on top,
   // or render the overlay standalone if canvas data is unavailable.
   if (lifecycle === 'finished') {
-    const { winnerName } = deriveEndReason(gameState.gameActions, gameState.myPlayer);
+    const { label: endLabel, winnerName } = deriveEndReason(gameState.gameActions, gameState.myPlayer);
+    const opponentLeft = endLabel === 'Opponent resigned' || endLabel === 'Opponent disconnected';
 
     // Show the overlay over the frozen canvas — always render canvas if gameId is known
     if (gameId !== null) {
@@ -740,7 +741,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                 onEndTurn={() => {}}
                 isFinished
                 winnerName={winnerName}
-                onPlayAgain={() => setPlayAgainTriggered(true)}
+                onPlayAgain={opponentLeft ? undefined : () => setPlayAgainTriggered(true)}
                 myScore={gameState.myCards['land-of-redemption']?.length ?? 0}
                 opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}
               />
@@ -810,7 +811,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               onEndTurn={() => {}}
               isFinished
               winnerName={winnerName}
-              onPlayAgain={() => setPlayAgainTriggered(true)}
+              onPlayAgain={opponentLeft ? undefined : () => setPlayAgainTriggered(true)}
               myScore={gameState.myCards['land-of-redemption']?.length ?? 0}
               opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}
             />

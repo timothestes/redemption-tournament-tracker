@@ -32,6 +32,8 @@ interface GameContextValue {
   removeOpponentToken: (cardInstanceId: string) => void;
   moveCardsBatch: (cardInstanceIds: string[], toZone: ZoneId, positions?: Record<string, { posX: number; posY: number }>) => void;
   addPlayerLostSoul: () => void;
+  reorderHand: (cardInstanceIds: string[]) => void;
+  reorderLob: (cardInstanceIds: string[]) => void;
   toggleSpreadHand: () => void;
 }
 
@@ -131,6 +133,14 @@ export function GameProvider({ children, deck, optionsOverrides }: GameProviderP
     [dispatch]
   );
   const addPlayerLostSoul = useCallback(() => dispatch(actions.addPlayerLostSoul()), [dispatch]);
+  const reorderHand = useCallback(
+    (cardInstanceIds: string[]) => dispatch(actions.reorderHand(cardInstanceIds)),
+    [dispatch]
+  );
+  const reorderLob = useCallback(
+    (cardInstanceIds: string[]) => dispatch(actions.reorderLob(cardInstanceIds)),
+    [dispatch]
+  );
 
   const toggleSpreadHand = useCallback(() => {
     // Spread hand toggle — handled via a special action or direct state
@@ -170,6 +180,8 @@ export function GameProvider({ children, deck, optionsOverrides }: GameProviderP
       removeOpponentToken,
       moveCardsBatch,
       addPlayerLostSoul,
+      reorderHand,
+      reorderLob,
       toggleSpreadHand,
     }),
     [
@@ -177,7 +189,7 @@ export function GameProvider({ children, deck, optionsOverrides }: GameProviderP
       moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck,
       shuffleDeck, undo, newGame, advancePhase, regressPhase, endTurn,
       addCounter, removeCounter, meekCard, unmeekCard, flipCard,
-      addNote, addOpponentLostSoul, removeOpponentToken, moveCardsBatch, addPlayerLostSoul, toggleSpreadHand,
+      addNote, addOpponentLostSoul, removeOpponentToken, moveCardsBatch, addPlayerLostSoul, reorderHand, reorderLob, toggleSpreadHand,
     ]
   );
 

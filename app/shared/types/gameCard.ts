@@ -98,7 +98,9 @@ export type ActionType =
   | 'SHUFFLE_AND_MOVE_TO_TOP'
   | 'SHUFFLE_AND_MOVE_TO_BOTTOM'
   | 'MOVE_CARDS_BATCH'
-  | 'ADD_PLAYER_LOST_SOUL';
+  | 'ADD_PLAYER_LOST_SOUL'
+  | 'REORDER_HAND'
+  | 'REORDER_LOB';
 
 export interface GameAction {
   id: string;

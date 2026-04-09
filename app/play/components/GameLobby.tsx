@@ -327,7 +327,7 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
               <Button
                 size="lg"
                 onClick={handleCreateGame}
-                disabled={isCreating || !selectedDeck}
+                disabled={isCreating || isJoining || !selectedDeck}
                 className="w-full h-12 text-base"
               >
                 {isCreating ? (
@@ -384,7 +384,7 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
                   size="lg"
                   variant="outline"
                   onClick={handleJoinGame}
-                  disabled={isJoining || gameCode.length !== 4 || (!isSpectate && !selectedDeck)}
+                  disabled={isJoining || isCreating || gameCode.length !== 4 || (!isSpectate && !selectedDeck)}
                   className="shrink-0 h-12 w-20"
                 >
                   {isJoining ? (

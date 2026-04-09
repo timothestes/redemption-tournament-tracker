@@ -97,8 +97,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         result.card.isFlipped = false;
       }
       result.card.zone = toZone;
-      // Store free-form position for territory and land-of-bondage
-      const FREE_FORM_ZONES: ZoneId[] = ['territory', 'land-of-bondage'];
+      // Store free-form position for territory only (LOB is auto-arranged)
+      const FREE_FORM_ZONES: ZoneId[] = ['territory'];
       if (FREE_FORM_ZONES.includes(toZone) && posX !== undefined && posY !== undefined) {
         result.card.posX = posX;
         result.card.posY = posY;
@@ -419,6 +419,59 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const { cardInstanceId } = action.payload;
       if (!cardInstanceId) return state;
       findAndRemoveCard(zones, cardInstanceId);
+      return { ...state, zones, history };
+    }
+
+    case 'REORDER_HAND': {
+      const { cardInstanceIds } = action.payload;
+      if (!cardInstanceIds || cardInstanceIds.length === 0) return state;
+
+      // Build a map of instanceId → card for quick lookup
+      const handMap = new Map<string, GameCard>();
+      for (const card of zones.hand) {
+        handMap.set(card.instanceId, card);
+      }
+
+      // Reorder hand to match the provided ID order
+      const reordered: GameCard[] = [];
+      for (const id of cardInstanceIds) {
+        const card = handMap.get(id);
+        if (card) {
+          reordered.push(card);
+          handMap.delete(id);
+        }
+      }
+      // Append any cards not in the provided list (safety net)
+      for (const card of handMap.values()) {
+        reordered.push(card);
+      }
+
+      zones.hand = reordered;
+      return { ...state, zones, history };
+    }
+
+    case 'REORDER_LOB': {
+      const { cardInstanceIds } = action.payload;
+      if (!cardInstanceIds || cardInstanceIds.length === 0) return state;
+
+      const lobMap = new Map<string, GameCard>();
+      for (const card of zones['land-of-bondage']) {
+        lobMap.set(card.instanceId, card);
+      }
+
+      const reordered: GameCard[] = [];
+      for (const id of cardInstanceIds) {
+        const card = lobMap.get(id);
+        if (card) {
+          reordered.push(card);
+          lobMap.delete(id);
+        }
+      }
+      for (const card of lobMap.values()) {
+        reordered.push(card);
+      }
+
+      zones['land-of-bondage'] = reordered;
       return { ...state, zones, history };
     }
 

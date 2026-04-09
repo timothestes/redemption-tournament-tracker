@@ -1229,9 +1229,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       // layer coords back to the parent's local coords.
       const snapBack = () => {
         if (originalParent && node.parent !== originalParent) {
-          const absPos = node.getAbsolutePosition();
           node.moveTo(originalParent);
-          node.setAbsolutePosition(absPos);
+          // originalPos is in layer-local coords (captured after reparenting to the layer
+          // in dragStart). The original parent Group is also a child of the same layer
+          // with no additional transform, so layer-local coords === parent-local coords.
+          if (originalPos) {
+            node.x(originalPos.x);
+            node.y(originalPos.y);
+          }
         } else if (originalPos) {
           node.x(originalPos.x);
           node.y(originalPos.y);
@@ -1347,12 +1352,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
             }
           }
           // Build positions for batch move (normalized 0–1)
-          const positions: Record<string, { posX: number; posY: number }> = {
-            [card.instanceId]: { posX: normX(dropX), posY: normY(dropY) },
+          const positions: Record<string, { posX: string; posY: string }> = {
+            [card.instanceId]: { posX: String(normX(dropX)), posY: String(normY(dropY)) },
           };
           if (followerOffsets) {
             for (const [id, offset] of followerOffsets) {
-              positions[id] = { posX: normX(dropX + offset.dx), posY: normY(dropY + offset.dy) };
+              positions[id] = { posX: String(normX(dropX + offset.dx)), posY: String(normY(dropY + offset.dy)) };
             }
           }
           moveCardsBatch(
@@ -1421,12 +1426,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
             if (targetZone === 'deck') {
               moveCardsBatch(JSON.stringify(cardIds), targetZone, undefined, targetOwnerId);
             } else if (isFreeFormZone(targetZone)) {
-              const positions: Record<string, { posX: number; posY: number }> = {
-                [card.instanceId]: { posX: normX(adjDropX), posY: normY(adjDropY) },
+              const positions: Record<string, { posX: string; posY: string }> = {
+                [card.instanceId]: { posX: String(normX(adjDropX)), posY: String(normY(adjDropY)) },
               };
               if (followerOffsets) {
                 for (const [id, offset] of followerOffsets) {
-                  positions[id] = { posX: normX(adjDropX + offset.dx), posY: normY(adjDropY + offset.dy) };
+                  positions[id] = { posX: String(normX(adjDropX + offset.dx)), posY: String(normY(adjDropY + offset.dy)) };
                 }
               }
               moveCardsBatch(JSON.stringify(cardIds), targetZone, JSON.stringify(positions), targetOwnerId);
@@ -1488,12 +1493,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
             moveCardsBatch(JSON.stringify(cardIds), targetZone, undefined, targetOwnerId);
           }
         } else if (isFreeFormZone(targetZone)) {
-          const positions: Record<string, { posX: number; posY: number }> = {
-            [card.instanceId]: { posX: normX(adjDropX), posY: normY(adjDropY) },
+          const positions: Record<string, { posX: string; posY: string }> = {
+            [card.instanceId]: { posX: String(normX(adjDropX)), posY: String(normY(adjDropY)) },
           };
           if (followerOffsets) {
             for (const [id, offset] of followerOffsets) {
-              positions[id] = { posX: normX(adjDropX + offset.dx), posY: normY(adjDropY + offset.dy) };
+              positions[id] = { posX: String(normX(adjDropX + offset.dx)), posY: String(normY(adjDropY + offset.dy)) };
             }
           }
           moveCardsBatch(
