@@ -5,14 +5,15 @@ import { useTable, useSpacetimeDB } from 'spacetimedb/react';
 import { tables } from '@/lib/spacetimedb/module_bindings';
 import type { Game } from '@/lib/spacetimedb/module_bindings/types';
 import { Button } from '@/components/ui/button';
+import { Loader2 } from 'lucide-react';
 
 interface LobbyListProps {
   selectedDeckId: string | null;
+  joiningCode: string | null;
   onJoinGame: (code: string) => void;
-  onSwitchToCreate: () => void;
 }
 
-export function LobbyList({ selectedDeckId, onJoinGame, onSwitchToCreate }: LobbyListProps) {
+export function LobbyList({ selectedDeckId, joiningCode, onJoinGame }: LobbyListProps) {
   // Follow existing codebase pattern: useSpacetimeDB() returns a context object,
   // not the connection directly. Use .getConnection() to get the actual DbConnection.
   const spacetimeCtx = useSpacetimeDB() as any;
@@ -77,13 +78,10 @@ export function LobbyList({ selectedDeckId, onJoinGame, onSwitchToCreate }: Lobb
 
   if (openGames.length === 0) {
     return (
-      <div className="py-8 text-center">
-        <p className="text-sm text-muted-foreground mb-3">
+      <div className="py-6 text-center">
+        <p className="text-sm text-muted-foreground">
           No open games right now.
         </p>
-        <Button variant="outline" size="sm" onClick={onSwitchToCreate}>
-          Create one
-        </Button>
       </div>
     );
   }
@@ -127,10 +125,14 @@ export function LobbyList({ selectedDeckId, onJoinGame, onSwitchToCreate }: Lobb
             <Button
               size="sm"
               onClick={() => onJoinGame(game.code)}
-              disabled={!selectedDeckId}
+              disabled={!selectedDeckId || joiningCode !== null}
               className="shrink-0"
             >
-              Join
+              {joiningCode === game.code ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                'Join'
+              )}
             </Button>
           </div>
         );

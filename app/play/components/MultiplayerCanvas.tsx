@@ -2999,6 +2999,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
           actions={multiplayerActions}
           onClose={() => setContextMenu(null)}
           onExchange={(cardIds) => { setContextMenu(null); setExchangeCardIds(cardIds); }}
+          zones={modalGameValue.zones as any}
         />
       )}
 

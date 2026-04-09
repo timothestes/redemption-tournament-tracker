@@ -50,15 +50,19 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   MOVE_CARD: 'moved a card',
   MOVE_CARDS_BATCH: 'moved multiple cards',
   SHUFFLE_DECK: 'shuffled their deck',
+  SHUFFLE: 'shuffled their deck',
   SHUFFLE_CARD_INTO_DECK: 'shuffled a card into their deck',
-  MEEK_CARD: 'meekened a card',
-  UNMEEK_CARD: 'unmeekened a card',
+  SHUFFLE_INTO_DECK: 'shuffled a card into their deck',
+  MEEK_CARD: 'converted a card to meek',
+  MEEK: 'converted a card to meek',
+  UNMEEK_CARD: 'converted a card from meek',
+  UNMEEK: 'converted a card from meek',
   FLIP_CARD: 'flipped a card',
   ADD_COUNTER: 'added a counter',
   REMOVE_COUNTER: 'removed a counter',
   SET_NOTE: 'set a note on a card',
   EXCHANGE_CARDS: 'exchanged cards',
-  SET_PHASE: 'changed phase',
+  SET_PHASE: 'moved to a new phase',
   END_TURN: 'ended their turn',
   ROLL_DICE: 'rolled dice',
   SEND_CHAT: 'sent a message',
@@ -119,6 +123,27 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       const data = JSON.parse(payload);
       return `rolled ${data.result0} vs ${data.result1}`;
     } catch { /* fall through */ }
+  }
+  if ((actionType === 'MEEK' || actionType === 'MEEK_CARD') && payload) {
+    try {
+      const data = JSON.parse(payload);
+      if (data.cardName) return <>converted <HoverableCard name={data.cardName} img={data.cardImgFile} /> to meek</>;
+    } catch { /* fall through */ }
+  }
+  if ((actionType === 'UNMEEK' || actionType === 'UNMEEK_CARD') && payload) {
+    try {
+      const data = JSON.parse(payload);
+      if (data.cardName) return <>converted <HoverableCard name={data.cardName} img={data.cardImgFile} /> from meek</>;
+    } catch { /* fall through */ }
+  }
+  if (actionType === 'SET_PHASE' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      if (data.phase) return `moved to ${data.phase}`;
+    } catch { /* fall through */ }
+  }
+  if (actionType === 'SPAWN_LOST_SOUL') {
+    return 'spawned a lost soul token';
   }
   if (actionType === 'MOVE_CARD' && payload) {
     try {

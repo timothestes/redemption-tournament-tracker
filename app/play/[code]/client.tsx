@@ -499,10 +499,17 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   }
 
   // Determine if we're in a ceremony phase (rolling/choosing/revealing) where
-  // the game board should be visible behind the overlay
+  // the game board should be visible behind the overlay.
+  // Once the local player has acknowledged during 'revealing', dismiss the overlay
+  // immediately instead of waiting for the server round-trip from the other player.
   const pregamePhase = gameState.game?.pregamePhase;
+  const myAckedRevealing = (() => {
+    if (pregamePhase !== 'revealing' || !gameState.game || !gameState.myPlayer) return false;
+    const isSeat0 = gameState.myPlayer.seat.toString() === '0';
+    return isSeat0 ? gameState.game.pregameReady0 : gameState.game.pregameReady1;
+  })();
   const isCeremonyPhase = lifecycle === 'pregame' &&
-    (pregamePhase === 'rolling' || pregamePhase === 'choosing' || pregamePhase === 'revealing');
+    (pregamePhase === 'rolling' || pregamePhase === 'choosing' || (pregamePhase === 'revealing' && !myAckedRevealing));
 
   if ((lifecycle === 'waiting' || lifecycle === 'pregame') && !isCeremonyPhase) {
     if (isPracticing && goldfishDeck) {

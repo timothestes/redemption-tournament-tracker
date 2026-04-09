@@ -17,7 +17,7 @@ const RITUAL_TUMBLE_MS = 1200;
 const RITUAL_TUMBLE_FRAMES = 18;
 const ROLLING_RESULT_DISPLAY_MS = 2200;
 const CHOOSE_TIME_LIMIT_S = 30;
-const REVEAL_AUTO_ACK_MS = 2500;
+const REVEAL_AUTO_ACK_MS = 1500;
 
 // ---------------------------------------------------------------------------
 // Props

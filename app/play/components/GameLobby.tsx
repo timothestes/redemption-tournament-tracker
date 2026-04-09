@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Loader2 } from 'lucide-react';
 import { getCardImageUrl } from '@/lib/card-images';
 import { loadDeckForGame } from '../actions';
 import { useSpacetimeConnection } from '../hooks/useSpacetimeConnection';
@@ -26,18 +27,18 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
   // Pre-fill game code from ?join=XXXX invite link
   const joinCode = searchParams.get('join')?.toUpperCase().slice(0, 4) ?? '';
 
-  // Auto-select last-played deck (from localStorage), fall back to most recently edited
-  const [selectedDeck, setSelectedDeck] = useState<DeckOption | null>(() => {
-    if (decks.length === 0) return null;
-    if (typeof window !== 'undefined') {
-      const lastPlayedId = localStorage.getItem('lastPlayedDeckId');
-      if (lastPlayedId) {
-        const found = decks.find(d => d.id === lastPlayedId);
-        if (found) return found;
-      }
+  // Start with first deck (server-safe), then restore last-played from localStorage
+  const [selectedDeck, setSelectedDeck] = useState<DeckOption | null>(
+    decks.length > 0 ? decks[0] : null
+  );
+
+  useEffect(() => {
+    const lastPlayedId = localStorage.getItem('lastPlayedDeckId');
+    if (lastPlayedId) {
+      const found = decks.find(d => d.id === lastPlayedId);
+      if (found) setSelectedDeck(found);
     }
-    return decks[0];
-  });
+  }, [decks]);
   const [pickerOpen, setPickerOpen] = useState(false);
 
   // Game state
@@ -54,13 +55,10 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
     const lobbyError = sessionStorage.getItem('lobby_error');
     if (lobbyError) {
       setError(lobbyError);
-      setActiveTab('lobby');
       sessionStorage.removeItem('lobby_error');
     }
   }, []);
 
-  // Tab and lobby visibility state
-  const [activeTab, setActiveTab] = useState<'create' | 'lobby'>('create');
   const [isPrivate, setIsPrivate] = useState(false);
 
   // SpacetimeDB connection for lobby
@@ -274,33 +272,7 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
         selectedDeckId={selectedDeck?.id}
       />
 
-      {/* Tab navigation — only shown when NOT in invite link mode */}
-      {!joinCode && (
-        <div className="flex border-b border-border">
-          <button
-            onClick={() => setActiveTab('create')}
-            className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'create'
-                ? 'border-primary text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Create / Join
-          </button>
-          <button
-            onClick={() => setActiveTab('lobby')}
-            className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'lobby'
-                ? 'border-primary text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Open Games
-          </button>
-        </div>
-      )}
-
-      {/* Actions — invite link mode shows join/spectate choice, normal mode shows tabbed content */}
+      {/* Actions — invite link mode shows join/spectate choice, normal mode shows create/join + lobby */}
       {joinCode ? (
         <div className="flex flex-col gap-3">
           <p className="text-sm text-muted-foreground text-center">
@@ -313,7 +285,14 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
               disabled={isJoining || !selectedDeck}
               className="flex-1 h-12 text-base"
             >
-              {isJoining ? 'Joining...' : 'Join as Player'}
+              {isJoining ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Joining...
+                </>
+              ) : (
+                'Join as Player'
+              )}
             </Button>
             <div className="relative flex-1 group">
               <Button
@@ -343,118 +322,123 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
         </div>
       ) : (
         <SpacetimeProvider connectionBuilder={connectionBuilder}>
-          {activeTab === 'create' && (
-            <>
-              <div className="flex flex-col sm:flex-row items-stretch gap-3">
-                <div className="sm:basis-0 sm:flex-1 flex flex-col gap-2.5">
-                  <Button
-                    size="lg"
-                    onClick={handleCreateGame}
-                    disabled={isCreating || !selectedDeck}
-                    className="w-full h-12 text-base"
-                  >
-                    {isCreating ? 'Loading deck...' : 'Create Game'}
-                  </Button>
-                  {/* Private game toggle — visually belongs to Create Game */}
-                  <div className="flex items-center gap-2.5 justify-center">
-                    <label htmlFor="private-toggle" className="text-sm text-muted-foreground">
-                      Private game
-                    </label>
-                    <button
-                      id="private-toggle"
-                      role="switch"
-                      aria-checked={isPrivate}
-                      onClick={() => setIsPrivate(!isPrivate)}
-                      className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors ${
-                        isPrivate ? 'bg-primary' : 'bg-muted'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          isPrivate ? 'translate-x-[22px]' : 'translate-x-[3px]'
-                        }`}
-                      />
-                    </button>
-                  </div>
-                </div>
-
-                {/* OR divider */}
-                <div className="flex sm:flex-col items-center justify-center gap-2 sm:gap-1 py-1 sm:py-0 sm:px-2 shrink-0">
-                  <div className="flex-1 h-px sm:h-auto sm:w-px bg-border sm:flex-1" />
-                  <span className="text-xs text-muted-foreground tracking-widest">OR</span>
-                  <div className="flex-1 h-px sm:h-auto sm:w-px bg-border sm:flex-1" />
-                </div>
-
-                <div className="sm:basis-0 sm:flex-1 flex flex-col gap-2.5">
-                  <div className="flex gap-2">
-                    <Input
-                      value={gameCode}
-                      onChange={(e) =>
-                        setGameCode(e.target.value.toUpperCase().slice(0, 4))
-                      }
-                      placeholder="Game Code"
-                      maxLength={4}
-                      className="flex-1 uppercase tracking-widest font-mono text-center h-12 focus-visible:ring-0 focus-visible:border-primary"
-                    />
-                    <Button
-                      size="lg"
-                      variant="outline"
-                      onClick={handleJoinGame}
-                      disabled={isJoining || gameCode.length !== 4 || (!isSpectate && !selectedDeck)}
-                      className="shrink-0 h-12 w-20"
-                    >
-                      {isJoining ? 'Joining...' : isSpectate ? 'Watch' : 'Join'}
-                    </Button>
-                  </div>
-                  {/* Spectate toggle — disabled until spectator mode is ready */}
-                  <div className="relative group flex items-center gap-2.5 justify-center opacity-50">
-                    <label htmlFor="spectate-toggle" className="text-sm text-muted-foreground">
-                      Spectate
-                    </label>
-                    <button
-                      id="spectate-toggle"
-                      role="switch"
-                      aria-checked={false}
-                      disabled
-                      className="relative inline-flex h-6 w-10 items-center rounded-full transition-colors bg-muted cursor-not-allowed"
-                    >
-                      <span
-                        className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform translate-x-[3px]"
-                      />
-                    </button>
-                    <span className="absolute -bottom-7 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs text-muted-foreground bg-popover border rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                      Coming soon
-                    </span>
-                  </div>
-                </div>
+          <div className="flex flex-col sm:flex-row items-stretch gap-3">
+            <div className="sm:basis-0 sm:flex-1 flex flex-col gap-2.5">
+              <Button
+                size="lg"
+                onClick={handleCreateGame}
+                disabled={isCreating || !selectedDeck}
+                className="w-full h-12 text-base"
+              >
+                {isCreating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Loading deck...
+                  </>
+                ) : (
+                  'Create Game'
+                )}
+              </Button>
+              {/* Private game toggle — visually belongs to Create Game */}
+              <div className="flex items-center gap-2.5 justify-center">
+                <label htmlFor="private-toggle" className="text-sm text-muted-foreground">
+                  Private game
+                </label>
+                <button
+                  id="private-toggle"
+                  role="switch"
+                  aria-checked={isPrivate}
+                  onClick={() => setIsPrivate(!isPrivate)}
+                  className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors ${
+                    isPrivate ? 'bg-primary' : 'bg-muted'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      isPrivate ? 'translate-x-[22px]' : 'translate-x-[3px]'
+                    }`}
+                  />
+                </button>
               </div>
+            </div>
 
-              {/* Error */}
-              {error && (
-                <p className="text-sm text-destructive text-center">{error}</p>
-              )}
+            {/* OR divider */}
+            <div className="flex sm:flex-col items-center justify-center gap-2 sm:gap-1 py-1 sm:py-0 sm:px-2 shrink-0">
+              <div className="flex-1 h-px sm:h-auto sm:w-px bg-border sm:flex-1" />
+              <span className="text-xs text-muted-foreground tracking-widest">OR</span>
+              <div className="flex-1 h-px sm:h-auto sm:w-px bg-border sm:flex-1" />
+            </div>
 
-            </>
+            <div className="sm:basis-0 sm:flex-1 flex flex-col gap-2.5">
+              <div className="flex gap-2">
+                <Input
+                  value={gameCode}
+                  onChange={(e) =>
+                    setGameCode(e.target.value.toUpperCase().slice(0, 4))
+                  }
+                  placeholder="Game Code"
+                  maxLength={4}
+                  className="flex-1 uppercase tracking-widest font-mono text-center h-12 focus-visible:ring-0 focus-visible:border-primary"
+                />
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={handleJoinGame}
+                  disabled={isJoining || gameCode.length !== 4 || (!isSpectate && !selectedDeck)}
+                  className="shrink-0 h-12 w-20"
+                >
+                  {isJoining ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : isSpectate ? (
+                    'Watch'
+                  ) : (
+                    'Join'
+                  )}
+                </Button>
+              </div>
+              {/* Spectate toggle — disabled until spectator mode is ready */}
+              <div className="relative group flex items-center gap-2.5 justify-center opacity-50">
+                <label htmlFor="spectate-toggle" className="text-sm text-muted-foreground">
+                  Spectate
+                </label>
+                <button
+                  id="spectate-toggle"
+                  role="switch"
+                  aria-checked={false}
+                  disabled
+                  className="relative inline-flex h-6 w-10 items-center rounded-full transition-colors bg-muted cursor-not-allowed"
+                >
+                  <span
+                    className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform translate-x-[3px]"
+                  />
+                </button>
+                <span className="absolute -bottom-7 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs text-muted-foreground bg-popover border rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                  Coming soon
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Error */}
+          {error && (
+            <p className="text-sm text-destructive text-center">{error}</p>
           )}
 
-          {activeTab === 'lobby' && (
-            connError ? (
-              <div className="py-8 text-center">
-                <p className="text-sm text-destructive mb-1">Could not connect to game server</p>
-                <p className="text-xs text-muted-foreground">{connError}</p>
-              </div>
-            ) : (
-              <>
-                {error && (
-                  <p className="text-sm text-destructive text-center mb-2">{error}</p>
-                )}
-                <LobbyList
-                  selectedDeckId={selectedDeck?.id ?? null}
-                  onJoinGame={handleJoinFromLobby}
-                  onSwitchToCreate={() => setActiveTab('create')}
-                />
-              </>
-            )
+          {/* Open Games */}
+          {connError ? (
+            <div className="py-8 text-center">
+              <p className="text-sm text-destructive mb-1">Could not connect to game server</p>
+              <p className="text-xs text-muted-foreground">{connError}</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3 pt-2">
+              <h3 className="text-sm font-medium text-muted-foreground">Open Games</h3>
+              <LobbyList
+                selectedDeckId={selectedDeck?.id ?? null}
+                joiningCode={isJoining ? gameCode : null}
+                onJoinGame={handleJoinFromLobby}
+              />
+            </div>
           )}
         </SpacetimeProvider>
       )}

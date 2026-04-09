@@ -216,8 +216,8 @@ export default function GameOverOverlay({
       {/* Temporary toast — auto-dismisses (for self-resign / generic end) */}
       {!isOpponentLeft && toastVisible && (
         <div style={{
-          position: 'fixed',
-          top: 60,
+          position: 'absolute',
+          bottom: 70,
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: 800,
@@ -228,7 +228,7 @@ export default function GameOverOverlay({
           textAlign: 'center',
           boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
           pointerEvents: 'none',
-          animation: 'fadeInDown 0.3s ease',
+          animation: 'fadeInUp 0.3s ease',
         }}>
           <p style={{
             fontFamily: 'var(--font-cinzel), Georgia, serif',
@@ -245,8 +245,8 @@ export default function GameOverOverlay({
       {/* Rematch request banner from opponent */}
       {showRematchBanner && (
         <div style={{
-          position: 'fixed',
-          bottom: 56,
+          position: 'absolute',
+          bottom: 70,
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: 800,
@@ -315,8 +315,8 @@ export default function GameOverOverlay({
       {/* Waiting/result status toast */}
       {(showWaitingStatus || showRematchResult) && (
         <div style={{
-          position: 'fixed',
-          bottom: 56,
+          position: 'absolute',
+          bottom: 70,
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: 800,
@@ -359,8 +359,8 @@ export default function GameOverOverlay({
 
       {/* Inline CSS animation */}
       <style>{`
-        @keyframes fadeInDown {
-          from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateX(-50%) translateY(12px); }
           to { opacity: 1; transform: translateX(-50%) translateY(0); }
         }
       `}</style>

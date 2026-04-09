@@ -1304,7 +1304,10 @@ export const move_card = spacetimedb.reducer(
       ownerId: newOwnerId,
     });
 
-    logAction(ctx, gameId, player.id, 'MOVE_CARD', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), from: fromZone, to: toZone, cardName: card.cardName, cardImgFile: card.cardImgFile, targetOwnerId: targetOwnerId || '' }), game.turnNumber, game.currentPhase);
+    // Only log when the card actually changes zones (not repositioning within the same zone)
+    if (fromZone !== toZone) {
+      logAction(ctx, gameId, player.id, 'MOVE_CARD', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), from: fromZone, to: toZone, cardName: card.cardName, cardImgFile: card.cardImgFile, targetOwnerId: targetOwnerId || '' }), game.turnNumber, game.currentPhase);
+    }
   }
 );
 
@@ -1326,6 +1329,7 @@ export const move_cards_batch = spacetimedb.reducer(
     const posMap: Record<string, { posX: string; posY: string }> = positions ? JSON.parse(positions) : {};
     const newOwnerId = targetOwnerId ? BigInt(targetOwnerId) : null;
     const cards: { name: string; img: string }[] = [];
+    const movedCards: { name: string; img: string }[] = [];
     const redirectedLostSouls: { name: string; img: string }[] = [];
 
     const game = ctx.db.Game.id.find(gameId);
@@ -1360,6 +1364,9 @@ export const move_cards_batch = spacetimedb.reducer(
       if (card.gameId !== gameId) throw new SenderError('Card not in this game: ' + idStr);
 
       cards.push({ name: card.cardName, img: card.cardImgFile });
+      if (card.zone !== toZone) {
+        movedCards.push({ name: card.cardName, img: card.cardImgFile });
+      }
 
       // Lost souls sent to discard or reserve go to land-of-bondage instead
       const isLostSoul = card.cardType === 'LS' || card.cardName.toLowerCase().includes('lost soul');
@@ -1420,7 +1427,10 @@ export const move_cards_batch = spacetimedb.reducer(
       });
     }
 
-    logAction(ctx, gameId, player.id, 'MOVE_CARDS_BATCH', JSON.stringify({ count: ids.length, toZone, cards, redirectedLostSouls, targetOwnerId: targetOwnerId || '' }), game.turnNumber, game.currentPhase);
+    // Only log if cards actually changed zones (not just repositioned within the same zone)
+    if (movedCards.length > 0 || redirectedLostSouls.length > 0) {
+      logAction(ctx, gameId, player.id, 'MOVE_CARDS_BATCH', JSON.stringify({ count: movedCards.length, toZone, cards: movedCards, redirectedLostSouls, targetOwnerId: targetOwnerId || '' }), game.turnNumber, game.currentPhase);
+    }
   }
 );
 
@@ -1700,7 +1710,7 @@ export const meek_card = spacetimedb.reducer(
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
 
-    logAction(ctx, gameId, player.id, 'MEEK', JSON.stringify({ cardInstanceId: cardInstanceId.toString() }), game.turnNumber, game.currentPhase);
+    logAction(ctx, gameId, player.id, 'MEEK', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: card.cardName, cardImgFile: card.cardImgFile }), game.turnNumber, game.currentPhase);
   }
 );
 
@@ -1724,7 +1734,7 @@ export const unmeek_card = spacetimedb.reducer(
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
 
-    logAction(ctx, gameId, player.id, 'UNMEEK', JSON.stringify({ cardInstanceId: cardInstanceId.toString() }), game.turnNumber, game.currentPhase);
+    logAction(ctx, gameId, player.id, 'UNMEEK', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: card.cardName, cardImgFile: card.cardImgFile }), game.turnNumber, game.currentPhase);
   }
 );
 

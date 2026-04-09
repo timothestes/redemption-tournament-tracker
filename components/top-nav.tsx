@@ -131,8 +131,8 @@ const TopNav: React.FC = () => {
   type NavLink = { href: string; label: string; icon: IconType; highlight?: boolean; authRequired?: boolean; isNew?: boolean };
 
   const navLinks: NavLink[] = [
-    { href: "/play", label: "Play", icon: GiCrossedSwords },
     { href: "/register", label: NATIONALS_CONFIG.adminOnly ? `${NATIONALS_CONFIG.displayName} (Admin Only)` : `${NATIONALS_CONFIG.displayName}`, icon: HiUserAdd, highlight: true },
+    { href: "/play", label: "Play", icon: GiCrossedSwords },
     { href: "/decklist/card-search?new=true", label: "Deck Builder", icon: TbSearch },
     { href: "/spoilers", label: "Spoilers", icon: HiSparkles },
   ];
