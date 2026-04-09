@@ -206,23 +206,25 @@ export const GameCardNode = memo(function GameCardNode({
           </>
         )}
 
-        {/* Counter badges — top-right, stacked down the side */}
+        {/* Counter badges — top-right corner, stacked vertically */}
         {card.counters.map((counter, idx) => {
           const colorDef = COUNTER_COLORS.find(c => c.id === counter.color);
+          const r = 12;
           return (
-            <Group key={counter.color} x={cardWidth - 12} y={8 + idx * 22}>
-              <Circle radius={10} fill={colorDef?.hex ?? '#8b1a1a'} stroke="rgba(0,0,0,0.5)" strokeWidth={1} />
+            <Group key={counter.color} x={cardWidth - 14} y={14 + idx * 28}>
+              <Circle radius={r} fill="rgba(0,0,0,0.6)" />
+              <Circle radius={r - 2} fill={colorDef?.hex ?? '#8b1a1a'} stroke="rgba(0,0,0,0.8)" strokeWidth={2} />
               <Text
                 text={String(counter.count)}
-                fontSize={11}
+                fontSize={13}
                 fill="white"
                 fontStyle="bold"
-                width={20}
-                height={20}
+                width={r * 2}
+                height={r * 2}
                 align="center"
                 verticalAlign="middle"
-                offsetX={10}
-                offsetY={10}
+                offsetX={r}
+                offsetY={r}
               />
             </Group>
           );
