@@ -60,7 +60,7 @@ export interface GameState {
   drawCard: () => void;
   drawMultiple: (count: bigint) => void;
   moveCard: (cardInstanceId: bigint, toZone: string, zoneIndex?: string, posX?: string, posY?: string, targetOwnerId?: string) => void;
-  moveCardsBatch: (cardInstanceIds: string, toZone: string, positions?: string, targetOwnerId?: string) => void;
+  moveCardsBatch: (cardInstanceIds: string, toZone: string, positions?: string, targetOwnerId?: string, fromSource?: string) => void;
   shuffleDeck: () => void;
   shuffleCardIntoDeck: (cardInstanceId: bigint) => void;
   reloadDeck: (deckId: string, deckData: string) => void;
@@ -97,6 +97,7 @@ export interface GameState {
   respondRematch: (accepted: boolean, deckId: string, deckData: string) => void;
   revealCards: (cardIds: string) => void;
   clearRevealedCards: () => void;
+  logSearchDeck: () => void;
   requestZoneSearch: (zone: string) => void;
   approveZoneSearch: (requestId: bigint) => void;
   denyZoneSearch: (requestId: bigint) => void;
@@ -284,13 +285,14 @@ export function useGameState(gameId: bigint): GameState {
   );
 
   const moveCardsBatch = useCallback(
-    (cardInstanceIds: string, toZone: string, positions?: string, targetOwnerId?: string) => {
+    (cardInstanceIds: string, toZone: string, positions?: string, targetOwnerId?: string, fromSource?: string) => {
       conn?.reducers.moveCardsBatch({
         gameId,
         cardInstanceIds,
         toZone,
         positions: positions || '{}',
         targetOwnerId: targetOwnerId || '',
+        fromSource: fromSource || '',
       });
     },
     [conn, gameId],
@@ -498,6 +500,10 @@ export function useGameState(gameId: bigint): GameState {
     conn?.reducers.respondRematch({ gameId, accepted, deckId, deckData });
   }, [conn, gameId]);
 
+  const logSearchDeck = useCallback(() => {
+    conn?.reducers.logSearchDeck({ gameId });
+  }, [conn, gameId]);
+
   const requestZoneSearch = useCallback(
     (zone: string) => {
       conn?.reducers.requestZoneSearch({ gameId, zone });
@@ -615,6 +621,7 @@ export function useGameState(gameId: bigint): GameState {
     zoneSearchRequests,
     incomingSearchRequest,
     approvedSearchRequest,
+    logSearchDeck,
     requestZoneSearch,
     approveZoneSearch,
     denyZoneSearch,

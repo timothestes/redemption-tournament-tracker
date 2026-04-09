@@ -12,9 +12,4 @@ import {
 
 export default {
   gameId: __t.u64(),
-  cardInstanceIds: __t.string(),
-  toZone: __t.string(),
-  positions: __t.string(),
-  targetOwnerId: __t.string(),
-  fromSource: __t.string(),
 };

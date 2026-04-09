@@ -1377,8 +1377,9 @@ export const move_cards_batch = spacetimedb.reducer(
     toZone: t.string(),
     positions: t.string(),
     targetOwnerId: t.string(),
+    fromSource: t.string(),
   },
-  (ctx, { gameId, cardInstanceIds, toZone, positions, targetOwnerId }) => {
+  (ctx, { gameId, cardInstanceIds, toZone, positions, targetOwnerId, fromSource }) => {
     const player = findPlayerBySender(ctx, gameId);
 
     const ids: string[] = JSON.parse(cardInstanceIds);
@@ -1498,7 +1499,7 @@ export const move_cards_batch = spacetimedb.reducer(
 
     // Only log if cards actually changed zones (not just repositioned within the same zone)
     if (movedCards.length > 0 || redirectedLostSouls.length > 0) {
-      logAction(ctx, gameId, player.id, 'MOVE_CARDS_BATCH', JSON.stringify({ count: movedCards.length, toZone, cards: movedCards, redirectedLostSouls, targetOwnerId: targetOwnerId || '' }), game.turnNumber, game.currentPhase);
+      logAction(ctx, gameId, player.id, 'MOVE_CARDS_BATCH', JSON.stringify({ count: movedCards.length, toZone, cards: movedCards, redirectedLostSouls, targetOwnerId: targetOwnerId || '', fromSource: fromSource || '' }), game.turnNumber, game.currentPhase);
     }
 
     // Compact hand indices for any owners whose hand had cards removed
@@ -2131,7 +2132,7 @@ export const move_card_to_top_of_deck = spacetimedb.reducer(
 
     const topLogName = card.isFlipped ? 'a face-down card' : card.cardName;
     const topLogImg = card.isFlipped ? '' : card.cardImgFile;
-    logAction(ctx, gameId, player.id, 'MOVE_TO_TOP_OF_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: topLogName, cardImgFile: topLogImg }), game.turnNumber, game.currentPhase);
+    logAction(ctx, gameId, player.id, 'MOVE_TO_TOP_OF_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: topLogName, cardImgFile: topLogImg, targetOwnerId: card.ownerId.toString() }), game.turnNumber, game.currentPhase);
   }
 );
 
@@ -2186,7 +2187,7 @@ export const move_card_to_bottom_of_deck = spacetimedb.reducer(
 
     const bottomLogName = card.isFlipped ? 'a face-down card' : card.cardName;
     const bottomLogImg = card.isFlipped ? '' : card.cardImgFile;
-    logAction(ctx, gameId, player.id, 'MOVE_TO_BOTTOM_OF_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: bottomLogName, cardImgFile: bottomLogImg }), game.turnNumber, game.currentPhase);
+    logAction(ctx, gameId, player.id, 'MOVE_TO_BOTTOM_OF_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: bottomLogName, cardImgFile: bottomLogImg, targetOwnerId: card.ownerId.toString() }), game.turnNumber, game.currentPhase);
   }
 );
 
@@ -2459,6 +2460,23 @@ export const onConnect = spacetimedb.clientConnected((ctx) => {
     });
   }
 });
+
+// ---------------------------------------------------------------------------
+// Reducer: log_search_deck (logs when a player searches their own deck)
+// ---------------------------------------------------------------------------
+export const log_search_deck = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+  },
+  (ctx, { gameId }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
+
+    const player = findPlayerBySender(ctx, gameId);
+    logAction(ctx, gameId, player.id, 'SEARCH_OWN_DECK', '', game.turnNumber, game.currentPhase);
+  }
+);
 
 // ===========================================================================
 // Zone Search reducers

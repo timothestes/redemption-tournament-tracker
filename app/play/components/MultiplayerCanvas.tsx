@@ -169,6 +169,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
     updateCardPosition,
     incomingSearchRequest,
     approvedSearchRequest,
+    logSearchDeck,
     requestZoneSearch,
     approveZoneSearch,
     denyZoneSearch,
@@ -615,8 +616,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       selected = shuffled.slice(0, count);
     }
     const ids = selected.map(c => String(c.id));
-    if (ids.length > 0) multiplayerActions.moveCardsBatch(ids, targetZone);
-  }, [myCards, multiplayerActions]);
+    const fromSource = position === 'top' ? 'top-of-deck' : position === 'bottom' ? 'bottom-of-deck' : 'random-from-deck';
+    if (ids.length > 0) {
+      const execute = () => gameState.moveCardsBatch(JSON.stringify(ids), targetZone, undefined, undefined, fromSource);
+      if (checkReserveBatchProtection(ids, targetZone, execute)) return;
+      execute();
+    }
+  }, [myCards, gameState, checkReserveBatchProtection]);
 
   // ---- moveOpponentDeckCardsToZone helper (operates on opponent's deck) ----
   const moveOpponentDeckCardsToZone = useCallback((
@@ -638,9 +644,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       }
       selected = shuffled.slice(0, count);
     }
-    for (const card of selected) {
-      gameState.moveCard(card.id, targetZone);
-    }
+    const ids = selected.map(c => String(c.id));
+    const fromSource = position === 'top' ? 'top-of-deck' : position === 'bottom' ? 'bottom-of-deck' : 'random-from-deck';
+    if (ids.length > 0) gameState.moveCardsBatch(JSON.stringify(ids), targetZone, undefined, undefined, fromSource);
   }, [opponentCards, gameState]);
 
   // ---- Drag state ----
@@ -1443,7 +1449,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
           } else if (isAutoArrangeZone(targetZone)) {
             moveCard(cardId, targetZone, '', '0', '0', targetOwnerId);
           } else {
-            moveCard(cardId, targetZone, '0', undefined, undefined, targetOwnerId);
+            moveCard(cardId, targetZone, targetZone === 'hand' ? '' : '0', undefined, undefined, targetOwnerId);
           }
           if (isGroupDrag) clearSelection();
         };
@@ -1529,8 +1535,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
           moveCard(cardId, targetZone, '0', undefined, undefined, targetOwnerId);
         }
       } else {
-        // Stacked zone
-        moveCard(cardId, targetZone, '0', undefined, undefined, targetOwnerId);
+        // Stacked zone — for hand, omit zoneIndex so server auto-appends to end
+        moveCard(cardId, targetZone, targetZone === 'hand' ? '' : '0', undefined, undefined, targetOwnerId);
       }
     },
     [
@@ -3038,7 +3044,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
           y={deckMenu.y}
           deckSize={(myCards['deck'] ?? []).length}
           onClose={() => setDeckMenu(null)}
-          onSearchDeck={() => { setDeckMenu(null); setShowDeckSearch(true); }}
+          onSearchDeck={() => { logSearchDeck(); setDeckMenu(null); setShowDeckSearch(true); }}
           onShuffleDeck={() => { multiplayerActions.shuffleDeck(); setDeckMenu(null); }}
           onDrawTop={(n) => { multiplayerActions.drawMultiple(n); setDeckMenu(null); }}
           onRevealTop={(n) => { setDeckMenu(null); setPeekState({ position: 'top', count: n }); }}

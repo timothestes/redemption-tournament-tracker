@@ -49,6 +49,7 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   DRAW_MULTIPLE: 'drew multiple cards',
   MOVE_CARD: 'moved a card',
   MOVE_CARDS_BATCH: 'moved multiple cards',
+  SEARCH_OWN_DECK: 'is searching their deck',
   SHUFFLE_DECK: 'shuffled their deck',
   SHUFFLE: 'shuffled their deck',
   SHUFFLE_CARD_INTO_DECK: 'shuffled a card into their deck',
@@ -199,7 +200,11 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
     try {
       const data = JSON.parse(payload);
       if (data.cardName) {
-        return <>moved <HoverableCard name={data.cardName} img={data.cardImgFile} /> to top of deck</>;
+        const isCrossPlayer = data.targetOwnerId && data.targetOwnerId !== actorPlayerId;
+        const targetName = isCrossPlayer && playerNames?.[data.targetOwnerId];
+        return targetName
+          ? <>moved <HoverableCard name={data.cardName} img={data.cardImgFile} /> to top of {targetName}&apos;s deck</>
+          : <>moved <HoverableCard name={data.cardName} img={data.cardImgFile} /> to top of deck</>;
       }
     } catch { /* fall through */ }
   }
@@ -207,7 +212,11 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
     try {
       const data = JSON.parse(payload);
       if (data.cardName) {
-        return <>moved <HoverableCard name={data.cardName} img={data.cardImgFile} /> to bottom of deck</>;
+        const isCrossPlayer = data.targetOwnerId && data.targetOwnerId !== actorPlayerId;
+        const targetName = isCrossPlayer && playerNames?.[data.targetOwnerId];
+        return targetName
+          ? <>moved <HoverableCard name={data.cardName} img={data.cardImgFile} /> to bottom of {targetName}&apos;s deck</>
+          : <>moved <HoverableCard name={data.cardName} img={data.cardImgFile} /> to bottom of deck</>;
       }
     } catch { /* fall through */ }
   }
@@ -215,15 +224,19 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
     try {
       const data = JSON.parse(payload);
       const parts: ReactNode[] = [];
+      const fromSuffix = data.fromSource === 'top-of-deck' ? ' from top of deck'
+        : data.fromSource === 'bottom-of-deck' ? ' from bottom of deck'
+        : data.fromSource === 'random-from-deck' ? ' randomly from deck'
+        : '';
       if (data.cards?.length) {
-        if (data.toZone === 'discard') parts.push(<span key="discard">discarded <CardNameList cards={data.cards} /></span>);
-        if (data.toZone === 'reserve') parts.push(<span key="reserve">placed <CardNameList cards={data.cards} /> in reserve</span>);
-        if (data.toZone === 'banish') parts.push(<span key="banish">banished <CardNameList cards={data.cards} /></span>);
+        if (data.toZone === 'discard') parts.push(<span key="discard">discarded <CardNameList cards={data.cards} />{fromSuffix}</span>);
+        if (data.toZone === 'reserve') parts.push(<span key="reserve">reserved <CardNameList cards={data.cards} />{fromSuffix}</span>);
+        if (data.toZone === 'banish') parts.push(<span key="banish">banished <CardNameList cards={data.cards} />{fromSuffix}</span>);
         if (data.toZone === 'deck') parts.push(<span key="deck">put <CardNameList cards={data.cards} /> into deck</span>);
         if (data.toZone === 'hand') {
           const isCrossPlayer = data.targetOwnerId && playerNames?.[data.targetOwnerId] && data.targetOwnerId !== actorPlayerId;
           const targetName = isCrossPlayer && playerNames?.[data.targetOwnerId];
-          parts.push(<span key="hand">{targetName ? <>moved <CardNameList cards={data.cards} /> to {targetName}&apos;s hand</> : <>moved <CardNameList cards={data.cards} /> to hand</>}</span>);
+          parts.push(<span key="hand">{targetName ? <>moved <CardNameList cards={data.cards} /> to {targetName}&apos;s hand{fromSuffix}</> : <>drew <CardNameList cards={data.cards} />{fromSuffix}</>}</span>);
         }
         if (data.toZone === 'territory') {
           const isCrossPlayer = data.targetOwnerId && data.targetOwnerId !== actorPlayerId;
