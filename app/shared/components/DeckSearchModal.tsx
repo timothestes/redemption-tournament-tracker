@@ -591,11 +591,31 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
                 cursor: 'pointer',
               }}
             >
+              <span
+                style={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: 3,
+                  border: leaveOpen ? '1.5px solid #c4955a' : '1.5px solid var(--gf-border)',
+                  background: leaveOpen ? 'rgba(196, 149, 90, 0.25)' : 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  transition: 'border-color 0.15s, background 0.15s',
+                }}
+              >
+                {leaveOpen && (
+                  <svg width="12" height="12" viewBox="0 0 10 10" fill="none">
+                    <path d="M2 5L4.5 7.5L8 3" stroke="#e8d5a3" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </span>
               <input
                 type="checkbox"
                 checked={leaveOpen}
                 onChange={(e) => setLeaveOpen(e.target.checked)}
-                className="focus:outline-none focus:ring-0"
+                className="sr-only"
               />
               Leave open
             </label>
@@ -609,11 +629,31 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
                 cursor: 'pointer',
               }}
             >
+              <span
+                style={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: 3,
+                  border: autoShuffle ? '1.5px solid #c4955a' : '1.5px solid var(--gf-border)',
+                  background: autoShuffle ? 'rgba(196, 149, 90, 0.25)' : 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  transition: 'border-color 0.15s, background 0.15s',
+                }}
+              >
+                {autoShuffle && (
+                  <svg width="12" height="12" viewBox="0 0 10 10" fill="none">
+                    <path d="M2 5L4.5 7.5L8 3" stroke="#e8d5a3" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </span>
               <input
                 type="checkbox"
                 checked={autoShuffle}
                 onChange={(e) => setAutoShuffle(e.target.checked)}
-                className="focus:outline-none focus:ring-0"
+                className="sr-only"
               />
               Shuffle on close
             </label>

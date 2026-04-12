@@ -1479,9 +1479,9 @@ export const move_cards_batch = spacetimedb.reducer(
       let finalZoneIndex = card.zoneIndex;
       if (toZone === 'hand') {
         finalZoneIndex = handZoneIndex;
-      } else if (isFreeFormTarget && card.zone !== toZone) {
-        // Only assign new ascending index when moving INTO the zone (cross-zone move),
-        // not when repositioning within the same zone
+      } else if (isFreeFormTarget) {
+        // Assign ascending zoneIndex for free-form zones — both cross-zone moves
+        // and same-zone repositioning — so moved cards render on top for all clients.
         finalZoneIndex = nextFreeFormIndex;
         nextFreeFormIndex += 1n;
       }
@@ -1908,7 +1908,14 @@ export const update_card_position = spacetimedb.reducer(
     if (!card) throw new SenderError('Card not found');
     if (card.gameId !== gameId) throw new SenderError('Card not in this game');
 
-    ctx.db.CardInstance.id.update({ ...card, posX, posY });
+    // Bump zoneIndex to max + 1 so repositioned card renders on top for all clients
+    let maxIdx = -1n;
+    for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+      if (c.ownerId === card.ownerId && c.zone === card.zone && c.zoneIndex > maxIdx) {
+        maxIdx = c.zoneIndex;
+      }
+    }
+    ctx.db.CardInstance.id.update({ ...card, posX, posY, zoneIndex: maxIdx + 1n });
     // No logAction — too noisy
   }
 );
