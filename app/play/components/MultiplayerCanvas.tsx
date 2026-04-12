@@ -1746,10 +1746,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       const cards = myCards[zoneKey] ?? [];
       for (const card of cards) {
         const zone = myZones[zoneKey];
-        const zoneX = zone?.x ?? 0;
-        const zoneY = zone?.y ?? 0;
-        const x = card.posX ? parseFloat(card.posX) * (zone?.width ?? 0) + zoneX : zoneX + 20;
-        const y = card.posY ? parseFloat(card.posY) * (zone?.height ?? 0) + zoneY : zoneY + 24;
+        let x: number, y: number;
+        if (card.posX && zone) {
+          ({ x, y } = toScreenPos(parseFloat(card.posX), parseFloat(card.posY), zone, 'my'));
+        } else {
+          x = (zone?.x ?? 0) + 20;
+          y = (zone?.y ?? 0) + 24;
+        }
         bounds.push({
           instanceId: String(card.id),
           x,
@@ -1768,15 +1771,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       for (const card of cards) {
         const zone = opponentZones[zoneKey];
         if (!zone) continue;
-        const mirroredPosX = card.posX ? 1 - parseFloat(card.posX) : 0;
-        const mirroredPosY = card.posY ? 1 - parseFloat(card.posY) : 0;
-        const x = mirroredPosX * zone.width + zone.x;
-        const y = mirroredPosY * zone.height + zone.y;
-        // Rotation=180 means (x,y) is bottom-right corner; bounding box is (x-w, y-h) to (x, y)
+        const { x: anchorX, y: anchorY } = toScreenPos(
+          card.posX ? parseFloat(card.posX) : 0,
+          card.posY ? parseFloat(card.posY) : 0,
+          zone, 'opponent',
+        );
+        // Rotation=180 means anchor is bottom-right corner; bounding box is (anchor-w, anchor-h) to (anchor)
         bounds.push({
           instanceId: String(card.id),
-          x: x - cardWidth,
-          y: y - cardHeight,
+          x: anchorX - cardWidth,
+          y: anchorY - cardHeight,
           width: cardWidth,
           height: cardHeight,
           rotation: 180,
