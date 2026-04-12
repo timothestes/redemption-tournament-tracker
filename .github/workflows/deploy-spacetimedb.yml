@@ -39,7 +39,7 @@ jobs:
           fi
 
       - name: Publish module
-        run: spacetime publish ${{ steps.module.outputs.name }} --module-path spacetimedb
+        run: spacetime publish ${{ steps.module.outputs.name }} --module-path spacetimedb --server maincloud --no-config --yes
 
       - name: Generate client bindings
         if: github.ref_name == 'main'
