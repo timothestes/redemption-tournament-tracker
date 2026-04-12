@@ -334,13 +334,14 @@ export default function ChatPanel({
   const logEndRef = useRef<HTMLDivElement>(null);
   const prevChatLengthRef = useRef(chatMessages.length);
 
-  // Track unread messages when panel is closed
+  // Track unread messages when chat isn't actively visible
   useEffect(() => {
-    if (!isOpen && chatMessages.length > prevChatLengthRef.current) {
+    const chatVisible = isOpen && activeTab === 'chat';
+    if (!chatVisible && chatMessages.length > prevChatLengthRef.current) {
       setUnreadCount((n) => n + (chatMessages.length - prevChatLengthRef.current));
     }
     prevChatLengthRef.current = chatMessages.length;
-  }, [chatMessages.length, isOpen]);
+  }, [chatMessages.length, isOpen, activeTab]);
 
   // Clear unread when opening chat tab
   useEffect(() => {
@@ -527,7 +528,25 @@ export default function ChatPanel({
                       transition: 'color 0.15s, background 0.15s, border-color 0.15s',
                     }}
                   >
-                    {tab === 'chat' ? 'Chat' : 'Log'}
+                    {tab === 'chat' ? (
+                      <span style={{ position: 'relative' }}>
+                        Chat
+                        {unreadCount > 0 && activeTab !== 'chat' && (
+                          <span
+                            style={{
+                              position: 'absolute',
+                              top: -1,
+                              right: -7,
+                              width: 6,
+                              height: 6,
+                              borderRadius: '50%',
+                              background: '#c4955a',
+                              boxShadow: '0 0 4px rgba(196, 149, 90, 0.6)',
+                            }}
+                          />
+                        )}
+                      </span>
+                    ) : 'Log'}
                   </button>
                 );
               })}
