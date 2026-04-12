@@ -39,6 +39,7 @@ export interface GameState {
   myPlayer: PlayerRow | undefined;
   opponentPlayer: PlayerRow | undefined;
   opponentConnectionStatus: 'connected' | 'reconnecting' | 'disconnected';
+  disconnectTimeoutFired: boolean;
   myCards: Record<string, CardInstanceRow[]>;
   opponentCards: Record<string, CardInstanceRow[]>;
   isMyTurn: boolean;
@@ -88,6 +89,7 @@ export interface GameState {
   removeToken: (cardInstanceId: bigint) => void;
   resignGame: () => void;
   leaveGame: () => void;
+  claimTimeoutVictory: () => void;
   // Pregame ceremony actions
   pregameReady: (ready: boolean) => void;
   pregameAcknowledgeRoll: () => void;
@@ -169,6 +171,8 @@ export function useGameState(gameId: bigint): GameState {
         : undefined,
     [gamePlayers, identityHex],
   );
+
+  const disconnectTimeoutFired = game?.disconnectTimeoutFired ?? false;
 
   const opponentConnectionStatus = useMemo((): 'connected' | 'reconnecting' | 'disconnected' => {
     if (!opponentPlayer) return 'connected';
@@ -481,6 +485,11 @@ export function useGameState(gameId: bigint): GameState {
     conn?.reducers.leaveGame({ gameId });
   }, [conn, gameId]);
 
+  const claimTimeoutVictory = useCallback(() => {
+    if (!conn || !gameId) return;
+    conn.reducers.claimTimeoutVictory({ gameId });
+  }, [conn, gameId]);
+
   const pregameReady = useCallback((ready: boolean) => {
     conn?.reducers.pregameReady({ gameId, ready });
   }, [conn, gameId]);
@@ -583,6 +592,7 @@ export function useGameState(gameId: bigint): GameState {
     myPlayer,
     opponentPlayer,
     opponentConnectionStatus,
+    disconnectTimeoutFired,
     myCards,
     opponentCards,
     isMyTurn,
@@ -624,6 +634,7 @@ export function useGameState(gameId: bigint): GameState {
     removeToken,
     resignGame,
     leaveGame,
+    claimTimeoutVictory,
     pregameReady,
     pregameAcknowledgeRoll,
     pregameChooseFirst,
