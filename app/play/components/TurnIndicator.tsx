@@ -36,6 +36,7 @@ interface TurnIndicatorProps {
   onPlayAgain?: () => void;
   myScore?: number;
   opponentScore?: number;
+  opponentConnectionStatus?: 'connected' | 'reconnecting' | 'disconnected';
 }
 
 // ---------------------------------------------------------------------------
@@ -57,6 +58,7 @@ export default function TurnIndicator({
   onPlayAgain,
   myScore = 0,
   opponentScore = 0,
+  opponentConnectionStatus = 'connected',
 }: TurnIndicatorProps) {
   const [showConcedeConfirm, setShowConcedeConfirm] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
@@ -218,7 +220,21 @@ export default function TurnIndicator({
         <span style={{ color: 'rgba(232, 213, 163, 0.2)', fontSize: 10, fontWeight: 400 }}>vs</span>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <span style={{ color: '#4a7ab5', fontSize: 20, fontWeight: 700, lineHeight: 1 }}>{opponentScore}</span>
-          <span style={{ color: 'rgba(74, 122, 181, 0.45)', fontSize: 8, letterSpacing: '0.08em', textTransform: 'uppercase', lineHeight: 1, marginTop: 2 }}>opp</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: 'rgba(74, 122, 181, 0.45)', fontSize: 8, letterSpacing: '0.08em', textTransform: 'uppercase', lineHeight: 1, marginTop: 2 }}>
+            opp
+            <span
+              title={opponentConnectionStatus === 'connected' ? 'Connected' : opponentConnectionStatus === 'reconnecting' ? 'Reconnecting...' : 'Disconnected'}
+              style={{
+                display: 'inline-block',
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: opponentConnectionStatus === 'connected' ? '#22c55e' : opponentConnectionStatus === 'reconnecting' ? '#eab308' : '#ef4444',
+                boxShadow: `0 0 5px ${opponentConnectionStatus === 'connected' ? 'rgba(34, 197, 94, 0.6)' : opponentConnectionStatus === 'reconnecting' ? 'rgba(234, 179, 8, 0.6)' : 'rgba(239, 68, 68, 0.6)'}`,
+                flexShrink: 0,
+              }}
+            />
+          </span>
         </div>
       </div>
       </div>

@@ -200,6 +200,28 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // in the dependency array (which is evaluated during render).
   const gameState = useGameState(gameId ?? BigInt(0));
 
+  // Track unread chat messages at this level so the count survives ChatPanel
+  // unmounting when the right panel collapses.
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const prevChatCountRef = useRef(0);
+  useEffect(() => {
+    const current = gameState.chatMessages.length;
+    if (current > prevChatCountRef.current) {
+      const newCount = current - prevChatCountRef.current;
+      if (!isLoupeVisible) {
+        setUnreadChatCount((n) => n + newCount);
+      }
+    }
+    prevChatCountRef.current = current;
+  }, [gameState.chatMessages.length, isLoupeVisible]);
+
+  // Clear unread when panel opens
+  useEffect(() => {
+    if (isLoupeVisible) {
+      setUnreadChatCount(0);
+    }
+  }, [isLoupeVisible]);
+
   // Keyboard shortcuts — active only during a live game.
   const hotkeysActions = useMemo<GameActions>(() => ({
     drawCard: () => gameState.drawCard(),
@@ -590,11 +612,11 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           width: '100%',
           height: 48,
           minHeight: 48,
-          background: 'rgba(30, 22, 16, 0.92)',
+          background: 'rgba(10, 8, 5, 0.96)',
           borderTop: 'none',
           borderLeft: 'none',
           borderRight: 'none',
-          borderBottom: '1px solid rgba(107, 78, 39, 0.4)',
+          borderBottom: '1px solid rgba(107, 78, 39, 0.5)',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
@@ -619,9 +641,35 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             </span>
           </>
         ) : (
-          <span style={{ fontSize: 14 }}>‹</span>
+          <span style={{ fontSize: 14, position: 'relative' }}>
+            ‹
+            {unreadChatCount > 0 && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: -2,
+                  right: -6,
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  background: '#c4955a',
+                  boxShadow: '0 0 4px rgba(196, 149, 90, 0.6)',
+                  animation: 'unread-pulse 2s ease-in-out infinite',
+                }}
+              />
+            )}
+          </span>
         )}
       </button>
+      {/* Keyframe for unread dot pulse */}
+      {unreadChatCount > 0 && !isLoupeVisible && (
+        <style>{`
+          @keyframes unread-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+          }
+        `}</style>
+      )}
       {isLoupeVisible && (
         <>
           <div style={{
@@ -700,6 +748,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               game={gameState.game}
               myPlayer={gameState.myPlayer}
               opponentPlayer={gameState.opponentPlayer}
+              opponentConnectionStatus={gameState.opponentConnectionStatus}
               isMyTurn={false}
               onSetPhase={() => {}}
               onEndTurn={() => {}}
@@ -736,6 +785,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                 game={gameState.game}
                 myPlayer={gameState.myPlayer}
                 opponentPlayer={gameState.opponentPlayer}
+              opponentConnectionStatus={gameState.opponentConnectionStatus}
                 isMyTurn={false}
                 onSetPhase={() => {}}
                 onEndTurn={() => {}}
@@ -806,6 +856,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               game={gameState.game}
               myPlayer={gameState.myPlayer}
               opponentPlayer={gameState.opponentPlayer}
+              opponentConnectionStatus={gameState.opponentConnectionStatus}
               isMyTurn={false}
               onSetPhase={() => {}}
               onEndTurn={() => {}}

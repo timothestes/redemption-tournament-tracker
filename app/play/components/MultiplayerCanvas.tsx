@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Stage, Layer, Rect, Text, Group, Circle } from 'react-konva';
+import { Stage, Layer, Rect, Text, Group } from 'react-konva';
 import type Konva from 'konva';
 import KonvaLib from 'konva';
 
@@ -179,26 +179,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
     zoneSearchRequests,
   } = gameState;
 
-  // ---- Opponent connection status indicator ----
-  const connectionDotColor = gameState.opponentConnectionStatus === 'connected'
-    ? '#22c55e'
-    : gameState.opponentConnectionStatus === 'reconnecting'
-      ? '#eab308'
-      : '#ef4444';
-
-  const connectionDotGlow = gameState.opponentConnectionStatus === 'connected'
-    ? 'rgba(34, 197, 94, 0.7)'
-    : gameState.opponentConnectionStatus === 'reconnecting'
-      ? 'rgba(234, 179, 8, 0.7)'
-      : 'rgba(239, 68, 68, 0.7)';
-
-  const connectionDotLabel = gameState.opponentConnectionStatus === 'connected'
-    ? 'Connected'
-    : gameState.opponentConnectionStatus === 'reconnecting'
-      ? 'Reconnecting...'
-      : 'Disconnected';
-
-  const [connectionTooltip, setConnectionTooltip] = useState<{ x: number; y: number } | null>(null);
   const [claimBannerDismissed, setClaimBannerDismissed] = useState(false);
 
   // Reset claim banner when opponent reconnects
@@ -2107,28 +2087,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
               });
             }}
           />
-          <Text
-            x={myHandRect.x + 8}
-            y={myHandRect.y + 4}
-            text="HAND"
-            fontSize={12}
-            fontFamily="Cinzel, Georgia, serif"
-            fill="#e8d5a3"
-            letterSpacing={2}
-          />
-          <Group x={myHandRect.x + 60} y={myHandRect.y + 2}>
-            <Rect width={26} height={18} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} />
-            <Text
-              text={String(myCards['hand']?.length ?? 0)}
-              fontSize={12}
-              fontStyle="bold"
-              fill="#e8d5a3"
-              width={26}
-              height={18}
-              align="center"
-              verticalAlign="middle"
-            />
-          </Group>
+          {(() => {
+            const areaRight = myHandRect.x + myHandRect.width;
+            const bw = 26;
+            const lw = 52; // "HAND" at fontSize 12 + letterSpacing 2
+            const sx = areaRight - lw - 8 - bw - 6;
+            return (
+              <>
+                <Text x={sx} y={myHandRect.y + 4} text="HAND" fontSize={12} fontFamily="Cinzel, Georgia, serif" fill="#e8d5a3" letterSpacing={2} />
+                <Group x={sx + lw + 8} y={myHandRect.y + 2}>
+                  <Rect width={bw} height={18} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} />
+                  <Text text={String(myCards['hand']?.length ?? 0)} fontSize={12} fontStyle="bold" fill="#e8d5a3" width={bw} height={18} align="center" verticalAlign="middle" />
+                </Group>
+              </>
+            );
+          })()}
 
           {/* Opponent hand */}
           <Rect
@@ -2149,43 +2122,22 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
               });
             }}
           />
-          {/* Connection status dot */}
-          <Circle
-            x={opponentHandRect.x + 8}
-            y={opponentHandRect.y + 12}
-            radius={3.5}
-            fill={connectionDotColor}
-            shadowColor={connectionDotGlow}
-            shadowBlur={6}
-            shadowOpacity={1}
-            hitStrokeWidth={8}
-            onMouseEnter={(e: Konva.KonvaEventObject<MouseEvent>) => {
-              setConnectionTooltip({ x: e.evt.clientX, y: e.evt.clientY });
-            }}
-            onMouseLeave={() => setConnectionTooltip(null)}
-          />
-          <Text
-            x={opponentHandRect.x + 18}
-            y={opponentHandRect.y + 4}
-            text="OPPONENT HAND"
-            fontSize={12}
-            fontFamily="Cinzel, Georgia, serif"
-            fill="#a3c5e8"
-            letterSpacing={2}
-          />
-          <Group x={opponentHandRect.x + 170} y={opponentHandRect.y + 2}>
-            <Rect width={26} height={18} fill="#101828" cornerRadius={4} stroke="#4a7ab5" strokeWidth={1} />
-            <Text
-              text={String(opponentCards['hand']?.length ?? 0)}
-              fontSize={12}
-              fontStyle="bold"
-              fill="#a3c5e8"
-              width={26}
-              height={18}
-              align="center"
-              verticalAlign="middle"
-            />
-          </Group>
+          {(() => {
+            const areaRight = opponentHandRect.x + opponentHandRect.width;
+            const bw = 26;
+            const lw = 154; // "OPPONENT HAND" at fontSize 12 + letterSpacing 2
+            const totalW = lw + 8 + bw;
+            const sx = areaRight - totalW - 6;
+            return (
+              <>
+                <Text x={sx} y={opponentHandRect.y + 4} text="OPPONENT HAND" fontSize={12} fontFamily="Cinzel, Georgia, serif" fill="#a3c5e8" letterSpacing={2} />
+                <Group x={sx + lw + 8} y={opponentHandRect.y + 2}>
+                  <Rect width={bw} height={18} fill="#101828" cornerRadius={4} stroke="#4a7ab5" strokeWidth={1} />
+                  <Text text={String(opponentCards['hand']?.length ?? 0)} fontSize={12} fontStyle="bold" fill="#a3c5e8" width={bw} height={18} align="center" verticalAlign="middle" />
+                </Group>
+              </>
+            );
+          })()}
 
           {/* ================================================================
               Cards in free-form zones — My territory (draggable, clipped)
@@ -3775,29 +3727,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
         </div>
       )}
 
-      {/* Connection status tooltip */}
-      {connectionTooltip && (
-        <div
-          style={{
-            position: 'fixed',
-            left: connectionTooltip.x + 10,
-            top: connectionTooltip.y + 10,
-            zIndex: 1000,
-            pointerEvents: 'none',
-            background: 'rgba(10, 8, 5, 0.92)',
-            border: '1px solid rgba(107, 78, 39, 0.4)',
-            borderRadius: 6,
-            padding: '4px 8px',
-            fontFamily: 'var(--font-cinzel), Georgia, serif',
-            fontSize: 10,
-            letterSpacing: '0.06em',
-            color: connectionDotColor,
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {connectionDotLabel}
-        </div>
-      )}
 
       {/* Disconnect timeout — claim victory banner */}
       {gameState.disconnectTimeoutFired && !claimBannerDismissed && (
