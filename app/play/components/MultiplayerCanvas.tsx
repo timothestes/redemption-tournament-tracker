@@ -658,6 +658,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
   const dragCardSizeRef = useRef<{ w: number; h: number } | null>(null);
   /** Tracks the original parent Group so we can move the node back on snap-back. */
   const dragOriginalParentRef = useRef<Konva.Container | null>(null);
+  /** Tracks the card's z-index within its original parent so we can restore stacking order after drag. */
+  const dragOriginalZIndexRef = useRef<number | null>(null);
   const [dragHoverZone, setDragHoverZone] = useState<DropZoneKey | null>(null);
   const dragHoverZoneRef = useRef<DropZoneKey | null>(null);
 
@@ -1001,8 +1003,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
         // during the drag.
         const layer = gameLayerRef.current;
         if (layer && node.parent !== layer) {
-          // Save original parent so we can restore on snap-back
+          // Save original parent and z-index so we can restore on snap-back
           dragOriginalParentRef.current = node.parent as Konva.Container;
+          dragOriginalZIndexRef.current = node.zIndex();
           // Convert the node's position from its current parent's coordinate
           // space to the layer's coordinate space. Without this, cards nested
           // in offset Groups (e.g. sidebar pile cards at local (0,0) inside a
@@ -1013,6 +1016,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
           node.setAbsolutePosition(absPos);
         } else {
           dragOriginalParentRef.current = null;
+          dragOriginalZIndexRef.current = null;
         }
         // Capture position after reparenting so snap-back uses layer coords
         dragOriginalPosRef.current = { x: node.x(), y: node.y() };
@@ -1067,6 +1071,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
             }
             const ghostW = maxX - minX;
             const ghostH = maxY - minY;
+
+            // Sort followers by zoneIndex so the ghost image preserves stacking order
+            // (lower zoneIndex drawn first = underneath; higher drawn last = on top).
+            followerRects.sort((a, b) => {
+              const aCard = findMyCardById(a.f.id);
+              const bCard = findMyCardById(b.f.id);
+              return Number(aCard?.zoneIndex ?? 0) - Number(bCard?.zoneIndex ?? 0);
+            });
 
             const offscreen = document.createElement('canvas');
             offscreen.width = ghostW * 2;
@@ -1123,7 +1135,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
         dragFollowerOffsets.current = null;
       }
     },
-    [selectedIds, stopHoverAnimation, cardWidth, cardHeight, pileCardWidth, pileCardHeight, lobCard.cardWidth, lobCard.cardHeight, scale, offsetX, offsetY],
+    [selectedIds, stopHoverAnimation, cardWidth, cardHeight, pileCardWidth, pileCardHeight, lobCard.cardWidth, lobCard.cardHeight, scale, offsetX, offsetY, findMyCardById],
   );
 
   const handleCardDragMove = useCallback(
@@ -1182,6 +1194,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       const originalPos = dragOriginalPosRef.current;
       const sourceZone = dragSourceZoneRef.current;
       const originalParent = dragOriginalParentRef.current;
+      const originalZIndex = dragOriginalZIndexRef.current;
       // Capture the dragged card's actual rendered size before resetting
       const dragW = dragCardSizeRef.current?.w ?? cardWidth;
       const dragH = dragCardSizeRef.current?.h ?? cardHeight;
@@ -1193,6 +1206,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       dragOriginalPosRef.current = null;
       dragCardSizeRef.current = null;
       dragOriginalParentRef.current = null;
+      dragOriginalZIndexRef.current = null;
       dragHoverZoneRef.current = null;
       dragFollowerOffsets.current = null;
       dragGhostOffsetRef.current = null;
@@ -1242,6 +1256,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
           if (originalPos) {
             node.x(originalPos.x);
             node.y(originalPos.y);
+          }
+          // Restore original z-index so stacking order is preserved after snap-back
+          if (originalZIndex != null) {
+            const maxIdx = originalParent.getChildren().length - 1;
+            node.zIndex(Math.min(originalZIndex, maxIdx));
           }
         } else if (originalPos) {
           node.x(originalPos.x);
@@ -1340,6 +1359,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
           const absPos = node.getAbsolutePosition();
           node.moveTo(originalParent);
           node.setAbsolutePosition(absPos);
+          // Restore original z-index: moveTo adds the node as the last child,
+          // which makes it render on top. Restore its original position among
+          // siblings so the stacking order is preserved after a group drag.
+          if (originalZIndex != null) {
+            const maxIdx = originalParent.getChildren().length - 1;
+            node.zIndex(Math.min(originalZIndex, maxIdx));
+          }
         }
         if (isGroupDrag) {
           // Followers are already at drop positions from handleCardDragMove; confirm positions

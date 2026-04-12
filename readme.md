@@ -122,6 +122,13 @@ AoD calculations
 - reporting bugs
 - suggesting features
 
+## Bugs
+Ending tournament early bug
+CA State T1 bug
+jayden mode tournament
+redemptionccg app logo (Top nav) takes a while to load in 
+bright green in dark mode needs dimming
+
 ## short term
 add aod button
 
@@ -142,9 +149,10 @@ Fallow audit: https://github.com/fallow-rs/fallow
 
 
 # play features
-probably improve right click top/bottom/random menu
+probably improve right click top/bottom/random menu?
 card placement mismatches? hard to replicate
 start of game takes a bit to load
-add feature for t1 reserve access
-redemptionccg app logo takes a while to load in 
+add feature for t1 reserve access?
 create system where cards can have custom abilities coded
+save game, load game, invite to game?
+pulsing chat notification

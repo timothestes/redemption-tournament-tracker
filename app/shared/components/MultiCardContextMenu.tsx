@@ -9,6 +9,12 @@ const MOVE_TARGETS: ZoneId[] = [
   'land-of-bondage', 'land-of-redemption', 'banish',
 ];
 
+const LOST_SOUL_EXCLUDED_TARGETS: ZoneId[] = ['territory', 'discard', 'reserve'];
+
+function isLostSoul(card: GameCard): boolean {
+  return card.type === 'LS' || card.type === 'Lost Soul' || card.type.toLowerCase().includes('lost soul');
+}
+
 interface MultiCardContextMenuProps {
   selectedIds: string[];
   x: number;
@@ -25,6 +31,17 @@ export function MultiCardContextMenu({ selectedIds, x, y, actions, onClose, onCl
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number; ready: boolean }>({ left: x, top: y, ready: false });
 
+  // Find the cards in the current game state
+  const selectedCards = zones
+    ? selectedIds.flatMap(id => {
+        for (const zoneId of Object.keys(zones) as ZoneId[]) {
+          const card = zones[zoneId].find(c => c.instanceId === id);
+          if (card) return [card];
+        }
+        return [];
+      })
+    : [];
+
   // Determine zones of selected cards to filter move targets
   const selectedZones = new Set<string>();
   if (zones) {
@@ -38,9 +55,10 @@ export function MultiCardContextMenu({ selectedIds, x, y, actions, onClose, onCl
   }
   const allInHand = selectedZones.size === 1 && selectedZones.has('hand');
   const HAND_EXCLUDED_TARGETS: ZoneId[] = ['land-of-bondage', 'land-of-redemption'];
-  const filteredTargets = allInHand
-    ? MOVE_TARGETS.filter(z => !HAND_EXCLUDED_TARGETS.includes(z))
-    : MOVE_TARGETS;
+  const allLostSouls = selectedCards.length > 0 && selectedCards.every(c => isLostSoul(c));
+  const filteredTargets = MOVE_TARGETS
+    .filter(z => !allInHand || !HAND_EXCLUDED_TARGETS.includes(z))
+    .filter(z => !allLostSouls || !LOST_SOUL_EXCLUDED_TARGETS.includes(z));
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -132,17 +150,6 @@ export function MultiCardContextMenu({ selectedIds, x, y, actions, onClose, onCl
     onClearSelection();
     onClose();
   };
-
-  // Find the cards in the current game state
-  const selectedCards = zones
-    ? selectedIds.flatMap(id => {
-        for (const zoneId of Object.keys(zones) as ZoneId[]) {
-          const card = zones[zoneId].find(c => c.instanceId === id);
-          if (card) return [card];
-        }
-        return [];
-      })
-    : [];
 
   const meekCount = selectedCards.filter(c => c.isMeek).length;
   const flippedCount = selectedCards.filter(c => c.isFlipped).length;

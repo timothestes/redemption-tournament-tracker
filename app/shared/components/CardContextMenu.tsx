@@ -9,6 +9,12 @@ const MOVE_TARGETS: ZoneId[] = [
   'discard', 'reserve',
 ];
 
+const LOST_SOUL_EXCLUDED_TARGETS: ZoneId[] = ['territory', 'discard', 'reserve'];
+
+function isLostSoul(card: GameCard): boolean {
+  return card.type === 'LS' || card.type === 'Lost Soul' || card.type.toLowerCase().includes('lost soul');
+}
+
 interface CardContextMenuProps {
   card: GameCard;
   x: number;
@@ -255,6 +261,7 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
       {/* Zone targets */}
       {MOVE_TARGETS
         .filter(z => z !== card.zone)
+        .filter(z => !isLostSoul(card) || !LOST_SOUL_EXCLUDED_TARGETS.includes(z))
         .map(zoneId => (
           <button
             key={zoneId}
