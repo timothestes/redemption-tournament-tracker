@@ -3728,7 +3728,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       )}
 
 
-      {/* Disconnect timeout — claim victory banner */}
+      {/* Disconnect timeout — notification banner */}
       {gameState.disconnectTimeoutFired && !claimBannerDismissed && (
         <div
           style={{
@@ -3755,72 +3755,25 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
           <span style={{ letterSpacing: '0.04em' }}>
             Your opponent has been disconnected for 5 minutes.
           </span>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              onClick={() => setClaimBannerDismissed(true)}
-              style={{
-                background: 'rgba(50, 45, 35, 0.8)',
-                border: '1px solid rgba(107, 78, 39, 0.4)',
-                borderRadius: 5,
-                padding: '6px 14px',
-                fontFamily: 'var(--font-cinzel), Georgia, serif',
-                fontSize: 11,
-                color: '#a89878',
-                cursor: 'pointer',
-                letterSpacing: '0.04em',
-              }}
-            >
-              Keep Waiting
-            </button>
-            <button
-              onClick={() => gameState.claimTimeoutVictory()}
-              style={{
-                background: 'rgba(180, 140, 60, 0.25)',
-                border: '1px solid rgba(180, 140, 60, 0.6)',
-                borderRadius: 5,
-                padding: '6px 14px',
-                fontFamily: 'var(--font-cinzel), Georgia, serif',
-                fontSize: 11,
-                color: '#d4b86a',
-                cursor: 'pointer',
-                letterSpacing: '0.04em',
-                fontWeight: 600,
-              }}
-            >
-              Claim Victory
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Disconnect timeout — persistent claim victory button (after banner dismissed) */}
-      {gameState.disconnectTimeoutFired && claimBannerDismissed && (
-        <div
-          style={{
-            position: 'absolute',
-            top: opponentHandRect.y + opponentHandRect.height + 8,
-            right: 16,
-            zIndex: 900,
-          }}
-        >
           <button
-            onClick={() => gameState.claimTimeoutVictory()}
+            onClick={() => setClaimBannerDismissed(true)}
             style={{
-              background: 'rgba(180, 140, 60, 0.2)',
-              border: '1px solid rgba(180, 140, 60, 0.5)',
+              background: 'rgba(50, 45, 35, 0.8)',
+              border: '1px solid rgba(107, 78, 39, 0.4)',
               borderRadius: 5,
-              padding: '5px 12px',
+              padding: '6px 14px',
               fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 10,
-              color: '#d4b86a',
+              fontSize: 11,
+              color: '#a89878',
               cursor: 'pointer',
               letterSpacing: '0.04em',
             }}
           >
-            Claim Victory
+            Dismiss
           </button>
         </div>
       )}
+
 
       {/* ================================================================
           Card hover preview — floating tooltip near cursor

@@ -904,6 +904,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             )}
             myScore={gameState.myCards['land-of-redemption']?.length ?? 0}
             opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}
+            disconnectTimeoutFired={gameState.disconnectTimeoutFired}
+            onClaimVictory={gameState.claimTimeoutVictory}
           />
         </div>
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>

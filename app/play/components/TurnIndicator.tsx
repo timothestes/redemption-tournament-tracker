@@ -37,6 +37,8 @@ interface TurnIndicatorProps {
   myScore?: number;
   opponentScore?: number;
   opponentConnectionStatus?: 'connected' | 'reconnecting' | 'disconnected';
+  disconnectTimeoutFired?: boolean;
+  onClaimVictory?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -59,6 +61,8 @@ export default function TurnIndicator({
   myScore = 0,
   opponentScore = 0,
   opponentConnectionStatus = 'connected',
+  disconnectTimeoutFired = false,
+  onClaimVictory,
 }: TurnIndicatorProps) {
   const [showConcedeConfirm, setShowConcedeConfirm] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
@@ -398,7 +402,36 @@ export default function TurnIndicator({
             Play Again
           </button>
         )}
-        {!isFinished && onConcede && (
+        {!isFinished && disconnectTimeoutFired && onClaimVictory && (
+          <button
+            onClick={onClaimVictory}
+            style={{
+              padding: '5px 12px',
+              background: 'rgba(180, 140, 60, 0.15)',
+              border: '1px solid rgba(180, 140, 60, 0.5)',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: 10,
+              letterSpacing: '0.07em',
+              textTransform: 'uppercase',
+              color: '#d4b86a',
+              fontWeight: 600,
+              transition: 'background 0.15s, border-color 0.15s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(180, 140, 60, 0.28)';
+              e.currentTarget.style.borderColor = 'rgba(180, 140, 60, 0.75)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(180, 140, 60, 0.15)';
+              e.currentTarget.style.borderColor = 'rgba(180, 140, 60, 0.5)';
+            }}
+          >
+            Claim Victory
+          </button>
+        )}
+        {!isFinished && !disconnectTimeoutFired && onConcede && (
           <button
             onClick={() => setShowConcedeConfirm(true)}
             style={{
