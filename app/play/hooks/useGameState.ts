@@ -11,6 +11,7 @@ import type {
   ChatMessage,
   GameAction,
   Spectator,
+  DisconnectTimeout,
 } from '@/lib/spacetimedb/module_bindings/types';
 
 // ---------------------------------------------------------------------------
@@ -23,6 +24,7 @@ type CardCounterRow = CardCounter;
 type ChatMessageRow = ChatMessage;
 type GameActionRow = GameAction;
 type SpectatorRow = Spectator;
+type DisconnectTimeoutRow = DisconnectTimeout;
 
 // ---------------------------------------------------------------------------
 // Public interface
@@ -36,6 +38,7 @@ export interface GameState {
   game: GameRow | undefined;
   myPlayer: PlayerRow | undefined;
   opponentPlayer: PlayerRow | undefined;
+  opponentConnectionStatus: 'connected' | 'reconnecting' | 'disconnected';
   myCards: Record<string, CardInstanceRow[]>;
   opponentCards: Record<string, CardInstanceRow[]>;
   isMyTurn: boolean;
@@ -131,6 +134,7 @@ export function useGameState(gameId: bigint): GameState {
   const [allActions, actionsLoading] = useTable(tables.GameAction) as [GameActionRow[], boolean];
   const [allSpectators, spectatorsLoading] = useTable(tables.Spectator) as [SpectatorRow[], boolean];
   const [allZoneSearchRequests, zsrLoading] = useTable(tables.ZoneSearchRequest) as [any[], boolean];
+  const [allDisconnectTimeouts] = useTable(tables.DisconnectTimeout) as [DisconnectTimeoutRow[], boolean];
 
   // useTable returns [rows, subscribeApplied] where subscribeApplied=true means data is ready
   // Only require core tables (game, player, cards) — chat/actions/spectators can load async
@@ -165,6 +169,15 @@ export function useGameState(gameId: bigint): GameState {
         : undefined,
     [gamePlayers, identityHex],
   );
+
+  const opponentConnectionStatus = useMemo((): 'connected' | 'reconnecting' | 'disconnected' => {
+    if (!opponentPlayer) return 'connected';
+    if (opponentPlayer.isConnected) return 'connected';
+    const hasPendingTimeout = allDisconnectTimeouts.some(
+      (t) => t.playerId === opponentPlayer.id,
+    );
+    return hasPendingTimeout ? 'reconnecting' : 'disconnected';
+  }, [opponentPlayer, allDisconnectTimeouts]);
 
   const isMyTurn = useMemo(
     () => (game && myPlayer ? game.currentTurn === myPlayer.seat : false),
@@ -569,6 +582,7 @@ export function useGameState(gameId: bigint): GameState {
     game,
     myPlayer,
     opponentPlayer,
+    opponentConnectionStatus,
     myCards,
     opponentCards,
     isMyTurn,
