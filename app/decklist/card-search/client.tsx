@@ -7,6 +7,7 @@ import ModalWithClose from "./ModalWithClose";
 import FilterGrid from "./components/FilterGrid";
 import CardImage from "./components/CardImage";
 import DeckBuilderPanel, { TabType } from "./components/DeckBuilderPanel";
+import SpotlightPanel from "./components/SpotlightPanel";
 import { CARD_DATA_URL, OT_BOOKS, NT_BOOKS, GOSPEL_BOOKS } from "./constants";
 import { 
   Card, 
@@ -16,10 +17,13 @@ import {
   normalizeBrigadeField 
 } from "./utils";
 import { useDeckState } from "./hooks/useDeckState";
+import { useDeckCheck } from "./hooks/useDeckCheck";
 import { parseDeckText, generateDeckText, downloadDeckAsFile, copyDeckToClipboard } from "./utils/deckImportExport";
 import { createClient } from "../../../utils/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { deleteDeckAction } from "../actions";
+import { MobileBottomNav } from "./components/MobileBottomNav";
+import { useCardPrices } from "./hooks/useCardPrices";
 
 // Helper component for rename form in new deck modal
 function NewDeckRenameForm({ 
@@ -37,12 +41,12 @@ function NewDeckRenameForm({
 
   return (
     <>
-      <p className="text-gray-600 dark:text-gray-300 mb-4 leading-relaxed">
-        Your deck is still named <strong>"Untitled Deck"</strong>. Would you like to give it a name before saving?
+      <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
+        Your deck is still named <strong className="text-foreground">&quot;Untitled Deck&quot;</strong>. Give it a name before saving?
       </p>
-      
+
       <div className="mb-5">
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        <label className="block text-sm font-medium text-foreground mb-1.5">
           Deck Name
         </label>
         <input
@@ -50,7 +54,7 @@ function NewDeckRenameForm({
           value={deckName}
           onChange={(e) => setDeckName(e.target.value)}
           placeholder="Enter deck name..."
-          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-3.5 py-2.5 rounded-lg bg-muted text-foreground placeholder:text-muted-foreground text-sm"
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               onSubmit(deckName.trim() || "Untitled Deck");
@@ -60,32 +64,24 @@ function NewDeckRenameForm({
         />
       </div>
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2.5">
         <button
           onClick={() => onSubmit(deckName.trim() || "Untitled Deck")}
-          className="w-full px-6 py-3 bg-white dark:bg-gray-800 rounded-lg transition-all font-semibold flex items-center justify-center gap-2 border-2 hover:bg-green-50 dark:hover:bg-green-950/20"
-          style={{
-            borderImage: 'linear-gradient(to right, rgb(34 197 94), rgb(59 130 246)) 1',
-          }}
+          className="w-full px-5 py-2.5 bg-primary/85 text-primary-foreground rounded-lg transition-all font-semibold text-sm hover:bg-primary"
         >
-          <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-          </svg>
-          <span className="text-gray-900 dark:text-white">
-            Save & Create New Deck
-          </span>
+          Save & Create New
         </button>
 
         <button
           onClick={onDiscard}
-          className="w-full px-6 py-3 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg transition-all font-semibold flex items-center justify-center gap-2 border-2 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+          className="w-full px-5 py-2.5 rounded-lg transition-all text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
         >
-          Discard & Create New Deck
+          Don&apos;t Save
         </button>
 
         <button
           onClick={onCancel}
-          className="w-full px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+          className="w-full px-4 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           Cancel
         </button>
@@ -132,8 +128,18 @@ export default function CardSearchClient() {
   // Card legality filter mode: Rotation, Classic (all), Banned, Scrolls (not Rotation or Banned), Paragon
   const [legalityMode, setLegalityMode] = useState<'Rotation'|'Classic'|'Banned'|'Scrolls'|'Paragon'>('Rotation');
   const [visibleCount, setVisibleCount] = useState(0); // Number of cards to show
+  const [sortBy, setSortBy] = useState<'name' | 'set' | 'strength' | 'toughness' | 'type' | 'brigade'>('name');
 
-  const [modalCard, setModalCard] = useState<Card | null>(null);
+  const [modalCard, setModalCardRaw] = useState<Card | null>(null);
+  const modalOpenedFromDeckRef = useRef(false);
+  const setModalCard = React.useCallback((card: Card | null) => {
+    if (card === null && modalOpenedFromDeckRef.current) {
+      // Reopen deck drawer when closing modal that was opened from deck
+      setIsMobileDeckDrawerOpen(true);
+      modalOpenedFromDeckRef.current = false;
+    }
+    setModalCardRaw(card);
+  }, []);
   // Alignment filters: Good, Evil, Neutral (multiple selection)
   const [selectedAlignmentFilters, setSelectedAlignmentFilters] = useState<string[]>([]);
   // Rarity filters
@@ -200,7 +206,71 @@ export default function CardSearchClient() {
   // Panel visibility state
   const [showDeckBuilder, setShowDeckBuilder] = useState(true);
   const [showSearch, setShowSearch] = useState(true);
-  const [showMobileBanner, setShowMobileBanner] = useState(false);
+  const [isMobileDeckDrawerOpen, setIsMobileDeckDrawerOpen] = useState(false);
+
+  // Spotlight mode state
+  const [mode, setMode] = useState<"deck" | "spotlight">("deck");
+  const [spotlightCard, setSpotlightCard] = useState<Card | null>(null);
+  const isSpotlight = mode === "spotlight";
+  const [player1Name, setPlayer1Name] = useState("Player 1");
+  const [player2Name, setPlayer2Name] = useState("Player 2");
+  const [player1Score, setPlayer1Score] = useState(0);
+  const [player2Score, setPlayer2Score] = useState(0);
+
+  // Spotlight mode is desktop-only — reset on mobile
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+    const handler = (e: MediaQueryListEvent) => {
+      if (e.matches && modeRef.current === "spotlight") {
+        setMode("deck");
+      }
+    };
+    if (mediaQuery.matches && modeRef.current === "spotlight") {
+      setMode("deck");
+    }
+    mediaQuery.addEventListener("change", handler);
+    return () => mediaQuery.removeEventListener("change", handler);
+  }, []);
+
+  // Clear spotlight state when leaving spotlight mode
+  useEffect(() => {
+    if (mode === "deck") {
+      setSpotlightCard(null);
+      setPlayer1Name("Player 1");
+      setPlayer2Name("Player 2");
+      setPlayer1Score(0);
+      setPlayer2Score(0);
+    }
+  }, [mode]);
+
+  // ESC clears spotlight card
+  useEffect(() => {
+    if (!isSpotlight) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && spotlightCard) {
+        setSpotlightCard(null);
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [isSpotlight, spotlightCard]);
+
+  // Auto-open deck drawer on mobile when editing an existing deck
+  useEffect(() => {
+    if (deckIdFromUrl && !isNewDeck && window.innerWidth < 768) {
+      setIsMobileDeckDrawerOpen(true);
+    }
+  }, [deckIdFromUrl, isNewDeck]);
+
+  // Lock body scroll when mobile deck drawer is open to prevent iOS elastic overscroll
+  useEffect(() => {
+    if (isMobileDeckDrawerOpen && window.innerWidth < 768) {
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = ''; };
+    }
+  }, [isMobileDeckDrawerOpen]);
 
   // Deck panel resize state
   const containerRef = useRef<HTMLDivElement>(null);
@@ -252,22 +322,30 @@ export default function CardSearchClient() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!localStorage.getItem('mobile-banner-dismissed')) {
-      setShowMobileBanner(true);
-      const timer = setTimeout(() => {
-        setShowMobileBanner(false);
-        localStorage.setItem('mobile-banner-dismissed', '1');
-      }, 4000);
-      return () => clearTimeout(timer);
-    }
-  }, []);
 
   // Track active tab in deck builder
   const [activeDeckTab, setActiveDeckTab] = useState<TabType>("main");
-  
+
   // Track which section we're viewing in full deck view (for modal navigation)
   const [fullDeckViewSection, setFullDeckViewSection] = useState<'main' | 'reserve'>('main');
+
+  // Track which card's "..." menu is open in the search results grid
+  const [openSearchMenuCard, setOpenSearchMenuCard] = useState<string | null>(null);
+
+  // Close search card menu on click-outside or ESC
+  useEffect(() => {
+    if (!openSearchMenuCard) return;
+    const handleClick = () => setOpenSearchMenuCard(null);
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpenSearchMenuCard(null);
+    };
+    document.addEventListener('click', handleClick);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('click', handleClick);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [openSearchMenuCard]);
 
   // User authentication state
   const [user, setUser] = useState<User | null>(null);
@@ -297,6 +375,30 @@ export default function CardSearchClient() {
     getDeckStats,
     clearUnsavedChanges,
   } = useDeckState(deckIdFromUrl, folderIdFromUrl, isNewDeck);
+
+  const [ignoreLegalityChecks, setIgnoreLegalityChecksRaw] = useState(() => {
+    if (typeof window === 'undefined' || !deck.id) return false;
+    return localStorage.getItem(`deck-ignore-legality-${deck.id}`) === 'true';
+  });
+  const setIgnoreLegalityChecks = (val: boolean) => {
+    setIgnoreLegalityChecksRaw(val);
+    if (deck.id) {
+      localStorage.setItem(`deck-ignore-legality-${deck.id}`, String(val));
+    }
+  };
+
+  // Sync ignore state when deck changes (e.g., loading a different deck)
+  useEffect(() => {
+    if (!deck.id) {
+      setIgnoreLegalityChecksRaw(false);
+      return;
+    }
+    setIgnoreLegalityChecksRaw(localStorage.getItem(`deck-ignore-legality-${deck.id}`) === 'true');
+  }, [deck.id]);
+
+  const { result: deckCheckResult, isChecking: isDeckChecking, setResult: setDeckCheckResult } = useDeckCheck(deck, !ignoreLegalityChecks);
+
+  const { getPrice } = useCardPrices();
 
   // Refs for input fields to enable auto-focus
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -382,10 +484,11 @@ export default function CardSearchClient() {
     if (filters.demonOnly) params.set('demon', 'true');
     if (filters.danielOnly) params.set('daniel', 'true');
     if (filters.postexilicOnly) params.set('postexilic', 'true');
+    if (mode === 'spotlight') params.set('mode', 'spotlight');
 
     const url = params.toString() ? `?${params.toString()}` : '';
     router.replace(`/decklist/card-search${url}`, { scroll: false });
-  }, [router, deck.id]);
+  }, [router, deck.id, mode]);
 
   // Check user authentication on mount
   useEffect(() => {
@@ -464,6 +567,11 @@ export default function CardSearchClient() {
       setDanielOnly(searchParams.get('daniel') === 'true');
       setPostexilicOnly(searchParams.get('postexilic') === 'true');
       
+      // Spotlight mode from URL (desktop only)
+      if (searchParams.get('mode') === 'spotlight' && !window.matchMedia("(max-width: 767px)").matches) {
+        setMode('spotlight');
+      }
+
       setIsInitialized(true);
     }
   }, [searchParams, isInitialized]);
@@ -500,7 +608,7 @@ export default function CardSearchClient() {
     selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, strengthFilter,
     strengthOp, toughnessFilter, toughnessOp, noAltArt, noFirstPrint,
     nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly,
-    postexilicOnly, updateURL
+    postexilicOnly, updateURL, mode
   ]);
 
   // Note: We don't warn on page unload because the deck is always saved to localStorage
@@ -554,8 +662,13 @@ export default function CardSearchClient() {
       // Ctrl+S / Cmd+S to save
       if (e.key === 's') {
         e.preventDefault();
-        if (user && !syncStatus?.isSaving) {
-          saveDeckToCloud();
+        const stats = getDeckStats();
+        if (user && !syncStatus?.isSaving && (stats.mainDeckCount + stats.reserveCount) > 0) {
+          saveDeckToCloud().then((result) => {
+            if (result?.deckCheckResult) {
+              setDeckCheckResult(result.deckCheckResult);
+            }
+          });
         }
       }
       
@@ -574,7 +687,7 @@ export default function CardSearchClient() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [user, syncStatus?.isSaving, saveDeckToCloud, handleExportDeck, showSearch, showDeckBuilder, modalCard]);
+  }, [user, syncStatus?.isSaving, saveDeckToCloud, handleExportDeck, showSearch, showDeckBuilder, modalCard, getDeckStats]);
 
   // sanitize imgFile to avoid duplicate extensions - now imported from utils
 
@@ -697,26 +810,27 @@ export default function CardSearchClient() {
           // Start with the first query's result
           let result: boolean;
           const firstQuery = activeQueries[0];
+          const norm = (s: string) => s.toLowerCase().replace(/[\u2018\u2019\u201B\u2032\u0060]/g, "'");
           const firstMatches = (queryObj: QueryWithOp): boolean => {
-            const q = queryObj.text.toLowerCase();
+            const q = norm(queryObj.text);
             const searchField = queryObj.field;
             switch (searchField) {
               case 'name':
-                return c.name.toLowerCase().includes(q);
+                return norm(c.name).includes(q);
               case 'type':
-                return c.type.toLowerCase().includes(q);
+                return norm(c.type).includes(q);
               case 'brigade':
-                return c.brigade.toLowerCase().includes(q);
+                return norm(c.brigade).includes(q);
               case 'specialAbility':
-                return c.specialAbility.toLowerCase().includes(q);
+                return norm(c.specialAbility).includes(q);
               case 'setName':
-                return c.officialSet.toLowerCase().includes(q) || c.set.toLowerCase().includes(q);
+                return norm(c.officialSet).includes(q) || norm(c.set).includes(q);
               case 'identifier':
-                return c.identifier.toLowerCase().includes(q);
+                return norm(c.identifier).includes(q);
               case 'reference':
-                return c.reference.toLowerCase().includes(q);
+                return norm(c.reference).includes(q);
               default:
-                return Object.values(c).join(" ").toLowerCase().includes(q);
+                return norm(Object.values(c).join(" ")).includes(q);
             }
           };
           
@@ -1013,9 +1127,52 @@ export default function CardSearchClient() {
 
   const visibleCards = useMemo(() => {
     return [...filtered]
-      .sort((a, b) => a.name.localeCompare(b.name))
+      .sort((a, b) => {
+        switch (sortBy) {
+          case 'set':
+            return a.officialSet.localeCompare(b.officialSet) || a.name.localeCompare(b.name);
+          case 'strength': {
+            const aStr = parseInt(a.strength) || 0;
+            const bStr = parseInt(b.strength) || 0;
+            return bStr - aStr || a.name.localeCompare(b.name);
+          }
+          case 'toughness': {
+            const aTgh = parseInt(a.toughness) || 0;
+            const bTgh = parseInt(b.toughness) || 0;
+            return bTgh - aTgh || a.name.localeCompare(b.name);
+          }
+          case 'type':
+            return a.type.localeCompare(b.type) || a.name.localeCompare(b.name);
+          case 'brigade':
+            return a.brigade.localeCompare(b.brigade) || a.name.localeCompare(b.name);
+          case 'name':
+          default:
+            return a.name.localeCompare(b.name);
+        }
+      })
       .slice(0, visibleCount);
-  }, [filtered, visibleCount]);
+  }, [filtered, visibleCount, sortBy]);
+
+  // Whether any filter pills should be shown in the summary bar
+  const hasActiveFilters = queries.some(q => q.text.trim()) ||
+    legalityMode !== 'Rotation' ||
+    selectedAlignmentFilters.length > 0 ||
+    selectedRarityFilters.length > 0 ||
+    selectedIconFilters.length > 0 ||
+    selectedTestaments.length > 0 ||
+    isGospel ||
+    strengthFilter !== null ||
+    toughnessFilter !== null ||
+    !noAltArt ||
+    !noFirstPrint ||
+    nativityOnly ||
+    hasStarOnly ||
+    cloudOnly ||
+    angelOnly ||
+    demonOnly ||
+    danielOnly ||
+    postexilicOnly;
+
 
   // Infinite scroll: load more cards when sentinel comes into view
   useEffect(() => {
@@ -1084,6 +1241,9 @@ export default function CardSearchClient() {
     // If format is Paragon, automatically set legality filter to Paragon
     if (format.toLowerCase().includes('paragon')) {
       setLegalityMode('Paragon');
+    } else if (legalityMode === 'Paragon') {
+      // Switching away from Paragon — reset filter back to Rotation
+      setLegalityMode('Rotation');
     }
   }
 
@@ -1202,12 +1362,16 @@ export default function CardSearchClient() {
     if (shouldSave && user) {
       try {
         // Update name if provided, and pass it directly to save
+        let saveResult;
         if (newName && newName !== deck.name) {
           setDeckName(newName);
           // Pass the new name directly to saveDeckToCloud to avoid closure issues
-          await saveDeckToCloud(newName);
+          saveResult = await saveDeckToCloud(newName);
         } else {
-          await saveDeckToCloud();
+          saveResult = await saveDeckToCloud();
+        }
+        if (saveResult?.deckCheckResult) {
+          setDeckCheckResult(saveResult.deckCheckResult);
         }
         setNotification({ message: 'Deck saved successfully!', type: 'success' });
         setTimeout(() => setNotification(null), 3000);
@@ -1280,43 +1444,27 @@ export default function CardSearchClient() {
           onRemoveCard={removeCard}
           getCardQuantity={getCardQuantity}
           activeDeckTab={activeDeckTab}
+          legalityFilter={legalityMode}
+          allCards={cards}
         />
       )}
       
-    <div ref={containerRef} className="flex w-full h-screen overflow-hidden bg-gray-100 dark:bg-gray-900">
-      {/* Mobile notice */}
-      {showMobileBanner && (
-        <div className="md:hidden fixed top-16 left-0 right-0 z-50 bg-blue-100 dark:bg-blue-900 border-b border-blue-300 dark:border-blue-700 px-4 py-3 text-center">
-          <button
-            onClick={() => { setShowMobileBanner(false); localStorage.setItem('mobile-banner-dismissed', '1'); }}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-900 dark:text-blue-100 hover:text-blue-700 dark:hover:text-blue-300"
-            aria-label="Close banner"
-          >
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
-          </button>
-          <p className="text-sm text-blue-900 dark:text-blue-100 font-medium">
-            ℹ️ Deckbuilder isn't supported on mobile (yet)
-          </p>
-        </div>
-      )}
+    <div ref={containerRef} className="flex w-full h-screen overflow-hidden bg-background jayden-gradient-bg">
       {/* Left panel: Card search */}
       {showSearch && (
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <div className="bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200 flex-1 flex flex-col overflow-hidden">
-          <div className="p-2 flex flex-col items-center sticky top-0 z-40 bg-white text-gray-900 border-b border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-800 dark:shadow-lg">
-        <div className="relative w-full max-w-xl px-2 flex flex-col sm:flex-row sm:flex-wrap items-center justify-center gap-2">
-          <div className="w-full flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-center sm:gap-2 text-center">
-            <div className="flex flex-col gap-2 w-full sm:w-auto">
+        <div className="bg-background text-foreground transition-colors duration-200 flex-1 flex flex-col overflow-auto md:overflow-hidden">
+          <div className="p-1.5 md:p-2 flex flex-col items-center md:sticky md:top-0 z-40 bg-background text-foreground border-b border-border shadow-sm">
+        <div className="relative w-full px-1 md:px-2 flex flex-col items-center justify-center gap-1.5 md:gap-2">
+          <div className="w-full flex flex-col gap-1.5 md:gap-2 text-center">
+            <div className="flex flex-col gap-1.5 md:gap-2 w-full">
               {queries.map((queryObj, index) => (
-                <div key={index} className="flex items-center gap-1">
+                <div key={index} className="flex items-center gap-1 min-w-0">
                   {/* Field dropdown */}
                   <select
                     value={queryObj.field}
                     onChange={e => updateQueryField(index, e.target.value)}
-                    className="border rounded px-2 py-2 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center text-sm"
-                    style={{ minHeight: 48, maxWidth: 120 }}
+                    className="border rounded px-1 sm:px-2 h-9 sm:h-11 bg-muted text-foreground border-border shadow-sm focus:ring-2 focus:ring-ring text-center text-xs sm:text-sm min-w-0"
                   >
                     <option value="everything">All</option>
                     <option value="name">Name</option>
@@ -1332,13 +1480,12 @@ export default function CardSearchClient() {
                   <select
                     value={queryObj.operator}
                     onChange={e => updateQueryOperator(index, e.target.value as QueryOperator)}
-                    className="border rounded px-2 py-2 bg-gray-100 text-gray-900 border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-400 dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center text-sm"
-                    style={{ minHeight: 48, maxWidth: 100 }}
+                    className="border rounded px-1 sm:px-2 h-9 sm:h-11 bg-muted text-foreground border-border shadow-sm focus:ring-2 focus:ring-ring text-center text-xs sm:text-sm min-w-0"
                     title={index === 0 ? "Negate this query" : "How to combine this query with previous results"}
                   >
                     {index === 0 ? (
                       <>
-                        <option value="AND">--</option>
+                        <option value="AND">—</option>
                         <option value="NOT">NOT</option>
                       </>
                     ) : (
@@ -1355,11 +1502,10 @@ export default function CardSearchClient() {
                     ref={el => { inputRefs.current[index] = el; }}
                     type="text"
                     placeholder={index === 0 ? "Search" : `Search ${index + 1}`}
-                    className="w-full sm:w-auto p-3 pr-10 border rounded text-base focus:ring-2 focus:ring-blue-400 text-gray-900 bg-white dark:text-white dark:bg-gray-900"
+                    className="flex-1 min-w-0 px-2 sm:px-3 h-9 sm:h-11 border rounded text-base focus:outline-none focus:ring-2 focus:ring-ring text-foreground bg-card border-border"
                     value={queryObj.text}
                     onChange={(e) => updateQuery(index, e.target.value)}
                     maxLength={64}
-                    style={{ minHeight: 48, maxWidth: 180 }}
                   />
                   
                   {/* Remove button - only show if more than one query */}
@@ -1367,9 +1513,8 @@ export default function CardSearchClient() {
                     <button
                       type="button"
                       onClick={() => removeQuery(index)}
-                      className="p-2 text-red-600 hover:text-red-800 hover:bg-red-100 rounded transition-colors dark:hover:bg-red-900"
+                      className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center text-destructive/70 hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors text-lg font-bold"
                       title="Remove this query"
-                      style={{ minHeight: 48 }}
                     >
                       ×
                     </button>
@@ -1377,21 +1522,49 @@ export default function CardSearchClient() {
                 </div>
               ))}
             </div>
+            {/* Mobile: original layout */}
+            <div className="flex sm:hidden flex-row flex-wrap gap-1.5 w-full justify-center">
             <button
-              className="px-4 w-full sm:w-auto rounded bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center text-sm"
+              className="px-2.5 flex-1 rounded bg-muted text-muted-foreground hover:bg-muted/80 border border-border transition font-medium shadow-sm text-center text-xs h-8"
               onClick={handleResetFilters}
-              style={{ minHeight: 48, height: 48 }}
+            >
+              <span className="flex items-center justify-center gap-1">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Reset
+              </span>
+            </button>
+            <button
+              className="px-3 flex-1 shrink-0 rounded bg-primary/15 text-primary hover:bg-primary/25 border border-primary/30 transition font-medium shadow-sm text-center relative text-xs h-8"
+              onClick={addNewQuery}
+              title="Add new query"
+            >
+              +
+            </button>
+            </div>
+            {/* Desktop: centered buttons with filters right-aligned */}
+            <div className="hidden sm:flex flex-row gap-2 w-full items-center justify-center relative">
+            <button
+              className="px-4 shrink-0 rounded bg-primary/15 text-primary hover:bg-primary/25 border border-primary/30 transition font-medium shadow-sm text-center relative h-9 sm:h-11"
+              onClick={addNewQuery}
+              title="Add new query"
+            >
+              +
+            </button>
+            <button
+              className="px-4 rounded bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground border border-border transition font-medium shadow-sm text-center text-sm h-9 sm:h-11"
+              onClick={handleResetFilters}
             >
               Reset Filters
             </button>
             <button
-              className={`px-4 w-full sm:w-auto rounded border transition font-semibold shadow text-center relative hidden sm:block ${
+              className={`px-4 rounded border transition font-medium shadow-sm text-center relative h-9 sm:h-11 ${
                 queries.filter(q => q.text.trim()).length > 1
-                  ? 'bg-gray-400 text-gray-600 border-gray-500 cursor-not-allowed opacity-50 dark:bg-gray-800 dark:text-gray-500 dark:border-gray-600'
-                  : 'bg-gray-200 text-gray-900 hover:bg-gray-400 hover:text-gray-900 border-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-green-800 dark:hover:text-white dark:border-transparent'
+                  ? 'bg-muted text-muted-foreground/50 border-border cursor-not-allowed opacity-50'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground border-border'
               }`}
               onClick={queries.filter(q => q.text.trim()).length > 1 ? undefined : handleCopyLink}
-              style={{ minHeight: 48, height: 48 }}
               title={
                 queries.filter(q => q.text.trim()).length > 1
                   ? 'Multiple query link sharing sadly not supported'
@@ -1401,45 +1574,55 @@ export default function CardSearchClient() {
             >
               {copyLinkNotification ? '✓' : '🔗'}
             </button>
+            {/* Sort + Filter collapse — desktop only, right-aligned */}
+            <div className="hidden md:flex absolute right-0 items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <label htmlFor="card-sort" className="text-sm text-muted-foreground font-medium">Sort:</label>
+              <select
+                id="card-sort"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="px-2 py-1.5 border rounded text-sm font-semibold bg-muted text-foreground border-border focus:outline-none h-9 sm:h-11"
+              >
+                <option value="name">Name</option>
+                <option value="set">Set</option>
+                <option value="strength">Strength</option>
+                <option value="toughness">Toughness</option>
+                <option value="type">Type</option>
+                <option value="brigade">Brigade</option>
+              </select>
+            </div>
             <button
-              className="px-4 w-full sm:w-auto rounded bg-green-200 text-green-900 hover:bg-green-400 hover:text-green-900 border border-green-300 dark:bg-green-700 dark:text-white dark:hover:bg-green-600 dark:hover:text-white dark:border-transparent transition font-semibold shadow text-center relative"
-              onClick={addNewQuery}
-              style={{ minHeight: 48, height: 48 }}
-              title="Add new query"
+              aria-label="Toggle filter grid"
+              className={`flex px-3 shrink-0 rounded items-center justify-center gap-1.5 border transition font-medium shadow-sm text-sm h-9 sm:h-11 ${
+                filterGridCollapsed
+                  ? 'bg-primary/15 text-primary border-primary/30'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80 border-border'
+              }`}
+              onClick={() => setFilterGridCollapsed(v => !v)}
+              title={filterGridCollapsed ? 'Show filters' : 'Hide filters'}
             >
-              +
+              {filterGridCollapsed ? (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                </svg>
+              )}
+              Filters
             </button>
+            </div>{/* end Sort + Filter collapse wrapper */}
+            </div>
           </div>
         </div>
       </div>
-      {/* Active Filters Summary Bar */}
-      <div className="w-full px-4 py-2 flex flex-wrap gap-2 items-center justify-center min-h-[44px] transition-all duration-300 sticky top-[120px] sm:top-[64px] z-30 bg-white text-gray-900 border-b border-gray-200 shadow-sm dark:bg-gray-900 dark:text-white dark:border-gray-900 dark:shadow">
-        {/* Collapse/Expand Filter Grid Button */}
-        <div className="absolute right-4 top-2 flex flex-row items-center gap-1.5">
-          <span className="md:hidden text-xs text-gray-500 dark:text-gray-400 font-medium">
-            Filters
-          </span>
-          <button
-            aria-label="Toggle filter grid"
-            className={`w-8 h-8 rounded-full flex items-center justify-center border border-gray-400 dark:border-gray-700 shadow transition bg-gray-300 dark:bg-gray-700 ${filterGridCollapsed ? 'ring-2 ring-blue-400' : ''}`}
-            style={{ outline: 'none' }}
-            onClick={() => setFilterGridCollapsed(v => !v)}
-          >
-            {/* Use a chevron icon for clarity */}
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              style={{ transitionProperty: 'transform', transitionDuration: '0.2s', transitionTimingFunction: 'ease', transform: filterGridCollapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}
-              suppressHydrationWarning
-            >
-              <circle cx="12" cy="12" r="11" className="fill-gray-200 stroke-gray-400 dark:fill-gray-700 dark:stroke-gray-600" strokeWidth="1" />
-              <path d="M8 10l4 4 4-4" className="stroke-gray-700 dark:stroke-gray-400" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-        </div>
+      {/* Active Filters Summary Bar — always visible on desktop to prevent layout jump, hidden on mobile when empty */}
+      <div className={`w-full transition-all duration-300 md:sticky md:top-[64px] z-30 bg-background text-foreground border-b border-border ${hasActiveFilters ? 'flex' : 'hidden md:flex'} items-center`}>
+        {/* Scrollable pills area */}
+        <div className="flex-1 overflow-x-auto flex flex-nowrap sm:flex-wrap gap-1.5 sm:gap-2 items-center sm:justify-center px-2 sm:px-4 py-1.5 sm:py-2 sm:overflow-visible min-h-[44px]">
         {/* Query Pills */}
         {queries.map((queryObj, originalIndex) => {
           if (!queryObj.text.trim()) return null;
@@ -1460,95 +1643,73 @@ export default function CardSearchClient() {
           
           return (
             <span
-              key={originalIndex}
-              className="bg-blue-200 text-blue-900 dark:bg-blue-800 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer"
+              key={`${originalIndex}-${queryObj.field}-${queryObj.text}`}
+              className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap"
               onClick={() => updateQuery(originalIndex, "")}
               tabIndex={0}
               role="button"
               aria-label={`Remove Search filter ${originalIndex + 1}`}
             >
               {operatorPrefix && <span className="font-bold mr-1">{operatorPrefix}</span>}
-              {queryObj.field === 'everything' && `Search: "${queryObj.text}"`}
-              {queryObj.field === 'name' && `Name contains: "${queryObj.text}"`}
-              {queryObj.field === 'type' && `Type contains: "${queryObj.text}"`}
-              {queryObj.field === 'brigade' && `Brigade contains: "${queryObj.text}"`}
-              {queryObj.field === 'specialAbility' && `Special Ability contains: "${queryObj.text}"`}
-              {queryObj.field === 'setName' && `Set Name contains: "${queryObj.text}"`}
-              {queryObj.field === 'identifier' && `Identifier contains: "${queryObj.text}"`}
-              {queryObj.field === 'reference' && `Reference contains: "${queryObj.text}"`}
-              <span className="ml-1 text-blue-900 dark:text-white">×</span>
+              {queryObj.field === 'everything' && `"${queryObj.text}"`}
+              {queryObj.field === 'name' && `Name: "${queryObj.text}"`}
+              {queryObj.field === 'type' && `Type: "${queryObj.text}"`}
+              {queryObj.field === 'brigade' && `Brigade: "${queryObj.text}"`}
+              {queryObj.field === 'specialAbility' && `Ability: "${queryObj.text}"`}
+              {queryObj.field === 'setName' && `Set: "${queryObj.text}"`}
+              {queryObj.field === 'identifier' && `ID: "${queryObj.text}"`}
+              {queryObj.field === 'reference' && `Ref: "${queryObj.text}"`}
+              <span className="ml-1">×</span>
             </span>
           );
         })}
         {/* Legality */}
         {legalityMode !== 'Rotation' && (
-          <span className="bg-blue-400 text-blue-900 dark:bg-green-800 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setLegalityMode('Rotation')} tabIndex={0} role="button" aria-label="Remove Legality filter">
+          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => setLegalityMode('Rotation')} tabIndex={0} role="button" aria-label="Remove Legality filter">
             {legalityMode}
-            <span className="ml-1 text-blue-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         )}
         {/* Alignment */}
         {selectedAlignmentFilters.map(mode => (
           <span
             key={mode}
-            className="bg-blue-100 text-blue-900 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer border border-blue-300 shadow-sm"
+            className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap"
             onClick={() => setSelectedAlignmentFilters(selectedAlignmentFilters.filter(m => m !== mode))}
             tabIndex={0}
             role="button"
             aria-label={`Remove ${mode} alignment filter`}
           >
             {mode}
-            <span className="ml-1 text-blue-900">×</span>
+            <span className="ml-1">×</span>
           </span>
         ))}
         {/* Rarity */}
         {selectedRarityFilters.map(rarity => (
           <span
             key={rarity}
-            className="bg-purple-200 text-purple-900 dark:bg-purple-600 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer"
+            className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap"
             onClick={() => setSelectedRarityFilters(selectedRarityFilters.filter(r => r !== rarity))}
             tabIndex={0}
             role="button"
             aria-label={`Remove ${rarity} rarity filter`}
           >
             {rarity}
-            <span className="ml-1 text-purple-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         ))}
         {/* Icon Filters */}
         {selectedIconFilters.map((filter, idx) => {
-          // Brigade color mapping
-          const brigadeColors = {
-            Black: 'bg-black text-white',
-            Blue: 'bg-blue-200 text-blue-900 dark:bg-green-800 dark:text-white',
-            Brown: 'bg-yellow-900 text-white',
-            Clay: 'bg-orange-100 text-orange-900 dark:bg-orange-200 dark:text-gray-900',
-            Crimson: 'bg-red-200 text-red-900 dark:bg-red-900 dark:text-white',
-            Gold: 'bg-yellow-200 text-yellow-900 dark:bg-yellow-400 dark:text-gray-900',
-            'Good Gold': 'bg-yellow-200 text-yellow-900 dark:bg-yellow-400 dark:text-gray-900',
-            'Evil Gold': 'bg-yellow-700 text-white',
-            Gray: 'bg-gray-200 text-gray-900 dark:bg-gray-500 dark:text-white',
-            Green: 'bg-green-200 text-green-900 dark:bg-green-700 dark:text-white',
-            Orange: 'bg-orange-200 text-orange-900 dark:bg-orange-500 dark:text-white',
-            'Pale Green': 'bg-green-100 text-green-900 dark:bg-green-200 dark:text-gray-900',
-            Purple: 'bg-purple-200 text-purple-900 dark:bg-purple-700 dark:text-white',
-            Silver: 'bg-gray-100 text-gray-900 dark:bg-gray-300 dark:text-gray-900',
-            White: 'bg-gray-100 text-gray-900 dark:bg-white dark:text-gray-900',
-            Red: 'bg-red-200 text-red-900 dark:bg-red-700 dark:text-white',
-            Teal: 'bg-teal-100 text-teal-900 dark:bg-teal-600 dark:text-white',
-            'Good Multi': 'bg-gradient-to-r from-blue-200 via-green-200 to-red-200 text-gray-900 dark:from-blue-700 dark:via-green-700 dark:to-red-700 dark:text-white',
-            'Evil Multi': 'bg-gradient-to-r from-gray-200 via-red-200 to-gray-400 text-gray-900 dark:from-black dark:via-crimson dark:to-gray-700 dark:text-white',
-          };
-          const pillClass = brigadeColors[filter.icon] ? `${brigadeColors[filter.icon]} px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer` : 'bg-green-200 text-green-900 dark:bg-green-700 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer';
+          const pillClass = 'animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap';
           return (
             <React.Fragment key={filter.icon}>
               <span className={pillClass} onClick={() => setSelectedIconFilters(selectedIconFilters.filter(f => f.icon !== filter.icon))} tabIndex={0} role="button" aria-label={`Remove ${filter.icon} filter`}>
                 {filter.icon}
-                <span className="ml-1 text-gray-700 dark:text-gray-200">×</span>
+                <span className="ml-1">×</span>
               </span>
               {idx < selectedIconFilters.length - 1 && (
                 <span 
-                  className="mx-1 font-bold text-xs text-gray-500 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors px-2 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                  className="animate-pill-enter mx-1 font-bold text-xs text-gray-500 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors px-2 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
                   onClick={(e) => {
                     e.preventDefault();
                     // Left-click: cycle through AND → OR → AND NOT → AND
@@ -1587,89 +1748,130 @@ export default function CardSearchClient() {
         })}
         {/* Testament */}
         {selectedTestaments.map(t => (
-          <span key={t} className="bg-yellow-200 text-yellow-900 dark:bg-yellow-700 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setSelectedTestaments(selectedTestaments.filter(x => x !== t)); setTestamentNots(prev => { const newNots = { ...prev }; delete newNots[t]; return newNots; }); }} tabIndex={0} role="button" aria-label={`Remove ${t} testament filter`}>
+          <span key={t} className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setSelectedTestaments(selectedTestaments.filter(x => x !== t)); setTestamentNots(prev => { const newNots = { ...prev }; delete newNots[t]; return newNots; }); }} tabIndex={0} role="button" aria-label={`Remove ${t} testament filter`}>
             {testamentNots[t] ? 'NOT ' : ''}{t}
-            <span className="ml-1 text-yellow-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         ))}
         {/* Gospel */}
         {isGospel && (
-          <span className="bg-yellow-300 text-yellow-900 dark:bg-yellow-800 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setIsGospel(false); setGospelNot(false); }} tabIndex={0} role="button" aria-label="Remove Gospel filter">
+          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setIsGospel(false); setGospelNot(false); }} tabIndex={0} role="button" aria-label="Remove Gospel filter">
             {gospelNot ? 'NOT ' : ''}Gospel
-            <span className="ml-1 text-yellow-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         )}
         {/* Strength */}
         {strengthFilter !== null && (
-          <span className="bg-red-200 text-red-900 dark:bg-red-700 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setStrengthFilter(null)} tabIndex={0} role="button" aria-label="Remove Strength filter">
+          <span className="animate-pill-enter bg-destructive/15 text-destructive px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => setStrengthFilter(null)} tabIndex={0} role="button" aria-label="Remove Strength filter">
             Strength {strengthOp === 'eq' ? '=' : strengthOp === 'lt' ? '<' : strengthOp === 'lte' ? '≤' : strengthOp === 'gt' ? '>' : '≥'} {strengthFilter}
-            <span className="ml-1 text-red-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         )}
         {/* Toughness */}
         {toughnessFilter !== null && (
-          <span className="bg-red-300 text-red-900 dark:bg-red-800 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setToughnessFilter(null)} tabIndex={0} role="button" aria-label="Remove Toughness filter">
+          <span className="animate-pill-enter bg-destructive/15 text-destructive px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => setToughnessFilter(null)} tabIndex={0} role="button" aria-label="Remove Toughness filter">
             Toughness {toughnessOp === 'eq' ? '=' : toughnessOp === 'lt' ? '<' : toughnessOp === 'lte' ? '≤' : toughnessOp === 'gt' ? '>' : '≥'} {toughnessFilter}
-            <span className="ml-1 text-red-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         )}
         {/* Misc */}
         {noAltArt === false && (
-          <span className="bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setnoAltArt(true)} tabIndex={0} role="button" aria-label="Remove AB Versions filter">
+          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => setnoAltArt(true)} tabIndex={0} role="button" aria-label="Remove AB Versions filter">
             AB Versions
-            <span className="ml-1 text-gray-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         )}
         {noFirstPrint === false && (
-          <span className="bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => setnoFirstPrint(true)} tabIndex={0} role="button" aria-label="Remove 1st Print K/L Starters filter">
+          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => setnoFirstPrint(true)} tabIndex={0} role="button" aria-label="Remove 1st Print K/L Starters filter">
             1st Print K/L Starters
-            <span className="ml-1 text-gray-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         )}
         {nativityOnly && (
-          <span className="bg-pink-200 text-pink-900 dark:bg-pink-700 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setNativityOnly(false); setNativityNot(false); }} tabIndex={0} role="button" aria-label="Remove Nativity filter">
+          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setNativityOnly(false); setNativityNot(false); }} tabIndex={0} role="button" aria-label="Remove Nativity filter">
             {nativityNot ? 'NOT ' : ''}Nativity
-            <span className="ml-1 text-pink-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         )}
         {hasStarOnly && (
-          <span className="bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setHasStarOnly(false); setHasStarNot(false); }} tabIndex={0} role="button" aria-label="Remove Has Star filter">
+          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setHasStarOnly(false); setHasStarNot(false); }} tabIndex={0} role="button" aria-label="Remove Has Star filter">
             {hasStarNot ? 'NOT ' : ''}Has Star
-            <span className="ml-1 text-blue-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         )}
         {cloudOnly && (
-          <span className="bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setCloudOnly(false); setCloudNot(false); }} tabIndex={0} role="button" aria-label="Remove Cloud filter">
+          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setCloudOnly(false); setCloudNot(false); }} tabIndex={0} role="button" aria-label="Remove Cloud filter">
             {cloudNot ? 'NOT ' : ''}Cloud
-            <span className="ml-1 text-blue-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         )}
         {angelOnly && (
-          <span className="bg-gray-100 text-gray-900 dark:bg-gray-300 dark:text-gray-900 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setAngelOnly(false); setAngelNot(false); }} tabIndex={0} role="button" aria-label="Remove Angel filter">
+          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setAngelOnly(false); setAngelNot(false); }} tabIndex={0} role="button" aria-label="Remove Angel filter">
             {angelNot ? 'NOT ' : ''}Angel
-            <span className="ml-1 text-gray-900">×</span>
+            <span className="ml-1">×</span>
           </span>
         )}
         {demonOnly && (
-          <span className="bg-orange-200 text-orange-900 dark:bg-orange-500 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setDemonOnly(false); setDemonNot(false); }} tabIndex={0} role="button" aria-label="Remove Demon filter">
+          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setDemonOnly(false); setDemonNot(false); }} tabIndex={0} role="button" aria-label="Remove Demon filter">
             {demonNot ? 'NOT ' : ''}Demon
-            <span className="ml-1 text-orange-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         )}
         {danielOnly && (
-          <span className="bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setDanielOnly(false); setDanielNot(false); }} tabIndex={0} role="button" aria-label="Remove Daniel filter">
+          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setDanielOnly(false); setDanielNot(false); }} tabIndex={0} role="button" aria-label="Remove Daniel filter">
             {danielNot ? 'NOT ' : ''}Daniel
-            <span className="ml-1 text-blue-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         )}
         {postexilicOnly && (
-          <span className="bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-white px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer" onClick={() => { setPostexilicOnly(false); setPostexilicNot(false); }} tabIndex={0} role="button" aria-label="Remove Postexilic filter">
+          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setPostexilicOnly(false); setPostexilicNot(false); }} tabIndex={0} role="button" aria-label="Remove Postexilic filter">
             {postexilicNot ? 'NOT ' : ''}Postexilic
-            <span className="ml-1 text-blue-900 dark:text-white">×</span>
+            <span className="ml-1">×</span>
           </span>
         )}
+        </div>
       </div>
-      <main className="p-2 overflow-auto bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-200">
+      {/* Collapse/Expand Filter Grid Button — mobile only (on desktop it's in the search header) */}
+      <div className={`flex-shrink-0 ${!filterGridCollapsed ? 'sticky top-0 z-30' : ''} flex md:hidden flex-row items-center justify-between px-3 py-1.5 bg-background border-b border-border`}>
+        <div className="flex items-center gap-1.5">
+          <label htmlFor="card-sort-mobile" className="text-xs text-muted-foreground font-medium">Sort:</label>
+          <select
+            id="card-sort-mobile"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+            className="px-2 py-1 border rounded text-xs font-semibold bg-muted text-foreground border-border focus:outline-none"
+          >
+            <option value="name">Name</option>
+            <option value="set">Set</option>
+            <option value="strength">Strength</option>
+            <option value="toughness">Toughness</option>
+            <option value="type">Type</option>
+            <option value="brigade">Brigade</option>
+          </select>
+        </div>
+        <button
+          aria-label="Toggle filter grid"
+          className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full border text-xs font-semibold transition ${
+            filterGridCollapsed
+              ? 'bg-primary/15 text-primary border-primary/30'
+              : 'bg-muted text-muted-foreground border-border'
+          }`}
+          onClick={() => setFilterGridCollapsed(v => !v)}
+        >
+          {filterGridCollapsed ? (
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+          ) : (
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+            </svg>
+          )}
+          Filters
+        </button>
+      </div>
+      <main className="p-2 pb-16 md:pb-2 md:overflow-auto md:flex-1 bg-background text-foreground transition-colors duration-200" style={{ scrollbarGutter: 'stable' }}>
         {/* Responsive grid for filters */}
         {!filterGridCollapsed && (
           <FilterGrid
@@ -1740,18 +1942,105 @@ export default function CardSearchClient() {
         {/* Card grid */}
         {visibleCards.length > 0 ? (
           <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
-            {visibleCards.map((c) => {
+          {/* Sort + count bar */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-4 mt-2 sm:mt-4">
+            {visibleCards.map((c, cardIndex) => {
               const quantityInDeck = getCardQuantity(c.name, c.set, false);
+              const quantityInReserve = getCardQuantity(c.name, c.set, true);
+              const isMenuOpen = openSearchMenuCard === c.dataLine;
               return (
-                <div 
-                  key={c.dataLine} 
-                  className="relative cursor-pointer group rounded overflow-hidden shadow hover:shadow-xl transition-all duration-200"
+                <div
+                  key={c.dataLine}
+                  className={`relative cursor-pointer group rounded overflow-hidden transition-all duration-200 ${
+                    isSpotlight && spotlightCard?.dataLine === c.dataLine
+                      ? "ring-2 ring-amber-500 dark:ring-amber-400"
+                      : ""
+                  }`}
                 >
-                  {/* Card Image - Click to view modal */}
-                  <div 
+                  {/* Backdrop overlay when menu is open */}
+                  {!isSpotlight && isMenuOpen && (
+                    <div
+                      className="absolute inset-0 bg-black/60 backdrop-blur-sm z-30 rounded"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenSearchMenuCard(null);
+                      }}
+                    />
+                  )}
+
+                  {/* Menu items overlay */}
+                  {!isSpotlight && isMenuOpen && (
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-1.5 py-4 z-40">
+                      {/* Add to Main Deck */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addCard(c, false);
+                          setOpenSearchMenuCard(null);
+                        }}
+                        className="w-10 h-10 hover:scale-110 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 flex items-center justify-center text-gray-700 dark:text-gray-200 transition-all"
+                        title="Add to deck"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                        </svg>
+                      </button>
+
+                      {/* Add to Reserve */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addCard(c, true);
+                          setOpenSearchMenuCard(null);
+                        }}
+                        className="w-10 h-10 hover:scale-110 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 flex items-center justify-center text-gray-700 dark:text-gray-200 transition-all"
+                        title="Add to reserve"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                        </svg>
+                      </button>
+
+                      {/* Remove from Deck (only if card is in deck) */}
+                      {quantityInDeck > 0 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeCard(c.name, c.set, false);
+                            setOpenSearchMenuCard(null);
+                          }}
+                          className="w-10 h-10 hover:scale-110 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 flex items-center justify-center text-red-600 dark:text-red-400 transition-all"
+                          title="Remove from deck"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20 12H4" />
+                          </svg>
+                        </button>
+                      )}
+
+                      {/* Remove from Reserve (only if card is in reserve) */}
+                      {quantityInReserve > 0 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeCard(c.name, c.set, true);
+                            setOpenSearchMenuCard(null);
+                          }}
+                          className="w-10 h-10 hover:scale-110 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 flex items-center justify-center text-orange-600 dark:text-orange-400 transition-all"
+                          title="Remove from reserve"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Card Image - Click to view modal (or spotlight in spotlight mode) */}
+                  <div
                     className="relative overflow-hidden rounded"
-                    onClick={() => setModalCard(c)}
+                    onClick={() => isSpotlight ? setSpotlightCard(c) : setModalCard(c)}
                   >
                     <CardImage
                       imgFile={c.imgFile}
@@ -1759,64 +2048,101 @@ export default function CardSearchClient() {
                       className="rounded w-full"
                       sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 16vw"
                     />
-                    
-                    {/* Controls Overlay - Shows on Hover */}
-                    <div className="absolute inset-x-0 bottom-0 transition-opacity duration-200">
-                      {/* Using golden ratio: top section ~61.8%, bottom ~38.2% */}
-                      <div className="grid grid-rows-[1.618fr_1fr] grid-cols-2 gap-1.5 p-3 h-32">
-                        {/* Top Left: Decrement */}
-                        <div className="flex items-center justify-center">
+
+                    {/* Controls Overlay - Centered on Card */}
+                    <div className="absolute inset-0 flex items-center justify-center transition-opacity duration-200">
+                      {isSpotlight ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSpotlightCard(c);
+                          }}
+                          className="flex w-11 h-11 md:w-9 md:h-9 items-center justify-center rounded-lg bg-black/50 md:bg-black/30 md:hover:bg-black/50 backdrop-blur-md text-white transition-all border border-white/20 md:opacity-0 md:group-hover:opacity-100 md:pointer-events-none md:group-hover:pointer-events-auto"
+                          aria-label="Spotlight this card"
+                          title="Spotlight this card"
+                        >
+                          <svg className="w-5 h-5 md:w-4 md:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-3 md:gap-2">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               removeCard(c.name, c.set, activeDeckTab === "reserve");
                             }}
-                            className="hidden md:flex w-14 h-14 max-w-full max-h-full items-center justify-center rounded-lg bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-3xl border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
+                            className="flex w-11 h-11 md:w-9 md:h-9 items-center justify-center rounded-lg bg-black/50 md:bg-black/30 md:hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-2xl md:text-xl border border-white/20 md:opacity-0 md:group-hover:opacity-100 md:pointer-events-none md:group-hover:pointer-events-auto"
                             aria-label="Remove card"
                             title="Remove card from deck"
                           >
                             −
                           </button>
-                        </div>
-                        
-                        {/* Top Right: Increment */}
-                        <div className="flex items-center justify-center">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               addCard(c, activeDeckTab === "reserve");
                             }}
-                            className="hidden md:flex w-14 h-14 max-w-full max-h-full items-center justify-center rounded-lg bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-3xl border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
+                            className="flex w-11 h-11 md:w-9 md:h-9 items-center justify-center rounded-lg bg-black/50 md:bg-black/30 md:hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-2xl md:text-xl border border-white/20 md:opacity-0 md:group-hover:opacity-100 md:pointer-events-none md:group-hover:pointer-events-auto"
                             aria-label="Add card"
                             title="Add card to deck"
                           >
                             +
                           </button>
                         </div>
-                        
-                        {/* Bottom Left: Empty space */}
-                        <div className="flex items-center justify-center">
-                        </div>
-                        
-                        {/* Bottom Right: Quantity Display - Always Visible */}
+                      )}
+                    </div>
+
+                    {/* Menu Button - Bottom Left */}
+                    {!isSpotlight && (
+                    <div className="absolute bottom-0.5 left-0.5 z-10">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenSearchMenuCard(isMenuOpen ? null : c.dataLine);
+                        }}
+                        className="w-9 h-9 md:w-7 md:h-7 flex items-center justify-center rounded-lg md:rounded-md bg-black/50 md:bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all border border-white/20 md:opacity-0 md:group-hover:opacity-100 md:pointer-events-none md:group-hover:pointer-events-auto"
+                        aria-label="Card options"
+                      >
+                        <svg className="w-5 h-5 md:w-4 md:h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
+                        </svg>
+                      </button>
+                    </div>
+                    )}
+
+
+                    {/* Quantity Badge - Bottom Right, Always Visible */}
+                    {!isSpotlight && (quantityInDeck > 0 || quantityInReserve > 0) && (
+                      <div className="absolute bottom-1 right-1 flex flex-col items-end gap-0.5">
                         {quantityInDeck > 0 && (
-                          <div className="flex items-center justify-end pr-1">
-                            <div className="bg-black/75 backdrop-blur-sm text-white px-2.5 py-1 rounded-md font-bold text-sm shadow-lg">
-                              ×{quantityInDeck}
-                            </div>
+                          <div key={`m${quantityInDeck}`} className="animate-qty-pop bg-black/75 backdrop-blur-sm text-white px-1.5 py-0.5 rounded font-bold text-xs shadow-lg">
+                            ×{quantityInDeck}
+                          </div>
+                        )}
+                        {quantityInReserve > 0 && (
+                          <div key={`r${quantityInReserve}`} className="animate-qty-pop bg-black/75 backdrop-blur-sm text-white px-1.5 py-0.5 rounded font-bold text-xs shadow-lg">
+                            ×{quantityInReserve} R
                           </div>
                         )}
                       </div>
-                    </div>
+                    )}
                   </div>
-                  
-                  <p className="text-sm mt-1 text-center truncate">{c.name}</p>
+
+                  <p className="text-xs sm:text-sm mt-1 text-center truncate hidden sm:block">{c.name}</p>
+                  {(() => {
+                    const priceKey = `${c.name}|${c.set}|${c.imgFile}`;
+                    const priceInfo = getPrice(priceKey);
+                    return priceInfo ? (
+                      <p className="text-xs sm:text-xs text-center text-gray-500 dark:text-gray-400 font-medium">${priceInfo.price.toFixed(2)}</p>
+                    ) : null;
+                  })()}
                 </div>
               );
             })}
           </div>
-          <div className="py-3 text-center text-sm text-gray-500 dark:text-gray-400">
-            Showing {Math.min(visibleCount, filtered.length)} of {filtered.length} cards
+          <div className="py-3 text-center text-xs sm:text-sm text-muted-foreground">
+            Showing {Math.min(visibleCount, filtered.length)} of {filtered.length}
           </div>
           {visibleCount < filtered.length && (
             <div ref={sentinelRef} className="h-8 flex items-center justify-center mt-2">
@@ -1836,11 +2162,11 @@ export default function CardSearchClient() {
         </div>
         </div>
       )}
-      
+
       {/* Central Divider with Toggle Buttons */}
       {showSearch && showDeckBuilder && (
         <div
-          className="hidden md:flex relative bg-gradient-to-b from-transparent via-gray-300 to-transparent dark:via-gray-700 hover:via-blue-400 dark:hover:via-blue-500 items-center justify-center cursor-ew-resize select-none transition-colors flex-shrink-0"
+          className="hidden md:flex relative bg-gradient-to-b from-transparent via-border to-transparent hover:via-primary/50 items-center justify-center cursor-ew-resize select-none transition-colors flex-shrink-0 [.jayden_&]:via-primary/30 [.jayden_&]:hover:via-primary/60"
           style={{ width: '6px' }}
           onMouseDown={handleResizeStart}
           title="Drag to resize panels"
@@ -1850,10 +2176,10 @@ export default function CardSearchClient() {
             {/* Hide Search Button */}
             <button
               onClick={() => setShowSearch(false)}
-              className="group relative w-7 h-7 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 hover:border-blue-500 dark:hover:border-green-600 flex items-center justify-center"
+              className="group relative w-7 h-7 bg-card border border-border rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 hover:border-primary flex items-center justify-center"
               title="Hide search panel"
             >
-              <svg className="w-3 h-3 text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-3 h-3 text-muted-foreground group-hover:text-primary transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M15 19l-7-7 7-7" />
               </svg>
               {/* Tooltip */}
@@ -1865,10 +2191,10 @@ export default function CardSearchClient() {
             {/* Hide Deck Button */}
             <button
               onClick={() => setShowDeckBuilder(false)}
-              className="group relative w-7 h-7 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 hover:border-blue-500 dark:hover:border-green-600 flex items-center justify-center"
+              className="group relative w-7 h-7 bg-card border border-border rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 hover:border-primary flex items-center justify-center"
               title="Hide deck builder"
             >
-              <svg className="w-3 h-3 text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-3 h-3 text-muted-foreground group-hover:text-primary transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M9 5l7 7-7 7" />
               </svg>
               {/* Tooltip */}
@@ -1884,7 +2210,7 @@ export default function CardSearchClient() {
       {!showSearch && (
         <button
           onClick={() => setShowSearch(true)}
-          className="hidden md:flex fixed left-0 top-1/2 -translate-y-1/2 z-50 flex-col items-center gap-2 px-2 py-4 bg-gradient-to-r from-blue-600 to-blue-500 dark:from-blue-700 dark:to-blue-600 rounded-r-xl shadow-2xl hover:shadow-blue-500/50 dark:hover:shadow-blue-700/50 transition-all hover:pl-3 text-white font-medium group border-r-4 border-green-600 dark:border-blue-500"
+          className="hidden md:flex fixed left-0 top-1/2 -translate-y-1/2 z-50 flex-col items-center gap-2 px-2 py-4 bg-primary rounded-r-xl shadow-2xl hover:shadow-primary/50 transition-all hover:pl-3 text-primary-foreground font-medium group border-r-4 border-primary/60"
           title="Show search panel"
         >
           <svg className="w-4 h-4 group-hover:scale-105 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1897,7 +2223,7 @@ export default function CardSearchClient() {
       {!showDeckBuilder && (
         <button
           onClick={() => setShowDeckBuilder(true)}
-          className="hidden md:flex fixed right-0 top-1/2 -translate-y-1/2 z-50 flex-col items-center gap-3 px-4 py-8 bg-gradient-to-l from-purple-600 to-purple-500 dark:from-purple-700 dark:to-purple-600 rounded-l-2xl shadow-2xl hover:shadow-purple-500/50 dark:hover:shadow-purple-700/50 transition-all hover:pr-6 text-white font-medium group border-l-4 border-purple-400 dark:border-purple-500"
+          className="hidden md:flex fixed right-0 top-1/2 -translate-y-1/2 z-50 flex-col items-center gap-3 px-4 py-8 bg-accent rounded-l-2xl shadow-2xl hover:shadow-accent/50 transition-all hover:pr-6 text-accent-foreground font-medium group border-l-4 border-accent/60"
           title="Show deck builder"
         >
           <svg className="w-6 h-6 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1910,12 +2236,32 @@ export default function CardSearchClient() {
       {/* Right panel: Deck builder (hidden on mobile, toggleable on desktop) */}
       {showDeckBuilder && (
         <div
-          className="hidden md:flex flex-col overflow-hidden flex-shrink-0"
+          className="hidden md:flex flex-col overflow-visible flex-shrink-0"
           style={{ width: showSearch ? `${deckPanelWidth}%` : '100%' }}
         >
-          {isInitializing ? (
-            <div className="flex-1 flex items-center justify-center bg-white dark:bg-gray-800">
-              <div className="text-gray-400 dark:text-gray-500 text-sm">Loading deck...</div>
+          {isSpotlight ? (
+            <SpotlightPanel
+              card={spotlightCard}
+              price={spotlightCard ? (getPrice(`${spotlightCard.name}|${spotlightCard.set}|${spotlightCard.imgFile}`)?.price ?? null) : null}
+              onClear={() => setSpotlightCard(null)}
+              player1Name={player1Name}
+              player2Name={player2Name}
+              player1Score={player1Score}
+              player2Score={player2Score}
+              onPlayer1NameChange={setPlayer1Name}
+              onPlayer2NameChange={setPlayer2Name}
+              onPlayer1ScoreChange={setPlayer1Score}
+              onPlayer2ScoreChange={setPlayer2Score}
+              onResetScoreboard={() => {
+                setPlayer1Name("Player 1");
+                setPlayer2Name("Player 2");
+                setPlayer1Score(0);
+                setPlayer2Score(0);
+              }}
+            />
+          ) : isInitializing ? (
+            <div className="flex-1 flex items-center justify-center bg-background">
+              <div className="text-muted-foreground text-sm">Loading deck...</div>
             </div>
           ) : (
           <DeckBuilderPanel
@@ -1924,6 +2270,10 @@ export default function CardSearchClient() {
             hasUnsavedChanges={hasUnsavedChanges}
             isAuthenticated={!!user}
             isExpanded={!showSearch}
+            deckCheckResult={deckCheckResult}
+            isDeckChecking={isDeckChecking}
+            allCards={cards}
+            onToggleExpand={() => setShowSearch(prev => !prev)}
             onDeckNameChange={setDeckName}
             onDeckFormatChange={handleDeckFormatChange}
             onParagonChange={setDeckParagon}
@@ -1949,6 +2299,7 @@ export default function CardSearchClient() {
             }}
             onNewDeck={handleNewDeck}
             onLoadDeck={loadDeckFromCloud}
+            defaultTab={activeDeckTab}
             onActiveTabChange={setActiveDeckTab}
             onViewCard={(card, isReserve) => {
               setFullDeckViewSection(isReserve ? 'reserve' : 'main');
@@ -1960,11 +2311,106 @@ export default function CardSearchClient() {
             }}
             onPreviewCardsChange={setPreviewCards}
             onDescriptionChange={setDeckDescription}
+            ignoreLegalityChecks={ignoreLegalityChecks}
+            onIgnoreLegalityChecksChange={setIgnoreLegalityChecks}
+            onSpotlightToggle={() => {
+              setMode("spotlight");
+              setShowDeckBuilder(true);
+              setShowSearch(true);
+            }}
           />
           )}
         </div>
       )}
-      
+
+      {/* Mobile Reserve Indicator - shows on Search tab when Reserve is active */}
+      {!isMobileDeckDrawerOpen && activeDeckTab === "reserve" && (
+        <div className="md:hidden fixed bottom-14 inset-x-0 z-50 flex justify-center pointer-events-none pb-[env(safe-area-inset-bottom)]">
+          <div className="pointer-events-auto bg-amber-500 dark:bg-amber-600 text-white text-xs font-semibold px-3 py-1 rounded-full shadow-lg flex items-center gap-1.5">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            +/− adds to Reserve
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Bottom Nav */}
+      <MobileBottomNav
+        isDeckOpen={isMobileDeckDrawerOpen}
+        onToggleDeck={() => {
+          setIsMobileDeckDrawerOpen(prev => {
+            if (!prev) setModalCard(null); // Close card carousel when opening deck
+            return !prev;
+          });
+        }}
+        deckCardCount={getDeckStats().mainDeckCount + getDeckStats().reserveCount}
+        onSaveDeck={saveDeckToCloud}
+        hasUnsavedChanges={hasUnsavedChanges}
+        isSaving={syncStatus?.isSaving}
+        isAuthenticated={!!user}
+      />
+
+      {/* Mobile Deck View (replaces search when Deck tab is active) */}
+      {isMobileDeckDrawerOpen && (
+        <div className="md:hidden fixed inset-x-0 top-[64px] bottom-[3.5rem] z-40 bg-white dark:bg-gray-900 flex flex-col overflow-hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+          {isInitializing ? (
+            <div className="flex-1 flex items-center justify-center p-8">
+              <div className="text-gray-400 dark:text-gray-500 text-sm">Loading deck...</div>
+            </div>
+          ) : (
+            <DeckBuilderPanel
+              deck={deck}
+              syncStatus={syncStatus}
+              hasUnsavedChanges={hasUnsavedChanges}
+              isAuthenticated={!!user}
+              isExpanded={false}
+              forceDisableHoverPreview
+              deckCheckResult={deckCheckResult}
+              isDeckChecking={isDeckChecking}
+              allCards={cards}
+              onDeckNameChange={setDeckName}
+              onDeckFormatChange={handleDeckFormatChange}
+              onParagonChange={setDeckParagon}
+              onDeckPublicChange={setDeckPublic}
+              onSaveDeck={saveDeckToCloud}
+              onAddCard={(cardName, cardSet, isReserve) => {
+                const card = cards.find(c => c.name === cardName && c.set === cardSet);
+                if (card) {
+                  addCard(card, isReserve);
+                }
+              }}
+              onRemoveCard={(cardName, cardSet, isReserve) => {
+                removeCard(cardName, cardSet, isReserve);
+              }}
+              onExport={handleExportDeck}
+              onDownload={handleDownloadDeck}
+              onImport={() => setShowImportModal(true)}
+              onDelete={handleDeleteDeck}
+              onDuplicate={() => {}}
+              onNewDeck={handleNewDeck}
+              onLoadDeck={loadDeckFromCloud}
+              defaultTab={activeDeckTab}
+              onActiveTabChange={setActiveDeckTab}
+              onViewCard={(card, isReserve) => {
+                setFullDeckViewSection(isReserve ? 'reserve' : 'main');
+                modalOpenedFromDeckRef.current = true;
+                setModalCard(card);
+                setIsMobileDeckDrawerOpen(false);
+              }}
+              onNotify={(message, type) => {
+                setNotification({ message, type });
+                setTimeout(() => setNotification(null), 3000);
+              }}
+              onPreviewCardsChange={setPreviewCards}
+              onDescriptionChange={setDeckDescription}
+              ignoreLegalityChecks={ignoreLegalityChecks}
+              onIgnoreLegalityChecksChange={setIgnoreLegalityChecks}
+            />
+          )}
+        </div>
+      )}
+
       {/* Import modal */}
       {showImportModal && (
         <div 
@@ -2013,7 +2459,35 @@ export default function CardSearchClient() {
                 </ul>
               </div>
             )}
-            <div className="mt-6 flex gap-3 justify-end">
+            <div className="mt-6 flex gap-3 items-center">
+              <label
+                htmlFor="import-deck-file"
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded cursor-pointer transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                </svg>
+                Upload .txt
+              </label>
+              <input
+                id="import-deck-file"
+                type="file"
+                accept=".txt"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                      const text = event.target?.result as string;
+                      setImportText(text);
+                    };
+                    reader.readAsText(file);
+                  }
+                  e.target.value = "";
+                }}
+              />
+              <div className="ml-auto flex gap-3">
               <button
                 className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                 onClick={() => {
@@ -2025,17 +2499,18 @@ export default function CardSearchClient() {
                 Cancel
               </button>
               <button
-                className="px-4 py-2 bg-green-700 text-white rounded hover:bg-green-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => handleImportDeck(importText)}
                 disabled={!importText.trim()}
               >
                 Import
               </button>
+              </div>
             </div>
           </div>
         </div>
       )}
-      
+
       {/* Unsaved Changes Modal */}
       {showUnsavedChangesModal && (
         <div 
@@ -2106,10 +2581,13 @@ export default function CardSearchClient() {
                   onClick={async () => {
                     if (user) {
                       try {
-                        await saveDeckToCloud();
+                        const saveResult = await saveDeckToCloud();
+                        if (saveResult?.deckCheckResult) {
+                          setDeckCheckResult(saveResult.deckCheckResult);
+                        }
                         setNotification({ message: 'Deck saved successfully!', type: 'success' });
                         setTimeout(() => setNotification(null), 3000);
-                        
+
                         // Wait a bit for save to complete, then navigate
                         setTimeout(() => {
                           if (pendingNavigation) {
@@ -2181,57 +2659,24 @@ export default function CardSearchClient() {
       
       {/* New Deck Confirmation Modal */}
       {showNewDeckModal && (
-        <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-150"
           onClick={() => setShowNewDeckModal(false)}
         >
-          <div 
-            className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden animate-in zoom-in-95 duration-200"
+          <div
+            className="bg-card text-card-foreground rounded-xl w-full max-w-md animate-in zoom-in-95 duration-200"
+            style={{ boxShadow: '0 16px 40px rgba(0, 20, 80, 0.15)' }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
-            <div className="bg-gradient-to-r from-amber-600 to-orange-600 dark:from-amber-700 dark:to-orange-800 px-6 py-5">
-              <div className="flex items-start gap-4">
-                <div className="flex-shrink-0 w-12 h-12 bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                  <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-xl font-bold text-white mb-1">Create New Deck?</h3>
-                  {!user && <p className="text-sm text-amber-50">Your current deck will be discarded</p>}
-                </div>
-              </div>
-            </div>
-            
-            {/* Content */}
-            <div className="px-6 py-6">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-foreground mb-3">
+                {!user ? 'Create New Deck?' : hasUnsavedChanges ? 'Unsaved Changes' : 'Create New Deck?'}
+              </h3>
+
               {!user ? (
-                <>
-                  <div className="mb-5 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                    <div className="flex items-start gap-3">
-                      <svg className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                      </svg>
-                      <div>
-                        <p className="text-sm font-semibold text-red-900 dark:text-red-100 mb-1">
-                          You are not signed in
-                        </p>
-                        <p className="text-sm text-red-700 dark:text-red-300">
-                          Creating a new deck will discard your current deck. Your deck is saved locally on this device only. 
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mb-5 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                    <p className="text-sm text-blue-700 dark:text-blue-300 flex items-start gap-2">
-                      <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <span>💡 Users that are signed in can save multiple decks to the cloud</span>
-                    </p>
-                  </div>
-                </>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Your current deck will be lost — it&apos;s only saved locally on this device. Sign in to save multiple decks to the cloud.
+                </p>
               ) : hasUnsavedChanges && deck.name === "Untitled Deck" ? (
                 <NewDeckRenameForm
                   onSubmit={(newName) => proceedWithNewDeck(true, newName)}
@@ -2241,92 +2686,75 @@ export default function CardSearchClient() {
                 />
               ) : hasUnsavedChanges ? (
                 <>
-                  <p className="text-gray-600 dark:text-gray-300 mb-5 leading-relaxed">
-                    You have unsaved changes to <strong>{deck.name}</strong>. Would you like to save it before creating a new deck?
+                  <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
+                    Save changes to <strong className="text-foreground">{deck.name}</strong> before creating a new deck?
                   </p>
-                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/50 dark:to-gray-900/30 rounded-xl p-4 border border-gray-200 dark:border-gray-700 shadow-sm">
+                  <div className="bg-muted/60 rounded-lg p-3.5">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-green-600/10 dark:bg-green-600/20 rounded-lg flex items-center justify-center">
-                        <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                      <div className="w-9 h-9 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                         </svg>
                       </div>
                       <div>
-                        <div className="font-semibold text-gray-900 dark:text-white text-base">
-                          {deck.name}
-                        </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
-                          <span>{getDeckStats().mainDeckCount + getDeckStats().reserveCount} cards</span>
-                          <span className="text-gray-400 dark:text-gray-600"></span>
-                          <span>{deck.format || "Type 1"}</span>
+                        <div className="font-medium text-foreground text-sm">{deck.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {getDeckStats().mainDeckCount + getDeckStats().reserveCount} cards · {deck.format || "Type 1"}
                         </div>
                       </div>
                     </div>
                   </div>
                 </>
               ) : (
-                <p className="text-gray-600 dark:text-gray-300 mb-5 leading-relaxed">
-                  Are you sure you want to create a new deck? Your current deck will be replaced.
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Start a fresh deck?
                 </p>
               )}
-            </div>
-            
-            {/* Actions */}
-            {(!user || !hasUnsavedChanges || deck.name !== "Untitled Deck") && (
-              <div className="px-6 py-5 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-700">
-                <div className="flex flex-col gap-3">
+
+              {/* Actions */}
+              {(!user || !hasUnsavedChanges || deck.name !== "Untitled Deck") && (
+                <div className="mt-5 flex flex-col gap-2.5">
                   {user && hasUnsavedChanges && (
                     <button
                       onClick={() => proceedWithNewDeck(true)}
-                      className="w-full px-6 py-3 bg-white dark:bg-gray-800 rounded-lg transition-all font-semibold flex items-center justify-center gap-2 border-2 hover:bg-green-50 dark:hover:bg-green-950/20"
-                      style={{
-                        borderImage: 'linear-gradient(to right, rgb(34 197 94), rgb(59 130 246)) 1',
-                      }}
+                      className="w-full px-5 py-2.5 bg-primary/85 text-primary-foreground rounded-lg transition-all font-semibold text-sm hover:bg-primary"
                     >
-                      <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                      </svg>
-                      <span className="text-gray-900 dark:text-white">
-                        Save & Create New Deck
-                      </span>
+                      Save & Create New
                     </button>
                   )}
 
                   {!user && (
                     <button
                       onClick={() => {
-                        // Close modal and navigate to sign in
                         setShowNewDeckModal(false);
                         router.push('/sign-in');
                       }}
-                      className="w-full px-6 py-3 bg-green-700 dark:bg-green-800 text-white rounded-lg transition-all font-semibold flex items-center justify-center gap-2 hover:bg-green-800 dark:hover:bg-green-700 border-2 border-green-700 dark:border-green-800"
+                      className="w-full px-5 py-2.5 bg-primary/85 text-primary-foreground rounded-lg transition-all font-semibold text-sm hover:bg-primary"
                     >
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                      </svg>
                       Sign In to Save Decks
                     </button>
                   )}
 
                   <button
                     onClick={() => proceedWithNewDeck(false)}
-                    className="w-full px-6 py-3 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg transition-all font-semibold flex items-center justify-center gap-2 border-2 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    className={`w-full px-5 py-2.5 rounded-lg transition-all text-sm ${
+                      (user && hasUnsavedChanges) || !user
+                        ? 'font-medium text-muted-foreground hover:bg-muted hover:text-foreground'
+                        : 'bg-primary/85 text-primary-foreground font-semibold hover:bg-primary'
+                    }`}
                   >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    Discard Changes & Create New Deck
+                    {user && hasUnsavedChanges ? "Don\u2019t Save" : !user ? "Discard & Start New" : "Create New Deck"}
                   </button>
 
                   <button
                     onClick={() => setShowNewDeckModal(false)}
-                    className="w-full px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+                    className="w-full px-4 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
                   >
                     Cancel
                   </button>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       )}

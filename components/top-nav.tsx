@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { HiMenu, HiDocumentText, HiArrowSmRight, HiUserAdd, HiShieldCheck, HiGlobeAlt } from "react-icons/hi";
+import { HiMenu, HiDocumentText, HiArrowSmRight, HiUserAdd, HiShieldCheck, HiGlobeAlt, HiSparkles, HiCalendar, HiCollection } from "react-icons/hi";
 import { IoClose } from "react-icons/io5";
 import { FaTrophy, FaBookOpen } from "react-icons/fa6";
 import { PiPencilLineBold } from "react-icons/pi";
@@ -21,34 +21,77 @@ const TopNav: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isResourcesOpen, setIsResourcesOpen] = useState(false);
   const [isDecksOpen, setIsDecksOpen] = useState(false);
+  const [isTournamentsOpen, setIsTournamentsOpen] = useState(false);
   const { theme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [logoSrc, setLogoSrc] = useState('/darkmode_redemptionccgapp.webp');
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const { isAdmin } = useIsAdmin();
+  const { isAdmin, permissions, loading: adminLoading } = useIsAdmin();
   const pathname = usePathname();
   const supabase = createClient();
 
+  // Nav is "ready" when both auth and admin checks have resolved
+  const navReady = !authLoading && !adminLoading;
+
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
+
+  const closeMobileMenu = () => {
+    setIsMobileMenuOpen(false);
+    setIsDecksOpen(false);
+    setIsResourcesOpen(false);
+    setIsAdminOpen(false);
+    setIsTournamentsOpen(false);
+  };
+
   const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
+    if (isMobileMenuOpen) {
+      closeMobileMenu();
+    } else {
+      setIsMobileMenuOpen(true);
+    }
+  };
+
+  const closeAllDropdowns = () => {
+    setIsResourcesOpen(false);
+    setIsDecksOpen(false);
+    setIsAdminOpen(false);
+    setIsTournamentsOpen(false);
   };
 
   const toggleResources = () => {
-    setIsResourcesOpen(!isResourcesOpen);
-    setIsDecksOpen(false);
+    const next = !isResourcesOpen;
+    closeAllDropdowns();
+    setIsResourcesOpen(next);
   };
 
   const toggleDecks = () => {
-    setIsDecksOpen(!isDecksOpen);
-    setIsResourcesOpen(false);
+    const next = !isDecksOpen;
+    closeAllDropdowns();
+    setIsDecksOpen(next);
   };
 
+  const toggleAdmin = () => {
+    const next = !isAdminOpen;
+    closeAllDropdowns();
+    setIsAdminOpen(next);
+  };
+
+  const toggleTournaments = () => {
+    const next = !isTournamentsOpen;
+    closeAllDropdowns();
+    setIsTournamentsOpen(next);
+  };
+
+  // Theme / logo effect — runs when theme changes
   useEffect(() => {
     setMounted(true);
     const currentTheme = theme === 'system' ? resolvedTheme : theme;
     setLogoSrc(currentTheme === 'light' ? '/lightmode_redemptionccgapp.webp' : '/darkmode_redemptionccgapp.webp');
+  }, [theme, resolvedTheme]);
 
+  // Auth effect — runs once on mount, listens for session changes
+  useEffect(() => {
     const getUser = async () => {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       setUser(currentUser);
@@ -62,15 +105,14 @@ const TopNav: React.FC = () => {
     });
 
     return () => subscription.unsubscribe();
-  }, [theme, resolvedTheme]);
+  }, [supabase]);
 
   // Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = () => {
-      setIsDecksOpen(false);
-      setIsResourcesOpen(false);
+      closeAllDropdowns();
     };
-    if (isDecksOpen || isResourcesOpen) {
+    if (isDecksOpen || isResourcesOpen || isAdminOpen || isTournamentsOpen) {
       // Use a slight delay so the toggle click doesn't immediately re-close
       const timer = setTimeout(() => {
         document.addEventListener('click', handleClickOutside, { once: true });
@@ -80,35 +122,36 @@ const TopNav: React.FC = () => {
         document.removeEventListener('click', handleClickOutside);
       };
     }
-  }, [isDecksOpen, isResourcesOpen]);
+  }, [isDecksOpen, isResourcesOpen, isAdminOpen, isTournamentsOpen]);
 
   const isActive = (path: string) => pathname?.startsWith(path);
 
   const navLinks = [
     { href: "/register", label: NATIONALS_CONFIG.adminOnly ? `${NATIONALS_CONFIG.displayName} (Admin Only)` : `${NATIONALS_CONFIG.displayName}`, icon: HiUserAdd, highlight: true },
-    { href: "/tracker/tournaments", label: "Tournaments", icon: FaTrophy, authRequired: true },
+    { href: "/decklist/card-search?new=true", label: "Deck Builder", icon: TbSearch },
+    { href: "/spoilers", label: "Spoilers", icon: HiSparkles },
+  ];
+
+  const tournamentLinks = [
+    { href: "/tournaments", label: "Upcoming Events", icon: HiCalendar },
+    { href: "/tracker/tournaments", label: "My Tournaments", icon: FaTrophy, authRequired: true },
   ];
 
   const deckLinks = [
     { href: "/decklist/community", label: "Community Decks", icon: HiGlobeAlt, isNew: true },
     { href: "/decklist/my-decks", label: "My Decks", icon: TbCardsFilled, authRequired: true },
-    { href: "/decklist/card-search?new=true", label: "Deck Builder", icon: TbSearch },
     { href: "/decklist/generate", label: "Deck Check PDF", icon: TbCardsFilled },
   ];
 
-  const adminLinks = [
-    { href: "/admin/registrations", label: "Admin", icon: HiShieldCheck },
-  ];
-
   const tournamentResources = [
-    { href: "https://landofredemption.com/wp-content/uploads/2025/03/REG_PDF_10.0.0.pdf", label: "REG (Official Rulebook)", icon: PiPencilLineBold },
-    { href: "https://landofredemption.com/wp-content/uploads/2025/03/ORDIR_PDF_6.0.0.pdf", label: "ORDIR (Dictionary)", icon: FaBookOpen },
-    { href: "https://landofredemption.com/wp-content/uploads/2024/10/Deck_Building_Rules_1.2.pdf", label: "Deck Building Rules", icon: TbCardsFilled },
+    { href: "https://landofredemption.com/wp-content/uploads/2026/03/REG_PDF_11.0.0.pdf", label: "REG (Official Rulebook)", icon: PiPencilLineBold },
+    { href: "https://landofredemption.com/wp-content/uploads/2026/03/ORDIR_PDF_7.0.0.pdf", label: "ORDIR (Dictionary)", icon: FaBookOpen },
+    { href: "https://landofredemption.com/wp-content/uploads/2026/03/Deck_Building_Rules_1.3.pdf", label: "Deck Building Rules", icon: TbCardsFilled },
   ];
 
   const paragonResources = [
     { href: "https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Paragons-v1.pdf", label: "Paragon Cards" },
-    { href: "https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Rules-v1.pdf", label: "Paragon Rules" },
+    { href: "https://landofredemption.com/wp-content/uploads/2026/03/Redemption-Paragon-Format-Rules-v1-1.pdf", label: "Paragon Rules" },
     { href: "https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Lost-Souls-Color-v1.pdf", label: "Lost Souls (Color)" },
     { href: "https://landofredemption.com/wp-content/uploads/2025/11/Paragon-Format-Lost-Souls-BW-v1.pdf", label: "Lost Souls (B&W)" },
   ];
@@ -118,15 +161,15 @@ const TopNav: React.FC = () => {
     { href: "https://landofredemption.com/wp-content/uploads/2025/05/Redemption-Tournament-Host-Application-2025-1.pdf", label: "Hosting Application" },
     { href: "https://landofredemption.com/wp-content/uploads/2025/11/Redemption-Tournament-Host-Application-2025-08.pdf", label: "Hosting Application" },
     { href: "https://landofredemption.com/wp-content/uploads/2025/03/host_sign_in_sheets.pdf", label: "Sign In Sheet" },
-    { href: "https://landofredemption.com/wp-content/uploads/2025/03/Type-1-Deck-Check-Sheet-1.pdf", label: "T1 Deck Check Sheet" },
+    { href: "https://landofredemption.com/wp-content/uploads/2026/02/t1_deck_check.pdf", label: "T1 Deck Check Sheet" },
     { href: "https://landofredemption.com/wp-content/uploads/2025/03/Reserve-List-T1.pdf", label: "T1 Reserve List" },
-    { href: "https://landofredemption.com/wp-content/uploads/2025/03/T2-Deck-Check-Sheet.pdf", label: "T2 Deck Check Sheet" },
+    { href: "https://landofredemption.com/wp-content/uploads/2026/02/t2_deck_check.pdf", label: "T2 Deck Check Sheet" },
     { href: "https://landofredemption.com/wp-content/uploads/2025/03/Reserve-List-Type-2.pdf", label: "T2 Reserve List" },
     { href: "https://landofredemption.com/wp-content/uploads/2025/03/host_winners_list.pdf", label: "Winners Form" },
   ];
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b bg-white dark:bg-gray-900 shadow-sm">
+    <nav className="sticky top-0 z-50 w-full border-b bg-background shadow-sm">
       <div className="max-w-full mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
@@ -137,14 +180,15 @@ const TopNav: React.FC = () => {
                 alt="RedemptionCCG App Logo"
                 width={120}
                 height={32}
-                style={{ width: "auto", height: "auto", maxHeight: "32px", opacity: mounted ? 1 : 0 }}
+                style={{ width: "auto", height: "auto", maxHeight: "32px" }}
+                className={`transition-opacity duration-150 ${mounted ? 'opacity-100' : 'opacity-0'}`}
                 priority
               />
             </div>
           </Link>
 
           {/* Desktop Navigation - Center */}
-          <div className="hidden md:flex md:items-center md:space-x-1 flex-1 justify-center">
+          <div className="hidden lg:flex lg:items-center lg:space-x-1 flex-1 justify-center">
             {navLinks.slice(0, 1).map((link) => {
               const Icon = link.icon;
               const isHighlight = link.highlight;
@@ -154,10 +198,10 @@ const TopNav: React.FC = () => {
                   href={link.href}
                   className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
                     ${isHighlight
-                      ? 'border-2 border-green-500 text-green-600 hover:bg-green-50 dark:border-green-400 dark:text-green-400 dark:hover:bg-green-950'
+                      ? 'border-2 border-primary text-primary hover:bg-primary/10'
                       : isActive(link.href)
-                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+                      ? 'bg-muted text-foreground'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                     }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -166,24 +210,132 @@ const TopNav: React.FC = () => {
               );
             })}
 
-            {/* Admin Links - Only for admins (right after Nationals) */}
-            {isAdmin && adminLinks.map((link) => {
-              const Icon = link.icon;
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
+            {/* Admin Dropdown - Only for admins */}
+            {isAdmin && (
+              <div className="relative">
+                <button
+                  onClick={toggleAdmin}
                   className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors
-                    ${isActive(link.href)
-                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+                    ${isAdminOpen || isActive('/admin')
+                      ? 'bg-muted text-foreground'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                     }`}
                 >
-                  <Icon className="w-4 h-4" />
-                  {link.label}
-                </Link>
-              );
-            })}
+                  <HiShieldCheck className="w-4 h-4" />
+                  Admin
+                  <svg
+                    className={`w-4 h-4 transition-transform ${isAdminOpen ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {isAdminOpen && (
+                  <div className="absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-card ring-1 ring-black ring-opacity-5">
+                    <div className="py-2">
+                      {permissions.includes('manage_registrations') && (
+                        <Link
+                          href="/admin/registrations"
+                          onClick={() => setIsAdminOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
+                        >
+                          <HiUserAdd className="w-4 h-4" />
+                          Registrations
+                        </Link>
+                      )}
+                      {permissions.includes('manage_tags') && (
+                        <Link
+                          href="/admin/tags"
+                          onClick={() => setIsAdminOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
+                        >
+                          <TbCardsFilled className="w-4 h-4" />
+                          Manage Tags
+                        </Link>
+                      )}
+                      {permissions.includes('manage_spoilers') && (
+                        <Link
+                          href="/admin/spoilers"
+                          onClick={() => setIsAdminOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
+                        >
+                          <HiSparkles className="w-4 h-4" />
+                          Manage Spoilers
+                        </Link>
+                      )}
+                      {permissions.includes('manage_cards') && (
+                        <Link
+                          href="/admin/cards"
+                          onClick={() => setIsAdminOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
+                        >
+                          <HiCollection className="w-4 h-4" />
+                          Manage Cards
+                        </Link>
+                      )}
+                      {permissions.includes('manage_rulings') && (
+                        <Link
+                          href="/admin/rulings"
+                          onClick={() => setIsAdminOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
+                        >
+                          <HiDocumentText className="w-4 h-4" />
+                          Manage Rulings
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tournaments Dropdown */}
+            <div className="relative">
+              <button
+                onClick={toggleTournaments}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
+                  ${isTournamentsOpen || isActive('/tournaments') || isActive('/tracker/tournaments')
+                    ? 'bg-muted text-foreground'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  }`}
+              >
+                <FaTrophy className="w-4 h-4" />
+                Tournaments
+                <svg
+                  className={`w-4 h-4 transition-transform ${isTournamentsOpen ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {isTournamentsOpen && (
+                <div className="absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-card ring-1 ring-black ring-opacity-5">
+                  <div className="py-2">
+                    {tournamentLinks.map((link) => {
+                      if (link.authRequired && !user) return null;
+                      const Icon = link.icon;
+                      return (
+                        <Link
+                          key={link.href}
+                          href={link.href}
+                          onClick={() => setIsTournamentsOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
+                        >
+                          <Icon className="w-4 h-4" />
+                          {link.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Rest of nav links */}
             {navLinks.slice(1).map((link) => {
@@ -195,10 +347,10 @@ const TopNav: React.FC = () => {
                   href={link.href}
                   className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
                     ${isHighlight
-                      ? 'border-2 border-green-500 text-green-600 hover:bg-green-50 dark:border-green-400 dark:text-green-400 dark:hover:bg-green-950'
+                      ? 'border-2 border-primary text-primary hover:bg-primary/10'
                       : isActive(link.href)
-                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+                      ? 'bg-muted text-foreground'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                     }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -213,8 +365,8 @@ const TopNav: React.FC = () => {
                 onClick={toggleDecks}
                 className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
                   ${isDecksOpen || isActive('/decklist')
-                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+                    ? 'bg-muted text-foreground'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                   }`}
               >
                 <TbCardsFilled className="w-4 h-4" />
@@ -230,7 +382,7 @@ const TopNav: React.FC = () => {
               </button>
 
               {isDecksOpen && (
-                <div className="absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5">
+                <div className="absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-card ring-1 ring-black ring-opacity-5">
                   <div className="py-2">
                     {deckLinks.map((link) => {
                       const Icon = link.icon;
@@ -239,12 +391,12 @@ const TopNav: React.FC = () => {
                           key={link.href}
                           href={link.href}
                           onClick={() => setIsDecksOpen(false)}
-                          className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
                         >
                           <Icon className="w-4 h-4" />
                           {link.label}
                           {link.isNew && (
-                            <span className="ml-auto px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] font-bold rounded uppercase">
+                            <span className="ml-auto px-1.5 py-0.5 bg-primary/15 text-primary text-[10px] font-bold rounded uppercase">
                               New
                             </span>
                           )}
@@ -262,8 +414,8 @@ const TopNav: React.FC = () => {
                 onClick={toggleResources}
                 className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
                   ${isResourcesOpen
-                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+                    ? 'bg-muted text-foreground'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                   }`}
               >
                 <HiDocumentText className="w-4 h-4" />
@@ -280,10 +432,10 @@ const TopNav: React.FC = () => {
 
               {/* Resources Dropdown Menu */}
               {isResourcesOpen && (
-                <div className="absolute left-0 mt-2 w-72 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5">
+                <div className="absolute left-0 mt-2 w-72 rounded-md shadow-lg bg-card ring-1 ring-black ring-opacity-5">
                   <div className="py-2">
                     {/* Tournament Resources */}
-                    <div className="px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       Tournament Resources
                     </div>
                     {tournamentResources.map((resource) => {
@@ -294,7 +446,7 @@ const TopNav: React.FC = () => {
                           href={resource.href}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
                         >
                           <Icon className="w-4 h-4" />
                           {resource.label}
@@ -302,8 +454,18 @@ const TopNav: React.FC = () => {
                       );
                     })}
 
+                    {/* Card Rulings */}
+                    <Link
+                      href="/rulings"
+                      onClick={() => setIsResourcesOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
+                    >
+                      <FaBookOpen className="w-4 h-4" />
+                      Card Rulings
+                    </Link>
+
                     {/* Paragon Resources */}
-                    <div className="px-4 py-2 mt-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-t border-gray-200 dark:border-gray-700">
+                    <div className="px-4 py-2 mt-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-t border-border">
                       Paragon Resources
                     </div>
                     {paragonResources.map((resource) => (
@@ -312,14 +474,14 @@ const TopNav: React.FC = () => {
                         href={resource.href}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        className="block px-4 py-2 text-sm text-foreground hover:bg-muted"
                       >
                         {resource.label}
                       </a>
                     ))}
 
                     {/* Host Resources */}
-                    <div className="px-4 py-2 mt-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-t border-gray-200 dark:border-gray-700">
+                    <div className="px-4 py-2 mt-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-t border-border">
                       Host Resources
                     </div>
                     {hostResources.map((resource) => (
@@ -328,42 +490,41 @@ const TopNav: React.FC = () => {
                         href={resource.href}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        className="block px-4 py-2 text-sm text-foreground hover:bg-muted"
                       >
                         {resource.label}
                       </a>
                     ))}
+
+                    {/* Report a Bug */}
+                    <div className="border-t border-border mt-2 pt-2">
+                      <Link
+                        href="/tracker/bug"
+                        onClick={() => setIsResourcesOpen(false)}
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                      >
+                        <HiArrowSmRight className="w-4 h-4" />
+                        Report a Bug
+                      </Link>
+                    </div>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Report a Bug */}
-            <Link
-              href="/tracker/bug"
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
-                ${isActive('/tracker/bug')
-                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
-                }`}
-            >
-              <HiArrowSmRight className="w-4 h-4" />
-              Report a Bug
-            </Link>
           </div>
 
           {/* Auth Section - Right Side */}
-          <div className="hidden md:flex md:items-center md:gap-3">
+          <div className="hidden lg:flex lg:items-center lg:gap-3">
             <ThemeSwitcher />
-            {authLoading ? (
-              // Invisible placeholder matching the logged-out button sizes so layout doesn't shift
-              <div className="flex items-center gap-3 invisible" aria-hidden>
-                <Button size="sm" variant="outline">Sign in</Button>
-                <Button size="sm" variant="default">Sign up</Button>
+            {!navReady ? (
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-16 rounded-md bg-muted animate-pulse" />
+                <div className="h-8 w-16 rounded-md bg-muted animate-pulse" />
               </div>
             ) : user ? (
               <>
-                <span className="text-sm text-gray-600 dark:text-gray-300">
+                <span className="text-sm text-muted-foreground">
                   {user.email}
                 </span>
                 <form action={signOutAction}>
@@ -387,7 +548,7 @@ const TopNav: React.FC = () => {
           {/* Mobile menu button */}
           <button
             onClick={toggleMobileMenu}
-            className="md:hidden p-2 rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+            className="lg:hidden min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
           >
             {isMobileMenuOpen ? <IoClose size={24} /> : <HiMenu size={24} />}
           </button>
@@ -396,7 +557,7 @@ const TopNav: React.FC = () => {
 
       {/* Mobile Navigation */}
       {isMobileMenuOpen && (
-        <div className="md:hidden border-t border-gray-200 dark:border-gray-700 max-h-[calc(100dvh-4rem)] overflow-y-auto">
+        <div className="lg:hidden border-t border-border max-h-[calc(100dvh-4rem)] overflow-y-auto">
           <div className="px-2 pt-2 pb-3 space-y-1">
             {/* Nationals link */}
             {navLinks.slice(0, 1).map((link) => {
@@ -406,13 +567,13 @@ const TopNav: React.FC = () => {
                 <Link
                   key={link.href}
                   href={link.href}
-                  onClick={() => setIsMobileMenuOpen(false)}
+                  onClick={closeMobileMenu}
                   className={`flex items-center gap-3 px-3 py-2 rounded-md text-base font-medium transition-colors
                     ${isHighlight
-                      ? 'border-2 border-green-500 text-green-600 hover:bg-green-50 dark:border-green-400 dark:text-green-400 dark:hover:bg-green-950'
+                      ? 'border-2 border-primary text-primary hover:bg-primary/10'
                       : isActive(link.href)
-                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                      ? 'bg-muted text-foreground'
+                      : 'text-muted-foreground hover:bg-muted'
                     }`}
                 >
                   <Icon className="w-5 h-5" />
@@ -421,25 +582,124 @@ const TopNav: React.FC = () => {
               );
             })}
 
-            {/* Admin Links - Only for admins (right after Nationals) */}
-            {isAdmin && adminLinks.map((link) => {
-              const Icon = link.icon;
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-md text-base font-medium transition-colors
-                    ${isActive(link.href)
-                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                    }`}
+            {/* Admin Dropdown - Only for admins */}
+            {isAdmin && (
+              <div className="pt-2">
+                <button
+                  onClick={toggleAdmin}
+                  className="flex items-center justify-between w-full px-3 py-2 rounded-md text-base font-medium text-muted-foreground hover:bg-muted"
                 >
-                  <Icon className="w-5 h-5" />
-                  {link.label}
-                </Link>
-              );
-            })}
+                  <div className="flex items-center gap-3">
+                    <HiShieldCheck className="w-5 h-5" />
+                    Admin
+                  </div>
+                  <svg
+                    className={`w-4 h-4 transition-transform ${isAdminOpen ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {isAdminOpen && (
+                  <div className="mt-2 ml-8 space-y-1">
+                    {permissions.includes('manage_registrations') && (
+                      <Link
+                        href="/admin/registrations"
+                        onClick={closeMobileMenu}
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
+                      >
+                        <HiUserAdd className="w-4 h-4" />
+                        Registrations
+                      </Link>
+                    )}
+                    {permissions.includes('manage_tags') && (
+                      <Link
+                        href="/admin/tags"
+                        onClick={closeMobileMenu}
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
+                      >
+                        <TbCardsFilled className="w-4 h-4" />
+                        Manage Tags
+                      </Link>
+                    )}
+                    {permissions.includes('manage_spoilers') && (
+                      <Link
+                        href="/admin/spoilers"
+                        onClick={closeMobileMenu}
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
+                      >
+                        <HiSparkles className="w-4 h-4" />
+                        Manage Spoilers
+                      </Link>
+                    )}
+                    {permissions.includes('manage_cards') && (
+                      <Link
+                        href="/admin/cards"
+                        onClick={closeMobileMenu}
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
+                      >
+                        <HiCollection className="w-4 h-4" />
+                        Manage Cards
+                      </Link>
+                    )}
+                    {permissions.includes('manage_rulings') && (
+                      <Link
+                        href="/admin/rulings"
+                        onClick={closeMobileMenu}
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
+                      >
+                        <HiDocumentText className="w-4 h-4" />
+                        Manage Rulings
+                      </Link>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Mobile Tournaments Section */}
+            <div className="pt-2">
+              <button
+                onClick={toggleTournaments}
+                className="flex items-center justify-between w-full px-3 py-2 rounded-md text-base font-medium text-muted-foreground hover:bg-muted"
+              >
+                <div className="flex items-center gap-3">
+                  <FaTrophy className="w-5 h-5" />
+                  Tournaments
+                </div>
+                <svg
+                  className={`w-4 h-4 transition-transform ${isTournamentsOpen ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {isTournamentsOpen && (
+                <div className="mt-2 ml-8 space-y-1">
+                  {tournamentLinks.map((link) => {
+                    if (link.authRequired && !user) return null;
+                    const Icon = link.icon;
+                    return (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        onClick={closeMobileMenu}
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
+                      >
+                        <Icon className="w-4 h-4" />
+                        {link.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
             {/* Rest of nav links */}
             {navLinks.slice(1).map((link) => {
@@ -449,13 +709,13 @@ const TopNav: React.FC = () => {
                 <Link
                   key={link.href}
                   href={link.href}
-                  onClick={() => setIsMobileMenuOpen(false)}
+                  onClick={closeMobileMenu}
                   className={`flex items-center gap-3 px-3 py-2 rounded-md text-base font-medium transition-colors
                     ${isHighlight
-                      ? 'border-2 border-green-500 text-green-600 hover:bg-green-50 dark:border-green-400 dark:text-green-400 dark:hover:bg-green-950'
+                      ? 'border-2 border-primary text-primary hover:bg-primary/10'
                       : isActive(link.href)
-                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                      ? 'bg-muted text-foreground'
+                      : 'text-muted-foreground hover:bg-muted'
                     }`}
                 >
                   <Icon className="w-5 h-5" />
@@ -468,7 +728,7 @@ const TopNav: React.FC = () => {
             <div className="pt-2">
               <button
                 onClick={toggleDecks}
-                className="flex items-center justify-between w-full px-3 py-2 rounded-md text-base font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                className="flex items-center justify-between w-full px-3 py-2 rounded-md text-base font-medium text-muted-foreground hover:bg-muted"
               >
                 <div className="flex items-center gap-3">
                   <TbCardsFilled className="w-5 h-5" />
@@ -492,13 +752,13 @@ const TopNav: React.FC = () => {
                       <Link
                         key={link.href}
                         href={link.href}
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        onClick={closeMobileMenu}
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
                       >
                         <Icon className="w-4 h-4" />
                         {link.label}
                         {link.isNew && (
-                          <span className="ml-auto px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] font-bold rounded uppercase">
+                          <span className="ml-auto px-1.5 py-0.5 bg-primary/15 text-primary text-[10px] font-bold rounded uppercase">
                             New
                           </span>
                         )}
@@ -513,7 +773,7 @@ const TopNav: React.FC = () => {
             <div className="pt-2">
               <button
                 onClick={toggleResources}
-                className="flex items-center justify-between w-full px-3 py-2 rounded-md text-base font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                className="flex items-center justify-between w-full px-3 py-2 rounded-md text-base font-medium text-muted-foreground hover:bg-muted"
               >
                 <div className="flex items-center gap-3">
                   <HiDocumentText className="w-5 h-5" />
@@ -531,7 +791,7 @@ const TopNav: React.FC = () => {
 
               {isResourcesOpen && (
                 <div className="mt-2 ml-8 space-y-1">
-                  <div className="px-3 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <div className="px-3 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     Tournament Resources
                   </div>
                   {tournamentResources.map((resource) => {
@@ -542,7 +802,7 @@ const TopNav: React.FC = () => {
                         href={resource.href}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
                       >
                         <Icon className="w-4 h-4" />
                         {resource.label}
@@ -550,7 +810,17 @@ const TopNav: React.FC = () => {
                     );
                   })}
 
-                  <div className="px-3 py-1 mt-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-t border-gray-200 dark:border-gray-700 pt-2">
+                  {/* Card Rulings */}
+                  <Link
+                    href="/rulings"
+                    onClick={closeMobileMenu}
+                    className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
+                  >
+                    <FaBookOpen className="w-4 h-4" />
+                    Card Rulings
+                  </Link>
+
+                  <div className="px-3 py-1 mt-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-t border-border pt-2">
                     Paragon Resources
                   </div>
                   {paragonResources.map((resource) => (
@@ -559,13 +829,13 @@ const TopNav: React.FC = () => {
                       href={resource.href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block px-3 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                      className="block px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
                     >
                       {resource.label}
                     </a>
                   ))}
 
-                  <div className="px-3 py-1 mt-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-t border-gray-200 dark:border-gray-700 pt-2">
+                  <div className="px-3 py-1 mt-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-t border-border pt-2">
                     Host Resources
                   </div>
                   {hostResources.map((resource) => (
@@ -574,38 +844,36 @@ const TopNav: React.FC = () => {
                       href={resource.href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block px-3 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                      className="block px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
                     >
                       {resource.label}
                     </a>
                   ))}
+
+                  {/* Report a Bug */}
+                  <div className="border-t border-border mt-2 pt-2">
+                    <Link
+                      href="/tracker/bug"
+                      onClick={closeMobileMenu}
+                      className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted"
+                    >
+                      <HiArrowSmRight className="w-4 h-4" />
+                      Report a Bug
+                    </Link>
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* Report a Bug */}
-            <Link
-              href="/tracker/bug"
-              onClick={() => setIsMobileMenuOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2 rounded-md text-base font-medium transition-colors
-                ${isActive('/tracker/bug')
-                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                }`}
-            >
-              <HiArrowSmRight className="w-5 h-5" />
-              Report a Bug
-            </Link>
-
             {/* Mobile Auth Section */}
-            <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700 space-y-3">
+            <div className="pt-4 mt-4 border-t border-border space-y-3">
               <div className="flex items-center justify-between px-3">
-                <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Theme</span>
+                <span className="text-sm font-medium text-muted-foreground">Theme</span>
                 <ThemeSwitcher />
               </div>
               {user ? (
                 <>
-                  <div className="px-3 text-sm text-gray-600 dark:text-gray-300">
+                  <div className="px-3 text-sm text-muted-foreground">
                     {user.email}
                   </div>
                   <form

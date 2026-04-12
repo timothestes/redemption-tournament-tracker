@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /auth/
+Disallow: /tracker/
+Disallow: /decklist/my-decks/
+Disallow: /decklist/card-search/
+Disallow: /reset-password/
+
+# Allow public-facing pages to be indexed
+Allow: /decklist/community/
+Allow: /decklist/public/
+Allow: /register/

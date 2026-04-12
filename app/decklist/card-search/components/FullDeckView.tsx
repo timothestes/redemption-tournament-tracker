@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Deck } from "../types/deck";
 import { Card } from "../utils";
 import { useCardImageUrl } from "../hooks/useCardImageUrl";
@@ -7,6 +8,7 @@ import { loadGlobalTagsAction, updateDeckTagsAction, GlobalTag } from "../../act
 import { createGlobalTagAction } from "../../../admin/tags/actions";
 import { HexColorPicker } from "react-colorful";
 import { useIsAdmin } from "../../../../hooks/useIsAdmin";
+import { useCardPrices } from "../hooks/useCardPrices";
 
 function getTagContrastColor(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -19,20 +21,24 @@ interface FullDeckViewProps {
   deck: Deck;
   onViewCard?: (card: Card, isReserve?: boolean) => void;
   isAuthenticated?: boolean;
+  viewMode: 'normal' | 'stacked';
+  groupBy: 'none' | 'alignment' | 'type';
+  showPreview?: boolean;
+  tagsBarContainer?: HTMLElement | null;
 }
 
 /**
  * Full-screen optimized deck view with compact card display
  * Shows entire deck at a glance with minimal scrolling
  */
-export default function FullDeckView({ deck, onViewCard, isAuthenticated = false }: FullDeckViewProps) {
+export default function FullDeckView({ deck, onViewCard, isAuthenticated = false, viewMode, groupBy, showPreview = true, tagsBarContainer }: FullDeckViewProps) {
   const { getImageUrl } = useCardImageUrl();
   const { isAdmin, permissions } = useIsAdmin();
+  const { getPrice } = useCardPrices();
   const canManageTags = isAdmin && permissions.includes('manage_tags');
 
-  // View mode state
-    const [viewMode, setViewMode] = useState<'normal' | 'stacked'>('stacked');
-    const [groupBy, setGroupBy] = useState<'none' | 'alignment' | 'type'>('type');
+  // Hover preview state (desktop only)
+  const [hoveredCard, setHoveredCard] = useState<Card | null>(null);
 
   // Tags state
   const [deckTags, setDeckTags] = useState<GlobalTag[]>([]);
@@ -134,8 +140,9 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
     setCreateColor("#6366f1");
     setCreateColorOpen(false);
     setCreateError(null);
+    setTagFilter("");
   }
-  
+
   // Separate main deck and reserve
   const mainDeckCards = deck.cards.filter((dc) => !dc.isReserve);
   const reserveCards = deck.cards.filter((dc) => dc.isReserve);
@@ -208,16 +215,16 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
       if (groupBy === 'alignment') {
         key = deckCard.card.alignment || 'Neutral';
       } else if (groupBy === 'type') {
-        const typeName = prettifyTypeName(deckCard.card.type || 'Unknown');
+        const rawType = deckCard.card.type || 'Unknown';
+        const typeName = prettifyTypeName(rawType);
+        // Dual-type cards (e.g. "Hero/GE", "Evil Character/EE") go into a shared pile
+        if (rawType.includes('/')) {
+          key = 'Dual-Type';
         // Combine certain types together
-        if (typeName === 'Artifact' || typeName === 'Covenant' || typeName === 'Curse') {
+        } else if (typeName === 'Artifact' || typeName === 'Covenant' || typeName === 'Curse') {
           key = 'Artifact/Covenant/Curse';
         } else if (typeName === 'Fortress' || typeName === 'Site' || typeName === 'City') {
           key = 'Fortress/Site';
-        } else if (typeName === 'Good Enhancement' || deckCard.card.type === 'Hero/GE') {
-          key = 'Good Enhancement';
-        } else if (typeName === 'Evil Enhancement' || deckCard.card.type === 'Evil Character/EE') {
-          key = 'Evil Enhancement';
         } else {
           key = typeName;
         }
@@ -408,19 +415,20 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
 
     return (
       <div
-        className={`group relative w-28 flex-shrink-0 cursor-pointer transition-all hover:z-20 ${
+        className={`group relative w-[calc((100%-1rem)/3)] md:w-28 flex-shrink-0 cursor-pointer transition-all ${
           isVerticalStack ? '-mb-32' : viewMode === 'stacked' ? '-mb-24' : ''
         }`}
         onClick={(e) => {
           e.stopPropagation();
-          console.log('Card clicked:', card.name, 'onViewCard exists:', !!onViewCard);
           if (onViewCard) {
             onViewCard(card, deckCard.isReserve);
           }
         }}
+        onMouseEnter={() => setHoveredCard(card)}
+        onMouseLeave={() => setHoveredCard(null)}
       >
         {/* Card image - compact */}
-        <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-blue-500 transition-all cursor-pointer hover:scale-105 hover:z-10 shadow-md hover:shadow-xl">
+        <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-gray-800 hover:ring-2 hover:ring-primary transition-all cursor-pointer shadow-md">
           {imageUrl ? (
             <img
               src={imageUrl}
@@ -430,7 +438,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gray-700">
-              <span className="text-xs text-gray-400 text-center px-1">{card.name}</span>
+              <span className="text-xs text-muted-foreground text-center px-1">{card.name}</span>
             </div>
           )}
           
@@ -455,190 +463,18 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
     );
   };
 
-  return (
-    <div className="h-full w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-white overflow-y-auto">
-      {/* Header with stats */}
-      <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-lg">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between mb-3">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{deck.name}</h1>
-            <div className="flex items-center gap-4 text-sm">
-              {/* View Mode Toggle */}
-              <button
-                onClick={() => {
-                  const newMode = viewMode === 'normal' ? 'stacked' : 'normal';
-                  setViewMode(newMode);
-                  if (newMode === 'normal') {
-                    setGroupBy('none');
-                  }
-                }}
-                className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors"
-                title={viewMode === 'normal' ? 'Switch to stacked view' : 'Switch to normal view'}
-              >
-                <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  {viewMode === 'normal' ? (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                  ) : (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-                  )}
-                </svg>
-                <span className="text-gray-600 dark:text-gray-300 text-xs font-medium">
-                  {viewMode === 'normal' ? 'Normal' : 'Stacked'}
-                </span>
-              </button>
-
-              {/* Group By Dropdown - Only show in stacked mode */}
-              {viewMode === 'stacked' && (
-                <div className="relative">
-                  <select
-                    value={groupBy}
-                    onChange={(e) => setGroupBy(e.target.value as 'none' | 'alignment' | 'type')}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors text-gray-700 dark:text-gray-300 text-xs font-medium cursor-pointer appearance-none pr-8"
-                    title="Group cards by"
-                  >
-                    <option value="none">No Grouping</option>
-                    <option value="alignment">Group by Alignment</option>
-                    <option value="type">Group by Type</option>
-                  </select>
-                  <svg className="w-4 h-4 text-gray-500 dark:text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              )}
-              
-              <div className="flex items-center gap-2">
-                <span className="text-gray-500 dark:text-gray-400">Format:</span>
-                <span className="font-semibold text-blue-400">{deck.format || 'Type 1'}</span>
-              </div>
-            </div>
-          </div>
-          
-          {/* Quick stats bar */}
-          <div className="flex items-center gap-6 text-sm">
-            {/* Validation Status */}
-            <div className={`relative group flex items-center gap-2 px-3 py-1.5 border rounded-lg cursor-help ${
-              validation.isValid && validation.stats.totalCards > 0
-                ? 'bg-green-50 dark:bg-green-900/30 border-green-300 dark:border-green-700/50'
-                : validation.stats.totalCards === 0
-                ? 'bg-gray-100 dark:bg-gray-800/30 border-gray-300 dark:border-gray-700/50'
-                : 'bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-700/50'
-            }`}>
-              {validation.isValid && validation.stats.totalCards > 0 ? (
-                <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                </svg>
-              ) : validation.stats.totalCards === 0 ? (
-                <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              )}
-              <span className={`font-semibold ${
-                validation.isValid && validation.stats.totalCards > 0
-                  ? 'text-green-400'
-                  : validation.stats.totalCards === 0
-                  ? 'text-gray-400'
-                  : 'text-red-400'
-              }`}>
-                {validation.isValid && validation.stats.totalCards > 0
-                  ? 'Valid'
-                  : validation.stats.totalCards === 0
-                  ? 'Empty'
-                  : 'Invalid'
-                }
-              </span>
-              
-              {/* Tooltip showing validation details */}
-              {validation.stats.totalCards > 0 && (
-                <div className={`absolute left-0 top-full mt-2 w-80 p-4 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none ${
-                  validation.isValid
-                    ? "bg-green-50 dark:bg-green-900/90 border-2 border-green-300 dark:border-green-600"
-                    : "bg-red-50 dark:bg-red-900/90 border-2 border-red-300 dark:border-red-600"
-                }`}>
-                  {/* Arrow */}
-                  <div className={`absolute left-4 bottom-full w-0 h-0 border-l-8 border-r-8 border-b-8 border-l-transparent border-r-transparent ${
-                    validation.isValid
-                      ? "border-b-green-300 dark:border-b-green-600"
-                      : "border-b-red-300 dark:border-b-red-600"
-                  }`}></div>
-                  
-                  {/* Content */}
-                  <div className={`font-semibold mb-3 text-base ${
-                    validation.isValid
-                      ? "text-green-800 dark:text-green-200"
-                      : "text-red-800 dark:text-red-200"
-                  }`}>
-                    {validation.isValid ? "✓ Passed Basic Checks" : `✗ ${validation.issues.filter(i => i.type === "error").length} Error${validation.issues.filter(i => i.type === "error").length !== 1 ? "s" : ""}`}
-                  </div>
-                  
-                  {validation.issues.length > 0 && (
-                    <div className="space-y-2">
-                      {validation.issues.map((issue, idx) => (
-                        <div
-                          key={idx}
-                          className={`text-sm flex items-start gap-2 ${
-                            issue.type === "error"
-                              ? "text-red-700 dark:text-red-300"
-                              : issue.type === "warning"
-                              ? "text-yellow-700 dark:text-yellow-300"
-                              : "text-blue-700 dark:text-blue-300"
-                          }`}
-                        >
-                          <span className="mt-0.5 flex-shrink-0">
-                            {issue.type === "error" ? "⚠" : issue.type === "warning" ? "⚠" : "ℹ"}
-                          </span>
-                          <span className="flex-1">{issue.message}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-            
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-green-800/50 rounded-lg">
-              <svg className="w-4 h-4 text-blue-500 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-              <span className="text-gray-500 dark:text-gray-400">Total:</span>
-              <span className="font-bold text-gray-900 dark:text-white">{totalCards}</span>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <span className="text-gray-500 dark:text-gray-400">Main Deck:</span>
-              <span className="font-semibold text-gray-900 dark:text-white">{mainDeckCount}</span>
-            </div>
-
-            {reserveCount > 0 && (
-              <>
-                <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-500 dark:text-gray-400">Reserve:</span>
-                  <span className="font-semibold text-gray-900 dark:text-white">{reserveCount}</span>
-                </div>
-              </>
-            )}
-
-            <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
-            <div className="flex items-center gap-2">
-              <span className="text-gray-500 dark:text-gray-400">Unique Cards:</span>
-              <span className="font-semibold text-gray-900 dark:text-white">{uniqueCards}</span>
-            </div>
-          </div>
-
-          {/* Tags row */}
-          {(deckTags.length > 0 || (isAuthenticated && deck.id)) && (
-            <div className="flex items-center gap-2 flex-wrap mt-3 pt-3 border-t border-gray-200 dark:border-gray-700/50 min-h-[1.75rem]">
-              {/* Current tag pills */}
+  const tagsBarContent = (deckTags.length > 0 || (isAuthenticated && deck.id)) ? (
+      <div className="bg-background/95 backdrop-blur-sm border-b border-border/60">
+        <div className="px-3 md:px-4 py-1 md:py-1.5">
+          <div className="flex items-center gap-2">
+              {/* Scrollable tag pills */}
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar min-w-0">
               {deckTags.map((tag) => (
                 isAuthenticated ? (
                   <button
                     key={tag.id}
                     onClick={() => toggleTag(tag)}
-                    className="group flex items-center gap-1 pl-2.5 pr-1.5 py-0.5 rounded-full text-xs font-medium transition-opacity"
+                    className="group flex items-center gap-1 pl-2.5 pr-1.5 py-0.5 rounded-full text-xs font-medium transition-opacity flex-shrink-0 whitespace-nowrap"
                     style={{ backgroundColor: tag.color, color: getTagContrastColor(tag.color) }}
                     title={`Remove "${tag.name}"`}
                   >
@@ -650,20 +486,21 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                 ) : (
                   <span
                     key={tag.id}
-                    className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+                    className="px-2.5 py-0.5 rounded-full text-xs font-medium flex-shrink-0 whitespace-nowrap"
                     style={{ backgroundColor: tag.color, color: getTagContrastColor(tag.color) }}
                   >
                     {tag.name}
                   </span>
                 )
               ))}
+              </div>
 
-              {/* Picker trigger */}
+              {/* Picker trigger — outside the scrollable area so dropdown isn't clipped */}
               {isAuthenticated && deck.id && (
-                <div className="relative" ref={tagPickerRef}>
+                <div className="relative flex-shrink-0" ref={tagPickerRef}>
                   <button
                     onClick={() => { setTagPickerOpen((o) => !o); setTagFilter(""); setCreateMode(false); }}
-                    className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-dashed border-gray-400 dark:border-gray-500 text-xs text-gray-500 dark:text-gray-400 hover:border-gray-600 dark:hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-dashed border-border text-xs text-muted-foreground hover:border-foreground/50 hover:text-foreground transition-colors whitespace-nowrap"
                   >
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -673,14 +510,14 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                   </button>
 
                   {tagPickerOpen && (
-                    <div className="absolute z-50 top-full mt-1.5 left-0 w-64 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl">
+                    <div className="absolute z-50 top-full mt-1.5 left-0 w-64 bg-card border border-border rounded-xl shadow-xl">
                       {createMode ? (
                         <form onSubmit={handleCreateTag} className="p-3 flex flex-col gap-3">
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
                               onClick={() => setCreateColorOpen((o) => !o)}
-                              className="w-7 h-7 rounded-md border-2 border-gray-300 dark:border-gray-600 shadow-sm flex-shrink-0 hover:scale-110 transition-transform"
+                              className="w-7 h-7 rounded-md border-2 border-border shadow-sm flex-shrink-0 hover:scale-110 transition-transform"
                               style={{ backgroundColor: createColor }}
                             />
                             <input
@@ -690,53 +527,53 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                               value={createName}
                               onChange={(e) => setCreateName(e.target.value)}
                               maxLength={50}
-                              className="flex-1 px-2.5 py-1.5 text-sm rounded-lg border border-gray-600 bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="flex-1 px-2.5 py-1.5 text-sm rounded-lg border border-border bg-muted text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                             />
                           </div>
                           {createColorOpen && (
                             <div className="flex flex-col items-center gap-1.5">
                               <HexColorPicker color={createColor} onChange={setCreateColor} style={{ width: "100%" }} />
-                              <span className="font-mono text-xs text-gray-400">{createColor}</span>
+                              <span className="font-mono text-xs text-muted-foreground">{createColor}</span>
                             </div>
                           )}
                           {createName.trim() && (
                             <div className="flex items-center gap-1.5">
-                              <span className="text-xs text-gray-400">Preview:</span>
+                              <span className="text-xs text-muted-foreground">Preview:</span>
                               <span className="px-2.5 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: createColor, color: getTagContrastColor(createColor) }}>{createName}</span>
                             </div>
                           )}
                           {createError && <p className="text-xs text-red-400">{createError}</p>}
                           <div className="flex gap-2">
-                            <button type="submit" disabled={creating || !createName.trim()} className="flex-1 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                            <button type="submit" disabled={creating || !createName.trim()} className="flex-1 py-1.5 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50">
                               {creating ? "Creating…" : "Create tag"}
                             </button>
-                            <button type="button" onClick={() => { setCreateMode(false); setCreateError(null); setCreateName(""); setCreateColorOpen(false); }} className="flex-1 py-1.5 border border-gray-600 text-gray-300 text-sm rounded-lg hover:bg-gray-800">
+                            <button type="button" onClick={() => { setCreateMode(false); setCreateError(null); setCreateName(""); setCreateColorOpen(false); }} className="flex-1 py-1.5 border border-border text-muted-foreground text-sm rounded-lg hover:bg-muted">
                               Cancel
                             </button>
                           </div>
                         </form>
                       ) : (
                         <>
-                          <div className="px-3 pt-3 pb-2 border-b border-gray-800">
+                          <div className="px-3 pt-3 pb-2 border-b border-border">
                             <input
                               autoFocus
                               type="text"
                               placeholder="Filter tags…"
                               value={tagFilter}
                               onChange={(e) => setTagFilter(e.target.value)}
-                              className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-gray-600 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-border bg-muted text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                             />
                           </div>
                           <div className="max-h-52 overflow-y-auto">
                             {tagsLoading ? (
                               <div className="flex justify-center py-4">
-                                <svg className="animate-spin w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24">
+                                <svg className="animate-spin w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24">
                                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
                                 </svg>
                               </div>
                             ) : filteredGlobalTags.length === 0 ? (
-                              <p className="text-xs text-gray-500 text-center py-4">
+                              <p className="text-xs text-muted-foreground text-center py-4">
                                 {allGlobalTags.length === 0 ? "No tags available yet" : "No matches"}
                               </p>
                             ) : (
@@ -746,27 +583,27 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                                   <button
                                     key={tag.id}
                                     onClick={() => toggleTag(tag)}
-                                    className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-800 transition-colors text-left"
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-muted transition-colors text-left"
                                   >
                                     <span className="w-4 flex-shrink-0 flex items-center justify-center">
                                       {selected && (
-                                        <svg className="w-3.5 h-3.5 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <svg className="w-3.5 h-3.5 text-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                                         </svg>
                                       )}
                                     </span>
                                     <span className="w-3 h-3 rounded-full flex-shrink-0 border border-black/10" style={{ backgroundColor: tag.color }} />
-                                    <span className="text-sm text-gray-200">{tag.name}</span>
+                                    <span className="text-sm text-foreground">{tag.name}</span>
                                   </button>
                                 );
                               })
                             )}
                           </div>
                           {canManageTags && (
-                            <div className="border-t border-gray-800">
+                            <div className="border-t border-border">
                               <button
                                 onClick={() => { setCreateName(tagFilter); setCreateColor("#6366f1"); setCreateError(null); setCreateMode(true); }}
-                                className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-gray-400 hover:bg-gray-800 transition-colors"
+                                className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-muted-foreground hover:bg-muted transition-colors"
                               >
                                 <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -781,15 +618,19 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                   )}
                 </div>
               )}
-            </div>
-          )}
+          </div>
         </div>
       </div>
+  ) : null;
 
+  return (
+    <>
+      {tagsBarContainer ? (tagsBarContent && createPortal(tagsBarContent, tagsBarContainer)) : tagsBarContent}
+      <div className="h-full w-full bg-background text-foreground">
       {/* Main content area */}
-      <div className="px-6 py-6">
-        {/* Single column layout - all cards together */}
-        <div>
+      <div className="px-3 py-3 md:px-4 md:py-3 lg:flex lg:gap-4">
+        {/* Deck cards */}
+        <div className="flex-1 min-w-0">
           {/* Main Deck */}
           <div>
             {groupBy === 'type' || groupBy === 'alignment' ? (
@@ -797,62 +638,104 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
               <div>
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-3">
-                    <h2 className="text-xl font-bold text-blue-400">Main Deck</h2>
-                    <span className="text-sm text-gray-500">({mainDeckCount} cards)</span>
+                    <h2 className="text-xl font-bold text-primary">Main Deck</h2>
+                    <span className="text-sm text-muted-foreground">({mainDeckCount} cards)</span>
                   </div>
                 </div>
                 
                 {mainDeckCards.length > 0 ? (
-                  <div className="flex gap-4 items-start flex-wrap">
+                  <div className="md:flex md:gap-4 md:items-start md:flex-wrap space-y-4 md:space-y-0">
                     {Object.entries(groupCards(mainDeckCards)).map(([groupName, cards]) => {
                       // Use different splitting logic for alignment vs type grouping
-                      const columns = groupBy === 'alignment' 
+                      const columns = groupBy === 'alignment'
                         ? splitAlignmentGroup(cards)
                         : splitTypeGroup(cards).map(col => ({ cards: col }));
-                      
-                      return columns.map((column, colIndex) => (
-                        <div key={`${groupName}-${colIndex}`} className="flex flex-col">
-                          {/* Show group header for alignment grouping (only on first column) */}
-                          {groupBy === 'alignment' && colIndex === 0 && (
-                            <div className="mb-2 flex items-center gap-2">
-                              <h3 className={`text-lg font-semibold ${getAlignmentColor(groupName)}`}>{groupName}</h3>
-                              <span className="text-xs text-gray-500">({cards.reduce((sum, dc) => sum + dc.quantity, 0)})</span>
+
+                      return (
+                        <React.Fragment key={groupName}>
+                          {/* Mobile: horizontal card layout per group */}
+                          <div className="md:hidden">
+                            {groupBy === 'alignment' && (
+                              <div className="mb-1.5 flex items-center gap-2">
+                                <h3 className={`text-sm font-semibold ${getAlignmentColor(groupName)}`}>{groupName}</h3>
+                                <span className="text-xs text-muted-foreground">({cards.reduce((sum, dc) => sum + dc.quantity, 0)})</span>
+                              </div>
+                            )}
+                            <div className="flex flex-wrap gap-2 items-start">
+                              {cards.flatMap((deckCard) =>
+                                Array.from({ length: viewMode === 'stacked' ? deckCard.quantity : 1 }, (_, i) => (
+                                  <React.Fragment key={`${deckCard.card.name}-${deckCard.card.set}-m-${i}`}>
+                                    {renderCompactCard(deckCard, i, false, viewMode === 'stacked')}
+                                  </React.Fragment>
+                                ))
+                              )}
                             </div>
-                          )}
-                          <div className="flex flex-col gap-2 items-center">
-                            {column.cards.flatMap((deckCard) =>
-                              Array.from({ length: deckCard.quantity }, (_, i) => (
-                                <React.Fragment key={`${deckCard.card.name}-${deckCard.card.set}-${i}`}>
-                                  {renderCompactCard(deckCard, i, true, true)}
+                          </div>
+
+                          {/* Desktop: vertical column layout per group */}
+                          {columns.map((column, colIndex) => (
+                            <div key={`${groupName}-${colIndex}`} className="hidden md:flex flex-col">
+                              {groupBy === 'alignment' && colIndex === 0 && (
+                                <div className="mb-2 flex items-center gap-2">
+                                  <h3 className={`text-lg font-semibold ${getAlignmentColor(groupName)}`}>{groupName}</h3>
+                                  <span className="text-xs text-muted-foreground">({cards.reduce((sum, dc) => sum + dc.quantity, 0)})</span>
+                                </div>
+                              )}
+                              <div className="flex flex-col gap-2 items-center">
+                                {column.cards.flatMap((deckCard) =>
+                                  Array.from({ length: viewMode === 'stacked' ? deckCard.quantity : 1 }, (_, i) => (
+                                    <React.Fragment key={`${deckCard.card.name}-${deckCard.card.set}-${i}`}>
+                                      {renderCompactCard(deckCard, i, viewMode === 'stacked', viewMode === 'stacked')}
+                                    </React.Fragment>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </React.Fragment>
+                      );
+                    })}
+
+                    {/* Reserve - Show immediately after main deck columns */}
+                    {reserveCount > 0 && (
+                      <>
+                        {/* Mobile reserve */}
+                        <div className="md:hidden">
+                          <div className="mb-1.5 flex items-center gap-2">
+                            <h3 className="text-sm font-semibold text-purple-400">Reserve</h3>
+                            <span className="text-xs text-muted-foreground">({reserveCount})</span>
+                          </div>
+                          <div className="flex flex-wrap gap-2 items-start">
+                            {sortCards(reserveCards).flatMap((deckCard) =>
+                              Array.from({ length: viewMode === 'stacked' ? deckCard.quantity : 1 }, (_, i) => (
+                                <React.Fragment key={`${deckCard.card.name}-${deckCard.card.set}-reserve-m-${i}`}>
+                                  {renderCompactCard(deckCard, i, false, viewMode === 'stacked')}
                                 </React.Fragment>
                               ))
                             )}
                           </div>
                         </div>
-                      ));
-                    })}
-                    
-                    {/* Reserve - Show immediately after main deck columns */}
-                    {reserveCount > 0 && (
-                      <div className="flex flex-col ml-4">
-                        <div className="mb-2 flex items-center gap-2">
-                          <h3 className="text-lg font-semibold text-purple-400">Reserve</h3>
-                          <span className="text-xs text-gray-500">({reserveCount})</span>
+                        {/* Desktop reserve */}
+                        <div className="hidden md:flex flex-col ml-4">
+                          <div className="mb-2 flex items-center gap-2">
+                            <h3 className="text-lg font-semibold text-purple-400">Reserve</h3>
+                            <span className="text-xs text-muted-foreground">({reserveCount})</span>
+                          </div>
+                          <div className="flex flex-col gap-2 items-center">
+                            {sortCards(reserveCards).flatMap((deckCard) =>
+                              Array.from({ length: viewMode === 'stacked' ? deckCard.quantity : 1 }, (_, i) => (
+                                <React.Fragment key={`${deckCard.card.name}-${deckCard.card.set}-reserve-${i}`}>
+                                  {renderCompactCard(deckCard, i, viewMode === 'stacked', viewMode === 'stacked')}
+                                </React.Fragment>
+                              ))
+                            )}
+                          </div>
                         </div>
-                        <div className="flex flex-col gap-2 items-center">
-                          {sortCards(reserveCards).flatMap((deckCard) =>
-                            Array.from({ length: deckCard.quantity }, (_, i) => (
-                              <React.Fragment key={`${deckCard.card.name}-${deckCard.card.set}-reserve-${i}`}>
-                                {renderCompactCard(deckCard, i, true, true)}
-                              </React.Fragment>
-                            ))
-                          )}
-                        </div>
-                      </div>
+                      </>
                     )}
                   </div>
                 ) : (
-                  <div className="text-center py-12 text-gray-500">
+                  <div className="text-center py-12 text-muted-foreground">
                     <p>No cards in main deck</p>
                   </div>
                 )}
@@ -861,8 +744,8 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
               // Non-type grouping layout with stacked headers
               <div>
                 <div className="flex items-center gap-3 mb-2">
-                  <h2 className="text-xl font-bold text-blue-400">Main Deck</h2>
-                  <span className="text-sm text-gray-500">({mainDeckCount} cards)</span>
+                  <h2 className="text-xl font-bold text-primary">Main Deck</h2>
+                  <span className="text-sm text-muted-foreground">({mainDeckCount} cards)</span>
                 </div>
                 
                 {mainDeckCards.length > 0 ? (
@@ -881,7 +764,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-12 text-gray-500">
+                  <div className="text-center py-12 text-muted-foreground">
                     <p>No cards in main deck</p>
                   </div>
                 )}
@@ -894,7 +777,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
             <div className="mt-20 pt-6">
               <div className="flex items-center gap-3 mb-2">
                 <h2 className="text-xl font-bold text-purple-400">Reserve</h2>
-                <span className="text-sm text-gray-500">({reserveCount} cards)</span>
+                <span className="text-sm text-muted-foreground">({reserveCount} cards)</span>
               </div>
               
               <div>
@@ -914,7 +797,42 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
             </div>
           )}
         </div>
+
+        {/* Sticky sidebar card preview — desktop only */}
+        {showPreview && (
+          <div className="hidden lg:block w-72 flex-shrink-0">
+            <div className="sticky top-12">
+              {hoveredCard ? (
+                <div className="transition-opacity duration-150">
+                  <div className="aspect-[2.5/3.5] rounded-lg overflow-hidden shadow-lg bg-gray-800">
+                    <img
+                      src={getImageUrl(hoveredCard.imgFile)}
+                      alt={hoveredCard.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <p className="mt-2 text-sm font-semibold text-foreground">{hoveredCard.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {hoveredCard.set}{hoveredCard.type ? ` · ${hoveredCard.type}` : ''}
+                    {(() => {
+                      const priceKey = `${hoveredCard.name}|${hoveredCard.set}|${hoveredCard.imgFile}`;
+                      const priceInfo = getPrice(priceKey);
+                      return priceInfo ? (
+                        <span className="text-green-600 dark:text-green-400 font-medium"> · ${priceInfo.price.toFixed(2)}</span>
+                      ) : null;
+                    })()}
+                  </p>
+                </div>
+              ) : (
+                <div className="aspect-[2.5/3.5] rounded-lg border-2 border-dashed border-primary/30 flex items-center justify-center">
+                  <p className="text-sm text-muted-foreground text-center px-4">Hover over a card to preview</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+      </div>
+    </>
   );
 }

@@ -137,7 +137,7 @@ function isDominant(card: Card): boolean {
 function getMinimumDeckSize(format?: string): number {
   const fmt = format?.toLowerCase();
   if (fmt?.includes("paragon")) return 40;
-  if (fmt?.includes("type 2") || fmt?.includes("multi")) return 100;
+  if (fmt?.includes("type 2")) return 100;
   if (fmt?.includes("type 1") || fmt?.includes("single")) return 50;
   if (fmt?.includes("draft") || fmt?.includes("sealed")) return 40;
   return 50; // Default to Type 1 minimum
@@ -149,7 +149,7 @@ function getMinimumDeckSize(format?: string): number {
 function getMaximumDeckSize(format?: string): number {
   const fmt = format?.toLowerCase();
   if (fmt?.includes("paragon")) return 40;
-  if (fmt?.includes("type 2") || fmt?.includes("multi")) return 252;
+  if (fmt?.includes("type 2")) return 252;
   if (fmt?.includes("type 1") || fmt?.includes("single")) return 154;
   return 154; // Default to Type 1 maximum
 }
@@ -159,7 +159,7 @@ function getMaximumDeckSize(format?: string): number {
  */
 function getMaximumReserveSize(format?: string): number {
   const fmt = format?.toLowerCase();
-  if (fmt?.includes("type 2") || fmt?.includes("multi")) return 15;
+  if (fmt?.includes("type 2")) return 15;
   if (fmt?.includes("paragon")) return 10;
   return 10; // Type 1 and default
 }
@@ -476,7 +476,7 @@ export function validateDeck(deck: Deck): DeckValidation {
   }
   
   // Validation: Type 2 requires equal Good and Evil cards (in both main deck and reserve)
-  const isType2 = deck.format?.toLowerCase().includes("type 2") || deck.format?.toLowerCase().includes("multi");
+  const isType2 = deck.format?.toLowerCase().includes("type 2");
   if (isType2) {
     // Check Main Deck - INCLUDE Lost Souls and Dominants in alignment check
     const mainGoodCards = deck.cards

@@ -6,6 +6,7 @@ import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { submitRegistration } from "./actions";
 import TopNav from "../../components/top-nav";
+import SponsorFooter from "../../components/sponsor-footer";
 import { createClient } from "../../utils/supabase/client";
 import { NATIONALS_CONFIG } from "../config/nationals";
 import { useIsAdmin } from "../../hooks/useIsAdmin";
@@ -43,6 +44,7 @@ export default function RegistrationPage() {
     firstNationals: false,
     needsAirportTransportation: false,
     needsHotelTransportation: false,
+    ironManInterest: false,
     stayingOvernight: false,
     overnightStayNights: [] as string[],
   });
@@ -74,6 +76,7 @@ export default function RegistrationPage() {
           firstNationals: false,
           needsAirportTransportation: false,
           needsHotelTransportation: false,
+          ironManInterest: false,
           stayingOvernight: false,
           overnightStayNights: [],
         });
@@ -204,6 +207,17 @@ export default function RegistrationPage() {
           </h1>
           <p className="text-muted-foreground mb-6">
             Register for the {NATIONALS_CONFIG.year} National Redemption Tournament
+            {" \u00B7 "}
+            {NATIONALS_CONFIG.dates}
+            {" \u00B7 "}
+            <a
+              href="https://landofredemption.com/2026-redemption-national-tournament-wilmore-ky/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              Learn more
+            </a>
           </p>
 
           {showThankYou ? (
@@ -305,6 +319,7 @@ export default function RegistrationPage() {
                       firstNationals: false,
                       needsAirportTransportation: false,
                       needsHotelTransportation: false,
+                      ironManInterest: false,
                       stayingOvernight: false,
                       overnightStayNights: [],
                     });
@@ -320,7 +335,7 @@ export default function RegistrationPage() {
               </div>
             </div>
           ) : (
-            <div className="bg-card border border-border rounded-lg shadow-sm p-8">
+            <div className="bg-card border border-border rounded-lg shadow-sm p-8 jayden-gradient-bg">
               <form onSubmit={handleSubmit} className="space-y-6">
             {/* Personal Information */}
             <div className="space-y-4">
@@ -433,7 +448,7 @@ export default function RegistrationPage() {
               </h2>
 
               {/* Thursday */}
-              <div className="space-y-3 p-4 bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600">
+              <div className="space-y-3 p-4 bg-card rounded-lg border-2 border-border">
                 <h3 className="font-semibold">
                   Thursday <span className="text-red-500">*</span> <span className="text-sm text-muted-foreground font-normal">({NATIONALS_CONFIG.eventDates.thursday})</span>
                 </h3>
@@ -450,17 +465,17 @@ export default function RegistrationPage() {
                       }
                       className={`w-full flex items-start space-x-3 p-3 transition-all ${
                         formData.thursdayEvent === event.value
-                          ? 'text-blue-600 dark:text-blue-400'
-                          : 'hover:text-blue-500 dark:hover:text-blue-400'
+                          ? 'text-primary'
+                          : 'hover:text-primary'
                       }`}
                     >
                       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
                         formData.thursdayEvent === event.value
-                          ? 'bg-blue-500 border-blue-600'
-                          : 'border-gray-400 dark:border-gray-500'
+                          ? 'bg-primary border-primary'
+                          : 'border-muted-foreground'
                       }`}>
                         {formData.thursdayEvent === event.value && (
-                          <div className="w-2 h-2 bg-white rounded-full"></div>
+                          <div className="w-2 h-2 bg-primary-foreground rounded-full"></div>
                         )}
                       </div>
                       <span className="text-left">
@@ -477,7 +492,7 @@ export default function RegistrationPage() {
               </div>
 
               {/* Friday */}
-              <div className="space-y-3 p-4 bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600">
+              <div className="space-y-3 p-4 bg-card rounded-lg border-2 border-border">
                 <h3 className="font-semibold">
                   Friday <span className="text-red-500">*</span> <span className="text-sm text-muted-foreground font-normal">({NATIONALS_CONFIG.eventDates.friday})</span>
                 </h3>
@@ -494,17 +509,17 @@ export default function RegistrationPage() {
                       }
                       className={`w-full flex items-start space-x-3 p-3 transition-all ${
                         formData.fridayEvent === event.value
-                          ? 'text-blue-600 dark:text-blue-400'
-                          : 'hover:text-blue-500 dark:hover:text-blue-400'
+                          ? 'text-primary'
+                          : 'hover:text-primary'
                       }`}
                     >
                       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
                         formData.fridayEvent === event.value
-                          ? 'bg-blue-500 border-blue-600'
-                          : 'border-gray-400 dark:border-gray-500'
+                          ? 'bg-primary border-primary'
+                          : 'border-muted-foreground'
                       }`}>
                         {formData.fridayEvent === event.value && (
-                          <div className="w-2 h-2 bg-white rounded-full"></div>
+                          <div className="w-2 h-2 bg-primary-foreground rounded-full"></div>
                         )}
                       </div>
                       <span className="text-left">
@@ -521,7 +536,7 @@ export default function RegistrationPage() {
               </div>
 
               {/* Saturday */}
-              <div className="space-y-3 p-4 bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600">
+              <div className="space-y-3 p-4 bg-card rounded-lg border-2 border-border">
                 <h3 className="font-semibold">
                   Saturday <span className="text-red-500">*</span> <span className="text-sm text-muted-foreground font-normal">({NATIONALS_CONFIG.eventDates.saturday})</span>
                 </h3>
@@ -538,17 +553,17 @@ export default function RegistrationPage() {
                       }
                       className={`w-full flex items-start space-x-3 p-3 transition-all ${
                         formData.saturdayEvent === event.value
-                          ? 'text-blue-600 dark:text-blue-400'
-                          : 'hover:text-blue-500 dark:hover:text-blue-400'
+                          ? 'text-primary'
+                          : 'hover:text-primary'
                       }`}
                     >
                       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
                         formData.saturdayEvent === event.value
-                          ? 'bg-blue-500 border-blue-600'
-                          : 'border-gray-400 dark:border-gray-500'
+                          ? 'bg-primary border-primary'
+                          : 'border-muted-foreground'
                       }`}>
                         {formData.saturdayEvent === event.value && (
-                          <div className="w-2 h-2 bg-white rounded-full"></div>
+                          <div className="w-2 h-2 bg-primary-foreground rounded-full"></div>
                         )}
                       </div>
                       <span className="text-left">
@@ -572,38 +587,13 @@ export default function RegistrationPage() {
               </h2>
 
               <div className="space-y-4">
-                <div className="flex items-start space-x-3">
+                <label className="flex items-center space-x-3 cursor-pointer">
                   <button
                     type="button"
-                    onClick={() => setFormData({...formData, fantasyDraftOptIn: !formData.fantasyDraftOptIn})}
-                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 ${formData.fantasyDraftOptIn ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
-                  >
-                    {formData.fantasyDraftOptIn && (
-                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
-                  </button>
-                  <div className="space-y-1" onClick={() => setFormData({...formData, fantasyDraftOptIn: !formData.fantasyDraftOptIn})}>
-                    <Label
-                      htmlFor="fantasyDraft"
-                      className="font-normal cursor-pointer"
-                    >
-                      Would you like to be a draftable player in the Fantasy
-                      Draft?
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      All players who opt in will be entered into a drawing for
-                      a box of the new set even if they are not drafted
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  <button
-                    type="button"
+                    role="checkbox"
+                    aria-checked={formData.firstNationals}
                     onClick={() => setFormData({...formData, firstNationals: !formData.firstNationals})}
-                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${formData.firstNationals ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
+                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${formData.firstNationals ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
                   >
                     {formData.firstNationals && (
                       <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -611,20 +601,63 @@ export default function RegistrationPage() {
                       </svg>
                     )}
                   </button>
-                  <Label
-                    htmlFor="firstNationals"
-                    className="font-normal cursor-pointer"
-                    onClick={() => setFormData({...formData, firstNationals: !formData.firstNationals})}
-                  >
+                  <span className="text-sm font-normal text-foreground">
                     Is this your first National tournament?
-                  </Label>
-                </div>
+                  </span>
+                </label>
 
-                <div className="flex items-start space-x-3">
+                <label className="flex items-center space-x-3 cursor-pointer">
                   <button
                     type="button"
+                    role="checkbox"
+                    aria-checked={formData.ironManInterest}
+                    onClick={() => setFormData({...formData, ironManInterest: !formData.ironManInterest})}
+                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${formData.ironManInterest ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
+                  >
+                    {formData.ironManInterest && (
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+                  <span className="text-sm font-normal text-foreground">
+                    Will you be playing in the Iron Man side event?
+                  </span>
+                </label>
+
+                <label className="flex items-start space-x-3 cursor-pointer">
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={formData.fantasyDraftOptIn}
+                    onClick={() => setFormData({...formData, fantasyDraftOptIn: !formData.fantasyDraftOptIn})}
+                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${formData.fantasyDraftOptIn ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
+                  >
+                    {formData.fantasyDraftOptIn && (
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+                  <div className="space-y-1">
+                    <span className="text-sm font-normal text-foreground">
+                      Would you like to be a draftable player in the Fantasy
+                      Draft?
+                    </span>
+                    <p className="text-sm text-muted-foreground">
+                      All players who opt in will be entered into a drawing for
+                      a box of the new set even if they are not drafted
+                    </p>
+                  </div>
+                </label>
+
+                <label className="flex items-start space-x-3 cursor-pointer">
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={formData.needsAirportTransportation}
                     onClick={() => setFormData({...formData, needsAirportTransportation: !formData.needsAirportTransportation})}
-                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 ${formData.needsAirportTransportation ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
+                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${formData.needsAirportTransportation ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
                   >
                     {formData.needsAirportTransportation && (
                       <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -632,34 +665,33 @@ export default function RegistrationPage() {
                       </svg>
                     )}
                   </button>
-                  <div className="space-y-1" onClick={() => setFormData({...formData, needsAirportTransportation: !formData.needsAirportTransportation})}>
-                    <Label
-                      htmlFor="airportTransportation"
-                      className="font-normal cursor-pointer"
-                    >
+                  <div className="space-y-1">
+                    <span className="text-sm font-normal text-foreground">
                       Will you need transportation to/from{" "}
                       <a
                         href="https://maps.app.goo.gl/JSoAe6ex487NL9pU9"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-blue-600 dark:text-blue-400 hover:underline"
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={(e) => e.preventDefault()}
                       >
                         Bluegrass International Airport
                       </a>
                       ?
-                    </Label>
+                    </span>
                     <p className="text-sm text-muted-foreground">
                       Shuttle times are TBD but will be sent via email when determined
                     </p>
                   </div>
-                </div>
+                </label>
 
-                <div className="flex items-start space-x-3">
+                <label className="flex items-start space-x-3 cursor-pointer">
                   <button
                     type="button"
+                    role="checkbox"
+                    aria-checked={formData.needsHotelTransportation}
                     onClick={() => setFormData({...formData, needsHotelTransportation: !formData.needsHotelTransportation})}
-                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 ${formData.needsHotelTransportation ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
+                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${formData.needsHotelTransportation ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
                   >
                     {formData.needsHotelTransportation && (
                       <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -667,33 +699,32 @@ export default function RegistrationPage() {
                       </svg>
                     )}
                   </button>
-                  <div className="space-y-1" onClick={() => setFormData({...formData, needsHotelTransportation: !formData.needsHotelTransportation})}>
-                    <Label
-                      htmlFor="hotelTransportation"
-                      className="font-normal cursor-pointer"
-                    >
+                  <div className="space-y-1">
+                    <span className="text-sm font-normal text-foreground">
                       Will you need transportation between the official hotel
                       and the venue?
-                    </Label>
+                    </span>
                     <p className="text-sm text-muted-foreground">
                       Shuttle times are TBD but will be sent via email when determined
                     </p>
                   </div>
-                </div>
+                </label>
 
                 {/* Overnight Stay Section */}
-                <div className="flex items-start space-x-3 pt-2">
+                <label className="flex items-start space-x-3 pt-2 cursor-pointer">
                   <button
                     type="button"
+                    role="checkbox"
+                    aria-checked={formData.stayingOvernight}
                     onClick={() => {
                       const newStayingOvernight = !formData.stayingOvernight;
                       setFormData({
-                        ...formData, 
+                        ...formData,
                         stayingOvernight: newStayingOvernight,
                         overnightStayNights: newStayingOvernight ? formData.overnightStayNights : []
                       });
                     }}
-                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 ${formData.stayingOvernight ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
+                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${formData.stayingOvernight ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
                   >
                     {formData.stayingOvernight && (
                       <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -701,49 +732,38 @@ export default function RegistrationPage() {
                       </svg>
                     )}
                   </button>
-                  <div 
-                    className="space-y-1 cursor-pointer" 
-                    onClick={() => {
-                      const newStayingOvernight = !formData.stayingOvernight;
-                      setFormData({
-                        ...formData, 
-                        stayingOvernight: newStayingOvernight,
-                        overnightStayNights: newStayingOvernight ? formData.overnightStayNights : []
-                      });
-                    }}
-                  >
-                    <Label
-                      htmlFor="stayingOvernight"
-                      className="font-normal cursor-pointer"
-                    >
+                  <div className="space-y-1">
+                    <span className="text-sm font-normal text-foreground">
                       Do you plan to stay overnight at the venue?
-                    </Label>
+                    </span>
                     <p className="text-sm text-muted-foreground">
                       Help us plan for overnight accommodations
                     </p>
                   </div>
-                </div>
+                </label>
 
                 {/* Overnight Stay Nights Selection */}
                 {formData.stayingOvernight && (
-                  <div className="ml-9 mt-3 space-y-2 p-4 bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-200 dark:border-gray-600">
+                  <div className="ml-9 mt-3 space-y-2 p-4 bg-card rounded-lg border-2 border-border">
                     <p className="text-sm font-medium text-muted-foreground mb-3">
                       Which nights do you plan to stay?
                     </p>
                     {NATIONALS_CONFIG.overnightStayNights.map((night) => (
-                      <div key={night.value} className="flex items-center space-x-3">
+                      <label key={night.value} className="flex items-center space-x-3 cursor-pointer">
                         <button
                           type="button"
+                          role="checkbox"
+                          aria-checked={formData.overnightStayNights.includes(night.value)}
                           onClick={() => {
                             const nights = formData.overnightStayNights.includes(night.value)
                               ? formData.overnightStayNights.filter(n => n !== night.value)
                               : [...formData.overnightStayNights, night.value];
                             setFormData({...formData, overnightStayNights: nights});
                           }}
-                          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${
-                            formData.overnightStayNights.includes(night.value) 
-                              ? 'bg-blue-500 border-blue-600' 
-                              : 'border-gray-300 dark:border-gray-500'
+                          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                            formData.overnightStayNights.includes(night.value)
+                              ? 'bg-primary border-primary'
+                              : 'border-muted-foreground'
                           }`}
                         >
                           {formData.overnightStayNights.includes(night.value) && (
@@ -752,18 +772,10 @@ export default function RegistrationPage() {
                             </svg>
                           )}
                         </button>
-                        <Label
-                          className="font-normal cursor-pointer text-sm"
-                          onClick={() => {
-                            const nights = formData.overnightStayNights.includes(night.value)
-                              ? formData.overnightStayNights.filter(n => n !== night.value)
-                              : [...formData.overnightStayNights, night.value];
-                            setFormData({...formData, overnightStayNights: nights});
-                          }}
-                        >
+                        <span className="font-normal text-sm text-foreground">
                           {night.label}
-                        </Label>
-                      </div>
+                        </span>
+                      </label>
                     ))}
                   </div>
                 )}
@@ -775,7 +787,7 @@ export default function RegistrationPage() {
               <h2 className="text-xl font-semibold">
                 Payment Information
               </h2>
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 text-blue-900 dark:text-blue-100 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="p-4 bg-primary/10 text-foreground rounded-lg border border-primary/30">
                 <p className="font-medium mb-2">💳 Payment at Venue</p>
                 <p className="text-sm">
                   Payment is to be received at the venue (no pre-payment options). Accepted payment methods:
@@ -810,7 +822,7 @@ export default function RegistrationPage() {
                   type="submit"
                   disabled={isSubmitting || isUploadingPhoto}
                   variant="outline"
-                  className="border-2 border-blue-500 text-blue-600 hover:bg-blue-50 hover:border-blue-600 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-950"
+                  className="border-2 border-primary text-primary hover:bg-primary/10 hover:border-primary/80"
                   size="lg"
                 >
                   {isUploadingPhoto ? "Uploading picture..." : isSubmitting ? "Submitting..." : "Submit Registration"}
@@ -821,6 +833,7 @@ export default function RegistrationPage() {
           )}
         </div>
       </div>
+      <SponsorFooter />
     </div>
   );
 }

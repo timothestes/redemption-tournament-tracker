@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { Label } from "../../../components/ui/label";
@@ -24,6 +24,7 @@ interface Registration {
   first_nationals: boolean;
   needs_airport_transportation: boolean;
   needs_hotel_transportation: boolean;
+  iron_man_interest: boolean;
   staying_overnight: boolean;
   overnight_stay_nights: string[] | null;
   photo_url: string | null;
@@ -51,6 +52,7 @@ export default function AdminRegistrationsPage() {
   const [emailSubject, setEmailSubject] = useState("");
   const [emailContent, setEmailContent] = useState("");
   const [sending, setSending] = useState(false);
+  const [emailResult, setEmailResult] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [showEmailLimitsInfo, setShowEmailLimitsInfo] = useState(true);
   
   // Filter states
@@ -62,6 +64,7 @@ export default function AdminRegistrationsPage() {
   const [fantasyDraftFilter, setFantasyDraftFilter] = useState("all");
   const [airportTransportFilter, setAirportTransportFilter] = useState("all");
   const [hotelTransportFilter, setHotelTransportFilter] = useState("all");
+  const [ironManFilter, setIronManFilter] = useState("all");
   const [overnightStayFilter, setOvernightStayFilter] = useState("all");
   const [photoFilter, setPhotoFilter] = useState("all");
   const [paidFilter, setPaidFilter] = useState("all");
@@ -69,15 +72,16 @@ export default function AdminRegistrationsPage() {
   const router = useRouter();
   const supabase = createClient();
 
-  const { isAdmin, loading: adminLoading } = useIsAdmin();
+  const { isAdmin, permissions, loading: adminLoading } = useIsAdmin();
+  const canManageRegistrations = isAdmin && permissions.includes('manage_registrations');
 
   useEffect(() => {
     const checkAccess = async () => {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       setUser(currentUser);
 
-      // Check if user is admin (wait for admin loading to complete)
-      if (!adminLoading && (!currentUser || !isAdmin)) {
+      // Check if user has manage_registrations permission
+      if (!adminLoading && (!currentUser || !canManageRegistrations)) {
         router.push("/");
         return;
       }
@@ -92,7 +96,7 @@ export default function AdminRegistrationsPage() {
     if (dismissed === 'true') {
       setShowEmailLimitsInfo(false);
     }
-  }, [adminLoading, isAdmin]);
+  }, [adminLoading, canManageRegistrations]);
 
   const loadRegistrations = async () => {
     // Only show loading spinner on initial load
@@ -145,6 +149,9 @@ export default function AdminRegistrationsPage() {
     if (hotelTransportFilter !== "all") {
       filtered = filtered.filter((reg) => reg.needs_hotel_transportation === (hotelTransportFilter === "yes"));
     }
+    if (ironManFilter !== "all") {
+      filtered = filtered.filter((reg) => reg.iron_man_interest === (ironManFilter === "yes"));
+    }
     if (overnightStayFilter !== "all") {
       filtered = filtered.filter((reg) => reg.staying_overnight === (overnightStayFilter === "yes"));
     }
@@ -166,6 +173,7 @@ export default function AdminRegistrationsPage() {
     fantasyDraftFilter,
     airportTransportFilter,
     hotelTransportFilter,
+    ironManFilter,
     overnightStayFilter,
     photoFilter,
     paidFilter,
@@ -209,6 +217,7 @@ export default function AdminRegistrationsPage() {
       first_nationals: editingRegistration.first_nationals,
       needs_airport_transportation: editingRegistration.needs_airport_transportation,
       needs_hotel_transportation: editingRegistration.needs_hotel_transportation,
+      iron_man_interest: editingRegistration.iron_man_interest,
       staying_overnight: editingRegistration.staying_overnight,
       overnight_stay_nights: editingRegistration.overnight_stay_nights || [],
       paid: editingRegistration.paid,
@@ -286,13 +295,15 @@ export default function AdminRegistrationsPage() {
   };
 
   const handleSendEmail = async () => {
+    setEmailResult(null);
+
     if (selectedIds.size === 0) {
-      alert("Please select at least one recipient");
+      setEmailResult({ type: "error", message: "Please select at least one recipient." });
       return;
     }
 
     if (!emailSubject || !emailContent) {
-      alert("Please provide both subject and content");
+      setEmailResult({ type: "error", message: "Please provide both a subject and content." });
       return;
     }
 
@@ -305,15 +316,30 @@ export default function AdminRegistrationsPage() {
     setSending(false);
 
     if (result.success) {
-      alert(result.message);
-      setShowEmailModal(false);
+      setEmailResult({ type: "success", message: result.message || `Sent ${result.sentCount} email(s).` });
+    } else {
+      setEmailResult({ type: "error", message: result.error || result.message || "Failed to send emails." });
+    }
+  };
+
+  const handleCloseEmailModal = useCallback(() => {
+    if (emailResult?.type === "success") {
       setEmailSubject("");
       setEmailContent("");
       setSelectedIds(new Set());
-    } else {
-      alert(`Error: ${result.error || result.message}`);
     }
-  };
+    setEmailResult(null);
+    setShowEmailModal(false);
+  }, [emailResult]);
+
+  useEffect(() => {
+    if (!showEmailModal) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !sending) handleCloseEmailModal();
+    };
+    document.addEventListener("keydown", handleEsc);
+    return () => document.removeEventListener("keydown", handleEsc);
+  }, [showEmailModal, sending, handleCloseEmailModal]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -498,7 +524,7 @@ export default function AdminRegistrationsPage() {
     return selectedWithPhotos;
   };
 
-  if (!isAdmin) {
+  if (!canManageRegistrations) {
     return null;
   }
 
@@ -539,7 +565,7 @@ export default function AdminRegistrationsPage() {
                   <Button
                     onClick={() => setShowTournamentModal(true)}
                     variant="outline"
-                    className="border-2 border-blue-500 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-950"
+                    className="border-2 border-primary text-primary hover:bg-primary/10"
                   >
                     Create Tournament ({selectedIds.size})
                   </Button>
@@ -625,7 +651,7 @@ export default function AdminRegistrationsPage() {
                   id="thursday"
                   value={thursdayFilter}
                   onChange={(e) => setThursdayFilter(e.target.value)}
-                  className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                  className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
                 >
                   <option value="all">All</option>
                   <option value="booster_draft">Booster Draft</option>
@@ -640,7 +666,7 @@ export default function AdminRegistrationsPage() {
                   id="friday"
                   value={fridayFilter}
                   onChange={(e) => setFridayFilter(e.target.value)}
-                  className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                  className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
                 >
                   <option value="all">All</option>
                   <option value="type1_2player">Type 1 (2-Player)</option>
@@ -655,7 +681,7 @@ export default function AdminRegistrationsPage() {
                   id="saturday"
                   value={saturdayFilter}
                   onChange={(e) => setSaturdayFilter(e.target.value)}
-                  className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                  className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
                 >
                   <option value="all">All</option>
                   <option value="teams">Teams</option>
@@ -666,14 +692,14 @@ export default function AdminRegistrationsPage() {
             </div>
 
             {/* Additional Filters */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
               <div>
                 <Label htmlFor="firstNats">First Nationals?</Label>
                 <select
                   id="firstNats"
                   value={firstNationalsFilter}
                   onChange={(e) => setFirstNationalsFilter(e.target.value)}
-                  className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                  className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
                 >
                   <option value="all">All</option>
                   <option value="yes">Yes</option>
@@ -687,7 +713,7 @@ export default function AdminRegistrationsPage() {
                   id="fantasy"
                   value={fantasyDraftFilter}
                   onChange={(e) => setFantasyDraftFilter(e.target.value)}
-                  className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                  className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
                 >
                   <option value="all">All</option>
                   <option value="yes">Yes</option>
@@ -701,7 +727,7 @@ export default function AdminRegistrationsPage() {
                   id="airport"
                   value={airportTransportFilter}
                   onChange={(e) => setAirportTransportFilter(e.target.value)}
-                  className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                  className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
                 >
                   <option value="all">All</option>
                   <option value="yes">Yes</option>
@@ -715,7 +741,7 @@ export default function AdminRegistrationsPage() {
                   id="hotel"
                   value={hotelTransportFilter}
                   onChange={(e) => setHotelTransportFilter(e.target.value)}
-                  className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                  className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
                 >
                   <option value="all">All</option>
                   <option value="yes">Yes</option>
@@ -729,7 +755,21 @@ export default function AdminRegistrationsPage() {
                   id="overnight"
                   value={overnightStayFilter}
                   onChange={(e) => setOvernightStayFilter(e.target.value)}
-                  className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                  className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
+                >
+                  <option value="all">All</option>
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                </select>
+              </div>
+
+              <div>
+                <Label htmlFor="ironMan">Iron Man?</Label>
+                <select
+                  id="ironMan"
+                  value={ironManFilter}
+                  onChange={(e) => setIronManFilter(e.target.value)}
+                  className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
                 >
                   <option value="all">All</option>
                   <option value="yes">Yes</option>
@@ -743,7 +783,7 @@ export default function AdminRegistrationsPage() {
                   id="photo"
                   value={photoFilter}
                   onChange={(e) => setPhotoFilter(e.target.value)}
-                  className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                  className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
                 >
                   <option value="all">All</option>
                   <option value="yes">Yes</option>
@@ -757,7 +797,7 @@ export default function AdminRegistrationsPage() {
                   id="paid"
                   value={paidFilter}
                   onChange={(e) => setPaidFilter(e.target.value)}
-                  className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                  className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
                 >
                   <option value="all">All</option>
                   <option value="yes">Yes</option>
@@ -769,7 +809,7 @@ export default function AdminRegistrationsPage() {
 
           {loading ? (
             <div className="text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-100"></div>
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
             </div>
           ) : filteredRegistrations.length === 0 ? (
             <div className="text-center py-12 bg-card border rounded-lg">
@@ -778,7 +818,7 @@ export default function AdminRegistrationsPage() {
               </p>
             </div>
           ) : (
-            <div className="bg-card border rounded-lg shadow-sm overflow-hidden">
+            <div className="bg-card border rounded-lg shadow-sm overflow-hidden jayden-gradient-bg">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-muted">
@@ -789,7 +829,7 @@ export default function AdminRegistrationsPage() {
                           className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
                             selectedIds.size === filteredRegistrations.length && filteredRegistrations.length > 0
                               ? 'bg-green-500 border-green-600 hover:bg-green-600'
-                              : 'border-gray-300 hover:border-green-400 hover:bg-green-50 dark:border-gray-600 dark:hover:border-green-400 dark:hover:bg-green-950/20'
+                              : 'border-border hover:border-green-400 hover:bg-green-50 dark:hover:border-green-400 dark:hover:bg-green-950/20'
                           }`}
                         >
                           {selectedIds.size === filteredRegistrations.length && filteredRegistrations.length > 0 && (
@@ -822,7 +862,7 @@ export default function AdminRegistrationsPage() {
                             className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
                               selectedIds.has(reg.id)
                                 ? 'bg-green-500 border-green-600 hover:bg-green-600'
-                                : 'border-gray-300 hover:border-green-400 hover:bg-green-50 dark:border-gray-600 dark:hover:border-green-400 dark:hover:bg-green-950/20'
+                                : 'border-border hover:border-green-400 hover:bg-green-50 dark:hover:border-green-400 dark:hover:bg-green-950/20'
                             }`}
                           >
                             {selectedIds.has(reg.id) && (
@@ -861,10 +901,10 @@ export default function AdminRegistrationsPage() {
                                 };
                                 input.click();
                               }}
-                              className="w-10 h-10 rounded-md flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-950 transition-colors"
+                              className="w-10 h-10 rounded-md flex items-center justify-center border-2 border-dashed border-border hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-950 transition-colors"
                               title="Upload photo"
                             >
-                              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                               </svg>
                             </button>
@@ -891,7 +931,7 @@ export default function AdminRegistrationsPage() {
                               </span>
                             )}
                             {reg.first_nationals && (
-                              <span className="text-blue-600 dark:text-blue-400">
+                              <span className="text-primary">
                                 First Nationals
                               </span>
                             )}
@@ -903,6 +943,11 @@ export default function AdminRegistrationsPage() {
                             {reg.needs_hotel_transportation && (
                               <span className="text-purple-600 dark:text-purple-400">
                                 Hotel
+                              </span>
+                            )}
+                            {reg.iron_man_interest && (
+                              <span className="text-red-600 dark:text-red-400">
+                                Iron Man
                               </span>
                             )}
                             {reg.staying_overnight && (
@@ -935,7 +980,7 @@ export default function AdminRegistrationsPage() {
                             className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all mx-auto ${
                               reg.paid
                                 ? 'bg-green-500 border-green-600 hover:bg-green-600'
-                                : 'border-gray-300 hover:border-green-400 hover:bg-green-50 dark:border-gray-600 dark:hover:border-green-400 dark:hover:bg-green-950/20'
+                                : 'border-border hover:border-green-400 hover:bg-green-50 dark:hover:border-green-400 dark:hover:bg-green-950/20'
                             }`}
                           >
                             {reg.paid && (
@@ -948,7 +993,7 @@ export default function AdminRegistrationsPage() {
                         <td className="px-4 py-3 text-sm">
                           <span className={`font-semibold ${
                             calculateTotalOwed(reg.thursday_event, reg.friday_event, reg.saturday_event) > 0
-                              ? 'text-blue-600 dark:text-blue-400'
+                              ? 'text-primary'
                               : 'text-muted-foreground'
                           }`}>
                             ${calculateTotalOwed(reg.thursday_event, reg.friday_event, reg.saturday_event).toFixed(2)}
@@ -986,66 +1031,98 @@ export default function AdminRegistrationsPage() {
 
         {/* Email Modal */}
         {showEmailModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            onClick={(e) => { if (e.target === e.currentTarget && !sending) handleCloseEmailModal(); }}
+          >
             <div className="bg-card border rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-auto">
               <div className="p-6">
-                <h2 className="text-2xl font-bold mb-4">
-                  Send Email to {selectedIds.size} Recipient(s)
-                </h2>
-
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="subject">Subject</Label>
-                    <Input
-                      id="subject"
-                      value={emailSubject}
-                      onChange={(e) => setEmailSubject(e.target.value)}
-                      placeholder="Email subject"
-                      className="mt-1"
-                    />
+                {emailResult?.type === "success" ? (
+                  <div className="text-center py-6 space-y-5">
+                    <div className="w-14 h-14 bg-green-500/10 dark:bg-green-500/20 rounded-full flex items-center justify-center mx-auto">
+                      <svg className="w-7 h-7 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div className="space-y-1">
+                      <h2 className="text-xl font-semibold text-foreground">Emails Sent</h2>
+                      <p className="text-sm text-muted-foreground">{emailResult.message}</p>
+                    </div>
+                    <Button
+                      onClick={handleCloseEmailModal}
+                      variant="outline"
+                      className="px-8"
+                    >
+                      Done
+                    </Button>
                   </div>
+                ) : (
+                  <>
+                    <h2 className="text-2xl font-bold mb-4">
+                      Send Email to {selectedIds.size} Recipient(s)
+                    </h2>
 
-                  <div>
-                    <Label htmlFor="content">Email Content (HTML)</Label>
-                    <textarea
-                      id="content"
-                      value={emailContent}
-                      onChange={(e) => setEmailContent(e.target.value)}
-                      placeholder="You can use {firstName}, {lastName}, or {fullName} for personalization"
-                      className="mt-1 flex min-h-[300px] w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:border-green-500"
-                    />
-                    <p className="text-sm text-muted-foreground mt-1">
-                      You can use basic HTML tags for formatting. Variables: {"{firstName}"}, {"{lastName}"}, {"{fullName}"}
-                    </p>
-                  </div>
+                    {emailResult?.type === "error" && (
+                      <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm">
+                        {emailResult.message}
+                      </div>
+                    )}
 
-                  <div className="bg-muted p-3 rounded text-sm">
-                    <strong>Preview variables:</strong>
-                    <ul className="mt-1 ml-4 list-disc">
-                      <li>{"{firstName}"} - Recipient's first name</li>
-                      <li>{"{lastName}"} - Recipient's last name</li>
-                      <li>{"{fullName}"} - Full name</li>
-                    </ul>
-                  </div>
-                </div>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="subject">Subject</Label>
+                        <Input
+                          id="subject"
+                          value={emailSubject}
+                          onChange={(e) => setEmailSubject(e.target.value)}
+                          placeholder="Email subject"
+                          className="mt-1"
+                        />
+                      </div>
 
-                <div className="flex gap-3 mt-6">
-                  <Button
-                    onClick={handleSendEmail}
-                    disabled={sending}
-                    variant="outline"
-                    className="flex-1 border-2 border-green-500 text-green-600 hover:bg-green-50 dark:border-green-400 dark:text-green-400 dark:hover:bg-green-950"
-                  >
-                    {sending ? "Sending..." : `Send to ${selectedIds.size} recipient(s)`}
-                  </Button>
-                  <Button
-                    onClick={() => setShowEmailModal(false)}
-                    variant="outline"
-                    disabled={sending}
-                  >
-                    Cancel
-                  </Button>
-                </div>
+                      <div>
+                        <Label htmlFor="content">Email Content (HTML)</Label>
+                        <textarea
+                          id="content"
+                          value={emailContent}
+                          onChange={(e) => setEmailContent(e.target.value)}
+                          placeholder="You can use {firstName}, {lastName}, or {fullName} for personalization"
+                          className="mt-1 flex min-h-[300px] w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm focus-visible:outline-none focus-visible:border-foreground"
+                        />
+                        <p className="text-sm text-muted-foreground mt-1">
+                          You can use basic HTML tags for formatting. Variables: {"{firstName}"}, {"{lastName}"}, {"{fullName}"}
+                        </p>
+                      </div>
+
+                      <div className="bg-muted p-3 rounded text-sm">
+                        <strong>Preview variables:</strong>
+                        <ul className="mt-1 ml-4 list-disc">
+                          <li>{"{firstName}"} - Recipient's first name</li>
+                          <li>{"{lastName}"} - Recipient's last name</li>
+                          <li>{"{fullName}"} - Full name</li>
+                        </ul>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 mt-6">
+                      <Button
+                        onClick={handleSendEmail}
+                        disabled={sending}
+                        variant="outline"
+                        className="flex-1 border-2 border-green-500 text-green-600 hover:bg-green-50 dark:border-green-400 dark:text-green-400 dark:hover:bg-green-950"
+                      >
+                        {sending ? "Sending..." : `Send to ${selectedIds.size} recipient(s)`}
+                      </Button>
+                      <Button
+                        onClick={handleCloseEmailModal}
+                        variant="outline"
+                        disabled={sending}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -1086,7 +1163,7 @@ export default function AdminRegistrationsPage() {
                     onClick={handleCreateTournament}
                     disabled={!tournamentName.trim() || creating}
                     variant="outline"
-                    className="flex-1 border-2 border-blue-500 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-950"
+                    className="flex-1 border-2 border-primary text-primary hover:bg-primary/10"
                   >
                     {creating ? "Creating..." : "Create Tournament"}
                   </Button>
@@ -1179,7 +1256,7 @@ export default function AdminRegistrationsPage() {
                         id="edit-thursday"
                         value={editingRegistration.thursday_event}
                         onChange={(e) => setEditingRegistration({...editingRegistration, thursday_event: e.target.value})}
-                        className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                        className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
                       >
                         <option value="booster_draft">Booster Draft</option>
                         <option value="type2_2player">Type 2 (2-Player)</option>
@@ -1193,7 +1270,7 @@ export default function AdminRegistrationsPage() {
                         id="edit-friday"
                         value={editingRegistration.friday_event}
                         onChange={(e) => setEditingRegistration({...editingRegistration, friday_event: e.target.value})}
-                        className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                        className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
                       >
                         <option value="type1_2player">Type 1 (2-Player)</option>
                         <option value="typeA_2player">Type A (2-Player)</option>
@@ -1207,7 +1284,7 @@ export default function AdminRegistrationsPage() {
                         id="edit-saturday"
                         value={editingRegistration.saturday_event}
                         onChange={(e) => setEditingRegistration({...editingRegistration, saturday_event: e.target.value})}
-                        className="mt-1 flex h-10 w-full rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                        className="mt-1 flex h-10 w-full rounded-md border-2 border-border bg-card px-3 py-2 text-sm"
                       >
                         <option value="teams">Teams</option>
                         <option value="sealed_deck">Sealed Deck</option>
@@ -1223,7 +1300,7 @@ export default function AdminRegistrationsPage() {
                     <div className="flex items-center space-x-3">
                       <button
                         onClick={() => setEditingRegistration({...editingRegistration, fantasy_draft_opt_in: !editingRegistration.fantasy_draft_opt_in})}
-                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.fantasy_draft_opt_in ? 'bg-green-500 border-green-600' : 'border-gray-300 dark:border-gray-600'}`}
+                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.fantasy_draft_opt_in ? 'bg-green-500 border-green-600' : 'border-border'}`}
                       >
                         {editingRegistration.fantasy_draft_opt_in && (
                           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1239,7 +1316,7 @@ export default function AdminRegistrationsPage() {
                     <div className="flex items-center space-x-3">
                       <button
                         onClick={() => setEditingRegistration({...editingRegistration, first_nationals: !editingRegistration.first_nationals})}
-                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.first_nationals ? 'bg-green-500 border-green-600' : 'border-gray-300 dark:border-gray-600'}`}
+                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.first_nationals ? 'bg-green-500 border-green-600' : 'border-border'}`}
                       >
                         {editingRegistration.first_nationals && (
                           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1255,7 +1332,7 @@ export default function AdminRegistrationsPage() {
                     <div className="flex items-center space-x-3">
                       <button
                         onClick={() => setEditingRegistration({...editingRegistration, needs_airport_transportation: !editingRegistration.needs_airport_transportation})}
-                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.needs_airport_transportation ? 'bg-green-500 border-green-600' : 'border-gray-300 dark:border-gray-600'}`}
+                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.needs_airport_transportation ? 'bg-green-500 border-green-600' : 'border-border'}`}
                       >
                         {editingRegistration.needs_airport_transportation && (
                           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1271,7 +1348,7 @@ export default function AdminRegistrationsPage() {
                     <div className="flex items-center space-x-3">
                       <button
                         onClick={() => setEditingRegistration({...editingRegistration, needs_hotel_transportation: !editingRegistration.needs_hotel_transportation})}
-                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.needs_hotel_transportation ? 'bg-green-500 border-green-600' : 'border-gray-300 dark:border-gray-600'}`}
+                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.needs_hotel_transportation ? 'bg-green-500 border-green-600' : 'border-border'}`}
                       >
                         {editingRegistration.needs_hotel_transportation && (
                           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1286,6 +1363,22 @@ export default function AdminRegistrationsPage() {
 
                     <div className="flex items-center space-x-3">
                       <button
+                        onClick={() => setEditingRegistration({...editingRegistration, iron_man_interest: !editingRegistration.iron_man_interest})}
+                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.iron_man_interest ? 'bg-green-500 border-green-600' : 'border-border'}`}
+                      >
+                        {editingRegistration.iron_man_interest && (
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
+                      <Label htmlFor="edit-ironMan" className="font-normal cursor-pointer" onClick={() => setEditingRegistration({...editingRegistration, iron_man_interest: !editingRegistration.iron_man_interest})}>
+                        Iron Man Side Event
+                      </Label>
+                    </div>
+
+                    <div className="flex items-center space-x-3">
+                      <button
                         onClick={() => {
                           const newStayingOvernight = !editingRegistration.staying_overnight;
                           setEditingRegistration({
@@ -1294,7 +1387,7 @@ export default function AdminRegistrationsPage() {
                             overnight_stay_nights: newStayingOvernight ? editingRegistration.overnight_stay_nights : []
                           });
                         }}
-                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.staying_overnight ? 'bg-green-500 border-green-600' : 'border-gray-300 dark:border-gray-600'}`}
+                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.staying_overnight ? 'bg-green-500 border-green-600' : 'border-border'}`}
                       >
                         {editingRegistration.staying_overnight && (
                           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1332,8 +1425,8 @@ export default function AdminRegistrationsPage() {
                               }}
                               className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${
                                 (editingRegistration.overnight_stay_nights || []).includes(night.value) 
-                                  ? 'bg-blue-500 border-blue-600' 
-                                  : 'border-gray-300 dark:border-gray-500'
+                                  ? 'bg-blue-500 border-blue-600'
+                                  : 'border-border'
                               }`}
                             >
                               {(editingRegistration.overnight_stay_nights || []).includes(night.value) && (
@@ -1359,7 +1452,7 @@ export default function AdminRegistrationsPage() {
                     <div className="flex items-center space-x-3">
                       <button
                         onClick={() => setEditingRegistration({...editingRegistration, paid: !editingRegistration.paid})}
-                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.paid ? 'bg-green-500 border-green-600' : 'border-gray-300 dark:border-gray-600'}`}
+                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${editingRegistration.paid ? 'bg-green-500 border-green-600' : 'border-border'}`}
                       >
                         {editingRegistration.paid && (
                           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1579,7 +1672,7 @@ export default function AdminRegistrationsPage() {
                       }
                     }}
                     variant="outline"
-                    className="flex-1 border-blue-500 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400"
+                    className="flex-1 border-primary text-primary hover:bg-primary/10"
                   >
                     Replace
                   </Button>

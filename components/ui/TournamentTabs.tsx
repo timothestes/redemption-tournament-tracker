@@ -1,6 +1,6 @@
 "use client";
 
-import { Tabs, Card, Button } from "flowbite-react";
+import { Tabs, Card } from "flowbite-react";
 import PodGenerationModal from "./PodGenerationModal";
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
 import { HiUserGroup } from "react-icons/hi";
@@ -13,6 +13,8 @@ import ParticipantFormModal from "./participant-form-modal";
 import { HiPlus } from "react-icons/hi";
 import { GiCardPickup } from "react-icons/gi";
 import { printFinalStandings } from "../../utils/printUtils";
+import { Button } from "./button";
+import type { TournamentDecklistRow } from "../../app/tracker/tournaments/actions";
 
 interface TournamentTabsProps {
   participants: any[];
@@ -40,6 +42,8 @@ interface TournamentTabsProps {
   activeTab: number;
   setActiveTab: Dispatch<SetStateAction<number>>;
   fetchParticipants: () => void;
+  decklists: TournamentDecklistRow[];
+  onDecklistsChange: () => void;
 }
 
 export default function TournamentTabs({
@@ -64,6 +68,8 @@ export default function TournamentTabs({
   activeTab,
   setActiveTab,
   fetchParticipants,
+  decklists,
+  onDecklistsChange,
 }: TournamentTabsProps) {
   // state for booster draft pods
   const [showPodsModal, setShowPodsModal] = useState(false);
@@ -98,26 +104,21 @@ export default function TournamentTabs({
           <div className="flex items-center gap-3">
             {/* generate pods button only if more than one participant */}
             {participants.length > 1 && (
-              <div className="relative group">
-                <button
-                  type="button"
-                  onClick={() => setShowPodsModal(true)}
-                  className="inline-flex items-center justify-center p-2 rounded-md border border-blue-500 text-blue-500 hover:bg-blue-500 hover:text-white"
-                  aria-label="Generate booster draft pods"
-                >
-                  <GiCardPickup className="w-5 h-5" />
-                </button>
-                <div className="absolute left-1/2 transform -translate-x-1/2 bottom-full mb-2 px-3 py-1 bg-gray-900 text-white text-sm rounded-md opacity-0 group-hover:opacity-100 transition-opacity">
-                  Generate booster draft pods
-                  <div className="absolute left-1/2 transform -translate-x-1/2 top-full -mt-1 border-4 border-transparent border-t-gray-900"></div>
-                </div>
-              </div>
+              <Button
+                type="button"
+                onClick={() => setShowPodsModal(true)}
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+              >
+                <GiCardPickup className="w-4 h-4" />
+                <span className="hidden sm:inline">Pods</span>
+              </Button>
             )}
             {tournamentEnded && (
               <Button
                 onClick={() => printFinalStandings(participants, tournamentName || "Tournament")}
-                outline
-                gradientDuoTone="purpleToBlue"
+                variant="accent"
               >
                 Print Final Standings
               </Button>
@@ -128,8 +129,7 @@ export default function TournamentTabs({
                 onClick={() => !tournamentStarted && setIsModalOpen(true)}
                 className={`flex items-center gap-2 ${tournamentStarted ? "opacity-50 cursor-not-allowed" : ""}`}
                 style={{ width: "200px" }}
-                outline
-                gradientDuoTone="greenToBlue"
+                variant="success"
                 disabled={tournamentStarted}
               >
                 <div className="flex gap-2">
@@ -168,8 +168,8 @@ export default function TournamentTabs({
           <div className="w-[800px] max-xl:w-full mx-auto overflow-x-auto">
             <Card>
               <div className="flex flex-col items-center justify-center py-8">
-                <p className="text-gray-500 mb-4">No participants found</p>
-                <p className="text-sm text-gray-400">
+                <p className="text-muted-foreground mb-4">No participants found</p>
+                <p className="text-sm text-muted-foreground/70">
                   Add participants to get started
                 </p>
               </div>
@@ -185,6 +185,9 @@ export default function TournamentTabs({
               onDelete={onDelete}
               onDropOut={onDropOut}
               onDropIn={onDropIn}
+              tournamentId={tournamentId}
+              decklists={decklists}
+              onDecklistsChange={onDecklistsChange}
             />
           </div>
         )}

@@ -16,6 +16,7 @@ export interface RegistrationData {
   firstNationals: boolean;
   needsAirportTransportation: boolean;
   needsHotelTransportation: boolean;
+  ironManInterest: boolean;
   stayingOvernight: boolean;
   overnightStayNights: string[];
 }
@@ -35,6 +36,7 @@ export async function submitRegistration(data: RegistrationData, photoUrl: strin
     first_nationals: data.firstNationals,
     needs_airport_transportation: data.needsAirportTransportation,
     needs_hotel_transportation: data.needsHotelTransportation,
+    iron_man_interest: data.ironManInterest,
     staying_overnight: data.stayingOvernight,
     overnight_stay_nights: data.overnightStayNights,
     photo_url: photoUrl,

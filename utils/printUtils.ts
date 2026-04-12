@@ -26,6 +26,9 @@ export const printFinalStandings = (
   
   // Sort participants by match points (desc) then by differential (desc)
   const sortedParticipants = [...participants].sort((a, b) => {
+    // Dropped players always rank after active players
+    if (a.dropped_out !== b.dropped_out) return a.dropped_out ? 1 : -1;
+
     const mpA = a.match_points !== null ? a.match_points : -Infinity;
     const mpB = b.match_points !== null ? b.match_points : -Infinity;
 

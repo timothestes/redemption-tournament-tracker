@@ -87,4 +87,6 @@ next-env.d.ts
 .aider*
 tmp/*
 .claude
-claude.md
+# claude.md
+test_shopify.py
+.mcp.json

@@ -2,6 +2,8 @@
 
 import { createClient } from "../../utils/supabase/server";
 import { revalidatePath } from "next/cache";
+import { checkDeck } from "@/utils/deckcheck";
+import type { DeckCheckCard, DeckCheckResult } from "@/utils/deckcheck/types";
 
 // Types matching the database schema
 export interface DeckData {
@@ -19,6 +21,8 @@ export interface DeckData {
   created_at?: string;
   updated_at?: string;
   tags?: GlobalTag[];
+  total_price?: number | null;
+  budget_price?: number | null;
 }
 
 export interface DeckCardData {
@@ -136,6 +140,30 @@ export async function saveDeckAction(params: SaveDeckParams) {
         }
       }
 
+      // Run comprehensive deck legality check
+      let deckCheckResult: DeckCheckResult | null = null;
+      try {
+        const mainCards: DeckCheckCard[] = cards
+          .filter(c => !c.is_reserve)
+          .map(c => ({ name: c.card_name, set: c.card_set || "", quantity: c.quantity }));
+        const reserveCards: DeckCheckCard[] = cards
+          .filter(c => c.is_reserve)
+          .map(c => ({ name: c.card_name, set: c.card_set || "", quantity: c.quantity }));
+
+        deckCheckResult = await checkDeck(mainCards, reserveCards, params.format);
+
+        await supabase
+          .from("decks")
+          .update({
+            is_legal: deckCheckResult.valid,
+            deckcheck_issues: deckCheckResult.issues,
+          })
+          .eq("id", deckId);
+      } catch (e) {
+        // Deckcheck failure should not block save
+        console.error("Deckcheck failed:", e);
+      }
+
       revalidatePath("/decklist/my-decks");
       revalidatePath(`/decklist/card-search`);
 
@@ -143,6 +171,7 @@ export async function saveDeckAction(params: SaveDeckParams) {
         success: true,
         deckId: deck.id,
         message: "Deck updated successfully",
+        deckCheckResult,
       };
     } else {
       // Create new deck
@@ -196,12 +225,37 @@ export async function saveDeckAction(params: SaveDeckParams) {
         }
       }
 
+      // Run comprehensive deck legality check
+      let deckCheckResult: DeckCheckResult | null = null;
+      try {
+        const mainCards: DeckCheckCard[] = cards
+          .filter(c => !c.is_reserve)
+          .map(c => ({ name: c.card_name, set: c.card_set || "", quantity: c.quantity }));
+        const reserveCards: DeckCheckCard[] = cards
+          .filter(c => c.is_reserve)
+          .map(c => ({ name: c.card_name, set: c.card_set || "", quantity: c.quantity }));
+
+        deckCheckResult = await checkDeck(mainCards, reserveCards, params.format);
+
+        await supabase
+          .from("decks")
+          .update({
+            is_legal: deckCheckResult.valid,
+            deckcheck_issues: deckCheckResult.issues,
+          })
+          .eq("id", deck.id);
+      } catch (e) {
+        // Deckcheck failure should not block save
+        console.error("Deckcheck failed:", e);
+      }
+
       revalidatePath("/decklist/my-decks");
 
       return {
         success: true,
         deckId: deck.id,
         message: "Deck created successfully",
+        deckCheckResult,
       };
     }
   } catch (error) {
@@ -270,6 +324,34 @@ export async function loadUserDecksAction() {
       }
     }
 
+    // Batch-fetch total prices and budget prices for all returned decks
+    let priceMap = new Map<string, number>();
+    let budgetPriceMap = new Map<string, number>();
+    if (deckIds.length > 0) {
+      const [priceResult, budgetResult] = await Promise.all([
+        supabase.rpc("get_deck_total_prices", { deck_ids: deckIds }),
+        supabase.rpc("get_deck_budget_prices", { deck_ids: deckIds }),
+      ]);
+
+      if (priceResult.error) {
+        console.error("Error fetching deck prices:", priceResult.error);
+      }
+      for (const row of (priceResult.data || []) as any[]) {
+        if (row.total_price > 0) {
+          priceMap.set(row.deck_id, parseFloat(row.total_price));
+        }
+      }
+
+      if (budgetResult.error) {
+        console.error("Error fetching budget prices:", budgetResult.error);
+      }
+      for (const row of (budgetResult.data || []) as any[]) {
+        if (row.budget_price > 0) {
+          budgetPriceMap.set(row.deck_id, parseFloat(row.budget_price));
+        }
+      }
+    }
+
     const decksWithCounts = (decks || []).map((deck: any) => {
       const mainDeckCount = (deck.deck_cards || [])
         .filter((card: any) => !card.is_reserve)
@@ -280,6 +362,8 @@ export async function loadUserDecksAction() {
         card_count: mainDeckCount,
         deck_cards: undefined,
         tags: tagsMap.get(deck.id) || [],
+        total_price: priceMap.get(deck.id) || null,
+        budget_price: budgetPriceMap.get(deck.id) || null,
       };
     });
 
@@ -342,20 +426,33 @@ export async function loadDeckByIdAction(deckId: string) {
       };
     }
 
-    // Load deck cards
-    const { data: cards, error: cardsError } = await supabase
-      .from("deck_cards")
-      .select("*")
-      .eq("deck_id", deckId)
-      .order("card_name");
+    // Load deck cards — paginate past Supabase's default 1000-row limit
+    let cards: any[] = [];
+    {
+      const PAGE_SIZE = 1000;
+      let offset = 0;
+      let hasMore = true;
+      while (hasMore) {
+        const { data: batch, error: batchError } = await supabase
+          .from("deck_cards")
+          .select("*")
+          .eq("deck_id", deckId)
+          .order("card_name")
+          .range(offset, offset + PAGE_SIZE - 1);
 
-    if (cardsError) {
-      console.error("Error loading deck cards:", cardsError);
-      return {
-        success: false,
-        error: "Failed to load deck cards",
-        deck: null,
-      };
+        if (batchError) {
+          console.error("Error loading deck cards:", batchError);
+          return {
+            success: false,
+            error: "Failed to load deck cards",
+            deck: null,
+          };
+        }
+
+        cards = cards.concat(batch || []);
+        hasMore = (batch?.length || 0) === PAGE_SIZE;
+        offset += PAGE_SIZE;
+      }
     }
 
     return {
@@ -879,20 +976,34 @@ export async function loadPublicDeckAction(deckId: string) {
       };
     }
 
-    // Load deck cards
-    const { data: cards, error: cardsError } = await supabase
-      .from("deck_cards")
-      .select("*")
-      .eq("deck_id", deckId)
-      .order("card_name");
+    // Load deck cards — Supabase defaults to 1000 rows max, so we must
+    // paginate to ensure large decks (e.g. cubes with 1700+ entries) are fully loaded.
+    let cards: any[] = [];
+    {
+      const PAGE_SIZE = 1000;
+      let offset = 0;
+      let hasMore = true;
+      while (hasMore) {
+        const { data: batch, error: batchError } = await supabase
+          .from("deck_cards")
+          .select("*")
+          .eq("deck_id", deckId)
+          .order("card_name")
+          .range(offset, offset + PAGE_SIZE - 1);
 
-    if (cardsError) {
-      console.error("Error loading deck cards:", cardsError);
-      return {
-        success: false,
-        error: "Failed to load deck cards",
-        deck: null,
-      };
+        if (batchError) {
+          console.error("Error loading deck cards:", batchError);
+          return {
+            success: false,
+            error: "Failed to load deck cards",
+            deck: null,
+          };
+        }
+
+        cards = cards.concat(batch || []);
+        hasMore = (batch?.length || 0) === PAGE_SIZE;
+        offset += PAGE_SIZE;
+      }
     }
 
     // Fetch username for the deck creator
@@ -921,6 +1032,22 @@ export async function loadPublicDeckAction(deckId: string) {
         .then(() => {});
     }
 
+    // Fetch total and budget prices
+    let totalPrice: number | null = null;
+    let budgetPrice: number | null = null;
+    {
+      const [priceResult, budgetResult] = await Promise.all([
+        supabase.rpc("get_deck_total_prices", { deck_ids: [deckId] }),
+        supabase.rpc("get_deck_budget_prices", { deck_ids: [deckId] }),
+      ]);
+      if (priceResult.data?.[0]?.total_price > 0) {
+        totalPrice = parseFloat(priceResult.data[0].total_price);
+      }
+      if (budgetResult.data?.[0]?.budget_price > 0) {
+        budgetPrice = parseFloat(budgetResult.data[0].budget_price);
+      }
+    }
+
     return {
       success: true,
       deck: {
@@ -928,6 +1055,8 @@ export async function loadPublicDeckAction(deckId: string) {
         username: profile?.username || null,
         cards: cards || [],
         tags,
+        total_price: totalPrice,
+        budget_price: budgetPrice,
       },
       isOwner,
     };
@@ -982,17 +1111,30 @@ export async function copyPublicDeckAction(sourceDeckId: string) {
       };
     }
 
-    // Load source deck cards
-    const { data: sourceCards, error: cardsError } = await supabase
-      .from("deck_cards")
-      .select("*")
-      .eq("deck_id", sourceDeckId);
+    // Load source deck cards — paginate past Supabase's default 1000-row limit
+    let sourceCards: any[] = [];
+    {
+      const PAGE_SIZE = 1000;
+      let offset = 0;
+      let hasMore = true;
+      while (hasMore) {
+        const { data: batch, error: batchError } = await supabase
+          .from("deck_cards")
+          .select("*")
+          .eq("deck_id", sourceDeckId)
+          .range(offset, offset + PAGE_SIZE - 1);
 
-    if (cardsError) {
-      return {
-        success: false,
-        error: "Failed to load source deck cards",
-      };
+        if (batchError) {
+          return {
+            success: false,
+            error: "Failed to load source deck cards",
+          };
+        }
+
+        sourceCards = sourceCards.concat(batch || []);
+        hasMore = (batch?.length || 0) === PAGE_SIZE;
+        offset += PAGE_SIZE;
+      }
     }
 
     // Create the copy
@@ -1091,6 +1233,8 @@ export interface LoadPublicDecksParams {
   search?: string;
   username?: string;
   tagIds?: string[];
+  tournamentOnly?: boolean;
+  excludeFullSize?: boolean;
 }
 
 export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) {
@@ -1104,9 +1248,25 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
       search,
       username,
       tagIds,
+      tournamentOnly,
+      excludeFullSize,
     } = params;
 
     const offset = (page - 1) * pageSize;
+
+    // If tournament-only filter, resolve published deck IDs first
+    let tournamentDeckIds: string[] | null = null;
+    if (tournamentOnly) {
+      const { data: tdRows } = await supabase
+        .from("tournament_decklists")
+        .select("published_deck_id, tournaments!inner(decklists_published)")
+        .eq("tournaments.decklists_published", true)
+        .not("published_deck_id", "is", null);
+      tournamentDeckIds = [...new Set((tdRows || []).map((r: any) => r.published_deck_id).filter(Boolean))];
+      if (tournamentDeckIds.length === 0) {
+        return { success: true, decks: [], totalCount: 0 };
+      }
+    }
 
     // If tag filtering is requested, resolve the matching deck IDs first
     let tagFilteredDeckIds: string[] | null = null;
@@ -1124,11 +1284,15 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
 
     let query = supabase
       .from("decks")
-      .select("id, name, description, format, paragon, card_count, view_count, preview_card_1, preview_card_2, user_id, created_at, updated_at", { count: "exact" })
+      .select("id, name, description, format, paragon, card_count, view_count, preview_card_1, preview_card_2, user_id, created_at, updated_at, is_legal", { count: "exact" })
       .eq("is_public", true);
 
     if (tagFilteredDeckIds) {
       query = query.in("id", tagFilteredDeckIds);
+    }
+
+    if (tournamentDeckIds) {
+      query = query.in("id", tournamentDeckIds);
     }
 
     if (format) {
@@ -1138,6 +1302,10 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
       } else {
         query = query.eq("format", format);
       }
+    }
+
+    if (excludeFullSize) {
+      query = query.lt("card_count", 100);
     }
 
     // Filter by exact username (e.g. clicking a username link)
@@ -1155,7 +1323,7 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
       }
     }
 
-    // Search by deck name or username
+    // Search by deck name, username, or tournament name
     if (search && search.trim()) {
       const term = search.trim();
       // Find user IDs matching the search term
@@ -1165,11 +1333,23 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
         .ilike("username", `%${term}%`);
       const matchingUserIds = (matchingProfiles || []).map((p: any) => p.id);
 
+      // Find published deck IDs from tournaments matching the search term
+      const { data: tournamentDeckRows } = await supabase
+        .from("tournament_decklists")
+        .select("published_deck_id, tournaments!inner(name, decklists_published)")
+        .eq("tournaments.decklists_published", true)
+        .not("published_deck_id", "is", null)
+        .ilike("tournaments.name", `%${term}%`);
+      const tournamentDeckIds = [...new Set((tournamentDeckRows || []).map((r: any) => r.published_deck_id).filter(Boolean))];
+
+      const orClauses: string[] = [`name.ilike.%${term}%`];
       if (matchingUserIds.length > 0) {
-        query = query.or(`name.ilike.%${term}%,user_id.in.(${matchingUserIds.join(",")})`);
-      } else {
-        query = query.ilike("name", `%${term}%`);
+        orClauses.push(`user_id.in.(${matchingUserIds.join(",")})`);
       }
+      if (tournamentDeckIds.length > 0) {
+        orClauses.push(`id.in.(${tournamentDeckIds.join(",")})`);
+      }
+      query = query.or(orClauses.join(","));
     }
 
     switch (sort) {
@@ -1220,11 +1400,102 @@ export async function loadPublicDecksAction(params: LoadPublicDecksParams = {}) 
       }
     }
 
-    const decksWithUsername = (decks || []).map((d: any) => ({
-      ...d,
-      username: usernameMap.get(d.user_id) || null,
-      tags: tagsMap.get(d.id) || [],
-    }));
+    // Batch-fetch total prices and budget prices for all returned decks
+    let priceMap = new Map<string, number>();
+    let budgetPriceMap = new Map<string, number>();
+    if (deckIds.length > 0) {
+      const [priceResult, budgetResult] = await Promise.all([
+        supabase.rpc("get_deck_total_prices", { deck_ids: deckIds }),
+        supabase.rpc("get_deck_budget_prices", { deck_ids: deckIds }),
+      ]);
+
+      if (priceResult.error) {
+        console.error("Error fetching deck prices:", priceResult.error);
+      }
+      for (const row of (priceResult.data || []) as any[]) {
+        if (row.total_price > 0) {
+          priceMap.set(row.deck_id, parseFloat(row.total_price));
+        }
+      }
+
+      if (budgetResult.error) {
+        console.error("Error fetching budget prices:", budgetResult.error);
+      }
+      for (const row of (budgetResult.data || []) as any[]) {
+        if (row.budget_price > 0) {
+          budgetPriceMap.set(row.deck_id, parseFloat(row.budget_price));
+        }
+      }
+    }
+
+    // Batch-fetch tournament placement data for returned decks
+    let tournamentMap = new Map<string, { tournament_name: string; placement: number | null; deck_format: string | null; participant_count: number }>();
+    if (deckIds.length > 0) {
+      const { data: tdRows } = await supabase
+        .from("tournament_decklists")
+        .select(`
+          deck_id,
+          published_deck_id,
+          participant_id,
+          tournaments!inner (
+            id,
+            name,
+            decklists_published,
+            deck_format
+          ),
+          participants!inner (
+            place,
+            tournament_id
+          )
+        `)
+        .in("published_deck_id", deckIds);
+
+      if (tdRows && tdRows.length > 0) {
+        // Get unique tournament IDs that are published
+        const publishedRows = (tdRows as any[]).filter((r: any) => r.tournaments?.decklists_published);
+        const tournamentIds = [...new Set(publishedRows.map((r: any) => r.tournaments?.id).filter(Boolean))];
+
+        // Fetch participant counts in parallel (one query per tournament, all concurrent)
+        const countMap = new Map<string, number>();
+        if (tournamentIds.length > 0) {
+          const countResults = await Promise.all(
+            tournamentIds.map((tid) =>
+              supabase
+                .from("participants")
+                .select("id", { count: "exact", head: true })
+                .eq("tournament_id", tid)
+                .then(({ count }) => ({ tid, count: count || 0 }))
+            )
+          );
+          for (const { tid, count } of countResults) {
+            countMap.set(tid, count);
+          }
+        }
+
+        for (const row of publishedRows) {
+          const tid = row.tournaments?.id;
+          // Map by published_deck_id since that's the public deck visible on community page
+          tournamentMap.set(row.published_deck_id, {
+            tournament_name: row.tournaments?.name || "Tournament",
+            placement: row.participants?.place ?? null,
+            deck_format: row.tournaments?.deck_format || null,
+            participant_count: countMap.get(tid) || 0,
+          });
+        }
+      }
+    }
+
+    const decksWithUsername = (decks || []).map((d: any) => {
+      const tournament = tournamentMap.get(d.id);
+      return {
+        ...d,
+        username: usernameMap.get(d.user_id) || null,
+        tags: tagsMap.get(d.id) || [],
+        total_price: priceMap.get(d.id) || null,
+        budget_price: budgetPriceMap.get(d.id) || null,
+        tournament: tournament || null,
+      };
+    });
 
     return { success: true, decks: decksWithUsername, totalCount: count || 0 };
   } catch (error) {

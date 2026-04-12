@@ -1,8 +1,33 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { Button, ToggleSwitch } from "flowbite-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Button } from "flowbite-react";
 import ToastNotification from "../../../components/ui/toast-notification";
+import DeckSourcePicker from "./DeckSourcePicker";
+
+async function checkLegality(decklist: string, deckType: string, deckId?: string | null): Promise<boolean | null> {
+  try {
+    const body: Record<string, unknown> = deckId
+      ? { deckId }
+      : { decklist, decklist_type: deckType };
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    const res = await fetch("/api/deckcheck", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!res.ok) return null;
+    const result = await res.json();
+    return result.valid ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export default function GenerateDeckList() {
   const [decklist, setDecklist] = useState("");
@@ -19,8 +44,19 @@ export default function GenerateDeckList() {
   const [activeTab, setActiveTab] = useState<'pdf' | 'screenshot'>('pdf');
   const [mCount, setMCount] = useState(false);
   const [aodCount, setAodCount] = useState(false);
+  const [loadedDeckName, setLoadedDeckName] = useState<string | null>(null);
+  const [loadedDeckId, setLoadedDeckId] = useState<string | null>(null);
   const successRef = useRef<HTMLDivElement>(null);
   const screenshotSuccessRef = useRef<HTMLDivElement>(null);
+
+  const handleDeckSelected = useCallback((text: string, deckName: string, deckTypeValue: string | null, deckId?: string) => {
+    setDecklist(text);
+    setLoadedDeckName(deckName);
+    setLoadedDeckId(deckId || null);
+    if (deckTypeValue) {
+      setDeckType(deckTypeValue);
+    }
+  }, []);
 
   // Auto-scroll to success message when it appears
   useEffect(() => {
@@ -42,28 +78,18 @@ export default function GenerateDeckList() {
     }
   }, [screenshotSuccess]);
 
-  const validateForm = (list: string, name?: string, event?: string, isScreenshot: boolean = false): { valid: boolean; message?: string } => {
+  const validateForm = (list: string, name?: string, event?: string): { valid: boolean; message?: string } => {
     if (!list.trim()) {
       return { valid: false, message: "Decklist cannot be empty" };
     }
 
-    // For PDF generation, name and event are required
-    if (!isScreenshot) {
-      if (!name?.trim()) {
-        return { valid: false, message: "Player name is required for PDF generation" };
-      }
+    // Validate lengths if provided
+    if (name && name.length > 50) {
+      return { valid: false, message: "Player name must be 50 characters or less" };
+    }
 
-      if (name.length > 50) {
-        return { valid: false, message: "Player name must be 50 characters or less" };
-      }
-
-      if (!event?.trim()) {
-        return { valid: false, message: "Event name is required for PDF generation" };
-      }
-
-      if (event.length > 100) {
-        return { valid: false, message: "Event name must be 100 characters or less" };
-      }
+    if (event && event.length > 100) {
+      return { valid: false, message: "Event name must be 100 characters or less" };
     }
 
     // Check reasonable length (e.g., max 10000 characters)
@@ -96,7 +122,7 @@ export default function GenerateDeckList() {
     setError(null);
     setSuccess(null);
     
-    const validation = validateForm(decklist, name, event, false);
+    const validation = validateForm(decklist, name, event);
     if (!validation.valid) {
       setError(validation.message || "Invalid form data");
       return;
@@ -104,6 +130,8 @@ export default function GenerateDeckList() {
 
     setLoading(true);
     try {
+      const isLegal = await checkLegality(decklist, deckType, loadedDeckId);
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_TOURNAMENT_API_ENDPOINT}/v1/generate-decklist`, {
         method: "POST",
         headers: {
@@ -117,6 +145,8 @@ export default function GenerateDeckList() {
           show_alignment: showAlignment,
           m_count: mCount,
           aod_count: aodCount,
+          ...(loadedDeckId ? { deck_id: loadedDeckId } : {}),
+          ...(isLegal != null ? { is_legal: isLegal } : {}),
         }),
       });
 
@@ -138,7 +168,7 @@ export default function GenerateDeckList() {
   };
 
   const handleGenerateScreenshot = async () => {
-    const validation = validateForm(decklist, undefined, undefined, true);
+    const validation = validateForm(decklist);
     if (!validation.valid) {
       setError(validation.message || "Invalid decklist format");
       return;
@@ -149,6 +179,8 @@ export default function GenerateDeckList() {
     setScreenshotLoading(true);
 
     try {
+      const isLegal = await checkLegality(decklist, deckType, loadedDeckId);
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_TOURNAMENT_API_ENDPOINT}/v1/generate-decklist-image`, {
         method: 'POST',
         headers: {
@@ -160,6 +192,8 @@ export default function GenerateDeckList() {
           n_card_columns: nCardColumns,
           m_count: mCount,
           aod_count: aodCount,
+          ...(loadedDeckId ? { deck_id: loadedDeckId } : {}),
+          ...(isLegal != null ? { is_legal: isLegal } : {}),
         }),
       });
 
@@ -185,18 +219,18 @@ export default function GenerateDeckList() {
     <div className="flex-1 w-full flex flex-col gap-6 max-w-4xl mx-auto p-4">
       <div className="w-full">
         <h2 className="text-3xl font-bold mb-2">Decklist Generator</h2>
-        <p className="text-gray-600 dark:text-gray-400 mb-6">
+        <p className="text-muted-foreground mb-6">
           Generate a formatted PDF for tournament play or create a visual screenshot of your deck
         </p>
 
         {/* Tab Navigation */}
-        <div className="flex space-x-1 rounded-lg bg-gray-100 dark:bg-gray-800 p-1 mb-6">
+        <div className="flex space-x-1 rounded-lg bg-muted p-1 mb-6">
           <button
             onClick={() => setActiveTab('pdf')}
             className={`flex-1 rounded-md py-2 px-4 text-sm font-medium transition-colors ${
               activeTab === 'pdf'
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                ? 'bg-card text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             📄 Tournament PDF
@@ -205,8 +239,8 @@ export default function GenerateDeckList() {
             onClick={() => setActiveTab('screenshot')}
             className={`flex-1 rounded-md py-2 px-4 text-sm font-medium transition-colors ${
               activeTab === 'screenshot'
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                ? 'bg-card text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             📸 Visual Screenshot
@@ -215,14 +249,14 @@ export default function GenerateDeckList() {
 
         {/* Content based on active tab */}
         {activeTab === 'pdf' ? (
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <div className="bg-card rounded-lg border border-border p-6">
             <div className="flex items-center gap-2 mb-4">
               <h3 className="text-xl font-semibold">Generate Tournament PDF</h3>
               <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full">
                 Official Format
               </span>
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+            <p className="text-sm text-muted-foreground mb-6">
               Creates a properly formatted PDF suitable for tournament deck checks with player information and card alignments.
             </p>
 
@@ -231,120 +265,84 @@ export default function GenerateDeckList() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    Player Name <span className="text-red-500">*</span>
+                    Player Name (optional)
                   </label>
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full p-3 border rounded-lg bg-background focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full p-3 border rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
                     placeholder="Enter your name"
                     maxLength={50}
-                    required
                   />
                 </div>
                 
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    Event Name <span className="text-red-500">*</span>
+                    Event Name (optional)
                   </label>
                   <input
                     type="text"
                     value={event}
                     onChange={(e) => setEvent(e.target.value)}
-                    className="w-full p-3 border rounded-lg bg-background focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full p-3 border rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
                     placeholder="Tournament or event name"
                     maxLength={100}
-                    required
                   />
                 </div>
               </div>
 
               {/* Deck Configuration */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
+              <div className="space-y-4">
+                <div className="max-w-xs">
                   <label className="block text-sm font-medium mb-2">
                     Deck Type
                   </label>
                   <select
                     value={deckType}
                     onChange={(e) => setDeckType(e.target.value)}
-                    className="w-full p-3 border rounded-lg bg-background focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full p-3 border rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
                   >
                     <option value="type_1">Type 1</option>
                     <option value="type_2">Type 2</option>
                     <option value="paragon">Paragon</option>
                   </select>
                 </div>
-                
+
                 <div>
-                  <label className="block text-sm font-medium mb-2">
-                    PDF Options
-                  </label>
-                  <div className="flex items-center p-3 border rounded-lg bg-gray-50 dark:bg-gray-700">
-                    <ToggleSwitch
-                      label="Show Card Alignments"
-                      checked={showAlignment}
-                      onChange={setShowAlignment}
-                    />
+                  <label className="block text-sm font-medium mb-2">Options</label>
+                  <div className="flex flex-wrap gap-x-5 gap-y-2">
+                    <label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+                      <input type="checkbox" checked={showAlignment} onChange={(e) => setShowAlignment(e.target.checked)} className="rounded border-border text-primary bg-transparent" />
+                      Show card alignments
+                    </label>
+                    <label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none" title="Average number of unique brigades when randomly drawing 8 non-lost soul cards from a deck">
+                      <input type="checkbox" checked={mCount} onChange={(e) => setMCount(e.target.checked)} className="rounded border-border text-primary bg-transparent" />
+                      Matthew count
+                    </label>
+                    <label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none" title="Average number of Daniel cards in the top 9 cards of a randomly shuffled deck">
+                      <input type="checkbox" checked={aodCount} onChange={(e) => setAodCount(e.target.checked)} className="rounded border-border text-primary bg-transparent" />
+                      AoD count
+                    </label>
                   </div>
                 </div>
-                <div title="The M count (Matthew Count) represents average number of unique brigades when randomly drawing 8 non-lost soul cards from a deck. Higher M count = more brigades in opening hand, on average">
-                  <label className="block text-sm font-medium mb-2 flex items-center">
-                    Matthew Count
-                    <span className="ml-1 text-gray-400 hover:text-gray-600" title="The M count (Matthew Count) represents average number of unique brigades when randomly drawing 8 non-lost soul cards from a deck. Higher M count = more brigades in opening hand, on average">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 11-0 20 10 10 0 010-20z" />
-                      </svg>
-                    </span>
-                  </label>
-                   <div className="flex items-center p-3 border rounded-lg bg-gray-50 dark:bg-gray-700">
-                     <ToggleSwitch label="M Count" checked={mCount} onChange={setMCount} />
-                   </div>
-                 </div>
-                <div title="The AoD count (Ancient of Day Count) represents average number of daniel cards in the top 9 cards of a randomly shuffled deck">
-                  <label className="block text-sm font-medium mb-2 flex items-center">
-                    AoD Count
-                    <span className="ml-1 text-gray-400 hover:text-gray-600" title="The AoD count (Ancient of Day Count) represents average number of daniel cards in the top 9 cards of a randomly shuffled deck">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 11-0 20 10 10 0 010-20z" />
-                      </svg>
-                    </span>
-                  </label>
-                   <div className="flex items-center p-3 border rounded-lg bg-gray-50 dark:bg-gray-700">
-                     <ToggleSwitch label="AoD Count" checked={aodCount} onChange={setAodCount} />
-                   </div>
-                 </div>
               </div>
 
               {/* Decklist Input */}
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Lackey Decklist <span className="text-red-500">*</span>
-                </label>
-                <p className="text-xs text-gray-500 mb-2">
-                  Build a deck in{" "}
-                  <a 
-                    href="https://landofredemption.com/installing-lackey-with-redemption-plugin/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-500 hover:underline"
-                  >
-                    Lackey
-                  </a>
-                  , then click the "Copy" button and paste here
-                </p>
-                <textarea
-                  value={decklist}
-                  onChange={(e) => setDecklist(e.target.value)}
-                  className="w-full h-64 p-3 font-mono text-sm border rounded-lg bg-background focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="1 Card Name [Set]"
-                  required
-                />
-              </div>
+              <DeckSourcePicker
+                value={decklist}
+                onChange={(val) => {
+                  setDecklist(val);
+                  if (loadedDeckName) setLoadedDeckName(null);
+                }}
+                onDeckSelected={handleDeckSelected}
+                loadedDeckName={loadedDeckName}
+                onClearLoaded={() => setLoadedDeckName(null)}
+                textareaClassName="focus:ring-2 focus:ring-ring focus:border-transparent"
+              />
 
               <Button
-                type="submit" 
+                type="submit"
                 disabled={loading || !decklist.trim()}
                 outline
                 gradientDuoTone="greenToBlue"
@@ -366,103 +364,80 @@ export default function GenerateDeckList() {
             </form>
           </div>
         ) : (
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <div className="bg-card rounded-lg border border-border p-6">
             <div className="flex items-center gap-2 mb-4">
               <h3 className="text-xl font-semibold">Generate Visual Screenshot</h3>
               <span className="text-xs bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 px-2 py-1 rounded-full">
                 Visual Format
               </span>
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+            <p className="text-sm text-muted-foreground mb-6">
               Creates a visual screenshot of your deck list. No player information required - just your decklist!
             </p>
 
             <div className="space-y-6">
               {/* Screenshot Configuration */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Deck Type
-                  </label>
-                  <select
-                    value={deckType}
-                    onChange={(e) => setDeckType(e.target.value)}
-                    className="w-full p-3 border rounded-lg bg-background focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  >
-                    <option value="type_1">Type 1</option>
-                    <option value="type_2">Type 2</option>
-                    <option value="paragon">Paragon</option>
-                  </select>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 max-w-md">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Deck Type
+                    </label>
+                    <select
+                      value={deckType}
+                      onChange={(e) => setDeckType(e.target.value)}
+                      className="w-full p-3 border rounded-lg bg-background focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    >
+                      <option value="type_1">Type 1</option>
+                      <option value="type_2">Type 2</option>
+                      <option value="paragon">Paragon</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Card Columns
+                    </label>
+                    <select
+                      value={nCardColumns}
+                      onChange={(e) => setNCardColumns(parseInt(e.target.value))}
+                      className="w-full p-3 border rounded-lg bg-background focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    >
+                      <option value={6}>6 columns</option>
+                      <option value={8}>8 columns</option>
+                      <option value={10}>10 columns</option>
+                      <option value={12}>12 columns</option>
+                      <option value={15}>15 columns</option>
+                    </select>
+                  </div>
                 </div>
+
                 <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Card Columns
-                  </label>
-                  <select
-                    value={nCardColumns}
-                    onChange={(e) => setNCardColumns(parseInt(e.target.value))}
-                    className="w-full p-3 border rounded-lg bg-background focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  >
-                    <option value={6}>6 columns</option>
-                    <option value={8}>8 columns</option>
-                    <option value={10}>10 columns</option>
-                    <option value={12}>12 columns</option>
-                    <option value={15}>15 columns</option>
-                  </select>
+                  <label className="block text-sm font-medium mb-2">Options</label>
+                  <div className="flex flex-wrap gap-x-5 gap-y-2">
+                    <label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none" title="Average number of unique brigades when randomly drawing 8 non-lost soul cards from a deck">
+                      <input type="checkbox" checked={mCount} onChange={(e) => setMCount(e.target.checked)} className="rounded border-border text-primary bg-transparent" />
+                      Matthew count
+                    </label>
+                    <label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none" title="Average number of Daniel cards in the top 9 cards of a randomly shuffled deck">
+                      <input type="checkbox" checked={aodCount} onChange={(e) => setAodCount(e.target.checked)} className="rounded border-border text-primary bg-transparent" />
+                      AoD count
+                    </label>
+                  </div>
                 </div>
-                <div title="The M count (Matthew Count) represents average number of unique brigades when randomly drawing 8 non-lost soul cards from a deck. Higher M count = more brigades in opening hand, on average">
-                  <label className="block text-sm font-medium mb-2 flex items-center">
-                    Matthew Count
-                    <span className="ml-1 text-gray-400 hover:text-gray-600" title="The M count (Matthew Count) represents average number of unique brigades when randomly drawing 8 non-lost soul cards from a deck. Higher M count = more brigades in opening hand, on average">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 11-0 20 10 10 0 010-20z" />
-                      </svg>
-                    </span>
-                  </label>
-                   <div className="flex items-center p-3 border rounded-lg bg-gray-50 dark:bg-gray-700">
-                     <ToggleSwitch label="Matthew Count" checked={mCount} onChange={setMCount} />
-                   </div>
-                 </div>
-                <div title="The AoD count (Ancient of Day Count) represents average number of daniel cards in the top 9 cards of a randomly shuffled deck">
-                  <label className="block text-sm font-medium mb-2 flex items-center">
-                    AoD Count
-                    <span className="ml-1 text-gray-400 hover:text-gray-600" title="The AoD count (Ancient of Day Count) represents average number of daniel cards in the top 9 cards of a randomly shuffled deck">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 11-0 20 10 10 0 010-20z" />
-                      </svg>
-                    </span>
-                  </label>
-                   <div className="flex items-center p-3 border rounded-lg bg-gray-50 dark:bg-gray-700">
-                     <ToggleSwitch label="AoD Count" checked={aodCount} onChange={setAodCount} />
-                   </div>
-                 </div>
               </div>
 
               {/* Decklist Input */}
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Lackey Decklist <span className="text-red-500">*</span>
-                </label>
-                <p className="text-xs text-gray-500 mb-2">
-                  Build a deck in{" "}
-                  <a 
-                    href="https://landofredemption.com/installing-lackey-with-redemption-plugin/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-500 hover:underline"
-                  >
-                    Lackey
-                  </a>
-                  , then click the "Copy" button and paste here
-                </p>
-                <textarea
-                  value={decklist}
-                  onChange={(e) => setDecklist(e.target.value)}
-                  className="w-full h-64 p-3 font-mono text-sm border rounded-lg bg-background focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="1 Card Name [Set]"
-                  required
-                />
-              </div>
+              <DeckSourcePicker
+                value={decklist}
+                onChange={(val) => {
+                  setDecklist(val);
+                  if (loadedDeckName) setLoadedDeckName(null);
+                }}
+                onDeckSelected={handleDeckSelected}
+                loadedDeckName={loadedDeckName}
+                onClearLoaded={() => setLoadedDeckName(null)}
+                textareaClassName="focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
 
               <Button
                 type="button"
@@ -536,7 +511,7 @@ export default function GenerateDeckList() {
           <div className="mt-6" ref={screenshotSuccessRef}>
             <div className="p-6 bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-900 rounded-lg">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
+                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
                   <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>

@@ -2,6 +2,7 @@ import React from "react";
 import { DeckCard } from "../types/deck";
 import { Card } from "../utils";
 import { useCardImageUrl } from "../hooks/useCardImageUrl";
+import { useCardPrices } from "../hooks/useCardPrices";
 
 interface DeckCardListProps {
   /** Array of cards to display */
@@ -24,6 +25,8 @@ interface DeckCardListProps {
   viewLayout?: 'grid' | 'list';
   /** Optional: Disable card hover preview */
   disableHoverPreview?: boolean;
+  /** Whether to show prices below card images in grid view */
+  showPrices?: boolean;
 }
 
 /**
@@ -40,10 +43,12 @@ export default function DeckCardList({
   showTypeIcons = true,
   viewLayout = 'list',
   disableHoverPreview = false,
+  showPrices = false,
 }: DeckCardListProps) {
   const [openMenuCard, setOpenMenuCard] = React.useState<string | null>(null);
   const [previewCard, setPreviewCard] = React.useState<{ card: Card; x: number; y: number } | null>(null);
   const { getImageUrl } = useCardImageUrl();
+  const { getPrice } = useCardPrices();
   
   // Close menu when clicking outside or pressing ESC
   React.useEffect(() => {
@@ -119,10 +124,7 @@ export default function DeckCardList({
     return cards.filter((dc) => dc.isReserve === filterReserve);
   }, [cards, filterReserve]);
 
-  // Use filtered cards directly - parent component handles sorting
-  const displayCards = filteredCards;
-
-  if (displayCards.length === 0) {
+  if (filteredCards.length === 0) {
     return (
       <div className="flex items-center justify-center py-8 text-gray-400 dark:text-gray-500 text-sm">
         No cards yet
@@ -133,14 +135,14 @@ export default function DeckCardList({
   // Grid View
   if (viewLayout === 'grid') {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
-        {displayCards.map((deckCard) => {
+      <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 sm:gap-2">
+        {filteredCards.map((deckCard) => {
           const { card, quantity, isReserve } = deckCard;
           const cardKey = `${card.name}-${card.set}-${isReserve}`;
           
           return (
+            <div key={cardKey} className="deck-card-enter">
             <div
-              key={cardKey}
               className="relative group rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-200"
               onMouseEnter={disableHoverPreview ? undefined : (e) => {
                 const pos = calculatePreviewPosition(e.currentTarget);
@@ -163,15 +165,19 @@ export default function DeckCardList({
               )}
 
               {/* Card Image */}
-              <div 
-                className="aspect-[2.5/3.5] bg-gray-200 dark:bg-gray-700 cursor-pointer relative"
+              <div
+                className="aspect-[2.5/3.5] bg-gray-200 dark:bg-gray-700 animate-pulse cursor-pointer relative"
                 onClick={() => onViewCard?.(card)}
               >
                 <img
                   src={getImageUrl(card.imgFile)}
                   alt={card.name}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover opacity-0 transition-opacity duration-300"
                   crossOrigin="anonymous"
+                  onLoad={(e) => {
+                    e.currentTarget.classList.replace('opacity-0', 'opacity-100');
+                    e.currentTarget.parentElement?.classList.remove('animate-pulse');
+                  }}
                   onError={(e) => {
                     e.currentTarget.src = '/placeholder-card.png';
                   }}
@@ -186,10 +192,10 @@ export default function DeckCardList({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        onMoveCard(card.name, card.set, isReserve, !isReserve);
                         setOpenMenuCard(null);
+                        onMoveCard(card.name, card.set, isReserve, !isReserve);
                       }}
-                      className="w-10 h-10 hover:scale-110 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 flex items-center justify-center text-gray-700 dark:text-gray-200 transition-all"
+                      className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-gray-700 dark:text-gray-200 transition-all"
                       title={isReserve ? "Move to main deck" : "Move to reserve"}
                     >
                       {isReserve ? (
@@ -212,7 +218,7 @@ export default function DeckCardList({
                         onViewCard(card);
                         setOpenMenuCard(null);
                       }}
-                      className="w-10 h-10 hover:scale-110 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 flex items-center justify-center text-gray-700 dark:text-gray-200 transition-all"
+                      className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-gray-700 dark:text-gray-200 transition-all"
                       title="View card details"
                     >
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -225,10 +231,10 @@ export default function DeckCardList({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      onRemove(card.name, card.set, isReserve);
                       setOpenMenuCard(null);
+                      onRemove(card.name, card.set, isReserve);
                     }}
-                    className="w-10 h-10 hover:scale-110 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 flex items-center justify-center text-red-600 dark:text-red-400 transition-all"
+                    className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-red-600 dark:text-red-400 transition-all"
                     title="Remove all copies"
                   >
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -289,12 +295,23 @@ export default function DeckCardList({
                   
                   {/* Bottom Right: Quantity Display - Always Visible, Compact Style */}
                   <div className="flex items-center justify-center">
-                    <div className="bg-black/75 backdrop-blur-sm text-white px-2.5 py-1 rounded-md font-bold text-sm shadow-lg">
+                    <div key={quantity} className="animate-qty-pop bg-black/75 backdrop-blur-sm text-white px-2.5 py-1 rounded-md font-bold text-sm shadow-lg">
                       ×{quantity}
                     </div>
                   </div>
                 </div>
               </div>
+            </div>
+            {/* Price label below card */}
+            {showPrices && (() => {
+              const priceKey = `${card.name}|${card.set}|${card.imgFile}`;
+              const priceInfo = getPrice(priceKey);
+              return priceInfo ? (
+                <div className="text-[10px] text-green-600 dark:text-green-400 text-center mt-0.5 tabular-nums font-medium truncate">
+                  ${priceInfo.price.toFixed(2)}
+                </div>
+              ) : null;
+            })()}
             </div>
           );
         })}
@@ -324,7 +341,7 @@ export default function DeckCardList({
   // List View (default)
   return (
     <div className="space-y-1">
-      {displayCards.map((deckCard) => {
+      {filteredCards.map((deckCard) => {
         const { card, quantity, isReserve } = deckCard;
         const cardKey = `${card.name}-${card.set}-${isReserve}`;
         
@@ -402,7 +419,7 @@ export default function DeckCardList({
         return (
           <div
             key={cardKey}
-            className="flex items-center gap-2 p-2 rounded bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
+            className="flex items-center gap-2 p-2 rounded bg-muted hover:bg-muted/80 transition-colors group"
           >
             {/* Type Icon */}
             {showTypeIcons && (
@@ -649,7 +666,7 @@ export default function DeckCardList({
               </button>
 
               {/* Quantity Badge (always visible, not a button) */}
-              <div className="flex-shrink-0 w-9 h-7 flex items-center justify-center text-gray-900 dark:text-white font-bold text-sm">
+              <div key={quantity} className="animate-qty-pop flex-shrink-0 w-9 h-7 flex items-center justify-center text-gray-900 dark:text-white font-bold text-sm">
                 {quantity}
               </div>
 
@@ -666,7 +683,7 @@ export default function DeckCardList({
 
             {/* Card Info */}
             <div className="flex-1 min-w-0">
-              <div 
+              <div
                 className="text-sm font-medium text-gray-900 dark:text-white truncate cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                 onMouseEnter={(e) => {
                   const pos = calculatePreviewPosition(e.currentTarget);
@@ -681,13 +698,24 @@ export default function DeckCardList({
               </div>
             </div>
 
+            {/* Price */}
+            {(() => {
+              const priceKey = `${card.name}|${card.set}|${card.imgFile}`;
+              const priceInfo = getPrice(priceKey);
+              return priceInfo ? (
+                <span className="text-xs text-green-600 dark:text-green-400 font-medium flex-shrink-0 tabular-nums">
+                  ${priceInfo.price.toFixed(2)}
+                </span>
+              ) : null;
+            })()}
+
             {/* Additional Controls */}
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               {/* View Card Button */}
               {onViewCard && (
                 <button
                   onClick={() => onViewCard(card)}
-                  className="w-6 h-6 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-600 hover:bg-green-600 dark:hover:bg-green-700 text-gray-700 dark:text-gray-200 hover:text-white transition-colors"
+                  className="w-6 h-6 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-600 hover:bg-primary text-gray-700 dark:text-gray-200 hover:text-primary-foreground transition-colors"
                   aria-label="View card details"
                   title="View card details"
                 >

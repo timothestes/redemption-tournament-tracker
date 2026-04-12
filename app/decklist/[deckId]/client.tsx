@@ -12,6 +12,12 @@ import ReactMarkdown from "react-markdown";
 import { CARD_DATA_URL } from "../card-search/constants";
 import { Card } from "../card-search/utils";
 import ModalWithClose from "../card-search/ModalWithClose";
+import { GoldfishButton } from "../../goldfish/components/GoldfishButton";
+import { useCardPrices } from "../card-search/hooks/useCardPrices";
+import BuyDeckModal from "../card-search/components/BuyDeckModal";
+import GeneratePDFModal from "../card-search/components/GeneratePDFModal";
+import GenerateDeckImageModal from "../card-search/components/GenerateDeckImageModal";
+import { Deck as DeckType } from "../card-search/types/deck";
 
 interface PublicDeckData {
   id: string;
@@ -29,6 +35,8 @@ interface PublicDeckData {
   updated_at: string;
   cards: DeckCardData[];
   tags?: GlobalTag[];
+  total_price?: number | null;
+  budget_price?: number | null;
 }
 
 function getContrastColor(hex: string): string {
@@ -105,7 +113,7 @@ function formatDeckType(format?: string): string {
   if (!format) return "T1";
   const fmt = format.toLowerCase();
   if (fmt.includes("paragon")) return "Paragon";
-  if (fmt.includes("type 2") || fmt.includes("multi") || fmt === "t2") return "T2";
+  if (fmt.includes("type 2") || fmt === "t2") return "T2";
   return "T1";
 }
 
@@ -139,8 +147,23 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   const [copyResult, setCopyResult] = useState<{ success: boolean; message: string } | null>(null);
   const [cardDatabase, setCardDatabase] = useState<Map<string, Card> | null>(null);
   const [modalCard, setModalCard] = useState<Card | null>(null);
-  const [viewMode, setViewMode] = useState<"normal" | "stacked">("stacked");
+  const [viewMode, setViewMode] = useState<"normal" | "stacked">("normal");
   const [groupBy, setGroupBy] = useState<"type" | "alignment" | "none">("type");
+  const [showParagonModal, setShowParagonModal] = useState(false);
+  const [paragonVisible, setParagonVisible] = useState(true);
+
+  // Hover preview state (desktop only)
+  const [hoveredCard, setHoveredCard] = useState<{ name: string; imgFile: string; set?: string; type?: string } | null>(null);
+  const [showPreview, setShowPreview] = useState(true);
+  const [showStats, setShowStats] = useState(false);
+  const [showBuyDeckModal, setShowBuyDeckModal] = useState(false);
+  const [buyModalMode, setBuyModalMode] = useState<"exact" | "budget">("exact");
+  const [showPDFModal, setShowPDFModal] = useState(false);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+
+  // Card prices
+  const { getPrice, getProductUrl } = useCardPrices();
 
   // Inline name editing (owner only)
   const [deckName, setDeckName] = useState(deck.name);
@@ -255,6 +278,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
     setCreateName("");
     setCreateColor("#6366f1");
     setCreateError(null);
+    setTagFilter("");
   }
 
   // Cover card editor (owner only)
@@ -264,6 +288,8 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   const [coverPickerSlot, setCoverPickerSlot] = useState<1 | 2 | null>(null);
   const [coverSaving, setCoverSaving] = useState(false);
   const [coverSaved, setCoverSaved] = useState(false);
+  const [coverPickerSort, setCoverPickerSort] = useState<"default" | "name" | "type" | "brigade">("type");
+  const [coverPickerSearch, setCoverPickerSearch] = useState("");
 
   useEffect(() => {
     if (!coverEditorOpen) return;
@@ -332,10 +358,47 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
     });
   }, [deck.cards, cardDatabase]);
 
+  // Build Deck object for PDF/Image modals
+  const deckForModal: DeckType = useMemo(() => ({
+    id: deck.id,
+    name: deck.name,
+    description: deck.description || "",
+    format: deck.format,
+    cards: enrichedCards.map((c) => ({
+      card: c.fullCard || ({
+        name: c.card_name,
+        set: c.card_set || "",
+        imgFile: c.card_img_file || "",
+        dataLine: "", officialSet: "", type: "", brigade: "",
+        strength: "", toughness: "", class: "", identifier: "",
+        specialAbility: "", rarity: "", reference: "", alignment: "",
+        legality: "", testament: "", isGospel: false,
+      } as Card),
+      quantity: c.quantity,
+      isReserve: c.is_reserve,
+    })),
+    createdAt: new Date(deck.created_at),
+    updatedAt: new Date(deck.updated_at),
+  }), [deck, enrichedCards]);
+
   const mainCards = enrichedCards.filter((c) => !c.is_reserve);
   const reserveCards = enrichedCards.filter((c) => c.is_reserve);
   const mainDeckCount = mainCards.reduce((sum, c) => sum + c.quantity, 0);
   const reserveCount = reserveCards.reduce((sum, c) => sum + c.quantity, 0);
+
+  const totalDeckPrice = useMemo(() => {
+    let total = 0;
+    let hasAnyPrice = false;
+    for (const card of enrichedCards) {
+      const priceKey = `${card.card_name}|${card.card_set}|${sanitizeImgFile(card.card_img_file || "")}`;
+      const priceInfo = getPrice(priceKey);
+      if (priceInfo) {
+        total += priceInfo.price * card.quantity;
+        hasAnyPrice = true;
+      }
+    }
+    return hasAnyPrice ? total : null;
+  }, [enrichedCards, getPrice]);
 
   // Group and sort cards based on current groupBy setting
   const groupedMainCards = useMemo(() => {
@@ -413,7 +476,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   }
 
   return (
-    <div className={`w-full mx-auto py-8 ${viewMode === "stacked" ? "max-w-full px-2" : "max-w-7xl px-4"}`}>
+    <div className={`w-full mx-auto py-8 jayden-gradient-bg ${viewMode === "stacked" ? "max-w-full px-2" : "max-w-7xl px-4"}`}>
       {/* Card detail modal — no add/remove buttons */}
       {modalCard && (
         <ModalWithClose
@@ -423,22 +486,54 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
           onAddCard={null}
           onRemoveCard={null}
           getCardQuantity={null}
+          legalityFilter={null}
+          allCards={allCardsForNav}
         />
       )}
 
+      {/* Paragon Card Modal */}
+      {showParagonModal && deck.paragon && (
+        <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowParagonModal(false)}
+        >
+          <div
+            className="relative max-w-4xl w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowParagonModal(false)}
+              className="absolute -top-4 -right-4 w-10 h-10 bg-card rounded-full shadow-lg flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors z-10"
+              aria-label="Close"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <Image
+              src={`/paragons/Paragon ${deck.paragon}.png`}
+              alt={deck.paragon}
+              width={800}
+              height={1120}
+              className="w-full h-auto rounded-lg shadow-2xl"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Breadcrumb */}
-      <nav className="mb-6 flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
-        <a href="/decklist/community" className="hover:text-gray-800 dark:hover:text-gray-200 transition-colors">
+      <nav className="mb-4 flex items-center gap-1.5 text-sm text-muted-foreground">
+        <a href="/decklist/community" className="hover:text-foreground transition-colors">
           Community Decks
         </a>
         <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
-        <span className="text-gray-800 dark:text-gray-200 truncate">{deckName}</span>
+        <span className="text-foreground truncate">{deckName}</span>
       </nav>
 
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             {isOwner && editingName ? (
@@ -451,11 +546,11 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                   if (e.key === "Enter") handleNameSubmit();
                   if (e.key === "Escape") { setNameInput(deckName); setEditingName(false); }
                 }}
-                className="text-3xl font-bold bg-transparent border-b-2 border-blue-500 outline-none w-full min-w-0 mb-3"
+                className="text-3xl font-bold bg-transparent border-b-2 border-blue-500 outline-none w-full min-w-0 mb-2"
               />
             ) : (
               <h1
-                className={`text-3xl font-bold mb-3 ${isOwner ? "cursor-pointer hover:text-blue-500 dark:hover:text-blue-400 transition-colors" : ""}`}
+                className={`text-3xl font-bold mb-2 ${isOwner ? "cursor-pointer hover:text-blue-500 dark:hover:text-blue-400 transition-colors" : ""}`}
                 onClick={isOwner ? () => { setNameInput(deckName); setEditingName(true); } : undefined}
                 title={isOwner ? "Click to rename" : undefined}
               >
@@ -467,38 +562,60 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                 {formatDeckType(deck.format)}
               </span>
               {deck.paragon && formatDeckType(deck.format) === "Paragon" && (
-                <span className="text-sm text-gray-600 dark:text-gray-400">
+                <span className="text-sm text-muted-foreground">
                   Paragon: <strong>{deck.paragon}</strong>
                 </span>
               )}
               {deck.username && (
-                <span className="text-sm text-gray-600 dark:text-gray-400">
+                <span className="text-sm text-muted-foreground">
                   by{" "}
                   <Link
                     href={`/decklist/community?username=${encodeURIComponent(deck.username)}`}
-                    className="font-medium text-gray-600 dark:text-gray-400 underline hover:text-gray-900 dark:hover:text-gray-200"
+                    className="font-medium text-muted-foreground underline hover:text-foreground"
                   >
                     {deck.username}
                   </Link>
                 </span>
               )}
-              <span className="text-sm text-gray-500 dark:text-gray-400">
+              <span className="text-sm text-muted-foreground">
                 {mainDeckCount} cards{reserveCount > 0 && ` + ${reserveCount} reserve`}
+                {totalDeckPrice !== null && (
+                  <button
+                    onClick={() => { setBuyModalMode("exact"); setShowBuyDeckModal(true); }}
+                    className="text-green-600 dark:text-green-400 font-medium hover:underline inline-flex items-center gap-1"
+                    title="Buy deck on YTG"
+                  >
+                    {" · "}
+                    <img src="/sponsors/ytg-dark.png" alt="" className="h-3 w-3 object-contain hidden dark:block" />
+                    <img src="/sponsors/ytg-light.png" alt="" className="h-3 w-3 object-contain dark:hidden" />
+                    ${totalDeckPrice.toFixed(2)}
+                  </button>
+                )}
+                {deck.budget_price != null && deck.total_price != null && deck.budget_price < deck.total_price - 0.005 && (
+                  <button
+                    onClick={() => { setBuyModalMode("budget"); setShowBuyDeckModal(true); }}
+                    className="text-muted-foreground font-normal hover:underline inline-flex items-center gap-0.5 text-xs"
+                    title={`Save $${(deck.total_price - deck.budget_price).toFixed(2)} with cheapest versions`}
+                  >
+                    {" · Min: "}
+                    <span className="text-green-600 dark:text-green-400">${deck.budget_price.toFixed(2)}</span>
+                  </button>
+                )}
               </span>
-              <span className="text-sm text-gray-400 dark:text-gray-500">
+              <span className="text-sm text-muted-foreground">
                 Created {new Date(deck.created_at).toLocaleDateString()}
               </span>
-              <span className="text-sm text-gray-400 dark:text-gray-500">
+              <span className="text-sm text-muted-foreground">
                 Updated {new Date(deck.updated_at).toLocaleDateString()}
               </span>
               {(deck.view_count ?? 0) > 0 && (
-                <span className="text-sm text-gray-400 dark:text-gray-500">{deck.view_count} views</span>
+                <span className="text-sm text-muted-foreground">{deck.view_count} views</span>
               )}
             </div>
 
             {/* Tags row */}
             {(deckTags.length > 0 || isOwner) && (
-              <div className="flex items-center gap-2 flex-wrap mt-2">
+              <div className="flex items-center gap-2 flex-wrap mt-3">
                 {deckTags.map((tag) =>
                   isOwner ? (
                     <button
@@ -534,7 +651,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                   <div className="relative" ref={tagPickerRef}>
                     <button
                       onClick={() => { setTagPickerOpen((o) => !o); setTagFilter(""); }}
-                      className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-dashed border-gray-400 dark:border-gray-500 text-xs text-gray-500 dark:text-gray-400 hover:border-gray-600 dark:hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                      className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-dashed border-border text-xs text-muted-foreground hover:border-foreground/50 hover:text-foreground transition-colors"
                     >
                       <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -544,7 +661,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                     </button>
 
                     {tagPickerOpen && (
-                      <div className="absolute z-50 top-full mt-1.5 left-0 w-72 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl">
+                      <div className="absolute z-50 top-full mt-1.5 left-0 w-72 bg-background border border-border rounded-xl shadow-xl">
 
                         {createMode ? (
                           /* ── Inline create form ── */
@@ -554,7 +671,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                               <button
                                 type="button"
                                 onClick={() => setCreateColorOpen((o) => !o)}
-                                className="w-7 h-7 rounded-md border-2 border-gray-300 dark:border-gray-600 shadow-sm flex-shrink-0 hover:scale-110 transition-transform"
+                                className="w-7 h-7 rounded-md border-2 border-border shadow-sm flex-shrink-0 hover:scale-110 transition-transform"
                                 style={{ backgroundColor: createColor }}
                                 title={createColorOpen ? "Close color picker" : "Pick color"}
                               />
@@ -565,7 +682,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                                 value={createName}
                                 onChange={(e) => setCreateName(e.target.value)}
                                 maxLength={50}
-                                className="flex-1 px-2.5 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="flex-1 px-2.5 py-1.5 text-sm rounded-lg border border-border bg-card focus:outline-none focus:ring-2 focus:ring-blue-500"
                               />
                             </div>
 
@@ -573,14 +690,14 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                             {createColorOpen && (
                               <div className="flex flex-col items-center gap-1.5">
                                 <HexColorPicker color={createColor} onChange={setCreateColor} style={{ width: "100%" }} />
-                                <span className="font-mono text-xs text-gray-400 dark:text-gray-500">{createColor}</span>
+                                <span className="font-mono text-xs text-muted-foreground">{createColor}</span>
                               </div>
                             )}
 
                             {/* Preview pill */}
                             {createName.trim() && (
                               <div className="flex items-center gap-1.5">
-                                <span className="text-xs text-gray-400 dark:text-gray-500">Preview:</span>
+                                <span className="text-xs text-muted-foreground">Preview:</span>
                                 <span
                                   className="px-2.5 py-0.5 rounded-full text-xs font-medium"
                                   style={{ backgroundColor: createColor, color: getContrastColor(createColor) }}
@@ -605,7 +722,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                               <button
                                 type="button"
                                 onClick={() => { setCreateMode(false); setCreateError(null); setCreateName(""); setCreateColorOpen(false); }}
-                                className="flex-1 py-1.5 border border-gray-300 dark:border-gray-600 text-sm rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                                className="flex-1 py-1.5 border border-border text-sm rounded-lg hover:bg-muted transition-colors"
                               >
                                 Cancel
                               </button>
@@ -614,21 +731,21 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                         ) : (
                           <>
                             {/* Filter input */}
-                            <div className="px-3 pt-3 pb-2 border-b border-gray-100 dark:border-gray-800">
+                            <div className="px-3 pt-3 pb-2 border-b border-border">
                               <input
                                 autoFocus
                                 type="text"
                                 placeholder="Filter tags…"
                                 value={tagFilter}
                                 onChange={(e) => setTagFilter(e.target.value)}
-                                className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-border bg-card focus:outline-none focus:ring-2 focus:ring-blue-500"
                               />
                             </div>
 
                             {/* Tag list */}
                             <div className="max-h-56 overflow-y-auto">
                               {filteredGlobalTags.length === 0 ? (
-                                <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-4">
+                                <p className="text-xs text-muted-foreground text-center py-4">
                                   {allGlobalTags.length === 0 ? "No tags available yet" : "No matches"}
                                 </p>
                               ) : (
@@ -638,11 +755,11 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                                     <button
                                       key={tag.id}
                                       onClick={() => toggleTag(tag)}
-                                      className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                                      className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-muted transition-colors text-left"
                                     >
                                       <span className="w-4 flex-shrink-0 flex items-center justify-center">
                                         {selected && (
-                                          <svg className="w-3.5 h-3.5 text-gray-700 dark:text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <svg className="w-3.5 h-3.5 text-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                                           </svg>
                                         )}
@@ -651,7 +768,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                                         className="w-3 h-3 rounded-full flex-shrink-0 border border-black/10"
                                         style={{ backgroundColor: tag.color }}
                                       />
-                                      <span className="text-sm text-gray-800 dark:text-gray-200">{tag.name}</span>
+                                      <span className="text-sm text-foreground">{tag.name}</span>
                                     </button>
                                   );
                                 })
@@ -660,7 +777,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
 
                             {/* Admin: create new tag footer */}
                             {canManageTags && (
-                              <div className="border-t border-gray-100 dark:border-gray-800">
+                              <div className="border-t border-border">
                                 <button
                                   onClick={() => {
                                     setCreateName(tagFilter);
@@ -668,7 +785,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                                     setCreateError(null);
                                     setCreateMode(true);
                                   }}
-                                  className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                                  className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-muted-foreground hover:bg-muted transition-colors"
                                 >
                                   <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -688,10 +805,10 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={handleCopyLink}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2"
+              className="px-4 py-2 border border-border rounded-lg text-sm font-medium hover:bg-muted transition-colors flex items-center gap-2"
             >
               {linkCopied ? (
                 <>
@@ -710,16 +827,54 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
               )}
             </button>
 
-            <button
-              onClick={handleDownloadTxt}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2"
-              title="Download deck as .txt file"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              Download .txt
-            </button>
+            <GoldfishButton deckId={deck.id} deckName={deck.name} format={deck.format} />
+
+            {/* Export dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                className="px-4 py-2 border border-border rounded-lg text-sm font-medium hover:bg-muted transition-colors flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Export
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {showExportMenu && (
+                <div className="absolute left-0 top-full mt-1 bg-card border border-border rounded-lg shadow-lg py-1 z-50 min-w-[160px]">
+                  <button
+                    onClick={() => { setShowPDFModal(true); setShowExportMenu(false); }}
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-muted flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    Generate PDF
+                  </button>
+                  <button
+                    onClick={() => { setShowImageModal(true); setShowExportMenu(false); }}
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-muted flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    Generate Image
+                  </button>
+                  <button
+                    onClick={() => { handleDownloadTxt(); setShowExportMenu(false); }}
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-muted flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Download .txt
+                  </button>
+                </div>
+              )}
+            </div>
 
             {!isOwner && isLoggedIn && (
               <button
@@ -747,7 +902,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
               <>
                 <button
                   onClick={() => { setCoverEditorOpen(true); setCoverPickerSlot(1); }}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2"
+                  className="px-4 py-2 border border-border rounded-lg text-sm font-medium hover:bg-muted transition-colors flex items-center gap-2"
                   title="Edit cover cards"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -790,48 +945,63 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
 
       {/* Cover card editor modal — owner only */}
       {isOwner && coverEditorOpen && (() => {
-        const mainCards = deck.cards.filter(c => !c.is_reserve);
+        const coverMainCards = enrichedCards.filter(c => !c.is_reserve);
+        const filteredCoverCards = coverPickerSearch.trim()
+          ? coverMainCards.filter(c => c.card_name.toLowerCase().includes(coverPickerSearch.trim().toLowerCase()))
+          : coverMainCards;
+        const sortedCoverCards = [...filteredCoverCards].sort((a, b) => {
+          switch (coverPickerSort) {
+            case "name":
+              return a.card_name.localeCompare(b.card_name);
+            case "type":
+              return (a.type || "").localeCompare(b.type || "") || a.card_name.localeCompare(b.card_name);
+            case "brigade":
+              return (a.brigade || "").localeCompare(b.brigade || "") || a.card_name.localeCompare(b.card_name);
+            default:
+              return 0;
+          }
+        });
         const close = () => { setCoverEditorOpen(false); setCoverPickerSlot(null); };
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={close}>
-            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/60" onClick={close}>
+            <div className="bg-background rounded-t-xl sm:rounded-xl shadow-2xl w-full sm:max-w-2xl flex flex-col max-h-[95vh] sm:max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
 
               {/* Header */}
-              <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+              <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4 border-b border-border flex-shrink-0">
                 <div>
-                  <h2 className="text-lg font-semibold">Cover Cards</h2>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">These two cards appear as the thumbnail on the Community Decks page.</p>
+                  <h2 className="text-base sm:text-lg font-semibold">Cover Cards</h2>
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">Choose thumbnail cards for the Community page.</p>
                 </div>
-                <button onClick={close} className="ml-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 flex-shrink-0">
+                <button onClick={close} className="ml-4 text-muted-foreground hover:text-foreground p-1 flex-shrink-0">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
 
-              <div className="px-6 py-5 flex-shrink-0">
+              <div className="px-4 sm:px-6 py-3 sm:py-5 flex-shrink-0">
                 {/* Two card slots */}
-                <div className="flex gap-6 justify-center mb-2">
+                <div className="flex gap-4 sm:gap-6 justify-center mb-2">
                   {([1, 2] as const).map((slot) => {
                     const imgFile = slot === 1 ? previewCard1 : previewCard2;
                     const imgUrl = imgFile ? getImageUrl(imgFile) : null;
                     const isActive = coverPickerSlot === slot;
                     return (
-                      <div key={slot} className="flex flex-col items-center gap-2">
+                      <div key={slot} className="flex flex-col items-center gap-1 sm:gap-2">
                         <button
                           onClick={() => setCoverPickerSlot(slot)}
                           className={`relative rounded-xl overflow-hidden border-2 transition-all ${
                             isActive
                               ? "border-blue-500 ring-4 ring-blue-200 dark:ring-blue-800 scale-105"
-                              : "border-gray-300 dark:border-gray-600 hover:border-green-600 hover:scale-102"
-                          } bg-gray-100 dark:bg-gray-800`}
-                          style={{ width: 130, aspectRatio: "2.5/3.5" }}
+                              : "border-border hover:border-green-600 hover:scale-102"
+                          } bg-muted w-20 sm:w-[130px]`}
+                          style={{ aspectRatio: "2.5/3.5" }}
                           title={`Set cover card ${slot}`}
                         >
                           {imgUrl ? (
                             <img src={imgUrl} alt={`Cover ${slot}`} className="w-full h-full object-cover" />
                           ) : (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
+                            <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
                               <svg className="w-8 h-8 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
                               </svg>
@@ -844,24 +1014,60 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                             </div>
                           )}
                         </button>
-                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Card {slot}</span>
+                        <span className="text-xs font-medium text-muted-foreground">Card {slot}</span>
                       </div>
                     );
                   })}
                 </div>
 
                 {/* Instruction */}
-                <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-center text-sm text-muted-foreground">
                   {coverPickerSlot
                     ? `Click a card below to set it as cover card ${coverPickerSlot}`
                     : "Click a slot above to start"}
                 </p>
               </div>
 
+              {/* Sort + Search */}
+              <div className="px-4 sm:px-6 pb-2 flex-shrink-0 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Sort:</span>
+                  <select
+                    value={coverPickerSort}
+                    onChange={(e) => setCoverPickerSort(e.target.value as any)}
+                    className="text-xs px-1.5 py-0.5 border border-border rounded bg-card text-muted-foreground"
+                  >
+                    <option value="default">Default</option>
+                    <option value="name">Name</option>
+                    <option value="type">Type</option>
+                    <option value="brigade">Brigade</option>
+                  </select>
+                </div>
+                <div className="relative">
+                  <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder="Search cards..."
+                    value={coverPickerSearch}
+                    onChange={(e) => setCoverPickerSearch(e.target.value)}
+                    className="w-full pl-8 pr-8 py-1.5 text-sm border border-border rounded-lg bg-card focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                  {coverPickerSearch && (
+                    <button onClick={() => setCoverPickerSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              </div>
+
               {/* Card grid — scrollable */}
-              <div className="flex-1 overflow-y-auto px-6 pb-4 min-h-0">
-                <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
-                  {mainCards.map((card) => (
+              <div className="flex-1 overflow-y-auto px-4 sm:px-6 pb-4 min-h-0">
+                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+                  {sortedCoverCards.map((card) => (
                     <button
                       key={`${card.card_name}|${card.card_set}`}
                       onClick={async () => {
@@ -885,8 +1091,8 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                       disabled={!coverPickerSlot}
                       className={`relative rounded-lg overflow-hidden border transition-all ${
                         coverPickerSlot
-                          ? "border-gray-200 dark:border-gray-600 hover:border-blue-500 hover:scale-105 cursor-pointer"
-                          : "border-gray-200 dark:border-gray-700 opacity-50 cursor-default"
+                          ? "border-border hover:border-blue-500 hover:scale-105 cursor-pointer"
+                          : "border-border opacity-50 cursor-default"
                       }`}
                       style={{ aspectRatio: "2.5/3.5" }}
                       title={card.card_name}
@@ -898,8 +1104,8 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
               </div>
 
               {/* Footer status */}
-              <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex-shrink-0 h-12 flex items-center justify-center">
-                {coverSaving && <p className="text-sm text-gray-500 dark:text-gray-400">Saving…</p>}
+              <div className="px-6 py-3 border-t border-border flex-shrink-0 h-12 flex items-center justify-center">
+                {coverSaving && <p className="text-sm text-muted-foreground">Saving…</p>}
                 {coverSaved && <p className="text-sm text-green-600 dark:text-green-400 font-medium">Saved!</p>}
               </div>
 
@@ -908,24 +1114,41 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
         );
       })()}
 
-      {/* Paragon image */}
+      {/* Paragon image — collapsible */}
       {deck.paragon && formatDeckType(deck.format) === "Paragon" && (
-        <div className="mb-8 max-w-xs">
-          <img
-            src={`/paragons/Paragon ${deck.paragon}.png`}
-            alt={deck.paragon}
-            className="w-full rounded-lg shadow-md"
-          />
+        <div className="mb-6">
+          <button
+            onClick={() => setParagonVisible((v) => !v)}
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-2"
+          >
+            <svg className={`w-4 h-4 transition-transform ${paragonVisible ? 'rotate-0' : '-rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+            {paragonVisible ? 'Hide' : 'Show'} Paragon Card
+          </button>
+          {paragonVisible && (
+            <div className="max-w-xs">
+              <Image
+                src={`/paragons/Paragon ${deck.paragon}.png`}
+                alt={deck.paragon}
+                width={320}
+                height={448}
+                className="w-full rounded-lg shadow-md cursor-pointer hover:scale-105 hover:shadow-xl transition-all"
+                onClick={() => setShowParagonModal(true)}
+                title="Click to view full size"
+              />
+            </div>
+          )}
         </div>
       )}
 
       {/* View Controls */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-2 md:gap-3 mb-6 flex-wrap">
         <button
           onClick={() => setViewMode(viewMode === "normal" ? "stacked" : "normal")}
-          className="flex items-center gap-2 px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 border border-border rounded-lg text-xs md:text-sm hover:bg-muted transition-colors"
         >
-          <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             {viewMode === "normal" ? (
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
             ) : (
@@ -938,35 +1161,208 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
         <select
           value={groupBy}
           onChange={(e) => setGroupBy(e.target.value as "type" | "alignment" | "none")}
-          className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm"
+          className="px-2.5 md:px-3 py-1.5 border border-border rounded-lg bg-card text-xs md:text-sm"
         >
           <option value="type">Group by Type</option>
           <option value="alignment">Group by Alignment</option>
           <option value="none">No Grouping</option>
         </select>
+
+        {/* Preview sidebar toggle — desktop only */}
+        <button
+          onClick={() => setShowPreview((v) => !v)}
+          className={`hidden lg:flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm transition-colors ${
+            showPreview
+              ? 'border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+              : 'border-border text-muted-foreground hover:bg-muted'
+          }`}
+          title={showPreview ? 'Hide card preview' : 'Show card preview'}
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            {showPreview ? (
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            ) : (
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878l4.242 4.242M15.12 15.12L21 21" />
+            )}
+          </svg>
+          Preview
+        </button>
+
+        {/* Stats toggle */}
+        <button
+          onClick={() => setShowStats((v) => !v)}
+          className={`flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 border rounded-lg text-xs md:text-sm transition-colors ${
+            showStats
+              ? 'border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+              : 'border-border text-muted-foreground hover:bg-muted'
+          }`}
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          Stats
+        </button>
       </div>
+
+      {/* Stats Panel — collapsible */}
+      {showStats && cardDatabase && (
+        <div className="mb-6 rounded-lg border border-border bg-muted p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Alignment Breakdown */}
+            <div>
+              <h3 className="font-semibold text-foreground mb-3">
+                Alignment Breakdown
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                {(() => {
+                  const alignmentCounts = enrichedCards.reduce((acc, card) => {
+                    let alignment = card.alignment || "Neutral";
+                    if (alignment.includes("Good/Evil")) alignment = "Neutral";
+                    acc[alignment] = (acc[alignment] || 0) + card.quantity;
+                    return acc;
+                  }, {} as Record<string, number>);
+
+                  const alignmentConfig = [
+                    { name: 'Good', color: 'bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-800 dark:text-blue-200' },
+                    { name: 'Evil', color: 'bg-red-100 dark:bg-red-900/30 border-red-300 dark:border-red-700 text-red-800 dark:text-red-200' },
+                    { name: 'Neutral', color: 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200' },
+                    { name: 'Dual', color: 'bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700 text-purple-800 dark:text-purple-200' },
+                  ];
+
+                  return alignmentConfig.map(({ name, color }) => {
+                    const count = alignmentCounts[name] || 0;
+                    if (count === 0 && name === 'Dual') return null;
+                    return (
+                      <div key={name} className={`p-3 rounded-lg border-2 ${color}`}>
+                        <div className="text-xs font-semibold uppercase tracking-wide mb-1">{name}</div>
+                        <div className="text-2xl font-bold">{count}</div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+
+            {/* Deck Statistics */}
+            <div>
+              <h3 className="font-semibold text-foreground mb-3">
+                Deck Statistics
+              </h3>
+              <div className="space-y-1 text-sm text-muted-foreground">
+                <div className="flex justify-between">
+                  <span>Total Cards:</span>
+                  <span className="font-medium">{mainDeckCount + reserveCount}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Unique Cards:</span>
+                  <span className="font-medium">{enrichedCards.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Main Deck:</span>
+                  <span className="font-medium">{mainDeckCount}</span>
+                </div>
+                {reserveCount > 0 && (
+                  <div className="flex justify-between">
+                    <span>Reserve:</span>
+                    <span className="font-medium">{reserveCount}</span>
+                  </div>
+                )}
+                <div className="border-t border-border my-2 pt-2">
+                  <div className="flex justify-between">
+                    <span>Lost Souls:</span>
+                    <span className="font-medium">
+                      {enrichedCards.filter(c => c.type === 'LS' || c.type === 'Lost Soul').reduce((s, c) => s + c.quantity, 0)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Dominants:</span>
+                    <span className="font-medium">
+                      {enrichedCards.filter(c => c.type === 'Dom' || c.type === 'Dominant').reduce((s, c) => s + c.quantity, 0)}
+                    </span>
+                  </div>
+                  {totalDeckPrice !== null && (
+                    <button
+                      onClick={() => { setBuyModalMode("exact"); setShowBuyDeckModal(true); }}
+                      className="flex justify-between w-full text-left hover:bg-muted -mx-1 px-1 py-0.5 rounded transition-colors group"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <img src="/sponsors/ytg-dark.png" alt="" className="h-3.5 w-3.5 object-contain hidden dark:block" />
+                        <img src="/sponsors/ytg-light.png" alt="" className="h-3.5 w-3.5 object-contain dark:hidden" />
+                        Est. Price:
+                      </span>
+                      <span className="font-medium text-green-600 dark:text-green-400 group-hover:underline">${totalDeckPrice.toFixed(2)}</span>
+                    </button>
+                  )}
+                  {deck.budget_price != null && deck.total_price != null && deck.budget_price < deck.total_price - 0.005 && (
+                    <button
+                      onClick={() => { setBuyModalMode("budget"); setShowBuyDeckModal(true); }}
+                      className="flex justify-between w-full text-left hover:bg-muted -mx-1 px-1 py-0.5 rounded transition-colors group"
+                    >
+                      <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                        <span className="w-3.5" />
+                        Min:
+                      </span>
+                      <span className="text-xs">
+                        <span className="text-green-600 dark:text-green-400 group-hover:underline">${deck.budget_price.toFixed(2)}</span>
+                        <span className="text-muted-foreground ml-1">(save ${(deck.total_price - deck.budget_price).toFixed(2)})</span>
+                      </span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Card Type Breakdown */}
+            <div>
+              <h3 className="font-semibold text-foreground mb-3">
+                Card Types
+              </h3>
+              <div className="space-y-0.5 text-sm text-muted-foreground">
+                {(() => {
+                  const typeCounts = enrichedCards.reduce((acc, card) => {
+                    const type = prettifyTypeName(card.type || "Unknown");
+                    acc[type] = (acc[type] || 0) + card.quantity;
+                    return acc;
+                  }, {} as Record<string, number>);
+
+                  return Object.entries(typeCounts)
+                    .sort(([, a], [, b]) => b - a)
+                    .map(([type, count]) => (
+                      <div key={type} className="flex justify-between gap-2">
+                        <span className="flex-shrink-0">{type}:</span>
+                        <span className="font-medium ml-auto">{count}</span>
+                      </div>
+                    ));
+                })()}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Loading state while card database fetches */}
       {!cardDatabase && deck.cards.length > 0 && (
         <div className="flex items-center justify-center py-16">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-400 mx-auto"></div>
-            <p className="mt-4 text-gray-500 dark:text-gray-400 text-sm">Loading deck...</p>
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-muted-foreground mx-auto"></div>
+            <p className="mt-4 text-muted-foreground text-sm">Loading deck...</p>
           </div>
         </div>
       )}
 
       {/* Deck cards — only render after card database is loaded */}
-      {cardDatabase && <><div className="mb-8">
+      {cardDatabase && <div className="lg:flex lg:gap-6">
+      <div className="flex-1 min-w-0">
+      <div className="mb-8">
         <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
           Main Deck
-          <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
+          <span className="text-sm font-normal text-muted-foreground">
             ({mainDeckCount} cards)
           </span>
         </h2>
 
         {mainCards.length === 0 ? (
-          <p className="text-gray-500 dark:text-gray-400 italic">No cards in main deck.</p>
+          <p className="text-muted-foreground italic">No cards in main deck.</p>
         ) : viewMode === "stacked" ? (
           /* Stacked view — matches FullDeckView layout exactly */
           <div className="flex gap-4 items-start flex-wrap">
@@ -976,8 +1372,8 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                 <div key={`${groupName}-${colIndex}`} className="flex flex-col">
                   {groupBy === "alignment" && colIndex === 0 && (
                     <div className="mb-2 flex items-center gap-2">
-                      <h3 className="text-lg font-semibold text-gray-400">{groupName}</h3>
-                      <span className="text-xs text-gray-500">({cards.reduce((s, c) => s + c.quantity, 0)})</span>
+                      <h3 className="text-lg font-semibold text-muted-foreground">{groupName}</h3>
+                      <span className="text-xs text-muted-foreground">({cards.reduce((s, c) => s + c.quantity, 0)})</span>
                     </div>
                   )}
                   <div className="flex flex-col gap-2 items-center">
@@ -985,10 +1381,12 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                       Array.from({ length: card.quantity }, (_, i) => (
                         <div
                           key={`${card.card_name}-${card.card_set}-${colIndex}-${i}`}
-                          className="group relative w-28 flex-shrink-0 cursor-pointer transition-all hover:z-20 -mb-32 last:mb-0"
+                          className="group relative w-28 flex-shrink-0 cursor-pointer transition-all -mb-32 last:mb-0"
                           onClick={() => card.fullCard && setModalCard(card.fullCard)}
+                          onMouseEnter={() => setHoveredCard({ name: card.card_name, imgFile: card.card_img_file || "", set: card.card_set, type: card.type })}
+                          onMouseLeave={() => setHoveredCard(null)}
                         >
-                          <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-gray-800 border border-gray-700 hover:border-blue-500 transition-all cursor-pointer hover:scale-105 hover:z-10 shadow-md hover:shadow-xl">
+                          <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-gray-800 hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer shadow-md">
                             <img
                               src={getImageUrl(card.card_img_file || "")}
                               alt={card.card_name}
@@ -1015,7 +1413,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                 {colIndex === 0 && (
                   <div className="mb-2 flex items-center gap-2">
                     <h3 className="text-lg font-semibold text-purple-400">Reserve</h3>
-                    <span className="text-xs text-gray-500">({reserveCount})</span>
+                    <span className="text-xs text-muted-foreground">({reserveCount})</span>
                   </div>
                 )}
                 <div className="flex flex-col gap-2 items-center">
@@ -1023,10 +1421,12 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                     Array.from({ length: card.quantity }, (_, i) => (
                       <div
                         key={`reserve-${card.card_name}-${card.card_set}-${colIndex}-${i}`}
-                        className="group relative w-28 flex-shrink-0 cursor-pointer transition-all hover:z-20 -mb-32 last:mb-0"
+                        className="group relative w-28 flex-shrink-0 cursor-pointer transition-all -mb-32 last:mb-0"
                         onClick={() => card.fullCard && setModalCard(card.fullCard)}
+                        onMouseEnter={() => setHoveredCard({ name: card.card_name, imgFile: card.card_img_file || "", set: card.card_set, type: card.type })}
+                        onMouseLeave={() => setHoveredCard(null)}
                       >
-                        <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-gray-800 border border-gray-700 hover:border-blue-500 transition-all cursor-pointer hover:scale-105 hover:z-10 shadow-md hover:shadow-xl">
+                        <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-gray-800 hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer shadow-md">
                           <img
                             src={getImageUrl(card.card_img_file || "")}
                             alt={card.card_name}
@@ -1054,7 +1454,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
               return (
                 <div key={groupName}>
                   {groupBy !== "none" && (
-                    <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
                       {getGroupDisplayName(groupName)}
                       <span className="ml-1.5 font-normal">({groupCount})</span>
                     </h3>
@@ -1065,6 +1465,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                         key={`main-${card.card_name}-${card.card_set}-${index}`}
                         card={card}
                         onClick={() => card.fullCard && setModalCard(card.fullCard)}
+                        onHover={setHoveredCard}
                         compact
                       />
                     ))}
@@ -1081,7 +1482,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
         <div className="mb-8">
           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
             Reserve
-            <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
+            <span className="text-sm font-normal text-muted-foreground">
               ({reserveCount} cards)
             </span>
           </h2>
@@ -1091,6 +1492,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                 key={`reserve-${card.card_name}-${card.card_set}-${index}`}
                 card={card}
                 onClick={() => card.fullCard && setModalCard(card.fullCard)}
+                onHover={setHoveredCard}
                 compact
               />
             ))}
@@ -1113,7 +1515,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                 }}
                 rows={3}
                 placeholder="Write a description for your deck... (Markdown supported)"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none overflow-hidden"
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none overflow-hidden"
               />
               <div className="flex items-center gap-2 mt-2">
                 <button
@@ -1124,36 +1526,102 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                 </button>
                 <button
                   onClick={() => { setDescriptionInput(description); setEditingDescription(false); }}
-                  className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                  className="px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Cancel
                 </button>
-                <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto">Markdown supported</span>
+                <span className="text-xs text-muted-foreground ml-auto">Markdown supported</span>
               </div>
             </div>
           ) : description ? (
             <div
-              className={`rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3 ${isOwner ? "cursor-pointer hover:border-blue-300 dark:hover:border-blue-500 transition-colors" : ""}`}
+              className={`rounded-lg border border-border bg-muted px-4 py-3 ${isOwner ? "cursor-pointer hover:border-primary/50 transition-colors" : ""}`}
               onClick={isOwner ? () => { setDescriptionInput(description); setEditingDescription(true); } : undefined}
               title={isOwner ? "Click to edit description" : undefined}
             >
-              <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Description</h3>
-              <div className="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Description</h3>
+              <div className="prose prose-sm dark:prose-invert max-w-none text-foreground">
                 <ReactMarkdown>{description}</ReactMarkdown>
               </div>
             </div>
           ) : isOwner ? (
             <button
               onClick={() => setEditingDescription(true)}
-              className="w-full rounded-lg border border-dashed border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-gray-400 dark:text-gray-500 hover:border-blue-400 hover:text-blue-500 dark:hover:border-blue-500 dark:hover:text-blue-400 transition-colors text-left"
+              className="w-full rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors text-left"
             >
               + Add a description...
             </button>
           ) : null}
         </div>
       )}
-      </>}
+      </div>
 
+      {/* Sticky sidebar card preview — desktop only */}
+      {showPreview && (
+        <div className="hidden lg:block w-72 flex-shrink-0">
+          <div className="sticky top-24">
+            {hoveredCard ? (
+              <div className="transition-opacity duration-150">
+                <div className="aspect-[2.5/3.5] rounded-lg overflow-hidden shadow-lg bg-gray-800">
+                  <img
+                    src={getImageUrl(hoveredCard.imgFile)}
+                    alt={hoveredCard.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <p className="mt-2 text-sm font-semibold text-foreground">{hoveredCard.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {hoveredCard.set}{hoveredCard.type ? ` · ${prettifyTypeName(hoveredCard.type)}` : ''}
+                  {(() => {
+                    const priceKey = `${hoveredCard.name}|${hoveredCard.set}|${hoveredCard.imgFile}`;
+                    const priceInfo = getPrice(priceKey);
+                    return priceInfo ? (
+                      <span className="text-green-600 dark:text-green-400 font-medium"> · ${priceInfo.price.toFixed(2)}</span>
+                    ) : null;
+                  })()}
+                </p>
+              </div>
+            ) : (
+              <div className="aspect-[2.5/3.5] rounded-lg border-2 border-dashed border-border flex items-center justify-center">
+                <p className="text-sm text-muted-foreground text-center px-4">Hover over a card to preview</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      </div>}
+
+      {/* Buy Deck Modal */}
+      {showBuyDeckModal && (
+        <BuyDeckModal
+          cards={enrichedCards.map(c => ({
+            card_name: c.card_name,
+            card_key: `${c.card_name}|${c.card_set}|${sanitizeImgFile(c.card_img_file || "")}`,
+            quantity: c.quantity,
+            isReserve: c.is_reserve,
+          }))}
+          onClose={() => setShowBuyDeckModal(false)}
+          initialMode={buyModalMode}
+        />
+      )}
+
+      {/* Generate PDF Modal */}
+      {showPDFModal && (
+        <GeneratePDFModal
+          deck={deckForModal}
+          onClose={() => setShowPDFModal(false)}
+          isLegal={null}
+        />
+      )}
+
+      {/* Generate Image Modal */}
+      {showImageModal && (
+        <GenerateDeckImageModal
+          deck={deckForModal}
+          onClose={() => setShowImageModal(false)}
+          isLegal={null}
+        />
+      )}
     </div>
   );
 }
@@ -1250,15 +1718,20 @@ function groupAndSortCards(
   return ordered;
 }
 
-function CardTile({ card, onClick, compact }: { card: EnrichedCard | DeckCardData; onClick?: () => void; compact?: boolean }) {
+function CardTile({ card, onClick, onHover, compact }: { card: EnrichedCard | DeckCardData; onClick?: () => void; onHover?: (card: { name: string; imgFile: string; set?: string; type?: string } | null) => void; compact?: boolean }) {
   const [imgError, setImgError] = useState(false);
   const src = getImageUrl(card.card_img_file || "");
 
   return (
-    <div className={`relative group cursor-pointer ${compact ? "w-[calc(100%/12-4px)] min-w-[70px] -mb-6 last:mb-0 hover:z-20" : ""}`} onClick={onClick}>
-      <div className="relative w-full aspect-[2.5/3.5] bg-gray-100 dark:bg-gray-800 rounded-md overflow-hidden shadow-sm hover:shadow-md transition-all hover:scale-105 hover:z-10">
+    <div
+      className={`relative group cursor-pointer ${compact ? "w-[calc(100%/12-4px)] min-w-[70px] -mb-6 last:mb-0" : ""}`}
+      onClick={onClick}
+      onMouseEnter={onHover ? () => onHover({ name: card.card_name, imgFile: card.card_img_file || "", set: card.card_set, type: (card as EnrichedCard).type }) : undefined}
+      onMouseLeave={onHover ? () => onHover(null) : undefined}
+    >
+      <div className="relative w-full aspect-[2.5/3.5] bg-muted rounded-md overflow-hidden shadow-sm hover:shadow-md transition-all hover:ring-2 hover:ring-blue-500">
         {imgError ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 text-xs p-1">
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground text-xs p-1">
             <div className="text-center font-medium text-[10px] leading-tight">{card.card_name}</div>
           </div>
         ) : (

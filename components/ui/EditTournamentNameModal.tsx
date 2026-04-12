@@ -1,4 +1,12 @@
-import { Button, Modal, TextInput } from "flowbite-react";
+import { Button } from "./button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogBody,
+  DialogFooter,
+} from "./dialog";
 
 interface EditTournamentNameModalProps {
   isOpen: boolean;
@@ -16,37 +24,30 @@ export default function EditTournamentNameModal({
   setTournamentName,
 }: EditTournamentNameModalProps) {
   return (
-    <Modal
-      dismissible
-      show={isOpen}
-      onClose={onClose}
-      size="sm"
-    >
-      <Modal.Header>Edit Tournament Name</Modal.Header>
-      <Modal.Body>
-        <div className="space-y-4">
-          <TextInput
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent size="sm">
+        <DialogHeader>
+          <DialogTitle>Edit Tournament Name</DialogTitle>
+        </DialogHeader>
+        <DialogBody className="space-y-4">
+          <input
             value={tournamentName}
             onChange={(e) => setTournamentName(e.target.value)}
             placeholder="Tournament Name (max 35 characters)"
             required
             maxLength={35}
+            className="w-full rounded-lg border border-border bg-card text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-ring focus:outline-none"
           />
-        </div>
-      </Modal.Body>
-      <Modal.Footer className="flex justify-end space-x-2">
-        <Button outline gradientDuoTone="greenToBlue" onClick={onSave}>
-          Save
-        </Button>
-        <Button 
-          outline 
-          gradientDuoTone="pinkToOrange" 
-          onClick={onClose}
-          className="border-red-500 hover:bg-red-500/10"
-        >
-          Cancel
-        </Button>
-      </Modal.Footer>
-    </Modal>
+        </DialogBody>
+        <DialogFooter className="justify-end">
+          <Button variant="success" onClick={onSave}>
+            Save
+          </Button>
+          <Button variant="cancel" onClick={onClose}>
+            Cancel
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -15,7 +15,7 @@
     --card-foreground: 0 0% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
+    --primary: 152 72% 29%;
     --primary-foreground: 0 0% 98%;
     --secondary: 0 0% 96.1%;
     --secondary-foreground: 0 0% 9%;
@@ -27,40 +27,95 @@
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
+    --ring: 152 72% 29%;
     --radius: 0.5rem;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
+
+    /* Dialog surface tokens */
+    --dialog-bg: 0 0% 100%;
+    --dialog-header-bg: 160 25% 97%;
+    --dialog-border: 160 15% 86%;
+    --dialog-header-accent: 142 71% 45%;
   }
 
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+    --background: 221 39% 11%;
+    --foreground: 210 10% 95%;
+    --card: 215 15% 9%;
+    --card-foreground: 210 10% 95%;
+    --popover: 215 15% 9%;
+    --popover-foreground: 210 10% 95%;
+    --primary: 142 71% 45%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 215 12% 18%;
+    --secondary-foreground: 210 10% 95%;
+    --muted: 215 12% 20%;
+    --muted-foreground: 215 8% 55%;
+    --accent: 215 12% 18%;
+    --accent-foreground: 210 10% 95%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
+    --border: 215 10% 18%;
+    --input: 215 10% 18%;
+    --ring: 142 71% 45%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
+
+    /* Dialog surface tokens (dark) */
+    --dialog-bg: 215 15% 11%;
+    --dialog-header-bg: 215 15% 13%;
+    --dialog-border: 215 10% 20%;
+    --dialog-header-accent: 142 71% 45%;
+  }
+
+  .jayden {
+    color-scheme: dark;
+    --background: 270 20% 4%;
+    --foreground: 190 30% 93%;
+    --card: 270 25% 8%;
+    --card-foreground: 190 30% 93%;
+    --popover: 270 25% 8%;
+    --popover-foreground: 190 30% 93%;
+    --primary: 330 75% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 60% 22%;
+    --secondary-foreground: 190 30% 93%;
+    --muted: 270 20% 15%;
+    --muted-foreground: 280 15% 65%;
+    --accent: 230 90% 55%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 90% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 280 40% 25%;
+    --input: 280 40% 25%;
+    --ring: 330 90% 55%;
+    --chart-1: 0 90% 55%;
+    --chart-2: 330 90% 55%;
+    --chart-3: 270 70% 60%;
+    --chart-4: 240 90% 55%;
+    --chart-5: 200 90% 55%;
+
+    /* Gradient spectrum: red (top) → pink → blue (bottom) */
+    --gradient-red: hsl(0, 90%, 55%);
+    --gradient-pink: hsl(330, 90%, 55%);
+    --gradient-purple: hsl(270, 70%, 50%);
+    --gradient-blue: hsl(230, 90%, 55%);
+    --jayden-gradient: linear-gradient(135deg, var(--gradient-red), var(--gradient-pink), var(--gradient-purple), var(--gradient-blue));
+    --jayden-gradient-subtle: linear-gradient(135deg, hsla(0, 80%, 50%, 0.06), hsla(330, 80%, 50%, 0.04), hsla(270, 60%, 50%, 0.04), hsla(230, 80%, 50%, 0.06));
+    --jayden-border-gradient: linear-gradient(135deg, hsla(0, 90%, 55%, 0.3), hsla(330, 90%, 55%, 0.2), hsla(270, 70%, 50%, 0.2), hsla(230, 90%, 55%, 0.3));
+
+    /* Dialog surface tokens (jayden) */
+    --dialog-bg: 270 25% 7%;
+    --dialog-header-bg: 270 30% 10%;
+    --dialog-border: 280 40% 25%;
+    --dialog-header-accent: 330 90% 55%;
   }
 }
 
@@ -70,5 +125,96 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+  html {
+    --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  }
+}
+
+/* Jayden theme gradient utilities */
+.jayden .jayden-gradient-bg {
+  background: var(--jayden-gradient-subtle);
+}
+.jayden .jayden-gradient-border {
+  border-image: var(--jayden-border-gradient) 1;
+}
+.jayden .jayden-gradient-text {
+  background: var(--jayden-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.jayden .jayden-gradient-accent {
+  background: var(--jayden-gradient);
+}
+
+/* Suppress focus rings globally — placed outside @layer so it overrides utilities */
+input:focus, input:focus-visible,
+textarea:focus, textarea:focus-visible,
+select:focus, select:focus-visible,
+button:focus, button:focus-visible,
+[role="button"]:focus, [role="button"]:focus-visible {
+  outline: none !important;
+  --tw-ring-shadow: 0 0 #0000 !important;
+  --tw-ring-offset-shadow: 0 0 #0000 !important;
+}
+
+/* Deck builder animations */
+@keyframes pill-enter {
+  from { opacity: 0; transform: translateY(-4px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes qty-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+@keyframes card-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-pill-enter {
+  animation: pill-enter 200ms cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+.animate-qty-pop {
+  animation: qty-pop 250ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+.animate-card-in {
+  animation: card-fade-in 300ms cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+/* Deck card entrance — desktop only */
+@media (min-width: 768px) {
+  .deck-card-enter {
+    animation: card-fade-in 300ms cubic-bezier(0.25, 1, 0.5, 1) both;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-pill-enter,
+  .animate-qty-pop,
+  .animate-card-in,
+  .deck-card-enter {
+    animation: none;
+  }
+}
+
+/* Goldfish (solitaire game) theme tokens */
+:root {
+  --gf-bg: #2a1f12;
+  --gf-bg-dark: #0d0905;
+  --gf-border: #6b4e27;
+  --gf-border-dim: #4a3520;
+  --gf-text: #c9b99a;
+  --gf-text-bright: #e8d5a3;
+  --gf-text-dim: #8b6532;
+  --gf-accent: #c4955a;
+  --gf-gold: #f0c060;
+  --gf-hover: rgba(196, 149, 90, 0.15);
+  --gf-hover-strong: rgba(196, 149, 90, 0.25);
+}
+
+/* Goldfish mode — ultrawide background bias */
+@media (min-aspect-ratio: 2/1) {
+  .cave-bg {
+    background-position: center 82% !important;
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "flowbite-react";
+import { Button } from "../../../../components/ui/button";
 import { useCallback, useEffect, useState } from "react";
 import { HiPencil } from "react-icons/hi";
 import CountdownTimer from "../../../../components/ui/CountdownTimer";
@@ -13,6 +13,8 @@ import ToastNotification from "../../../../components/ui/toast-notification";
 import { createClient } from "../../../../utils/supabase/client";
 import { suggestNumberOfRounds } from "../../../../utils/tournamentUtils";
 import { createPairing } from "../../../../utils/tournament/pairingUtilsV2";
+import { loadTournamentDecklistsAction, type TournamentDecklistRow } from "../actions";
+import PublishDecklistsSection from "../../../../components/ui/PublishDecklistsSection";
 
 const supabase = createClient();
 
@@ -52,6 +54,7 @@ export default function TournamentPage({
 
   const [latestRound, setLatestRound] = useState<any>(null);
   const [showPairingNotice, setShowPairingNotice] = useState(true);
+  const [decklists, setDecklists] = useState<TournamentDecklistRow[]>([]);
 
   const showToast = (
     message: string,
@@ -221,7 +224,7 @@ export default function TournamentPage({
 
       if (byeError) throw byeError;
 
-      handleEndRound(data, setMatchErrorIndex, byeData, latestRound.round_number);
+      await handleEndRound(data, setMatchErrorIndex, byeData, latestRound.round_number);
     }
     try {
       const { data, error } = await supabase
@@ -248,6 +251,31 @@ export default function TournamentPage({
     let matchErrorIndexArr = [];
 
     const now = new Date().toISOString();
+
+    // Auto-handle matches where a player has dropped mid-round
+    for (const match of matches) {
+      if (match.player1_score !== null && match.player2_score !== null) continue;
+      const [{ data: p1Status }, { data: p2Status }] = await Promise.all([
+        client.from("participants").select("dropped_out").eq("id", match.player1_id.id).single(),
+        client.from("participants").select("dropped_out").eq("id", match.player2_id.id).single(),
+      ]);
+      if (p1Status?.dropped_out || p2Status?.dropped_out) {
+        if (p1Status?.dropped_out && p2Status?.dropped_out) {
+          match.player1_score = 0;
+          match.player2_score = 0;
+        } else if (p1Status?.dropped_out) {
+          match.player1_score = 0;
+          match.player2_score = tournament.max_score;
+        } else {
+          match.player1_score = tournament.max_score;
+          match.player2_score = 0;
+        }
+        await client.from("matches").update({
+          player1_score: match.player1_score,
+          player2_score: match.player2_score,
+        }).eq("id", match.id);
+      }
+    }
 
     // Checking if the user has not added the score
     matches.forEach((match, index) => {
@@ -284,16 +312,16 @@ export default function TournamentPage({
         if (participant2SelectError) throw participant2SelectError;
 
         if (match.player2_score === match.player1_score) {
-          // Draw: Both get 1.5 points
+          // Draw: Both get 1.5 points, differential unchanged (tie = 0 diff)
           await Promise.all([
             client.from("participants").update({
               match_points: (participant1.match_points || 0) + 1.5,
-              differential: (match.differential || 0) + (participant1.differential || 0),
+              differential: (participant1.differential || 0),
             }).eq("id", match.player1_id.id),
 
             client.from("participants").update({
               match_points: (participant2.match_points || 0) + 1.5,
-              differential: (match.differential2 || 0) + (participant2.differential || 0),
+              differential: (participant2.differential || 0),
             }).eq("id", match.player2_id.id),
           ]);
 
@@ -357,14 +385,13 @@ export default function TournamentPage({
 
       // Updating byes
       if (byes && byes.length > 0) {
-        byes.forEach(async (bye) => {
-          // Updating the participant match_points
+        for (const bye of byes) {
           const { error: participantUpdateError } = await client.from("participants").update({
             match_points: (bye.match_points ?? 0),
             differential: (bye.differential ?? 0),
           }).eq("id", bye.participant_id.id);
           if (participantUpdateError) console.log(participantUpdateError);
-        })
+        }
       }
 
       // Update the database
@@ -416,7 +443,7 @@ export default function TournamentPage({
     } catch (error) {
       console.error("Error ending round:", error);
     }
-  }, []);
+  }, [tournament]);
 
   const handleStartTournament = async (
     numberOfRounds: number,
@@ -521,16 +548,24 @@ export default function TournamentPage({
     }
   }, [tournament]);
 
+  const fetchDecklists = useCallback(async () => {
+    if (!id) return;
+    const res = await loadTournamentDecklistsAction(id);
+    if (res.success) {
+      setDecklists(res.decklists);
+    }
+  }, [id]);
+
   useEffect(() => {
     if (id) {
       fetchTournamentDetails();
       fetchParticipants();
-
+      fetchDecklists();
     }
   }, [id]);
 
   return (
-    <div className="flex min-h-screen px-5 w-full">
+    <div className="flex min-h-screen px-5 w-full jayden-gradient-bg">
       <div className="max-w-4xl max-md:max-w-full mx-auto space-y-5">
         <Breadcrumb
           items={[
@@ -547,17 +582,34 @@ export default function TournamentPage({
         
         <div className="flex-grow max-w-4xl mx-auto">
           {tournament && (
-            <div className="mb-6">
-              <div className="flex items-center gap-2">
+            <div className="mb-6 space-y-4">
+              {/* Title row with status badge */}
+              <div className="flex items-center gap-3 flex-wrap">
                 <h1 className="text-3xl font-bold">{tournament.name}</h1>
-                <HiPencil
+                <button
                   onClick={() => {
                     setNewTournamentName(tournament.name);
                     setIsEditTournamentModalOpen(true);
                   }}
-                  className="text-gray-500 cursor-pointer hover:text-gray-700 w-6 h-6"
+                  className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                   aria-label="Edit tournament name"
-                />
+                >
+                  <HiPencil className="w-5 h-5" />
+                </button>
+                {/* Status badge */}
+                <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
+                  tournament.has_ended
+                    ? "bg-muted text-muted-foreground"
+                    : tournament.has_started
+                      ? "bg-primary/15 text-primary"
+                      : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                }`}>
+                  {tournament.has_ended
+                    ? "Ended"
+                    : tournament.has_started
+                      ? `Round ${tournament.current_round || 1} of ${tournament.n_rounds || "?"}`
+                      : "Not Started"}
+                </span>
               </div>
               <EditTournamentNameModal
                 isOpen={isEditTournamentModalOpen}
@@ -588,75 +640,88 @@ export default function TournamentPage({
                 tournamentName={newTournamentName}
                 setTournamentName={setNewTournamentName}
               />
-              <p className="text-sm text-gray-500 mt-2">
-                Created on:{" "}
-                {new Intl.DateTimeFormat("en-US", {
-                  year: "numeric",
-                  month: "long",
+
+              {/* Dates — single condensed line */}
+              <p className="text-sm text-muted-foreground">
+                Created {new Intl.DateTimeFormat("en-US", {
+                  month: "short",
                   day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
+                  year: "numeric",
                 }).format(new Date(tournament.created_at))}
+                {tournament.started_at && (
+                  <> · Started {new Intl.DateTimeFormat("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }).format(new Date(tournament.started_at))}</>
+                )}
+                {tournament.ended_at && (
+                  <> · Ended {new Intl.DateTimeFormat("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }).format(new Date(tournament.ended_at))}</>
+                )}
               </p>
-              {tournament.started_at && (
-                <p className="text-sm text-gray-500">
-                  Started at:{"\u00A0\u00A0\u00A0"}
-                  {new Intl.DateTimeFormat("en-US", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  }).format(new Date(tournament.started_at))}
-                </p>
-              )}
-              {tournament.ended_at && (
-                <p className="text-sm text-gray-500">
-                  Ended at:{"\u00A0\u00A0\u00A0\u00A0\u00A0"}
-                  {new Intl.DateTimeFormat("en-US", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  }).format(new Date(tournament.ended_at))}
-                </p>
-              )}
+
               {participants.length === 0 && (
-                <p className="text-sm text-gray-500 mt-2">
-                  To start a tournament, first add some participants
+                <p className="text-sm text-muted-foreground">
+                  Add participants to get started
                 </p>
               )}
-              <div className="flex flex-col gap-4 mt-4">
+
+              {/* Timer — full width, prominent when active */}
+              {tournament?.has_started &&
+                !tournament?.has_ended &&
+                tournament?.round_length && (
+                  <CountdownTimer
+                    key={latestRound?.started_at || "inactive"}
+                    startTime={latestRound?.started_at || null}
+                    durationMinutes={tournament.round_length}
+                    soundNotifications={tournament.sound_notifications ?? false}
+                  />
+                )}
+
+              {/* End Tournament — destructive styling, less prominent */}
+              {!tournament?.has_ended && (
                 <Button
-                  disabled={participants.length === 0 || tournament?.has_ended}
-                  color={
-                    tournament?.has_ended
-                      ? "gray"
-                      : Boolean(tournament?.has_started)
-                        ? "failure"
-                        : "success"
+                  disabled={participants.length === 0}
+                  variant={
+                    Boolean(tournament?.has_started)
+                      ? "destructive"
+                      : "success"
                   }
                   onClick={handleTournamentStatusToggle}
-                  className="w-fit"
+                  className={`w-fit ${tournament?.has_started ? "opacity-80" : ""}`}
+                  size={tournament?.has_started ? "sm" : "default"}
                 >
-                  {tournament?.has_ended
-                    ? "Tournament Ended"
-                    : Boolean(tournament?.has_started)
-                      ? "End Tournament"
-                      : "Start Tournament"}
+                  {Boolean(tournament?.has_started)
+                    ? "End Tournament"
+                    : "Start Tournament"}
                 </Button>
-                {tournament?.has_started &&
-                  !tournament?.has_ended &&
-                  tournament?.round_length && (
-                    <CountdownTimer
-                      key={latestRound?.started_at || "inactive"} // Force re-render on start time change
-                      startTime={latestRound?.started_at || null}
-                      durationMinutes={tournament.round_length}
-                      soundNotifications={tournament.sound_notifications ?? false}
-                    />
-                  )}
-              </div>
+              )}
+              {tournament?.has_ended && (
+                <span className="text-sm text-muted-foreground italic">
+                  Tournament has ended
+                </span>
+              )}
+
+              {/* Publish decklists section */}
+              {tournament?.has_ended && (
+                <PublishDecklistsSection
+                  tournamentId={tournament.id}
+                  tournamentEnded={tournament.has_ended}
+                  decklistCount={decklists.length}
+                  isPublished={tournament.decklists_published || false}
+                  currentFormat={tournament.deck_format || null}
+                  onPublishChange={() => {
+                    fetchTournamentDetails();
+                    fetchDecklists();
+                  }}
+                />
+              )}
             </div>
           )}
           <TournamentTabs
@@ -693,6 +758,8 @@ export default function TournamentPage({
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             fetchParticipants={fetchParticipants}
+            decklists={decklists}
+            onDecklistsChange={fetchDecklists}
           />
         </div>
         <EditParticipantModal

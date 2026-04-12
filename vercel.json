@@ -2,7 +2,19 @@
   "crons": [
     {
       "path": "/api/sync-card-images",
-      "schedule": "0 * * * *"
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/sync-prices",
+      "schedule": "0 6,18 * * *"
+    },
+    {
+      "path": "/api/cron/sync-listings",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/sync-rulings",
+      "schedule": "0 7 * * *"
     }
   ]
 }

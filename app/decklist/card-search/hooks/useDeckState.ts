@@ -350,14 +350,14 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
           error: null,
         });
         
-        return { success: true };
+        return { success: true, deckCheckResult: result.deckCheckResult ?? null };
       } else {
         setSyncStatus({
           isSaving: false,
           lastSavedAt: null,
           error: result.error || "Failed to save deck",
         });
-        
+
         return { success: false, error: result.error };
       }
     } catch (error) {
