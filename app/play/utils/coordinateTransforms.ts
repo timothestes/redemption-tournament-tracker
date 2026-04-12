@@ -28,6 +28,10 @@ export interface ClampOpts {
 /**
  * Convert screen pixel coordinates to a normalized DB position (0–1).
  * Handles optional clamping (keeps card within zone bounds) and opponent mirroring.
+ *
+ * NOTE: If the card is crossing between rotation contexts (e.g., player rotation=0
+ * → opponent rotation=180), call `adjustAnchorForRotationChange` on the drop
+ * position BEFORE passing it here. This function handles mirroring and clamping only.
  */
 export function toDbPos(
   screenX: number,
