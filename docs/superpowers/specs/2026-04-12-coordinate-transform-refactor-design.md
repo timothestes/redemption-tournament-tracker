@@ -62,6 +62,12 @@ function toScreenPos(
  * Convert screen pixel coordinates to a normalized DB position (0–1).
  * Handles opponent mirroring and optional clamping to keep cards
  * within zone bounds.
+ *
+ * NOTE: If the card is crossing between rotation contexts (e.g.,
+ * player territory rotation=0 → opponent territory rotation=180),
+ * call `adjustAnchorForRotationChange` on the drop position BEFORE
+ * passing it to this function. `toDbPos` handles mirroring and
+ * clamping only — it does not adjust for rotation anchor changes.
  */
 function toDbPos(
   screenX: number, screenY: number,
@@ -221,9 +227,9 @@ The utility functions are pure math with no dependencies — unit test them dire
 - **Behavioral regression in drag handlers**: The drag handlers are complex and have many code paths. Replacing inline math with function calls could introduce subtle differences if the function signatures don't exactly match what each site needs. Mitigate by doing one site at a time and testing after each.
 - **Edge cases in clamping**: The current clamping logic varies slightly between sites (some clamp, some don't). The utility function needs to handle this via the opts parameter.
 
-## Partial Changes Already Made (this session)
+## Partial Changes Already Made (prior sessions)
 
-The following changes were made to MultiplayerCanvas.tsx and useSelectionState.ts in this session. They compile but have **not been fully tested**. The future agent should review, test, and potentially revise these:
+The following changes were made to MultiplayerCanvas.tsx and useSelectionState.ts in prior sessions. They compile and the **z-index bugs are believed to be fixed**. The future agent should treat these as stable baseline code:
 
 1. **`dragOriginalZIndexRef`** — new ref that saves the lead card's z-index before reparenting during drag start; used to restore z-index on snap-back
 2. **`findAnyCardById`** — new helper that searches both `myCards` and `opponentCards`; used in ghost sort and group z-index reordering

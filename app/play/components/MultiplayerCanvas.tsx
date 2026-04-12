@@ -2383,12 +2383,15 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
             if (oppLob) lobEntries.push({ zone: oppLob, isOpponent: true });
             return lobEntries.map(({ zone, isOpponent }) => {
               const cards = isOpponent ? (opponentCards['land-of-bondage'] ?? []) : (myCards['land-of-bondage'] ?? []);
-              const labelTextWidth = zone.label.toUpperCase().length * 7;
+              // ~8.5px per uppercase Cinzel char at fontSize 11 + letterSpacing 1
+              const labelTextWidth = zone.label.toUpperCase().length * 8.5;
               const fillColor = isOpponent ? '#a3c5e8' : '#e8d5a3';
               const badgeFill = isOpponent ? 'rgba(100, 149, 237, 0.25)' : 'rgba(196, 149, 90, 0.25)';
               const badgeStroke = isOpponent ? 'rgba(100, 149, 237, 0.5)' : 'rgba(196, 149, 90, 0.5)';
               const bgFill = isOpponent ? 'rgba(16, 20, 30, 0.85)' : 'rgba(30, 22, 16, 0.85)';
-              const labelW = labelTextWidth + 8 + 24 + 8; // text + gap + badge + pad
+              const badgeW = 24;
+              const badgeX = zone.x + 6 + labelTextWidth + 8;
+              const labelW = labelTextWidth + 8 + badgeW + 8;
               return (
                 <Group key={`lob-overlay-${isOpponent ? 'opp' : 'my'}`}>
                   <Rect
@@ -2411,9 +2414,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
                     ellipsis={true}
                   />
                   <Rect
-                    x={zone.x + 6 + labelTextWidth + 8}
-                    y={zone.y + 4}
-                    width={24}
+                    x={badgeX}
+                    y={zone.y + 3}
+                    width={badgeW}
                     height={14}
                     fill={badgeFill}
                     cornerRadius={3}
@@ -2421,9 +2424,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
                     strokeWidth={0.5}
                   />
                   <Text
-                    x={zone.x + 6 + labelTextWidth + 8}
+                    x={badgeX}
                     y={zone.y + 4}
-                    width={24}
+                    width={badgeW}
                     text={String(cards.length)}
                     fontSize={11}
                     fill={fillColor}
@@ -2444,12 +2447,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
             if (myTerr) territoryEntries.push({ zone: myTerr, isOpponent: false, cards: myCards['territory'] ?? [] });
             if (oppTerr) territoryEntries.push({ zone: oppTerr, isOpponent: true, cards: opponentCards['territory'] ?? [] });
             return territoryEntries.map(({ zone, isOpponent, cards }) => {
-              const labelTextWidth = zone.label.toUpperCase().length * 7;
+              const labelTextWidth = zone.label.toUpperCase().length * 8.5;
               const fillColor = isOpponent ? '#a3c5e8' : '#e8d5a3';
               const badgeFill = isOpponent ? 'rgba(100, 149, 237, 0.25)' : 'rgba(196, 149, 90, 0.25)';
               const badgeStroke = isOpponent ? 'rgba(100, 149, 237, 0.5)' : 'rgba(196, 149, 90, 0.5)';
               const bgFill = isOpponent ? 'rgba(16, 20, 30, 0.85)' : 'rgba(30, 22, 16, 0.85)';
-              const labelW = labelTextWidth + 8 + 24 + 8;
+              const badgeW = 24;
+              const badgeX = zone.x + 6 + labelTextWidth + 8;
+              const labelW = labelTextWidth + 8 + badgeW + 8;
               return (
                 <Group key={`territory-overlay-${isOpponent ? 'opp' : 'my'}`}>
                   <Rect
@@ -2472,9 +2477,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
                     ellipsis={true}
                   />
                   <Rect
-                    x={zone.x + 6 + labelTextWidth + 8}
-                    y={zone.y + 4}
-                    width={24}
+                    x={badgeX}
+                    y={zone.y + 3}
+                    width={badgeW}
                     height={14}
                     fill={badgeFill}
                     cornerRadius={3}
@@ -2482,9 +2487,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
                     strokeWidth={0.5}
                   />
                   <Text
-                    x={zone.x + 6 + labelTextWidth + 8}
+                    x={badgeX}
                     y={zone.y + 4}
-                    width={24}
+                    width={badgeW}
                     text={String(cards.length)}
                     fontSize={11}
                     fill={fillColor}

@@ -152,7 +152,7 @@ Fallow audit: https://github.com/fallow-rs/fallow
 probably improve right click top/bottom/random menu?
 card placement mismatches? hard to replicate
 start of game takes a bit to load
-add feature for t1 reserve access?
 create system where cards can have custom abilities coded
 save game, load game, invite to game?
 pulsing chat notification
+visual flash of screen during pre-game ritual

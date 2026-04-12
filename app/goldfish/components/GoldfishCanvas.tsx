@@ -773,13 +773,19 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
 
   const handleCardDblClick = useCallback(
     (card: GameCard) => {
+      const willBeMeek = !card.isMeek;
       if (card.isMeek) {
         unmeekCard(card.instanceId);
       } else {
         meekCard(card.instanceId);
       }
+      setPreviewCard({
+        cardName: card.cardName,
+        cardImgFile: card.cardImgFile,
+        isMeek: willBeMeek,
+      });
     },
-    [meekCard, unmeekCard]
+    [meekCard, unmeekCard, setPreviewCard]
   );
 
   const handleDeckContextMenu = useCallback(
