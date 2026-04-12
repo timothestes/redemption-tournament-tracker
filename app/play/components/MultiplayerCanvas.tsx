@@ -179,6 +179,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
     zoneSearchRequests,
   } = gameState;
 
+  // ---- Opponent connection status indicator ----
+  const connectionDotColor = gameState.opponentConnectionStatus === 'connected'
+    ? '#22c55e'
+    : gameState.opponentConnectionStatus === 'reconnecting'
+      ? '#eab308'
+      : '#ef4444';
+
+  const connectionDotGlow = gameState.opponentConnectionStatus === 'connected'
+    ? 'rgba(34, 197, 94, 0.7)'
+    : gameState.opponentConnectionStatus === 'reconnecting'
+      ? 'rgba(234, 179, 8, 0.7)'
+      : 'rgba(239, 68, 68, 0.7)';
+
   // ---- Layout ----
   const mpLayout = useMemo(
     () => calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT, false),
@@ -2120,8 +2133,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
               });
             }}
           />
-          <Text
+          {/* Connection status dot */}
+          <Circle
             x={opponentHandRect.x + 8}
+            y={opponentHandRect.y + 12}
+            radius={3.5}
+            fill={connectionDotColor}
+            shadowColor={connectionDotGlow}
+            shadowBlur={6}
+            shadowOpacity={1}
+            listening={false}
+          />
+          <Text
+            x={opponentHandRect.x + 18}
             y={opponentHandRect.y + 4}
             text="OPPONENT HAND"
             fontSize={12}
@@ -2129,7 +2153,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
             fill="#a3c5e8"
             letterSpacing={2}
           />
-          <Group x={opponentHandRect.x + 160} y={opponentHandRect.y + 2}>
+          <Group x={opponentHandRect.x + 170} y={opponentHandRect.y + 2}>
             <Rect width={26} height={18} fill="#101828" cornerRadius={4} stroke="#4a7ab5" strokeWidth={1} />
             <Text
               text={String(opponentCards['hand']?.length ?? 0)}
