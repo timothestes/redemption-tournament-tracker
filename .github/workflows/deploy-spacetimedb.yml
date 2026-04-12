@@ -1,5 +1,6 @@
 name: Deploy SpacetimeDB Module
 on:
+  workflow_dispatch:
   push:
     branches: [main, '**']
     paths:
