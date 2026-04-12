@@ -2493,9 +2493,8 @@ export const onConnect = spacetimedb.clientConnected((ctx) => {
       }
 
       // Reset disconnectTimeoutFired if it was set
-      const gameForReset = ctx.db.Game.id.find(player.gameId);
-      if (gameForReset && gameForReset.disconnectTimeoutFired) {
-        ctx.db.Game.id.update({ ...gameForReset, disconnectTimeoutFired: false });
+      if (game && game.disconnectTimeoutFired) {
+        ctx.db.Game.id.update({ ...game, disconnectTimeoutFired: false });
       }
     }
   }
