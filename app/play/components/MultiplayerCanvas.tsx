@@ -12,7 +12,7 @@ import {
   calculateMultiplayerLayout,
   type ZoneRect,
 } from '../layout/multiplayerLayout';
-import { toScreenPos, toDbPos } from '../utils/coordinateTransforms';
+import { toScreenPos, toDbPos, cardCenter } from '../utils/coordinateTransforms';
 import { calculateHandPositions } from '../layout/multiplayerHandLayout';
 import { calculateAutoArrangePositions } from '../layout/multiplayerAutoArrange';
 import {
@@ -1158,10 +1158,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       // For rotation=180 cards (opponent territory), the node position is
       // the bottom-right corner, so compute center accordingly.
       const rot = (node as Konva.Group).rotation?.() ?? 0;
-      const isRotated = Math.abs(rot) > 90;
-      const centerX = isRotated ? x - dragW / 2 : x + dragW / 2;
-      const centerY = isRotated ? y - dragH / 2 : y + dragH / 2;
-      const hit = findZoneAtPosition(centerX, centerY);
+      const center = cardCenter(x, y, dragW, dragH, rot);
+      const hit = findZoneAtPosition(center.x, center.y);
       const zoneKey = hit ? `${hit.owner}:${hit.zone}` : null;
 
       // Only trigger re-render when hovered zone changes
@@ -1232,10 +1230,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       // the bottom-right corner, so compute center accordingly.
       // Use the actual dragged card dimensions, not the territory default.
       const dropRot = (node as Konva.Group).rotation?.() ?? 0;
-      const isDropRotated = Math.abs(dropRot) > 90;
-      const centerX = isDropRotated ? dropX - dragW / 2 : dropX + dragW / 2;
-      const centerY = isDropRotated ? dropY - dragH / 2 : dropY + dragH / 2;
-      const hit = findZoneAtPosition(centerX, centerY);
+      const center = cardCenter(dropX, dropY, dragW, dragH, dropRot);
+      const hit = findZoneAtPosition(center.x, center.y);
 
       const isGroupDrag = selectedIds.has(card.instanceId) && selectedIds.size > 1;
       const cardIds = isGroupDrag ? Array.from(selectedIds) : [card.instanceId];
