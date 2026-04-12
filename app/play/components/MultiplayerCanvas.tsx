@@ -454,6 +454,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
     return myPlayer.seat === BigInt(0) ? game.turnNumber === BigInt(1) : game.turnNumber === BigInt(2);
   }, [gameState]);
 
+  const isOpponentFirstTurn = useMemo(() => {
+    const { game, opponentPlayer } = gameState;
+    if (!game || !opponentPlayer) return false;
+    return opponentPlayer.seat === BigInt(0) ? game.turnNumber === BigInt(1) : game.turnNumber === BigInt(2);
+  }, [gameState]);
+
   // Skip reserve protection in goldfish/practice mode (no opponent)
   const hasOpponent = !!gameState.opponentPlayer;
 
@@ -834,35 +840,51 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
     offsetY,
     moveCard: (id: string, toZone: ZoneId, _idx?: number, posX?: number, posY?: number) => {
       if (approvedSearchRequest) {
-        // Determine which player's zone was hit so we can normalize correctly
-        const hit = posX != null && posY != null
-          ? findZoneAtPosition(posX + cardWidth / 2, posY + cardHeight / 2)
-          : null;
-        const isOppZone = hit?.owner === 'opponent';
-        const zone = isOppZone ? opponentZones[toZone] : myZones[toZone];
+        const execute = () => {
+          // Determine which player's zone was hit so we can normalize correctly
+          const hit = posX != null && posY != null
+            ? findZoneAtPosition(posX + cardWidth / 2, posY + cardHeight / 2)
+            : null;
+          const isOppZone = hit?.owner === 'opponent';
+          const zone = isOppZone ? opponentZones[toZone] : myZones[toZone];
 
-        let normX = posX?.toString();
-        let normY = posY?.toString();
-        if (zone && posX != null && posY != null) {
-          const owner: 'my' | 'opponent' = isOppZone ? 'opponent' : 'my';
-          const clamp = isFreeFormZone(String(toZone)) ? { cardWidth, cardHeight } : undefined;
-          const db = toDbPos(posX, posY, zone, owner, clamp);
-          normX = db.x.toString();
-          normY = db.y.toString();
+          let normX = posX?.toString();
+          let normY = posY?.toString();
+          if (zone && posX != null && posY != null) {
+            const owner: 'my' | 'opponent' = isOppZone ? 'opponent' : 'my';
+            const clamp = isFreeFormZone(String(toZone)) ? { cardWidth, cardHeight } : undefined;
+            const db = toDbPos(posX, posY, zone, owner, clamp);
+            normX = db.x.toString();
+            normY = db.y.toString();
+          }
+          moveOpponentCard(
+            BigInt(approvedSearchRequest.id),
+            BigInt(id),
+            String(toZone),
+            normX,
+            normY
+          );
+        };
+        // T1 reserve protection for opponent's reserve
+        if (isOpponentFirstTurn && approvedSearchRequest.zone === 'reserve' && toZone !== 'reserve') {
+          setPendingReserveMove({ kind: 'single', execute });
+        } else {
+          execute();
         }
-        moveOpponentCard(
-          BigInt(approvedSearchRequest.id),
-          BigInt(id),
-          String(toZone),
-          normX,
-          normY
-        );
       }
     },
     moveCardsBatch: (ids: string[], toZone: ZoneId) => {
       if (approvedSearchRequest) {
-        for (const id of ids) {
-          moveOpponentCard(BigInt(approvedSearchRequest.id), BigInt(id), String(toZone));
+        const execute = () => {
+          for (const id of ids) {
+            moveOpponentCard(BigInt(approvedSearchRequest.id), BigInt(id), String(toZone));
+          }
+        };
+        // T1 reserve protection for opponent's reserve
+        if (isOpponentFirstTurn && approvedSearchRequest.zone === 'reserve' && toZone !== 'reserve') {
+          setPendingReserveMove({ kind: 'batch', execute });
+        } else {
+          execute();
         }
       }
     },

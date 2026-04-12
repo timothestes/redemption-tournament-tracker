@@ -194,7 +194,7 @@ const TopNav: React.FC = () => {
 
           {/* Desktop Navigation - Center */}
           <div className="hidden lg:flex lg:items-center lg:space-x-1 flex-1 justify-center">
-            {navLinks.slice(0, 2).map((link) => {
+            {navLinks.slice(0, 1).map((link) => {
               const Icon = link.icon;
               const isHighlight = link.highlight;
               return (
@@ -296,6 +296,19 @@ const TopNav: React.FC = () => {
                 )}
               </div>
             )}
+
+            {/* Play link - after Admin */}
+            <Link
+              href="/play"
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
+                ${isActive('/play')
+                ? 'bg-muted text-foreground'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                }`}
+            >
+              <GiCrossedSwords className="w-4 h-4" />
+              Play
+            </Link>
 
             {/* Tournaments Dropdown */}
             <div className="relative">

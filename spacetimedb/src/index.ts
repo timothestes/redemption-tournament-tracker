@@ -1386,8 +1386,9 @@ export const move_card = spacetimedb.reducer(
       ownerId: newOwnerId,
     });
 
-    // Only log when the card actually changes zones (not repositioning within the same zone)
-    if (fromZone !== toZone) {
+    // Log when the card changes zones OR changes ownership (e.g. territory → opponent's territory)
+    const ownerChanged = newOwnerId !== card.ownerId;
+    if (fromZone !== toZone || ownerChanged) {
       const logName = isFlipped ? 'a face-down card' : card.cardName;
       const logImg = isFlipped ? '' : card.cardImgFile;
       logAction(ctx, gameId, player.id, 'MOVE_CARD', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), from: fromZone, to: toZone, cardName: logName, cardImgFile: logImg, targetOwnerId: targetOwnerId || '' }), game.turnNumber, game.currentPhase);
@@ -1464,7 +1465,8 @@ export const move_cards_batch = spacetimedb.reducer(
       const logName = isFlipped ? 'a face-down card' : card.cardName;
       const logImg = isFlipped ? '' : card.cardImgFile;
       cards.push({ name: logName, img: logImg });
-      if (card.zone !== toZone) {
+      const cardOwnerChanged = newOwnerId !== null && newOwnerId !== card.ownerId;
+      if (card.zone !== toZone || cardOwnerChanged) {
         movedCards.push({ name: logName, img: logImg });
         if (card.zone === 'hand') {
           handCompactOwners.add(card.ownerId);
