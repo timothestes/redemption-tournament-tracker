@@ -893,6 +893,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             game={gameState.game}
             myPlayer={gameState.myPlayer}
             opponentPlayer={gameState.opponentPlayer}
+            opponentConnectionStatus={gameState.opponentConnectionStatus}
             isMyTurn={gameState.isMyTurn}
             onSetPhase={gameState.setPhase}
             onEndTurn={gameState.endTurn}
