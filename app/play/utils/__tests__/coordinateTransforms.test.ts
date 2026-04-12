@@ -103,6 +103,15 @@ describe('toDbPos', () => {
     expect(result.y).toBeCloseTo(0, 10);
   });
 
+  it('clamps opponent card within zone bounds (mirror + clamp interaction)', () => {
+    // Screen bottom-right of zone (500, 500) → rawX=1, rawY=1 → clamped → mirrored
+    const result = toDbPos(500, 500, ZONE, 'opponent', { cardWidth: 60, cardHeight: 80 });
+    // rawX=1, maxX=1-60/400=0.85 → clampedX=0.85 → mirroredX=1-0.85=0.15
+    expect(result.x).toBeCloseTo(1 - (1 - 60 / 400), 10);
+    // rawY=1, maxY=1-80/300≈0.733 → clampedY≈0.733 → mirroredY≈0.267
+    expect(result.y).toBeCloseTo(1 - (1 - 80 / 300), 10);
+  });
+
   it('zero-width zone: no division by zero (uses fallback 1)', () => {
     const zeroZone = { x: 100, y: 200, width: 0, height: 0, label: 'zero' };
     // Should not throw; rawX = (150-100)/1 = 50, rawY = (250-200)/1 = 50
