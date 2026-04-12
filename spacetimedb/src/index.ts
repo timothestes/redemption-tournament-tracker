@@ -262,6 +262,7 @@ export const create_game = spacetimedb.reducer(
       rematchDeckData1: '',
       rematchResponse: '',
       rematchCode: '',
+      disconnectTimeoutFired: false,
     });
 
     // Insert player row with pending deck data (cards loaded later during pregame)
@@ -1010,16 +1011,31 @@ export const handle_disconnect_timeout = spacetimedb.reducer(
     if (!player.isConnected) {
       const game = ctx.db.Game.id.find(arg.gameId);
       if (game && game.status !== 'finished') {
-        ctx.db.Game.id.update({ ...game, status: 'finished' });
-        logAction(
-          ctx,
-          arg.gameId,
-          arg.playerId,
-          'TIMEOUT',
-          JSON.stringify({ reason: 'disconnect_timeout' }),
-          game.turnNumber,
-          game.currentPhase
-        );
+        if (game.status === 'playing') {
+          // Active game: set flag so remaining player can claim victory
+          ctx.db.Game.id.update({ ...game, disconnectTimeoutFired: true });
+          logAction(
+            ctx,
+            arg.gameId,
+            arg.playerId,
+            'DISCONNECT_TIMEOUT_WARNING',
+            JSON.stringify({ reason: 'disconnect_timeout' }),
+            game.turnNumber,
+            game.currentPhase
+          );
+        } else {
+          // Waiting/pregame: end game immediately
+          ctx.db.Game.id.update({ ...game, status: 'finished' });
+          logAction(
+            ctx,
+            arg.gameId,
+            arg.playerId,
+            'TIMEOUT',
+            JSON.stringify({ reason: 'disconnect_timeout' }),
+            game.turnNumber,
+            game.currentPhase
+          );
+        }
       }
     }
   }
@@ -1027,6 +1043,26 @@ export const handle_disconnect_timeout = spacetimedb.reducer(
 
 // Wire the scheduled reducer to the schema's forward reference
 setDisconnectTimeoutReducer(handle_disconnect_timeout);
+
+// ---------------------------------------------------------------------------
+// Reducer: claim_timeout_victory
+// Called by the remaining connected player after disconnectTimeoutFired is set
+// ---------------------------------------------------------------------------
+export const claim_timeout_victory = spacetimedb.reducer(
+  { gameId: t.u64() },
+  (ctx, { gameId }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
+    if (!game.disconnectTimeoutFired) throw new SenderError('Disconnect timeout has not fired');
+
+    const player = findPlayerBySender(ctx, gameId);
+    if (!player.isConnected) throw new SenderError('Only the connected player can claim victory');
+
+    ctx.db.Game.id.update({ ...game, status: 'finished', disconnectTimeoutFired: false });
+    logAction(ctx, gameId, player.id, 'TIMEOUT', JSON.stringify({ reason: 'claimed_by_opponent' }), game.turnNumber, game.currentPhase);
+  }
+);
 
 // ---------------------------------------------------------------------------
 // Scheduled reducer: handle_choose_first_timeout
@@ -2454,6 +2490,12 @@ export const onConnect = spacetimedb.clientConnected((ctx) => {
         if (timeout.playerId === player.id) {
           ctx.db.DisconnectTimeout.scheduledId.delete(timeout.scheduledId);
         }
+      }
+
+      // Reset disconnectTimeoutFired if it was set
+      const gameForReset = ctx.db.Game.id.find(player.gameId);
+      if (gameForReset && gameForReset.disconnectTimeoutFired) {
+        ctx.db.Game.id.update({ ...gameForReset, disconnectTimeoutFired: false });
       }
     }
   }
