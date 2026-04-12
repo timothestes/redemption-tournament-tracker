@@ -192,6 +192,22 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       ? 'rgba(234, 179, 8, 0.7)'
       : 'rgba(239, 68, 68, 0.7)';
 
+  const connectionDotLabel = gameState.opponentConnectionStatus === 'connected'
+    ? 'Connected'
+    : gameState.opponentConnectionStatus === 'reconnecting'
+      ? 'Reconnecting...'
+      : 'Disconnected';
+
+  const [connectionTooltip, setConnectionTooltip] = useState<{ x: number; y: number } | null>(null);
+  const [claimBannerDismissed, setClaimBannerDismissed] = useState(false);
+
+  // Reset claim banner when opponent reconnects
+  useEffect(() => {
+    if (!gameState.disconnectTimeoutFired) {
+      setClaimBannerDismissed(false);
+    }
+  }, [gameState.disconnectTimeoutFired]);
+
   // ---- Layout ----
   const mpLayout = useMemo(
     () => calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT, false),
@@ -2142,7 +2158,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
             shadowColor={connectionDotGlow}
             shadowBlur={6}
             shadowOpacity={1}
-            listening={false}
+            hitStrokeWidth={8}
+            onMouseEnter={(e: Konva.KonvaEventObject<MouseEvent>) => {
+              setConnectionTooltip({ x: e.evt.clientX, y: e.evt.clientY });
+            }}
+            onMouseLeave={() => setConnectionTooltip(null)}
           />
           <Text
             x={opponentHandRect.x + 18}
@@ -2375,27 +2395,29 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
             if (oppLob) lobEntries.push({ zone: oppLob, isOpponent: true });
             return lobEntries.map(({ zone, isOpponent }) => {
               const cards = isOpponent ? (opponentCards['land-of-bondage'] ?? []) : (myCards['land-of-bondage'] ?? []);
-              // ~8.5px per uppercase Cinzel char at fontSize 11 + letterSpacing 1
               const labelTextWidth = zone.label.toUpperCase().length * 8.5;
               const fillColor = isOpponent ? '#a3c5e8' : '#e8d5a3';
               const badgeFill = isOpponent ? 'rgba(100, 149, 237, 0.25)' : 'rgba(196, 149, 90, 0.25)';
               const badgeStroke = isOpponent ? 'rgba(100, 149, 237, 0.5)' : 'rgba(196, 149, 90, 0.5)';
               const bgFill = isOpponent ? 'rgba(16, 20, 30, 0.85)' : 'rgba(30, 22, 16, 0.85)';
               const badgeW = 24;
-              const badgeX = zone.x + 6 + labelTextWidth + 8;
               const labelW = labelTextWidth + 8 + badgeW + 8;
+              const bgW = Math.min(labelW + 6, zone.width);
+              const bgX = zone.x + zone.width - bgW;
+              const labelX = bgX + 6;
+              const badgeX = labelX + labelTextWidth + 8;
               return (
                 <Group key={`lob-overlay-${isOpponent ? 'opp' : 'my'}`}>
                   <Rect
-                    x={zone.x}
+                    x={bgX}
                     y={zone.y}
-                    width={Math.min(labelW + 6, zone.width)}
+                    width={bgW}
                     height={20}
                     fill={bgFill}
-                    cornerRadius={[3, 0, 4, 0]}
+                    cornerRadius={[0, 3, 0, 4]}
                   />
                   <Text
-                    x={zone.x + 6}
+                    x={labelX}
                     y={zone.y + 4}
                     text={zone.label.toUpperCase()}
                     fontSize={11}
@@ -2445,20 +2467,23 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
               const badgeStroke = isOpponent ? 'rgba(100, 149, 237, 0.5)' : 'rgba(196, 149, 90, 0.5)';
               const bgFill = isOpponent ? 'rgba(16, 20, 30, 0.85)' : 'rgba(30, 22, 16, 0.85)';
               const badgeW = 24;
-              const badgeX = zone.x + 6 + labelTextWidth + 8;
               const labelW = labelTextWidth + 8 + badgeW + 8;
+              const bgW = Math.min(labelW + 6, zone.width);
+              const bgX = zone.x + zone.width - bgW;
+              const labelX = bgX + 6;
+              const badgeX = labelX + labelTextWidth + 8;
               return (
                 <Group key={`territory-overlay-${isOpponent ? 'opp' : 'my'}`}>
                   <Rect
-                    x={zone.x}
+                    x={bgX}
                     y={zone.y}
-                    width={Math.min(labelW + 6, zone.width)}
+                    width={bgW}
                     height={20}
                     fill={bgFill}
-                    cornerRadius={[3, 0, 4, 0]}
+                    cornerRadius={[0, 3, 0, 4]}
                   />
                   <Text
-                    x={zone.x + 6}
+                    x={labelX}
                     y={zone.y + 4}
                     text={zone.label.toUpperCase()}
                     fontSize={11}
@@ -3747,6 +3772,124 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Connection status tooltip */}
+      {connectionTooltip && (
+        <div
+          style={{
+            position: 'fixed',
+            left: connectionTooltip.x + 10,
+            top: connectionTooltip.y + 10,
+            zIndex: 1000,
+            pointerEvents: 'none',
+            background: 'rgba(10, 8, 5, 0.92)',
+            border: '1px solid rgba(107, 78, 39, 0.4)',
+            borderRadius: 6,
+            padding: '4px 8px',
+            fontFamily: 'var(--font-cinzel), Georgia, serif',
+            fontSize: 10,
+            letterSpacing: '0.06em',
+            color: connectionDotColor,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {connectionDotLabel}
+        </div>
+      )}
+
+      {/* Disconnect timeout — claim victory banner */}
+      {gameState.disconnectTimeoutFired && !claimBannerDismissed && (
+        <div
+          style={{
+            position: 'absolute',
+            top: opponentHandRect.y + opponentHandRect.height + 8,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 900,
+            background: 'rgba(10, 8, 5, 0.95)',
+            border: '1px solid rgba(180, 140, 60, 0.6)',
+            borderRadius: 8,
+            padding: '12px 20px',
+            fontFamily: 'var(--font-cinzel), Georgia, serif',
+            fontSize: 13,
+            color: '#e8dcc8',
+            textAlign: 'center' as const,
+            display: 'flex',
+            flexDirection: 'column' as const,
+            alignItems: 'center',
+            gap: 10,
+            maxWidth: 360,
+          }}
+        >
+          <span style={{ letterSpacing: '0.04em' }}>
+            Your opponent has been disconnected for 5 minutes.
+          </span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => setClaimBannerDismissed(true)}
+              style={{
+                background: 'rgba(50, 45, 35, 0.8)',
+                border: '1px solid rgba(107, 78, 39, 0.4)',
+                borderRadius: 5,
+                padding: '6px 14px',
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+                fontSize: 11,
+                color: '#a89878',
+                cursor: 'pointer',
+                letterSpacing: '0.04em',
+              }}
+            >
+              Keep Waiting
+            </button>
+            <button
+              onClick={() => gameState.claimTimeoutVictory()}
+              style={{
+                background: 'rgba(180, 140, 60, 0.25)',
+                border: '1px solid rgba(180, 140, 60, 0.6)',
+                borderRadius: 5,
+                padding: '6px 14px',
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+                fontSize: 11,
+                color: '#d4b86a',
+                cursor: 'pointer',
+                letterSpacing: '0.04em',
+                fontWeight: 600,
+              }}
+            >
+              Claim Victory
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Disconnect timeout — persistent claim victory button (after banner dismissed) */}
+      {gameState.disconnectTimeoutFired && claimBannerDismissed && (
+        <div
+          style={{
+            position: 'absolute',
+            top: opponentHandRect.y + opponentHandRect.height + 8,
+            right: 16,
+            zIndex: 900,
+          }}
+        >
+          <button
+            onClick={() => gameState.claimTimeoutVictory()}
+            style={{
+              background: 'rgba(180, 140, 60, 0.2)',
+              border: '1px solid rgba(180, 140, 60, 0.5)',
+              borderRadius: 5,
+              padding: '5px 12px',
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: 10,
+              color: '#d4b86a',
+              cursor: 'pointer',
+              letterSpacing: '0.04em',
+            }}
+          >
+            Claim Victory
+          </button>
         </div>
       )}
 
