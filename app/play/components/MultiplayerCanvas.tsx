@@ -1430,7 +1430,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
             let targetIdx = 0;
             let minDist = Infinity;
             for (let i = 0; i < positions.length; i++) {
-              const dist = Math.abs(positions[i].x + cardWidth / 2 - centerX);
+              const dist = Math.abs(positions[i].x + cardWidth / 2 - center.x);
               if (dist < minDist) {
                 minDist = dist;
                 targetIdx = i;
@@ -1523,7 +1523,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
           // Show deck drop popup for batch
           const stage = stageRef.current;
           if (stage) {
-            const screenPos = virtualToScreen(centerX, centerY, scale, offsetX, offsetY);
+            const screenPos = virtualToScreen(center.x, center.y, scale, offsetX, offsetY);
             pendingBatchRef.current = cardIds;
             setDeckDrop({
               x: screenPos.x,
@@ -1561,7 +1561,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       } else if (targetZone === 'deck') {
         const stage = stageRef.current;
         if (stage) {
-          const screenPos = virtualToScreen(centerX, centerY, scale, offsetX, offsetY);
+          const screenPos = virtualToScreen(center.x, center.y, scale, offsetX, offsetY);
           setDeckDrop({
             x: screenPos.x,
             y: screenPos.y,
