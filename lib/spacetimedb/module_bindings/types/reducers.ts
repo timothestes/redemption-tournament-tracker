@@ -8,6 +8,7 @@ import { type Infer as __Infer } from "spacetimedb";
 // Import all reducer arg schemas
 import AddCounterReducer from "../add_counter_reducer";
 import ApproveZoneSearchReducer from "../approve_zone_search_reducer";
+import ClaimTimeoutVictoryReducer from "../claim_timeout_victory_reducer";
 import ClearRevealedCardsReducer from "../clear_revealed_cards_reducer";
 import CompleteZoneSearchReducer from "../complete_zone_search_reducer";
 import CreateGameReducer from "../create_game_reducer";
@@ -59,6 +60,7 @@ import UpdateLobbyMessageReducer from "../update_lobby_message_reducer";
 
 export type AddCounterParams = __Infer<typeof AddCounterReducer>;
 export type ApproveZoneSearchParams = __Infer<typeof ApproveZoneSearchReducer>;
+export type ClaimTimeoutVictoryParams = __Infer<typeof ClaimTimeoutVictoryReducer>;
 export type ClearRevealedCardsParams = __Infer<typeof ClearRevealedCardsReducer>;
 export type CompleteZoneSearchParams = __Infer<typeof CompleteZoneSearchReducer>;
 export type CreateGameParams = __Infer<typeof CreateGameReducer>;

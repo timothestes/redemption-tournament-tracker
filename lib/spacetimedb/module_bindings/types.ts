@@ -100,6 +100,7 @@ export const Game = __t.object("Game", {
   rematchDeckData1: __t.string(),
   rematchResponse: __t.string(),
   rematchCode: __t.string(),
+  disconnectTimeoutFired: __t.bool(),
 });
 export type Game = __Infer<typeof Game>;
 

@@ -39,7 +39,7 @@ export const Game = table(
     rematchDeckData1: t.string(),   // seat 1's deck data for rematch
     rematchResponse: t.string(),    // "" | "accepted" | "declined"
     rematchCode: t.string(),        // new game code for rematch
-    disconnectTimeoutFired: t.bool(), // true when timeout fired during active game
+    disconnectTimeoutFired: t.bool().default(false), // true when timeout fired during active game
   }
 );
 
