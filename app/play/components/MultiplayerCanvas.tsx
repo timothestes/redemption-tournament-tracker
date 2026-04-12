@@ -983,6 +983,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       isDraggingRef.current = true;
       dragSourceZoneRef.current = card.zone;
 
+      // If there is an active selection and the dragged card is not part of it,
+      // clear the selection so the stale highlight doesn't persist.
+      if (selectedIds.size > 0 && !selectedIds.has(card.instanceId)) {
+        clearSelection();
+      }
+
       // Determine the card's rendered dimensions based on its source zone.
       // Pile zones render at pileCardWidth/pileCardHeight, LOB at lobCard size,
       // everything else at the main cardWidth/cardHeight.
