@@ -456,6 +456,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
     return undefined;
   }, [myCards]);
 
+  /** Look up a card instance by its string ID across both players' cards. */
+  const findAnyCardById = useCallback((id: string): CardInstance | undefined => {
+    for (const cards of Object.values(myCards)) {
+      const found = cards.find(c => String(c.id) === id);
+      if (found) return found;
+    }
+    for (const cards of Object.values(opponentCards)) {
+      const found = cards.find(c => String(c.id) === id);
+      if (found) return found;
+    }
+    return undefined;
+  }, [myCards, opponentCards]);
+
   /**
    * Check if a move should be intercepted by the Turn 1 reserve protection rule.
    * Returns true if the move was intercepted (dialog shown), false if it should proceed.
@@ -1075,8 +1088,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
             // Sort followers by zoneIndex so the ghost image preserves stacking order
             // (lower zoneIndex drawn first = underneath; higher drawn last = on top).
             followerRects.sort((a, b) => {
-              const aCard = findMyCardById(a.f.id);
-              const bCard = findMyCardById(b.f.id);
+              const aCard = findAnyCardById(a.f.id);
+              const bCard = findAnyCardById(b.f.id);
               return Number(aCard?.zoneIndex ?? 0) - Number(bCard?.zoneIndex ?? 0);
             });
 
@@ -1135,7 +1148,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
         dragFollowerOffsets.current = null;
       }
     },
-    [selectedIds, stopHoverAnimation, cardWidth, cardHeight, pileCardWidth, pileCardHeight, lobCard.cardWidth, lobCard.cardHeight, scale, offsetX, offsetY, findMyCardById],
+    [selectedIds, stopHoverAnimation, cardWidth, cardHeight, pileCardWidth, pileCardHeight, lobCard.cardWidth, lobCard.cardHeight, scale, offsetX, offsetY, findAnyCardById],
   );
 
   const handleCardDragMove = useCallback(
@@ -1359,13 +1372,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
           const absPos = node.getAbsolutePosition();
           node.moveTo(originalParent);
           node.setAbsolutePosition(absPos);
-          // Restore original z-index: moveTo adds the node as the last child,
-          // which makes it render on top. Restore its original position among
-          // siblings so the stacking order is preserved after a group drag.
-          if (originalZIndex != null) {
-            const maxIdx = originalParent.getChildren().length - 1;
-            node.zIndex(Math.min(originalZIndex, maxIdx));
-          }
         }
         if (isGroupDrag) {
           // Followers are already at drop positions from handleCardDragMove; confirm positions
@@ -1381,6 +1387,28 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
                 fNode.x(dropX + offset.dx);
                 fNode.y(dropY + offset.dy);
               }
+            }
+          }
+          // Preserve relative z-order within the group, but place the entire
+          // group above all other cards. Collect the group's Konva nodes,
+          // sort them by their original zoneIndex, and moveToTop in order
+          // (lowest first → highest last = highest on top).
+          if (originalParent) {
+            const groupNodes: { node: Konva.Node; zoneIndex: number }[] = [];
+            const leadCard = findAnyCardById(card.instanceId);
+            groupNodes.push({ node, zoneIndex: Number(leadCard?.zoneIndex ?? 0) });
+            if (followerOffsets) {
+              for (const [id] of followerOffsets) {
+                const fNode = cardNodeRefs.current.get(id);
+                if (fNode) {
+                  const fCard = findAnyCardById(id);
+                  groupNodes.push({ node: fNode, zoneIndex: Number(fCard?.zoneIndex ?? 0) });
+                }
+              }
+            }
+            groupNodes.sort((a, b) => a.zoneIndex - b.zoneIndex);
+            for (const { node: gNode } of groupNodes) {
+              gNode.moveToTop();
             }
           }
           // Build positions for batch move (normalized 0–1)
@@ -1647,12 +1675,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
   // Double-click toggles meek on your own cards
   const handleDblClick = useCallback((card: GameCard) => {
     if (card.ownerId !== 'player1') return; // only your own cards
+    const willBeMeek = !card.isMeek;
     if (card.isMeek) {
       multiplayerActions.unmeekCard(card.instanceId);
     } else {
       multiplayerActions.meekCard(card.instanceId);
     }
-  }, [multiplayerActions]);
+    setPreviewCard({
+      cardName: card.cardName,
+      cardImgFile: card.cardImgFile,
+      isMeek: willBeMeek,
+    });
+  }, [multiplayerActions, setPreviewCard]);
   const noopDblClick = useCallback((_card: GameCard) => {}, []);
   const noopContextMenu = useCallback((_card: GameCard, _e: Konva.KonvaEventObject<PointerEvent>) => {}, []);
 
@@ -1722,6 +1756,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
           width: cardWidth,
           height: cardHeight,
           rotation: 0,
+          owner: 'my',
         });
       }
     }
@@ -1744,6 +1779,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
           width: cardWidth,
           height: cardHeight,
           rotation: 180,
+          owner: 'opponent',
         });
       }
     }
@@ -1764,6 +1800,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
               width: lobCard.cardWidth,
               height: lobCard.cardHeight,
               rotation: 0,
+              owner: 'my',
             });
           }
         });
@@ -1787,6 +1824,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
               width: lobCard.cardWidth,
               height: lobCard.cardHeight,
               rotation: 180,
+              owner: 'opponent',
             });
           }
         });
@@ -1813,6 +1851,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
             width: cardWidth,
             height: cardHeight,
             rotation: pos.rotation,
+            owner: 'my',
           });
         }
       });

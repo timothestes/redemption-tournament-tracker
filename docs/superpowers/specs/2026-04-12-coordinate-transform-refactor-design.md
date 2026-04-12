@@ -153,9 +153,39 @@ const { x: centerX, y: centerY } = cardCenter(dropX, dropY, dragW, dragH, dropRo
 
 The bounds computation also duplicates the DB→Screen transform. Replace with `toScreenPos` calls.
 
-## Known Bug to Fix During Refactor
+## Z-Index / Stacking Order Requirements
 
-**Opponent group drag produces horizontal line:** When dragging a group of opponent cards within opponent territory, the cards lose their relative positions. The root cause needs to be identified during implementation — the refactor will make it findable because the transform logic will be in one testable place rather than scattered inline.
+Card stacking behavior during and after drag operations:
+
+### Single card drag
+- During drag: card displays **above everything** (via `node.moveToTop()` after reparenting to the layer)
+- After drop (same zone): card stays on top — it should be the most visible card. Do NOT restore its original z-index.
+- After snap-back (invalid drop): card returns to its **original z-index position** among siblings
+
+### Group drag
+- During drag: lead card is on the game layer (moveToTop); followers are hidden and replaced by a semi-transparent ghost image on a dedicated ghost layer above everything
+- Ghost image must draw followers **sorted by zoneIndex** (lowest first, highest last = on top) to preserve visual stacking within the ghost
+- After drop (same zone): the **entire group** should be placed above all other non-selected cards, but the **relative order within the group** must be preserved. Implementation: sort group nodes by zoneIndex, then call `moveToTop()` on each in ascending order (lowest first → highest ends up on top)
+- After snap-back: all cards return to original positions and z-index
+
+### Key implementation notes
+- `findAnyCardById` (searches both `myCards` and `opponentCards`) must be used instead of `findMyCardById` when looking up zoneIndex for sorting — otherwise opponent card groups all get zoneIndex=0 and lose their relative order
+- The `dragOriginalZIndexRef` captures the lead card's z-index before reparenting; this is only used for snap-back, NOT for successful drops
+- Konva's `moveTo()` always adds the node as the **last child** (highest z). `node.zIndex(n)` can reposition it among siblings.
+
+## Known Bugs to Fix During Refactor
+
+### 1. Opponent group drag produces horizontal line
+When dragging a group of opponent cards within opponent territory, the cards lose their relative positions and display in a horizontal line. The root cause has resisted analysis because the transform logic is scattered across 400+ lines of drag handler code. The refactor will make it findable because the transform logic will be in one testable place.
+
+**Investigation notes:** The math for normalization (`normX`/`normY` with opponent mirror) appears correct on paper for both single and group drags. The bug may be in:
+- An interaction between rotation=180 anchor points and the follower offset calculation
+- The `moveCardsBatch` reducer not receiving correct positions
+- A rendering issue after the subscription update comes back
+- The `findMyCardById` function returning `undefined` for opponent cards (partially addressed — `findAnyCardById` was added but needs to be wired into all call sites)
+
+### 2. Incomplete `findAnyCardById` wiring
+A `findAnyCardById` helper was added (searches both `myCards` and `opponentCards`) but the `handleCardDragEnd` dependency array may not include it yet. The future agent should verify all dep arrays are correct after making changes.
 
 ## What This Does NOT Change
 
@@ -190,3 +220,15 @@ The utility functions are pure math with no dependencies — unit test them dire
 
 - **Behavioral regression in drag handlers**: The drag handlers are complex and have many code paths. Replacing inline math with function calls could introduce subtle differences if the function signatures don't exactly match what each site needs. Mitigate by doing one site at a time and testing after each.
 - **Edge cases in clamping**: The current clamping logic varies slightly between sites (some clamp, some don't). The utility function needs to handle this via the opts parameter.
+
+## Partial Changes Already Made (this session)
+
+The following changes were made to MultiplayerCanvas.tsx and useSelectionState.ts in this session. They compile but have **not been fully tested**. The future agent should review, test, and potentially revise these:
+
+1. **`dragOriginalZIndexRef`** — new ref that saves the lead card's z-index before reparenting during drag start; used to restore z-index on snap-back
+2. **`findAnyCardById`** — new helper that searches both `myCards` and `opponentCards`; used in ghost sort and group z-index reordering
+3. **Ghost image follower sort** — `followerRects` sorted by `zoneIndex` before drawing onto the offscreen canvas
+4. **Group drag z-index reorder** — after same-zone free-form drop, group nodes are sorted by `zoneIndex` and `moveToTop()`'d in order to place the group above other cards while preserving internal order
+5. **Snap-back z-index restore** — `snapBack()` restores `originalZIndex` so canceled drags return to original stacking position
+6. **Marquee selection owner restriction** (useSelectionState.ts) — `CardBound` now has optional `owner` field; `computeHitIds` restricts selection to a single owner when the marquee hits cards from both players
+7. **Owner tags on bounds** — all entries in `allCardBounds` useMemo now include `owner: 'my'` or `owner: 'opponent'`
