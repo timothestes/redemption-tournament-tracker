@@ -70,3 +70,27 @@ export function cardCenter(
     y: isRotated ? anchorY - height / 2 : anchorY + height / 2,
   };
 }
+
+/**
+ * Adjust a drop position when a card crosses between rotation contexts.
+ * Offsets by card dimensions to keep the visual position stable.
+ */
+export function adjustAnchorForRotationChange(
+  dropX: number,
+  dropY: number,
+  cardWidth: number,
+  cardHeight: number,
+  sourceRotated: boolean,
+  targetRotated: boolean,
+): { x: number; y: number } {
+  let x = dropX;
+  let y = dropY;
+  if (sourceRotated && !targetRotated) {
+    x -= cardWidth;
+    y -= cardHeight;
+  } else if (!sourceRotated && targetRotated) {
+    x += cardWidth;
+    y += cardHeight;
+  }
+  return { x, y };
+}

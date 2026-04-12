@@ -3,6 +3,7 @@ import {
   toScreenPos,
   toDbPos,
   cardCenter,
+  adjustAnchorForRotationChange,
 } from '../coordinateTransforms';
 
 // Shared test zone: x=100, y=200, width=400, height=300
@@ -163,5 +164,36 @@ describe('cardCenter', () => {
     // abs(91) > 90 → rotated
     const result = cardCenter(100, 200, 60, 80, 91);
     expect(result).toEqual({ x: 70, y: 160 });
+  });
+});
+
+// ── adjustAnchorForRotationChange ────────────────────────────────────────────
+
+describe('adjustAnchorForRotationChange', () => {
+  it('no change when both contexts are the same (both not rotated)', () => {
+    const result = adjustAnchorForRotationChange(100, 200, 60, 80, false, false);
+    expect(result).toEqual({ x: 100, y: 200 });
+  });
+
+  it('no change when both contexts are the same (both rotated)', () => {
+    const result = adjustAnchorForRotationChange(100, 200, 60, 80, true, true);
+    expect(result).toEqual({ x: 100, y: 200 });
+  });
+
+  it('subtracts card dimensions when going from rotated (180) to normal (0)', () => {
+    const result = adjustAnchorForRotationChange(100, 200, 60, 80, true, false);
+    expect(result).toEqual({ x: 40, y: 120 });
+  });
+
+  it('adds card dimensions when going from normal (0) to rotated (180)', () => {
+    const result = adjustAnchorForRotationChange(100, 200, 60, 80, false, true);
+    expect(result).toEqual({ x: 160, y: 280 });
+  });
+
+  it('round-trip: 0→180→0 returns original position', () => {
+    const original = { x: 100, y: 200 };
+    const step1 = adjustAnchorForRotationChange(original.x, original.y, 60, 80, false, true);
+    const step2 = adjustAnchorForRotationChange(step1.x, step1.y, 60, 80, true, false);
+    expect(step2).toEqual(original);
   });
 });
