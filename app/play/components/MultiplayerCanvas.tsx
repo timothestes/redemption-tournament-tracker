@@ -12,6 +12,7 @@ import {
   calculateMultiplayerLayout,
   type ZoneRect,
 } from '../layout/multiplayerLayout';
+import { toScreenPos } from '../utils/coordinateTransforms';
 import { calculateHandPositions } from '../layout/multiplayerHandLayout';
 import { calculateAutoArrangePositions } from '../layout/multiplayerAutoArrange';
 import {
@@ -2190,10 +2191,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
                 {sorted.map((card) => {
                   const gameCard = adaptCard(card, 'player1');
                   const myZone = myZones[zoneKey];
-                  const zoneX = myZone?.x ?? 0;
-                  const zoneY = myZone?.y ?? 0;
-                  const x = card.posX ? parseFloat(card.posX) * (myZone?.width ?? 0) + zoneX : zoneX + 20;
-                  const y = card.posY ? parseFloat(card.posY) * (myZone?.height ?? 0) + zoneY : zoneY + 24;
+                  let x: number, y: number;
+                  if (card.posX && myZone) {
+                    ({ x, y } = toScreenPos(parseFloat(card.posX), parseFloat(card.posY), myZone, 'my'));
+                  } else {
+                    x = (myZone?.x ?? 0) + 20;
+                    y = (myZone?.y ?? 0) + 24;
+                  }
                   return (
                     <GameCardNode
                       key={String(card.id)}
@@ -2242,19 +2246,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
                 {sorted.map((card) => {
                   const gameCard = adaptCard(card, 'player2');
                   const oppZone = opponentZones[zoneKey];
-                  const zoneX = oppZone?.x ?? 0;
-                  const zoneY = oppZone?.y ?? 0;
-                  const zoneW = oppZone?.width ?? 0;
-                  const zoneH = oppZone?.height ?? 0;
-                  // Mirror opponent positions: flip both axes so their board
-                  // appears rotated 180° (as if sitting across the table).
-                  // With rotation=180, Konva renders the card extending LEFT and UP
-                  // from (x,y), so the visible rectangle is (x-cardW, y-cardH) to (x,y).
-                  // No additional offset needed — the rotation pivot handles it.
-                  const mirroredPosX = card.posX ? 1 - parseFloat(card.posX) : 0;
-                  const mirroredPosY = card.posY ? 1 - parseFloat(card.posY) : 0;
-                  const x = mirroredPosX * zoneW + zoneX;
-                  const y = mirroredPosY * zoneH + zoneY;
+                  if (!oppZone) return null;
+                  const { x, y } = toScreenPos(
+                    card.posX ? parseFloat(card.posX) : 0,
+                    card.posY ? parseFloat(card.posY) : 0,
+                    oppZone, 'opponent',
+                  );
                   return (
                     <GameCardNode
                       key={String(card.id)}
