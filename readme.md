@@ -156,3 +156,4 @@ create system where cards can have custom abilities coded
 save game, load game, invite to game?
 pulsing chat notification
 visual flash of screen during pre-game ritual
+add paragon to online play?
