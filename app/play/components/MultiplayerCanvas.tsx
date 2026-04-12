@@ -12,7 +12,7 @@ import {
   calculateMultiplayerLayout,
   type ZoneRect,
 } from '../layout/multiplayerLayout';
-import { toScreenPos, toDbPos, cardCenter } from '../utils/coordinateTransforms';
+import { toScreenPos, toDbPos, cardCenter, adjustAnchorForRotationChange } from '../utils/coordinateTransforms';
 import { calculateHandPositions } from '../layout/multiplayerHandLayout';
 import { calculateAutoArrangePositions } from '../layout/multiplayerAutoArrange';
 import {
@@ -1288,10 +1288,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       // (0–1 ratios). This ensures cards render at the correct proportional position
       // regardless of each player's screen/window size.
       const zoneRect = hit.owner === 'my' ? myZones[targetZone] : opponentZones[targetZone];
-      const zoneOffX = zoneRect?.x ?? 0;
-      const zoneOffY = zoneRect?.y ?? 0;
-      const zoneW = zoneRect?.width || 1;
-      const zoneH = zoneRect?.height || 1;
       // Resolve target owner ID — always set to the target zone's owner so
       // cards transfer ownership when moving between players' zones.
       const targetOwnerId = hit.owner === 'my' && gameState.myPlayer
@@ -1312,38 +1308,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       // position stays consistent.
       const sourceIsRotated = sourceOwner === 'opponent' && (isFreeFormZone(sourceZone ?? '') || isAutoArrangeZone(sourceZone ?? '') || SIDEBAR_PILE_ZONES.includes(sourceZone as any));
       const targetIsRotated = isOpponentTarget && isFreeFormZone(targetZone);
-      let adjDropX = dropX;
-      let adjDropY = dropY;
-      if (sourceIsRotated && !targetIsRotated) {
-        // rotation 180→0: shift anchor from bottom-right to top-left
-        adjDropX -= dragW;
-        adjDropY -= dragH;
-      } else if (!sourceIsRotated && targetIsRotated) {
-        // rotation 0→180: shift anchor from top-left to bottom-right
-        adjDropX += dragW;
-        adjDropY += dragH;
-      }
+      const { x: adjDropX, y: adjDropY } = adjustAnchorForRotationChange(
+        dropX, dropY, dragW, dragH, sourceIsRotated, targetIsRotated,
+      );
 
-      // Helper: normalize pixel position to 0–1, clamp so the entire card stays
-      // within the territory zone bounds, and apply opponent mirror if needed.
-      // Without clamping, cards dragged to the edge can end up outside the
-      // clipped territory region and become invisible/unreachable.
-      const maxNormX = Math.max(0, 1 - cardWidth / zoneW);
-      const maxNormY = Math.max(0, 1 - cardHeight / zoneH);
-      const normX = (px: number) => {
-        const raw = (px - zoneOffX) / zoneW;
-        const clamped = isFreeFormZone(targetZone)
-          ? Math.max(0, Math.min(raw, maxNormX))
-          : raw;
-        return isOpponentTarget ? 1 - clamped : clamped;
-      };
-      const normY = (py: number) => {
-        const raw = (py - zoneOffY) / zoneH;
-        const clamped = isFreeFormZone(targetZone)
-          ? Math.max(0, Math.min(raw, maxNormY))
-          : raw;
-        return isOpponentTarget ? 1 - clamped : clamped;
-      };
+      const targetOwner: 'my' | 'opponent' = isOpponentTarget ? 'opponent' : 'my';
+      const clampOpts = isFreeFormZone(targetZone) ? { cardWidth, cardHeight } : undefined;
+      const toDb = (px: number, py: number) => toDbPos(px, py, zoneRect!, targetOwner, clampOpts);
 
       // Same free-form zone: just update position.
       // Restore the node to its original parent Group first — it was reparented
@@ -1394,12 +1365,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
             }
           }
           // Build positions for batch move (normalized 0–1)
+          const leadDb = toDb(dropX, dropY);
           const positions: Record<string, { posX: string; posY: string }> = {
-            [card.instanceId]: { posX: String(normX(dropX)), posY: String(normY(dropY)) },
+            [card.instanceId]: { posX: String(leadDb.x), posY: String(leadDb.y) },
           };
           if (followerOffsets) {
             for (const [id, offset] of followerOffsets) {
-              positions[id] = { posX: String(normX(dropX + offset.dx)), posY: String(normY(dropY + offset.dy)) };
+              const fDb = toDb(dropX + offset.dx, dropY + offset.dy);
+              positions[id] = { posX: String(fDb.x), posY: String(fDb.y) };
             }
           }
           moveCardsBatch(
@@ -1409,7 +1382,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
           );
           clearSelection();
         } else {
-          updateCardPosition(cardId, String(normX(dropX)), String(normY(dropY)));
+          const singleDb = toDb(dropX, dropY);
+          updateCardPosition(cardId, String(singleDb.x), String(singleDb.y));
         }
         return;
       }
@@ -1468,12 +1442,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
             if (targetZone === 'deck') {
               moveCardsBatch(JSON.stringify(cardIds), targetZone, undefined, targetOwnerId);
             } else if (isFreeFormZone(targetZone)) {
+              const leadDb = toDb(adjDropX, adjDropY);
               const positions: Record<string, { posX: string; posY: string }> = {
-                [card.instanceId]: { posX: String(normX(adjDropX)), posY: String(normY(adjDropY)) },
+                [card.instanceId]: { posX: String(leadDb.x), posY: String(leadDb.y) },
               };
               if (followerOffsets) {
                 for (const [id, offset] of followerOffsets) {
-                  positions[id] = { posX: String(normX(adjDropX + offset.dx)), posY: String(normY(adjDropY + offset.dy)) };
+                  const fDb = toDb(adjDropX + offset.dx, adjDropY + offset.dy);
+                  positions[id] = { posX: String(fDb.x), posY: String(fDb.y) };
                 }
               }
               moveCardsBatch(JSON.stringify(cardIds), targetZone, JSON.stringify(positions), targetOwnerId);
@@ -1481,7 +1457,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
               moveCardsBatch(JSON.stringify(cardIds), targetZone, undefined, targetOwnerId);
             }
           } else if (isFreeFormZone(targetZone)) {
-            moveCard(cardId, targetZone, '', String(normX(adjDropX)), String(normY(adjDropY)), targetOwnerId);
+            const db = toDb(adjDropX, adjDropY);
+            moveCard(cardId, targetZone, '', String(db.x), String(db.y), targetOwnerId);
           } else if (isAutoArrangeZone(targetZone)) {
             moveCard(cardId, targetZone, '', '0', '0', targetOwnerId);
           } else {
@@ -1535,12 +1512,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
             moveCardsBatch(JSON.stringify(cardIds), targetZone, undefined, targetOwnerId);
           }
         } else if (isFreeFormZone(targetZone)) {
+          const leadDb = toDb(adjDropX, adjDropY);
           const positions: Record<string, { posX: string; posY: string }> = {
-            [card.instanceId]: { posX: String(normX(adjDropX)), posY: String(normY(adjDropY)) },
+            [card.instanceId]: { posX: String(leadDb.x), posY: String(leadDb.y) },
           };
           if (followerOffsets) {
             for (const [id, offset] of followerOffsets) {
-              positions[id] = { posX: String(normX(adjDropX + offset.dx)), posY: String(normY(adjDropY + offset.dy)) };
+              const fDb = toDb(adjDropX + offset.dx, adjDropY + offset.dy);
+              positions[id] = { posX: String(fDb.x), posY: String(fDb.y) };
             }
           }
           moveCardsBatch(
@@ -1554,7 +1533,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
         }
         clearSelection();
       } else if (isFreeFormZone(targetZone)) {
-        moveCard(cardId, targetZone, '', String(normX(adjDropX)), String(normY(adjDropY)), targetOwnerId);
+        const db = toDb(adjDropX, adjDropY);
+        moveCard(cardId, targetZone, '', String(db.x), String(db.y), targetOwnerId);
       } else if (isAutoArrangeZone(targetZone)) {
         // Auto-arrange zone: positions are ignored by rendering
         moveCard(cardId, targetZone, '', '0', '0', targetOwnerId);
