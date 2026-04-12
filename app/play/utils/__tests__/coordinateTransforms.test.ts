@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   toScreenPos,
   toDbPos,
+  cardCenter,
 } from '../coordinateTransforms';
 
 // Shared test zone: x=100, y=200, width=400, height=300
@@ -132,4 +133,35 @@ describe('round-trip: toDbPos(toScreenPos(db, zone, owner), zone, owner) ≈ db'
       });
     }
   }
+});
+
+// ── cardCenter ───────────────────────────────────────────────────────────────
+
+describe('cardCenter', () => {
+  it('rotation=0 → anchor + half dimensions', () => {
+    const result = cardCenter(100, 200, 60, 80, 0);
+    expect(result).toEqual({ x: 130, y: 240 });
+  });
+
+  it('rotation=180 → anchor - half dimensions', () => {
+    const result = cardCenter(100, 200, 60, 80, 180);
+    expect(result).toEqual({ x: 70, y: 160 });
+  });
+
+  it('rotation=-180 → anchor - half dimensions', () => {
+    const result = cardCenter(100, 200, 60, 80, -180);
+    expect(result).toEqual({ x: 70, y: 160 });
+  });
+
+  it('rotation=90 → not rotated (threshold is >90)', () => {
+    // abs(90) is NOT > 90, so treated as normal
+    const result = cardCenter(100, 200, 60, 80, 90);
+    expect(result).toEqual({ x: 130, y: 240 });
+  });
+
+  it('rotation=91 → rotated', () => {
+    // abs(91) > 90 → rotated
+    const result = cardCenter(100, 200, 60, 80, 91);
+    expect(result).toEqual({ x: 70, y: 160 });
+  });
 });

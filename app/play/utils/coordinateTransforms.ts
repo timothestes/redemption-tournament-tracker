@@ -51,3 +51,22 @@ export function toDbPos(
     y: owner === 'opponent' ? 1 - rawY : rawY,
   };
 }
+
+/**
+ * Compute the visual center of a card given its anchor position, dimensions,
+ * and rotation. For rotation=180 (opponent territory), the Konva anchor is
+ * the bottom-right corner, so center = anchor - half-dimensions.
+ */
+export function cardCenter(
+  anchorX: number,
+  anchorY: number,
+  width: number,
+  height: number,
+  rotation: number,
+): { x: number; y: number } {
+  const isRotated = Math.abs(rotation) > 90;
+  return {
+    x: isRotated ? anchorX - width / 2 : anchorX + width / 2,
+    y: isRotated ? anchorY - height / 2 : anchorY + height / 2,
+  };
+}
