@@ -12,7 +12,7 @@ import {
   calculateMultiplayerLayout,
   type ZoneRect,
 } from '../layout/multiplayerLayout';
-import { toScreenPos } from '../utils/coordinateTransforms';
+import { toScreenPos, toDbPos } from '../utils/coordinateTransforms';
 import { calculateHandPositions } from '../layout/multiplayerHandLayout';
 import { calculateAutoArrangePositions } from '../layout/multiplayerAutoArrange';
 import {
@@ -775,18 +775,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
 
       const execute = () => {
         if (zone && posX != null && posY != null) {
-          let rawX = (posX - zone.x) / zone.width;
-          let rawY = (posY - zone.y) / zone.height;
-          // Clamp so the entire card stays within the zone bounds
-          if (isFreeFormZone(String(toZone))) {
-            const maxX = Math.max(0, 1 - cardWidth / zone.width);
-            const maxY = Math.max(0, 1 - cardHeight / zone.height);
-            rawX = Math.max(0, Math.min(rawX, maxX));
-            rawY = Math.max(0, Math.min(rawY, maxY));
-          }
-          const normX = isOppZone ? 1 - rawX : rawX;
-          const normY = isOppZone ? 1 - rawY : rawY;
-          gameState.moveCard(BigInt(id), String(toZone), undefined, normX.toString(), normY.toString(), ownerId);
+          const owner: 'my' | 'opponent' = isOppZone ? 'opponent' : 'my';
+          const clamp = isFreeFormZone(String(toZone)) ? { cardWidth, cardHeight } : undefined;
+          const db = toDbPos(posX, posY, zone, owner, clamp);
+          gameState.moveCard(BigInt(id), String(toZone), undefined, db.x.toString(), db.y.toString(), ownerId);
         } else {
           gameState.moveCard(BigInt(id), String(toZone), undefined, posX?.toString(), posY?.toString(), ownerId);
         }
@@ -843,18 +835,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
         let normX = posX?.toString();
         let normY = posY?.toString();
         if (zone && posX != null && posY != null) {
-          let rawX = (posX - zone.x) / zone.width;
-          let rawY = (posY - zone.y) / zone.height;
-          // Clamp so the entire card stays within the zone bounds
-          if (isFreeFormZone(String(toZone))) {
-            const maxX = Math.max(0, 1 - cardWidth / zone.width);
-            const maxY = Math.max(0, 1 - cardHeight / zone.height);
-            rawX = Math.max(0, Math.min(rawX, maxX));
-            rawY = Math.max(0, Math.min(rawY, maxY));
-          }
-          // Inverse-mirror for opponent zones (they render with 1-posX, 1-posY)
-          normX = (isOppZone ? 1 - rawX : rawX).toString();
-          normY = (isOppZone ? 1 - rawY : rawY).toString();
+          const owner: 'my' | 'opponent' = isOppZone ? 'opponent' : 'my';
+          const clamp = isFreeFormZone(String(toZone)) ? { cardWidth, cardHeight } : undefined;
+          const db = toDbPos(posX, posY, zone, owner, clamp);
+          normX = db.x.toString();
+          normY = db.y.toString();
         }
         moveOpponentCard(
           BigInt(approvedSearchRequest.id),
