@@ -102,42 +102,26 @@ export async function saveDeckAction(params: SaveDeckParams) {
         };
       }
 
-      // Delete existing cards
-      const { error: deleteError } = await supabase
-        .from("deck_cards")
-        .delete()
-        .eq("deck_id", deckId);
+      // Atomically replace deck cards — if insert fails, delete rolls back too
+      const cardsForRpc = cards.map((card) => ({
+        card_name: card.card_name,
+        card_set: card.card_set || null,
+        card_img_file: card.card_img_file || null,
+        quantity: card.quantity,
+        is_reserve: card.is_reserve ?? false,
+      }));
 
-      if (deleteError) {
-        console.error("Error deleting old deck cards:", deleteError);
+      const { error: replaceError } = await supabase.rpc("replace_deck_cards", {
+        p_deck_id: deckId,
+        p_cards: cardsForRpc,
+      });
+
+      if (replaceError) {
+        console.error("Error replacing deck cards:", replaceError);
         return {
           success: false,
-          error: "Failed to update deck cards",
+          error: "Failed to save deck cards",
         };
-      }
-
-      // Insert updated cards
-      if (cards.length > 0) {
-        const cardsToInsert = cards.map((card) => ({
-          deck_id: deckId,
-          card_name: card.card_name,
-          card_set: card.card_set || null,
-          card_img_file: card.card_img_file || null,
-          quantity: card.quantity,
-          is_reserve: card.is_reserve,
-        }));
-
-        const { error: insertError } = await supabase
-          .from("deck_cards")
-          .insert(cardsToInsert);
-
-        if (insertError) {
-          console.error("Error inserting deck cards:", insertError);
-          return {
-            success: false,
-            error: "Failed to save deck cards",
-          };
-        }
       }
 
       // Run comprehensive deck legality check
@@ -199,7 +183,7 @@ export async function saveDeckAction(params: SaveDeckParams) {
         };
       }
 
-      // Insert cards
+      // Insert cards in batches to avoid payload size limits
       if (cards.length > 0) {
         const cardsToInsert = cards.map((card) => ({
           deck_id: deck.id,
@@ -210,18 +194,22 @@ export async function saveDeckAction(params: SaveDeckParams) {
           is_reserve: card.is_reserve,
         }));
 
-        const { error: insertError } = await supabase
-          .from("deck_cards")
-          .insert(cardsToInsert);
+        const BATCH_SIZE = 500;
+        for (let i = 0; i < cardsToInsert.length; i += BATCH_SIZE) {
+          const batch = cardsToInsert.slice(i, i + BATCH_SIZE);
+          const { error: insertError } = await supabase
+            .from("deck_cards")
+            .insert(batch);
 
-        if (insertError) {
-          console.error("Error inserting deck cards:", insertError);
-          // Rollback: delete the deck we just created
-          await supabase.from("decks").delete().eq("id", deck.id);
-          return {
-            success: false,
-            error: "Failed to save deck cards",
-          };
+          if (insertError) {
+            console.error(`Error inserting deck cards batch ${Math.floor(i / BATCH_SIZE) + 1}:`, insertError);
+            // Rollback: delete the deck we just created
+            await supabase.from("decks").delete().eq("id", deck.id);
+            return {
+              success: false,
+              error: "Failed to save deck cards",
+            };
+          }
         }
       }
 

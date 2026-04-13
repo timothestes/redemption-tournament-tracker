@@ -46,7 +46,16 @@ export async function getCardDatabase(): Promise<Map<string, CardData>> {
 }
 
 async function fetchAndParse(): Promise<Map<string, CardData>> {
-  const response = await fetch(CARD_DATA_URL);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
+
+  let response: Response;
+  try {
+    response = await fetch(CARD_DATA_URL, { signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+
   if (!response.ok) {
     throw new Error(
       `Failed to fetch card database: ${response.status} ${response.statusText}`

@@ -133,6 +133,7 @@ bright green in dark mode needs dimming
 add aod button
 
 ## long term
+Pre-bake duplicate card groups at build time (static JSON) instead of fetching from Supabase at runtime — eliminates cold-start connection pressure on deckcheck
 add maybeboard
 add animations to goldfish/play mode
 Collection Tracker
