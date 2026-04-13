@@ -102,6 +102,7 @@ We will want to let the host print it out easily
 ## short term
 
 ## long term
+Pre-bake duplicate card groups at build time (static JSON) instead of fetching from Supabase at runtime — eliminates cold-start connection pressure on deckcheck
 add maybeboard
 add animations to goldfish mode
 Collection Tracker
