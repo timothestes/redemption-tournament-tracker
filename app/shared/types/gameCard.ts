@@ -65,6 +65,7 @@ export interface GameCard {
   toughness: string;
   specialAbility: string;
   identifier: string;
+  reference: string;
   alignment: string;
   isMeek: boolean;
   counters: Counter[];
@@ -138,6 +139,7 @@ export interface DeckDataForGoldfish {
     card_toughness: string;
     card_special_ability: string;
     card_identifier: string;
+    card_reference: string;
     card_alignment: string;
     quantity: number;
     is_reserve: boolean;

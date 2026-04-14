@@ -23,4 +23,5 @@ export default __t.row({
   handRevealed: __t.bool().name("hand_revealed"),
   pendingDeckData: __t.string().name("pending_deck_data"),
   revealedCards: __t.string().name("revealed_cards"),
+  reserveRevealed: __t.bool().name("reserve_revealed"),
 });

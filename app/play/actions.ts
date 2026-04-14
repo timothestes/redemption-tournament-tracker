@@ -11,7 +11,7 @@ const CARD_DATA_URL =
  * Key: "cardName|cardSet|imgFile", "cardName|cardSet", or "cardName" for fallback.
  */
 async function fetchCardLookup(): Promise<
-  Map<string, { type: string; brigade: string; strength: string; toughness: string; specialAbility: string; identifier: string; alignment: string }>
+  Map<string, { type: string; brigade: string; strength: string; toughness: string; specialAbility: string; identifier: string; reference: string; alignment: string }>
 > {
   const response = await fetch(CARD_DATA_URL, { next: { revalidate: 3600 } });
   const text = await response.text();
@@ -20,7 +20,7 @@ async function fetchCardLookup(): Promise<
 
   const map = new Map<
     string,
-    { type: string; brigade: string; strength: string; toughness: string; specialAbility: string; identifier: string; alignment: string }
+    { type: string; brigade: string; strength: string; toughness: string; specialAbility: string; identifier: string; reference: string; alignment: string }
   >();
 
   for (const line of dataLines) {
@@ -36,6 +36,7 @@ async function fetchCardLookup(): Promise<
       toughness: cols[7] || '',
       specialAbility: cols[10] || '',
       identifier: cols[9] || '',
+      reference: cols[12] || '',
       alignment: cols[14] || '',
     };
 
@@ -59,6 +60,7 @@ export interface GameCardData {
   toughness: string;
   alignment: string;
   identifier: string;
+  reference: string;
   specialAbility: string;
   isReserve: boolean;
 }
@@ -140,6 +142,7 @@ export async function loadDeckForGame(deckId: string): Promise<LoadDeckResult> {
         toughness: enriched?.toughness || '',
         alignment: enriched?.alignment || '',
         identifier: enriched?.identifier || '',
+        reference: enriched?.reference || '',
         specialAbility: enriched?.specialAbility || '',
         isReserve: card.is_reserve || false,
       });

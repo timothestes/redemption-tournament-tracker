@@ -33,6 +33,7 @@ function expandDeckCards(deck: DeckDataForGoldfish): { main: GameCard[]; reserve
         toughness: dc.card_toughness,
         specialAbility: dc.card_special_ability,
         identifier: dc.card_identifier,
+        reference: dc.card_reference,
         alignment: dc.card_alignment,
         isMeek: false,
         counters: [],

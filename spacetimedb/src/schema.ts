@@ -67,6 +67,7 @@ export const Player = table(
     handRevealed: t.bool(),       // When true, hand is visible to opponent
     pendingDeckData: t.string(),  // JSON deck data, stored until game starts
     revealedCards: t.string(),    // JSON array of card instance IDs revealed from deck, "" when none
+    reserveRevealed: t.bool().default(false), // When true, reserve is visible to opponent
   }
 );
 

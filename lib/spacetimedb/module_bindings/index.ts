@@ -45,6 +45,7 @@ import DrawCardReducer from "./draw_card_reducer";
 import DrawMultipleReducer from "./draw_multiple_reducer";
 import EndTurnReducer from "./end_turn_reducer";
 import ExchangeCardsReducer from "./exchange_cards_reducer";
+import ExchangeFromDeckReducer from "./exchange_from_deck_reducer";
 import FlipCardReducer from "./flip_card_reducer";
 import JoinAsSpectatorReducer from "./join_as_spectator_reducer";
 import JoinGameReducer from "./join_game_reducer";
@@ -82,6 +83,7 @@ import ShuffleCardIntoDeckReducer from "./shuffle_card_into_deck_reducer";
 import ShuffleDeckReducer from "./shuffle_deck_reducer";
 import SpawnLostSoulReducer from "./spawn_lost_soul_reducer";
 import ToggleRevealHandReducer from "./toggle_reveal_hand_reducer";
+import ToggleRevealReserveReducer from "./toggle_reveal_reserve_reducer";
 import UnmeekCardReducer from "./unmeek_card_reducer";
 import UpdateCardPositionReducer from "./update_card_position_reducer";
 import UpdateLobbyMessageReducer from "./update_lobby_message_reducer";
@@ -268,6 +270,7 @@ const reducersSchema = __reducers(
   __reducerSchema("draw_multiple", DrawMultipleReducer),
   __reducerSchema("end_turn", EndTurnReducer),
   __reducerSchema("exchange_cards", ExchangeCardsReducer),
+  __reducerSchema("exchange_from_deck", ExchangeFromDeckReducer),
   __reducerSchema("flip_card", FlipCardReducer),
   __reducerSchema("join_as_spectator", JoinAsSpectatorReducer),
   __reducerSchema("join_game", JoinGameReducer),
@@ -305,6 +308,7 @@ const reducersSchema = __reducers(
   __reducerSchema("shuffle_deck", ShuffleDeckReducer),
   __reducerSchema("spawn_lost_soul", SpawnLostSoulReducer),
   __reducerSchema("toggle_reveal_hand", ToggleRevealHandReducer),
+  __reducerSchema("toggle_reveal_reserve", ToggleRevealReserveReducer),
   __reducerSchema("unmeek_card", UnmeekCardReducer),
   __reducerSchema("update_card_position", UpdateCardPositionReducer),
   __reducerSchema("update_lobby_message", UpdateLobbyMessageReducer),

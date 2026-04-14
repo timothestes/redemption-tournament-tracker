@@ -10,6 +10,8 @@ export interface ModalGameActions {
   moveCardToBottomOfDeck(instanceId: string): void;
   shuffleDeck(): void;
   shuffleCardIntoDeck(instanceId: string): void;
+  /** Atomic exchange: send exchangeCardIds to deck, move replacements to target zones */
+  exchangeFromDeck?(exchangeCardIds: string[], replacementMoves: { cardId: string; toZone: string; posX: string; posY: string }[]): void;
 }
 
 export interface ModalGameContextValue {

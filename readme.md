@@ -165,6 +165,7 @@ fix logs when someone drags cards to deck, do not show card names in logs
 add text notes?
 hand has this weird visual glitch with a ghost card?? Think it happens if exchange happens
 if lost souls are put in play they should show up in the logs
+
 disable double click deck to draw
 Turn counter should track each person's turn
 Add reference to the search drop down
@@ -177,9 +178,8 @@ dragging a soul to land of redemption should put it "on top"
 spawn lost soul token should put the lost soul on the right of all lost souls
 when dragging cards to opponent's discard, should drag to the top
 pressing esc should exit discard modal
-right clicking individual cards in discard pile should show card options
 Opponent Hand/Opponent Territory -> opponent's hand/opponent's territory
 my discard zone and opp's discard menu modals are different for some reason
 opponent searched and discarded a card, did not show up in the logs well (kurthake move opponent card)
 set default to last played
-not a lot of feedback about the opponent conceding the game. ned to fix
+not a lot of feedback about the opponent conceding the game. nedd to fix

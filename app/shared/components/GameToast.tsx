@@ -46,9 +46,9 @@ export function GameToastContainer() {
     <div
       style={{
         position: 'absolute',
-        bottom: 70,
+        top: '50%',
         left: '50%',
-        transform: 'translateX(-50%)',
+        transform: 'translate(-50%, -50%)',
         zIndex: 900,
         display: 'flex',
         flexDirection: 'column-reverse',

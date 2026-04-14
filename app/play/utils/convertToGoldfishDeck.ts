@@ -15,6 +15,7 @@ export interface GameCardData {
   toughness: string;
   alignment: string;
   identifier: string;
+  reference: string;
   specialAbility: string;
   isReserve: boolean;
 }
@@ -70,6 +71,7 @@ export function convertToGoldfishDeck(
     card_toughness: card.toughness,
     card_special_ability: card.specialAbility,
     card_identifier: card.identifier,
+    card_reference: card.reference,
     card_alignment: card.alignment,
     quantity,
     is_reserve: card.isReserve,

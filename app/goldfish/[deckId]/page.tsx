@@ -16,7 +16,7 @@ export const metadata = {
  * Key: "cardName|cardSet" (lowercase) for matching against deck_cards rows.
  */
 async function fetchCardLookup(): Promise<
-  Map<string, { type: string; brigade: string; strength: string; toughness: string; specialAbility: string; identifier: string; alignment: string }>
+  Map<string, { type: string; brigade: string; strength: string; toughness: string; specialAbility: string; identifier: string; reference: string; alignment: string }>
 > {
   const response = await fetch(CARD_DATA_URL, { next: { revalidate: 3600 } });
   const text = await response.text();
@@ -25,7 +25,7 @@ async function fetchCardLookup(): Promise<
 
   const map = new Map<
     string,
-    { type: string; brigade: string; strength: string; toughness: string; specialAbility: string; identifier: string; alignment: string }
+    { type: string; brigade: string; strength: string; toughness: string; specialAbility: string; identifier: string; reference: string; alignment: string }
   >();
 
   for (const line of dataLines) {
@@ -41,6 +41,7 @@ async function fetchCardLookup(): Promise<
       toughness: cols[7] || '',
       specialAbility: cols[10] || '',
       identifier: cols[9] || '',
+      reference: cols[12] || '',
       alignment: cols[14] || '',
     };
 
@@ -99,6 +100,7 @@ export default async function GoldfishPage({
         card_toughness: enriched?.toughness || '',
         card_special_ability: enriched?.specialAbility || '',
         card_identifier: enriched?.identifier || '',
+        card_reference: enriched?.reference || '',
         card_alignment: enriched?.alignment || '',
         quantity: c.quantity || 1,
         is_reserve: c.is_reserve || false,

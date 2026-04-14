@@ -108,6 +108,7 @@ function cardInstanceToGameCard(
     toughness: card.toughness,
     specialAbility: card.specialAbility,
     identifier: card.identifier,
+    reference: '',
     alignment: card.alignment,
     isMeek: card.isMeek,
     isFlipped: card.isFlipped,
@@ -436,6 +437,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
   const [opponentRevealDismissed, setOpponentRevealDismissed] = useState(false);
   const [opponentRevealSnapshot, setOpponentRevealSnapshot] = useState<string[]>([]);
   const [handMenu, setHandMenu] = useState<{ x: number; y: number } | null>(null);
+  const [reserveMenu, setReserveMenu] = useState<{ x: number; y: number } | null>(null);
   const revealAutoHideRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [revealBarShrinking, setRevealBarShrinking] = useState(false);
 
@@ -582,6 +584,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       moveCardToBottomOfDeck: (id) => gameState.moveCardToBottomOfDeck(BigInt(id)),
       shuffleDeck: () => gameState.shuffleDeck(),
       shuffleCardIntoDeck: (id) => gameState.shuffleCardIntoDeck(BigInt(id)),
+      exchangeFromDeck: (exchangeCardIds, replacementMoves) => {
+        gameState.exchangeFromDeck(
+          JSON.stringify(exchangeCardIds),
+          JSON.stringify(replacementMoves),
+        );
+      },
     },
   }), [myCards, counters, gameState, findMyCardById, checkReserveProtection, checkReserveBatchProtection]);
 
@@ -622,6 +630,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
     setOpponentDeckMenu(null);
     setOpponentPeekState(null);
     setHandMenu(null);
+    setReserveMenu(null);
   }, []);
 
   // ---- moveDeckCardsToZone helper ----
@@ -770,6 +779,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
     startMultiDrag: modalStartMultiDrag,
     ghostRef: modalGhostRef,
     didDragRef: modalDidDragRef,
+    validDropRef: modalValidDropRef,
   } = useModalCardDrag({
     stageRef,
     zoneLayout: myZones as Partial<Record<ZoneId, GoldfishZoneRect>>,
@@ -2539,6 +2549,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
                     x: e.evt.clientX,
                     y: e.evt.clientY,
                   });
+                } : zoneKey === 'reserve' ? (e: Konva.KonvaEventObject<PointerEvent>) => {
+                  e.evt.preventDefault();
+                  closeAllMenus();
+                  setReserveMenu({
+                    x: e.evt.clientX,
+                    y: e.evt.clientY,
+                  });
                 } : undefined}
               >
                 {/* Count badge */}
@@ -2555,6 +2572,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
                     verticalAlign="middle"
                   />
                 </Group>
+
+                {/* Revealed indicator for own reserve */}
+                {zoneKey === 'reserve' && (gameState.myPlayer?.reserveRevealed ?? false) && (
+                  <Group x={zone.x + 4} y={zone.y + 2}>
+                    <Rect width={18} height={18} fill="#1a2e1a" cornerRadius={4} stroke="#5a9a5a" strokeWidth={1} />
+                    <Text
+                      text="👁"
+                      fontSize={10}
+                      width={18}
+                      height={18}
+                      align="center"
+                      verticalAlign="middle"
+                    />
+                  </Group>
+                )}
 
                 {/* LOR: spread all cards face-up with horizontal overlap */}
                 {zoneKey === 'land-of-redemption' && count > 0 && (() => {
@@ -2687,15 +2719,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
             const cy = zone.y + 18 + Math.max(0, (zone.height - 18 - pileCardHeight) / 2);
 
             const topCard = cards[cards.length - 1];
-            const showFace = (zoneKey === 'discard' || zoneKey === 'land-of-redemption') && topCard && !topCard.isFlipped;
+            const oppReserveRevealed = gameState.opponentPlayer?.reserveRevealed ?? false;
+            const showFace = ((zoneKey === 'discard' || zoneKey === 'land-of-redemption') && topCard && !topCard.isFlipped)
+              || (zoneKey === 'reserve' && oppReserveRevealed && topCard);
 
             return (
               <Group
                 key={`opp-pile-${zoneKey}`}
-                onClick={zoneKey !== 'deck' && zoneKey !== 'reserve' ? () => {
+                onClick={zoneKey !== 'deck' && !(zoneKey === 'reserve' && !oppReserveRevealed) ? () => {
                   setBrowseOpponentZone(zoneKey);
                 } : undefined}
-                onContextMenu={['deck', 'reserve'].includes(zoneKey) ? (e: Konva.KonvaEventObject<PointerEvent>) => {
+                onContextMenu={['deck', 'reserve'].includes(zoneKey) && !(zoneKey === 'reserve' && oppReserveRevealed) ? (e: Konva.KonvaEventObject<PointerEvent>) => {
                   e.evt.preventDefault();
                   closeAllMenus();
                   if (zoneKey === 'deck') {
@@ -2725,6 +2759,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
                     verticalAlign="middle"
                   />
                 </Group>
+
+                {/* Revealed indicator for reserve */}
+                {zoneKey === 'reserve' && oppReserveRevealed && (
+                  <Group x={zone.x + 4} y={zone.y + 2}>
+                    <Rect width={18} height={18} fill="#1a2e1a" cornerRadius={4} stroke="#5a9a5a" strokeWidth={1} />
+                    <Text
+                      text="👁"
+                      fontSize={10}
+                      width={18}
+                      height={18}
+                      align="center"
+                      verticalAlign="middle"
+                    />
+                  </Group>
+                )}
 
                 {/* Opponent LOR: spread all cards face-up with horizontal overlap (rotated 180°) */}
                 {zoneKey === 'land-of-redemption' && count > 0 && (() => {
@@ -3135,6 +3184,90 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
         />
       )}
 
+      {reserveMenu && (() => {
+        const isRevealed = gameState.myPlayer?.reserveRevealed ?? false;
+        const MENU_WIDTH = 200;
+        const rightAligned = reserveMenu.x + MENU_WIDTH > window.innerWidth;
+        const menuLeft = rightAligned ? Math.max(0, reserveMenu.x - MENU_WIDTH) : reserveMenu.x;
+        return (
+          <div
+            ref={(el) => {
+              if (!el) return;
+              const handleClick = (e: MouseEvent) => {
+                if (!el.contains(e.target as Node)) setReserveMenu(null);
+              };
+              const handleKey = (e: KeyboardEvent) => {
+                if (e.key === 'Escape') setReserveMenu(null);
+              };
+              document.addEventListener('mousedown', handleClick);
+              document.addEventListener('keydown', handleKey);
+              // Cleanup via data attribute to avoid stale closures
+              const prev = (el as any).__cleanup;
+              if (prev) prev();
+              (el as any).__cleanup = () => {
+                document.removeEventListener('mousedown', handleClick);
+                document.removeEventListener('keydown', handleKey);
+              };
+            }}
+            onContextMenu={(e) => e.preventDefault()}
+            style={{
+              position: 'fixed',
+              left: menuLeft,
+              top: Math.min(reserveMenu.y, window.innerHeight - 100),
+              background: 'var(--gf-bg)',
+              border: '1px solid var(--gf-border)',
+              borderRadius: 6,
+              padding: '4px 0',
+              zIndex: 900,
+              boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <div style={{
+              padding: '4px 14px 6px',
+              color: 'var(--gf-text-dim)',
+              fontSize: 10,
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              userSelect: 'none',
+            }}>
+              Reserve ({myCards['reserve']?.length ?? 0} cards)
+            </div>
+            <div style={{ height: 1, background: 'var(--gf-border)', margin: '4px 8px', opacity: 0.5 }} />
+            <button
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                width: '100%',
+                padding: '6px 14px',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--gf-text)',
+                fontSize: 13,
+                textAlign: 'left' as const,
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+              }}
+              onClick={() => {
+                gameState.revealReserve(!isRevealed);
+                setReserveMenu(null);
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              {isRevealed ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              )}
+              {isRevealed ? 'Hide Reserve' : 'Reveal Reserve'}
+            </button>
+          </div>
+        );
+      })()}
+
       {opponentDeckMenu && (
         <DeckContextMenu
           x={opponentDeckMenu.x}
@@ -3448,6 +3581,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
             onStartDrag={modalStartDrag}
             didDragRef={modalDidDragRef}
             isDragActive={modalDrag.isDragging}
+            validDropRef={modalValidDropRef}
           />
         )}
       </ModalGameProvider>
@@ -3720,7 +3854,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       {/* ================================================================
           Card hover preview — floating tooltip near cursor
           ================================================================ */}
-      {hoveredCard && hoverReady && !isLoupeVisible && !isDraggingRef.current && !contextMenu && !multiCardContextMenu && !deckMenu && !zoneMenu && !lorMenu && !opponentZoneMenu && !handMenu && (() => {
+      {hoveredCard && hoverReady && !isLoupeVisible && !isDraggingRef.current && !contextMenu && !multiCardContextMenu && !deckMenu && !zoneMenu && !lorMenu && !opponentZoneMenu && !handMenu && !reserveMenu && (() => {
         const previewWidth = 280;
         const previewHeight = Math.round(previewWidth * 1.4);
         const imageUrl = getSharedCardImageUrl(hoveredCard.cardImgFile);

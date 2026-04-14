@@ -18,6 +18,8 @@ interface DeckExchangeModalProps {
   onStartDrag?: (card: GameCard, imageUrl: string, e: React.PointerEvent) => void;
   didDragRef?: React.MutableRefObject<boolean>;
   isDragActive?: boolean;
+  /** Set by useModalCardDrag — true only when the drag ended on a valid zone */
+  validDropRef?: React.MutableRefObject<boolean>;
 }
 
 export function DeckExchangeModal({
@@ -27,11 +29,12 @@ export function DeckExchangeModal({
   onStartDrag,
   didDragRef,
   isDragActive,
+  validDropRef,
 }: DeckExchangeModalProps) {
   const { zones, actions } = useModalGame();
-  const { moveCard, moveCardToTopOfDeck, shuffleDeck } = actions;
+  const { moveCardToTopOfDeck, shuffleDeck, exchangeFromDeck } = actions;
   const [search, setSearch] = useState('');
-  const [searchField, setSearchField] = useState<'all' | 'type' | 'name' | 'brigade' | 'alignment' | 'ability' | 'identifier'>('all');
+  const [searchField, setSearchField] = useState<'all' | 'type' | 'name' | 'brigade' | 'alignment' | 'ability' | 'identifier' | 'reference'>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave } = useModalCardHover(350, { setPreviewCard, isLoupeVisible });
@@ -50,6 +53,7 @@ export function DeckExchangeModal({
     { id: 'alignment', label: 'Alignment' },
     { id: 'identifier', label: 'Identifier' },
     { id: 'ability', label: 'Ability' },
+    { id: 'reference', label: 'Reference' },
   ];
 
   const matchesSearch = (c: GameCard, term: string): boolean => {
@@ -61,7 +65,8 @@ export function DeckExchangeModal({
         c.brigade.toLowerCase().includes(t) ||
         c.alignment.toLowerCase().includes(t) ||
         c.identifier.toLowerCase().includes(t) ||
-        c.specialAbility.toLowerCase().includes(t)
+        c.specialAbility.toLowerCase().includes(t) ||
+        c.reference.toLowerCase().includes(t)
       );
     }
     switch (searchField) {
@@ -71,6 +76,7 @@ export function DeckExchangeModal({
       case 'alignment': return c.alignment.toLowerCase().includes(t);
       case 'identifier': return c.identifier.toLowerCase().includes(t);
       case 'ability': return c.specialAbility.toLowerCase().includes(t);
+      case 'reference': return c.reference.toLowerCase().includes(t);
     }
   };
 
@@ -144,28 +150,35 @@ export function DeckExchangeModal({
   // When a drag completes (isDragActive goes true→false), the shared hook
   // already moved the dragged card to the target zone at the drop position.
   // We now send the exchange cards to the deck and complete.
-  // Use refs for callbacks so the effect only re-runs when isDragActive changes,
-  // preventing double-fires from subscription-driven reference changes.
+  // IMPORTANT: Only proceed if validDropRef indicates the drop landed on a
+  // valid zone. Without this guard, dropping outside a zone would still move
+  // exchange cards to the deck with no replacement — causing a desync.
   const dragCompleteRef = useRef(() => {
     const draggedId = draggedCardIdRef.current;
-    if (draggedId) {
+    if (draggedId && validDropRef?.current) {
       for (const id of exchangeCardIds) {
         moveCardToTopOfDeck(id);
       }
       shuffleDeck();
       draggedCardIdRef.current = null;
       onComplete();
+    } else {
+      // Invalid drop — reset drag state, keep modal open
+      draggedCardIdRef.current = null;
     }
   });
   dragCompleteRef.current = () => {
     const draggedId = draggedCardIdRef.current;
-    if (draggedId) {
+    if (draggedId && validDropRef?.current) {
       for (const id of exchangeCardIds) {
         moveCardToTopOfDeck(id);
       }
       shuffleDeck();
       draggedCardIdRef.current = null;
       onComplete();
+    } else {
+      // Invalid drop — reset drag state, keep modal open
+      draggedCardIdRef.current = null;
     }
   };
 
@@ -185,22 +198,32 @@ export function DeckExchangeModal({
 
     const pickedIds = Array.from(selectedIds);
 
-    // Move picked cards from deck to the same zone and position as the exchanged cards
-    for (let i = 0; i < needCount; i++) {
-      const source = exchangeCards[i];
-      moveCard(pickedIds[i], source.zone, undefined, source.posX, source.posY);
+    if (exchangeFromDeck) {
+      // Atomic path: single reducer handles the entire exchange
+      const replacementMoves = pickedIds.map((cardId, i) => {
+        const source = exchangeCards[i];
+        return {
+          cardId,
+          toZone: source.zone,
+          posX: source.posX != null ? String(source.posX) : '',
+          posY: source.posY != null ? String(source.posY) : '',
+        };
+      });
+      exchangeFromDeck(exchangeCardIds, replacementMoves);
+    } else {
+      // Fallback for goldfish/non-multiplayer: use individual calls
+      for (let i = 0; i < needCount; i++) {
+        const source = exchangeCards[i];
+        actions.moveCard(pickedIds[i], source.zone, undefined, source.posX, source.posY);
+      }
+      for (const id of exchangeCardIds) {
+        moveCardToTopOfDeck(id);
+      }
+      shuffleDeck();
     }
-
-    // Move the exchanged cards to top of deck
-    for (const id of exchangeCardIds) {
-      moveCardToTopOfDeck(id);
-    }
-
-    // Shuffle after exchange
-    shuffleDeck();
 
     onComplete();
-  }, [selectedIds, needCount, exchangeCards, exchangeCardIds, moveCard, moveCardToTopOfDeck, shuffleDeck, onComplete]);
+  }, [selectedIds, needCount, exchangeCards, exchangeCardIds, exchangeFromDeck, actions, moveCardToTopOfDeck, shuffleDeck, onComplete]);
 
   return (
     <>

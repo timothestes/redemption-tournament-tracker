@@ -66,6 +66,9 @@ export function useModalCardDrag({
   // Tracks whether a drag was committed (threshold met) so callers can distinguish click vs drag
   const didDragRef = useRef(false);
 
+  // Tracks whether the last drag ended with a valid drop on a recognized zone
+  const validDropRef = useRef(false);
+
   const pendingDrag = useRef<{
     card: GameCard;
     imageUrl: string;
@@ -77,6 +80,7 @@ export function useModalCardDrag({
   const startDrag = useCallback((card: GameCard, imageUrl: string, e: React.PointerEvent) => {
     if (e.button !== 0) return;
     e.preventDefault();
+    validDropRef.current = false;
     pendingDrag.current = {
       card,
       imageUrl,
@@ -167,6 +171,7 @@ export function useModalCardDrag({
           const targetZone = findZoneAtPosition(virt.x, virt.y);
 
           if (targetZone) {
+            validDropRef.current = true;
             const primary = dragRef.current.card;
             const additional = dragRef.current.additionalCards;
             const isMulti = additional.length > 0;
@@ -220,5 +225,5 @@ export function useModalCardDrag({
     };
   }, [stageRef, findZoneAtPosition, moveCard, moveCardsBatch, onDeckDrop, onBatchDeckDrop, cardWidth, cardHeight, scale, offsetX, offsetY]);
 
-  return { dragState, startDrag, startMultiDrag, hoveredZone, ghostRef, didDragRef };
+  return { dragState, startDrag, startMultiDrag, hoveredZone, ghostRef, didDragRef, validDropRef };
 }

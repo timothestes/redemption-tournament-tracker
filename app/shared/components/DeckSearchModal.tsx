@@ -131,7 +131,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
   const { zones, actions } = useModalGame();
   const { moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleDeck } = actions;
   const [search, setSearch] = useState('');
-  const [searchField, setSearchField] = useState<'all' | 'type' | 'name' | 'brigade' | 'alignment' | 'ability' | 'identifier'>('all');
+  const [searchField, setSearchField] = useState<'all' | 'type' | 'name' | 'brigade' | 'alignment' | 'ability' | 'identifier' | 'reference'>('all');
   const [autoShuffle, setAutoShuffle] = useState(true);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [contextCard, setContextCard] = useState<{ card: GameCard; x: number; y: number } | null>(null);
@@ -161,6 +161,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
     { id: 'alignment', label: 'Alignment' },
     { id: 'identifier', label: 'Identifier' },
     { id: 'ability', label: 'Ability' },
+    { id: 'reference', label: 'Reference' },
   ];
 
   const TYPE_ALIASES: Record<string, string[]> = {
@@ -196,7 +197,8 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
         c.brigade.toLowerCase().includes(t) ||
         c.alignment.toLowerCase().includes(t) ||
         c.identifier.toLowerCase().includes(t) ||
-        c.specialAbility.toLowerCase().includes(t)
+        c.specialAbility.toLowerCase().includes(t) ||
+        c.reference.toLowerCase().includes(t)
       );
     }
     switch (searchField) {
@@ -206,6 +208,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
       case 'alignment': return c.alignment.toLowerCase().includes(t);
       case 'identifier': return c.identifier.toLowerCase().includes(t);
       case 'ability': return c.specialAbility.toLowerCase().includes(t);
+      case 'reference': return c.reference.toLowerCase().includes(t);
     }
   };
 

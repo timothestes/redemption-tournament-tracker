@@ -106,6 +106,7 @@ const SEARCH_FIELDS: { id: string; label: string }[] = [
   { id: 'alignment', label: 'Alignment' },
   { id: 'identifier', label: 'Identifier' },
   { id: 'ability', label: 'Ability' },
+  { id: 'reference', label: 'Reference' },
 ];
 
 const TYPE_ALIASES: Record<string, string[]> = {
@@ -154,7 +155,8 @@ export function OpponentBrowseModal({
     if (searchField === 'all') {
       return matchesType(c.type, t) || c.cardName.toLowerCase().includes(t) ||
         c.brigade.toLowerCase().includes(t) || c.alignment.toLowerCase().includes(t) ||
-        c.identifier.toLowerCase().includes(t) || c.specialAbility.toLowerCase().includes(t);
+        c.identifier.toLowerCase().includes(t) || c.specialAbility.toLowerCase().includes(t) ||
+        c.reference.toLowerCase().includes(t);
     }
     if (searchField === 'type') return matchesType(c.type, t);
     if (searchField === 'name') return c.cardName.toLowerCase().includes(t);
@@ -162,6 +164,7 @@ export function OpponentBrowseModal({
     if (searchField === 'alignment') return c.alignment.toLowerCase().includes(t);
     if (searchField === 'identifier') return c.identifier.toLowerCase().includes(t);
     if (searchField === 'ability') return c.specialAbility.toLowerCase().includes(t);
+    if (searchField === 'reference') return c.reference.toLowerCase().includes(t);
     return true;
   };
 

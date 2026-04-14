@@ -277,6 +277,7 @@ export const create_game = spacetimedb.reducer(
       isConnected: true,
       autoRouteLostSouls: true,
       handRevealed: false,
+      reserveRevealed: false,
       pendingDeckData: deckData,
       revealedCards: '',
     });
@@ -336,6 +337,7 @@ export const join_game = spacetimedb.reducer(
       isConnected: true,
       autoRouteLostSouls: true,
       handRevealed: false,
+      reserveRevealed: false,
       pendingDeckData: deckData,
       revealedCards: '',
     });
@@ -1227,7 +1229,8 @@ export const end_turn = spacetimedb.reducer(
     }
 
     const nextSeat = game.currentTurn === 0n ? 1n : 0n;
-    const newTurnNumber = game.turnNumber + 1n;
+    // Only increment the turn number when both players have gone (seat 1 finishes → back to seat 0)
+    const newTurnNumber = nextSeat === 0n ? game.turnNumber + 1n : game.turnNumber;
 
     ctx.db.Game.id.update({
       ...game,
@@ -2127,6 +2130,115 @@ export const exchange_cards = spacetimedb.reducer(
 );
 
 // ---------------------------------------------------------------------------
+// Reducer: exchange_from_deck — atomic pick-specific-cards exchange
+// Unlike exchange_cards (which draws random replacements), this lets the
+// player choose which deck cards to swap in and where they go.
+// ---------------------------------------------------------------------------
+export const exchange_from_deck = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    exchangeCardIds: t.string(),   // JSON array of card instance IDs being sent to deck
+    replacementMoves: t.string(),  // JSON array of { cardId: string, toZone: string, posX: string, posY: string }
+  },
+  (ctx, { gameId, exchangeCardIds, replacementMoves }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
+
+    const exchangeIds: string[] = JSON.parse(exchangeCardIds);
+    const moves: { cardId: string; toZone: string; posX: string; posY: string }[] = JSON.parse(replacementMoves);
+
+    if (exchangeIds.length === 0) throw new SenderError('No cards to exchange');
+    if (moves.length !== exchangeIds.length) throw new SenderError('Must pick same number of replacements as cards being exchanged');
+
+    // Validate exchange cards exist, belong to this game, and are owned by the player
+    for (const idStr of exchangeIds) {
+      const card = ctx.db.CardInstance.id.find(BigInt(idStr));
+      if (!card) throw new SenderError('Exchange card not found: ' + idStr);
+      if (card.gameId !== gameId) throw new SenderError('Card not in this game: ' + idStr);
+      if (card.ownerId !== player.id) throw new SenderError('Card not owned by player: ' + idStr);
+    }
+
+    // Validate replacement cards exist, are in deck, and belong to the player
+    for (const move of moves) {
+      const card = ctx.db.CardInstance.id.find(BigInt(move.cardId));
+      if (!card) throw new SenderError('Replacement card not found: ' + move.cardId);
+      if (card.gameId !== gameId) throw new SenderError('Card not in this game: ' + move.cardId);
+      if (card.ownerId !== player.id) throw new SenderError('Card not owned by player: ' + move.cardId);
+      if (card.zone !== 'deck') throw new SenderError('Replacement card not in deck: ' + move.cardId);
+    }
+
+    // Step 1: Move replacement cards from deck to their target zones
+    for (const move of moves) {
+      const card = ctx.db.CardInstance.id.find(BigInt(move.cardId));
+      if (!card) continue;
+
+      // Assign zoneIndex for the target zone
+      let finalZoneIndex = 0n;
+      if (move.toZone !== 'deck' && move.toZone !== 'hand') {
+        let maxIdx = -1n;
+        for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+          if (c.ownerId === player.id && c.zone === move.toZone && c.zoneIndex > maxIdx) {
+            maxIdx = c.zoneIndex;
+          }
+        }
+        finalZoneIndex = maxIdx + 1n;
+      }
+      if (move.toZone === 'hand') {
+        finalZoneIndex = BigInt(
+          [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+            (c: any) => c.ownerId === player.id && c.zone === 'hand'
+          ).length
+        );
+      }
+
+      ctx.db.CardInstance.id.update({
+        ...card,
+        zone: move.toZone,
+        zoneIndex: finalZoneIndex,
+        posX: move.posX,
+        posY: move.posY,
+        isFlipped: false, // Coming from deck = face up
+      });
+    }
+
+    // Step 2: Move exchange cards to deck (face down)
+    for (const idStr of exchangeIds) {
+      const card = ctx.db.CardInstance.id.find(BigInt(idStr));
+      if (!card) continue;
+      const fromZone = card.zone;
+      ctx.db.CardInstance.id.update({ ...card, zone: 'deck', isFlipped: true, posX: '', posY: '' });
+      // Compact hand/LOB if needed
+      if (fromZone === 'hand') {
+        compactHandIndices(ctx, gameId, player.id);
+      }
+      if (fromZone === 'land-of-bondage') {
+        compactLobIndices(ctx, gameId, player.id);
+      }
+    }
+
+    // Step 3: Shuffle deck
+    const deckCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+      (c: any) => c.ownerId === player.id && c.zone === 'deck'
+    );
+    const newRngCounter = game.rngCounter + 1n;
+    ctx.db.Game.id.update({ ...game, rngCounter: newRngCounter });
+    const seed = makeSeed(ctx.timestamp.microsSinceUnixEpoch, gameId, player.id, newRngCounter);
+    const indices = deckCards.map((_: any, idx: number) => idx);
+    seededShuffle(indices, seed);
+    for (let i = 0; i < deckCards.length; i++) {
+      ctx.db.CardInstance.id.update({
+        ...deckCards[i],
+        zoneIndex: BigInt(indices[i]),
+      });
+    }
+
+    logAction(ctx, gameId, player.id, 'EXCHANGE', JSON.stringify({ count: exchangeIds.length }), game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
 // Reducer: move_card_to_top_of_deck
 // ---------------------------------------------------------------------------
 export const move_card_to_top_of_deck = spacetimedb.reducer(
@@ -2437,6 +2549,31 @@ export const toggle_reveal_hand = spacetimedb.reducer(
       gameId,
       player.id,
       revealed ? 'REVEAL_HAND' : 'HIDE_HAND',
+      '',
+      game ? game.currentTurn : 0n,
+      game ? game.currentPhase : 'draw',
+    );
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: toggle_reveal_reserve
+// ---------------------------------------------------------------------------
+export const toggle_reveal_reserve = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    revealed: t.bool(),
+  },
+  (ctx, { gameId, revealed }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    ctx.db.Player.id.update({ ...player, reserveRevealed: revealed });
+
+    const game = ctx.db.Game.id.find(gameId);
+    logAction(
+      ctx,
+      gameId,
+      player.id,
+      revealed ? 'REVEAL_RESERVE' : 'HIDE_RESERVE',
       '',
       game ? game.currentTurn : 0n,
       game ? game.currentPhase : 'draw',

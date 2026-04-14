@@ -77,12 +77,14 @@ export interface GameState {
   removeCounter: (cardInstanceId: bigint, color: string) => void;
   setNote: (cardInstanceId: bigint, text: string) => void;
   exchangeCards: (cardInstanceIds: string) => void;
+  exchangeFromDeck: (exchangeCardIds: string, replacementMoves: string) => void;
   setPhase: (phase: string) => void;
   endTurn: () => void;
   rollDice: (sides: bigint) => void;
   sendChat: (text: string) => void;
   setPlayerOption: (optionName: string, value: string) => void;
   revealHand: (revealed: boolean) => void;
+  revealReserve: (revealed: boolean) => void;
   moveCardToTopOfDeck: (cardInstanceId: bigint) => void;
   moveCardToBottomOfDeck: (cardInstanceId: bigint) => void;
   spawnLostSoul: (testament: string, posX: string, posY: string, targetPlayerId?: string) => void;
@@ -396,6 +398,13 @@ export function useGameState(gameId: bigint): GameState {
     [conn, gameId],
   );
 
+  const exchangeFromDeck = useCallback(
+    (exchangeCardIds: string, replacementMoves: string) => {
+      conn?.reducers.exchangeFromDeck({ gameId, exchangeCardIds, replacementMoves });
+    },
+    [conn, gameId],
+  );
+
   const setPhase = useCallback(
     (phase: string) => {
       conn?.reducers.setPhase({ gameId, phase });
@@ -431,6 +440,13 @@ export function useGameState(gameId: bigint): GameState {
   const revealHand = useCallback(
     (revealed: boolean) => {
       conn?.reducers.toggleRevealHand({ gameId, revealed });
+    },
+    [conn, gameId],
+  );
+
+  const revealReserve = useCallback(
+    (revealed: boolean) => {
+      conn?.reducers.toggleRevealReserve({ gameId, revealed });
     },
     [conn, gameId],
   );
@@ -620,12 +636,14 @@ export function useGameState(gameId: bigint): GameState {
     removeCounter,
     setNote,
     exchangeCards,
+    exchangeFromDeck,
     setPhase,
     endTurn,
     rollDice,
     sendChat,
     setPlayerOption,
     revealHand,
+    revealReserve,
     revealCards,
     clearRevealedCards,
     moveCardToTopOfDeck,

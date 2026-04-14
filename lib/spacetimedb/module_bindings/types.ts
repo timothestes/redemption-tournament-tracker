@@ -129,6 +129,7 @@ export const Player = __t.object("Player", {
   handRevealed: __t.bool(),
   pendingDeckData: __t.string(),
   revealedCards: __t.string(),
+  reserveRevealed: __t.bool(),
 });
 export type Player = __Infer<typeof Player>;
 
