@@ -172,6 +172,7 @@ function insertCardsShuffleDraw(
       alignment: card.alignment || '',
       identifier: card.identifier || '',
       specialAbility: card.specialAbility || '',
+      reference: card.reference || '',
       notes: '',
     });
   }
@@ -2418,6 +2419,7 @@ export const spawn_lost_soul = spacetimedb.reducer(
       alignment: '',
       identifier: '',
       specialAbility: '',
+      reference: '',
       notes: '',
     });
 
@@ -2837,10 +2839,23 @@ export const move_opponent_card = spacetimedb.reducer(
     const fromZone = card.zone;
     // Moving to deck = face-down; leaving deck or reserve = face-up; otherwise preserve
     const isFlipped = toZone === 'deck' ? true : (fromZone === 'deck' || fromZone === 'reserve') ? false : card.isFlipped;
+
+    // For free-form zones, auto-assign highest zoneIndex so new cards render on top
+    let finalZoneIndex = 0n;
+    if (toZone !== 'deck' && toZone !== 'hand') {
+      let maxIdx = -1n;
+      for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+        if (c.ownerId === card.ownerId && c.zone === toZone && c.zoneIndex > maxIdx) {
+          maxIdx = c.zoneIndex;
+        }
+      }
+      finalZoneIndex = maxIdx + 1n;
+    }
+
     ctx.db.CardInstance.id.update({
       ...card,
       zone: toZone,
-      zoneIndex: 0n,
+      zoneIndex: finalZoneIndex,
       posX,
       posY,
       isFlipped,

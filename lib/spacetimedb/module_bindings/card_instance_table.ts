@@ -30,5 +30,6 @@ export default __t.row({
   alignment: __t.string(),
   identifier: __t.string(),
   specialAbility: __t.string().name("special_ability"),
+  reference: __t.string(),
   notes: __t.string(),
 });

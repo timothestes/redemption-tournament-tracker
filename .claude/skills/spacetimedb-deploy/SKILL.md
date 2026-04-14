@@ -22,26 +22,45 @@ calling new or modified reducers until both steps are complete.
 | Setting                  | Value                                      |
 |--------------------------|---------------------------------------------|
 | Module path              | `spacetimedb/` (relative to repo root)     |
-| Database name            | `redemption-multiplayer`                   |
+| Production database      | `redemption-multiplayer`                   |
+| Dev database             | `redemption-multiplayer-dev`               |
 | Server                   | `maincloud.spacetimedb.com` (default)      |
-| Config file              | `spacetime.json` (repo root)               |
+| Config file              | `spacetime.json` (repo root) — locked to production db |
 | Client bindings output   | `lib/spacetimedb/module_bindings/`         |
 | Env vars                 | `.env.local` — `NEXT_PUBLIC_SPACETIMEDB_HOST`, `NEXT_PUBLIC_SPACETIMEDB_DB_NAME` |
+
+**Important:** `.env.local` sets `NEXT_PUBLIC_SPACETIMEDB_DB_NAME=redemption-multiplayer-dev`,
+so the local dev server connects to the **dev** database. Check which database the client
+actually connects to before publishing — schema mismatches between the client bindings and
+the deployed module cause BSATN deserialization errors at runtime.
 
 ## Steps
 
 ### 1. Publish the module
+
+**Production** (uses `spacetime.json` config):
 ```bash
 echo "y" | spacetime publish redemption-multiplayer --module-path spacetimedb
+```
+
+**Dev** (must bypass `spacetime.json` with `--no-config`):
+```bash
+echo "y" | spacetime publish redemption-multiplayer-dev --module-path "$(pwd)/spacetimedb" --no-config --server maincloud
 ```
 
 The `echo "y"` is required — the CLI prompts for confirmation when publishing
 to a non-local server and aborts without it.
 
-**If the user passed `--clear`**, wipe and republish (destroys all game data):
+**With `--clear`** (destroys all game data):
 ```bash
+# Production
 echo "y" | spacetime publish redemption-multiplayer --clear-database -y --module-path spacetimedb
+# Dev
+echo "y" | spacetime publish redemption-multiplayer-dev --clear-database -y --module-path "$(pwd)/spacetimedb" --no-config --server maincloud
 ```
+
+**Default behavior:** Publish to **both** production and dev databases unless the
+user specifies one. Always publish dev first to catch migration issues early.
 
 ### 2. Regenerate client bindings
 ```bash
@@ -78,3 +97,6 @@ The `PregameScreen.tsx` BigInt error is a known pre-existing issue — ignore it
 | `Publish aborted by user` | Missing `echo "y"` pipe | Use `echo "y" \| spacetime publish ...` |
 | `reading 'tag'` on publish | Indexes defined in wrong position in `table()` call | Indexes go in the 1st arg (OPTIONS), not 2nd (COLUMNS) |
 | Binding import errors | Stale generated types | Regenerate with `spacetime generate` |
+| `Adding a column X requires a default value` | Existing rows can't auto-migrate with new column | Use `--clear-database -y` to wipe and republish, or add `.default()` to schema column |
+| `No database target matches 'X'` | `spacetime.json` restricts to a single db name | Use `--no-config --server maincloud` with absolute `--module-path` |
+| BSATN `RangeError: Tried to read N byte(s)` | Client bindings don't match deployed module schema | Republish the correct database (check `NEXT_PUBLIC_SPACETIMEDB_DB_NAME` in `.env.local`) + regenerate bindings |

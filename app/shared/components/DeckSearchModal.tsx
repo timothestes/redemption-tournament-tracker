@@ -420,7 +420,8 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
         right: isLoupeVisible ? 'clamp(280px, 20vw, 380px)' : '36px',
         background: 'rgba(0,0,0,0.35)',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
+        paddingTop: '5vh',
         justifyContent: 'center',
         zIndex: 500,
       }}

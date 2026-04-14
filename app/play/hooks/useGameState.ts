@@ -726,5 +726,15 @@ function groupCardsByZone(cards: CardInstanceRow[]): Record<string, CardInstance
       return ai < bi ? -1 : ai > bi ? 1 : 0;
     });
   }
+  // Sort pile zones by zoneIndex so the most recently added card is last (rendered on top)
+  for (const zone of ['discard', 'reserve', 'banish']) {
+    if (result[zone]) {
+      result[zone].sort((a, b) => {
+        const ai = typeof a.zoneIndex === 'bigint' ? a.zoneIndex : BigInt(a.zoneIndex ?? 0);
+        const bi = typeof b.zoneIndex === 'bigint' ? b.zoneIndex : BigInt(b.zoneIndex ?? 0);
+        return ai < bi ? -1 : ai > bi ? 1 : 0;
+      });
+    }
+  }
   return result;
 }

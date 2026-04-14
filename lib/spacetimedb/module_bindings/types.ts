@@ -38,6 +38,7 @@ export const CardInstance = __t.object("CardInstance", {
   alignment: __t.string(),
   identifier: __t.string(),
   specialAbility: __t.string(),
+  reference: __t.string(),
   notes: __t.string(),
 });
 export type CardInstance = __Infer<typeof CardInstance>;

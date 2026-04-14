@@ -91,7 +91,7 @@ export default function UsernameModal({ onSuccess, onClose }: UsernameModalProps
 
         <form onSubmit={handleSubmit}>
           <div className="px-6 py-4">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               Username
             </label>
             <input
@@ -103,7 +103,7 @@ export default function UsernameModal({ onSuccess, onClose }: UsernameModalProps
               name="deck-display-alias"
               autoComplete="one-time-code"
               maxLength={24}
-              className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
             />
             <div className="flex items-center justify-between mt-1">
               <p className="text-xs text-muted-foreground">
@@ -117,23 +117,23 @@ export default function UsernameModal({ onSuccess, onClose }: UsernameModalProps
             {trimmed.length >= 3 && isValidChars && (
               <div className="mt-2 text-sm">
                 {checking ? (
-                  <span className="text-gray-500">Checking availability...</span>
+                  <span className="text-muted-foreground">Checking availability...</span>
                 ) : available === true ? (
-                  <span className="text-green-600 dark:text-green-400">Username is available</span>
+                  <span className="text-primary">Username is available</span>
                 ) : available === false ? (
-                  <span className="text-red-600 dark:text-red-400">Username is already taken</span>
+                  <span className="text-destructive">Username is already taken</span>
                 ) : null}
               </div>
             )}
 
             {trimmed.length > 0 && !isValidChars && (
-              <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+              <p className="mt-2 text-sm text-destructive">
                 Only letters, numbers, underscores, and hyphens are allowed
               </p>
             )}
 
             {error && (
-              <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>
+              <p className="mt-2 text-sm text-destructive">{error}</p>
             )}
           </div>
 
@@ -148,7 +148,7 @@ export default function UsernameModal({ onSuccess, onClose }: UsernameModalProps
             <button
               type="submit"
               disabled={!canSubmit}
-              className="px-4 py-2 text-sm font-medium text-white bg-green-700 hover:bg-green-800 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-lg transition-colors"
+              className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed rounded-lg transition-colors"
             >
               {submitting ? "Setting..." : "Set Username & Continue"}
             </button>

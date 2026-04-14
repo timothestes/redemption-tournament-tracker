@@ -10,7 +10,6 @@ import { PiPencilLineBold } from "react-icons/pi";
 import { TbCardsFilled, TbSearch } from "react-icons/tb";
 import Image from "next/image";
 import Link from "next/link";
-import { useTheme } from "next-themes";
 import { usePathname } from "next/navigation";
 import { Button } from "./ui/button";
 import { ThemeSwitcher } from "./theme-switcher";
@@ -24,9 +23,6 @@ const TopNav: React.FC = () => {
   const [isResourcesOpen, setIsResourcesOpen] = useState(false);
   const [isDecksOpen, setIsDecksOpen] = useState(false);
   const [isTournamentsOpen, setIsTournamentsOpen] = useState(false);
-  const { theme, resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  const [logoSrc, setLogoSrc] = useState('/darkmode_redemptionccgapp.webp');
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const { isAdmin, permissions, loading: adminLoading } = useIsAdmin();
@@ -85,12 +81,6 @@ const TopNav: React.FC = () => {
     setIsTournamentsOpen(next);
   };
 
-  // Theme / logo effect — runs when theme changes
-  useEffect(() => {
-    setMounted(true);
-    const currentTheme = theme === 'system' ? resolvedTheme : theme;
-    setLogoSrc(currentTheme === 'light' ? '/lightmode_redemptionccgapp.webp' : '/darkmode_redemptionccgapp.webp');
-  }, [theme, resolvedTheme]);
 
   // Auth effect — runs once on mount, listens for session changes
   useEffect(() => {
@@ -181,12 +171,21 @@ const TopNav: React.FC = () => {
           <Link href="/decklist/community" className="flex-shrink-0">
             <div className="cursor-pointer" style={{ width: 120, height: 32 }}>
               <Image
-                src={logoSrc}
+                src="/lightmode_redemptionccgapp.webp"
                 alt="RedemptionCCG App Logo"
                 width={120}
                 height={32}
                 style={{ width: "auto", height: "auto", maxHeight: "32px" }}
-                className={`transition-opacity duration-150 ${mounted ? 'opacity-100' : 'opacity-0'}`}
+                className="dark:hidden [.jayden_&]:hidden"
+                priority
+              />
+              <Image
+                src="/darkmode_redemptionccgapp.webp"
+                alt="RedemptionCCG App Logo"
+                width={120}
+                height={32}
+                style={{ width: "auto", height: "auto", maxHeight: "32px" }}
+                className="hidden dark:block [.jayden_&]:block"
                 priority
               />
             </div>

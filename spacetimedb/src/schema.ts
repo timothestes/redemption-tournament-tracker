@@ -103,6 +103,7 @@ export const CardInstance = table(
     alignment: t.string(),
     identifier: t.string(),
     specialAbility: t.string(),
+    reference: t.string(),
     notes: t.string(),
   }
 );

@@ -108,7 +108,7 @@ function cardInstanceToGameCard(
     toughness: card.toughness,
     specialAbility: card.specialAbility,
     identifier: card.identifier,
-    reference: '',
+    reference: card.reference,
     alignment: card.alignment,
     isMeek: card.isMeek,
     isFlipped: card.isFlipped,
@@ -1508,7 +1508,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
           } else if (isAutoArrangeZone(targetZone)) {
             moveCard(cardId, targetZone, '', '0', '0', targetOwnerId);
           } else {
-            moveCard(cardId, targetZone, targetZone === 'hand' ? '' : '0', undefined, undefined, targetOwnerId);
+            moveCard(cardId, targetZone, '', undefined, undefined, targetOwnerId);
           }
           if (isGroupDrag) clearSelection();
         };
@@ -1518,28 +1518,45 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       }
 
       // Different zone — perform move.
-      // The dragged node was reparented to the layer during dragStart (moveTo).
-      // React-Konva won't be able to reconcile it back into the old parent Group
-      // when the card's zone changes, leaving an orphaned node on the layer with
-      // stale dimensions (e.g. pile size instead of territory size). Destroy the
-      // reparented node now and remove it from cardNodeRefs so React-Konva creates
-      // a completely fresh node in the correct parent Group with correct dimensions.
-      const draggedNode = cardNodeRefs.current.get(card.instanceId);
-      if (draggedNode) {
-        cardNodeRefs.current.delete(card.instanceId);
-        draggedNode.destroy();
-      }
-      // Also clean up any follower nodes that were reparented
-      if (followerOffsets) {
-        for (const [id] of followerOffsets) {
-          const fNode = cardNodeRefs.current.get(id);
-          if (fNode) {
-            cardNodeRefs.current.delete(id);
-            fNode.destroy();
+      // For deck drops that show a popup, we snap the card back instead of
+      // destroying the node. This prevents the card from disappearing if the
+      // user cancels the popup without picking an option.
+      const isDeckDropWithPopup = targetZone === 'deck' && stageRef.current;
+
+      if (isDeckDropWithPopup) {
+        // Deck drop: snap card back to original position while popup is open.
+        // The reducer will fire when the user picks an option, and the
+        // subscription update will properly move the card.
+        if (followerOffsets && originalPos) {
+          for (const [id, offset] of followerOffsets) {
+            const fNode = cardNodeRefs.current.get(id);
+            if (fNode) {
+              fNode.x(originalPos.x + offset.dx);
+              fNode.y(originalPos.y + offset.dy);
+            }
           }
         }
+        snapBack();
+      } else {
+        // Non-deck zone: destroy the reparented node so React-Konva creates
+        // a fresh node in the correct parent Group with correct dimensions.
+        const draggedNode = cardNodeRefs.current.get(card.instanceId);
+        if (draggedNode) {
+          cardNodeRefs.current.delete(card.instanceId);
+          draggedNode.destroy();
+        }
+        // Also clean up any follower nodes that were reparented
+        if (followerOffsets) {
+          for (const [id] of followerOffsets) {
+            const fNode = cardNodeRefs.current.get(id);
+            if (fNode) {
+              cardNodeRefs.current.delete(id);
+              fNode.destroy();
+            }
+          }
+        }
+        gameLayerRef.current?.batchDraw();
       }
-      gameLayerRef.current?.batchDraw();
 
       if (isGroupDrag) {
         if (targetZone === 'deck') {
@@ -1597,8 +1614,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
           moveCard(cardId, targetZone, '0', undefined, undefined, targetOwnerId);
         }
       } else {
-        // Stacked zone — for hand, omit zoneIndex so server auto-appends to end
-        moveCard(cardId, targetZone, targetZone === 'hand' ? '' : '0', undefined, undefined, targetOwnerId);
+        // Stacked zone — omit zoneIndex so server auto-appends to end
+        moveCard(cardId, targetZone, '', undefined, undefined, targetOwnerId);
       }
     },
     [
@@ -2156,12 +2173,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
           {(() => {
             const areaRight = opponentHandRect.x + opponentHandRect.width;
             const bw = 26;
-            const lw = 154; // "OPPONENT HAND" at fontSize 12 + letterSpacing 2
+            const lw = 178; // "OPPONENT'S HAND" at fontSize 12 + letterSpacing 2
             const totalW = lw + 8 + bw;
             const sx = areaRight - totalW - 6;
             return (
               <>
-                <Text x={sx} y={opponentHandRect.y + 4} text="OPPONENT HAND" fontSize={12} fontFamily="Cinzel, Georgia, serif" fill="#a3c5e8" letterSpacing={2} />
+                <Text x={sx} y={opponentHandRect.y + 4} text="OPPONENT'S HAND" fontSize={12} fontFamily="Cinzel, Georgia, serif" fill="#a3c5e8" letterSpacing={2} />
                 <Group x={sx + lw + 8} y={opponentHandRect.y + 2}>
                   <Rect width={bw} height={18} fill="#101828" cornerRadius={4} stroke="#4a7ab5" strokeWidth={1} />
                   <Text text={String(opponentCards['hand']?.length ?? 0)} fontSize={12} fontStyle="bold" fill="#a3c5e8" width={bw} height={18} align="center" verticalAlign="middle" />
@@ -3361,7 +3378,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
           style={{
             position: 'absolute',
             top: '50%',
-            left: '40%',
+            left: '50%',
             transform: 'translate(-50%, -50%)',
             zIndex: 300,
             pointerEvents: 'auto',
@@ -3530,7 +3547,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
           <ZoneBrowseModal
             zoneId={browseOpponentZone as ZoneId}
             onClose={() => setBrowseOpponentZone(null)}
-            readOnly
           />
         </ModalGameProvider>
       )}
