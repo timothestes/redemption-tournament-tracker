@@ -321,7 +321,7 @@ export function calculateMultiplayerLayout(
     y: oppHandY,
     width: stageWidth,
     height: oppHandHeight,
-    label: 'Opponent Hand',
+    label: "Opponent's Hand",
   };
 
   const opponentLob: ZoneRect = {
@@ -337,7 +337,7 @@ export function calculateMultiplayerLayout(
     y: oppTerritoryY + gap,
     width: playAreaWidth - pad * 2,
     height: oppTerritoryHeight - gap,
-    label: 'Opponent Territory',
+    label: "Opponent's Territory",
   };
 
   const divider: ZoneRect = {

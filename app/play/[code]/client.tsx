@@ -200,6 +200,9 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // in the dependency array (which is evaluated during render).
   const gameState = useGameState(gameId ?? BigInt(0));
 
+  // Persist chat/log tab across loupe toggles so it doesn't reset to chat
+  const [chatTab, setChatTab] = useState<'chat' | 'log'>('chat');
+
   // Track unread chat messages at this level so the count survives ChatPanel
   // unmounting when the right panel collapses.
   const [unreadChatCount, setUnreadChatCount] = useState(0);
@@ -584,6 +587,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // Return to lobby handler used by GameOverOverlay
   // ---------------------------------------------------------------------------
   function handleReturnToLobby() {
+    gameState.leaveGame();
     router.push('/play');
   }
 
@@ -729,6 +733,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               myPlayerId={gameState.myPlayer?.id ?? BigInt(0)}
               onSendChat={gameState.sendChat}
               playerNames={playerNameMap}
+              activeTab={chatTab}
+              onActiveTabChange={setChatTab}
             />
           </div>
         </>
@@ -773,7 +779,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // or render the overlay standalone if canvas data is unavailable.
   if (lifecycle === 'finished') {
     const { label: endLabel, winnerName } = deriveEndReason(gameState.gameActions, gameState.myPlayer);
-    const opponentLeft = endLabel === 'Opponent resigned' || endLabel === 'Opponent disconnected';
+    const opponentDisconnected = endLabel === 'Opponent disconnected';
+    const opponentResigned = endLabel === 'Opponent resigned';
 
     // Show the overlay over the frozen canvas — always render canvas if gameId is known
     if (gameId !== null) {
@@ -791,7 +798,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                 onEndTurn={() => {}}
                 isFinished
                 winnerName={winnerName}
-                onPlayAgain={opponentLeft ? undefined : () => setPlayAgainTriggered(true)}
+                onPlayAgain={opponentDisconnected ? undefined : () => setPlayAgainTriggered(true)}
                 myScore={gameState.myCards['land-of-redemption']?.length ?? 0}
                 opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}
               />
@@ -862,7 +869,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               onEndTurn={() => {}}
               isFinished
               winnerName={winnerName}
-              onPlayAgain={opponentLeft ? undefined : () => setPlayAgainTriggered(true)}
+              onPlayAgain={opponentDisconnected ? undefined : () => setPlayAgainTriggered(true)}
               myScore={gameState.myCards['land-of-redemption']?.length ?? 0}
               opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}
             />

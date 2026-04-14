@@ -694,5 +694,13 @@ function groupCardsByZone(cards: CardInstanceRow[]): Record<string, CardInstance
       return ai < bi ? -1 : ai > bi ? 1 : 0;
     });
   }
+  // Sort LOR cards by zoneIndex so newest card renders on top of the fan
+  if (result['land-of-redemption']) {
+    result['land-of-redemption'].sort((a, b) => {
+      const ai = typeof a.zoneIndex === 'bigint' ? a.zoneIndex : BigInt(a.zoneIndex ?? 0);
+      const bi = typeof b.zoneIndex === 'bigint' ? b.zoneIndex : BigInt(b.zoneIndex ?? 0);
+      return ai < bi ? -1 : ai > bi ? 1 : 0;
+    });
+  }
   return result;
 }

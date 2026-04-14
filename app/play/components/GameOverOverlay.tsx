@@ -68,7 +68,9 @@ export default function GameOverOverlay({
   const mySeat = myPlayer?.seat?.toString() ?? '0';
 
   // Determine if the game ended because of opponent action (resign/disconnect)
-  const isOpponentLeft = label === 'Opponent resigned' || label === 'Opponent disconnected';
+  const isOpponentResigned = label === 'Opponent resigned';
+  const isOpponentDisconnected = label === 'Opponent disconnected';
+  const isOpponentLeft = isOpponentResigned || isOpponentDisconnected;
 
   // Rematch state from game (derived before effects that use it)
   const rematchRequestedBy = game?.rematchRequestedBy ?? '';
@@ -158,7 +160,7 @@ export default function GameOverOverlay({
         >
           <div style={{
             background: 'rgba(14, 10, 6, 0.97)',
-            border: '1px solid rgba(107, 78, 39, 0.3)',
+            border: `1px solid ${isOpponentResigned ? 'rgba(196, 149, 90, 0.4)' : 'rgba(107, 78, 39, 0.3)'}`,
             borderRadius: 10,
             padding: '32px 36px',
             textAlign: 'center',
@@ -171,8 +173,8 @@ export default function GameOverOverlay({
               fontSize: 10,
               letterSpacing: '0.18em',
               textTransform: 'uppercase',
-              color: 'rgba(196, 149, 90, 0.5)',
-            }}>Game Over</p>
+              color: isOpponentResigned ? 'rgba(196, 149, 90, 0.7)' : 'rgba(196, 149, 90, 0.5)',
+            }}>{isOpponentResigned ? 'Victory' : 'Game Over'}</p>
             <h2 style={{
               fontFamily: 'var(--font-cinzel), Georgia, serif',
               fontSize: 18,
@@ -180,24 +182,49 @@ export default function GameOverOverlay({
               color: '#e8d5a3',
               marginTop: 8,
               textShadow: '0 1px 4px rgba(0,0,0,0.5)',
-            }}>{label}</h2>
+            }}>{isOpponentResigned ? `${oppName} Conceded` : label}</h2>
             <p style={{
               marginTop: 8,
               fontFamily: 'Georgia, serif',
               fontSize: 13,
               color: 'rgba(196, 149, 90, 0.5)',
-            }}>The game has ended.</p>
+            }}>{isOpponentResigned ? 'Your opponent has surrendered the game.' : 'The game has ended.'}</p>
 
             <div style={{ marginTop: 24, display: 'flex', gap: 12 }}>
+              {isOpponentResigned && (
+                <button
+                  onClick={() => {
+                    setModalDismissed(true);
+                    setPickerMode('request');
+                    setPickerOpen(true);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '10px 16px',
+                    borderRadius: 4,
+                    border: '1px solid rgba(196, 149, 90, 0.45)',
+                    background: 'rgba(196, 149, 90, 0.15)',
+                    color: '#e8d5a3',
+                    fontFamily: 'var(--font-cinzel), Georgia, serif',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Play Again
+                </button>
+              )}
               <button
                 onClick={() => setModalDismissed(true)}
                 style={{
                   flex: 1,
                   padding: '10px 16px',
                   borderRadius: 4,
-                  border: '1px solid rgba(196, 149, 90, 0.45)',
-                  background: 'rgba(196, 149, 90, 0.15)',
-                  color: '#e8d5a3',
+                  border: '1px solid rgba(107, 78, 39, 0.3)',
+                  background: isOpponentResigned ? 'transparent' : 'rgba(196, 149, 90, 0.15)',
+                  color: isOpponentResigned ? 'rgba(196, 149, 90, 0.6)' : '#e8d5a3',
                   fontFamily: 'var(--font-cinzel), Georgia, serif',
                   fontSize: 12,
                   fontWeight: 700,
@@ -206,7 +233,7 @@ export default function GameOverOverlay({
                   cursor: 'pointer',
                 }}
               >
-                OK
+                {isOpponentResigned ? 'Dismiss' : 'OK'}
               </button>
             </div>
           </div>

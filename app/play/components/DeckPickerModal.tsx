@@ -55,7 +55,7 @@ function DeckPickerContent({
 
   // ── My Decks state ──
   const [mySearch, setMySearch] = useState("");
-  const [mySort, setMySort] = useState<"latest" | "last_played" | "name">("latest");
+  const [mySort, setMySort] = useState<"latest" | "last_played" | "name">("last_played");
   const [myPage, setMyPage] = useState(1);
 
   // ── Community state ──

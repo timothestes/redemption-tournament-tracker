@@ -81,20 +81,28 @@ function compactLobIndices(ctx: any, gameId: bigint, playerId: bigint) {
 // Helper: drawCardsForPlayer
 // ---------------------------------------------------------------------------
 function drawCardsForPlayer(ctx: any, game: any, player: any, count: number): number {
+  // One upfront scan: collect this player's cards, build sorted deck + zone counts
+  const playerCards = [...ctx.db.CardInstance.card_instance_game_id.filter(game.id)].filter(
+    (c: any) => c.ownerId === player.id
+  );
+
+  // Build sorted deck cards (ascending by zoneIndex — first element is top of deck)
+  const deckCards = playerCards
+    .filter((c: any) => c.zone === 'deck')
+    .sort((a: any, b: any) => (a.zoneIndex < b.zoneIndex ? -1 : a.zoneIndex > b.zoneIndex ? 1 : 0));
+
+  // Track current hand and LOB counts for zoneIndex assignment
+  let handCount = playerCards.filter((c: any) => c.zone === 'hand').length;
+  let lobCount = playerCards.filter((c: any) => c.zone === 'land-of-bondage').length;
+
   let drawn = 0;
+  let deckPos = 0; // Pointer into sorted deckCards
 
   for (let i = 0; i < count; i++) {
-    // Find top card in deck (lowest zoneIndex)
-    let topCard: any = null;
-    for (const card of ctx.db.CardInstance.card_instance_game_id.filter(game.id)) {
-      if (card.ownerId === player.id && card.zone === 'deck') {
-        if (topCard === null || card.zoneIndex < topCard.zoneIndex) {
-          topCard = card;
-        }
-      }
-    }
+    if (deckPos >= deckCards.length) break; // No more cards in deck
 
-    if (!topCard) break; // No more cards in deck
+    const topCard = deckCards[deckPos];
+    deckPos++;
 
     // Check if auto-route lost souls
     const isLostSoul =
@@ -103,33 +111,25 @@ function drawCardsForPlayer(ctx: any, game: any, player: any, count: number): nu
 
     if (isLostSoul) {
       // Move to land-of-bondage
-      const lobIndex = BigInt(
-        [...ctx.db.CardInstance.card_instance_game_id.filter(game.id)].filter(
-          (c: any) => c.ownerId === player.id && c.zone === 'land-of-bondage'
-        ).length
-      );
       ctx.db.CardInstance.id.update({
         ...topCard,
         zone: 'land-of-bondage',
         isFlipped: false,
-        zoneIndex: lobIndex,
+        zoneIndex: BigInt(lobCount),
       });
+      lobCount++;
       drawn++;
       // Draw a replacement — extend the loop
       count++;
     } else {
       // Move to hand
-      const handIndex = BigInt(
-        [...ctx.db.CardInstance.card_instance_game_id.filter(game.id)].filter(
-          (c: any) => c.ownerId === player.id && c.zone === 'hand'
-        ).length
-      );
       ctx.db.CardInstance.id.update({
         ...topCard,
         zone: 'hand',
         isFlipped: false,
-        zoneIndex: handIndex,
+        zoneIndex: BigInt(handCount),
       });
+      handCount++;
       drawn++;
     }
   }
@@ -2270,12 +2270,19 @@ export const spawn_lost_soul = spacetimedb.reducer(
     const cardSet = isNT ? 'GoC' : 'RR';
     const cardImgFile = isNT ? '/gameplay/nt_soul_token.png' : '/gameplay/ot_lost_soul.png';
 
+    // Place at the end (rightmost) of existing LOB cards
+    const lobIndex = BigInt(
+      [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+        (c: any) => c.ownerId === ownerId && c.zone === 'land-of-bondage'
+      ).length
+    );
+
     ctx.db.CardInstance.insert({
       id: 0n,
       gameId,
       ownerId,
       zone: 'land-of-bondage',
-      zoneIndex: 0n,
+      zoneIndex: lobIndex,
       posX,
       posY,
       isMeek: false,
@@ -2702,8 +2709,21 @@ export const move_opponent_card = spacetimedb.reducer(
       compactLobIndices(ctx, gameId, card.ownerId);
     }
 
+    // Look up card owner's display name for richer log messages
+    const cardOwner = ctx.db.Player.id.find(card.ownerId);
+    const cardOwnerName = cardOwner ? cardOwner.displayName : 'opponent';
+
     logAction(ctx, gameId, player.id, 'MOVE_OPPONENT_CARD',
-      JSON.stringify({ requestId: requestId.toString(), cardInstanceId: cardInstanceId.toString(), from: fromZone, to: toZone }),
+      JSON.stringify({
+        requestId: requestId.toString(),
+        cardInstanceId: cardInstanceId.toString(),
+        from: fromZone,
+        to: toZone,
+        cardName: card.cardName,
+        cardImgFile: card.cardImgFile,
+        cardOwnerName,
+        cardOwnerId: card.ownerId.toString(),
+      }),
       game.turnNumber, game.currentPhase);
   }
 );

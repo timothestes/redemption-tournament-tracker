@@ -421,7 +421,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
 
   // ---- Zone browse overlay state ----
   const [browseMyZone, setBrowseMyZone] = useState<string | null>(null);
-  const [browseOpponentZone, setBrowseOpponentZone] = useState<{ zone: string; cards: typeof opponentCards[string]; label: string } | null>(null);
+  const [browseOpponentZone, setBrowseOpponentZone] = useState<string | null>(null);
   const [zoneMenu, setZoneMenu] = useState<{ x: number; y: number; spawnX: number; spawnY: number; targetPlayerId?: string } | null>(null);
   const [deckMenu, setDeckMenu] = useState<{ x: number; y: number } | null>(null);
   const [lorMenu, setLorMenu] = useState<{ x: number; y: number } | null>(null);
@@ -2518,9 +2518,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
                 onClick={zoneKey !== 'deck' ? () => {
                   setBrowseMyZone(zoneKey);
                 } : undefined}
-                onDblClick={zoneKey === 'deck' ? () => {
-                  multiplayerActions.drawCard();
-                } : undefined}
+                onDblClick={undefined}
                 onContextMenu={zoneKey === 'deck' ? (e: Konva.KonvaEventObject<PointerEvent>) => {
                   e.evt.preventDefault();
                   const stage = stageRef.current;
@@ -2695,8 +2693,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
               <Group
                 key={`opp-pile-${zoneKey}`}
                 onClick={zoneKey !== 'deck' && zoneKey !== 'reserve' ? () => {
-                  const zoneLabels: Record<string, string> = { discard: "Opponent's Discard", banish: "Opponent's Banish", lor: "Opponent's Land of Redemption" };
-                  setBrowseOpponentZone({ zone: zoneKey, cards, label: zoneLabels[zoneKey] ?? zoneKey });
+                  setBrowseOpponentZone(zoneKey);
                 } : undefined}
                 onContextMenu={['deck', 'reserve'].includes(zoneKey) ? (e: Konva.KonvaEventObject<PointerEvent>) => {
                   e.evt.preventDefault();
@@ -3397,90 +3394,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
           Zone browse overlay — card grid for browsing pile contents
           ================================================================ */}
       {browseOpponentZone && (
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            zIndex: 700,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'transparent',
-          }}
-          onClick={() => setBrowseOpponentZone(null)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: 'rgba(20, 16, 12, 0.97)',
-              border: '1px solid rgba(107, 78, 39, 0.5)',
-              borderRadius: 8,
-              padding: 16,
-              maxWidth: '80%',
-              maxHeight: '70%',
-              overflow: 'auto',
-              minWidth: 300,
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <span style={{
-                fontFamily: 'var(--font-cinzel), Georgia, serif',
-                fontSize: 14,
-                color: '#e8d5a3',
-                letterSpacing: '0.05em',
-              }}>
-                {browseOpponentZone.label} ({browseOpponentZone.cards.length})
-              </span>
-              <button
-                onClick={() => setBrowseOpponentZone(null)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#e8d5a3',
-                  cursor: 'pointer',
-                  fontSize: 18,
-                  padding: '2px 6px',
-                }}
-              >
-                ✕
-              </button>
-            </div>
-            {browseOpponentZone.cards.length === 0 ? (
-              <div style={{ color: 'rgba(232, 213, 163, 0.4)', fontSize: 13, textAlign: 'center', padding: 24 }}>
-                No cards in this zone
-              </div>
-            ) : (
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))',
-                gap: 8,
-              }}>
-                {browseOpponentZone.cards.map((card) => {
-                  const imgUrl = getSharedCardImageUrl(card.cardImgFile);
-                  return (
-                    <div
-                      key={String(card.id)}
-                      style={{
-                        borderRadius: 4,
-                        overflow: 'hidden',
-                        border: '1px solid rgba(107, 78, 39, 0.3)',
-                        cursor: 'default',
-                      }}
-                      title={card.cardName}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={imgUrl}
-                        alt={card.cardName}
-                        style={{ width: '100%', display: 'block' }}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
+        <ModalGameProvider value={opponentModalGameValue}>
+          <ZoneBrowseModal
+            zoneId={browseOpponentZone as ZoneId}
+            onClose={() => setBrowseOpponentZone(null)}
+            readOnly
+          />
+        </ModalGameProvider>
       )}
 
       {/* ================================================================

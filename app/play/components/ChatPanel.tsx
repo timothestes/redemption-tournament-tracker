@@ -32,6 +32,8 @@ interface ChatPanelProps {
   myPlayerId: bigint;
   onSendChat: (text: string) => void;
   playerNames: Record<string, string>; // playerId.toString() → display name
+  activeTab?: 'chat' | 'log';
+  onActiveTabChange?: (tab: 'chat' | 'log') => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -196,6 +198,22 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       }
     } catch { /* fall through */ }
   }
+  if (actionType === 'MOVE_OPPONENT_CARD' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const cardEl = data.cardName ? <HoverableCard name={data.cardName} img={data.cardImgFile} /> : 'a card';
+      const ownerName = data.cardOwnerName ?? 'opponent';
+      if (data.to === 'discard') return <>discarded {cardEl} from {ownerName}&apos;s {data.from}</>;
+      if (data.to === 'reserve') return <>placed {cardEl} in reserve from {ownerName}&apos;s {data.from}</>;
+      if (data.to === 'banish') return <>banished {cardEl} from {ownerName}&apos;s {data.from}</>;
+      if (data.to === 'deck') return <>put {cardEl} into {ownerName}&apos;s deck from {data.from}</>;
+      if (data.to === 'hand') return <>took {cardEl} from {ownerName}&apos;s {data.from} to hand</>;
+      if (data.to === 'territory') return <>moved {cardEl} from {ownerName}&apos;s {data.from} to territory</>;
+      if (data.to === 'land-of-bondage') return <>sent {cardEl} from {ownerName}&apos;s {data.from} to land of bondage</>;
+      if (data.to === 'land-of-redemption') return <>rescued {cardEl} from {ownerName}&apos;s {data.from}</>;
+      return <>moved {cardEl} from {ownerName}&apos;s {data.from} to {data.to}</>;
+    } catch { /* fall through */ }
+  }
   if (actionType === 'MOVE_TO_TOP_OF_DECK' && payload) {
     try {
       const data = JSON.parse(payload);
@@ -324,9 +342,13 @@ export default function ChatPanel({
   myPlayerId,
   onSendChat,
   playerNames,
+  activeTab: controlledTab,
+  onActiveTabChange,
 }: ChatPanelProps) {
   const [isOpen, setIsOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState<'chat' | 'log'>('chat');
+  const [internalTab, setInternalTab] = useState<'chat' | 'log'>('chat');
+  const activeTab = controlledTab ?? internalTab;
+  const setActiveTab = onActiveTabChange ?? setInternalTab;
   const [inputText, setInputText] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
 
