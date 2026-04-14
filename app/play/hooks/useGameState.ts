@@ -182,8 +182,14 @@ export function useGameState(gameId: bigint): GameState {
     const hasPendingTimeout = allDisconnectTimeouts.some(
       (t) => t.playerId === opponentPlayer.id,
     );
-    return hasPendingTimeout ? 'reconnecting' : 'disconnected';
-  }, [opponentPlayer, allDisconnectTimeouts]);
+    if (hasPendingTimeout) return 'reconnecting';
+    // No timeout and isConnected is false — two possibilities:
+    // 1. disconnectTimeoutFired is true → the 5-min timeout genuinely fired → 'disconnected'
+    // 2. disconnectTimeoutFired is false → stale data from a brief WebSocket reconnection
+    //    where clientConnected cancelled the timeout but isConnected wasn't restored.
+    //    Default to 'connected' to avoid false-alarm red dots.
+    return disconnectTimeoutFired ? 'disconnected' : 'connected';
+  }, [opponentPlayer, allDisconnectTimeouts, disconnectTimeoutFired]);
 
   const isMyTurn = useMemo(
     () => (game && myPlayer ? game.currentTurn === myPlayer.seat : false),

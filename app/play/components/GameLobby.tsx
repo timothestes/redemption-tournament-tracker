@@ -12,15 +12,17 @@ import { useSpacetimeConnection } from '../hooks/useSpacetimeConnection';
 import { SpacetimeProvider } from '../lib/spacetimedb-provider';
 import { DeckPickerModal } from './DeckPickerModal';
 import { LobbyList } from './LobbyList';
+import UsernameModal from '@/app/decklist/my-decks/UsernameModal';
 import type { DeckOption } from './DeckPickerCard';
 
 interface GameLobbyProps {
   decks: DeckOption[];
   userId: string;
   displayName: string;
+  hasUsername: boolean;
 }
 
-export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
+export function GameLobby({ decks, userId, displayName: initialDisplayName, hasUsername: initialHasUsername }: GameLobbyProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -50,6 +52,13 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
   // Spectate toggle
   const [isSpectate, setIsSpectate] = useState(false);
 
+  // Username gate — require a username before creating/joining games
+  const [hasUsername, setHasUsername] = useState(initialHasUsername);
+  const [displayName, setDisplayName] = useState(initialDisplayName);
+  const [showUsernameModal, setShowUsernameModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'create' | 'join' | 'lobby-join' | null>(null);
+  const [pendingLobbyCode, setPendingLobbyCode] = useState<string | null>(null);
+
   // Show error from redirect (e.g. stale lobby join attempt)
   useEffect(() => {
     const lobbyError = sessionStorage.getItem('lobby_error');
@@ -70,7 +79,35 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
     setError(null);
   }
 
-  async function handleJoinFromLobby(code: string) {
+  function handleUsernameSet(newUsername: string) {
+    setHasUsername(true);
+    setDisplayName(newUsername);
+    setShowUsernameModal(false);
+
+    // Resume the action that was blocked
+    const action = pendingAction;
+    const lobbyCode = pendingLobbyCode;
+    setPendingAction(null);
+    setPendingLobbyCode(null);
+
+    if (action === 'create') handleCreateGame(newUsername);
+    else if (action === 'join') handleJoinGame(newUsername);
+    else if (action === 'lobby-join' && lobbyCode) handleJoinFromLobby(lobbyCode, newUsername);
+  }
+
+  function handleUsernameClosed() {
+    setShowUsernameModal(false);
+    setPendingAction(null);
+    setPendingLobbyCode(null);
+  }
+
+  async function handleJoinFromLobby(code: string, overrideDisplayName?: string) {
+    if (!hasUsername && !overrideDisplayName) {
+      setPendingAction('lobby-join');
+      setPendingLobbyCode(code);
+      setShowUsernameModal(true);
+      return;
+    }
     if (!selectedDeck) {
       setError('Please select a deck first.');
       return;
@@ -87,7 +124,7 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
           role: 'join',
           deckId: selectedDeck.id,
           deckName: selectedDeck.name,
-          displayName,
+          displayName: overrideDisplayName || displayName,
           supabaseUserId: userId,
           format: selectedDeck.format || 'Type 1',
           paragon: selectedDeck.paragon || null,
@@ -101,7 +138,12 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
     }
   }
 
-  async function handleCreateGame() {
+  async function handleCreateGame(overrideDisplayName?: string) {
+    if (!hasUsername && !overrideDisplayName) {
+      setPendingAction('create');
+      setShowUsernameModal(true);
+      return;
+    }
     if (!selectedDeck) {
       setError('Please select a deck.');
       return;
@@ -118,7 +160,7 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
           role: 'create',
           deckId: selectedDeck.id,
           deckName: selectedDeck.name,
-          displayName,
+          displayName: overrideDisplayName || displayName,
           supabaseUserId: userId,
           format: selectedDeck.format || 'Type 1',
           paragon: selectedDeck.paragon || null,
@@ -134,7 +176,7 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
     }
   }
 
-  async function handleJoinGame() {
+  async function handleJoinGame(overrideDisplayName?: string) {
     const code = gameCode.trim().toUpperCase();
     if (code.length !== 4) {
       setError('Game code must be 4 characters.');
@@ -142,6 +184,11 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
     }
     if (isSpectate) {
       router.push(`/play/spectate/${code}`);
+      return;
+    }
+    if (!hasUsername && !overrideDisplayName) {
+      setPendingAction('join');
+      setShowUsernameModal(true);
       return;
     }
     if (!selectedDeck) {
@@ -159,7 +206,7 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
           role: 'join',
           deckId: selectedDeck.id,
           deckName: selectedDeck.name,
-          displayName,
+          displayName: overrideDisplayName || displayName,
           supabaseUserId: userId,
           format: selectedDeck.format || 'Type 1',
           paragon: selectedDeck.paragon || null,
@@ -281,7 +328,7 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
           <div className="flex gap-2">
             <Button
               size="lg"
-              onClick={handleJoinGame}
+              onClick={() => handleJoinGame()}
               disabled={isJoining || !selectedDeck}
               className="flex-1 h-12 text-base"
             >
@@ -326,7 +373,7 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
             <div className="sm:basis-0 sm:flex-1 flex flex-col gap-2.5">
               <Button
                 size="lg"
-                onClick={handleCreateGame}
+                onClick={() => handleCreateGame()}
                 disabled={isCreating || isJoining || !selectedDeck}
                 className="w-full h-12 text-base"
               >
@@ -383,7 +430,7 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
                 <Button
                   size="lg"
                   variant="outline"
-                  onClick={handleJoinGame}
+                  onClick={() => handleJoinGame()}
                   disabled={isJoining || isCreating || gameCode.length !== 4 || (!isSpectate && !selectedDeck)}
                   className="shrink-0 h-12 w-20"
                 >
@@ -441,6 +488,13 @@ export function GameLobby({ decks, userId, displayName }: GameLobbyProps) {
             </div>
           )}
         </SpacetimeProvider>
+      )}
+      {/* Username modal — shown when user tries to play without a username set */}
+      {showUsernameModal && (
+        <UsernameModal
+          onSuccess={handleUsernameSet}
+          onClose={handleUsernameClosed}
+        />
       )}
     </div>
   );

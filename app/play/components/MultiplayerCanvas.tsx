@@ -322,12 +322,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
   }, []);
 
   // Propagate hoveredCard to the shared CardPreview context (drives CardLoupePanel)
+  // Only update when there's a new card — don't clear on mouseLeave so the last card stays visible
   useEffect(() => {
-    setPreviewCard(
-      hoveredCard
-        ? { cardName: hoveredCard.cardName, cardImgFile: hoveredCard.cardImgFile, isMeek: hoveredCard.isMeek }
-        : null,
-    );
+    if (hoveredCard) {
+      setPreviewCard({ cardName: hoveredCard.cardName, cardImgFile: hoveredCard.cardImgFile, isMeek: hoveredCard.isMeek });
+    }
   }, [hoveredCard, setPreviewCard]);
 
   // ---- Hand spread toggle (fan vs flat) ----

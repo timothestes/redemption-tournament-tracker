@@ -88,7 +88,7 @@ function HoverableCard({ name, img }: { name: string; img?: string }) {
     <span
       style={{ textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 2, cursor: 'pointer' }}
       onMouseEnter={() => setPreviewCard({ cardName: name, cardImgFile: img ?? '' })}
-      onMouseLeave={() => setPreviewCard(null)}
+      onMouseLeave={() => {}}
     >
       {name}
     </span>
@@ -166,7 +166,7 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
         if (data.to === 'discard') return <>discarded <HoverableCard name={data.cardName} img={data.cardImgFile} /></>;
         if (data.to === 'reserve') return <>placed <HoverableCard name={data.cardName} img={data.cardImgFile} /> in reserve</>;
         if (data.to === 'banish') return <>banished <HoverableCard name={data.cardName} img={data.cardImgFile} /></>;
-        if (data.to === 'deck') return <>put <HoverableCard name={data.cardName} img={data.cardImgFile} /> into deck</>;
+        if (data.to === 'deck') return 'put a card into their deck';
         if (data.to === 'hand') {
           const isCrossPlayer = data.targetOwnerId && data.targetOwnerId !== actorPlayerId;
           const targetName = isCrossPlayer && playerNames?.[data.targetOwnerId];
@@ -206,7 +206,7 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       if (data.to === 'discard') return <>discarded {cardEl} from {ownerName}&apos;s {data.from}</>;
       if (data.to === 'reserve') return <>placed {cardEl} in reserve from {ownerName}&apos;s {data.from}</>;
       if (data.to === 'banish') return <>banished {cardEl} from {ownerName}&apos;s {data.from}</>;
-      if (data.to === 'deck') return <>put {cardEl} into {ownerName}&apos;s deck from {data.from}</>;
+      if (data.to === 'deck') return <>put a card into {ownerName}&apos;s deck from {data.from}</>;
       if (data.to === 'hand') return <>took {cardEl} from {ownerName}&apos;s {data.from} to hand</>;
       if (data.to === 'territory') return <>moved {cardEl} from {ownerName}&apos;s {data.from} to territory</>;
       if (data.to === 'land-of-bondage') return <>sent {cardEl} from {ownerName}&apos;s {data.from} to land of bondage</>;
@@ -217,25 +217,21 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
   if (actionType === 'MOVE_TO_TOP_OF_DECK' && payload) {
     try {
       const data = JSON.parse(payload);
-      if (data.cardName) {
-        const isCrossPlayer = data.targetOwnerId && data.targetOwnerId !== actorPlayerId;
-        const targetName = isCrossPlayer && playerNames?.[data.targetOwnerId];
-        return targetName
-          ? <>moved <HoverableCard name={data.cardName} img={data.cardImgFile} /> to top of {targetName}&apos;s deck</>
-          : <>moved <HoverableCard name={data.cardName} img={data.cardImgFile} /> to top of deck</>;
-      }
+      const isCrossPlayer = data.targetOwnerId && data.targetOwnerId !== actorPlayerId;
+      const targetName = isCrossPlayer && playerNames?.[data.targetOwnerId];
+      return targetName
+        ? <>moved a card to top of {targetName}&apos;s deck</>
+        : 'moved a card to top of their deck';
     } catch { /* fall through */ }
   }
   if (actionType === 'MOVE_TO_BOTTOM_OF_DECK' && payload) {
     try {
       const data = JSON.parse(payload);
-      if (data.cardName) {
-        const isCrossPlayer = data.targetOwnerId && data.targetOwnerId !== actorPlayerId;
-        const targetName = isCrossPlayer && playerNames?.[data.targetOwnerId];
-        return targetName
-          ? <>moved <HoverableCard name={data.cardName} img={data.cardImgFile} /> to bottom of {targetName}&apos;s deck</>
-          : <>moved <HoverableCard name={data.cardName} img={data.cardImgFile} /> to bottom of deck</>;
-      }
+      const isCrossPlayer = data.targetOwnerId && data.targetOwnerId !== actorPlayerId;
+      const targetName = isCrossPlayer && playerNames?.[data.targetOwnerId];
+      return targetName
+        ? <>moved a card to bottom of {targetName}&apos;s deck</>
+        : 'moved a card to bottom of their deck';
     } catch { /* fall through */ }
   }
   if (actionType === 'MOVE_CARDS_BATCH' && payload) {
@@ -250,7 +246,7 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
         if (data.toZone === 'discard') parts.push(<span key="discard">discarded <CardNameList cards={data.cards} />{fromSuffix}</span>);
         if (data.toZone === 'reserve') parts.push(<span key="reserve">reserved <CardNameList cards={data.cards} />{fromSuffix}</span>);
         if (data.toZone === 'banish') parts.push(<span key="banish">banished <CardNameList cards={data.cards} />{fromSuffix}</span>);
-        if (data.toZone === 'deck') parts.push(<span key="deck">put <CardNameList cards={data.cards} /> into deck</span>);
+        if (data.toZone === 'deck') parts.push(<span key="deck">put {data.cards?.length === 1 ? 'a card' : `${data.cards.length} cards`} into their deck</span>);
         if (data.toZone === 'hand') {
           const isCrossPlayer = data.targetOwnerId && playerNames?.[data.targetOwnerId] && data.targetOwnerId !== actorPlayerId;
           const targetName = isCrossPlayer && playerNames?.[data.targetOwnerId];
@@ -284,12 +280,7 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       const data = JSON.parse(payload);
       const isCrossPlayer = data.deckOwnerId && data.deckOwnerId !== actorPlayerId;
       const targetName = isCrossPlayer && playerNames?.[data.deckOwnerId];
-      if (data.cardName) {
-        return targetName
-          ? <>shuffled <HoverableCard name={data.cardName} img={data.cardImgFile} /> into {targetName}&apos;s deck</>
-          : <>shuffled <HoverableCard name={data.cardName} img={data.cardImgFile} /> into their deck</>;
-      }
-      return targetName ? `shuffled a card into ${targetName}'s deck` : 'shuffled a card into their deck';
+      return targetName ? <>shuffled a card into {targetName}&apos;s deck</> : 'shuffled a card into their deck';
     } catch { /* fall through */ }
   }
   if (actionType === 'REVEAL_HAND') return 'revealed their hand for 30 seconds';

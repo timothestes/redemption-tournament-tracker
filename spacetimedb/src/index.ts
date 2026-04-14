@@ -119,6 +119,7 @@ function drawCardsForPlayer(ctx: any, game: any, player: any, count: number): nu
       });
       lobCount++;
       drawn++;
+      logAction(ctx, game.id, player.id, 'MOVE_CARD', JSON.stringify({ cardInstanceId: topCard.id.toString(), from: 'deck', to: 'land-of-bondage', cardName: topCard.cardName, cardImgFile: topCard.cardImgFile, redirected: 'drew' }), game.turnNumber, game.currentPhase);
       // Draw a replacement — extend the loop
       count++;
     } else {
@@ -1392,8 +1393,10 @@ export const move_card = spacetimedb.reducer(
     // Log when the card changes zones OR changes ownership (e.g. territory → opponent's territory)
     const ownerChanged = newOwnerId !== card.ownerId;
     if (fromZone !== toZone || ownerChanged) {
-      const logName = isFlipped ? 'a face-down card' : card.cardName;
-      const logImg = isFlipped ? '' : card.cardImgFile;
+      // Hide card identity when moving from hand to hidden zones (deck/reserve) — hand contents are private
+      const hideIdentity = isFlipped || (fromZone === 'hand' && (toZone === 'deck' || toZone === 'reserve'));
+      const logName = hideIdentity ? 'a face-down card' : card.cardName;
+      const logImg = hideIdentity ? '' : card.cardImgFile;
       logAction(ctx, gameId, player.id, 'MOVE_CARD', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), from: fromZone, to: toZone, cardName: logName, cardImgFile: logImg, targetOwnerId: targetOwnerId || '' }), game.turnNumber, game.currentPhase);
       // Compact hand indices if card left hand
       if (fromZone === 'hand') {
@@ -1465,8 +1468,10 @@ export const move_cards_batch = spacetimedb.reducer(
       // Moving to deck = face-down; leaving deck = face-up; otherwise preserve
       const isFlipped = toZone === 'deck' ? true : (card.zone === 'deck' ? false : card.isFlipped);
 
-      const logName = isFlipped ? 'a face-down card' : card.cardName;
-      const logImg = isFlipped ? '' : card.cardImgFile;
+      // Hide card identity when moving from hand to hidden zones (deck/reserve) — hand contents are private
+      const hideIdentity = isFlipped || (card.zone === 'hand' && (toZone === 'deck' || toZone === 'reserve'));
+      const logName = hideIdentity ? 'a face-down card' : card.cardName;
+      const logImg = hideIdentity ? '' : card.cardImgFile;
       cards.push({ name: logName, img: logImg });
       const cardOwnerChanged = newOwnerId !== null && newOwnerId !== card.ownerId;
       if (card.zone !== toZone || cardOwnerChanged) {
@@ -2287,8 +2292,10 @@ export const move_card_to_top_of_deck = spacetimedb.reducer(
       compactLobIndices(ctx, gameId, card.ownerId);
     }
 
-    const topLogName = card.isFlipped ? 'a face-down card' : card.cardName;
-    const topLogImg = card.isFlipped ? '' : card.cardImgFile;
+    // Hide card identity when moving from hand — hand contents are private
+    const hideIdentity = card.isFlipped || fromZone === 'hand';
+    const topLogName = hideIdentity ? 'a face-down card' : card.cardName;
+    const topLogImg = hideIdentity ? '' : card.cardImgFile;
     logAction(ctx, gameId, player.id, 'MOVE_TO_TOP_OF_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: topLogName, cardImgFile: topLogImg, targetOwnerId: card.ownerId.toString() }), game.turnNumber, game.currentPhase);
   }
 );
@@ -2342,8 +2349,10 @@ export const move_card_to_bottom_of_deck = spacetimedb.reducer(
       compactLobIndices(ctx, gameId, card.ownerId);
     }
 
-    const bottomLogName = card.isFlipped ? 'a face-down card' : card.cardName;
-    const bottomLogImg = card.isFlipped ? '' : card.cardImgFile;
+    // Hide card identity when moving from hand — hand contents are private
+    const hideIdentity = card.isFlipped || fromZone === 'hand';
+    const bottomLogName = hideIdentity ? 'a face-down card' : card.cardName;
+    const bottomLogImg = hideIdentity ? '' : card.cardImgFile;
     logAction(ctx, gameId, player.id, 'MOVE_TO_BOTTOM_OF_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: bottomLogName, cardImgFile: bottomLogImg, targetOwnerId: card.ownerId.toString() }), game.turnNumber, game.currentPhase);
   }
 );

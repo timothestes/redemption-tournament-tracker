@@ -151,21 +151,19 @@ Fallow audit: https://github.com/fallow-rs/fallow
 
 # play features
 probably improve right click top/bottom/random menu?
-card placement mismatches? hard to replicate
 start of game takes a bit to load
 create system where cards can have custom abilities coded
 save game, load game, invite to game?
-pulsing chat notification
-visual flash of screen during pre-game ritual
 add paragon to online play?
-make sure username field is set before able to join/host games...
-connection issues?
-hover last should leave it up last card instead of immediatley dropping the card
-fix logs when someone drags cards to deck, do not show card names in logs
 add text notes?
+
+visual flash of screen during pre-game ritual
+make sure username field is set before able to join/host games...
+connection issues? both players immediately saw "opponent is disconnected" right after trying this out in preview branch
+fix logs when someone drags cards to deck, do not show card names in logs
+hover last should leave it up last card instead of immediatley dropping the card
 hand has this weird visual glitch with a ghost card?? Think it happens if exchange happens
 if lost souls are put in play they should show up in the logs
-
 disable double click deck to draw
 Turn counter should track each person's turn
 Add reference to the search drop down

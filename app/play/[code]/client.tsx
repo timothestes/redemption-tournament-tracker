@@ -536,7 +536,13 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const isCeremonyPhase = lifecycle === 'pregame' &&
     (pregamePhase === 'rolling' || pregamePhase === 'choosing' || (pregamePhase === 'revealing' && !myAckedRevealing));
 
-  if ((lifecycle === 'waiting' || lifecycle === 'pregame') && !isCeremonyPhase) {
+  // After the local player acknowledges during 'revealing', the ceremony overlay
+  // is dismissed but the server hasn't transitioned game.status to 'playing' yet
+  // (waiting for the opponent's ack). Show the game board without any overlay
+  // during this brief gap to avoid flashing the lobby/dice screen.
+  const isAwaitingGameStart = lifecycle === 'pregame' && myAckedRevealing && pregamePhase === 'revealing';
+
+  if ((lifecycle === 'waiting' || lifecycle === 'pregame') && !isCeremonyPhase && !isAwaitingGameStart) {
     if (isPracticing && goldfishDeck) {
       return (
         <div className="fixed inset-0 bg-background">
@@ -767,6 +773,38 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} />
             )}
             <PregameCeremonyOverlay gameState={gameState} />
+            <GameToastContainer />
+          </div>
+        </div>
+        {rightPanel}
+      </div>
+    );
+  }
+
+  // Transitional state: local player has acked the reveal but the server hasn't
+  // transitioned to 'playing' yet. Show the game board cleanly (no overlay, no
+  // toolbar) so there's no flash of the lobby screen.
+  if (isAwaitingGameStart) {
+    return (
+      <div style={{ display: 'flex', width: '100vw', height: '100dvh', backgroundImage: 'url(/gameplay/cave_background.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ flexShrink: 0, height: 48 }}>
+            <TurnIndicator
+              game={gameState.game}
+              myPlayer={gameState.myPlayer}
+              opponentPlayer={gameState.opponentPlayer}
+              opponentConnectionStatus={gameState.opponentConnectionStatus}
+              isMyTurn={false}
+              onSetPhase={() => {}}
+              onEndTurn={() => {}}
+              myScore={gameState.myCards['land-of-redemption']?.length ?? 0}
+              opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}
+            />
+          </div>
+          <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+            {gameId !== null && (
+              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} />
+            )}
             <GameToastContainer />
           </div>
         </div>

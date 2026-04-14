@@ -1040,12 +1040,6 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                 onClick={(e) => {
                   if (e.evt.button === 0 && zoneId !== 'deck') handleZoneClick(zoneId);
                 }}
-                onDblClick={(e) => {
-                  if (zoneId === 'deck' && e.evt.button === 0) drawCard();
-                }}
-                onDblTap={() => {
-                  if (zoneId === 'deck') drawCard();
-                }}
                 onContextMenu={(e) => {
                   if (zoneId === 'deck') handleDeckContextMenu(e);
                   if (zoneId === 'land-of-bondage') {
@@ -1192,8 +1186,6 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                     offsetX={oX}
                     offsetY={oY}
                     onContextMenu={handleDeckContextMenu}
-                    onDblClick={(e) => { if (e.evt.button === 0) drawCard(); }}
-                    onDblTap={() => drawCard()}
                   >
                     <CardBackShape width={sidebarCardWidth} height={sidebarCardHeight} />
                   </Group>

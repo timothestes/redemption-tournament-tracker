@@ -40,11 +40,20 @@ export default async function PlayPage({ searchParams }: { searchParams: Promise
     );
   }
 
-  const { data: decks } = await supabase
-    .from('decks')
-    .select('id, name, format, card_count, preview_card_1, preview_card_2, paragon, last_played_at')
-    .eq('user_id', user.id)
-    .order('updated_at', { ascending: false });
+  const [{ data: decks }, { data: profile }] = await Promise.all([
+    supabase
+      .from('decks')
+      .select('id, name, format, card_count, preview_card_1, preview_card_2, paragon, last_played_at')
+      .eq('user_id', user.id)
+      .order('updated_at', { ascending: false }),
+    supabase
+      .from('profiles')
+      .select('username')
+      .eq('id', user.id)
+      .single(),
+  ]);
+
+  const username = profile?.username ?? null;
 
   return (
     <>
@@ -54,11 +63,8 @@ export default async function PlayPage({ searchParams }: { searchParams: Promise
       <GameLobby
         decks={decks || []}
         userId={user.id}
-        displayName={
-          user.user_metadata?.display_name ||
-          user.email?.split('@')[0] ||
-          'Player'
-        }
+        displayName={username || user.user_metadata?.display_name || user.email?.split('@')[0] || 'Player'}
+        hasUsername={!!username}
       />
     </div>
     </>
