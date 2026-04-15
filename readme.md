@@ -153,23 +153,32 @@ Fallow audit: https://github.com/fallow-rs/fallow
 probably improve right click top/bottom/random menu?
 start of game takes a bit to load
 create system where cards can have custom abilities coded
+add ability to use meek tokens
 save game, load game, invite to game?
 add paragon to online play?
 add text notes?
 
-visual flash of screen during pre-game ritual
-make sure username field is set before able to join/host games...
-connection issues? both players immediately saw "opponent is disconnected" right after trying this out in preview branch
-fix logs when someone drags cards to deck, do not show card names in logs
-hover last should leave it up last card instead of immediatley dropping the card
-hand has this weird visual glitch with a ghost card?? Think it happens if exchange happens
-if lost souls are put in play they should show up in the logs
-disable double click deck to draw
-Turn counter should track each person's turn
-Add reference to the search drop down
-Ghost cards... from exchange option
 
+Ghost cards... from exchange option
 I don't have reveal reserve option
-draw button takes a bit of time to
-dragging a soul to land of redemption should put it "on top"
-when dragging cards to opponent's discard, should drag to the top
+
+
+
+
+"draw multiple cards" needs to be say "how many exactly
+needs undo button
+look at top card feature
+taking cards from reveal feature is buggy
+site in souls don't really work right now
+add equip feature?
+battle phase/zone could be better
+dragging group of cards doens't preserve card order (again)
+logs should show what counters are getting added to
+when drawing souls, sometimes it not super obvious you drew a soul
+hunter soul: jhendrix6426 moved a card to top of their deck. Should be shown what went into the deck
+Wonder if there is a chat + log view? idk
+shuffling multiple cards into deck does one at a time
+allow search deck a bit high up...
+can't discard random cards from a reserve
+adding counters to opponent's cards isn't working
+revealing opponent's deck doesn't give you the options that are normally available to deck search options

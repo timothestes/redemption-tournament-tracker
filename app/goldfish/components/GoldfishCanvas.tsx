@@ -762,14 +762,14 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
 
   const handleCardMouseLeave = useCallback(() => {
     setHoveredInstanceId(null);
-    setPreviewCard(null);
+    // Don't clear previewCard on mouseLeave so the last card stays visible in the loupe panel
     stopHoverAnimation();
     if (hoverTimerRef.current) {
       clearTimeout(hoverTimerRef.current);
       hoverTimerRef.current = null;
     }
     setHoverCard(null);
-  }, [stopHoverAnimation, setPreviewCard]);
+  }, [stopHoverAnimation]);
 
   const handleCardDblClick = useCallback(
     (card: GameCard) => {
