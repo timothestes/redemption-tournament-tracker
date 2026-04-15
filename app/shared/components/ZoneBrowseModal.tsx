@@ -4,10 +4,11 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useModalGame } from '@/app/shared/contexts/ModalGameContext';
 import { ZoneId, ZONE_LABELS, GameCard } from '@/app/shared/types/gameCard';
-import { X } from 'lucide-react';
+import { X, GripHorizontal } from 'lucide-react';
 import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './ModalCardHoverPreview';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
+import { useDraggableModal } from '@/app/shared/hooks/useDraggableModal';
 
 const MOVE_ZONES: { id: ZoneId; label: string }[] = [
   { id: 'hand', label: 'Hand' },
@@ -144,8 +145,9 @@ interface ZoneBrowseModalProps {
 }
 
 export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive, readOnly }: ZoneBrowseModalProps) {
+  const { dragHandleProps, modalStyle } = useDraggableModal();
   const { zones, actions } = useModalGame();
-  const { moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck } = actions;
+  const { moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck, shuffleDeck } = actions;
   const rawCards = zones[zoneId];
   // Sort reserve by type then name (matches goldfish canvas convention)
   const cards = zoneId === 'reserve'
@@ -155,6 +157,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
   const { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave } = useModalCardHover(200, { setPreviewCard, isLoupeVisible });
   const [contextCard, setContextCard] = useState<{ card: GameCard; x: number; y: number } | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [leaveOpen, setLeaveOpen] = useState(false);
 
   // Refs for card DOM elements (for lasso hit-testing)
   const cardElRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -169,15 +172,31 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
   const lassoStart = useRef<{ x: number; y: number } | null>(null);
   const isLassoing = useRef(false);
 
-  // Close modal after a successful drag-to-canvas completes (isDragActive goes from true -> false)
+  // Close modal after a successful drag-to-canvas completes (unless "leave open" is on).
+  // Use refs for onClose/leaveOpen so the effect only re-runs when isDragActive
+  // changes — not when callback references are recreated by subscription updates.
+  const leaveOpenRef = useRef(leaveOpen);
+  leaveOpenRef.current = leaveOpen;
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // Timestamp of last drag end — used by the backdrop click handler as a reliable
+  // guard against the spurious click that fires when mousedown-on-card + mouseup-on-backdrop
+  // occur during a drag gesture. didDragRef alone can race with React's re-render cycle.
+  const dragEndTimeRef = useRef(0);
+
   const prevDragActive = useRef(false);
   useEffect(() => {
     if (prevDragActive.current && !isDragActive) {
+      dragEndTimeRef.current = Date.now();
       setSelectedIds(new Set());
-      onClose();
+      if (!leaveOpenRef.current) {
+        onCloseRef.current();
+      }
+      if (didDragRef) didDragRef.current = false;
     }
     prevDragActive.current = !!isDragActive;
-  }, [isDragActive, onClose]);
+  }, [isDragActive]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -339,7 +358,13 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
   };
 
   const handleMultiShuffleIntoDeck = () => {
-    for (const id of selectedIds) shuffleCardIntoDeck(id);
+    const ids = [...selectedIds];
+    if (ids.length === 1) {
+      shuffleCardIntoDeck(ids[0]);
+    } else {
+      moveCardsBatch(ids, 'deck');
+      shuffleDeck();
+    }
     setSelectedIds(new Set());
     setContextCard(null);
   };
@@ -357,7 +382,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      onClick={() => { setContextCard(null); onClose(); }}
+      onClick={() => { if (!didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) { setContextCard(null); onClose(); } }}
       onContextMenu={(e) => e.preventDefault()}
       style={{
         position: 'fixed',
@@ -387,10 +412,21 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
           opacity: isDragActive ? 0.15 : 1,
           pointerEvents: isDragActive ? 'none' : 'auto',
           transition: 'opacity 0.2s ease',
+          ...modalStyle,
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div
+          {...dragHandleProps}
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 16,
+            ...dragHandleProps.style,
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <GripHorizontal size={14} style={{ color: 'var(--gf-border)', flexShrink: 0 }} />
             <h2
               style={{
                 fontFamily: 'var(--font-cinzel), Georgia, serif',
@@ -434,6 +470,53 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
             <X size={18} />
           </button>
         </div>
+
+        {/* Hint + leave open toggle */}
+        {!readOnly && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <span style={{ color: 'var(--gf-border)', fontSize: 10 }}>
+              Drag to a zone · Right-click for more · Hover to enlarge
+            </span>
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                color: 'var(--gf-text-dim)',
+                fontSize: 11,
+                cursor: 'pointer',
+              }}
+            >
+              <span
+                style={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: 3,
+                  border: leaveOpen ? '1.5px solid #c4955a' : '1.5px solid var(--gf-border)',
+                  background: leaveOpen ? 'rgba(196, 149, 90, 0.25)' : 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  transition: 'border-color 0.15s, background 0.15s',
+                }}
+              >
+                {leaveOpen && (
+                  <svg width="12" height="12" viewBox="0 0 10 10" fill="none">
+                    <path d="M2 5L4.5 7.5L8 3" stroke="#e8d5a3" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </span>
+              <input
+                type="checkbox"
+                checked={leaveOpen}
+                onChange={(e) => setLeaveOpen(e.target.checked)}
+                className="sr-only"
+              />
+              Leave open
+            </label>
+          </div>
+        )}
 
         {cards.length === 0 ? (
           <p style={{ color: 'var(--gf-text-dim)', fontStyle: 'italic' }}>Empty</p>

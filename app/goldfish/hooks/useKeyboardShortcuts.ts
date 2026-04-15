@@ -36,6 +36,7 @@ export function useKeyboardShortcuts(options?: KeyboardShortcutOptions) {
     moveCardToTopOfDeck: () => {},
     moveCardToBottomOfDeck: () => {},
     randomHandToZone: () => {},
+    randomReserveToZone: () => {},
     reloadDeck: () => {},
   }), [drawCard, shuffleDeck]);
 

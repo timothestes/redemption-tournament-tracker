@@ -122,7 +122,6 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const card = zones.deck.shift()!;
 
       if (state.options.autoRouteLostSouls && isLostSoul(card)) {
-        // TODO: animate Lost Soul sliding to Land of Bondage with golden glow flash
         card.zone = 'land-of-bondage';
         card.isFlipped = false;
         zones['land-of-bondage'].push(card);

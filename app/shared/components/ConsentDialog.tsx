@@ -13,9 +13,9 @@ export function ConsentDialog({ requesterName, zoneName, requestType = 'search',
     <div
       style={{
         position: 'absolute',
-        top: '30%',
+        top: '50%',
         left: '50%',
-        transform: 'translateX(-50%)',
+        transform: 'translate(-50%, -50%)',
         zIndex: 900,
         pointerEvents: 'auto',
       }}

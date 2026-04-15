@@ -3,11 +3,12 @@
 import { motion } from 'framer-motion';
 import { useModalGame } from '@/app/shared/contexts/ModalGameContext';
 import { GameCard, ZoneId } from '@/app/shared/types/gameCard';
-import { X, ArrowUp, ArrowDown, Shuffle } from 'lucide-react';
+import { X, ArrowUp, ArrowDown, Shuffle, GripHorizontal } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './ModalCardHoverPreview';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
+import { useDraggableModal } from '@/app/shared/hooks/useDraggableModal';
 
 const MOVE_ZONES: { id: ZoneId; label: string }[] = [
   { id: 'hand', label: 'Hand' },
@@ -131,6 +132,7 @@ interface DeckPeekModalProps {
 }
 
 export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive }: DeckPeekModalProps) {
+  const { dragHandleProps, modalStyle } = useDraggableModal();
   const { zones, actions } = useModalGame();
   const { moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleDeck, shuffleCardIntoDeck } = actions;
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
@@ -145,6 +147,21 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Timestamp of last drag end — used by the backdrop click handler as a reliable
+  // guard against the spurious click that fires when mousedown-on-card + mouseup-on-backdrop
+  // occur during a drag gesture. didDragRef alone can race with React's re-render cycle.
+  const dragEndTimeRef = useRef(0);
+
+  const prevDragActive = useRef(false);
+  useEffect(() => {
+    if (prevDragActive.current && !isDragActive) {
+      dragEndTimeRef.current = Date.now();
+      setSelectedIds(new Set());
+      if (didDragRef) didDragRef.current = false;
+    }
+    prevDragActive.current = !!isDragActive;
+  }, [isDragActive]);
 
   // Context menu state
   const [contextCard, setContextCard] = useState<{ card: GameCard; x: number; y: number } | null>(null);
@@ -345,7 +362,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
         alignItems: 'center',
         justifyContent: 'center',
       }}
-      onClick={() => { if (readyForClose) handleCloseAction('top'); }}
+      onClick={() => { if (readyForClose && !didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) handleCloseAction('top'); }}
       onContextMenu={(e) => e.preventDefault()}
     >
       <motion.div
@@ -366,10 +383,21 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
           opacity: isDragActive ? 0.15 : 1,
           pointerEvents: isDragActive ? 'none' : 'auto',
           transition: 'opacity 0.2s ease',
+          ...modalStyle,
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div
+          {...dragHandleProps}
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 16,
+            ...dragHandleProps.style,
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <GripHorizontal size={14} style={{ color: 'var(--gf-border)', flexShrink: 0 }} />
             <h2 style={{
               fontFamily: 'var(--font-cinzel), Georgia, serif',
               color: 'var(--gf-text-bright)',
@@ -588,7 +616,14 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
             onMove={(zone) => { for (const id of targetIds) moveCard(id, zone); }}
             onMoveToTop={() => { for (const id of targetIds) moveCardToTopOfDeck(id); }}
             onMoveToBottom={() => { for (const id of targetIds) moveCardToBottomOfDeck(id); }}
-            onShuffleIn={() => { for (const id of targetIds) shuffleCardIntoDeck(id); }}
+            onShuffleIn={() => {
+              if (targetIds.length === 1) {
+                shuffleCardIntoDeck(targetIds[0]);
+              } else {
+                moveCardsBatch(targetIds, 'deck');
+                shuffleDeck();
+              }
+            }}
           />
         );
       })()}

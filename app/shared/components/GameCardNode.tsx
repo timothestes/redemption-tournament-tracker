@@ -1,8 +1,9 @@
 'use client';
 
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useEffect, useRef } from 'react';
 import { Group, Rect, Image as KonvaImage, Circle, Text } from 'react-konva';
 import type Konva from 'konva';
+import KonvaLib from 'konva';
 import { GameCard, COUNTER_COLORS } from '../../goldfish/types';
 
 // Card back image — loaded once and shared across all instances
@@ -56,6 +57,8 @@ export interface GameCardNodeProps {
   isSelected?: boolean;
   isDraggable?: boolean;
   hoverProgress?: number;
+  /** When true, plays a one-shot amber pulse glow that fades out over ~1.5s. */
+  lobArrivalGlow?: boolean;
   nodeRef?: (instanceId: string, node: Konva.Group | null) => void;
   onDragStart: (card: GameCard) => void;
   onDragMove: (e: Konva.KonvaEventObject<DragEvent>) => void;
@@ -79,6 +82,7 @@ export const GameCardNode = memo(function GameCardNode({
   isSelected,
   isDraggable = true,
   hoverProgress,
+  lobArrivalGlow,
   nodeRef,
   onDragStart,
   onDragMove,
@@ -91,6 +95,38 @@ export const GameCardNode = memo(function GameCardNode({
 }: GameCardNodeProps) {
   const isToken = card.isToken;
   const showFace = !card.isFlipped && image;
+
+  // Ref for the LOB arrival glow rect — used to run an imperative Konva Tween
+  const arrivalGlowRef = useRef<Konva.Rect | null>(null);
+  const arrivalTweenRef = useRef<ReturnType<typeof KonvaLib.Tween.prototype.play> | null>(null);
+
+  useEffect(() => {
+    const node = arrivalGlowRef.current;
+    if (!node) return;
+
+    if (lobArrivalGlow) {
+      // Start visible, then fade out
+      node.opacity(1);
+      node.visible(true);
+      const tween = new KonvaLib.Tween({
+        node,
+        duration: 1.5,
+        opacity: 0,
+        easing: KonvaLib.Easings.EaseOut,
+        onFinish: () => {
+          node.visible(false);
+        },
+      });
+      tween.play();
+      arrivalTweenRef.current = tween as any;
+      return () => {
+        tween.destroy();
+      };
+    } else {
+      node.visible(false);
+      node.opacity(0);
+    }
+  }, [lobArrivalGlow]);
 
   const groupRefCb = useCallback((node: Konva.Group | null) => {
     nodeRef?.(card.instanceId, node);
@@ -115,6 +151,25 @@ export const GameCardNode = memo(function GameCardNode({
       onMouseLeave={onMouseLeave}
       onTouchStart={(e) => onMouseEnter(card, e as unknown as Konva.KonvaEventObject<MouseEvent>)}
     >
+      {/* LOB arrival glow — amber pulse that fades out when a card arrives in Land of Bondage */}
+      <Rect
+        ref={arrivalGlowRef as any}
+        x={-4}
+        y={-4}
+        width={cardWidth + 8}
+        height={cardHeight + 8}
+        fill="transparent"
+        stroke="#d4a044"
+        strokeWidth={2.5}
+        cornerRadius={6}
+        shadowColor="#d4a044"
+        shadowBlur={16}
+        shadowOpacity={0.8}
+        visible={false}
+        opacity={0}
+        listening={false}
+      />
+
       {/* Selection highlight — golden glow border */}
       {isSelected && (
         <Rect

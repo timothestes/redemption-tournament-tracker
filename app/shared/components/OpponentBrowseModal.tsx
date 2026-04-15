@@ -3,10 +3,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { GameCard } from '@/app/shared/types/gameCard';
-import { X, Search } from 'lucide-react';
+import { X, Search, GripHorizontal } from 'lucide-react';
 import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './ModalCardHoverPreview';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
+import { useDraggableModal } from '@/app/shared/hooks/useDraggableModal';
 
 const OPPONENT_ACTIONS = [
   { id: 'discard', label: 'Discard' },
@@ -18,12 +19,14 @@ const OPPONENT_ACTIONS = [
 
 function OpponentCardPopup({
   card,
+  count,
   x,
   y,
   onClose,
   onAction,
 }: {
   card: GameCard;
+  count?: number;
   x: number;
   y: number;
   onClose: () => void;
@@ -52,6 +55,8 @@ function OpponentCardPopup({
     fontFamily: 'var(--font-cinzel), Georgia, serif',
   };
 
+  const label = count && count > 1 ? `Move ${count} cards...` : card.cardName;
+
   return (
     <div
       ref={ref}
@@ -71,9 +76,9 @@ function OpponentCardPopup({
       }}
     >
       <div style={{ ...itemStyle, color: 'var(--gf-text-dim)', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', cursor: 'default', padding: '3px 12px' }}>
-        {card.cardName}
+        {label}
       </div>
-      {OPPONENT_ACTIONS.map(({ id, label }) => (
+      {OPPONENT_ACTIONS.map(({ id, label: actionLabel }) => (
         <button
           key={id}
           style={itemStyle}
@@ -81,19 +86,29 @@ function OpponentCardPopup({
           onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
         >
-          {label}
+          {actionLabel}
         </button>
       ))}
     </div>
   );
 }
 
+// Check if two axis-aligned rectangles overlap
+function rectsOverlap(
+  ax: number, ay: number, aw: number, ah: number,
+  bx: number, by: number, bw: number, bh: number,
+): boolean {
+  return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+}
+
 interface OpponentBrowseModalProps {
   zoneName: string;
   cards: GameCard[];
   onMoveCard: (cardId: string, action: string) => void;
+  onMoveCardsBatch?: (cardIds: string[], action: string) => void;
   onClose: () => void;
   onStartDrag?: (card: GameCard, imageUrl: string, e: React.PointerEvent) => void;
+  onStartMultiDrag?: (cards: { card: GameCard; imageUrl: string }[], e: React.PointerEvent) => void;
   didDragRef?: React.MutableRefObject<boolean>;
   isDragActive?: boolean;
 }
@@ -128,16 +143,34 @@ export function OpponentBrowseModal({
   zoneName,
   cards,
   onMoveCard,
+  onMoveCardsBatch,
   onClose,
   onStartDrag,
+  onStartMultiDrag,
   didDragRef,
   isDragActive,
 }: OpponentBrowseModalProps) {
+  const { dragHandleProps, modalStyle } = useDraggableModal();
   const [search, setSearch] = useState('');
   const [searchField, setSearchField] = useState<string>('all');
   const [contextCard, setContextCard] = useState<{ card: GameCard; x: number; y: number } | null>(null);
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave } = useModalCardHover(350, { setPreviewCard, isLoupeVisible });
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Refs for card DOM elements (for lasso hit-testing)
+  const cardElRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const registerCardEl = useCallback((instanceId: string, el: HTMLDivElement | null) => {
+    if (el) cardElRefs.current.set(instanceId, el);
+    else cardElRefs.current.delete(instanceId);
+  }, []);
+
+  // Lasso selection state
+  const gridRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [lassoRect, setLassoRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const lassoStart = useRef<{ x: number; y: number } | null>(null);
+  const isLassoing = useRef(false);
 
   const isReserve = zoneName.toLowerCase().includes('reserve');
   const sortedCards = isReserve
@@ -174,11 +207,17 @@ export function OpponentBrowseModal({
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        if (selectedIds.size > 0) {
+          setSelectedIds(new Set());
+        } else {
+          onClose();
+        }
+      }
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [onClose]);
+  }, [onClose, selectedIds.size]);
 
   const handleCardContextMenu = useCallback((card: GameCard, e: React.MouseEvent) => {
     e.preventDefault();
@@ -194,10 +233,18 @@ export function OpponentBrowseModal({
     onCardMouseLeave();
     pointerDownCardRef.current = card.instanceId;
     if (didDragRef) didDragRef.current = false;
-    if (onStartDrag) {
+
+    const isSelected = selectedIds.has(card.instanceId);
+    if (isSelected && selectedIds.size > 1 && onStartMultiDrag) {
+      const allSelected = filtered.filter(c => selectedIds.has(c.instanceId));
+      onStartMultiDrag(
+        allSelected.map(c => ({ card: c, imageUrl: getCardImageUrl(c.cardImgFile) })),
+        e,
+      );
+    } else if (onStartDrag) {
       onStartDrag(card, imageUrl, e);
     }
-  }, [onCardMouseLeave, didDragRef, onStartDrag]);
+  }, [onCardMouseLeave, didDragRef, onStartDrag, onStartMultiDrag, selectedIds, filtered]);
 
   const handlePointerUp = useCallback((card: GameCard) => {
     if (pointerDownCardRef.current !== card.instanceId) return;
@@ -207,7 +254,102 @@ export function OpponentBrowseModal({
       return;
     }
     setContextCard(null);
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(card.instanceId)) {
+        next.delete(card.instanceId);
+      } else {
+        next.add(card.instanceId);
+      }
+      return next;
+    });
   }, [didDragRef]);
+
+  // Lasso selection: pointer down on empty space
+  const handleContentPointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    const tag = target.tagName.toLowerCase();
+    if (tag === 'button' || tag === 'img' || tag === 'input' || tag === 'select' || tag === 'label') return;
+    if (target.closest('[data-card-id]')) return;
+    const grid = gridRef.current;
+    if (!grid) return;
+    const rect = grid.getBoundingClientRect();
+    const scrollContainer = scrollContainerRef.current;
+    const scrollTop = scrollContainer?.scrollTop ?? 0;
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top + scrollTop;
+    lassoStart.current = { x, y };
+    isLassoing.current = true;
+    setLassoRect(null);
+    if (!e.shiftKey) {
+      setSelectedIds(new Set());
+    }
+    e.preventDefault();
+  };
+
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      if (!isLassoing.current || !lassoStart.current || !gridRef.current) return;
+      const grid = gridRef.current;
+      const rect = grid.getBoundingClientRect();
+      const scrollContainer = scrollContainerRef.current;
+      const scrollTop = scrollContainer?.scrollTop ?? 0;
+      const currentX = e.clientX - rect.left;
+      const currentY = e.clientY - rect.top + scrollTop;
+      const sx = Math.min(lassoStart.current.x, currentX);
+      const sy = Math.min(lassoStart.current.y, currentY);
+      const sw = Math.abs(currentX - lassoStart.current.x);
+      const sh = Math.abs(currentY - lassoStart.current.y);
+
+      setLassoRect({ x: sx, y: sy, w: sw, h: sh });
+
+      if (sw > 5 || sh > 5) {
+        const hits = new Set<string>();
+        for (const [instanceId, el] of cardElRefs.current) {
+          const cardRect = el.getBoundingClientRect();
+          const cx = cardRect.left - rect.left;
+          const cy = cardRect.top - rect.top + scrollTop;
+          if (rectsOverlap(sx, sy, sw, sh, cx, cy, cardRect.width, cardRect.height)) {
+            hits.add(instanceId);
+          }
+        }
+        setSelectedIds(hits);
+      }
+    };
+
+    const onUp = () => {
+      if (isLassoing.current) {
+        isLassoing.current = false;
+        lassoStart.current = null;
+        setLassoRect(null);
+      }
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  }, []);
+
+  // Multi-card context menu handler
+  const handleMultiAction = (action: string) => {
+    if (onMoveCardsBatch) {
+      onMoveCardsBatch(Array.from(selectedIds), action);
+    } else {
+      // Fallback: call onMoveCard for each selected card
+      for (const id of selectedIds) {
+        onMoveCard(id, action);
+      }
+    }
+    setSelectedIds(new Set());
+    setContextCard(null);
+  };
+
+  // Determine if context card is part of a multi-selection
+  const isMultiContext = contextCard && selectedIds.has(contextCard.card.instanceId) && selectedIds.size > 1;
 
   return (
     <motion.div
@@ -229,6 +371,7 @@ export function OpponentBrowseModal({
     >
       <div
         onClick={(e) => { e.stopPropagation(); setContextCard(null); }}
+        onPointerDown={handleContentPointerDown}
         style={{
           background: 'var(--gf-bg)',
           border: '1px solid var(--gf-border)',
@@ -243,19 +386,58 @@ export function OpponentBrowseModal({
           opacity: isDragActive ? 0.15 : 1,
           pointerEvents: isDragActive ? 'none' : 'auto',
           transition: 'opacity 0.2s ease',
+          ...modalStyle,
         }}
       >
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h2
-            style={{
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 16,
-              color: 'var(--gf-text-bright)',
-            }}
-          >
-            {zoneName} ({cards.length})
-          </h2>
+        {/* Header — drag handle */}
+        <div
+          {...dragHandleProps}
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 12,
+            ...dragHandleProps.style,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <GripHorizontal size={14} style={{ color: 'var(--gf-border)', flexShrink: 0 }} />
+            <h2
+              style={{
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+                fontSize: 16,
+                color: 'var(--gf-text-bright)',
+              }}
+            >
+              {zoneName} ({cards.length})
+            </h2>
+            {selectedIds.size > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{
+                  color: 'var(--gf-accent)',
+                  fontSize: 12,
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                }}>
+                  {selectedIds.size} selected
+                </span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setSelectedIds(new Set()); }}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid var(--gf-border)',
+                    borderRadius: 4,
+                    color: 'var(--gf-text-dim)',
+                    fontSize: 10,
+                    padding: '2px 6px',
+                    cursor: 'pointer',
+                    fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  }}
+                >
+                  Deselect
+                </button>
+              </div>
+            )}
+          </div>
           <button
             onClick={onClose}
             style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--gf-text-dim)' }}
@@ -354,18 +536,19 @@ export function OpponentBrowseModal({
         {/* Hint */}
         <div style={{ marginBottom: 12 }}>
           <span style={{ color: 'var(--gf-border)', fontSize: 10 }}>
-            Right-click for actions · Drag to a zone · Hover to enlarge
+            Right-click for actions · Drag to a zone · Click to select · Hover to enlarge
           </span>
         </div>
 
         {/* Card grid — scrollable */}
-        <div style={{ overflow: 'auto', flex: 1 }}>
+        <div ref={scrollContainerRef} style={{ overflow: 'auto', flex: 1 }}>
           {filtered.length === 0 ? (
             <p style={{ color: 'var(--gf-text-dim)', fontStyle: 'italic', textAlign: 'center', padding: 20 }}>
               {search ? 'No cards match your search' : 'No cards in this zone'}
             </p>
           ) : (
             <div
+              ref={gridRef}
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
@@ -376,9 +559,11 @@ export function OpponentBrowseModal({
             >
               {filtered.map((card) => {
                 const imageUrl = getCardImageUrl(card.cardImgFile);
+                const isSelected = selectedIds.has(card.instanceId);
                 return (
                   <div
                     key={card.instanceId}
+                    ref={(el) => registerCardEl(card.instanceId, el)}
                     data-card-id={card.instanceId}
                     style={{ position: 'relative', cursor: 'grab' }}
                     onContextMenu={(e) => handleCardContextMenu(card, e)}
@@ -389,8 +574,9 @@ export function OpponentBrowseModal({
                     onMouseLeave={onCardMouseLeave}
                   >
                     {(() => {
-                      const isHoveredCard = hoveredCardId === card.instanceId;
+                      const isHoveredCard = hoveredCardId === card.instanceId && !isSelected;
                       const glowStyle = isHoveredCard ? getHoverGlowStyle(hoverProgress) : undefined;
+                      const selectedShadow = isSelected ? '0 0 8px rgba(196,149,90,0.4)' : 'none';
                       return imageUrl ? (
                         <img
                           src={imageUrl}
@@ -399,8 +585,8 @@ export function OpponentBrowseModal({
                           style={{
                             width: '100%',
                             borderRadius: 4,
-                            border: '1px solid var(--gf-border)',
-                            boxShadow: glowStyle?.boxShadow ?? 'none',
+                            border: isSelected ? '2px solid var(--gf-accent)' : '1px solid var(--gf-border)',
+                            boxShadow: glowStyle?.boxShadow ?? selectedShadow,
                             transition: 'border 0.1s ease',
                           }}
                         />
@@ -410,8 +596,8 @@ export function OpponentBrowseModal({
                             width: '100%',
                             aspectRatio: '1/1.4',
                             background: '#1e1610',
-                            border: '1px solid var(--gf-border)',
-                            boxShadow: glowStyle?.boxShadow ?? 'none',
+                            border: isSelected ? '2px solid var(--gf-accent)' : '1px solid var(--gf-border)',
+                            boxShadow: glowStyle?.boxShadow ?? selectedShadow,
                             borderRadius: 4,
                             display: 'flex',
                             alignItems: 'center',
@@ -430,6 +616,24 @@ export function OpponentBrowseModal({
                   </div>
                 );
               })}
+
+              {/* Lasso selection rectangle */}
+              {lassoRect && lassoRect.w > 5 && lassoRect.h > 5 && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: lassoRect.x,
+                    top: lassoRect.y,
+                    width: lassoRect.w,
+                    height: lassoRect.h,
+                    border: '2px dashed var(--gf-accent)',
+                    background: 'rgba(196,149,90,0.15)',
+                    borderRadius: 2,
+                    pointerEvents: 'none',
+                    zIndex: 100,
+                  }}
+                />
+              )}
             </div>
           )}
         </div>
@@ -439,13 +643,24 @@ export function OpponentBrowseModal({
 
       {/* Context menu */}
       {contextCard && (
-        <OpponentCardPopup
-          card={contextCard.card}
-          x={contextCard.x}
-          y={contextCard.y}
-          onClose={() => setContextCard(null)}
-          onAction={(action) => onMoveCard(contextCard.card.instanceId, action)}
-        />
+        isMultiContext ? (
+          <OpponentCardPopup
+            card={contextCard.card}
+            count={selectedIds.size}
+            x={contextCard.x}
+            y={contextCard.y}
+            onClose={() => setContextCard(null)}
+            onAction={handleMultiAction}
+          />
+        ) : (
+          <OpponentCardPopup
+            card={contextCard.card}
+            x={contextCard.x}
+            y={contextCard.y}
+            onClose={() => setContextCard(null)}
+            onAction={(action) => onMoveCard(contextCard.card.instanceId, action)}
+          />
+        )
       )}
     </motion.div>
   );

@@ -4,10 +4,11 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useModalGame } from '@/app/shared/contexts/ModalGameContext';
 import { GameCard, ZoneId, ZONE_LABELS } from '@/app/shared/types/gameCard';
-import { X, Search } from 'lucide-react';
+import { X, Search, GripHorizontal } from 'lucide-react';
 import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './ModalCardHoverPreview';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
+import { useDraggableModal } from '@/app/shared/hooks/useDraggableModal';
 
 const MOVE_ZONES: { id: ZoneId; label: string }[] = [
   { id: 'hand', label: 'Hand' },
@@ -128,6 +129,7 @@ function rectsOverlap(
 }
 
 export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive }: DeckSearchModalProps) {
+  const { dragHandleProps, modalStyle } = useDraggableModal();
   const { zones, actions } = useModalGame();
   const { moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleDeck } = actions;
   const [search, setSearch] = useState('');
@@ -443,11 +445,22 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
           opacity: isDragActive ? 0.15 : 1,
           pointerEvents: isDragActive ? 'none' : 'auto',
           transition: 'opacity 0.2s ease',
+          ...modalStyle,
         }}
       >
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        {/* Header — drag handle */}
+        <div
+          {...dragHandleProps}
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 12,
+            ...dragHandleProps.style,
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <GripHorizontal size={14} style={{ color: 'var(--gf-border)', flexShrink: 0 }} />
             <h2
               style={{
                 fontFamily: 'var(--font-cinzel), Georgia, serif',

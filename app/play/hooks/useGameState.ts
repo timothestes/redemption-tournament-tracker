@@ -69,6 +69,7 @@ export interface GameState {
   shuffleCardIntoDeck: (cardInstanceId: bigint) => void;
   reloadDeck: (deckId: string, deckData: string) => void;
   randomHandToZone: (count: number, toZone: string, deckPosition: string) => void;
+  randomReserveToZone: (count: number, toZone: string, deckPosition: string) => void;
   meekCard: (cardInstanceId: bigint) => void;
   unmeekCard: (cardInstanceId: bigint) => void;
   flipCard: (cardInstanceId: bigint) => void;
@@ -337,6 +338,13 @@ export function useGameState(gameId: bigint): GameState {
   const randomHandToZone = useCallback(
     (count: number, toZone: string, deckPosition: string) => {
       conn?.reducers.randomHandToZone({ gameId, count: BigInt(count), toZone, deckPosition });
+    },
+    [conn, gameId],
+  );
+
+  const randomReserveToZone = useCallback(
+    (count: number, toZone: string, deckPosition: string) => {
+      conn?.reducers.randomReserveToZone({ gameId, count: BigInt(count), toZone, deckPosition });
     },
     [conn, gameId],
   );
@@ -633,6 +641,7 @@ export function useGameState(gameId: bigint): GameState {
     shuffleDeck,
     shuffleCardIntoDeck,
     randomHandToZone,
+    randomReserveToZone,
     reloadDeck,
     meekCard,
     unmeekCard,

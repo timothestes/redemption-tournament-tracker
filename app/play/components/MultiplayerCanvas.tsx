@@ -36,6 +36,7 @@ import { DeckDropPopup } from '@/app/shared/components/DeckDropPopup';
 import { LorContextMenu } from '@/app/shared/components/LorContextMenu';
 import { OpponentZoneContextMenu } from '@/app/shared/components/OpponentZoneContextMenu';
 import { HandContextMenu } from '@/app/shared/components/HandContextMenu';
+import { ReserveContextMenu } from '@/app/shared/components/ReserveContextMenu';
 import { ConsentDialog } from '@/app/shared/components/ConsentDialog';
 import { OpponentBrowseModal } from '@/app/shared/components/OpponentBrowseModal';
 import { showGameToast } from '@/app/shared/components/GameToast';
@@ -54,6 +55,7 @@ import { getCardImageUrl as getSharedCardImageUrl } from '@/app/shared/utils/car
 import { useVirtualCanvas, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen } from '@/app/shared/layout/virtualCanvas';
 import { useCardScale } from '@/app/shared/hooks/useCardScale';
 import { CardScaleControl } from '@/app/shared/components/CardScaleControl';
+import { useLobArrivalEffect } from '@/app/shared/hooks/useLobArrivalEffect';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -239,6 +241,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
 
   const myHandRect = mpLayout?.zones.playerHand ?? null;
   const opponentHandRect = mpLayout?.zones.opponentHand ?? null;
+
+  // ---- LOB arrival glow effect ----
+  const myLobIds = useMemo(
+    () => (myCards['land-of-bondage'] ?? []).map(c => String(c.id)),
+    [myCards],
+  );
+  const oppLobIds = useMemo(
+    () => (opponentCards['land-of-bondage'] ?? []).map(c => String(c.id)),
+    [opponentCards],
+  );
+  const { getGlowIntensity: getMyLobGlow } = useLobArrivalEffect(myLobIds);
+  const { getGlowIntensity: getOppLobGlow } = useLobArrivalEffect(oppLobIds);
 
   // ---- Stage ref ----
   const stageRef = useRef<Konva.Stage>(null);
@@ -555,6 +569,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
     removeOpponentToken: undefined,
     randomHandToZone: (count, toZone, deckPosition) =>
       gameState.randomHandToZone(count, toZone, deckPosition),
+    randomReserveToZone: (count, toZone, deckPosition) =>
+      gameState.randomReserveToZone(count, toZone, deckPosition),
     reloadDeck: (deckId, deckData) => gameState.reloadDeck(deckId, deckData),
   }), [gameState, findMyCardById, checkReserveProtection, checkReserveBatchProtection]);
 
@@ -611,6 +627,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       shuffleCardIntoDeck: (id) => gameState.shuffleCardIntoDeck(BigInt(id)),
     },
   }), [opponentCards, counters, gameState]);
+
+  // ---- Combined zones for context menu (includes both players' cards so counters
+  //      update live when right-clicking opponent cards) ----
+  const allZonesForContextMenu = useMemo(() => {
+    const myZonesMap = modalGameValue.zones as Record<string, GameCard[]>;
+    const oppZonesMap = opponentModalGameValue.zones as Record<string, GameCard[]>;
+    const combined: Record<string, GameCard[]> = {};
+    const allKeys = new Set([...Object.keys(myZonesMap), ...Object.keys(oppZonesMap)]);
+    for (const key of allKeys) {
+      combined[key] = [...(myZonesMap[key] ?? []), ...(oppZonesMap[key] ?? [])];
+    }
+    return combined;
+  }, [modalGameValue.zones, opponentModalGameValue.zones]);
 
   // ---- Close all menus helper ----
   const closeAllMenus = useCallback(() => {
@@ -838,6 +867,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
   const {
     dragState: opponentModalDrag,
     startDrag: opponentModalStartDrag,
+    startMultiDrag: opponentModalStartMultiDrag,
     ghostRef: opponentModalGhostRef,
     didDragRef: opponentModalDidDragRef,
   } = useModalCardDrag({
@@ -1280,7 +1310,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
       const hit = findZoneAtPosition(center.x, center.y);
 
       const isGroupDrag = selectedIds.has(card.instanceId) && selectedIds.size > 1;
-      const cardIds = isGroupDrag ? Array.from(selectedIds) : [card.instanceId];
+      // Sort selected card IDs by their current zoneIndex so the server
+      // assigns new zoneIndices in the same relative order — prevents
+      // card order from getting scrambled during group drags.
+      const cardIds = isGroupDrag
+        ? Array.from(selectedIds).sort((a, b) => {
+            const aCard = findAnyCardById(a);
+            const bCard = findAnyCardById(b);
+            return Number(aCard?.zoneIndex ?? BigInt(0)) - Number(bCard?.zoneIndex ?? BigInt(0));
+          })
+        : [card.instanceId];
       const cardId = BigInt(card.instanceId);
 
       // Helper to snap back to original position and restore to original parent.
@@ -1620,6 +1659,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
     },
     [
       findZoneAtPosition,
+      findAnyCardById,
       moveCard,
       moveCardsBatch,
       updateCardPosition,
@@ -1987,7 +2027,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
   }
 
   return (
-    <div ref={containerRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
+    <div ref={containerRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }} onContextMenu={(e) => e.preventDefault()}>
       <Stage
         ref={stageRef}
         width={containerWidth}
@@ -2311,9 +2351,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
                   const gameCard = adaptCard(card, 'player1');
                   const pos = positions[i];
                   if (!pos) return null;
+                  const cardIdStr = String(card.id);
                   return (
                     <GameCardNode
-                      key={String(card.id)}
+                      key={cardIdStr}
                       card={gameCard}
                       x={pos.x}
                       y={pos.y}
@@ -2321,9 +2362,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
                       cardWidth={lobCard.cardWidth}
                       cardHeight={lobCard.cardHeight}
                       image={getCardImage(card)}
-                      isSelected={isSelected(String(card.id))}
+                      isSelected={isSelected(cardIdStr)}
                       isDraggable={true}
-                      hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
+                      hoverProgress={hoveredInstanceId === cardIdStr ? hoverProgress : 0}
+                      lobArrivalGlow={getMyLobGlow(cardIdStr) > 0}
                       nodeRef={registerCardNode}
                       onClick={handleCardClick}
                       onDragStart={handleCardDragStart}
@@ -2355,9 +2397,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
                   const gameCard = adaptCard(card, 'player2');
                   const pos = positions[i];
                   if (!pos) return null;
+                  const cardIdStr = String(card.id);
                   return (
                     <GameCardNode
-                      key={String(card.id)}
+                      key={cardIdStr}
                       card={gameCard}
                       x={pos.x + lobCard.cardWidth}
                       y={pos.y + lobCard.cardHeight}
@@ -2365,9 +2408,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
                       cardWidth={lobCard.cardWidth}
                       cardHeight={lobCard.cardHeight}
                       image={getCardImage(card)}
-                      isSelected={isSelected(String(card.id))}
+                      isSelected={isSelected(cardIdStr)}
                       isDraggable={true}
-                      hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
+                      hoverProgress={hoveredInstanceId === cardIdStr ? hoverProgress : 0}
+                      lobArrivalGlow={getOppLobGlow(cardIdStr) > 0}
                       nodeRef={registerCardNode}
                       onClick={handleCardClick}
                       onDragStart={handleCardDragStart}
@@ -3133,13 +3177,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
           actions={multiplayerActions}
           onClose={() => setContextMenu(null)}
           onExchange={(cardIds) => { setContextMenu(null); setExchangeCardIds(cardIds); }}
-          zones={modalGameValue.zones as any}
+          zones={allZonesForContextMenu as any}
         />
       )}
 
       {multiCardContextMenu && (
         <MultiCardContextMenu
-          selectedIds={Array.from(selectedIds)}
+          selectedIds={Array.from(selectedIds).sort((a, b) => {
+            const aCard = findAnyCardById(a);
+            const bCard = findAnyCardById(b);
+            return Number(aCard?.zoneIndex ?? BigInt(0)) - Number(bCard?.zoneIndex ?? BigInt(0));
+          })}
           x={multiCardContextMenu.x}
           y={multiCardContextMenu.y}
           actions={multiplayerActions}
@@ -3200,89 +3248,24 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
         />
       )}
 
-      {reserveMenu && (() => {
-        const isRevealed = gameState.myPlayer?.reserveRevealed ?? false;
-        const MENU_WIDTH = 200;
-        const rightAligned = reserveMenu.x + MENU_WIDTH > window.innerWidth;
-        const menuLeft = rightAligned ? Math.max(0, reserveMenu.x - MENU_WIDTH) : reserveMenu.x;
-        return (
-          <div
-            ref={(el) => {
-              if (!el) return;
-              const handleClick = (e: MouseEvent) => {
-                if (!el.contains(e.target as Node)) setReserveMenu(null);
-              };
-              const handleKey = (e: KeyboardEvent) => {
-                if (e.key === 'Escape') setReserveMenu(null);
-              };
-              document.addEventListener('mousedown', handleClick);
-              document.addEventListener('keydown', handleKey);
-              // Cleanup via data attribute to avoid stale closures
-              const prev = (el as any).__cleanup;
-              if (prev) prev();
-              (el as any).__cleanup = () => {
-                document.removeEventListener('mousedown', handleClick);
-                document.removeEventListener('keydown', handleKey);
-              };
-            }}
-            onContextMenu={(e) => e.preventDefault()}
-            style={{
-              position: 'fixed',
-              left: menuLeft,
-              top: Math.min(reserveMenu.y, window.innerHeight - 100),
-              background: 'var(--gf-bg)',
-              border: '1px solid var(--gf-border)',
-              borderRadius: 6,
-              padding: '4px 0',
-              zIndex: 900,
-              boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            <div style={{
-              padding: '4px 14px 6px',
-              color: 'var(--gf-text-dim)',
-              fontSize: 10,
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              userSelect: 'none',
-            }}>
-              Reserve ({myCards['reserve']?.length ?? 0} cards)
-            </div>
-            <div style={{ height: 1, background: 'var(--gf-border)', margin: '4px 8px', opacity: 0.5 }} />
-            <button
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                width: '100%',
-                padding: '6px 14px',
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                color: 'var(--gf-text)',
-                fontSize: 13,
-                textAlign: 'left' as const,
-                fontFamily: 'var(--font-cinzel), Georgia, serif',
-              }}
-              onClick={() => {
-                gameState.revealReserve(!isRevealed);
-                setReserveMenu(null);
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-            >
-              {isRevealed ? (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-              ) : (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              )}
-              {isRevealed ? 'Hide Reserve' : 'Reveal Reserve'}
-            </button>
-          </div>
-        );
-      })()}
+      {reserveMenu && (
+        <ReserveContextMenu
+          x={reserveMenu.x}
+          y={reserveMenu.y}
+          cardCount={myCards['reserve']?.length ?? 0}
+          isRevealed={gameState.myPlayer?.reserveRevealed ?? false}
+          onToggleReveal={() => {
+            const isRevealed = gameState.myPlayer?.reserveRevealed ?? false;
+            gameState.revealReserve(!isRevealed);
+          }}
+          onClose={() => setReserveMenu(null)}
+          onRandomToDiscard={(count) => { setReserveMenu(null); multiplayerActions.randomReserveToZone(count, 'discard', ''); }}
+          onRandomToHand={(count) => { setReserveMenu(null); multiplayerActions.randomReserveToZone(count, 'hand', ''); }}
+          onRandomToDeckTop={(count) => { setReserveMenu(null); multiplayerActions.randomReserveToZone(count, 'deck', 'top'); }}
+          onRandomToDeckBottom={(count) => { setReserveMenu(null); multiplayerActions.randomReserveToZone(count, 'deck', 'bottom'); }}
+          onShuffleRandomIntoDeck={(count) => { setReserveMenu(null); multiplayerActions.randomReserveToZone(count, 'deck', 'shuffle'); }}
+        />
+      )}
 
       {opponentDeckMenu && (
         <DeckContextMenu
@@ -3332,7 +3315,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
             x={deckDrop.x}
             y={deckDrop.y}
             onShuffleIn={() => {
-              for (const id of ids) multiplayerActions.shuffleCardIntoDeck(id);
+              if (ids.length === 1) {
+                multiplayerActions.shuffleCardIntoDeck(ids[0]);
+              } else {
+                multiplayerActions.moveCardsBatch(ids, 'deck');
+                multiplayerActions.shuffleDeck();
+              }
               setDeckDrop(null);
             }}
             onTopDeck={() => {
@@ -3531,8 +3519,28 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
                 gameState.shuffleDeck();
               }
             }}
+            onMoveCardsBatch={(cardIds, action) => {
+              const reqId = BigInt(approvedSearchRequest.id);
+              for (const cardId of cardIds) {
+                if (action === 'discard') {
+                  moveOpponentCard(reqId, BigInt(cardId), 'discard');
+                } else if (action === 'banish') {
+                  moveOpponentCard(reqId, BigInt(cardId), 'banish');
+                } else if (action === 'deck-top') {
+                  moveOpponentCard(reqId, BigInt(cardId), 'deck');
+                } else if (action === 'deck-bottom') {
+                  moveOpponentCard(reqId, BigInt(cardId), 'deck');
+                } else if (action === 'deck-shuffle') {
+                  moveOpponentCard(reqId, BigInt(cardId), 'deck');
+                }
+              }
+              if (action === 'deck-shuffle') {
+                gameState.shuffleDeck();
+              }
+            }}
             onClose={() => completeZoneSearch(BigInt(approvedSearchRequest.id))}
             onStartDrag={opponentModalStartDrag}
+            onStartMultiDrag={opponentModalStartMultiDrag}
             didDragRef={opponentModalDidDragRef}
             isDragActive={opponentModalDrag.isDragging}
           />
@@ -3719,22 +3727,85 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
 
       {/* Floating drag ghost (opponent modal → canvas drag) */}
       {opponentModalDrag.isDragging && opponentModalDrag.imageUrl && (
-        <img
-          ref={opponentModalGhostRef as React.RefObject<HTMLImageElement>}
-          src={opponentModalDrag.imageUrl}
-          alt="Dragging card"
-          draggable={false}
-          style={{
-            position: 'fixed',
-            width: 80,
-            borderRadius: 4,
-            border: '2px solid var(--gf-accent)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
-            pointerEvents: 'none',
-            zIndex: 700,
-            opacity: 0.9,
-          }}
-        />
+        opponentModalDrag.additionalCards.length > 0 ? (
+          <div
+            ref={opponentModalGhostRef as React.RefObject<HTMLDivElement>}
+            style={{
+              position: 'fixed',
+              pointerEvents: 'none',
+              zIndex: 700,
+            }}
+          >
+            {[...opponentModalDrag.additionalCards.slice(0, 2)].reverse().map((extra, i) => (
+              <img
+                key={i}
+                src={extra.imageUrl}
+                alt=""
+                draggable={false}
+                style={{
+                  position: 'absolute',
+                  width: 80,
+                  borderRadius: 4,
+                  border: '1px solid var(--gf-text-dim)',
+                  opacity: 0.4 - i * 0.15,
+                  top: -(6 + i * 4),
+                  left: 4 + i * 2,
+                  zIndex: -1 - i,
+                }}
+              />
+            ))}
+            <img
+              src={opponentModalDrag.imageUrl}
+              alt="Dragging cards"
+              draggable={false}
+              style={{
+                width: 80,
+                borderRadius: 4,
+                border: '2px solid var(--gf-accent)',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
+                opacity: 0.9,
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                top: -8,
+                right: -8,
+                background: 'var(--gf-accent)',
+                color: '#1e1610',
+                borderRadius: '50%',
+                width: 22,
+                height: 22,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 11,
+                fontWeight: 'bold',
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.5)',
+              }}
+            >
+              {opponentModalDrag.additionalCards.length + 1}
+            </div>
+          </div>
+        ) : (
+          <img
+            ref={opponentModalGhostRef as React.RefObject<HTMLImageElement>}
+            src={opponentModalDrag.imageUrl}
+            alt="Dragging card"
+            draggable={false}
+            style={{
+              position: 'fixed',
+              width: 80,
+              borderRadius: 4,
+              border: '2px solid var(--gf-accent)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
+              pointerEvents: 'none',
+              zIndex: 700,
+              opacity: 0.9,
+            }}
+          />
+        )
       )}
 
       {/* ================================================================

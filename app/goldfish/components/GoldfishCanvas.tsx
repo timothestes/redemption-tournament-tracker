@@ -35,6 +35,7 @@ import { GameActions } from '@/app/shared/types/gameActions';
 import { GameToastContainer, showGameToast } from './GameToast';
 import { DiceRollOverlay } from './DiceRollOverlay';
 import { useCardPreview } from '../state/CardPreviewContext';
+import { useLobArrivalEffect } from '@/app/shared/hooks/useLobArrivalEffect';
 
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 
@@ -52,6 +53,13 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const stageRef = useRef<Konva.Stage>(null);
   const gameLayerRef = useRef<Konva.Layer>(null);
+
+  // ---- LOB arrival glow effect ----
+  const lobCardIds = useMemo(
+    () => (state.zones['land-of-bondage'] ?? []).map(c => c.instanceId),
+    [state.zones],
+  );
+  const { getGlowIntensity: getLobGlow } = useLobArrivalEffect(lobCardIds);
 
   // Adapter: bridge goldfish game context to shared GameActions interface
   const goldfishActions: GameActions = useMemo(() => ({
@@ -72,6 +80,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     moveCardToBottomOfDeck: (cardId) => moveCardToBottomOfDeck(cardId),
     removeOpponentToken: (cardId) => removeOpponentToken(cardId),
     randomHandToZone: () => {}, // not used in goldfish
+    randomReserveToZone: () => {}, // not used in goldfish
     reloadDeck: () => {}, // not used in goldfish
   }), [moveCard, moveCardsBatch, flipCard, meekCard, unmeekCard, addCounter, removeCounter, shuffleCardIntoDeck, shuffleDeck, addNote, drawCard, drawMultiple, moveCardToTopOfDeck, moveCardToBottomOfDeck, removeOpponentToken]);
 
@@ -1409,6 +1418,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                         image={getImage(card.cardImgFile)}
                         isSelected={selectedIds.has(card.instanceId)}
                         hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
+                        lobArrivalGlow={getLobGlow(card.instanceId) > 0}
                         nodeRef={registerCardNode}
                         onDragStart={handleCardDragStart}
                         onDragMove={handleCardDragMove}

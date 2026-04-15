@@ -63,6 +63,7 @@ export function GameToolbar() {
     moveCardToBottomOfDeck,
     removeOpponentToken,
     randomHandToZone: () => {}, // not used in goldfish
+    randomReserveToZone: () => {}, // not used in goldfish
     reloadDeck: () => {}, // not used in goldfish
   }), [
     drawCard, drawMultiple, moveCard, moveCardsBatch, flipCard,

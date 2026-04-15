@@ -200,8 +200,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // in the dependency array (which is evaluated during render).
   const gameState = useGameState(gameId ?? BigInt(0));
 
-  // Persist chat/log tab across loupe toggles so it doesn't reset to chat
-  const [chatTab, setChatTab] = useState<'chat' | 'log'>('chat');
+  // Persist chat/log/all tab across loupe toggles so it doesn't reset to chat
+  const [chatTab, setChatTab] = useState<'chat' | 'log' | 'all'>('chat');
 
   // Track unread chat messages at this level so the count survives ChatPanel
   // unmounting when the right panel collapses.
@@ -243,6 +243,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     moveCardToTopOfDeck: () => {},
     moveCardToBottomOfDeck: () => {},
     randomHandToZone: () => {},
+    randomReserveToZone: () => {},
     reloadDeck: () => {},
   }), [gameState]);
 
@@ -842,7 +843,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               />
             </div>
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-              <MultiplayerCanvas gameId={gameId} />
+              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} />
               {/* Bottom toolbar — stays active for draw/shuffle, end turn disabled */}
               <GameToolbar
                 actions={{
@@ -862,6 +863,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                   moveCardToTopOfDeck: (id) => gameState.moveCardToTopOfDeck(BigInt(id)),
                   moveCardToBottomOfDeck: (id) => gameState.moveCardToBottomOfDeck(BigInt(id)),
                   randomHandToZone: (count, toZone, deckPosition) => gameState.randomHandToZone(count, toZone, deckPosition),
+                  randomReserveToZone: (count, toZone, deckPosition) => gameState.randomReserveToZone(count, toZone, deckPosition),
                   reloadDeck: (deckId, deckData) => gameState.reloadDeck(deckId, deckData),
                 } satisfies GameActions}
                 mode="multiplayer"
@@ -889,6 +891,84 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             </div>
           </div>
           {rightPanel}
+
+          {/* Deck reload picker (available after game ends for rematch/practice) */}
+          <DeckPickerModal
+            open={showReloadDeckPicker}
+            onOpenChange={(open) => setShowReloadDeckPicker(open)}
+            onSelect={async (deck) => {
+              const result = await loadDeckForGame(deck.id);
+              setShowReloadDeckPicker(false);
+              setReloadDeckConfirm({ deckId: deck.id, deckName: deck.name, deckData: JSON.stringify(result.deckData) });
+            }}
+            myDecks={reloadMyDecks}
+          />
+
+          {/* Deck reload confirmation dialog */}
+          {reloadDeckConfirm && (
+            <div style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+            }}>
+              <div style={{
+                background: 'rgba(14, 10, 6, 0.97)',
+                border: '1px solid rgba(107, 78, 39, 0.3)',
+                borderRadius: 8,
+                padding: '20px 28px',
+                maxWidth: 320,
+                width: '100%',
+                textAlign: 'center',
+                boxShadow: '0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(196, 149, 90, 0.08)',
+              }}>
+                <p style={{
+                  fontFamily: 'Georgia, serif',
+                  color: '#e8d5a3',
+                  fontSize: 13,
+                  lineHeight: 1.5,
+                }}>
+                  Clear all cards and load a new deck?
+                </p>
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 18 }}>
+                  <button
+                    onClick={() => setReloadDeckConfirm(null)}
+                    style={{
+                      padding: '7px 18px',
+                      background: 'transparent',
+                      border: '1px solid rgba(107, 78, 39, 0.3)',
+                      borderRadius: 4,
+                      color: 'rgba(196, 149, 90, 0.6)',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      fontFamily: 'Georgia, serif',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      gameState.reloadDeck(reloadDeckConfirm.deckId, reloadDeckConfirm.deckData);
+                      setReloadDeckConfirm(null);
+                    }}
+                    style={{
+                      padding: '7px 18px',
+                      background: 'rgba(196, 149, 90, 0.15)',
+                      border: '1px solid rgba(196, 149, 90, 0.45)',
+                      borderRadius: 4,
+                      color: '#e8d5a3',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      fontFamily: 'Georgia, serif',
+                      fontWeight: 600,
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    Load Deck
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       );
     }
@@ -976,6 +1056,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               moveCardToTopOfDeck: (id) => gameState.moveCardToTopOfDeck(BigInt(id)),
               moveCardToBottomOfDeck: (id) => gameState.moveCardToBottomOfDeck(BigInt(id)),
               randomHandToZone: (count, toZone, deckPosition) => gameState.randomHandToZone(count, toZone, deckPosition),
+              randomReserveToZone: (count, toZone, deckPosition) => gameState.randomReserveToZone(count, toZone, deckPosition),
               reloadDeck: (deckId, deckData) => gameState.reloadDeck(deckId, deckData),
             } satisfies GameActions}
             mode="multiplayer"

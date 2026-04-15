@@ -26,15 +26,22 @@ interface GameAction {
   timestamp: { microsSinceUnixEpoch: bigint };
 }
 
+type TabKey = 'chat' | 'log' | 'all';
+
 interface ChatPanelProps {
   chatMessages: ChatMessage[];
   gameActions: GameAction[];
   myPlayerId: bigint;
   onSendChat: (text: string) => void;
   playerNames: Record<string, string>; // playerId.toString() → display name
-  activeTab?: 'chat' | 'log';
-  onActiveTabChange?: (tab: 'chat' | 'log') => void;
+  activeTab?: TabKey;
+  onActiveTabChange?: (tab: TabKey) => void;
 }
+
+// Discriminated union for interleaved timeline entries
+type TimelineEntry =
+  | { kind: 'chat'; msg: ChatMessage; micros: bigint }
+  | { kind: 'action'; action: GameAction; micros: bigint };
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -48,7 +55,7 @@ function formatTimestamp(micros: bigint): string {
 
 const ACTION_TYPE_LABELS: Record<string, string> = {
   DRAW: 'drew a card',
-  DRAW_MULTIPLE: 'drew multiple cards',
+  // DRAW_MULTIPLE is handled inline in formatActionType (with count + private card names)
   MOVE_CARD: 'moved a card',
   MOVE_CARDS_BATCH: 'moved multiple cards',
   SEARCH_OWN_DECK: 'is searching their deck',
@@ -108,7 +115,7 @@ function CardNameList({ cards }: { cards: { name: string; img: string }[] }) {
   );
 }
 
-function formatActionType(actionType: string, payload?: string, playerNames?: Record<string, string>, actorPlayerId?: string): ReactNode {
+function formatActionType(actionType: string, payload?: string, playerNames?: Record<string, string>, actorPlayerId?: string, viewerPlayerId?: string): ReactNode {
   if (actionType === 'ROLL_DICE' && payload) {
     try {
       const data = JSON.parse(payload);
@@ -127,6 +134,29 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       const data = JSON.parse(payload);
       return `rolled ${data.result0} vs ${data.result1}`;
     } catch { /* fall through */ }
+  }
+  if (actionType === 'DRAW_MULTIPLE') {
+    if (payload) {
+      try {
+        const data = JSON.parse(payload);
+        const count = data.count ? Number(data.count) : undefined;
+        const isViewer = actorPlayerId && viewerPlayerId && actorPlayerId === viewerPlayerId;
+        const hasCards = data.cards && Array.isArray(data.cards) && data.cards.length > 0;
+        const countText = count ? `drew ${count} card${count === 1 ? '' : 's'}` : 'drew multiple cards';
+        if (isViewer && hasCards) {
+          return (
+            <>
+              {countText}: <CardNameList cards={data.cards} />
+              <span style={{ fontSize: 9, fontStyle: 'italic', color: 'rgba(232, 213, 163, 0.35)', marginLeft: 4 }}>
+                (only visible to you)
+              </span>
+            </>
+          );
+        }
+        return countText;
+      } catch { /* fall through */ }
+    }
+    return 'drew multiple cards';
   }
   if ((actionType === 'MEEK' || actionType === 'MEEK_CARD') && payload) {
     try {
@@ -219,9 +249,12 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       const data = JSON.parse(payload);
       const isCrossPlayer = data.targetOwnerId && data.targetOwnerId !== actorPlayerId;
       const targetName = isCrossPlayer && playerNames?.[data.targetOwnerId];
+      const cardEl = data.cardName && data.cardName !== 'a face-down card'
+        ? <HoverableCard name={data.cardName} img={data.cardImgFile} />
+        : 'a card';
       return targetName
-        ? <>moved a card to top of {targetName}&apos;s deck</>
-        : 'moved a card to top of their deck';
+        ? <>moved {cardEl} to top of {targetName}&apos;s deck</>
+        : <>moved {cardEl} to top of their deck</>;
     } catch { /* fall through */ }
   }
   if (actionType === 'MOVE_TO_BOTTOM_OF_DECK' && payload) {
@@ -229,9 +262,12 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       const data = JSON.parse(payload);
       const isCrossPlayer = data.targetOwnerId && data.targetOwnerId !== actorPlayerId;
       const targetName = isCrossPlayer && playerNames?.[data.targetOwnerId];
+      const cardEl = data.cardName && data.cardName !== 'a face-down card'
+        ? <HoverableCard name={data.cardName} img={data.cardImgFile} />
+        : 'a card';
       return targetName
-        ? <>moved a card to bottom of {targetName}&apos;s deck</>
-        : 'moved a card to bottom of their deck';
+        ? <>moved {cardEl} to bottom of {targetName}&apos;s deck</>
+        : <>moved {cardEl} to bottom of their deck</>;
     } catch { /* fall through */ }
   }
   if (actionType === 'MOVE_CARDS_BATCH' && payload) {
@@ -322,6 +358,18 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       return `finished searching ${targetName}'s ${data.zone}`;
     } catch { /* fall through */ }
   }
+  if (actionType === 'ADD_COUNTER' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      if (data.cardName) return <>added {data.color} counter to <HoverableCard name={data.cardName} img={data.cardImgFile} /></>;
+    } catch { /* fall through */ }
+  }
+  if (actionType === 'REMOVE_COUNTER' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      if (data.cardName) return <>removed {data.color} counter from <HoverableCard name={data.cardName} img={data.cardImgFile} /></>;
+    } catch { /* fall through */ }
+  }
   return ACTION_TYPE_LABELS[actionType] ?? actionType.toLowerCase().replace(/_/g, ' ');
 }
 
@@ -339,7 +387,7 @@ export default function ChatPanel({
   onActiveTabChange,
 }: ChatPanelProps) {
   const [isOpen, setIsOpen] = useState(true);
-  const [internalTab, setInternalTab] = useState<'chat' | 'log'>('chat');
+  const [internalTab, setInternalTab] = useState<TabKey>('chat');
   const activeTab = controlledTab ?? internalTab;
   const setActiveTab = onActiveTabChange ?? setInternalTab;
   const [inputText, setInputText] = useState('');
@@ -347,20 +395,21 @@ export default function ChatPanel({
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
+  const allEndRef = useRef<HTMLDivElement>(null);
   const prevChatLengthRef = useRef(chatMessages.length);
 
   // Track unread messages when chat isn't actively visible
   useEffect(() => {
-    const chatVisible = isOpen && activeTab === 'chat';
+    const chatVisible = isOpen && (activeTab === 'chat' || activeTab === 'all');
     if (!chatVisible && chatMessages.length > prevChatLengthRef.current) {
       setUnreadCount((n) => n + (chatMessages.length - prevChatLengthRef.current));
     }
     prevChatLengthRef.current = chatMessages.length;
   }, [chatMessages.length, isOpen, activeTab]);
 
-  // Clear unread when opening chat tab
+  // Clear unread when opening chat or all tab
   useEffect(() => {
-    if (isOpen && activeTab === 'chat') {
+    if (isOpen && (activeTab === 'chat' || activeTab === 'all')) {
       setUnreadCount(0);
     }
   }, [isOpen, activeTab]);
@@ -382,6 +431,16 @@ export default function ChatPanel({
     }
     prevLogTab.current = activeTab;
   }, [gameActions, isOpen, activeTab]);
+
+  // Auto-scroll combined "all" tab to bottom
+  const prevAllTab = useRef(activeTab);
+  useEffect(() => {
+    if (isOpen && activeTab === 'all') {
+      const justSwitched = prevAllTab.current !== 'all';
+      allEndRef.current?.scrollIntoView({ behavior: justSwitched ? 'instant' : 'smooth' });
+    }
+    prevAllTab.current = activeTab;
+  }, [chatMessages, gameActions, isOpen, activeTab]);
 
   const handleSend = () => {
     const trimmed = inputText.trim();
@@ -523,8 +582,9 @@ export default function ChatPanel({
           >
             {/* Tabs */}
             <div style={{ display: 'flex', gap: 4 }}>
-              {(['chat', 'log'] as const).map((tab) => {
+              {(['chat', 'log', 'all'] as const).map((tab) => {
                 const isActive = activeTab === tab;
+                const label = tab === 'chat' ? 'Chat' : tab === 'log' ? 'Log' : 'All';
                 return (
                   <button
                     key={tab}
@@ -546,7 +606,7 @@ export default function ChatPanel({
                     {tab === 'chat' ? (
                       <span style={{ position: 'relative' }}>
                         Chat
-                        {unreadCount > 0 && activeTab !== 'chat' && (
+                        {unreadCount > 0 && activeTab !== 'chat' && activeTab !== 'all' && (
                           <span
                             style={{
                               position: 'absolute',
@@ -561,7 +621,7 @@ export default function ChatPanel({
                           />
                         )}
                       </span>
-                    ) : 'Log'}
+                    ) : label}
                   </button>
                 );
               })}
@@ -756,7 +816,7 @@ export default function ChatPanel({
                 const playerName =
                   playerNames[action.playerId.toString()] ??
                   `Player ${action.playerId}`;
-                const verb = formatActionType(action.actionType, action.payload, playerNames, action.playerId.toString());
+                const verb = formatActionType(action.actionType, action.payload, playerNames, action.playerId.toString(), myPlayerId.toString());
                 const time = formatTimestamp(action.timestamp.microsSinceUnixEpoch);
                 const turn = Number(action.turnNumber);
 
@@ -791,6 +851,224 @@ export default function ChatPanel({
               })}
               <div ref={logEndRef} />
             </div>
+          )}
+
+          {/* ---- Tab: All (Combined) ---- */}
+          {activeTab === 'all' && (
+            <>
+              {/* Combined timeline */}
+              <div
+                style={{
+                  flex: 1,
+                  overflowY: 'auto',
+                  padding: '8px 8px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6,
+                }}
+              >
+                {chatMessages.length === 0 && gameActions.length === 0 && (
+                  <p
+                    style={{
+                      color: 'rgba(232, 213, 163, 0.3)',
+                      fontSize: 11,
+                      textAlign: 'center',
+                      marginTop: 16,
+                      fontStyle: 'italic',
+                    }}
+                  >
+                    No activity yet.
+                  </p>
+                )}
+                {(() => {
+                  // Build a merged timeline sorted chronologically
+                  const timeline: TimelineEntry[] = [];
+                  for (const msg of chatMessages) {
+                    timeline.push({ kind: 'chat', msg, micros: msg.sentAt.microsSinceUnixEpoch });
+                  }
+                  for (const action of gameActions) {
+                    timeline.push({ kind: 'action', action, micros: action.timestamp.microsSinceUnixEpoch });
+                  }
+                  timeline.sort((a, b) => (a.micros < b.micros ? -1 : a.micros > b.micros ? 1 : 0));
+
+                  return timeline.map((entry) => {
+                    if (entry.kind === 'chat') {
+                      const msg = entry.msg;
+                      const isMe = msg.senderId === myPlayerId;
+                      const senderName =
+                        playerNames[msg.senderId.toString()] ??
+                        (isMe ? 'You' : `Player ${msg.senderId}`);
+                      const time = formatTimestamp(msg.sentAt.microsSinceUnixEpoch);
+
+                      return (
+                        <div
+                          key={`chat-${msg.id.toString()}`}
+                          style={{
+                            display: 'flex',
+                            gap: 6,
+                            alignItems: 'flex-start',
+                          }}
+                        >
+                          {/* Chat icon */}
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="11"
+                            height="11"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke={isMe ? '#c4955a' : '#4a7ab5'}
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                            style={{ flexShrink: 0, marginTop: 2 }}
+                          >
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                          </svg>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', gap: 4, alignItems: 'baseline' }}>
+                              <span
+                                style={{
+                                  fontWeight: 700,
+                                  fontSize: 10,
+                                  color: isMe ? '#c4955a' : '#4a7ab5',
+                                  letterSpacing: '0.02em',
+                                }}
+                              >
+                                {senderName}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: 9,
+                                  color: 'rgba(232, 213, 163, 0.3)',
+                                  fontVariantNumeric: 'tabular-nums',
+                                }}
+                              >
+                                {time}
+                              </span>
+                            </div>
+                            <div
+                              style={{
+                                marginTop: 2,
+                                padding: '3px 7px',
+                                borderRadius: '8px 8px 8px 3px',
+                                background: isMe
+                                  ? 'rgba(196, 149, 90, 0.10)'
+                                  : 'rgba(255, 255, 255, 0.05)',
+                                border: isMe
+                                  ? '1px solid rgba(196, 149, 90, 0.22)'
+                                  : '1px solid rgba(255, 255, 255, 0.07)',
+                                fontSize: 12,
+                                color: '#e8d5a3',
+                                lineHeight: 1.4,
+                                wordBreak: 'break-word',
+                                maxWidth: '95%',
+                              }}
+                            >
+                              {msg.text}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    } else {
+                      const action = entry.action;
+                      const playerName =
+                        playerNames[action.playerId.toString()] ??
+                        `Player ${action.playerId}`;
+                      const verb = formatActionType(action.actionType, action.payload, playerNames, action.playerId.toString(), myPlayerId.toString());
+                      const time = formatTimestamp(action.timestamp.microsSinceUnixEpoch);
+                      const turn = Number(action.turnNumber);
+
+                      return (
+                        <div
+                          key={`action-${action.id.toString()}`}
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 1,
+                            padding: '3px 6px',
+                            borderLeft: '2px solid rgba(107, 78, 39, 0.25)',
+                            opacity: 0.8,
+                          }}
+                        >
+                          <span style={{ fontSize: 10, color: '#c8b882', lineHeight: 1.35 }}>
+                            <strong style={{ color: '#e8d5a3' }}>{playerName}</strong>{' '}
+                            {verb}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 9,
+                              color: 'rgba(232, 213, 163, 0.25)',
+                              fontVariantNumeric: 'tabular-nums',
+                            }}
+                          >
+                            T{turn} · {action.phase} · {time}
+                          </span>
+                        </div>
+                      );
+                    }
+                  });
+                })()}
+                <div ref={allEndRef} />
+              </div>
+
+              {/* Input row (same as chat tab) */}
+              <div
+                style={{
+                  padding: '6px 8px',
+                  borderTop: '1px solid rgba(107, 78, 39, 0.3)',
+                  display: 'flex',
+                  gap: 4,
+                  flexShrink: 0,
+                }}
+              >
+                <input
+                  type="text"
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Message..."
+                  maxLength={500}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid rgba(107, 78, 39, 0.35)',
+                    borderRadius: 4,
+                    padding: '5px 8px',
+                    color: '#e8d5a3',
+                    fontSize: 12,
+                    fontFamily: 'inherit',
+                    outline: 'none',
+                  }}
+                  aria-label="Chat message"
+                />
+                <button
+                  onClick={handleSend}
+                  disabled={!inputText.trim()}
+                  aria-label="Send message"
+                  style={{
+                    padding: '5px 8px',
+                    background:
+                      inputText.trim()
+                        ? 'rgba(196, 149, 90, 0.18)'
+                        : 'rgba(255, 255, 255, 0.04)',
+                    border: `1px solid ${inputText.trim() ? 'rgba(196, 149, 90, 0.5)' : 'rgba(107, 78, 39, 0.2)'}`,
+                    borderRadius: 4,
+                    color: inputText.trim() ? '#e8d5a3' : 'rgba(232, 213, 163, 0.3)',
+                    cursor: inputText.trim() ? 'pointer' : 'default',
+                    fontSize: 10,
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    fontFamily: 'inherit',
+                    transition: 'background 0.15s, color 0.15s, border-color 0.15s',
+                    flexShrink: 0,
+                  }}
+                >
+                  Send
+                </button>
+              </div>
+            </>
           )}
         </div>
       )}
