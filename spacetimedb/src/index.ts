@@ -2791,6 +2791,24 @@ export const log_search_deck = spacetimedb.reducer(
   }
 );
 
+// ---------------------------------------------------------------------------
+// Reducer: log_look_at_top (logs when a player privately looks at top N cards)
+// ---------------------------------------------------------------------------
+export const log_look_at_top = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    count: t.u64(),
+  },
+  (ctx, { gameId, count }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
+
+    const player = findPlayerBySender(ctx, gameId);
+    logAction(ctx, gameId, player.id, 'LOOK_AT_TOP', String(count), game.turnNumber, game.currentPhase);
+  }
+);
+
 // ===========================================================================
 // Zone Search reducers
 // ===========================================================================

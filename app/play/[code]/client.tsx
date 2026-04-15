@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useSpacetimeConnection } from '@/app/play/hooks/useSpacetimeConnection';
@@ -26,6 +26,8 @@ import { getRandomLoadingMessage } from '@/app/shared/constants/loadingMessages'
 import { ArrowLeft } from 'lucide-react';
 import type { DeckOption } from '../components/DeckPickerCard';
 import { loadUserDecks, loadDeckForGame } from '../actions';
+import { useUndoStack } from '../hooks/useUndoStack';
+import { useGameTimer } from '../hooks/useGameTimer';
 
 // Konva requires browser APIs — lazy-load to avoid SSR issues
 const MultiplayerCanvas = dynamic(
@@ -148,6 +150,13 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const { isLoupeVisible, toggleLoupe, previewCard } = useCardPreview();
   const { isSpreadHand, toggleSpreadHand } = useSpreadHand();
 
+  // Client-side undo stack for multiplayer reverse actions
+  const undoStack = useUndoStack();
+
+  // Game timer — client-side only, tracks elapsed play time
+  const gameTimer = useGameTimer();
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+
   // Phase 1: Subscribe to game table filtered by code so we can discover the
   // numeric gameId. This avoids sequential scans on unfiltered SELECT * queries.
   useEffect(() => {
@@ -225,6 +234,31 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     }
   }, [isLoupeVisible]);
 
+  // Undo handler — pops the stack and shows toast
+  const handleUndo = useCallback(() => {
+    const description = undoStack.undo();
+    if (description) {
+      showGameToast(`Undo: ${description}`);
+    }
+  }, [undoStack]);
+
+  // Clear undo stack on turn change
+  const prevTurnRef = useRef<bigint | undefined>(undefined);
+  useEffect(() => {
+    const currentTurn = gameState.game?.turnNumber;
+    if (currentTurn !== undefined && prevTurnRef.current !== undefined && currentTurn !== prevTurnRef.current) {
+      undoStack.clear();
+    }
+    prevTurnRef.current = currentTurn;
+  }, [gameState.game?.turnNumber, undoStack]);
+
+  // Clear undo stack when leaving the playing state
+  useEffect(() => {
+    if (lifecycle !== 'playing') {
+      undoStack.clear();
+    }
+  }, [lifecycle, undoStack]);
+
   // Keyboard shortcuts — active only during a live game.
   const hotkeysActions = useMemo<GameActions>(() => ({
     drawCard: () => gameState.drawCard(),
@@ -258,6 +292,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     onToggleSpreadHand: toggleSpreadHand,
     onToggleLoupe: toggleLoupe,
     onAdvancePhase: gameState.endTurn,
+    onUndo: handleUndo,
   });
 
   // Once subscription data is ready, call the appropriate reducer once.
@@ -401,6 +436,29 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       setLifecycle('finished');
     }
   }, [gameState.game, lifecycle]);
+
+  // --- Game timer control ---
+  // Start when lifecycle transitions to 'playing'; reset on pregame (rematch)
+  useEffect(() => {
+    if (lifecycle === 'playing') {
+      gameTimer.start();
+    } else if (lifecycle === 'pregame') {
+      // Reset timer for rematch (pregame re-entered from finished)
+      gameTimer.reset();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lifecycle]);
+
+  // Pause/resume based on search modal state
+  useEffect(() => {
+    if (lifecycle !== 'playing') return;
+    if (isSearchModalOpen) {
+      gameTimer.pause();
+    } else {
+      gameTimer.resume();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSearchModalOpen, lifecycle]);
 
   // Clean up waiting-status games when the user navigates away (component unmount).
   // We intentionally do NOT use beforeunload — it fires on page refresh, which
@@ -767,11 +825,14 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               onEndTurn={() => {}}
               myScore={gameState.myCards['land-of-redemption']?.length ?? 0}
               opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}
+              timerDisplay={gameTimer.formatted}
+              timerPaused={isSearchModalOpen}
+              timerVisible={gameTimer.isTimerVisible}
             />
           </div>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
             {gameId !== null && (
-              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} />
+              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} />
             )}
             <PregameCeremonyOverlay gameState={gameState} />
             <GameToastContainer />
@@ -800,11 +861,14 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               onEndTurn={() => {}}
               myScore={gameState.myCards['land-of-redemption']?.length ?? 0}
               opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}
+              timerDisplay={gameTimer.formatted}
+              timerPaused={isSearchModalOpen}
+              timerVisible={gameTimer.isTimerVisible}
             />
           </div>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
             {gameId !== null && (
-              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} />
+              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} />
             )}
             <GameToastContainer />
           </div>
@@ -831,7 +895,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                 game={gameState.game}
                 myPlayer={gameState.myPlayer}
                 opponentPlayer={gameState.opponentPlayer}
-              opponentConnectionStatus={gameState.opponentConnectionStatus}
+                opponentConnectionStatus={gameState.opponentConnectionStatus}
                 isMyTurn={false}
                 onSetPhase={() => {}}
                 onEndTurn={() => {}}
@@ -840,10 +904,13 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                 onPlayAgain={opponentDisconnected ? undefined : () => setPlayAgainTriggered(true)}
                 myScore={gameState.myCards['land-of-redemption']?.length ?? 0}
                 opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}
+                timerDisplay={gameTimer.formatted}
+                timerPaused={isSearchModalOpen}
+                timerVisible={gameTimer.isTimerVisible}
               />
             </div>
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} />
+              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} />
               {/* Bottom toolbar — stays active for draw/shuffle, end turn disabled */}
               <GameToolbar
                 actions={{
@@ -875,6 +942,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                 handCount={gameState.myCards['hand']?.length ?? 0}
                 onRollDice={() => gameState.rollDice(BigInt(20))}
                 onShowToast={showGameToast}
+                onUndo={handleUndo}
+                undoCount={undoStack.count}
                 onEndTurn={() => {}}
               />
               <GameToastContainer />
@@ -948,6 +1017,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                   <button
                     onClick={() => {
                       gameState.reloadDeck(reloadDeckConfirm.deckId, reloadDeckConfirm.deckData);
+                      gameTimer.reset();
                       setReloadDeckConfirm(null);
                     }}
                     style={{
@@ -990,6 +1060,9 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               onPlayAgain={opponentDisconnected ? undefined : () => setPlayAgainTriggered(true)}
               myScore={gameState.myCards['land-of-redemption']?.length ?? 0}
               opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}
+              timerDisplay={gameTimer.formatted}
+              timerPaused={isSearchModalOpen}
+              timerVisible={gameTimer.isTimerVisible}
             />
           </div>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
@@ -1031,11 +1104,14 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}
             disconnectTimeoutFired={gameState.disconnectTimeoutFired}
             onClaimVictory={gameState.claimTimeoutVictory}
+            timerDisplay={gameTimer.formatted}
+            timerPaused={isSearchModalOpen}
+            timerVisible={gameTimer.isTimerVisible}
           />
         </div>
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           {gameId !== null && (
-            <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} />
+            <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} />
           )}
           {/* Quick action toolbar — floating above hand area */}
           <GameToolbar
@@ -1067,6 +1143,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             handCount={gameState.myCards['hand']?.length ?? 0}
             onRollDice={() => gameState.rollDice(BigInt(20))}
             onShowToast={showGameToast}
+            onUndo={handleUndo}
+            undoCount={undoStack.count}
             onEndTurn={gameState.endTurn}
             onRequestPriority={() => gameState.requestZoneSearch('action-priority')}
             hasPendingPriority={gameState.zoneSearchRequests.some(
@@ -1136,6 +1214,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               <button
                 onClick={() => {
                   gameState.reloadDeck(reloadDeckConfirm.deckId, reloadDeckConfirm.deckData);
+                  gameTimer.reset();
                   setReloadDeckConfirm(null);
                 }}
                 style={{

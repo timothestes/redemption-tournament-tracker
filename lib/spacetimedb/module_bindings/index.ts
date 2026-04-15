@@ -50,6 +50,7 @@ import FlipCardReducer from "./flip_card_reducer";
 import JoinAsSpectatorReducer from "./join_as_spectator_reducer";
 import JoinGameReducer from "./join_game_reducer";
 import LeaveGameReducer from "./leave_game_reducer";
+import LogLookAtTopReducer from "./log_look_at_top_reducer";
 import LogSearchDeckReducer from "./log_search_deck_reducer";
 import MeekCardReducer from "./meek_card_reducer";
 import MoveCardReducer from "./move_card_reducer";
@@ -276,6 +277,7 @@ const reducersSchema = __reducers(
   __reducerSchema("join_as_spectator", JoinAsSpectatorReducer),
   __reducerSchema("join_game", JoinGameReducer),
   __reducerSchema("leave_game", LeaveGameReducer),
+  __reducerSchema("log_look_at_top", LogLookAtTopReducer),
   __reducerSchema("log_search_deck", LogSearchDeckReducer),
   __reducerSchema("meek_card", MeekCardReducer),
   __reducerSchema("move_card", MoveCardReducer),

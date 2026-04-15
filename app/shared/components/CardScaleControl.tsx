@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Settings, RotateCcw, RefreshCw } from 'lucide-react';
+import { Settings, RotateCcw, RefreshCw, Clock, EyeOff } from 'lucide-react';
 
 interface CardScaleControlProps {
   cardScale: number;
@@ -12,6 +12,10 @@ interface CardScaleControlProps {
   step: number;
   /** Called to trigger mid-game deck reload (multiplayer only). */
   onLoadDeck?: () => void;
+  /** Whether the game timer is currently visible. */
+  isTimerVisible?: boolean;
+  /** Toggle timer visibility. */
+  onToggleTimer?: () => void;
 }
 
 export function CardScaleControl({
@@ -22,6 +26,8 @@ export function CardScaleControl({
   maxScale,
   step,
   onLoadDeck,
+  isTimerVisible,
+  onToggleTimer,
 }: CardScaleControlProps) {
   const [open, setOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -215,6 +221,48 @@ export function CardScaleControl({
               >
                 <RefreshCw size={14} />
                 Load Deck
+              </button>
+            </>
+          )}
+
+          {/* Timer visibility toggle */}
+          {onToggleTimer && (
+            <>
+              <div style={{
+                height: 1,
+                background: 'var(--gf-border, #3d2e1f)',
+                margin: '4px 0',
+              }} />
+              <button
+                onClick={() => {
+                  onToggleTimer();
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  width: '100%',
+                  padding: '6px 4px',
+                  background: 'transparent',
+                  border: 'none',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  color: 'var(--gf-text, #e8d5a3)',
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  fontSize: 11,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--gf-hover, #2a1f12)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                }}
+              >
+                {isTimerVisible ? <EyeOff size={14} /> : <Clock size={14} />}
+                {isTimerVisible ? 'Hide Timer' : 'Show Timer'}
               </button>
             </>
           )}

@@ -129,9 +129,11 @@ interface DeckPeekModalProps {
   onStartMultiDrag?: (cards: { card: GameCard; imageUrl: string }[], e: React.PointerEvent) => void;
   didDragRef?: React.MutableRefObject<boolean>;
   isDragActive?: boolean;
+  /** When true, shows a "private" indicator — only you can see these cards */
+  isPrivateLook?: boolean;
 }
 
-export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive }: DeckPeekModalProps) {
+export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive, isPrivateLook }: DeckPeekModalProps) {
   const { dragHandleProps, modalStyle } = useDraggableModal();
   const { zones, actions } = useModalGame();
   const { moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleDeck, shuffleCardIntoDeck } = actions;
@@ -445,11 +447,13 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
 
         <p style={{
           fontFamily: 'var(--font-cinzel), Georgia, serif',
-          color: 'var(--gf-text-dim)',
+          color: isPrivateLook ? 'var(--gf-accent)' : 'var(--gf-text-dim)',
           fontSize: 11,
           marginBottom: 12,
         }}>
-          {onClose ? 'Drag to a zone · Click to select · Lasso to multi-select' : 'Your opponent is revealing cards'}
+          {isPrivateLook
+            ? 'Only you can see this \u00b7 Drag to a zone \u00b7 Click to select'
+            : onClose ? 'Drag to a zone \u00b7 Click to select \u00b7 Lasso to multi-select' : 'Your opponent is revealing cards'}
         </p>
 
         {peekedCards.length === 0 ? (

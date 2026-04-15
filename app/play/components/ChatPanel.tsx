@@ -319,6 +319,12 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       return targetName ? <>shuffled a card into {targetName}&apos;s deck</> : 'shuffled a card into their deck';
     } catch { /* fall through */ }
   }
+  if (actionType === 'LOOK_AT_TOP' && payload) {
+    const count = parseInt(payload, 10);
+    if (count === 1) return 'looked at the top card of their deck';
+    if (count > 1) return `looked at the top ${count} cards of their deck`;
+    return 'looked at the top of their deck';
+  }
   if (actionType === 'REVEAL_HAND') return 'revealed their hand for 30 seconds';
   if (actionType === 'HIDE_HAND') return 'hid their hand';
   if (actionType === 'REVEAL_RESERVE') return 'revealed their reserve';

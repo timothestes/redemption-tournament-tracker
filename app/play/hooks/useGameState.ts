@@ -106,6 +106,7 @@ export interface GameState {
   revealCards: (cardIds: string) => void;
   clearRevealedCards: () => void;
   logSearchDeck: () => void;
+  logLookAtTop: (count: number) => void;
   requestZoneSearch: (zone: string) => void;
   approveZoneSearch: (requestId: bigint) => void;
   denyZoneSearch: (requestId: bigint) => void;
@@ -556,6 +557,13 @@ export function useGameState(gameId: bigint): GameState {
     conn?.reducers.logSearchDeck({ gameId });
   }, [conn, gameId]);
 
+  const logLookAtTop = useCallback(
+    (count: number) => {
+      conn?.reducers.logLookAtTop({ gameId, count: BigInt(count) });
+    },
+    [conn, gameId],
+  );
+
   const requestZoneSearch = useCallback(
     (zone: string) => {
       conn?.reducers.requestZoneSearch({ gameId, zone });
@@ -680,6 +688,7 @@ export function useGameState(gameId: bigint): GameState {
     incomingSearchRequest,
     approvedSearchRequest,
     logSearchDeck,
+    logLookAtTop,
     requestZoneSearch,
     approveZoneSearch,
     denyZoneSearch,

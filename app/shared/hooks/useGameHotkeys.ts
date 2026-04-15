@@ -19,7 +19,7 @@ export interface GameHotkeysConfig {
   onToggleSpreadHand?: () => void;
   /** Trigger a dice roll overlay (R). */
   onRollDice?: () => void;
-  /** Undo the last action — goldfish only (Ctrl/Cmd+Z). */
+  /** Undo the last action (Ctrl/Cmd+Z). */
   onUndo?: () => void;
   /** Advance the current phase (Enter). */
   onAdvancePhase?: () => void;
@@ -54,7 +54,7 @@ export interface GameHotkeysConfig {
  *   Enter     — advance phase (turn-gated in multiplayer)
  *   +/=       — zoom in (increase card size)
  *   -         — zoom out (decrease card size)
- *   Ctrl/Cmd+Z — undo (goldfish only)
+ *   Ctrl/Cmd+Z — undo (both modes)
  *   Escape    — handled separately by the selection system
  */
 export function useGameHotkeys(config: GameHotkeysConfig) {
@@ -91,9 +91,9 @@ export function useGameHotkeys(config: GameHotkeysConfig) {
         return;
       }
 
-      // Ctrl/Cmd+Z — undo (goldfish only)
+      // Ctrl/Cmd+Z — undo (both modes)
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
-        if (mode === 'goldfish' && onUndo) {
+        if (onUndo) {
           e.preventDefault();
           onUndo();
         }

@@ -56,6 +56,7 @@ import { useVirtualCanvas, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen } from
 import { useCardScale } from '@/app/shared/hooks/useCardScale';
 import { CardScaleControl } from '@/app/shared/components/CardScaleControl';
 import { useLobArrivalEffect } from '@/app/shared/hooks/useLobArrivalEffect';
+import type { UndoStack } from '../hooks/useUndoStack';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -149,13 +150,21 @@ function isAutoArrangeZone(zone: string): boolean {
 interface MultiplayerCanvasProps {
   gameId: bigint;
   onLoadDeck?: () => void;
+  /** Client-side undo stack for recording reverse actions */
+  undoStack?: UndoStack;
+  /** Called when any search/browse modal opens or closes. `true` = at least one modal is open. */
+  onSearchModalChange?: (isOpen: boolean) => void;
+  /** Whether the game timer is visible (passed through to CardScaleControl). */
+  isTimerVisible?: boolean;
+  /** Toggle timer visibility (passed through to CardScaleControl). */
+  onToggleTimer?: () => void;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCanvasProps) {
+export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSearchModalChange, isTimerVisible, onToggleTimer }: MultiplayerCanvasProps) {
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
 
   // ---- Container sizing (respects flex layout) ----
@@ -168,12 +177,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
     myCards,
     opponentCards,
     counters,
-    moveCard,
-    moveCardsBatch,
+    moveCard: rawMoveCard,
+    moveCardsBatch: rawMoveCardsBatch,
     updateCardPosition,
     incomingSearchRequest,
     approvedSearchRequest,
     logSearchDeck,
+    logLookAtTop,
     requestZoneSearch,
     approveZoneSearch,
     denyZoneSearch,
@@ -181,6 +191,81 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
     moveOpponentCard,
     zoneSearchRequests,
   } = gameState;
+
+  // Undo-aware wrappers for moveCard / moveCardsBatch used in drag handlers.
+  const findCardForUndo = useCallback((id: string) => {
+    for (const cards of Object.values(myCards)) {
+      const found = cards.find(c => String(c.id) === id);
+      if (found) return found;
+    }
+    for (const cards of Object.values(opponentCards)) {
+      const found = cards.find(c => String(c.id) === id);
+      if (found) return found;
+    }
+    return undefined;
+  }, [myCards, opponentCards]);
+
+  const moveCard: typeof rawMoveCard = useCallback(
+    (cardInstanceId, toZone, zoneIndex, posX, posY, targetOwnerId) => {
+      if (undoStack) {
+        const card = findCardForUndo(String(cardInstanceId));
+        if (card && card.zone !== toZone) {
+          undoStack.push({
+            description: `Moved ${card.cardName || 'card'} to ${toZone}`,
+            reverseAction: () => rawMoveCard(cardInstanceId, card.zone, undefined, card.posX, card.posY, String(card.ownerId)),
+          });
+        }
+      }
+      rawMoveCard(cardInstanceId, toZone, zoneIndex, posX, posY, targetOwnerId);
+    },
+    [rawMoveCard, undoStack, findCardForUndo],
+  );
+
+  const moveCardsBatch: typeof rawMoveCardsBatch = useCallback(
+    (cardInstanceIds, toZone, positions, targetOwnerId, fromSource) => {
+      if (undoStack) {
+        const ids: string[] = JSON.parse(cardInstanceIds);
+        const originals = ids.map(id => {
+          const card = findCardForUndo(id);
+          return { id, zone: card?.zone, posX: card?.posX, posY: card?.posY, name: card?.cardName, ownerId: card?.ownerId };
+        }).filter(o => o.zone && o.zone !== toZone);
+        if (originals.length > 0) {
+          const desc = originals.length === 1
+            ? `Moved ${originals[0].name || 'card'} to ${toZone}`
+            : `Moved ${originals.length} cards to ${toZone}`;
+          undoStack.push({
+            description: desc,
+            reverseAction: () => {
+              const byZone: Record<string, { id: string; posX: string; posY: string; ownerId: string }[]> = {};
+              for (const o of originals) {
+                const z = o.zone!;
+                if (!byZone[z]) byZone[z] = [];
+                byZone[z].push({ id: o.id, posX: o.posX || '', posY: o.posY || '', ownerId: String(o.ownerId ?? '') });
+              }
+              for (const [zone, cards] of Object.entries(byZone)) {
+                if (cards.length === 1) {
+                  rawMoveCard(BigInt(cards[0].id), zone, undefined, cards[0].posX, cards[0].posY, cards[0].ownerId);
+                } else {
+                  const positionsMap: Record<string, { posX: string; posY: string }> = {};
+                  for (const c of cards) {
+                    positionsMap[c.id] = { posX: c.posX, posY: c.posY };
+                  }
+                  rawMoveCardsBatch(
+                    JSON.stringify(cards.map(c => c.id)),
+                    zone,
+                    JSON.stringify(positionsMap),
+                    cards[0].ownerId,
+                  );
+                }
+              }
+            },
+          });
+        }
+      }
+      rawMoveCardsBatch(cardInstanceIds, toZone, positions, targetOwnerId, fromSource);
+    },
+    [rawMoveCardsBatch, rawMoveCard, undoStack, findCardForUndo],
+  );
 
   const [claimBannerDismissed, setClaimBannerDismissed] = useState(false);
 
@@ -443,6 +528,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
   const pendingBatchRef = useRef<string[] | null>(null);
   const [showDeckSearch, setShowDeckSearch] = useState(false);
   const [peekState, setPeekState] = useState<{ position: 'top' | 'bottom' | 'random'; count: number } | null>(null);
+  const [lookState, setLookState] = useState<{ count: number } | null>(null);
   const [exchangeCardIds, setExchangeCardIds] = useState<string[] | null>(null);
   const [opponentZoneMenu, setOpponentZoneMenu] = useState<{ x: number; y: number; zone: string; zoneName: string } | null>(null);
   const [opponentDeckMenu, setOpponentDeckMenu] = useState<{ x: number; y: number } | null>(null);
@@ -453,6 +539,30 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
   const [reserveMenu, setReserveMenu] = useState<{ x: number; y: number } | null>(null);
   const revealAutoHideRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [revealBarShrinking, setRevealBarShrinking] = useState(false);
+
+  // ---- Report search/browse modal open state to parent (for timer pause) ----
+  useEffect(() => {
+    if (!onSearchModalChange) return;
+    const anyModalOpen = showDeckSearch ||
+      browseMyZone !== null ||
+      browseOpponentZone !== null ||
+      peekState !== null ||
+      exchangeCardIds !== null ||
+      opponentPeekState !== null ||
+      (approvedSearchRequest != null &&
+        approvedSearchRequest.zone !== 'hand-reveal' &&
+        approvedSearchRequest.zone !== 'action-priority');
+    onSearchModalChange(anyModalOpen);
+  }, [
+    onSearchModalChange,
+    showDeckSearch,
+    browseMyZone,
+    browseOpponentZone,
+    peekState,
+    exchangeCardIds,
+    opponentPeekState,
+    approvedSearchRequest,
+  ]);
 
   // ---- Turn 1 reserve protection ----
   // On each player's first turn, cards should not leave the reserve zone.
@@ -536,33 +646,155 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
   }, [isMyFirstTurn, hasOpponent, findMyCardById]);
 
   // ---- Multiplayer GameActions adapter ----
-  // Wraps moveCard/moveCardsBatch with Turn 1 reserve protection.
+  // Wraps moveCard/moveCardsBatch with Turn 1 reserve protection and undo tracking.
   const multiplayerActions: GameActions = useMemo(() => ({
     moveCard: (cardId, toZone, posX, posY) => {
       const card = findMyCardById(cardId);
       const fromZone = card?.zone;
-      const execute = () => gameState.moveCard(BigInt(cardId), toZone, undefined, posX, posY);
+      const execute = () => {
+        // Record undo entry before executing
+        if (undoStack && card && fromZone && fromZone !== toZone) {
+          const prevPosX = card.posX;
+          const prevPosY = card.posY;
+          undoStack.push({
+            description: `Moved ${card.cardName || 'card'} to ${toZone}`,
+            reverseAction: () => gameState.moveCard(BigInt(cardId), fromZone, undefined, prevPosX, prevPosY),
+          });
+        }
+        gameState.moveCard(BigInt(cardId), toZone, undefined, posX, posY);
+      };
       if (checkReserveProtection(fromZone, toZone, execute)) return;
       execute();
     },
     moveCardsBatch: (cardIds, toZone) => {
-      const execute = () => gameState.moveCardsBatch(JSON.stringify(cardIds), toZone);
+      const execute = () => {
+        // Record undo entry: reverse each card back to its original zone
+        if (undoStack && cardIds.length > 0) {
+          const originals = cardIds.map(id => {
+            const card = findMyCardById(id);
+            return { id, zone: card?.zone, posX: card?.posX, posY: card?.posY, name: card?.cardName };
+          }).filter(o => o.zone && o.zone !== toZone);
+          if (originals.length > 0) {
+            const desc = originals.length === 1
+              ? `Moved ${originals[0].name || 'card'} to ${toZone}`
+              : `Moved ${originals.length} cards to ${toZone}`;
+            undoStack.push({
+              description: desc,
+              reverseAction: () => {
+                // Group by original zone and move back
+                const byZone: Record<string, { id: string; posX: string; posY: string }[]> = {};
+                for (const o of originals) {
+                  const z = o.zone!;
+                  if (!byZone[z]) byZone[z] = [];
+                  byZone[z].push({ id: o.id, posX: o.posX || '', posY: o.posY || '' });
+                }
+                for (const [zone, cards] of Object.entries(byZone)) {
+                  if (cards.length === 1) {
+                    gameState.moveCard(BigInt(cards[0].id), zone, undefined, cards[0].posX, cards[0].posY);
+                  } else {
+                    const positions: Record<string, { posX: string; posY: string }> = {};
+                    for (const c of cards) {
+                      positions[c.id] = { posX: c.posX, posY: c.posY };
+                    }
+                    gameState.moveCardsBatch(
+                      JSON.stringify(cards.map(c => c.id)),
+                      zone,
+                      JSON.stringify(positions),
+                    );
+                  }
+                }
+              },
+            });
+          }
+        }
+        gameState.moveCardsBatch(JSON.stringify(cardIds), toZone);
+      };
       if (checkReserveBatchProtection(cardIds, toZone, execute)) return;
       execute();
     },
-    flipCard: (cardId) => gameState.flipCard(BigInt(cardId)),
-    meekCard: (cardId) => gameState.meekCard(BigInt(cardId)),
-    unmeekCard: (cardId) => gameState.unmeekCard(BigInt(cardId)),
-    addCounter: (cardId, color) => gameState.addCounter(BigInt(cardId), color),
-    removeCounter: (cardId, color) => gameState.removeCounter(BigInt(cardId), color),
+    flipCard: (cardId) => {
+      // Flip is a toggle — reverse is just flip again
+      if (undoStack) {
+        const card = findMyCardById(cardId);
+        undoStack.push({
+          description: `Flipped ${card?.cardName || 'card'}`,
+          reverseAction: () => gameState.flipCard(BigInt(cardId)),
+        });
+      }
+      gameState.flipCard(BigInt(cardId));
+    },
+    meekCard: (cardId) => {
+      if (undoStack) {
+        const card = findMyCardById(cardId);
+        undoStack.push({
+          description: `Set ${card?.cardName || 'card'} meek`,
+          reverseAction: () => gameState.unmeekCard(BigInt(cardId)),
+        });
+      }
+      gameState.meekCard(BigInt(cardId));
+    },
+    unmeekCard: (cardId) => {
+      if (undoStack) {
+        const card = findMyCardById(cardId);
+        undoStack.push({
+          description: `Removed meek from ${card?.cardName || 'card'}`,
+          reverseAction: () => gameState.meekCard(BigInt(cardId)),
+        });
+      }
+      gameState.unmeekCard(BigInt(cardId));
+    },
+    addCounter: (cardId, color) => {
+      if (undoStack) {
+        const card = findMyCardById(cardId);
+        undoStack.push({
+          description: `Added ${color} counter to ${card?.cardName || 'card'}`,
+          reverseAction: () => gameState.removeCounter(BigInt(cardId), color),
+        });
+      }
+      gameState.addCounter(BigInt(cardId), color);
+    },
+    removeCounter: (cardId, color) => {
+      if (undoStack) {
+        const card = findMyCardById(cardId);
+        undoStack.push({
+          description: `Removed ${color} counter from ${card?.cardName || 'card'}`,
+          reverseAction: () => gameState.addCounter(BigInt(cardId), color),
+        });
+      }
+      gameState.removeCounter(BigInt(cardId), color);
+    },
     shuffleCardIntoDeck: (cardId) => gameState.shuffleCardIntoDeck(BigInt(cardId)),
     shuffleDeck: () => gameState.shuffleDeck(),
     setNote: (cardId, text) => gameState.setNote(BigInt(cardId), text),
     exchangeCards: (cardIds) => gameState.exchangeCards(JSON.stringify(cardIds)),
     drawCard: () => gameState.drawCard(),
     drawMultiple: (count) => gameState.drawMultiple(BigInt(count)),
-    moveCardToTopOfDeck: (cardId) => gameState.moveCardToTopOfDeck(BigInt(cardId)),
-    moveCardToBottomOfDeck: (cardId) => gameState.moveCardToBottomOfDeck(BigInt(cardId)),
+    moveCardToTopOfDeck: (cardId) => {
+      if (undoStack) {
+        const card = findMyCardById(cardId);
+        const fromZone = card?.zone;
+        if (fromZone && fromZone !== 'deck') {
+          undoStack.push({
+            description: `Moved ${card?.cardName || 'card'} to top of deck`,
+            reverseAction: () => gameState.moveCard(BigInt(cardId), fromZone!, undefined, card?.posX, card?.posY),
+          });
+        }
+      }
+      gameState.moveCardToTopOfDeck(BigInt(cardId));
+    },
+    moveCardToBottomOfDeck: (cardId) => {
+      if (undoStack) {
+        const card = findMyCardById(cardId);
+        const fromZone = card?.zone;
+        if (fromZone && fromZone !== 'deck') {
+          undoStack.push({
+            description: `Moved ${card?.cardName || 'card'} to bottom of deck`,
+            reverseAction: () => gameState.moveCard(BigInt(cardId), fromZone!, undefined, card?.posX, card?.posY),
+          });
+        }
+      }
+      gameState.moveCardToBottomOfDeck(BigInt(cardId));
+    },
     spawnLostSoul: (testament, posX, posY) =>
       gameState.spawnLostSoul(testament, posX ?? '0.5', posY ?? '0.5'),
     removeToken: (cardId) => gameState.removeToken(BigInt(cardId)),
@@ -572,7 +804,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
     randomReserveToZone: (count, toZone, deckPosition) =>
       gameState.randomReserveToZone(count, toZone, deckPosition),
     reloadDeck: (deckId, deckData) => gameState.reloadDeck(deckId, deckData),
-  }), [gameState, findMyCardById, checkReserveProtection, checkReserveBatchProtection]);
+  }), [gameState, findMyCardById, checkReserveProtection, checkReserveBatchProtection, undoStack]);
 
   // ---- ModalGameProvider value (for shared deck modals) ----
   const modalGameValue = useMemo<ModalGameContextValue>(() => ({
@@ -651,6 +883,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
     setDeckDrop(null);
     setShowDeckSearch(false);
     setPeekState(null);
+    setLookState(null);
     setExchangeCardIds(null);
     setBrowseMyZone(null);
     setBrowseOpponentZone(null);
@@ -999,6 +1232,15 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
     }
     return selected.map(c => String(c.id));
   }, [peekState, myCards]);
+
+  // ---- Look card IDs (private peek — no broadcast to opponent) ----
+  const lookCardIds = useMemo(() => {
+    if (!lookState) return [];
+    const sorted = [...(myCards['deck'] ?? [])].sort(
+      (a, b) => Number(a.zoneIndex) - Number(b.zoneIndex)
+    );
+    return sorted.slice(0, lookState.count).map(c => String(c.id));
+  }, [lookState, myCards]);
 
   // Broadcast revealed cards to opponent via SpacetimeDB
   const peekCardIdsRef = useRef<string[]>([]);
@@ -3079,6 +3321,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
         maxScale={MAX_SCALE}
         step={STEP}
         onLoadDeck={onLoadDeck}
+        isTimerVisible={isTimerVisible}
+        onToggleTimer={onToggleTimer}
       />
 
       {/* ================================================================
@@ -3216,6 +3460,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
           deckSize={(myCards['deck'] ?? []).length}
           onClose={() => setDeckMenu(null)}
           onSearchDeck={() => { logSearchDeck(); setDeckMenu(null); setShowDeckSearch(true); }}
+          onLookAtTop={(n) => { logLookAtTop(n); setDeckMenu(null); setLookState({ count: n }); }}
           onShuffleDeck={() => { multiplayerActions.shuffleDeck(); setDeckMenu(null); }}
           onDrawTop={(n) => { multiplayerActions.drawMultiple(n); setDeckMenu(null); }}
           onRevealTop={(n) => { setDeckMenu(null); setPeekState({ position: 'top', count: n }); }}
@@ -3593,6 +3838,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck }: MultiplayerCan
             onStartMultiDrag={modalStartMultiDrag}
             didDragRef={modalDidDragRef}
             isDragActive={modalDrag.isDragging}
+          />
+        )}
+
+        {lookState && (
+          <DeckPeekModal
+            cardIds={lookCardIds}
+            title={`Looking at Top ${lookState.count}`}
+            onClose={() => setLookState(null)}
+            onStartDrag={modalStartDrag}
+            onStartMultiDrag={modalStartMultiDrag}
+            didDragRef={modalDidDragRef}
+            isDragActive={modalDrag.isDragging}
+            isPrivateLook
           />
         )}
 

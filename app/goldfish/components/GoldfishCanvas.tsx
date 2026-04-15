@@ -166,6 +166,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   const [showDeckSearch, setShowDeckSearch] = useState(false);
   const [deckMenu, setDeckMenu] = useState<{ x: number; y: number } | null>(null);
   const [peekState, setPeekState] = useState<{ cardIds: string[]; title: string } | null>(null);
+  const [lookState, setLookState] = useState<{ cardIds: string[]; title: string } | null>(null);
   const [deckDropPopup, setDeckDropPopup] = useState<{ cardInstanceId: string; x: number; y: number } | null>(null);
   const [canvasDragZone, setCanvasDragZone] = useState<ZoneId | null>(null);
   const isCanvasDragging = useRef(false);
@@ -1652,6 +1653,14 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
           deckSize={state.zones.deck.length}
           onClose={() => setDeckMenu(null)}
           onSearchDeck={() => { setDeckMenu(null); setShowDeckSearch(true); }}
+          onLookAtTop={(count) => {
+            setDeckMenu(null);
+            const deck = state.zones.deck;
+            if (deck.length === 0) { showGameToast('Deck is empty'); return; }
+            const n = Math.min(count, deck.length);
+            const ids = deck.slice(0, n).map(c => c.instanceId);
+            setLookState({ cardIds: ids, title: `Looking at Top ${n}` });
+          }}
           onShuffleDeck={() => { setDeckMenu(null); shuffleDeck(); }}
           // Top card actions
           onDrawTop={(count) => {
@@ -1822,6 +1831,19 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             onStartMultiDrag={modalStartMultiDrag}
             didDragRef={modalDidDragRef}
             isDragActive={modalDrag.isDragging}
+          />
+        )}
+
+        {lookState !== null && (
+          <DeckPeekModal
+            cardIds={lookState.cardIds}
+            title={lookState.title}
+            onClose={() => setLookState(null)}
+            onStartDrag={modalStartDrag}
+            onStartMultiDrag={modalStartMultiDrag}
+            didDragRef={modalDidDragRef}
+            isDragActive={modalDrag.isDragging}
+            isPrivateLook
           />
         )}
 

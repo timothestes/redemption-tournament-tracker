@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useCallback, useEffect, useRef, useState } from 'react';
-import { Search, Shuffle, Eye, Trash2, Archive, ChevronRight, Play, Dices } from 'lucide-react';
+import { Search, Shuffle, Eye, EyeOff, Trash2, Archive, ChevronRight, Play, Dices } from 'lucide-react';
 
 // Context to let SubMenuActionRow lock/unlock the parent SubmenuTrigger from auto-closing
 const SubmenuLockContext = createContext<{
@@ -35,6 +35,7 @@ interface DeckContextMenuProps {
   onRevealRandom: (count: number) => void;
   onDiscardRandom: (count: number) => void;
   onReserveRandom: (count: number) => void;
+  onLookAtTop?: (count: number) => void;
   /** When true, hides all draw-related actions (for opponent's deck) */
   hideDrawActions?: boolean;
 }
@@ -336,11 +337,14 @@ export function DeckContextMenu({
   onDrawTop, onRevealTop, onDiscardTop, onReserveTop,
   onDrawBottom, onRevealBottom, onDiscardBottom, onReserveBottom,
   onDrawRandom, onRevealRandom, onDiscardRandom, onReserveRandom,
+  onLookAtTop,
   hideDrawActions,
 }: DeckContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [showDrawX, setShowDrawX] = useState(false);
   const [drawXCount, setDrawXCount] = useState(3);
+  const [showLookX, setShowLookX] = useState(false);
+  const [lookXCount, setLookXCount] = useState(3);
   const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
   const submenuCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -387,6 +391,38 @@ export function DeckContextMenu({
         <Search size={14} />
         Search Deck
       </button>
+      {onLookAtTop && !hideDrawActions && (
+        <>
+          <button style={ITEM_STYLE} onClick={() => onLookAtTop(1)} onMouseEnter={hoverEnter} onMouseLeave={hoverLeave}>
+            <EyeOff size={14} />
+            Look at Top Card
+          </button>
+          <button style={ITEM_STYLE} onClick={() => setShowLookX(!showLookX)} onMouseEnter={hoverEnter} onMouseLeave={hoverLeave}>
+            <EyeOff size={14} />
+            Look at Top X...
+          </button>
+          {showLookX && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 14px 6px' }}>
+              <button
+                style={{ ...STEPPER_BTN_STYLE, opacity: lookXCount <= 1 ? 0.3 : 1 }}
+                onClick={() => setLookXCount(Math.max(1, lookXCount - 1))}
+              >
+                &minus;
+              </button>
+              <span style={{ width: 24, textAlign: 'center', color: 'var(--gf-text-bright)', fontSize: 13, fontWeight: 'bold', fontFamily: 'var(--font-cinzel), Georgia, serif' }}>
+                {lookXCount}
+              </span>
+              <button
+                style={{ ...STEPPER_BTN_STYLE, opacity: lookXCount >= deckSize ? 0.3 : 1 }}
+                onClick={() => setLookXCount(Math.min(deckSize, lookXCount + 1))}
+              >
+                +
+              </button>
+              <button style={GO_BTN_STYLE} onClick={() => onLookAtTop(lookXCount)}>Go</button>
+            </div>
+          )}
+        </>
+      )}
       {!hideDrawActions && (
         <>
           <button style={ITEM_STYLE} onClick={() => onDrawTop(1)} onMouseEnter={hoverEnter} onMouseLeave={hoverLeave}>

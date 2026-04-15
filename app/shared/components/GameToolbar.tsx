@@ -35,8 +35,10 @@ export interface GameToolbarProps {
   onRollDice: () => void;
   /** Called to show a toast message (e.g. "Deck is empty"). */
   onShowToast?: (message: string) => void;
-  /** Called for undo (goldfish only). */
+  /** Called for undo. */
   onUndo?: () => void;
+  /** Number of available undo entries (multiplayer only — shows count badge). */
+  undoCount?: number;
   /** Called for new game (goldfish only). */
   onNewGame?: () => void;
   /** Called for end turn (multiplayer only). */
@@ -64,6 +66,7 @@ export function GameToolbar({
   onRollDice,
   onShowToast,
   onUndo,
+  undoCount,
   onNewGame,
   onEndTurn,
   onRequestPriority,
@@ -92,6 +95,7 @@ export function GameToolbar({
   // Build button list — filter based on mode
   interface ToolbarButton {
     icon: typeof Play;
+    key: string;
     label: string;
     onClick: () => void;
     shortcut: string;
@@ -102,26 +106,30 @@ export function GameToolbar({
   const buttons: ToolbarButton[] = [
     {
       icon: Play,
+      key: 'draw',
       label: 'Draw',
       onClick: handleDraw,
       shortcut: 'D',
     },
     {
       icon: Dices,
+      key: 'roll',
       label: 'Roll',
       onClick: handleRollDice,
       shortcut: 'R',
     },
-    // Undo — goldfish only
+    // Undo — available in both modes
     {
       icon: Undo2,
-      label: 'Undo',
+      key: 'undo',
+      label: isMultiplayer && undoCount ? `Undo (${undoCount})` : 'Undo',
       onClick: onUndo ?? (() => {}),
       shortcut: '\u2318Z',
-      hidden: isMultiplayer,
+      disabled: isMultiplayer ? !undoCount || undoCount === 0 : false,
     },
     {
       icon: PanelBottomOpen,
+      key: 'fan',
       label: isSpreadHand ? 'Fan' : 'Unfan',
       onClick: onToggleSpreadHand,
       shortcut: 'H',
@@ -129,6 +137,7 @@ export function GameToolbar({
     // New Game — goldfish only
     {
       icon: RotateCcw,
+      key: 'newgame',
       label: 'New Game',
       onClick: onNewGame ?? (() => {}),
       shortcut: '',
@@ -137,12 +146,14 @@ export function GameToolbar({
     // End Turn (active player) or Request Priority (non-active player) — multiplayer only
     ...(isMultiplayer && isMyTurn ? [{
       icon: SkipForward,
+      key: 'endturn',
       label: 'End Turn',
       onClick: onEndTurn ?? (() => {}),
       shortcut: '',
       disabled: !!isFinished,
     }] : isMultiplayer && !isMyTurn && !isFinished ? [{
       icon: Hand,
+      key: 'priority',
       label: hasPendingPriority ? 'Pending...' : 'Priority',
       onClick: onRequestPriority ?? (() => {}),
       shortcut: '',
@@ -170,9 +181,9 @@ export function GameToolbar({
         zIndex: 200,
       }}
     >
-      {visibleButtons.map(({ icon: Icon, label, onClick, shortcut, disabled: btnDisabled }) => (
+      {visibleButtons.map(({ icon: Icon, key, label, onClick, shortcut, disabled: btnDisabled }) => (
         <button
-          key={label}
+          key={key}
           onClick={onClick}
           disabled={btnDisabled}
           title={`${label}${shortcut ? ` (${shortcut})` : ''}`}

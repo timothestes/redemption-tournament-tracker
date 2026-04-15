@@ -39,6 +39,12 @@ interface TurnIndicatorProps {
   opponentConnectionStatus?: 'connected' | 'reconnecting' | 'disconnected';
   disconnectTimeoutFired?: boolean;
   onClaimVictory?: () => void;
+  /** Formatted timer string (e.g. "12:34" or "1:23:45"). */
+  timerDisplay?: string;
+  /** Whether the timer is currently paused (deck search open). */
+  timerPaused?: boolean;
+  /** Whether to show the timer at all (controlled by gear menu toggle). */
+  timerVisible?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -63,6 +69,9 @@ export default function TurnIndicator({
   opponentConnectionStatus = 'connected',
   disconnectTimeoutFired = false,
   onClaimVictory,
+  timerDisplay,
+  timerPaused = false,
+  timerVisible = true,
 }: TurnIndicatorProps) {
   const [showConcedeConfirm, setShowConcedeConfirm] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
@@ -241,6 +250,24 @@ export default function TurnIndicator({
           </span>
         </div>
       </div>
+
+      {/* Game timer */}
+      {timerVisible && timerDisplay && (
+        <span
+          title={timerPaused ? 'Timer paused (searching)' : 'Elapsed game time'}
+          style={{
+            fontFamily: 'var(--font-cinzel), Georgia, serif',
+            fontSize: 12,
+            fontVariantNumeric: 'tabular-nums',
+            letterSpacing: '0.04em',
+            color: timerPaused ? 'rgba(232, 213, 163, 0.25)' : 'rgba(232, 213, 163, 0.45)',
+            flexShrink: 0,
+            transition: 'color 0.3s',
+          }}
+        >
+          {timerDisplay}
+        </span>
+      )}
       </div>
 
       {/* ================================================================
