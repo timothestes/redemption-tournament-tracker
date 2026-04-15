@@ -160,11 +160,11 @@ add text notes?
 
 
 Ghost cards... from exchange option
-I don't have reveal reserve option
 
 
 
 
+reveal reserve function seems buggy. Not able to close it.
 "draw multiple cards" needs to be say "how many exactly
 needs undo button
 look at top card feature
@@ -182,3 +182,7 @@ allow search deck a bit high up...
 can't discard random cards from a reserve
 adding counters to opponent's cards isn't working
 revealing opponent's deck doesn't give you the options that are normally available to deck search options
+deck and reserve modals could be draggable?
+add timer at the top? (pause timer when searching maybe?)
+add leave open feature for discard pile
+load deck feature doesn't show up for gear icon
