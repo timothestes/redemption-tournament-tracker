@@ -21,6 +21,32 @@ const CHOOSE_TIME_LIMIT_S = 30;
 const REVEAL_AUTO_ACK_MS = 1500;
 
 // ---------------------------------------------------------------------------
+// OpponentDisconnectBanner — shown during pregame when opponent drops
+// ---------------------------------------------------------------------------
+
+function OpponentDisconnectBanner({ connectionStatus }: { connectionStatus: 'connected' | 'reconnecting' | 'disconnected' }) {
+  if (connectionStatus === 'connected') return null;
+
+  const isReconnecting = connectionStatus === 'reconnecting';
+
+  return (
+    <div className={`mb-3 rounded border px-3 py-2 text-xs ${
+      isReconnecting
+        ? 'border-yellow-500/30 bg-yellow-500/10 text-yellow-300/90'
+        : 'border-red-500/30 bg-red-500/10 text-red-300/90'
+    }`}>
+      <span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle" style={{
+        backgroundColor: isReconnecting ? '#eab308' : '#ef4444',
+        boxShadow: `0 0 4px ${isReconnecting ? 'rgba(234, 179, 8, 0.6)' : 'rgba(239, 68, 68, 0.6)'}`,
+      }} />
+      {isReconnecting
+        ? 'Opponent disconnected — waiting for reconnect...'
+        : 'Opponent has left the game. It will be cancelled shortly.'}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
 
@@ -143,25 +169,34 @@ export default function PregameScreen({
             ) : phase === 'deck_select' ? (
               // Nothing extra — player cards have the ready button
               myReady && !opponentReady ? (
-                <p className="text-xs text-amber-200/40 font-cinzel tracking-wide">
-                  Waiting for opponent to ready up...
-                </p>
+                <>
+                  <OpponentDisconnectBanner connectionStatus={gameState.opponentConnectionStatus} />
+                  <p className="text-xs text-amber-200/40 font-cinzel tracking-wide">
+                    Waiting for opponent to ready up...
+                  </p>
+                </>
               ) : null
             ) : phase === 'rolling' || phase === 'choosing' ? (
-              <RollAndChooseArea
-                gameState={gameState}
-                phase={phase}
-                iWonRoll={iWonRoll}
-                opponentName={opponentName}
-                myPlayer={myPlayer}
-              />
+              <>
+                <OpponentDisconnectBanner connectionStatus={gameState.opponentConnectionStatus} />
+                <RollAndChooseArea
+                  gameState={gameState}
+                  phase={phase}
+                  iWonRoll={iWonRoll}
+                  opponentName={opponentName}
+                  myPlayer={myPlayer}
+                />
+              </>
             ) : phase === 'revealing' ? (
-              <RevealArea
-                gameState={gameState}
-                myPlayer={myPlayer}
-                opponentName={opponentName}
-                iWonRoll={iWonRoll}
-              />
+              <>
+                <OpponentDisconnectBanner connectionStatus={gameState.opponentConnectionStatus} />
+                <RevealArea
+                  gameState={gameState}
+                  myPlayer={myPlayer}
+                  opponentName={opponentName}
+                  iWonRoll={iWonRoll}
+                />
+              </>
             ) : null}
           </div>
 
@@ -616,7 +651,13 @@ function RollAndChooseArea({
 }) {
   const { game } = gameState;
   const hasChosenRef = useRef(false);
-  const [secondsLeft, setSecondsLeft] = useState(CHOOSE_TIME_LIMIT_S);
+
+  // Compute seconds left from server-set deadline so a page refresh
+  // doesn't reset the countdown and give extra time.
+  const deadlineMicros = game?.choosingDeadlineMicros ?? 0n;
+  const deadlineMs = Number(deadlineMicros / 1000n);
+  const computeSecondsLeft = () => Math.max(0, Math.ceil((deadlineMs - Date.now()) / 1000));
+  const [secondsLeft, setSecondsLeft] = useState(computeSecondsLeft);
 
   const mySeat = myPlayer?.seat;
   const isSeat0 = mySeat?.toString() === '0';
@@ -643,20 +684,16 @@ function RollAndChooseArea({
     return () => clearTimeout(timer);
   }, [iWonRoll, myRollAcked, phase, gameState]);
 
-  // Countdown timer
+  // Countdown timer — synced to server deadline
   useEffect(() => {
     if (!showResults) return;
     const interval = setInterval(() => {
-      setSecondsLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
-      });
+      const remaining = computeSecondsLeft();
+      setSecondsLeft(remaining);
+      if (remaining <= 0) clearInterval(interval);
     }, 1000);
     return () => clearInterval(interval);
-  }, [showResults]);
+  }, [showResults, deadlineMs]);
 
   // Auto-choose when timer expires — winner defaults to going first
   useEffect(() => {
@@ -681,6 +718,7 @@ function RollAndChooseArea({
 
   return (
     <motion.div
+      initial={{ opacity: 0, y: 8 }}
       animate={showResults ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
       transition={{ duration: 0.5, delay: showResults ? 0.2 : 0 }}
       style={{ pointerEvents: showResults ? 'auto' : 'none' }}
@@ -715,9 +753,9 @@ function RollAndChooseArea({
         <div className="mt-4">
           <div className="w-full h-[3px] rounded-sm bg-amber-200/[0.08] overflow-hidden">
             <motion.div
-              initial={{ width: '100%' }}
+              initial={{ width: `${(secondsLeft / CHOOSE_TIME_LIMIT_S) * 100}%` }}
               animate={{ width: '0%' }}
-              transition={{ duration: CHOOSE_TIME_LIMIT_S, ease: 'linear' }}
+              transition={{ duration: secondsLeft, ease: 'linear' }}
               className="h-full rounded-sm"
               style={{
                 backgroundColor: secondsLeft <= 10 ? 'rgba(220, 120, 80, 0.6)' : 'rgba(196, 149, 90, 0.4)',

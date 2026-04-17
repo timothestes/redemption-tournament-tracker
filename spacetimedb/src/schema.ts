@@ -40,6 +40,7 @@ export const Game = table(
     rematchResponse: t.string(),    // "" | "accepted" | "declined"
     rematchCode: t.string(),        // new game code for rematch
     disconnectTimeoutFired: t.bool().default(false), // true when timeout fired during active game
+    choosingDeadlineMicros: t.u64().default(0n),  // server timestamp (microseconds since epoch) when choosing timer expires
   }
 );
 

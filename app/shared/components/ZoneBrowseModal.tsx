@@ -475,7 +475,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
         {!readOnly && (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <span style={{ color: 'var(--gf-border)', fontSize: 10 }}>
-              Drag to a zone · Right-click for more · Hover to enlarge
+              Drag to a zone · Click or lasso to select · Right-click for more
             </span>
             <label
               style={{
@@ -529,6 +529,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
               gap: 10,
               position: 'relative',
               userSelect: 'none',
+              cursor: readOnly ? 'default' : 'crosshair',
             }}
           >
             {cards.map((card) => {

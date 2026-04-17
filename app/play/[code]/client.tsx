@@ -129,6 +129,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     }
   }, []);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorFromPregame, setErrorFromPregame] = useState(false);
   const [isPracticing, setIsPracticing] = useState(false);
   const [playAgainTriggered, setPlayAgainTriggered] = useState(false);
   const [gameId, setGameId] = useState<bigint | null>(null);
@@ -428,6 +429,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     } else if (game.status === 'playing') {
       setLifecycle('playing');
     } else if (game.status === 'finished' && lifecycle === 'pregame') {
+      setErrorFromPregame(true);
       setErrorMessage('Opponent disconnected. Game cancelled.');
       setLifecycle('error');
       return;
@@ -528,6 +530,39 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         </div>
       );
     }
+    if (errorFromPregame) {
+      return (
+        <div className="fixed inset-0 flex flex-col items-center justify-center bg-black">
+          <div
+            className="absolute inset-0 bg-cover bg-no-repeat opacity-40"
+            style={{ backgroundImage: 'url(/gameplay/cave_background.png)', backgroundPosition: 'center 70%' }}
+          />
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{ background: 'radial-gradient(ellipse 90% 85% at 50% 50%, transparent 60%, rgba(0,0,0,0.85) 100%)' }}
+          />
+          <div className="relative z-10 rounded-xl border border-red-500/20 bg-black/60 backdrop-blur-sm p-8 text-center max-w-sm mx-4">
+            <div className="mb-4 flex justify-center">
+              <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+                <svg className="w-6 h-6 text-red-400/80" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                </svg>
+              </div>
+            </div>
+            <p className="text-base font-semibold font-cinzel text-amber-200/90 mb-2">Game Cancelled</p>
+            <p className="text-sm text-amber-200/50">
+              {errorMessage ?? 'An unexpected error occurred.'}
+            </p>
+            <a
+              href="/play"
+              className="mt-6 inline-block rounded border border-[#c4955a]/45 bg-[#c4955a]/15 px-5 py-2.5 font-cinzel text-xs font-bold uppercase tracking-wider text-amber-200/90 hover:bg-[#c4955a]/25 transition-colors"
+            >
+              Back to Lobby
+            </a>
+          </div>
+        </div>
+      );
+    }
     return (
       <>
       <TopNav />
@@ -600,6 +635,14 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // (waiting for the opponent's ack). Show the game board without any overlay
   // during this brief gap to avoid flashing the lobby/dice screen.
   const isAwaitingGameStart = lifecycle === 'pregame' && myAckedRevealing && pregamePhase === 'revealing';
+
+  // Whether we've requested a rematch and are waiting for the opponent's response
+  const rematchPending = (() => {
+    const reqBy = gameState.game?.rematchRequestedBy ?? '';
+    if (!reqBy) return false;
+    const mySeat = gameState.myPlayer ? String(gameState.myPlayer.seat) : '';
+    return reqBy === mySeat && !(gameState.game?.rematchResponse);
+  })();
 
   if ((lifecycle === 'waiting' || lifecycle === 'pregame') && !isCeremonyPhase && !isAwaitingGameStart) {
     if (isPracticing && goldfishDeck) {
@@ -902,6 +945,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                 isFinished
                 winnerName={winnerName}
                 onPlayAgain={opponentDisconnected ? undefined : () => setPlayAgainTriggered(true)}
+                rematchPending={rematchPending}
                 myScore={gameState.myCards['land-of-redemption']?.length ?? 0}
                 opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}
                 timerDisplay={gameTimer.formatted}
@@ -1058,6 +1102,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               isFinished
               winnerName={winnerName}
               onPlayAgain={opponentDisconnected ? undefined : () => setPlayAgainTriggered(true)}
+              rematchPending={rematchPending}
               myScore={gameState.myCards['land-of-redemption']?.length ?? 0}
               opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}
               timerDisplay={gameTimer.formatted}

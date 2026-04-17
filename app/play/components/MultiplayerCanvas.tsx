@@ -3800,6 +3800,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           <ZoneBrowseModal
             zoneId={browseOpponentZone as ZoneId}
             onClose={() => setBrowseOpponentZone(null)}
+            onStartDrag={modalStartDrag}
+            onStartMultiDrag={modalStartMultiDrag}
+            didDragRef={modalDidDragRef}
+            isDragActive={modalDrag.isDragging}
           />
         </ModalGameProvider>
       )}

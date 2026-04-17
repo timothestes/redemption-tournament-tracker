@@ -83,10 +83,8 @@ git commit -m "chore: regenerate SpacetimeDB client bindings"
 
 ### 4. Verify the client compiles
 ```bash
-npx tsc --noEmit 2>&1 | grep -v "PregameScreen" | head -10
+npx tsc --noEmit 2>&1 | head -10
 ```
-
-The `PregameScreen.tsx` BigInt error is a known pre-existing issue — ignore it.
 
 ## Common Errors
 

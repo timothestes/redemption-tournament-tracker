@@ -45,6 +45,8 @@ interface TurnIndicatorProps {
   timerPaused?: boolean;
   /** Whether to show the timer at all (controlled by gear menu toggle). */
   timerVisible?: boolean;
+  /** Whether a rematch request has been sent and we're waiting for the opponent. */
+  rematchPending?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -72,6 +74,7 @@ export default function TurnIndicator({
   timerDisplay,
   timerPaused = false,
   timerVisible = true,
+  rematchPending = false,
 }: TurnIndicatorProps) {
   const [showConcedeConfirm, setShowConcedeConfirm] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
@@ -403,30 +406,34 @@ export default function TurnIndicator({
       >
         {isFinished && onPlayAgain && (
           <button
-            onClick={onPlayAgain}
+            onClick={rematchPending ? undefined : onPlayAgain}
+            disabled={rematchPending}
             style={{
               padding: '5px 12px',
-              background: 'rgba(196, 149, 90, 0.15)',
-              border: '1px solid rgba(196, 149, 90, 0.45)',
+              background: rematchPending ? 'rgba(107, 78, 39, 0.1)' : 'rgba(196, 149, 90, 0.15)',
+              border: `1px solid ${rematchPending ? 'rgba(107, 78, 39, 0.25)' : 'rgba(196, 149, 90, 0.45)'}`,
               borderRadius: 4,
-              cursor: 'pointer',
+              cursor: rematchPending ? 'default' : 'pointer',
               fontFamily: 'var(--font-cinzel), Georgia, serif',
               fontSize: 10,
               letterSpacing: '0.07em',
               textTransform: 'uppercase',
-              color: '#e8d5a3',
-              transition: 'background 0.15s, border-color 0.15s',
+              color: rematchPending ? 'rgba(196, 149, 90, 0.35)' : '#e8d5a3',
+              transition: 'background 0.15s, border-color 0.15s, color 0.15s',
+              opacity: rematchPending ? 0.7 : 1,
             }}
             onMouseEnter={(e) => {
+              if (rematchPending) return;
               e.currentTarget.style.background = 'rgba(196, 149, 90, 0.28)';
               e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.75)';
             }}
             onMouseLeave={(e) => {
+              if (rematchPending) return;
               e.currentTarget.style.background = 'rgba(196, 149, 90, 0.15)';
               e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.45)';
             }}
           >
-            Play Again
+            {rematchPending ? 'Waiting...' : 'Play Again'}
           </button>
         )}
         {!isFinished && disconnectTimeoutFired && onClaimVictory && (

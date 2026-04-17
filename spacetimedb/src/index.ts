@@ -277,6 +277,7 @@ export const create_game = spacetimedb.reducer(
       rematchResponse: '',
       rematchCode: '',
       disconnectTimeoutFired: false,
+      choosingDeadlineMicros: 0n,
     });
 
     // Insert player row with pending deck data (cards loaded later during pregame)
@@ -399,6 +400,7 @@ export const join_game = spacetimedb.reducer(
 
     const gameBeforeUpdate = ctx.db.Game.id.find(game.id);
     if (!gameBeforeUpdate) throw new SenderError('Game not found');
+    const CHOOSE_DEADLINE_MICROS = 30_000_000n; // 30 seconds from now
     ctx.db.Game.id.update({
       ...gameBeforeUpdate,
       status: 'pregame',
@@ -407,6 +409,7 @@ export const join_game = spacetimedb.reducer(
       rollResult1: BigInt(r1),
       rollWinner: winner,
       rngCounter: gameBeforeUpdate.rngCounter + 1n,
+      choosingDeadlineMicros: ctx.timestamp.microsSinceUnixEpoch + CHOOSE_DEADLINE_MICROS,
     });
 
     logAction(ctx, game.id, player.id, 'PREGAME_ROLL',
@@ -494,6 +497,7 @@ export const pregame_ready = spacetimedb.reducer(
 
     const winner = r0 > r1 ? '0' : '1';
 
+    const CHOOSE_DEADLINE_MICROS = 30_000_000n;
     const gameBeforeRoll = ctx.db.Game.id.find(gameId);
     if (!gameBeforeRoll) return;
     ctx.db.Game.id.update({
@@ -505,6 +509,7 @@ export const pregame_ready = spacetimedb.reducer(
       rollResult1: BigInt(r1),
       rollWinner: winner,
       rngCounter: gameBeforeRoll.rngCounter + 1n,
+      choosingDeadlineMicros: ctx.timestamp.microsSinceUnixEpoch + CHOOSE_DEADLINE_MICROS,
     });
 
     logAction(ctx, gameId, player.id, 'PREGAME_ROLL',
@@ -858,6 +863,7 @@ export const respond_rematch = spacetimedb.reducer(
       const winner = r0 > r1 ? '0' : '1';
 
       // 5. Reset game to pregame/rolling
+      const CHOOSE_DEADLINE_MICROS = 30_000_000n;
       const gameBeforeReset = ctx.db.Game.id.find(gameId);
       if (!gameBeforeReset) throw new SenderError('Game not found');
       ctx.db.Game.id.update({
@@ -881,6 +887,7 @@ export const respond_rematch = spacetimedb.reducer(
         rematchDeckData1: '',
         rematchResponse: '',
         rematchCode: '',
+        choosingDeadlineMicros: ctx.timestamp.microsSinceUnixEpoch + CHOOSE_DEADLINE_MICROS,
       });
 
       logAction(ctx, gameId, player.id, 'REMATCH_STARTED',
@@ -1935,7 +1942,7 @@ export const reload_deck = spacetimedb.reducer(
   (ctx, { gameId, deckId, deckData }) => {
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
-    if (game.status !== 'playing') throw new SenderError('Game is not in progress');
+    if (game.status !== 'playing' && game.status !== 'finished') throw new SenderError('Game is not in progress');
 
     const player = findPlayerBySender(ctx, gameId);
 

@@ -102,6 +102,7 @@ export const Game = __t.object("Game", {
   rematchResponse: __t.string(),
   rematchCode: __t.string(),
   disconnectTimeoutFired: __t.bool(),
+  choosingDeadlineMicros: __t.u64(),
 });
 export type Game = __Infer<typeof Game>;
 

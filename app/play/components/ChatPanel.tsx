@@ -393,7 +393,7 @@ export default function ChatPanel({
   onActiveTabChange,
 }: ChatPanelProps) {
   const [isOpen, setIsOpen] = useState(true);
-  const [internalTab, setInternalTab] = useState<TabKey>('chat');
+  const [internalTab, setInternalTab] = useState<TabKey>('all');
   const activeTab = controlledTab ?? internalTab;
   const setActiveTab = onActiveTabChange ?? setInternalTab;
   const [inputText, setInputText] = useState('');
