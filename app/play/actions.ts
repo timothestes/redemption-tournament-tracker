@@ -6,22 +6,28 @@ import type { DeckOption } from './components/DeckPickerCard';
 const CARD_DATA_URL =
   "https://raw.githubusercontent.com/jalstad/RedemptionLackeyCCG/master/RedemptionQuick/sets/carddata.txt";
 
-/**
- * Fetch the full card database and build a lookup map (same as goldfish mode).
- * Key: "cardName|cardSet|imgFile", "cardName|cardSet", or "cardName" for fallback.
- */
-async function fetchCardLookup(): Promise<
-  Map<string, { type: string; brigade: string; strength: string; toughness: string; specialAbility: string; identifier: string; reference: string; alignment: string }>
-> {
+type CardLookupEntry = {
+  type: string;
+  brigade: string;
+  strength: string;
+  toughness: string;
+  specialAbility: string;
+  identifier: string;
+  reference: string;
+  alignment: string;
+};
+type CardLookupMap = Map<string, CardLookupEntry>;
+
+const CARD_LOOKUP_TTL_MS = 60 * 60 * 1000;
+let cachedLookup: { promise: Promise<CardLookupMap>; expiresAt: number } | null = null;
+
+async function buildCardLookup(): Promise<CardLookupMap> {
   const response = await fetch(CARD_DATA_URL, { next: { revalidate: 3600 } });
   const text = await response.text();
   const lines = text.split('\n');
   const dataLines = lines.slice(1).filter((l) => l.trim());
 
-  const map = new Map<
-    string,
-    { type: string; brigade: string; strength: string; toughness: string; specialAbility: string; identifier: string; reference: string; alignment: string }
-  >();
+  const map: CardLookupMap = new Map();
 
   for (const line of dataLines) {
     const cols = line.split('\t');
@@ -29,7 +35,7 @@ async function fetchCardLookup(): Promise<
     const set = cols[1] || '';
     const imgFile = (cols[2] || '').replace(/\.jpe?g$/i, '');
 
-    const entry = {
+    const entry: CardLookupEntry = {
       type: cols[4] || '',
       brigade: cols[5] || '',
       strength: cols[6] || '',
@@ -48,6 +54,26 @@ async function fetchCardLookup(): Promise<
   }
 
   return map;
+}
+
+// Module-scoped cache: avoids re-parsing the ~thousands-of-rows card database
+// on every Create Game click. Next.js fetch cache skips the network round-trip
+// but not the parse, which was the bulk of the latency on the /play hot path.
+async function fetchCardLookup(): Promise<CardLookupMap> {
+  const now = Date.now();
+  if (cachedLookup && cachedLookup.expiresAt > now) {
+    return cachedLookup.promise;
+  }
+
+  const promise = buildCardLookup();
+  const entry = { promise, expiresAt: now + CARD_LOOKUP_TTL_MS };
+  cachedLookup = entry;
+
+  promise.catch(() => {
+    if (cachedLookup === entry) cachedLookup = null;
+  });
+
+  return promise;
 }
 
 export interface GameCardData {

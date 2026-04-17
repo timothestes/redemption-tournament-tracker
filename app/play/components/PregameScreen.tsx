@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import TopNav from '@/components/top-nav';
@@ -59,6 +58,7 @@ interface PregameScreenProps {
   myDeckName?: string;
   goldfishDeck: import('@/app/goldfish/types').DeckDataForGoldfish | null;
   onPractice: () => void;
+  onBackToLobby: () => void;
   onUpdateMessage?: (message: string) => void;
 }
 
@@ -75,9 +75,9 @@ export default function PregameScreen({
   myDeckName,
   goldfishDeck,
   onPractice,
+  onBackToLobby,
   onUpdateMessage,
 }: PregameScreenProps) {
-  const router = useRouter();
   const { game, myPlayer, opponentPlayer } = gameState;
 
   const phase = game?.pregamePhase ?? 'deck_select';
@@ -124,10 +124,7 @@ export default function PregameScreen({
           {/* Back to lobby */}
           <div className="text-left mb-4">
             <button
-              onClick={() => {
-                gameState.leaveGame();
-                router.push('/play');
-              }}
+              onClick={onBackToLobby}
               className="inline-flex items-center gap-1 text-xs text-amber-200/40 hover:text-amber-200/60 transition-colors"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

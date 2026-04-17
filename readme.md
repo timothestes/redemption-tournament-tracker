@@ -179,8 +179,6 @@ Subagent Tasks for Multiplayer mode:
 - shuffling multiple cards into deck does one at a time. For example I selected 6 cards from my hand as a group and right clicked shuffle into deck. It proceeded to shuffle one at a time, but we could optimize here
 - the allow search deck prompt toast is  a bit high up... can we try to have it more in the center like where the territory break is?
 - can't discard random cards from a reserve. We need to be able to randomly discard cards from a reserve via a right click menu.
-- adding counters to opponent's cards isn't working 100% correctly. When right click opp's card and adding/removing a counter, the UI isn't updating right away.
 - revealing opponent's deck doesn't give you the options that are normally available to deck search options. I want al lthe same options to appear as if searching my own deck. Can we just have the oppponent's deck search popup be more like the existing search my deck popup? Why are they different?
 - deck and reserve modals could be draggable? For example, if the user opens up the reserve modal, they should be able to drag it around on the screen using a typicall windows bar feature that people are familiar with
-- add timer at the top, next to the scores. Start the timer once the game begins. If someone is searching a deck zone, pause the time. Reset the time for play agains. Add an option in the gear icon menu at the bottom left to hide the timer. Timer should also reset if a player has reloaded their deck
 - add leave open feature for discard pile and reserve modal pop ups. Just like the deck pop up feature,

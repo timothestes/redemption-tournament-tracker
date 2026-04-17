@@ -198,6 +198,52 @@ export function MultiCardContextMenu({ selectedIds, x, y, actions, onClose, onCl
       </div>
       <div style={separatorStyle} />
 
+      {/* Card state toggles — near top for consistency with single-card menu */}
+      <button
+        style={itemStyle}
+        onClick={() => doAction(() => {
+          // If most are meek, unmeek all; otherwise meek all
+          const shouldUnmeek = meekCount > selectedCards.length / 2;
+          for (const card of selectedCards) {
+            if (shouldUnmeek && card.isMeek) actions.unmeekCard(card.instanceId);
+            else if (!shouldUnmeek && !card.isMeek) actions.meekCard(card.instanceId);
+          }
+        })}
+        {...hoverHandlers}
+      >
+        {meekCount > selectedCards.length / 2 ? 'Unmeek All' : 'Meek All'}
+      </button>
+
+      {flippedCount < selectedCards.length && (
+        <button
+          style={itemStyle}
+          onClick={() => doAction(() => {
+            for (const card of selectedCards) {
+              if (!card.isFlipped) actions.flipCard(card.instanceId);
+            }
+          })}
+          {...hoverHandlers}
+        >
+          Flip All Face-Down
+        </button>
+      )}
+
+      {flippedCount > 0 && (
+        <button
+          style={itemStyle}
+          onClick={() => doAction(() => {
+            for (const card of selectedCards) {
+              if (card.isFlipped) actions.flipCard(card.instanceId);
+            }
+          })}
+          {...hoverHandlers}
+        >
+          Flip All Face-Up
+        </button>
+      )}
+
+      <div style={separatorStyle} />
+
       {/* Move to zones */}
       <div style={labelStyle}>Move to...</div>
       {filteredTargets.map(zoneId => (
@@ -259,52 +305,6 @@ export function MultiCardContextMenu({ selectedIds, x, y, actions, onClose, onCl
           {...hoverHandlers}
         >
           Exchange with Deck
-        </button>
-      )}
-
-      <div style={separatorStyle} />
-
-      {/* Bulk card operations */}
-      <button
-        style={itemStyle}
-        onClick={() => doAction(() => {
-          // If most are meek, unmeek all; otherwise meek all
-          const shouldUnmeek = meekCount > selectedCards.length / 2;
-          for (const card of selectedCards) {
-            if (shouldUnmeek && card.isMeek) actions.unmeekCard(card.instanceId);
-            else if (!shouldUnmeek && !card.isMeek) actions.meekCard(card.instanceId);
-          }
-        })}
-        {...hoverHandlers}
-      >
-        {meekCount > selectedCards.length / 2 ? 'Unmeek All' : 'Meek All'}
-      </button>
-
-      {flippedCount < selectedCards.length && (
-        <button
-          style={itemStyle}
-          onClick={() => doAction(() => {
-            for (const card of selectedCards) {
-              if (!card.isFlipped) actions.flipCard(card.instanceId);
-            }
-          })}
-          {...hoverHandlers}
-        >
-          Flip All Face-Down
-        </button>
-      )}
-
-      {flippedCount > 0 && (
-        <button
-          style={itemStyle}
-          onClick={() => doAction(() => {
-            for (const card of selectedCards) {
-              if (card.isFlipped) actions.flipCard(card.instanceId);
-            }
-          })}
-          {...hoverHandlers}
-        >
-          Flip All Face-Up
         </button>
       )}
 

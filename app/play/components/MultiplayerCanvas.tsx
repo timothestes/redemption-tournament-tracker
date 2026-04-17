@@ -1093,8 +1093,32 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       if (checkReserveProtection(card?.zone, String(toZone), execute)) return;
       execute();
     },
-    moveCardsBatch: (ids: string[], toZone: ZoneId) => {
-      const execute = () => gameState.moveCardsBatch(JSON.stringify(ids), String(toZone));
+    moveCardsBatch: (ids: string[], toZone: ZoneId, positions?: Record<string, { posX: number; posY: number }>) => {
+      const execute = () => {
+        if (positions && (toZone === 'territory' || toZone === 'land-of-bondage')) {
+          const first = positions[ids[0]];
+          const hit = first ? findZoneAtPosition(first.posX + cardWidth / 2, first.posY + cardHeight / 2) : null;
+          const isOppZone = hit?.owner === 'opponent';
+          const zone = isOppZone ? opponentZones[toZone] : myZones[toZone];
+          const ownerId = isOppZone && gameState.opponentPlayer
+            ? String(gameState.opponentPlayer.id)
+            : gameState.myPlayer ? String(gameState.myPlayer.id) : '';
+          if (zone) {
+            const owner: 'my' | 'opponent' = isOppZone ? 'opponent' : 'my';
+            const clamp = isFreeFormZone(String(toZone)) ? { cardWidth, cardHeight } : undefined;
+            const normalized: Record<string, { posX: string; posY: string }> = {};
+            for (const id of ids) {
+              const p = positions[id];
+              if (!p) continue;
+              const db = toDbPos(p.posX, p.posY, zone, owner, clamp);
+              normalized[id] = { posX: db.x.toString(), posY: db.y.toString() };
+            }
+            gameState.moveCardsBatch(JSON.stringify(ids), String(toZone), JSON.stringify(normalized), ownerId);
+            return;
+          }
+        }
+        gameState.moveCardsBatch(JSON.stringify(ids), String(toZone));
+      };
       if (checkReserveBatchProtection(ids, String(toZone), execute)) return;
       execute();
     },
@@ -1165,9 +1189,29 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         }
       }
     },
-    moveCardsBatch: (ids: string[], toZone: ZoneId) => {
+    moveCardsBatch: (ids: string[], toZone: ZoneId, positions?: Record<string, { posX: number; posY: number }>) => {
       if (approvedSearchRequest) {
         const execute = () => {
+          if (positions && (toZone === 'territory' || toZone === 'land-of-bondage')) {
+            const first = positions[ids[0]];
+            const hit = first ? findZoneAtPosition(first.posX + cardWidth / 2, first.posY + cardHeight / 2) : null;
+            const isOppZone = hit?.owner === 'opponent';
+            const zone = isOppZone ? opponentZones[toZone] : myZones[toZone];
+            if (zone) {
+              const owner: 'my' | 'opponent' = isOppZone ? 'opponent' : 'my';
+              const clamp = isFreeFormZone(String(toZone)) ? { cardWidth, cardHeight } : undefined;
+              for (const id of ids) {
+                const p = positions[id];
+                if (!p) {
+                  moveOpponentCard(BigInt(approvedSearchRequest.id), BigInt(id), String(toZone));
+                  continue;
+                }
+                const db = toDbPos(p.posX, p.posY, zone, owner, clamp);
+                moveOpponentCard(BigInt(approvedSearchRequest.id), BigInt(id), String(toZone), db.x.toString(), db.y.toString());
+              }
+              return;
+            }
+          }
           for (const id of ids) {
             moveOpponentCard(BigInt(approvedSearchRequest.id), BigInt(id), String(toZone));
           }

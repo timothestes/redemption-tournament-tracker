@@ -393,6 +393,20 @@ export function HandContextMenu({
 
       <div style={SEPARATOR_STYLE} />
 
+      {onRevealHand && (
+        <button
+          style={ITEM_STYLE}
+          onClick={() => { onRevealHand(!isHandRevealed); onClose(); }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+        >
+          {isHandRevealed ? <EyeOff size={14} /> : <Eye size={14} />}
+          {isHandRevealed ? 'Hide Hand' : 'Reveal Hand'}
+        </button>
+      )}
+
+      {onRevealHand && <div style={SEPARATOR_STYLE} />}
+
       <ActiveSubmenuContext.Provider value={{ active: activeSubmenu, setActive: setActiveSubmenu, closeTimerRef: submenuCloseTimerRef }}>
         <SubMenuActionRow
           icon={<Trash2 size={14} />}
@@ -425,21 +439,6 @@ export function HandContextMenu({
           onAction={onShuffleRandomIntoDeck}
         />
       </ActiveSubmenuContext.Provider>
-
-      {onRevealHand && (
-        <>
-          <div style={SEPARATOR_STYLE} />
-          <button
-            style={ITEM_STYLE}
-            onClick={() => { onRevealHand(!isHandRevealed); onClose(); }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-          >
-            {isHandRevealed ? <EyeOff size={14} /> : <Eye size={14} />}
-            {isHandRevealed ? 'Hide Hand' : 'Reveal Hand'}
-          </button>
-        </>
-      )}
     </div>
   );
 }

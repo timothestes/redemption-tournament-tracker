@@ -257,7 +257,26 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
       </button>
 
       <div style={separatorStyle} />
+
+      {/* Zone targets */}
       <div style={labelStyle}>Move to...</div>
+      {MOVE_TARGETS
+        .filter(z => z !== card.zone)
+        .filter(z => !isLostSoul(card) || !LOST_SOUL_EXCLUDED_TARGETS.includes(z))
+        .map(zoneId => (
+          <button
+            key={zoneId}
+            style={itemStyle}
+            onClick={() => doAction(() => actions.moveCard(card.instanceId, zoneId))}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          >
+            {ZONE_LABELS[zoneId]}
+          </button>
+        ))}
+
+      <div style={separatorStyle} />
+      <div style={labelStyle}>Deck...</div>
 
       {/* Deck actions */}
       {actions.moveCardToTopOfDeck && (
@@ -298,24 +317,6 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
           Exchange with Deck
         </button>
       )}
-
-      <div style={separatorStyle} />
-
-      {/* Zone targets */}
-      {MOVE_TARGETS
-        .filter(z => z !== card.zone)
-        .filter(z => !isLostSoul(card) || !LOST_SOUL_EXCLUDED_TARGETS.includes(z))
-        .map(zoneId => (
-          <button
-            key={zoneId}
-            style={itemStyle}
-            onClick={() => doAction(() => actions.moveCard(card.instanceId, zoneId))}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-          >
-            {ZONE_LABELS[zoneId]}
-          </button>
-        ))}
     </div>
   );
 }

@@ -131,6 +131,11 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [errorFromPregame, setErrorFromPregame] = useState(false);
   const [isPracticing, setIsPracticing] = useState(false);
+  // Guards against a visual flash: once the user chooses to leave, we freeze the
+  // render on a transition overlay so that subsequent SpacetimeDB state updates
+  // (which re-derive `lifecycle` and can fall through to the game canvas) can't
+  // briefly reveal the territory zones before router.push unmounts us.
+  const [isLeaving, setIsLeaving] = useState(false);
   const [playAgainTriggered, setPlayAgainTriggered] = useState(false);
   const [gameId, setGameId] = useState<bigint | null>(null);
   const didCallReducer = useRef(false);
@@ -526,6 +531,24 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     router.replace('/play');
   }, [isGameNotFound, code, router]);
 
+  if (isLeaving) {
+    return (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black">
+        <div
+          className="absolute inset-0 bg-cover bg-no-repeat opacity-40"
+          style={{ backgroundImage: 'url(/gameplay/cave_background.png)', backgroundPosition: 'center 70%' }}
+        />
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: 'radial-gradient(ellipse 90% 85% at 50% 50%, transparent 60%, rgba(0,0,0,0.85) 100%)' }}
+        />
+        <p className="relative z-10 font-cinzel text-sm tracking-wide text-amber-200/70">
+          Returning to lobby...
+        </p>
+      </div>
+    );
+  }
+
   if (lifecycle === 'error') {
     if (isGameNotFound) {
       // Show brief loading state while redirecting
@@ -689,6 +712,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         myDeckName={gameParams?.deckName}
         goldfishDeck={goldfishDeck}
         onPractice={() => setIsPracticing(true)}
+        onBackToLobby={handleReturnToLobby}
         onUpdateMessage={gameId && conn ? (message: string) => {
           conn.reducers.updateLobbyMessage({ gameId, message });
         } : undefined}
@@ -700,6 +724,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // Return to lobby handler used by GameOverOverlay
   // ---------------------------------------------------------------------------
   function handleReturnToLobby() {
+    setIsLeaving(true);
     gameState.leaveGame();
     router.push('/play');
   }

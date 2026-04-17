@@ -1461,6 +1461,10 @@ export const move_cards_batch = spacetimedb.reducer(
     // so new cards render on top of existing ones. Each card in the batch
     // gets an incrementing index starting from maxIdx + 1.
     const isFreeFormTarget = toZone !== 'deck' && toZone !== 'hand';
+    // Auto-fan counter: when cards are dropped into territory without explicit
+    // positions (e.g. batch moves from search/browse modals), stagger them so
+    // they don't pile on top of each other at the zone origin.
+    let autoFanIndex = 0;
     let nextFreeFormIndex = 0n;
     if (isFreeFormTarget) {
       let maxIdx = -1n;
@@ -1529,6 +1533,18 @@ export const move_cards_batch = spacetimedb.reducer(
       // Ensure posX/posY are strings — client may send numbers via JSON positions map
       const pos = { posX: String(rawPos.posX ?? ''), posY: String(rawPos.posY ?? '') };
       const cardOwnerId = newOwnerId ?? card.ownerId;
+
+      // Auto-fan: if dropping into territory without an explicit position,
+      // stagger the card in a small grid so multi-card modal moves don't stack
+      // at the zone origin. Positions are normalized 0–1 within the zone.
+      if (toZone === 'territory' && pos.posX === '' && pos.posY === '') {
+        const cardsPerRow = 10;
+        const col = autoFanIndex % cardsPerRow;
+        const row = Math.floor(autoFanIndex / cardsPerRow);
+        pos.posX = String(0.03 + col * 0.04 + row * 0.02);
+        pos.posY = String(0.05 + row * 0.28);
+        autoFanIndex += 1;
+      }
 
       // For hand zone, assign sequential zoneIndex (count of existing hand cards for this owner)
       const handZoneIndex = toZone === 'hand' ? BigInt(
