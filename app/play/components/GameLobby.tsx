@@ -29,17 +29,11 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
   // Pre-fill game code from ?join=XXXX invite link
   const joinCode = searchParams.get('join')?.toUpperCase().slice(0, 4) ?? '';
 
-  // Restore last-played deck from localStorage, falling back to first deck
-  const [selectedDeck, setSelectedDeck] = useState<DeckOption | null>(() => {
-    if (typeof window !== 'undefined') {
-      const lastPlayedId = localStorage.getItem('lastPlayedDeckId');
-      if (lastPlayedId) {
-        const found = decks.find(d => d.id === lastPlayedId);
-        if (found) return found;
-      }
-    }
-    return decks.length > 0 ? decks[0] : null;
-  });
+  // Decks are sorted server-side by last_played_at DESC NULLS LAST, so decks[0]
+  // is already the last-played deck — no client-side swap needed.
+  const [selectedDeck, setSelectedDeck] = useState<DeckOption | null>(
+    decks.length > 0 ? decks[0] : null
+  );
   const [pickerOpen, setPickerOpen] = useState(false);
 
   // Game state

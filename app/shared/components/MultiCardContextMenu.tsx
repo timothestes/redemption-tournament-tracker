@@ -280,19 +280,33 @@ export function MultiCardContextMenu({ selectedIds, x, y, actions, onClose, onCl
         {meekCount > selectedCards.length / 2 ? 'Unmeek All' : 'Meek All'}
       </button>
 
-      <button
-        style={itemStyle}
-        onClick={() => doAction(() => {
-          const shouldFlipUp = flippedCount > selectedCards.length / 2;
-          for (const card of selectedCards) {
-            if (shouldFlipUp && card.isFlipped) actions.flipCard(card.instanceId);
-            else if (!shouldFlipUp && !card.isFlipped) actions.flipCard(card.instanceId);
-          }
-        })}
-        {...hoverHandlers}
-      >
-        {flippedCount > selectedCards.length / 2 ? 'Flip All Face-Up' : 'Flip All Face-Down'}
-      </button>
+      {flippedCount < selectedCards.length && (
+        <button
+          style={itemStyle}
+          onClick={() => doAction(() => {
+            for (const card of selectedCards) {
+              if (!card.isFlipped) actions.flipCard(card.instanceId);
+            }
+          })}
+          {...hoverHandlers}
+        >
+          Flip All Face-Down
+        </button>
+      )}
+
+      {flippedCount > 0 && (
+        <button
+          style={itemStyle}
+          onClick={() => doAction(() => {
+            for (const card of selectedCards) {
+              if (card.isFlipped) actions.flipCard(card.instanceId);
+            }
+          })}
+          {...hoverHandlers}
+        >
+          Flip All Face-Up
+        </button>
+      )}
 
       <div style={separatorStyle} />
 

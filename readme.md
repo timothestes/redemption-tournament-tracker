@@ -184,4 +184,3 @@ Subagent Tasks for Multiplayer mode:
 - deck and reserve modals could be draggable? For example, if the user opens up the reserve modal, they should be able to drag it around on the screen using a typicall windows bar feature that people are familiar with
 - add timer at the top, next to the scores. Start the timer once the game begins. If someone is searching a deck zone, pause the time. Reset the time for play agains. Add an option in the gear icon menu at the bottom left to hide the timer. Timer should also reset if a player has reloaded their deck
 - add leave open feature for discard pile and reserve modal pop ups. Just like the deck pop up feature,
-- load deck feature doesn't show up for gear icon when someone has conceded I believe. It should be available at all times.

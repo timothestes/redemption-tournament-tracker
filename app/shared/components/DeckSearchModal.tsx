@@ -4,11 +4,12 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useModalGame } from '@/app/shared/contexts/ModalGameContext';
 import { GameCard, ZoneId, ZONE_LABELS } from '@/app/shared/types/gameCard';
-import { X, Search, GripHorizontal } from 'lucide-react';
+import { X, Search } from 'lucide-react';
 import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './ModalCardHoverPreview';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import { useDraggableModal } from '@/app/shared/hooks/useDraggableModal';
+import { DraggableTitleBar } from './DraggableTitleBar';
 
 const MOVE_ZONES: { id: ZoneId; label: string }[] = [
   { id: 'hand', label: 'Hand' },
@@ -448,62 +449,40 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
           ...modalStyle,
         }}
       >
-        {/* Header — drag handle */}
-        <div
-          {...dragHandleProps}
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 12,
-            ...dragHandleProps.style,
-          }}
+        {/* Title bar — drag handle */}
+        <DraggableTitleBar
+          dragHandleProps={dragHandleProps}
+          title={`Search Deck (${deckCards.length} cards)`}
+          bottomGap={12}
+          onClose={handleClose}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <GripHorizontal size={14} style={{ color: 'var(--gf-border)', flexShrink: 0 }} />
-            <h2
-              style={{
+          {selectedIds.size > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{
+                color: 'var(--gf-accent)',
+                fontSize: 12,
                 fontFamily: 'var(--font-cinzel), Georgia, serif',
-                fontSize: 16,
-                color: 'var(--gf-text-bright)',
-              }}
-            >
-              Search Deck ({deckCards.length} cards)
-            </h2>
-            {selectedIds.size > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{
-                  color: 'var(--gf-accent)',
-                  fontSize: 12,
+              }}>
+                {selectedIds.size} selected
+              </span>
+              <button
+                onClick={(e) => { e.stopPropagation(); setSelectedIds(new Set()); }}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid var(--gf-border)',
+                  borderRadius: 4,
+                  color: 'var(--gf-text-dim)',
+                  fontSize: 10,
+                  padding: '2px 6px',
+                  cursor: 'pointer',
                   fontFamily: 'var(--font-cinzel), Georgia, serif',
-                }}>
-                  {selectedIds.size} selected
-                </span>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setSelectedIds(new Set()); }}
-                  style={{
-                    background: 'transparent',
-                    border: '1px solid var(--gf-border)',
-                    borderRadius: 4,
-                    color: 'var(--gf-text-dim)',
-                    fontSize: 10,
-                    padding: '2px 6px',
-                    cursor: 'pointer',
-                    fontFamily: 'var(--font-cinzel), Georgia, serif',
-                  }}
-                >
-                  Deselect
-                </button>
-              </div>
-            )}
-          </div>
-          <button
-            onClick={handleClose}
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--gf-text-dim)' }}
-          >
-            <X size={18} />
-          </button>
-        </div>
+                }}
+              >
+                Deselect
+              </button>
+            </div>
+          )}
+        </DraggableTitleBar>
 
         {/* Search input + field selector */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>

@@ -3,11 +3,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { GameCard } from '@/app/shared/types/gameCard';
-import { X, Search, GripHorizontal } from 'lucide-react';
+import { X, Search } from 'lucide-react';
 import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './ModalCardHoverPreview';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import { useDraggableModal } from '@/app/shared/hooks/useDraggableModal';
+import { DraggableTitleBar } from './DraggableTitleBar';
 
 const OPPONENT_ACTIONS = [
   { id: 'discard', label: 'Discard' },
@@ -106,7 +107,7 @@ interface OpponentBrowseModalProps {
   cards: GameCard[];
   onMoveCard: (cardId: string, action: string) => void;
   onMoveCardsBatch?: (cardIds: string[], action: string) => void;
-  onClose: () => void;
+  onClose: (opts?: { shuffled?: boolean }) => void;
   onStartDrag?: (card: GameCard, imageUrl: string, e: React.PointerEvent) => void;
   onStartMultiDrag?: (cards: { card: GameCard; imageUrl: string }[], e: React.PointerEvent) => void;
   didDragRef?: React.MutableRefObject<boolean>;
@@ -153,6 +154,8 @@ export function OpponentBrowseModal({
   const { dragHandleProps, modalStyle } = useDraggableModal();
   const [search, setSearch] = useState('');
   const [searchField, setSearchField] = useState<string>('all');
+  const [leaveOpen, setLeaveOpen] = useState(false);
+  const [shuffleOnClose, setShuffleOnClose] = useState(true);
   const [contextCard, setContextCard] = useState<{ card: GameCard; x: number; y: number } | null>(null);
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave } = useModalCardHover(350, { setPreviewCard, isLoupeVisible });
@@ -173,6 +176,7 @@ export function OpponentBrowseModal({
   const isLassoing = useRef(false);
 
   const isReserve = zoneName.toLowerCase().includes('reserve');
+  const isDeck = zoneName.toLowerCase().includes('deck');
   const sortedCards = isReserve
     ? [...cards].sort((a, b) => a.type.localeCompare(b.type) || a.cardName.localeCompare(b.cardName))
     : cards;
@@ -205,19 +209,48 @@ export function OpponentBrowseModal({
     ? sortedCards.filter(c => matchesSearch(c, search))
     : sortedCards;
 
+  // Complete the search, reporting whether the requester chose to shuffle the
+  // target's deck — so the backend can log "(and chose not to shuffle it)".
+  const didCloseRef = useRef(false);
+  const handleClose = useCallback(() => {
+    if (didCloseRef.current) return;
+    didCloseRef.current = true;
+    const shuffled = shuffleOnClose && isDeck;
+    onClose({ shuffled });
+  }, [shuffleOnClose, isDeck, onClose]);
+
+  // Close after a successful drag-to-canvas completes (unless "leave open").
+  const handleCloseRef = useRef(handleClose);
+  handleCloseRef.current = handleClose;
+  const leaveOpenRef = useRef(leaveOpen);
+  leaveOpenRef.current = leaveOpen;
+  const dragEndTimeRef = useRef(0);
+  const prevDragActive = useRef(false);
+  useEffect(() => {
+    if (prevDragActive.current && !isDragActive) {
+      dragEndTimeRef.current = Date.now();
+      setSelectedIds(new Set());
+      if (!leaveOpenRef.current) {
+        handleCloseRef.current();
+      }
+      if (didDragRef) didDragRef.current = false;
+    }
+    prevDragActive.current = !!isDragActive;
+  }, [isDragActive, didDragRef]);
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (selectedIds.size > 0) {
           setSelectedIds(new Set());
         } else {
-          onClose();
+          handleClose();
         }
       }
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [onClose, selectedIds.size]);
+  }, [handleClose, selectedIds.size]);
 
   const handleCardContextMenu = useCallback((card: GameCard, e: React.MouseEvent) => {
     e.preventDefault();
@@ -356,7 +389,10 @@ export function OpponentBrowseModal({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      onClick={() => { setContextCard(null); onClose(); }}
+      onClick={() => {
+        setContextCard(null);
+        if (!didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) handleClose();
+      }}
       onContextMenu={(e) => e.preventDefault()}
       style={{
         position: 'fixed',
@@ -389,62 +425,40 @@ export function OpponentBrowseModal({
           ...modalStyle,
         }}
       >
-        {/* Header — drag handle */}
-        <div
-          {...dragHandleProps}
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 12,
-            ...dragHandleProps.style,
-          }}
+        {/* Title bar — drag handle */}
+        <DraggableTitleBar
+          dragHandleProps={dragHandleProps}
+          title={`${zoneName} (${cards.length})`}
+          bottomGap={12}
+          onClose={handleClose}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <GripHorizontal size={14} style={{ color: 'var(--gf-border)', flexShrink: 0 }} />
-            <h2
-              style={{
+          {selectedIds.size > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{
+                color: 'var(--gf-accent)',
+                fontSize: 12,
                 fontFamily: 'var(--font-cinzel), Georgia, serif',
-                fontSize: 16,
-                color: 'var(--gf-text-bright)',
-              }}
-            >
-              {zoneName} ({cards.length})
-            </h2>
-            {selectedIds.size > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{
-                  color: 'var(--gf-accent)',
-                  fontSize: 12,
+              }}>
+                {selectedIds.size} selected
+              </span>
+              <button
+                onClick={(e) => { e.stopPropagation(); setSelectedIds(new Set()); }}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid var(--gf-border)',
+                  borderRadius: 4,
+                  color: 'var(--gf-text-dim)',
+                  fontSize: 10,
+                  padding: '2px 6px',
+                  cursor: 'pointer',
                   fontFamily: 'var(--font-cinzel), Georgia, serif',
-                }}>
-                  {selectedIds.size} selected
-                </span>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setSelectedIds(new Set()); }}
-                  style={{
-                    background: 'transparent',
-                    border: '1px solid var(--gf-border)',
-                    borderRadius: 4,
-                    color: 'var(--gf-text-dim)',
-                    fontSize: 10,
-                    padding: '2px 6px',
-                    cursor: 'pointer',
-                    fontFamily: 'var(--font-cinzel), Georgia, serif',
-                  }}
-                >
-                  Deselect
-                </button>
-              </div>
-            )}
-          </div>
-          <button
-            onClick={onClose}
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--gf-text-dim)' }}
-          >
-            <X size={18} />
-          </button>
-        </div>
+                }}
+              >
+                Deselect
+              </button>
+            </div>
+          )}
+        </DraggableTitleBar>
 
         {/* Search input + field selector */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
@@ -533,11 +547,91 @@ export function OpponentBrowseModal({
           </div>
         </div>
 
-        {/* Hint */}
-        <div style={{ marginBottom: 12 }}>
+        {/* Hint + options */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <span style={{ color: 'var(--gf-border)', fontSize: 10 }}>
             Right-click for actions · Drag to a zone · Click to select · Hover to enlarge
           </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                color: 'var(--gf-text-dim)',
+                fontSize: 11,
+                cursor: 'pointer',
+              }}
+            >
+              <span
+                style={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: 3,
+                  border: leaveOpen ? '1.5px solid #c4955a' : '1.5px solid var(--gf-border)',
+                  background: leaveOpen ? 'rgba(196, 149, 90, 0.25)' : 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  transition: 'border-color 0.15s, background 0.15s',
+                }}
+              >
+                {leaveOpen && (
+                  <svg width="12" height="12" viewBox="0 0 10 10" fill="none">
+                    <path d="M2 5L4.5 7.5L8 3" stroke="#e8d5a3" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </span>
+              <input
+                type="checkbox"
+                checked={leaveOpen}
+                onChange={(e) => setLeaveOpen(e.target.checked)}
+                className="sr-only"
+              />
+              Leave open
+            </label>
+            {isDeck && (
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  color: 'var(--gf-text-dim)',
+                  fontSize: 11,
+                  cursor: 'pointer',
+                }}
+              >
+                <span
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: 3,
+                    border: shuffleOnClose ? '1.5px solid #c4955a' : '1.5px solid var(--gf-border)',
+                    background: shuffleOnClose ? 'rgba(196, 149, 90, 0.25)' : 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    transition: 'border-color 0.15s, background 0.15s',
+                  }}
+                >
+                  {shuffleOnClose && (
+                    <svg width="12" height="12" viewBox="0 0 10 10" fill="none">
+                      <path d="M2 5L4.5 7.5L8 3" stroke="#e8d5a3" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </span>
+                <input
+                  type="checkbox"
+                  checked={shuffleOnClose}
+                  onChange={(e) => setShuffleOnClose(e.target.checked)}
+                  className="sr-only"
+                />
+                Shuffle on close
+              </label>
+            )}
+          </div>
         </div>
 
         {/* Card grid — scrollable */}

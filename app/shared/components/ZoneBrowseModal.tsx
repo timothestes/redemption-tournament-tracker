@@ -4,11 +4,11 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useModalGame } from '@/app/shared/contexts/ModalGameContext';
 import { ZoneId, ZONE_LABELS, GameCard } from '@/app/shared/types/gameCard';
-import { X, GripHorizontal } from 'lucide-react';
 import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './ModalCardHoverPreview';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import { useDraggableModal } from '@/app/shared/hooks/useDraggableModal';
+import { DraggableTitleBar } from './DraggableTitleBar';
 
 const MOVE_ZONES: { id: ZoneId; label: string }[] = [
   { id: 'hand', label: 'Hand' },
@@ -415,61 +415,38 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
           ...modalStyle,
         }}
       >
-        <div
-          {...dragHandleProps}
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 16,
-            ...dragHandleProps.style,
-          }}
+        <DraggableTitleBar
+          dragHandleProps={dragHandleProps}
+          title={`${ZONE_LABELS[zoneId]} (${cards.length})`}
+          onClose={onClose}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <GripHorizontal size={14} style={{ color: 'var(--gf-border)', flexShrink: 0 }} />
-            <h2
-              style={{
+          {selectedIds.size > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{
+                color: 'var(--gf-accent)',
+                fontSize: 12,
                 fontFamily: 'var(--font-cinzel), Georgia, serif',
-                fontSize: 16,
-                color: 'var(--gf-text-bright)',
-              }}
-            >
-              {ZONE_LABELS[zoneId]} ({cards.length})
-            </h2>
-            {selectedIds.size > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{
-                  color: 'var(--gf-accent)',
-                  fontSize: 12,
+              }}>
+                {selectedIds.size} selected
+              </span>
+              <button
+                onClick={(e) => { e.stopPropagation(); setSelectedIds(new Set()); }}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid var(--gf-border)',
+                  borderRadius: 4,
+                  color: 'var(--gf-text-dim)',
+                  fontSize: 10,
+                  padding: '2px 6px',
+                  cursor: 'pointer',
                   fontFamily: 'var(--font-cinzel), Georgia, serif',
-                }}>
-                  {selectedIds.size} selected
-                </span>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setSelectedIds(new Set()); }}
-                  style={{
-                    background: 'transparent',
-                    border: '1px solid var(--gf-border)',
-                    borderRadius: 4,
-                    color: 'var(--gf-text-dim)',
-                    fontSize: 10,
-                    padding: '2px 6px',
-                    cursor: 'pointer',
-                    fontFamily: 'var(--font-cinzel), Georgia, serif',
-                  }}
-                >
-                  Deselect
-                </button>
-              </div>
-            )}
-          </div>
-          <button
-            onClick={onClose}
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--gf-text-dim)' }}
-          >
-            <X size={18} />
-          </button>
-        </div>
+                }}
+              >
+                Deselect
+              </button>
+            </div>
+          )}
+        </DraggableTitleBar>
 
         {/* Hint + leave open toggle */}
         {!readOnly && (

@@ -1,7 +1,7 @@
 'use client';
 
-import { createContext, useContext, useCallback, useEffect, useRef, useState } from 'react';
-import { Search, Shuffle, Eye, EyeOff, Trash2, Archive, ChevronRight, Play, Dices } from 'lucide-react';
+import { createContext, useContext, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Search, Shuffle, Eye, Sparkles, Trash2, Archive, ChevronRight, Play, Dices } from 'lucide-react';
 
 // Context to let SubMenuActionRow lock/unlock the parent SubmenuTrigger from auto-closing
 const SubmenuLockContext = createContext<{
@@ -36,6 +36,8 @@ interface DeckContextMenuProps {
   onDiscardRandom: (count: number) => void;
   onReserveRandom: (count: number) => void;
   onLookAtTop?: (count: number) => void;
+  onLookAtBottom?: (count: number) => void;
+  onLookAtRandom?: (count: number) => void;
   /** When true, hides all draw-related actions (for opponent's deck) */
   hideDrawActions?: boolean;
 }
@@ -91,17 +93,14 @@ const GO_BTN_STYLE: React.CSSProperties = {
 };
 
 const SUBMENU_STYLE: React.CSSProperties = {
-  position: 'absolute',
-  left: 'auto',
-  right: '100%',
-  top: -4,
-  marginRight: -2,
+  position: 'fixed',
   background: 'var(--gf-bg)',
   border: '1px solid var(--gf-border)',
   borderRadius: 6,
   padding: '4px 0',
   boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
   whiteSpace: 'nowrap',
+  zIndex: 910,
 };
 
 function hoverEnter(e: React.MouseEvent<HTMLButtonElement | HTMLDivElement>) {
@@ -272,6 +271,31 @@ function SubmenuTrigger({
   const isOpen = ctx?.active === label;
   const openTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lockedRef = useRef(false);
+  const triggerRef = useRef<HTMLDivElement | null>(null);
+  const submenuRef = useRef<HTMLDivElement | null>(null);
+  const [fixedPos, setFixedPos] = useState<{ top: number; left: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      setFixedPos(null);
+      return;
+    }
+    const trigger = triggerRef.current;
+    const sub = submenuRef.current;
+    if (!trigger || !sub) return;
+    const tRect = trigger.getBoundingClientRect();
+    const sRect = sub.getBoundingClientRect();
+    const MARGIN = 8;
+    // Place to the left of the trigger
+    let left = tRect.left - sRect.width - 2;
+    if (left < MARGIN) left = tRect.right + 2; // flip to right if it overflows left
+    // Anchor top to trigger top, then clamp into viewport
+    let top = tRect.top - 4;
+    const maxTop = window.innerHeight - sRect.height - MARGIN;
+    if (top > maxTop) top = maxTop;
+    if (top < MARGIN) top = MARGIN;
+    setFixedPos({ top, left });
+  }, [isOpen]);
 
   const lock = useCallback(() => { lockedRef.current = true; }, []);
   const unlock = useCallback(() => { lockedRef.current = false; }, []);
@@ -308,7 +332,7 @@ function SubmenuTrigger({
 
   return (
     <div
-      style={{ position: 'relative' }}
+      ref={triggerRef}
       onMouseEnter={showSub}
       onMouseLeave={hideSub}
     >
@@ -321,7 +345,18 @@ function SubmenuTrigger({
         <span>{label}</span>
       </div>
       {isOpen && (
-        <div style={SUBMENU_STYLE} onContextMenu={(e) => e.preventDefault()}>
+        <div
+          ref={submenuRef}
+          style={{
+            ...SUBMENU_STYLE,
+            top: fixedPos?.top ?? -9999,
+            left: fixedPos?.left ?? -9999,
+            visibility: fixedPos ? 'visible' : 'hidden',
+          }}
+          onContextMenu={(e) => e.preventDefault()}
+          onMouseEnter={showSub}
+          onMouseLeave={hideSub}
+        >
           <SubmenuLockContext.Provider value={{ lock, unlock }}>
             {children}
           </SubmenuLockContext.Provider>
@@ -338,13 +373,13 @@ export function DeckContextMenu({
   onDrawBottom, onRevealBottom, onDiscardBottom, onReserveBottom,
   onDrawRandom, onRevealRandom, onDiscardRandom, onReserveRandom,
   onLookAtTop,
+  onLookAtBottom,
+  onLookAtRandom,
   hideDrawActions,
 }: DeckContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [showDrawX, setShowDrawX] = useState(false);
   const [drawXCount, setDrawXCount] = useState(3);
-  const [showLookX, setShowLookX] = useState(false);
-  const [lookXCount, setLookXCount] = useState(3);
   const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
   const submenuCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -391,38 +426,6 @@ export function DeckContextMenu({
         <Search size={14} />
         Search Deck
       </button>
-      {onLookAtTop && !hideDrawActions && (
-        <>
-          <button style={ITEM_STYLE} onClick={() => onLookAtTop(1)} onMouseEnter={hoverEnter} onMouseLeave={hoverLeave}>
-            <EyeOff size={14} />
-            Look at Top Card
-          </button>
-          <button style={ITEM_STYLE} onClick={() => setShowLookX(!showLookX)} onMouseEnter={hoverEnter} onMouseLeave={hoverLeave}>
-            <EyeOff size={14} />
-            Look at Top X...
-          </button>
-          {showLookX && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 14px 6px' }}>
-              <button
-                style={{ ...STEPPER_BTN_STYLE, opacity: lookXCount <= 1 ? 0.3 : 1 }}
-                onClick={() => setLookXCount(Math.max(1, lookXCount - 1))}
-              >
-                &minus;
-              </button>
-              <span style={{ width: 24, textAlign: 'center', color: 'var(--gf-text-bright)', fontSize: 13, fontWeight: 'bold', fontFamily: 'var(--font-cinzel), Georgia, serif' }}>
-                {lookXCount}
-              </span>
-              <button
-                style={{ ...STEPPER_BTN_STYLE, opacity: lookXCount >= deckSize ? 0.3 : 1 }}
-                onClick={() => setLookXCount(Math.min(deckSize, lookXCount + 1))}
-              >
-                +
-              </button>
-              <button style={GO_BTN_STYLE} onClick={() => onLookAtTop(lookXCount)}>Go</button>
-            </div>
-          )}
-        </>
-      )}
       {!hideDrawActions && (
         <>
           <button style={ITEM_STYLE} onClick={() => onDrawTop(1)} onMouseEnter={hoverEnter} onMouseLeave={hoverLeave}>
@@ -460,19 +463,22 @@ export function DeckContextMenu({
       <ActiveSubmenuContext.Provider value={{ active: activeSubmenu, setActive: setActiveSubmenu, closeTimerRef: submenuCloseTimerRef }}>
         <SubmenuTrigger label="Top Card">
           {!hideDrawActions && <SubMenuActionRow icon={<Play size={14} />} label="Draw" max={deckSize} onAction={onDrawTop} />}
-          <SubMenuActionRow icon={<Eye size={14} />} label="Reveal" max={deckSize} onAction={onRevealTop} />
+          {onLookAtTop && <SubMenuActionRow icon={<Eye size={14} />} label="Look" max={deckSize} onAction={onLookAtTop} />}
+          <SubMenuActionRow icon={<Sparkles size={14} />} label="Reveal" max={deckSize} onAction={onRevealTop} />
           <SubMenuActionRow icon={<Trash2 size={14} />} label="Discard" max={deckSize} onAction={onDiscardTop} />
           <SubMenuActionRow icon={<Archive size={14} />} label="Reserve" max={deckSize} onAction={onReserveTop} />
         </SubmenuTrigger>
         <SubmenuTrigger label="Bottom Card">
           {!hideDrawActions && <SubMenuActionRow icon={<Play size={14} />} label="Draw" max={deckSize} onAction={onDrawBottom} />}
-          <SubMenuActionRow icon={<Eye size={14} />} label="Reveal" max={deckSize} onAction={onRevealBottom} />
+          {onLookAtBottom && <SubMenuActionRow icon={<Eye size={14} />} label="Look" max={deckSize} onAction={onLookAtBottom} />}
+          <SubMenuActionRow icon={<Sparkles size={14} />} label="Reveal" max={deckSize} onAction={onRevealBottom} />
           <SubMenuActionRow icon={<Trash2 size={14} />} label="Discard" max={deckSize} onAction={onDiscardBottom} />
           <SubMenuActionRow icon={<Archive size={14} />} label="Reserve" max={deckSize} onAction={onReserveBottom} />
         </SubmenuTrigger>
         <SubmenuTrigger label="Random Card">
           {!hideDrawActions && <SubMenuActionRow icon={<Play size={14} />} label="Draw" max={deckSize} onAction={onDrawRandom} />}
-          <SubMenuActionRow icon={<Eye size={14} />} label="Reveal" max={deckSize} onAction={onRevealRandom} />
+          {onLookAtRandom && <SubMenuActionRow icon={<Eye size={14} />} label="Look" max={deckSize} onAction={onLookAtRandom} />}
+          <SubMenuActionRow icon={<Sparkles size={14} />} label="Reveal" max={deckSize} onAction={onRevealRandom} />
           <SubMenuActionRow icon={<Trash2 size={14} />} label="Discard" max={deckSize} onAction={onDiscardRandom} />
           <SubMenuActionRow icon={<Archive size={14} />} label="Reserve" max={deckSize} onAction={onReserveRandom} />
         </SubmenuTrigger>

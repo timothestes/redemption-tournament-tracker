@@ -57,7 +57,8 @@ export interface GameCardNodeProps {
   isSelected?: boolean;
   isDraggable?: boolean;
   hoverProgress?: number;
-  /** When true, plays a one-shot amber pulse glow that fades out over ~1.5s. */
+  /** When true, plays a one-shot amber pulse glow: a brief fade-in + bloom,
+   *  followed by a longer fade-out. Total duration ~1.8s. */
   lobArrivalGlow?: boolean;
   nodeRef?: (instanceId: string, node: Konva.Group | null) => void;
   onDragStart: (card: GameCard) => void;
@@ -98,29 +99,47 @@ export const GameCardNode = memo(function GameCardNode({
 
   // Ref for the LOB arrival glow rect — used to run an imperative Konva Tween
   const arrivalGlowRef = useRef<Konva.Rect | null>(null);
-  const arrivalTweenRef = useRef<ReturnType<typeof KonvaLib.Tween.prototype.play> | null>(null);
 
   useEffect(() => {
     const node = arrivalGlowRef.current;
     if (!node) return;
 
     if (lobArrivalGlow) {
-      // Start visible, then fade out
-      node.opacity(1);
+      // Phase 1: bloom in — quick fade-up with stroke + shadow expansion.
+      // Phase 2: settle + fade out — longer, with glow softening.
+      node.opacity(0);
+      node.strokeWidth(2.5);
+      node.shadowBlur(14);
       node.visible(true);
-      const tween = new KonvaLib.Tween({
+
+      let fade: Konva.Tween | null = null;
+      const bloom = new KonvaLib.Tween({
         node,
-        duration: 1.5,
-        opacity: 0,
+        duration: 0.22,
+        opacity: 1,
+        strokeWidth: 4,
+        shadowBlur: 30,
         easing: KonvaLib.Easings.EaseOut,
         onFinish: () => {
-          node.visible(false);
+          fade = new KonvaLib.Tween({
+            node,
+            duration: 1.55,
+            opacity: 0,
+            strokeWidth: 2.5,
+            shadowBlur: 12,
+            easing: KonvaLib.Easings.EaseOut,
+            onFinish: () => {
+              node.visible(false);
+            },
+          });
+          fade.play();
         },
       });
-      tween.play();
-      arrivalTweenRef.current = tween as any;
+      bloom.play();
+
       return () => {
-        tween.destroy();
+        bloom.destroy();
+        fade?.destroy();
       };
     } else {
       node.visible(false);
@@ -151,20 +170,21 @@ export const GameCardNode = memo(function GameCardNode({
       onMouseLeave={onMouseLeave}
       onTouchStart={(e) => onMouseEnter(card, e as unknown as Konva.KonvaEventObject<MouseEvent>)}
     >
-      {/* LOB arrival glow — amber pulse that fades out when a card arrives in Land of Bondage */}
+      {/* LOB arrival glow — amber bloom that fades when a card arrives in Land of Bondage.
+          strokeWidth and shadowBlur are animated imperatively in the effect above. */}
       <Rect
         ref={arrivalGlowRef as any}
-        x={-4}
-        y={-4}
-        width={cardWidth + 8}
-        height={cardHeight + 8}
+        x={-6}
+        y={-6}
+        width={cardWidth + 12}
+        height={cardHeight + 12}
         fill="transparent"
-        stroke="#d4a044"
+        stroke="#e8b86a"
         strokeWidth={2.5}
-        cornerRadius={6}
-        shadowColor="#d4a044"
-        shadowBlur={16}
-        shadowOpacity={0.8}
+        cornerRadius={7}
+        shadowColor="#e8b86a"
+        shadowBlur={14}
+        shadowOpacity={0.9}
         visible={false}
         opacity={0}
         listening={false}

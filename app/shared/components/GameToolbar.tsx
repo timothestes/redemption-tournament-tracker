@@ -122,7 +122,7 @@ export function GameToolbar({
     {
       icon: Undo2,
       key: 'undo',
-      label: isMultiplayer && undoCount ? `Undo (${undoCount})` : 'Undo',
+      label: 'Undo',
       onClick: onUndo ?? (() => {}),
       shortcut: '\u2318Z',
       disabled: isMultiplayer ? !undoCount || undoCount === 0 : false,

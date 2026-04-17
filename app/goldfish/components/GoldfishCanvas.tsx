@@ -1661,6 +1661,27 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             const ids = deck.slice(0, n).map(c => c.instanceId);
             setLookState({ cardIds: ids, title: `Looking at Top ${n}` });
           }}
+          onLookAtBottom={(count) => {
+            setDeckMenu(null);
+            const deck = state.zones.deck;
+            if (deck.length === 0) { showGameToast('Deck is empty'); return; }
+            const n = Math.min(count, deck.length);
+            const ids = deck.slice(-n).map(c => c.instanceId);
+            setLookState({ cardIds: ids, title: `Looking at Bottom ${n}` });
+          }}
+          onLookAtRandom={(count) => {
+            setDeckMenu(null);
+            const deck = state.zones.deck;
+            if (deck.length === 0) { showGameToast('Deck is empty'); return; }
+            const n = Math.min(count, deck.length);
+            const shuffled = [...deck];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            const ids = shuffled.slice(0, n).map(c => c.instanceId);
+            setLookState({ cardIds: ids, title: `Looking at Random ${n}` });
+          }}
           onShuffleDeck={() => { setDeckMenu(null); shuffleDeck(); }}
           // Top card actions
           onDrawTop={(count) => {

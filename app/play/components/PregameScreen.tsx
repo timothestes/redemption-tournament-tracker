@@ -458,6 +458,22 @@ function InlineDie({
   revealed: boolean;
   skipAnimation?: boolean;
 }) {
+  // Only reveal the "Winner" label after the die has actually landed,
+  // otherwise the result is spoiled before the tumble animation finishes.
+  const [landed, setLanded] = useState(false);
+  useEffect(() => {
+    if (skipAnimation) {
+      setLanded(true);
+      return;
+    }
+    if (!revealed) {
+      setLanded(false);
+      return;
+    }
+    const timer = setTimeout(() => setLanded(true), RITUAL_TUMBLE_MS);
+    return () => clearTimeout(timer);
+  }, [revealed, skipAnimation]);
+
   return (
     <div className="flex flex-col items-center gap-1">
       <RitualDie
@@ -468,7 +484,7 @@ function InlineDie({
         revealed={revealed}
         skipAnimation={skipAnimation}
       />
-      {isWinner && revealed && (
+      {isWinner && landed && (
         <motion.span
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}

@@ -13,5 +13,4 @@ import {
 export default {
   gameId: __t.u64(),
   requestId: __t.u64(),
-  shuffled: __t.bool(),
 };

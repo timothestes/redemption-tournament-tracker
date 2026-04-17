@@ -191,40 +191,15 @@ export default function GameOverOverlay({
             }}>{isOpponentResigned ? 'Your opponent has surrendered the game.' : 'The game has ended.'}</p>
 
             <div style={{ marginTop: 24, display: 'flex', gap: 12 }}>
-              {isOpponentResigned && (
-                <button
-                  onClick={() => {
-                    setModalDismissed(true);
-                    setPickerMode('request');
-                    setPickerOpen(true);
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: '10px 16px',
-                    borderRadius: 4,
-                    border: '1px solid rgba(196, 149, 90, 0.45)',
-                    background: 'rgba(196, 149, 90, 0.15)',
-                    color: '#e8d5a3',
-                    fontFamily: 'var(--font-cinzel), Georgia, serif',
-                    fontSize: 12,
-                    fontWeight: 700,
-                    letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Play Again
-                </button>
-              )}
               <button
-                onClick={() => setModalDismissed(true)}
+                onClick={onReturnToLobby}
                 style={{
                   flex: 1,
                   padding: '10px 16px',
                   borderRadius: 4,
-                  border: '1px solid rgba(107, 78, 39, 0.3)',
-                  background: isOpponentResigned ? 'transparent' : 'rgba(196, 149, 90, 0.15)',
-                  color: isOpponentResigned ? 'rgba(196, 149, 90, 0.6)' : '#e8d5a3',
+                  border: '1px solid rgba(196, 149, 90, 0.45)',
+                  background: 'rgba(196, 149, 90, 0.15)',
+                  color: '#e8d5a3',
                   fontFamily: 'var(--font-cinzel), Georgia, serif',
                   fontSize: 12,
                   fontWeight: 700,
@@ -233,7 +208,26 @@ export default function GameOverOverlay({
                   cursor: 'pointer',
                 }}
               >
-                {isOpponentResigned ? 'Dismiss' : 'OK'}
+                Back to Lobby
+              </button>
+              <button
+                onClick={() => setModalDismissed(true)}
+                style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  borderRadius: 4,
+                  border: '1px solid rgba(107, 78, 39, 0.3)',
+                  background: 'transparent',
+                  color: 'rgba(196, 149, 90, 0.6)',
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                }}
+              >
+                Dismiss
               </button>
             </div>
           </div>

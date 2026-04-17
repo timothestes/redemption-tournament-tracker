@@ -211,7 +211,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const gameState = useGameState(gameId ?? BigInt(0));
 
   // Persist chat/log/all tab across loupe toggles so it doesn't reset to chat
-  const [chatTab, setChatTab] = useState<'chat' | 'log' | 'all'>('chat');
+  const [chatTab, setChatTab] = useState<'chat' | 'log' | 'all'>('all');
 
   // Track unread chat messages at this level so the count survives ChatPanel
   // unmounting when the right panel collapses.
@@ -423,6 +423,11 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     console.log('[game-debug] lifecycle sync — game.status:', game.status, 'current lifecycle:', lifecycle, 'gameId:', String(game.id));
 
     if (game.status === 'waiting') {
+      // Joiners should never render the "waiting" lobby — that state belongs
+      // to the creator. The server's join_game reducer atomically transitions
+      // status to 'pregame', so a joiner seeing 'waiting' means their join
+      // hasn't committed yet. Keep them in the 'joining' loading screen.
+      if (gameParams?.role === 'join') return;
       setLifecycle('waiting');
     } else if (game.status === 'pregame') {
       setLifecycle('pregame');
@@ -944,7 +949,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                 onEndTurn={() => {}}
                 isFinished
                 winnerName={winnerName}
-                onPlayAgain={opponentDisconnected ? undefined : () => setPlayAgainTriggered(true)}
+                onPlayAgain={opponentDisconnected || opponentResigned ? undefined : () => setPlayAgainTriggered(true)}
                 rematchPending={rematchPending}
                 myScore={gameState.myCards['land-of-redemption']?.length ?? 0}
                 opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}

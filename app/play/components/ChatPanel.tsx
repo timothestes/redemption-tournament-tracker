@@ -361,6 +361,10 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       const targetName = data.targetName ?? 'opponent';
       if (data.zone === 'hand-reveal') return `finished viewing ${targetName}'s hand`;
       if (data.zone === 'action-priority') return 'finished action priority';
+      if (data.zone === 'deck') {
+        const suffix = data.shuffled ? ' (and shuffled it)' : ' (and chose not to shuffle it)';
+        return `finished searching ${targetName}'s deck${suffix}`;
+      }
       return `finished searching ${targetName}'s ${data.zone}`;
     } catch { /* fall through */ }
   }
@@ -588,7 +592,7 @@ export default function ChatPanel({
           >
             {/* Tabs */}
             <div style={{ display: 'flex', gap: 4 }}>
-              {(['chat', 'log', 'all'] as const).map((tab) => {
+              {(['all', 'chat', 'log'] as const).map((tab) => {
                 const isActive = activeTab === tab;
                 const label = tab === 'chat' ? 'Chat' : tab === 'log' ? 'Log' : 'All';
                 return (

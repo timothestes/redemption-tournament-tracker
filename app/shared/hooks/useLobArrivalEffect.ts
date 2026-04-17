@@ -1,34 +1,30 @@
 'use client';
 
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { showGameToast } from '../components/GameToast';
 
 /**
- * Duration (ms) for the LOB arrival glow animation.
- * The glow fades from full intensity to zero over this period.
+ * Duration (ms) that the glow stays marked on an arriving card. The Konva tween
+ * in GameCardNode animates the visuals; this just clears the flag afterwards.
  */
-const GLOW_DURATION_MS = 1800;
+const GLOW_DURATION_MS = 2000;
 
 /**
- * Tracks cards arriving in the Land of Bondage zone and provides:
- * 1. A Set of instance IDs that should display a glow effect (auto-clears after animation)
- * 2. A toast notification when a soul is drawn to LOB
+ * Tracks cards arriving in the Land of Bondage zone and returns a glow flag
+ * per instance ID. No toasts are emitted — the card's visual arrival plus the
+ * glow (and the game log entry for the MOVE_CARD action) are sufficient signal.
  *
  * Works for both goldfish (string IDs) and multiplayer (bigint IDs converted to string).
  *
  * @param lobCardIds - Current array of card instance IDs in the LOB zone
  * @param options.enabled - Whether to track arrivals (default true)
- * @param options.toastMessage - Custom toast message (default: "Soul placed in Land of Bondage")
  */
 export function useLobArrivalEffect(
   lobCardIds: string[],
   options?: {
     enabled?: boolean;
-    toastMessage?: string;
   },
 ) {
   const enabled = options?.enabled ?? true;
-  const toastMessage = options?.toastMessage ?? 'Soul placed in Land of Bondage';
 
   // Track which IDs we've seen before, so we can detect new arrivals
   const prevIdsRef = useRef<Set<string>>(new Set());
@@ -76,13 +72,6 @@ export function useLobArrivalEffect(
     }
 
     if (newArrivals.length > 0) {
-      // Show toast
-      if (newArrivals.length === 1) {
-        showGameToast(toastMessage);
-      } else {
-        showGameToast(`${newArrivals.length} souls placed in Land of Bondage`);
-      }
-
       // Add to glowing set
       setGlowingIds(prev => {
         const next = new Set(prev);
@@ -112,7 +101,7 @@ export function useLobArrivalEffect(
     }
 
     prevIdsRef.current = currentIds;
-  }, [lobCardIds, enabled, toastMessage]);
+  }, [lobCardIds, enabled]);
 
   /**
    * Returns a glow intensity (0-1) for a given card instance ID.

@@ -189,6 +189,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     denyZoneSearch,
     completeZoneSearch,
     moveOpponentCard,
+    shuffleOpponentDeck,
     zoneSearchRequests,
   } = gameState;
 
@@ -528,11 +529,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const pendingBatchRef = useRef<string[] | null>(null);
   const [showDeckSearch, setShowDeckSearch] = useState(false);
   const [peekState, setPeekState] = useState<{ position: 'top' | 'bottom' | 'random'; count: number } | null>(null);
-  const [lookState, setLookState] = useState<{ count: number } | null>(null);
+  const [lookState, setLookState] = useState<{ count: number; position: 'top' | 'bottom' | 'random' } | null>(null);
   const [exchangeCardIds, setExchangeCardIds] = useState<string[] | null>(null);
   const [opponentZoneMenu, setOpponentZoneMenu] = useState<{ x: number; y: number; zone: string; zoneName: string } | null>(null);
   const [opponentDeckMenu, setOpponentDeckMenu] = useState<{ x: number; y: number } | null>(null);
   const [opponentPeekState, setOpponentPeekState] = useState<{ position: 'top' | 'bottom' | 'random'; count: number } | null>(null);
+  const [opponentLookState, setOpponentLookState] = useState<{ position: 'top' | 'bottom' | 'random'; count: number } | null>(null);
   const [opponentRevealDismissed, setOpponentRevealDismissed] = useState(false);
   const [opponentRevealSnapshot, setOpponentRevealSnapshot] = useState<string[]>([]);
   const [handMenu, setHandMenu] = useState<{ x: number; y: number } | null>(null);
@@ -549,6 +551,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       peekState !== null ||
       exchangeCardIds !== null ||
       opponentPeekState !== null ||
+      opponentLookState !== null ||
       (approvedSearchRequest != null &&
         approvedSearchRequest.zone !== 'hand-reveal' &&
         approvedSearchRequest.zone !== 'action-priority');
@@ -561,6 +564,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     peekState,
     exchangeCardIds,
     opponentPeekState,
+    opponentLookState,
     approvedSearchRequest,
   ]);
 
@@ -763,7 +767,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       }
       gameState.removeCounter(BigInt(cardId), color);
     },
-    shuffleCardIntoDeck: (cardId) => gameState.shuffleCardIntoDeck(BigInt(cardId)),
+    shuffleCardIntoDeck: (cardId) => {
+      if (undoStack) {
+        const card = findMyCardById(cardId);
+        const fromZone = card?.zone;
+        if (fromZone && fromZone !== 'deck') {
+          undoStack.push({
+            description: `Shuffled ${card?.cardName || 'card'} into deck`,
+            reverseAction: () => gameState.moveCard(BigInt(cardId), fromZone!, undefined, card?.posX, card?.posY),
+          });
+        }
+      }
+      gameState.shuffleCardIntoDeck(BigInt(cardId));
+    },
     shuffleDeck: () => gameState.shuffleDeck(),
     setNote: (cardId, text) => gameState.setNote(BigInt(cardId), text),
     exchangeCards: (cardIds) => gameState.exchangeCards(JSON.stringify(cardIds)),
@@ -890,6 +906,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     setOpponentZoneMenu(null);
     setOpponentDeckMenu(null);
     setOpponentPeekState(null);
+    setOpponentLookState(null);
     setHandMenu(null);
     setReserveMenu(null);
   }, []);
@@ -953,6 +970,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const dragEndTimeRef = useRef<number>(0);
   const dragSourceZoneRef = useRef<string | null>(null);
   const dragOriginalPosRef = useRef<{ x: number; y: number } | null>(null);
+  // Local coords in the original parent (before reparenting to the layer).
+  // Used by snapBack to restore the card inside its source Group accurately.
+  const dragOriginalLocalPosRef = useRef<{ x: number; y: number } | null>(null);
   /** Tracks the rendered card dimensions during drag (pile vs territory vs LOB). */
   const dragCardSizeRef = useRef<{ w: number; h: number } | null>(null);
   /** Tracks the original parent Group so we can move the node back on snap-back. */
@@ -1239,7 +1259,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     const sorted = [...(myCards['deck'] ?? [])].sort(
       (a, b) => Number(a.zoneIndex) - Number(b.zoneIndex)
     );
-    return sorted.slice(0, lookState.count).map(c => String(c.id));
+    let selected: typeof sorted;
+    if (lookState.position === 'top') selected = sorted.slice(0, lookState.count);
+    else if (lookState.position === 'bottom') selected = sorted.slice(-lookState.count);
+    else {
+      const shuffled = [...sorted];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      selected = shuffled.slice(0, lookState.count);
+    }
+    return selected.map(c => String(c.id));
   }, [lookState, myCards]);
 
   // Broadcast revealed cards to opponent via SpacetimeDB
@@ -1288,6 +1319,26 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     return selected.map(c => String(c.id));
   }, [opponentPeekState, opponentCards]);
 
+  // Private look at opponent's deck — never broadcasts
+  const opponentLookCardIds = useMemo(() => {
+    if (!opponentLookState) return [];
+    const sorted = [...(opponentCards['deck'] ?? [])].sort(
+      (a, b) => Number(a.zoneIndex) - Number(b.zoneIndex)
+    );
+    let selected: typeof sorted;
+    if (opponentLookState.position === 'top') selected = sorted.slice(0, opponentLookState.count);
+    else if (opponentLookState.position === 'bottom') selected = sorted.slice(-opponentLookState.count);
+    else {
+      const shuffled = [...sorted];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      selected = shuffled.slice(0, opponentLookState.count);
+    }
+    return selected.map(c => String(c.id));
+  }, [opponentLookState, opponentCards]);
+
   // ---- Drag handlers ----
 
   const handleCardDragStart = useCallback(
@@ -1319,6 +1370,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         // any clipped parent Group and renders above all other zones/cards
         // during the drag.
         const layer = gameLayerRef.current;
+        // Capture the node's local position in its original parent BEFORE
+        // reparenting — snap-back restores these coords into the same parent.
+        dragOriginalLocalPosRef.current = { x: node.x(), y: node.y() };
         if (layer && node.parent !== layer) {
           // Save original parent and z-index so we can restore on snap-back
           dragOriginalParentRef.current = node.parent as Konva.Container;
@@ -1335,7 +1389,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           dragOriginalParentRef.current = null;
           dragOriginalZIndexRef.current = null;
         }
-        // Capture position after reparenting so snap-back uses layer coords
+        // Capture position after reparenting so drag-move logic uses layer coords
         dragOriginalPosRef.current = { x: node.x(), y: node.y() };
         node.moveToTop();
         layer?.batchDraw();
@@ -1507,6 +1561,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     (card: GameCard, e: Konva.KonvaEventObject<DragEvent>) => {
       const followerOffsets = dragFollowerOffsets.current;
       const originalPos = dragOriginalPosRef.current;
+      const originalLocalPos = dragOriginalLocalPosRef.current;
       const sourceZone = dragSourceZoneRef.current;
       const originalParent = dragOriginalParentRef.current;
       const originalZIndex = dragOriginalZIndexRef.current;
@@ -1519,6 +1574,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       dragEndTimeRef.current = performance.now();
       dragSourceZoneRef.current = null;
       dragOriginalPosRef.current = null;
+      dragOriginalLocalPosRef.current = null;
       dragCardSizeRef.current = null;
       dragOriginalParentRef.current = null;
       dragOriginalZIndexRef.current = null;
@@ -1572,10 +1628,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       const snapBack = () => {
         if (originalParent && node.parent !== originalParent) {
           node.moveTo(originalParent);
-          // originalPos is in layer-local coords (captured after reparenting to the layer
-          // in dragStart). The original parent Group is also a child of the same layer
-          // with no additional transform, so layer-local coords === parent-local coords.
-          if (originalPos) {
+          // Restore the node's position in its original parent's coord space.
+          // Using the pre-reparent local coords avoids the offset accumulation
+          // that would occur if we applied layer-local coords inside a parent
+          // that itself has a non-zero transform (e.g. sidebar pile Groups).
+          if (originalLocalPos) {
+            node.x(originalLocalPos.x);
+            node.y(originalLocalPos.y);
+          } else if (originalPos) {
             node.x(originalPos.x);
             node.y(originalPos.y);
           }
@@ -2827,7 +2887,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             return (
               <Group
                 key={`my-pile-${zoneKey}`}
-                onClick={zoneKey !== 'deck' ? () => {
+                onClick={zoneKey !== 'deck' ? (e: Konva.KonvaEventObject<PointerEvent>) => {
+                  if (e.evt.button !== 0) return;
                   setBrowseMyZone(zoneKey);
                 } : undefined}
                 onDblClick={undefined}
@@ -3437,6 +3498,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           actions={multiplayerActions}
           onClose={() => setMultiCardContextMenu(null)}
           onClearSelection={() => { clearSelection(); setMultiCardContextMenu(null); }}
+          zones={allZonesForContextMenu as any}
         />
       )}
 
@@ -3460,7 +3522,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           deckSize={(myCards['deck'] ?? []).length}
           onClose={() => setDeckMenu(null)}
           onSearchDeck={() => { logSearchDeck(); setDeckMenu(null); setShowDeckSearch(true); }}
-          onLookAtTop={(n) => { logLookAtTop(n); setDeckMenu(null); setLookState({ count: n }); }}
+          onLookAtTop={(n) => { logLookAtTop(n); setDeckMenu(null); setLookState({ count: n, position: 'top' }); }}
+          onLookAtBottom={(n) => { logLookAtTop(n); setDeckMenu(null); setLookState({ count: n, position: 'bottom' }); }}
+          onLookAtRandom={(n) => { logLookAtTop(n); setDeckMenu(null); setLookState({ count: n, position: 'random' }); }}
           onShuffleDeck={() => { multiplayerActions.shuffleDeck(); setDeckMenu(null); }}
           onDrawTop={(n) => { multiplayerActions.drawMultiple(n); setDeckMenu(null); }}
           onRevealTop={(n) => { setDeckMenu(null); setPeekState({ position: 'top', count: n }); }}
@@ -3525,6 +3589,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             showGameToast('Waiting for opponent to approve...');
           }}
           onShuffleDeck={() => { gameState.shuffleDeck(); setOpponentDeckMenu(null); }}
+          onLookAtTop={(n) => { setOpponentDeckMenu(null); setOpponentLookState({ position: 'top', count: n }); }}
+          onLookAtBottom={(n) => { setOpponentDeckMenu(null); setOpponentLookState({ position: 'bottom', count: n }); }}
+          onLookAtRandom={(n) => { setOpponentDeckMenu(null); setOpponentLookState({ position: 'random', count: n }); }}
           onDrawTop={(n) => { moveOpponentDeckCardsToZone('top', n, 'hand'); setOpponentDeckMenu(null); }}
           onRevealTop={(n) => { setOpponentDeckMenu(null); setOpponentPeekState({ position: 'top', count: n }); }}
           onDiscardTop={(n) => { moveOpponentDeckCardsToZone('top', n, 'discard'); setOpponentDeckMenu(null); }}
@@ -3761,7 +3828,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 moveOpponentCard(reqId, BigInt(cardId), 'deck');
               } else if (action === 'deck-shuffle') {
                 moveOpponentCard(reqId, BigInt(cardId), 'deck');
-                gameState.shuffleDeck();
+                shuffleOpponentDeck(reqId);
               }
             }}
             onMoveCardsBatch={(cardIds, action) => {
@@ -3780,10 +3847,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 }
               }
               if (action === 'deck-shuffle') {
-                gameState.shuffleDeck();
+                shuffleOpponentDeck(reqId);
               }
             }}
-            onClose={() => completeZoneSearch(BigInt(approvedSearchRequest.id))}
+            onClose={(opts) => completeZoneSearch(BigInt(approvedSearchRequest.id), opts?.shuffled ?? false)}
             onStartDrag={opponentModalStartDrag}
             onStartMultiDrag={opponentModalStartMultiDrag}
             didDragRef={opponentModalDidDragRef}
@@ -3848,7 +3915,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         {lookState && (
           <DeckPeekModal
             cardIds={lookCardIds}
-            title={`Looking at Top ${lookState.count}`}
+            title={`Looking at ${lookState.position === 'top' ? 'Top' : lookState.position === 'bottom' ? 'Bottom' : 'Random'} ${lookState.count}`}
             onClose={() => setLookState(null)}
             onStartDrag={modalStartDrag}
             onStartMultiDrag={modalStartMultiDrag}
@@ -3885,6 +3952,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             onStartMultiDrag={modalStartMultiDrag}
             didDragRef={modalDidDragRef}
             isDragActive={modalDrag.isDragging}
+          />
+        )}
+        {opponentLookState && (
+          <DeckPeekModal
+            cardIds={opponentLookCardIds}
+            title={`Looking at Opponent ${opponentLookState.position === 'top' ? 'Top' : opponentLookState.position === 'bottom' ? 'Bottom' : 'Random'} ${opponentLookState.count}`}
+            onClose={() => setOpponentLookState(null)}
+            onStartDrag={modalStartDrag}
+            onStartMultiDrag={modalStartMultiDrag}
+            didDragRef={modalDidDragRef}
+            isDragActive={modalDrag.isDragging}
+            isPrivateLook
           />
         )}
       </ModalGameProvider>

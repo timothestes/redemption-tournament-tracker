@@ -83,6 +83,7 @@ import SetPhaseReducer from "./set_phase_reducer";
 import SetPlayerOptionReducer from "./set_player_option_reducer";
 import ShuffleCardIntoDeckReducer from "./shuffle_card_into_deck_reducer";
 import ShuffleDeckReducer from "./shuffle_deck_reducer";
+import ShuffleOpponentDeckReducer from "./shuffle_opponent_deck_reducer";
 import SpawnLostSoulReducer from "./spawn_lost_soul_reducer";
 import ToggleRevealHandReducer from "./toggle_reveal_hand_reducer";
 import ToggleRevealReserveReducer from "./toggle_reveal_reserve_reducer";
@@ -310,6 +311,7 @@ const reducersSchema = __reducers(
   __reducerSchema("set_player_option", SetPlayerOptionReducer),
   __reducerSchema("shuffle_card_into_deck", ShuffleCardIntoDeckReducer),
   __reducerSchema("shuffle_deck", ShuffleDeckReducer),
+  __reducerSchema("shuffle_opponent_deck", ShuffleOpponentDeckReducer),
   __reducerSchema("spawn_lost_soul", SpawnLostSoulReducer),
   __reducerSchema("toggle_reveal_hand", ToggleRevealHandReducer),
   __reducerSchema("toggle_reveal_reserve", ToggleRevealReserveReducer),

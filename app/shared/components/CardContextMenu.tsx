@@ -149,7 +149,7 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
       {(card.zone === 'territory' || card.zone === 'land-of-bondage') && (
         <>
           <div style={labelStyle}>Counters</div>
-          <div style={{ display: 'flex', gap: 6, padding: '4px 16px 2px' }}>
+          <div style={{ display: 'flex', gap: 6, padding: '4px 16px 2px', alignItems: 'center' }}>
             {COUNTER_COLORS.filter(c => c.id === 'red' || c.id === 'green' || c.id === 'blue').map((color) => {
               const count = getCount(color.id);
               return (
@@ -188,6 +188,49 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
                 </button>
               );
             })}
+            {card.counters.some(c => c.count > 0) && (
+              <button
+                title="Clear all counters"
+                aria-label="Clear all counters"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  card.counters.forEach(c => {
+                    for (let i = 0; i < c.count; i++) {
+                      actions.removeCounter(card.instanceId, c.color);
+                    }
+                  });
+                }}
+                style={{
+                  width: 22,
+                  height: 22,
+                  marginLeft: 2,
+                  borderRadius: '50%',
+                  background: 'transparent',
+                  border: '1px solid var(--gf-border)',
+                  cursor: 'pointer',
+                  transition: 'transform 0.1s, border-color 0.1s, color 0.1s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--gf-text-dim)',
+                  fontSize: 12,
+                  lineHeight: 1,
+                  padding: 0,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'scale(1.15)';
+                  e.currentTarget.style.color = 'var(--gf-text)';
+                  e.currentTarget.style.borderColor = 'var(--gf-text-dim)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.color = 'var(--gf-text-dim)';
+                  e.currentTarget.style.borderColor = 'var(--gf-border)';
+                }}
+              >
+                ×
+              </button>
+            )}
           </div>
           <div style={{ padding: '0 16px 4px', fontSize: 9, color: 'var(--gf-border)', fontFamily: 'var(--font-cinzel), Georgia, serif' }}>
             Left-click +1 · Right-click -1

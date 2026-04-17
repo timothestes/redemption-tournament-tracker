@@ -3,12 +3,13 @@
 import { motion } from 'framer-motion';
 import { useModalGame } from '@/app/shared/contexts/ModalGameContext';
 import { GameCard, ZoneId } from '@/app/shared/types/gameCard';
-import { X, ArrowUp, ArrowDown, Shuffle, GripHorizontal } from 'lucide-react';
+import { ArrowUp, ArrowDown, Shuffle } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './ModalCardHoverPreview';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import { useDraggableModal } from '@/app/shared/hooks/useDraggableModal';
+import { DraggableTitleBar } from './DraggableTitleBar';
 
 const MOVE_ZONES: { id: ZoneId; label: string }[] = [
   { id: 'hand', label: 'Hand' },
@@ -388,62 +389,38 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
           ...modalStyle,
         }}
       >
-        <div
-          {...dragHandleProps}
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 16,
-            ...dragHandleProps.style,
-          }}
+        <DraggableTitleBar
+          dragHandleProps={dragHandleProps}
+          title={title}
+          onClose={onClose ? () => handleCloseAction('top') : undefined}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <GripHorizontal size={14} style={{ color: 'var(--gf-border)', flexShrink: 0 }} />
-            <h2 style={{
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              color: 'var(--gf-text-bright)',
-              fontSize: 16,
-              margin: 0,
-            }}>
-              {title}
-            </h2>
-            {selectedIds.size > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{
-                  color: 'var(--gf-accent)',
-                  fontSize: 12,
+          {selectedIds.size > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{
+                color: 'var(--gf-accent)',
+                fontSize: 12,
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+              }}>
+                {selectedIds.size} selected
+              </span>
+              <button
+                onClick={(e) => { e.stopPropagation(); setSelectedIds(new Set()); }}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid var(--gf-border)',
+                  borderRadius: 4,
+                  color: 'var(--gf-text-dim)',
+                  fontSize: 10,
+                  padding: '2px 6px',
+                  cursor: 'pointer',
                   fontFamily: 'var(--font-cinzel), Georgia, serif',
-                }}>
-                  {selectedIds.size} selected
-                </span>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setSelectedIds(new Set()); }}
-                  style={{
-                    background: 'transparent',
-                    border: '1px solid var(--gf-border)',
-                    borderRadius: 4,
-                    color: 'var(--gf-text-dim)',
-                    fontSize: 10,
-                    padding: '2px 6px',
-                    cursor: 'pointer',
-                    fontFamily: 'var(--font-cinzel), Georgia, serif',
-                  }}
-                >
-                  Deselect
-                </button>
-              </div>
-            )}
-          </div>
-          {onClose && (
-            <button
-              onClick={() => handleCloseAction('top')}
-              style={{ background: 'none', border: 'none', color: 'var(--gf-text)', cursor: 'pointer' }}
-            >
-              <X size={18} />
-            </button>
+                }}
+              >
+                Deselect
+              </button>
+            </div>
           )}
-        </div>
+        </DraggableTitleBar>
 
         <p style={{
           fontFamily: 'var(--font-cinzel), Georgia, serif',

@@ -1485,8 +1485,8 @@ export const move_cards_batch = spacetimedb.reducer(
       // Allow moves by either player in the game (cards move between zones during battles)
       if (card.gameId !== gameId) throw new SenderError('Card not in this game: ' + idStr);
 
-      // Moving to deck = face-down; leaving deck = face-up; otherwise preserve
-      const isFlipped = toZone === 'deck' ? true : (card.zone === 'deck' ? false : card.isFlipped);
+      // Moving to deck = face-down; leaving deck or reserve = face-up; otherwise preserve
+      const isFlipped = toZone === 'deck' ? true : (card.zone === 'deck' || card.zone === 'reserve') ? false : card.isFlipped;
 
       // Hide card identity when moving from hand to hidden zones (deck/reserve) — hand contents are private
       const hideIdentity = isFlipped || (card.zone === 'hand' && (toZone === 'deck' || toZone === 'reserve'));
@@ -2919,8 +2919,9 @@ export const complete_zone_search = spacetimedb.reducer(
   {
     gameId: t.u64(),
     requestId: t.u64(),
+    shuffled: t.bool(),
   },
-  (ctx, { gameId, requestId }) => {
+  (ctx, { gameId, requestId, shuffled }) => {
     const player = findPlayerBySender(ctx, gameId);
     const req = ctx.db.ZoneSearchRequest.id.find(requestId);
     if (!req) throw new SenderError('Request not found');
@@ -2933,10 +2934,30 @@ export const complete_zone_search = spacetimedb.reducer(
     const opponent = allPlayers.find(p => p.id !== player.id);
     const targetName = opponent ? opponent.displayName : 'opponent';
 
+    // If the requester elected to shuffle on close (deck-only), shuffle the
+    // target's deck inline so the whole action emits a single log entry.
+    if (shuffled && req.zone === 'deck' && game) {
+      const targetId = req.targetPlayerId;
+      const deckCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+        (c: any) => c.ownerId === targetId && c.zone === 'deck'
+      );
+      const newRngCounter = game.rngCounter + 1n;
+      ctx.db.Game.id.update({ ...game, rngCounter: newRngCounter });
+      const seed = makeSeed(ctx.timestamp.microsSinceUnixEpoch, gameId, targetId, newRngCounter);
+      const indices = deckCards.map((_: any, idx: number) => idx);
+      seededShuffle(indices, seed);
+      for (let i = 0; i < deckCards.length; i++) {
+        ctx.db.CardInstance.id.update({
+          ...deckCards[i],
+          zoneIndex: BigInt(indices[i]),
+        });
+      }
+    }
+
     ctx.db.ZoneSearchRequest.id.delete(requestId);
 
     if (game) {
-      logAction(ctx, gameId, player.id, 'COMPLETE_ZONE_SEARCH', JSON.stringify({ zone: req.zone, targetName }), game.turnNumber, game.currentPhase);
+      logAction(ctx, gameId, player.id, 'COMPLETE_ZONE_SEARCH', JSON.stringify({ zone: req.zone, targetName, shuffled }), game.turnNumber, game.currentPhase);
     }
   }
 );
@@ -3018,6 +3039,56 @@ export const move_opponent_card = spacetimedb.reducer(
         cardOwnerName,
         cardOwnerId: card.ownerId.toString(),
       }),
+      game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: shuffle_opponent_deck
+// Authorised via an approved ZoneSearchRequest — the requester can shuffle the
+// target's deck (useful after browsing it, to randomise order they memorised).
+// ---------------------------------------------------------------------------
+export const shuffle_opponent_deck = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    requestId: t.u64(),
+  },
+  (ctx, { gameId, requestId }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+
+    const player = findPlayerBySender(ctx, gameId);
+
+    const req = ctx.db.ZoneSearchRequest.id.find(requestId);
+    if (!req) throw new SenderError('Search request not found');
+    if (req.gameId !== gameId) throw new SenderError('Request not in this game');
+    if (req.requesterId !== player.id) throw new SenderError('Not your search request');
+    if (req.status !== 'approved') throw new SenderError('Search request not approved');
+
+    const targetId = req.targetPlayerId;
+
+    // Gather all of the target's deck cards and shuffle their zoneIndex values.
+    const deckCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+      (c: any) => c.ownerId === targetId && c.zone === 'deck'
+    );
+
+    const newRngCounter = game.rngCounter + 1n;
+    ctx.db.Game.id.update({ ...game, rngCounter: newRngCounter });
+
+    const seed = makeSeed(ctx.timestamp.microsSinceUnixEpoch, gameId, targetId, newRngCounter);
+
+    const indices = deckCards.map((_: any, idx: number) => idx);
+    seededShuffle(indices, seed);
+
+    for (let i = 0; i < deckCards.length; i++) {
+      ctx.db.CardInstance.id.update({
+        ...deckCards[i],
+        zoneIndex: BigInt(indices[i]),
+      });
+    }
+
+    logAction(ctx, gameId, player.id, 'SHUFFLE_OPPONENT_DECK',
+      JSON.stringify({ requestId: requestId.toString(), targetPlayerId: targetId.toString() }),
       game.turnNumber, game.currentPhase);
   }
 );

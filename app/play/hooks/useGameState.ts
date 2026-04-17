@@ -110,8 +110,9 @@ export interface GameState {
   requestZoneSearch: (zone: string) => void;
   approveZoneSearch: (requestId: bigint) => void;
   denyZoneSearch: (requestId: bigint) => void;
-  completeZoneSearch: (requestId: bigint) => void;
+  completeZoneSearch: (requestId: bigint, shuffled?: boolean) => void;
   moveOpponentCard: (requestId: bigint, cardInstanceId: bigint, toZone: string, posX?: string, posY?: string) => void;
+  shuffleOpponentDeck: (requestId: bigint) => void;
   reorderHand: (cardIds: string) => void;
   reorderLob: (cardIds: string) => void;
 }
@@ -586,8 +587,8 @@ export function useGameState(gameId: bigint): GameState {
   );
 
   const completeZoneSearch = useCallback(
-    (requestId: bigint) => {
-      conn?.reducers.completeZoneSearch({ gameId, requestId });
+    (requestId: bigint, shuffled: boolean = false) => {
+      conn?.reducers.completeZoneSearch({ gameId, requestId, shuffled });
     },
     [conn, gameId],
   );
@@ -602,6 +603,13 @@ export function useGameState(gameId: bigint): GameState {
         posX: posX || '',
         posY: posY || '',
       });
+    },
+    [conn, gameId],
+  );
+
+  const shuffleOpponentDeck = useCallback(
+    (requestId: bigint) => {
+      conn?.reducers.shuffleOpponentDeck({ gameId, requestId });
     },
     [conn, gameId],
   );
@@ -694,6 +702,7 @@ export function useGameState(gameId: bigint): GameState {
     denyZoneSearch,
     completeZoneSearch,
     moveOpponentCard,
+    shuffleOpponentDeck,
     reorderHand,
     reorderLob,
   };
