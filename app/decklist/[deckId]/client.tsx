@@ -9,8 +9,8 @@ import { createGlobalTagAction } from "../../admin/tags/actions";
 import { HexColorPicker } from "react-colorful";
 import { useIsAdmin } from "../../../hooks/useIsAdmin";
 import ReactMarkdown from "react-markdown";
-import { CARD_DATA_URL } from "../card-search/constants";
 import { Card } from "../card-search/utils";
+import { CARD_BY_FULL_KEY } from "../card-search/data/cardIndex";
 import ModalWithClose from "../card-search/ModalWithClose";
 import { GoldfishButton } from "../../goldfish/components/GoldfishButton";
 import { sanitizeImgFile, getCardImageUrl as getImageUrl } from '../../shared/utils/cardImageUrl';
@@ -291,44 +291,9 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [coverEditorOpen]);
 
-  // Fetch card database to get full card info
+  // Populate from the module-scope index (built once per bundle load)
   useEffect(() => {
-    fetch(CARD_DATA_URL)
-      .then((res) => res.text())
-      .then((text) => {
-        const lines = text.split("\n");
-        const dataLines = lines.slice(1).filter((l) => l.trim());
-        const db = new Map<string, Card>();
-        dataLines.forEach((line) => {
-          const cols = line.split("\t");
-          const name = cols[0] || "";
-          const set = cols[1] || "";
-          const imgFile = sanitizeImgFile(cols[2] || "");
-          const key = `${name}|${set}|${imgFile}`;
-          db.set(key, {
-            dataLine: line,
-            name,
-            set,
-            imgFile,
-            officialSet: cols[3] || "",
-            type: cols[4] || "",
-            brigade: cols[5] || "",
-            strength: cols[6] || "",
-            toughness: cols[7] || "",
-            class: cols[8] || "",
-            identifier: cols[9] || "",
-            specialAbility: cols[10] || "",
-            rarity: cols[11] || "",
-            reference: cols[12] || "",
-            alignment: cols[14] || "",
-            legality: cols[15] || "",
-            testament: "",
-            isGospel: false,
-          });
-        });
-        setCardDatabase(db);
-      })
-      .catch(console.error);
+    setCardDatabase(CARD_BY_FULL_KEY as Map<string, Card>);
   }, []);
 
   // Enrich cards with full card data

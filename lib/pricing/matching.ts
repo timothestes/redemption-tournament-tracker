@@ -5,10 +5,8 @@ import { normalize, stripEmbeddedSet, stripShopifySuffixes, parseShopifyTags, UN
 import { normalize as normalizeDup, stripSetSuffix, findGroup } from '@/lib/duplicateCards';
 import type { DuplicateGroupIndex, DuplicateGroup, DuplicateSibling } from '@/lib/duplicateCards';
 import { normalizeAbility } from '@/lib/pricing/budgetPricing';
+import { CARDS } from '@/lib/cards/lookup';
 import type { CardRow, SetAlias, ShopifyProductRow, MatchResult, MatchingSummary } from './types';
-
-const CARD_DATA_URL =
-  'https://raw.githubusercontent.com/jalstad/RedemptionLackeyCCG/master/RedemptionQuick/sets/carddata.txt';
 
 /**
  * Manual name aliases for cards where carddata and Shopify names differ.
@@ -30,33 +28,22 @@ const ART_VARIANT_PATTERNS = [
 ];
 
 /**
- * Load and parse card data from GitHub.
+ * Load card data from the build-time generated module.
  */
 export async function loadCardData(): Promise<CardRow[]> {
-  const res = await fetch(CARD_DATA_URL);
-  const text = await res.text();
-  const lines = text.split('\n');
-  return lines
-    .slice(1) // skip header
-    .filter(line => line.trim())
-    .map(line => {
-      const cols = line.split('\t');
-      const name = cols[0]?.trim() ?? '';
-      const set_code = cols[1]?.trim() ?? '';
-      // Strip .jpg/.jpeg extension to match the UI's sanitizeImgFile behavior
-      const img_file = (cols[2]?.trim() ?? '').replace(/\.jpe?g$/i, '');
-      return {
-        name,
-        set_code,
-        img_file,
-        official_set: cols[3]?.trim() ?? '',
-        type: cols[4]?.trim() ?? '',
-        brigade: cols[5]?.trim() ?? '',
-        rarity: cols[6]?.trim() ?? '',
-        special_ability: cols[10]?.trim() ?? '',
-        card_key: `${name}|${set_code}|${img_file}`,
-      };
-    });
+  return CARDS.map((c) => ({
+    name: c.name,
+    set_code: c.set,
+    img_file: c.imgFile,
+    official_set: c.officialSet,
+    type: c.type,
+    brigade: c.brigade,
+    // Preserves legacy mapping: the pre-codegen parser wrote column 6
+    // (strength) into `rarity`. Unread today but kept for behavior parity.
+    rarity: c.strength,
+    special_ability: c.specialAbility,
+    card_key: `${c.name}|${c.set}|${c.imgFile}`,
+  }));
 }
 
 /**

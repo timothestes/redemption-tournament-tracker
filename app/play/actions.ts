@@ -1,80 +1,8 @@
 'use server';
 
 import { createClient } from '@/utils/supabase/server';
+import { findCard } from '@/lib/cards/lookup';
 import type { DeckOption } from './components/DeckPickerCard';
-
-const CARD_DATA_URL =
-  "https://raw.githubusercontent.com/jalstad/RedemptionLackeyCCG/master/RedemptionQuick/sets/carddata.txt";
-
-type CardLookupEntry = {
-  type: string;
-  brigade: string;
-  strength: string;
-  toughness: string;
-  specialAbility: string;
-  identifier: string;
-  reference: string;
-  alignment: string;
-};
-type CardLookupMap = Map<string, CardLookupEntry>;
-
-const CARD_LOOKUP_TTL_MS = 60 * 60 * 1000;
-let cachedLookup: { promise: Promise<CardLookupMap>; expiresAt: number } | null = null;
-
-async function buildCardLookup(): Promise<CardLookupMap> {
-  const response = await fetch(CARD_DATA_URL, { next: { revalidate: 3600 } });
-  const text = await response.text();
-  const lines = text.split('\n');
-  const dataLines = lines.slice(1).filter((l) => l.trim());
-
-  const map: CardLookupMap = new Map();
-
-  for (const line of dataLines) {
-    const cols = line.split('\t');
-    const name = cols[0] || '';
-    const set = cols[1] || '';
-    const imgFile = (cols[2] || '').replace(/\.jpe?g$/i, '');
-
-    const entry: CardLookupEntry = {
-      type: cols[4] || '',
-      brigade: cols[5] || '',
-      strength: cols[6] || '',
-      toughness: cols[7] || '',
-      specialAbility: cols[10] || '',
-      identifier: cols[9] || '',
-      reference: cols[12] || '',
-      alignment: cols[14] || '',
-    };
-
-    map.set(`${name}|${set}|${imgFile}`, entry);
-    map.set(`${name}|${set}`, entry);
-    if (!map.has(name)) {
-      map.set(name, entry);
-    }
-  }
-
-  return map;
-}
-
-// Module-scoped cache: avoids re-parsing the ~thousands-of-rows card database
-// on every Create Game click. Next.js fetch cache skips the network round-trip
-// but not the parse, which was the bulk of the latency on the /play hot path.
-async function fetchCardLookup(): Promise<CardLookupMap> {
-  const now = Date.now();
-  if (cachedLookup && cachedLookup.expiresAt > now) {
-    return cachedLookup.promise;
-  }
-
-  const promise = buildCardLookup();
-  const entry = { promise, expiresAt: now + CARD_LOOKUP_TTL_MS };
-  cachedLookup = entry;
-
-  promise.catch(() => {
-    if (cachedLookup === entry) cachedLookup = null;
-  });
-
-  return promise;
-}
 
 export interface GameCardData {
   cardName: string;
@@ -144,18 +72,12 @@ export async function loadDeckForGame(deckId: string): Promise<LoadDeckResult> {
     throw new Error('Failed to load deck cards.');
   }
 
-  // Enrich cards with type/brigade/ability data from the card database
-  const cardLookup = await fetchCardLookup();
-
   // Expand quantity > 1 rows into individual card entries
   const deckData: GameCardData[] = [];
   for (const card of cards || []) {
     const quantity = card.quantity || 1;
     const imgFile = (card.card_img_file || '').replace(/\.jpe?g$/i, '');
-    const enriched =
-      cardLookup.get(`${card.card_name}|${card.card_set || ''}|${imgFile}`) ||
-      cardLookup.get(`${card.card_name}|${card.card_set || ''}`) ||
-      cardLookup.get(card.card_name || '');
+    const enriched = findCard(card.card_name || '', card.card_set || undefined, imgFile);
 
     for (let i = 0; i < quantity; i++) {
       deckData.push({

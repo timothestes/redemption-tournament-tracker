@@ -20,6 +20,7 @@ Next.js 15 (App Router), React 19, TypeScript, Supabase (PostgreSQL + Auth), Tai
 npm run dev              # Dev server at localhost:3000
 npm run build            # Production build
 make update-paragons     # Download latest Paragon CSV and regenerate TypeScript
+make update-cards        # Download latest carddata.txt and regenerate TypeScript
 ```
 
 ## Key References
@@ -32,6 +33,7 @@ make update-paragons     # Download latest Paragon CSV and regenerate TypeScript
 | Paragon format | `prompt_context/paragon_format.md` |
 | Deck validation | `app/decklist/card-search/utils/deckValidation.ts` |
 | Deck state | `app/decklist/card-search/hooks/useDeckState.ts` |
+| Card data access | `lib/cards/lookup.ts` — canonical `CARDS` / `findCard` / `CardData`. Backed by generated `lib/cards/generated/cardData.ts`; regen with `make update-cards`. |
 | Nationals config | `app/config/nationals.ts` |
 | Official REG (v11) | landofredemption.com/wp-content/uploads/2026/03/REG_PDF_11.0.0.pdf |
 | Official ORDIR (v7) | landofredemption.com/wp-content/uploads/2026/03/ORDIR_PDF_7.0.0.pdf |

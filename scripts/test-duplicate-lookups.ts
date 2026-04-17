@@ -8,11 +8,9 @@
 import { createClient } from "@supabase/supabase-js";
 import { config } from "dotenv";
 import { join } from "path";
+import { CARDS } from "../lib/cards/lookup";
 
 config({ path: join(__dirname, "..", ".env.local") });
-
-const CARD_DATA_URL =
-  "https://raw.githubusercontent.com/jalstad/RedemptionLackeyCCG/master/RedemptionQuick/sets/carddata.txt";
 
 // --- Replicate logic from lib/duplicateCards.ts ---
 
@@ -139,11 +137,8 @@ async function main() {
   }
 
   // --- Load carddata ---
-  console.log("Fetching carddata.txt...");
-  const res = await fetch(CARD_DATA_URL);
-  const text = await res.text();
-  const lines = text.split("\n").slice(1).filter((l) => l.trim());
-  const cardNames = [...new Set(lines.map((l) => l.split("\t")[0]?.trim()).filter(Boolean))];
+  console.log("Loading card names from generated module...");
+  const cardNames = [...new Set(CARDS.map((c) => c.name).filter(Boolean))];
   console.log(`Loaded ${cardNames.length} unique card names\n`);
 
   // --- Build component-style card index ---

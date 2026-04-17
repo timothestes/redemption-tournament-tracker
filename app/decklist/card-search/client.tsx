@@ -8,14 +8,13 @@ import FilterGrid from "./components/FilterGrid";
 import CardImage from "./components/CardImage";
 import DeckBuilderPanel, { TabType } from "./components/DeckBuilderPanel";
 import SpotlightPanel from "./components/SpotlightPanel";
-import { CARD_DATA_URL, OT_BOOKS, NT_BOOKS, GOSPEL_BOOKS } from "./constants";
-import { 
-  Card, 
-  categorizeRarity, 
-  isNativityReference, 
-  iconPredicates, 
-  normalizeBrigadeField 
+import {
+  Card,
+  categorizeRarity,
+  isNativityReference,
+  iconPredicates,
 } from "./utils";
+import { ALL_CARDS } from "./data/cardIndex";
 import { useDeckState } from "./hooks/useDeckState";
 import { useDeckCheck } from "./hooks/useDeckCheck";
 import { parseDeckText, generateDeckText, downloadDeckAsFile, copyDeckToClipboard } from "./utils/deckImportExport";
@@ -689,95 +688,9 @@ export default function CardSearchClient() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [user, syncStatus?.isSaving, saveDeckToCloud, handleExportDeck, showSearch, showDeckBuilder, modalCard, getDeckStats]);
 
-  // sanitize imgFile to avoid duplicate extensions - now imported from utils
-
-  // Adjust parsing to skip header row
+  // Card data is built once at module load from the generated CARDS artifact.
   useEffect(() => {
-    fetch(CARD_DATA_URL)
-      .then((res) => res.text())
-      .then((text) => {
-        const lines = text.split("\n");
-        const dataLines = lines.slice(1).filter((l) => l.trim());
-        const parsed = dataLines.map((line) => {
-          const cols = line.split("\t");
-          // Enhanced testament and gospel tagging logic
-          const reference = cols[12] || "";
-          let references: string[] = [];
-          for (let refGroup of reference.split(";")) {
-            refGroup = refGroup.trim();
-            if (refGroup.includes("(") && refGroup.includes(")")) {
-              // Extract main reference
-              const mainRef = refGroup.split("(")[0].trim();
-              if (mainRef) references.push(mainRef);
-              // Extract parenthetical references
-              const parenContent = refGroup.substring(refGroup.indexOf("(") + 1, refGroup.indexOf(")"));
-              const parenRefs = parenContent.split(",").map(pr => pr.trim()).filter(Boolean);
-              references.push(...parenRefs);
-            } else {
-              if (refGroup) references.push(refGroup);
-            }
-          }
-          // Lowercase all references for matching
-          const referencesLower = references.map(r => r.toLowerCase());
-          // Helper to normalize book names with numbers (e.g., II Samuel -> Samuel)
-          function normalizeBookName(ref) {
-            // Remove leading roman numerals or numbers (I, II, 1, 2, 3, 4, one, two, three, four)\s+/i, '')
-            return ref.replace(/^(i{1,3}|1|2|3|4|one|two|three|four)\s+/i, '').trim();
-          }
-          // Tagging strategy: collect all matching testaments
-          const foundTestaments = new Set<string>();
-          for (const ref of referencesLower) {
-            // Try both original and normalized book name
-            const book = ref.split(' ')[0];
-            const normalizedBook = normalizeBookName(ref).split(' ')[0];
-            if (NT_BOOKS.some(b => book === b.toLowerCase() || normalizedBook === b.toLowerCase())) foundTestaments.add('NT');
-            if (OT_BOOKS.some(b => book === b.toLowerCase() || normalizedBook === b.toLowerCase())) foundTestaments.add('OT');
-          }
-          let testament: string | string[] = '';
-          if (foundTestaments.size === 1) {
-            testament = Array.from(foundTestaments)[0];
-          } else if (foundTestaments.size > 1) {
-            testament = Array.from(foundTestaments);
-          }
-          // IsGospel: true if any reference starts with a Gospel book name
-          const gospelBooksLower = GOSPEL_BOOKS.map(b => b.toLowerCase());
-          const isGospel = referencesLower.some(ref => gospelBooksLower.some(b => ref.startsWith(b)));
-          // Normalize brigade field
-          const rawBrigade = cols[5] || "";
-          const alignment = cols[14] || "";
-          const cardName = cols[0] || "";
-          let normalizedBrigades = [];
-          try {
-            normalizedBrigades = normalizeBrigadeField(rawBrigade, alignment, cardName);
-          } catch (e) {
-            // fallback to raw brigade if normalization fails
-            normalizedBrigades = rawBrigade ? [rawBrigade] : [];
-          }
-          const brigade = normalizedBrigades.join("/");
-          return {
-            dataLine: line,
-            name: cols[0] || "",
-            set: cols[1] || "",
-            imgFile: cols[2] || "",
-            officialSet: cols[3] || "",
-            type: cols[4] || "",
-            brigade,
-            strength: cols[6] || "",
-            toughness: cols[7] || "",
-            class: cols[8] || "",
-            identifier: cols[9] || "",
-            specialAbility: cols[10] || "",
-            rarity: cols[11] || "",
-            reference,
-            alignment: cols[14] || "",
-            legality: cols[15] || "",
-            testament,
-            isGospel,
-          } as Card;
-        });
-        setCards(parsed);
-      })
-      .catch(console.error);
+    setCards(ALL_CARDS);
   }, []);
 
   // Quick icon filters for type-based icons (reordered) and color-coded brigades

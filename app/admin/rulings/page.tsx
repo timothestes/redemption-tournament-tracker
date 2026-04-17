@@ -8,7 +8,7 @@ import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { Badge } from "../../../components/ui/badge";
 import ConfirmationDialog from "../../../components/ui/confirmation-dialog";
-import { CARD_DATA_URL } from "../../decklist/card-search/constants";
+import { CARDS } from "@/lib/cards/lookup";
 import {
   getRulings,
   createRuling,
@@ -169,46 +169,45 @@ interface CardInfo {
   set: string;
 }
 
+const CARD_MAP_BY_LC_NAME: ReadonlyMap<string, CardInfo[]> = (() => {
+  const map = new Map<string, CardInfo[]>();
+  for (const c of CARDS) {
+    if (!c.name) continue;
+    const info: CardInfo = {
+      name: c.name,
+      imgFile: c.imgFile,
+      specialAbility: c.specialAbility,
+      type: c.type,
+      identifier: c.identifier,
+      set: c.set,
+    };
+    const key = c.name.toLowerCase();
+    const bucket = map.get(key);
+    if (bucket) bucket.push(info);
+    else map.set(key, [info]);
+  }
+  return map;
+})();
+
+const ALL_CARD_NAMES: readonly string[] = (() => {
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const c of CARDS) {
+    const key = c.name.toLowerCase();
+    if (c.name && !seen.has(key)) {
+      seen.add(key);
+      names.push(c.name);
+    }
+  }
+  return names;
+})();
+
 function useCardLookup() {
-  const [cardMap, setCardMap] = useState<Map<string, CardInfo[]>>(new Map());
-
-  useEffect(() => {
-    fetch(CARD_DATA_URL)
-      .then((res) => res.text())
-      .then((text) => {
-        const lines = text.split("\n");
-        const dataLines = lines.slice(1).filter((l) => l.trim());
-        const map = new Map<string, CardInfo[]>();
-        dataLines.forEach((line) => {
-          const cols = line.split("\t");
-          const name = cols[0] || "";
-          const key = name.toLowerCase();
-          const card: CardInfo = {
-            name,
-            imgFile: (cols[2] || "").replace(/\.jpe?g$/i, ""),
-            specialAbility: cols[10] || "",
-            type: cols[4] || "",
-            identifier: cols[9] || "",
-            set: cols[1] || "",
-          };
-          if (!map.has(key)) map.set(key, []);
-          map.get(key)!.push(card);
-        });
-        setCardMap(map);
-      });
+  return useCallback((name: string): CardInfo | null => {
+    if (!name.trim()) return null;
+    const exact = CARD_MAP_BY_LC_NAME.get(name.trim().toLowerCase());
+    return exact && exact.length > 0 ? exact[0] : null;
   }, []);
-
-  const lookup = useCallback(
-    (name: string): CardInfo | null => {
-      if (!name.trim()) return null;
-      const exact = cardMap.get(name.trim().toLowerCase());
-      if (exact && exact.length > 0) return exact[0];
-      return null;
-    },
-    [cardMap]
-  );
-
-  return lookup;
 }
 
 /* ------------------------------------------------------------------ */
@@ -224,30 +223,11 @@ function CardNameTypeahead({
   onChange: (name: string) => void;
   placeholder?: string;
 }) {
-  const [allCards, setAllCards] = useState<string[]>([]);
   const [results, setResults] = useState<string[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    fetch(CARD_DATA_URL)
-      .then((res) => res.text())
-      .then((text) => {
-        const lines = text.split("\n").slice(1).filter((l) => l.trim());
-        const seen = new Set<string>();
-        const names: string[] = [];
-        for (const line of lines) {
-          const name = line.split("\t")[0]?.trim();
-          if (name && !seen.has(name.toLowerCase())) {
-            seen.add(name.toLowerCase());
-            names.push(name);
-          }
-        }
-        setAllCards(names);
-      });
-  }, []);
 
   useEffect(() => {
     if (value.length < 2) {
@@ -258,7 +238,7 @@ function CardNameTypeahead({
     const timeout = setTimeout(() => {
       const q = value.toLowerCase();
       const found: string[] = [];
-      for (const name of allCards) {
+      for (const name of ALL_CARD_NAMES) {
         if (name.toLowerCase().includes(q)) {
           found.push(name);
           if (found.length >= 12) break;
@@ -269,7 +249,7 @@ function CardNameTypeahead({
       setActiveIndex(-1);
     }, 100);
     return () => clearTimeout(timeout);
-  }, [value, allCards]);
+  }, [value]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {

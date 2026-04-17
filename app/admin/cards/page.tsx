@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import ConfirmationDialog from "../../../components/ui/confirmation-dialog";
-import { CARD_DATA_URL } from "../../decklist/card-search/constants";
+import { CARDS } from "@/lib/cards/lookup";
 import {
   getDuplicateGroups,
   getDuplicateGroupStats,
@@ -42,86 +42,49 @@ interface CardInfo {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Shared card data (module-level cache, loaded once)                 */
+/*  Shared card data (module-scope, derived from generated CARDS)      */
 /* ------------------------------------------------------------------ */
 
-let cardDataPromise: Promise<CardInfo[]> | null = null;
-let cardDataCache: CardInfo[] | null = null;
+const ALL_CARD_INFOS: readonly CardInfo[] = CARDS
+  .filter((c) => c.name)
+  .map((c) => ({
+    name: c.name,
+    type: c.type,
+    set: c.set,
+    imgFile: c.imgFile,
+  }));
 
-function fetchCardData(): Promise<CardInfo[]> {
-  if (cardDataCache) return Promise.resolve(cardDataCache);
-  if (!cardDataPromise) {
-    cardDataPromise = fetch(CARD_DATA_URL)
-      .then((res) => res.text())
-      .then((text) => {
-        const lines = text.split("\n").slice(1).filter((l) => l.trim());
-        const cards: CardInfo[] = [];
-        for (const line of lines) {
-          const cols = line.split("\t");
-          const name = cols[0]?.trim();
-          if (!name) continue;
-          cards.push({
-            name,
-            type: cols[4]?.trim() || "",
-            set: cols[1]?.trim() || "",
-            imgFile: (cols[2] || "").replace(/\.jpe?g$/i, ""),
-          });
-        }
-        cardDataCache = cards;
-        return cards;
-      });
+const CARDS_BY_NAME: ReadonlyMap<string, CardInfo> = (() => {
+  const map = new Map<string, CardInfo>();
+  for (const card of ALL_CARD_INFOS) {
+    const key = card.name.toLowerCase();
+    if (!map.has(key)) map.set(key, card);
   }
-  return cardDataPromise;
-}
+  return map;
+})();
 
 function useCardLookup() {
-  const [allCards, setAllCards] = useState<CardInfo[]>(cardDataCache || []);
-  const [loading, setLoading] = useState(!cardDataCache);
-
-  useEffect(() => {
-    if (cardDataCache) return;
-    fetchCardData()
-      .then((cards) => {
-        setAllCards(cards);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+  const search = useCallback((query: string, limit = 20): CardInfo[] => {
+    if (!query.trim() || query.length < 2) return [];
+    const q = query.toLowerCase();
+    const results: CardInfo[] = [];
+    for (const card of ALL_CARD_INFOS) {
+      if (card.name.toLowerCase().includes(q)) {
+        results.push(card);
+        if (results.length >= limit) break;
+      }
+    }
+    return results;
   }, []);
 
-  const search = useCallback(
-    (query: string, limit = 20): CardInfo[] => {
-      if (!query.trim() || query.length < 2) return [];
-      const q = query.toLowerCase();
-      const results: CardInfo[] = [];
-      for (const card of allCards) {
-        if (card.name.toLowerCase().includes(q)) {
-          results.push(card);
-          if (results.length >= limit) break;
-        }
-      }
-      return results;
-    },
-    [allCards]
-  );
-
-  // Build a name→CardInfo lookup map for hover previews
-  const cardsByName = useMemo(() => {
-    const map = new Map<string, CardInfo>();
-    for (const card of allCards) {
-      const key = card.name.toLowerCase();
-      if (!map.has(key)) map.set(key, card);
-    }
-    return map;
-  }, [allCards]);
-
-  return { search, loading, allCards, cardsByName };
+  return { search, loading: false, allCards: ALL_CARD_INFOS, cardsByName: CARDS_BY_NAME };
 }
 
 /* ------------------------------------------------------------------ */
 /*  Shared card lookup context                                         */
 /* ------------------------------------------------------------------ */
 
-const CardLookupContext = createContext<Map<string, CardInfo>>(new Map());
+const CardLookupContext = createContext<ReadonlyMap<string, CardInfo>>(new Map());
 
 /* ------------------------------------------------------------------ */
 /*  Card image preview                                                 */
