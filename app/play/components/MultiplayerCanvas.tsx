@@ -143,6 +143,33 @@ function isAutoArrangeZone(zone: string): boolean {
   return zone === 'land-of-bondage';
 }
 
+/** Build a human-readable fragment for an opponent-action request, used in the
+ *  consent dialog (e.g. "draw 3 from the top of your deck"). */
+function describeOpponentAction(action: string, paramsJson: string): string {
+  let count = 0;
+  try { count = (paramsJson ? JSON.parse(paramsJson) : {}).count ?? 0; } catch {}
+  const plural = count === 1 ? '' : 's';
+  switch (action) {
+    case 'shuffle_deck': return 'shuffle your deck';
+    case 'look_deck_top': return `look at the top ${count} card${plural} of your deck`;
+    case 'look_deck_bottom': return `look at the bottom ${count} card${plural} of your deck`;
+    case 'look_deck_random': return `look at ${count} random card${plural} from your deck`;
+    case 'reveal_deck_top': return `reveal the top ${count} card${plural} of your deck`;
+    case 'reveal_deck_bottom': return `reveal the bottom ${count} card${plural} of your deck`;
+    case 'reveal_deck_random': return `reveal ${count} random card${plural} from your deck`;
+    case 'draw_deck_top': return `draw ${count} from the top of your deck`;
+    case 'draw_deck_bottom': return `draw ${count} from the bottom of your deck`;
+    case 'draw_deck_random': return `draw ${count} random card${plural} from your deck`;
+    case 'discard_deck_top': return `discard the top ${count} card${plural} of your deck`;
+    case 'discard_deck_bottom': return `discard the bottom ${count} card${plural} of your deck`;
+    case 'discard_deck_random': return `discard ${count} random card${plural} from your deck`;
+    case 'reserve_deck_top': return `send the top ${count} card${plural} of your deck to reserve`;
+    case 'reserve_deck_bottom': return `send the bottom ${count} card${plural} of your deck to reserve`;
+    case 'reserve_deck_random': return `send ${count} random card${plural} from your deck to reserve`;
+    default: return 'perform an action on your deck';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
@@ -185,6 +212,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     logSearchDeck,
     logLookAtTop,
     requestZoneSearch,
+    requestOpponentAction,
     approveZoneSearch,
     denyZoneSearch,
     completeZoneSearch,
@@ -539,6 +567,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const [opponentRevealSnapshot, setOpponentRevealSnapshot] = useState<string[]>([]);
   const [handMenu, setHandMenu] = useState<{ x: number; y: number } | null>(null);
   const [reserveMenu, setReserveMenu] = useState<{ x: number; y: number } | null>(null);
+  const [opponentReserveMenu, setOpponentReserveMenu] = useState<{ x: number; y: number } | null>(null);
   const revealAutoHideRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [revealBarShrinking, setRevealBarShrinking] = useState(false);
 
@@ -553,6 +582,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       opponentPeekState !== null ||
       opponentLookState !== null ||
       (approvedSearchRequest != null &&
+        !approvedSearchRequest.action &&
         approvedSearchRequest.zone !== 'hand-reveal' &&
         approvedSearchRequest.zone !== 'action-priority');
     onSearchModalChange(anyModalOpen);
@@ -909,6 +939,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     setOpponentLookState(null);
     setHandMenu(null);
     setReserveMenu(null);
+    setOpponentReserveMenu(null);
   }, []);
 
   // ---- moveDeckCardsToZone helper ----
@@ -1236,8 +1267,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       (r: any) => r.requesterId === gameState.myPlayer?.id && r.status === 'pending'
     );
     if (pendingSearchRef.current && !myPending && !approvedSearchRequest) {
-      const zone = pendingSearchRef.current.zone;
-      const msg = zone === 'hand-reveal' ? 'Reveal request denied'
+      const prev = pendingSearchRef.current;
+      const zone = prev.zone;
+      const msg = prev.action ? 'Action denied'
+        : zone === 'hand-reveal' ? 'Reveal request denied'
         : zone === 'action-priority' ? 'Priority request denied'
         : 'Search request denied';
       showGameToast(msg);
@@ -1256,6 +1289,95 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       showGameToast('Action priority granted — take your action');
     }
   }, [approvedSearchRequest, completeZoneSearch]);
+
+  // Dispatch approved opponent-action requests — fires the appropriate reducer
+  // client-side, then completes the request so the row is cleaned up.
+  const dispatchedActionRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!approvedSearchRequest || !approvedSearchRequest.action) return;
+    const reqId = String(approvedSearchRequest.id);
+    if (dispatchedActionRef.current === reqId) return;
+    dispatchedActionRef.current = reqId;
+
+    const { action, actionParams } = approvedSearchRequest;
+    let params: { count?: number } = {};
+    try { params = actionParams ? JSON.parse(actionParams) : {}; } catch {}
+    const count = params.count ?? 0;
+    const reqIdBig = BigInt(approvedSearchRequest.id);
+
+    const complete = () => completeZoneSearch(reqIdBig);
+
+    switch (action) {
+      case 'shuffle_deck':
+        shuffleOpponentDeck(reqIdBig);
+        complete();
+        break;
+      case 'look_deck_top':
+        setOpponentLookState({ position: 'top', count });
+        complete();
+        break;
+      case 'look_deck_bottom':
+        setOpponentLookState({ position: 'bottom', count });
+        complete();
+        break;
+      case 'look_deck_random':
+        setOpponentLookState({ position: 'random', count });
+        complete();
+        break;
+      case 'reveal_deck_top':
+        setOpponentPeekState({ position: 'top', count });
+        complete();
+        break;
+      case 'reveal_deck_bottom':
+        setOpponentPeekState({ position: 'bottom', count });
+        complete();
+        break;
+      case 'reveal_deck_random':
+        setOpponentPeekState({ position: 'random', count });
+        complete();
+        break;
+      case 'draw_deck_top':
+        moveOpponentDeckCardsToZone('top', count, 'hand');
+        complete();
+        break;
+      case 'draw_deck_bottom':
+        moveOpponentDeckCardsToZone('bottom', count, 'hand');
+        complete();
+        break;
+      case 'draw_deck_random':
+        moveOpponentDeckCardsToZone('random', count, 'hand');
+        complete();
+        break;
+      case 'discard_deck_top':
+        moveOpponentDeckCardsToZone('top', count, 'discard');
+        complete();
+        break;
+      case 'discard_deck_bottom':
+        moveOpponentDeckCardsToZone('bottom', count, 'discard');
+        complete();
+        break;
+      case 'discard_deck_random':
+        moveOpponentDeckCardsToZone('random', count, 'discard');
+        complete();
+        break;
+      case 'reserve_deck_top':
+        moveOpponentDeckCardsToZone('top', count, 'reserve');
+        complete();
+        break;
+      case 'reserve_deck_bottom':
+        moveOpponentDeckCardsToZone('bottom', count, 'reserve');
+        complete();
+        break;
+      case 'reserve_deck_random':
+        moveOpponentDeckCardsToZone('random', count, 'reserve');
+        complete();
+        break;
+      default:
+        // Unknown action — complete to unblock, then warn.
+        complete();
+        console.warn('Unknown opponent action:', action);
+    }
+  }, [approvedSearchRequest, completeZoneSearch, shuffleOpponentDeck, moveOpponentDeckCardsToZone]);
 
   // Track opponent hand reveal — show/hide countdown bar
   const oppHandRevealed = gameState.opponentPlayer?.handRevealed ?? false;
@@ -2295,18 +2417,25 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     (e: Konva.KonvaEventObject<MouseEvent>) => {
       if (e.evt.button !== 0) return;
 
-      // Only start selection on empty canvas (not on cards)
-      const target = e.target;
-      let ancestor: Konva.Node | null = target.parent;
-      let isCard = false;
-      while (ancestor && ancestor !== stageRef.current) {
-        if (ancestor.draggable?.()) {
-          isCard = true;
+      // Only start selection on empty canvas (not on cards or clickable zones).
+      // Walks target + ancestors; treats anything draggable, named "zone-click",
+      // or with a click/tap listener as interactive so we don't swallow the click.
+      let node: Konva.Node | null = e.target;
+      let isInteractive = false;
+      while (node && node !== stageRef.current) {
+        const listeners = (node as any).eventListeners;
+        if (
+          node.draggable?.() ||
+          node.name?.() === 'zone-click' ||
+          listeners?.click ||
+          listeners?.tap
+        ) {
+          isInteractive = true;
           break;
         }
-        ancestor = ancestor.parent;
+        node = node.parent;
       }
-      if (isCard) return;
+      if (isInteractive) return;
 
       if (!e.evt.shiftKey && selectedIds.size > 0) {
         clearSelection();
@@ -2426,6 +2555,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const cardsInZone = myCards[key] ?? [];
             // Approximate label width: ~7px per uppercase char at fontSize 11 + letterSpacing 1
             const labelTextWidth = zone.label.toUpperCase().length * 7;
+            const myPileContextHandler = (e: Konva.KonvaEventObject<PointerEvent>) => {
+              e.evt.preventDefault();
+              closeAllMenus();
+              const pt = { x: e.evt.clientX, y: e.evt.clientY };
+              if (key === 'deck') setDeckMenu(pt);
+              else if (key === 'reserve') setReserveMenu(pt);
+              else if (key === 'land-of-redemption') setLorMenu(pt);
+              else if (key === 'discard' || key === 'banish') setBrowseMyZone(key);
+            };
+            const myPileClickHandler = (e: Konva.KonvaEventObject<PointerEvent>) => {
+              if (e.evt.button !== 0) return;
+              if (key === 'discard' || key === 'banish' || key === 'reserve') setBrowseMyZone(key);
+            };
             return (
               <Group key={`my-${key}`}>
                 <Rect
@@ -2438,6 +2580,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   strokeWidth={1}
                   cornerRadius={3}
                   opacity={0.45}
+                  onClick={SIDEBAR_PILE_ZONES.includes(key as (typeof SIDEBAR_PILE_ZONES)[number]) ? myPileClickHandler : undefined}
                   onContextMenu={isLob ? (e: Konva.KonvaEventObject<PointerEvent>) => {
                     e.evt.preventDefault();
                     // Compute spawn position as normalized 0-1 within the LOB zone
@@ -2446,7 +2589,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     const spawnX = pointer ? (pointer.x - zone.x) / zone.width : 0.5;
                     const spawnY = pointer ? (pointer.y - zone.y) / zone.height : 0.5;
                     setZoneMenu({ x: e.evt.clientX, y: e.evt.clientY, spawnX, spawnY });
-                  } : undefined}
+                  } : SIDEBAR_PILE_ZONES.includes(key as (typeof SIDEBAR_PILE_ZONES)[number]) ? myPileContextHandler : undefined}
                 />
                 {/* Label + badge — skip for LOB/territory zones (rendered as overlay after cards) */}
                 {!skipLabel && (
@@ -2479,6 +2622,20 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const skipLabel = isLob || isFreeForm;
             const cardsInZone = opponentCards[key] ?? [];
             const labelTextWidth = zone.label.toUpperCase().length * 7;
+            const oppPileContextHandler = (e: Konva.KonvaEventObject<PointerEvent>) => {
+              e.evt.preventDefault();
+              closeAllMenus();
+              const pt = { x: e.evt.clientX, y: e.evt.clientY };
+              if (key === 'deck') setOpponentDeckMenu(pt);
+              else if (key === 'reserve') setOpponentReserveMenu(pt);
+              else if (key === 'discard' || key === 'banish') setBrowseOpponentZone(key);
+            };
+            const oppReserveRevealedBg = gameState.opponentPlayer?.reserveRevealed ?? false;
+            const oppPileClickHandler = (e: Konva.KonvaEventObject<PointerEvent>) => {
+              if (e.evt.button !== 0) return;
+              if (key === 'discard' || key === 'banish') setBrowseOpponentZone(key);
+              else if (key === 'reserve' && oppReserveRevealedBg) setBrowseOpponentZone('reserve');
+            };
             return (
               <Group key={`opp-${key}`}>
                 <Rect
@@ -2491,6 +2648,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   strokeWidth={1}
                   cornerRadius={3}
                   opacity={0.45}
+                  onClick={SIDEBAR_PILE_ZONES.includes(key as (typeof SIDEBAR_PILE_ZONES)[number]) ? oppPileClickHandler : undefined}
                   onContextMenu={isLob ? (e: Konva.KonvaEventObject<PointerEvent>) => {
                     e.evt.preventDefault();
                     const layer = gameLayerRef.current;
@@ -2499,7 +2657,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     const spawnY = pointer ? (pointer.y - zone.y) / zone.height : 0.5;
                     const oppId = gameState.opponentPlayer?.id;
                     setZoneMenu({ x: e.evt.clientX, y: e.evt.clientY, spawnX, spawnY, targetPlayerId: oppId != null ? String(oppId) : undefined });
-                  } : undefined}
+                  } : SIDEBAR_PILE_ZONES.includes(key as (typeof SIDEBAR_PILE_ZONES)[number]) ? oppPileContextHandler : undefined}
                 />
                 {/* Label + badge — skip for LOB/territory zones (rendered as overlay after cards) */}
                 {!skipLabel && (
@@ -2961,34 +3119,15 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   setBrowseMyZone(zoneKey);
                 } : undefined}
                 onDblClick={undefined}
-                onContextMenu={zoneKey === 'deck' ? (e: Konva.KonvaEventObject<PointerEvent>) => {
-                  e.evt.preventDefault();
-                  const stage = stageRef.current;
-                  if (!stage) return;
-                  const container = stage.container().getBoundingClientRect();
-                  closeAllMenus();
-                  setDeckMenu({
-                    x: e.evt.clientX,
-                    y: e.evt.clientY,
-                  });
-                } : zoneKey === 'land-of-redemption' ? (e: Konva.KonvaEventObject<PointerEvent>) => {
-                  e.evt.preventDefault();
-                  const stage = stageRef.current;
-                  if (!stage) return;
-                  const container = stage.container().getBoundingClientRect();
-                  closeAllMenus();
-                  setLorMenu({
-                    x: e.evt.clientX,
-                    y: e.evt.clientY,
-                  });
-                } : zoneKey === 'reserve' ? (e: Konva.KonvaEventObject<PointerEvent>) => {
+                onContextMenu={(e: Konva.KonvaEventObject<PointerEvent>) => {
                   e.evt.preventDefault();
                   closeAllMenus();
-                  setReserveMenu({
-                    x: e.evt.clientX,
-                    y: e.evt.clientY,
-                  });
-                } : undefined}
+                  const pt = { x: e.evt.clientX, y: e.evt.clientY };
+                  if (zoneKey === 'deck') setDeckMenu(pt);
+                  else if (zoneKey === 'land-of-redemption') setLorMenu(pt);
+                  else if (zoneKey === 'reserve') setReserveMenu(pt);
+                  else if (zoneKey === 'discard' || zoneKey === 'banish') setBrowseMyZone(zoneKey);
+                }}
               >
                 {/* Count badge */}
                 <Group x={zone.x + zone.width - 32} y={zone.y + 2} listening={false}>
@@ -3005,17 +3144,30 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   />
                 </Group>
 
-                {/* Revealed indicator for own reserve */}
+                {/* Revealed indicator for own reserve — clickable to hide. Sits left of the count badge. */}
                 {zoneKey === 'reserve' && (gameState.myPlayer?.reserveRevealed ?? false) && (
-                  <Group x={zone.x + 4} y={zone.y + 2} listening={false}>
-                    <Rect width={18} height={18} fill="#1a2e1a" cornerRadius={4} stroke="#5a9a5a" strokeWidth={1} />
+                  <Group
+                    x={zone.x + zone.width - 56}
+                    y={zone.y + 2}
+                    onMouseDown={(e: Konva.KonvaEventObject<PointerEvent>) => { e.cancelBubble = true; }}
+                    onClick={(e: Konva.KonvaEventObject<PointerEvent>) => {
+                      e.cancelBubble = true;
+                      e.evt.stopPropagation();
+                      if (e.evt.button !== 0) return;
+                      gameState.revealReserve(false);
+                    }}
+                    onMouseEnter={() => { const c = stageRef.current?.container(); if (c) c.style.cursor = 'pointer'; }}
+                    onMouseLeave={() => { const c = stageRef.current?.container(); if (c) c.style.cursor = 'default'; }}
+                  >
+                    <Rect width={20} height={18} fill="#1a2e1a" cornerRadius={4} stroke="#5a9a5a" strokeWidth={1} />
                     <Text
                       text="👁"
-                      fontSize={10}
-                      width={18}
+                      fontSize={11}
+                      width={20}
                       height={18}
                       align="center"
                       verticalAlign="middle"
+                      listening={false}
                     />
                   </Group>
                 )}
@@ -3158,24 +3310,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             return (
               <Group
                 key={`opp-pile-${zoneKey}`}
-                onClick={zoneKey !== 'deck' && !(zoneKey === 'reserve' && !oppReserveRevealed) ? () => {
+                name="zone-click"
+                onClick={zoneKey !== 'deck' && !(zoneKey === 'reserve' && !oppReserveRevealed) ? (e: Konva.KonvaEventObject<PointerEvent>) => {
+                  if (e.evt.button !== 0) return;
                   setBrowseOpponentZone(zoneKey);
                 } : undefined}
-                onContextMenu={['deck', 'reserve'].includes(zoneKey) && !(zoneKey === 'reserve' && oppReserveRevealed) ? (e: Konva.KonvaEventObject<PointerEvent>) => {
+                onContextMenu={(e: Konva.KonvaEventObject<PointerEvent>) => {
                   e.evt.preventDefault();
                   closeAllMenus();
-                  if (zoneKey === 'deck') {
-                    setOpponentDeckMenu({ x: e.evt.clientX, y: e.evt.clientY });
-                  } else {
-                    const zoneNames: Record<string, string> = { reserve: 'Reserve' };
-                    setOpponentZoneMenu({
-                      x: e.evt.clientX,
-                      y: e.evt.clientY,
-                      zone: zoneKey,
-                      zoneName: zoneNames[zoneKey] ?? zoneKey,
-                    });
-                  }
-                } : undefined}
+                  const pt = { x: e.evt.clientX, y: e.evt.clientY };
+                  if (zoneKey === 'deck') setOpponentDeckMenu(pt);
+                  else if (zoneKey === 'reserve') setOpponentReserveMenu(pt);
+                  else if (zoneKey === 'discard' || zoneKey === 'banish') setBrowseOpponentZone(zoneKey);
+                }}
               >
                 {/* Count badge */}
                 <Group x={zone.x + zone.width - 32} y={zone.y + 2} listening={false}>
@@ -3192,14 +3339,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   />
                 </Group>
 
-                {/* Revealed indicator for reserve */}
+                {/* Revealed indicator for opponent reserve — sits left of the count badge. Not clickable (only owner can toggle). */}
                 {zoneKey === 'reserve' && oppReserveRevealed && (
-                  <Group x={zone.x + 4} y={zone.y + 2} listening={false}>
-                    <Rect width={18} height={18} fill="#1a2e1a" cornerRadius={4} stroke="#5a9a5a" strokeWidth={1} />
+                  <Group x={zone.x + zone.width - 56} y={zone.y + 2} listening={false}>
+                    <Rect width={20} height={18} fill="#1a2e1a" cornerRadius={4} stroke="#5a9a5a" strokeWidth={1} />
                     <Text
                       text="👁"
-                      fontSize={10}
-                      width={18}
+                      fontSize={11}
+                      width={20}
                       height={18}
                       align="center"
                       verticalAlign="middle"
@@ -3258,10 +3405,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     )}
                     {showFace && topCard ? (
                       (() => {
-                        const img = getCardImage(topCard);
+                        // When opponent reserve is revealed, force face-up even if card has isFlipped=true
+                        const effectiveTop = zoneKey === 'reserve' && oppReserveRevealed && topCard.isFlipped
+                          ? { ...topCard, isFlipped: false }
+                          : topCard;
+                        const img = getCardImage(effectiveTop);
                         return img ? (
                           <GameCardNode
-                            card={adaptCard(topCard, 'player2')}
+                            card={adaptCard(effectiveTop, 'player2')}
                             x={pileCardWidth}
                             y={pileCardHeight}
                             rotation={180}
@@ -3272,10 +3423,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                             isDraggable={zoneKey === 'discard'}
                             nodeRef={zoneKey === 'discard' ? registerCardNode : undefined}
                             hoverProgress={hoveredInstanceId === String(topCard.id) ? hoverProgress : 0}
+                            onClick={zoneKey === 'reserve' && oppReserveRevealed ? (_c, e) => {
+                              if ((e.evt as MouseEvent).button !== 0) return;
+                              setBrowseOpponentZone('reserve');
+                            } : undefined}
                             onDragStart={zoneKey === 'discard' ? handleCardDragStart : noopCardDrag}
                             onDragMove={zoneKey === 'discard' ? handleCardDragMove : noopDrag}
                             onDragEnd={zoneKey === 'discard' ? handleCardDragEnd : noopCardDragEnd}
-                            onContextMenu={handleCardContextMenu}
+                            onContextMenu={zoneKey === 'reserve' ? noopContextMenu : handleCardContextMenu}
                             onDblClick={noopDblClick}
                             onMouseEnter={handleMouseEnter}
                             onMouseLeave={handleMouseLeave}
@@ -3636,45 +3791,85 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const isRevealed = gameState.myPlayer?.reserveRevealed ?? false;
             gameState.revealReserve(!isRevealed);
           }}
+          onLookAtReserve={() => { setReserveMenu(null); setBrowseMyZone('reserve'); }}
           onClose={() => setReserveMenu(null)}
           onRandomToDiscard={(count) => { setReserveMenu(null); multiplayerActions.randomReserveToZone(count, 'discard', ''); }}
-          onRandomToHand={(count) => { setReserveMenu(null); multiplayerActions.randomReserveToZone(count, 'hand', ''); }}
-          onRandomToDeckTop={(count) => { setReserveMenu(null); multiplayerActions.randomReserveToZone(count, 'deck', 'top'); }}
-          onRandomToDeckBottom={(count) => { setReserveMenu(null); multiplayerActions.randomReserveToZone(count, 'deck', 'bottom'); }}
-          onShuffleRandomIntoDeck={(count) => { setReserveMenu(null); multiplayerActions.randomReserveToZone(count, 'deck', 'shuffle'); }}
         />
       )}
 
-      {opponentDeckMenu && (
-        <DeckContextMenu
-          x={opponentDeckMenu.x}
-          y={opponentDeckMenu.y}
-          deckSize={(opponentCards['deck'] ?? []).length}
-          onClose={() => setOpponentDeckMenu(null)}
-          hideDrawActions
-          onSearchDeck={() => {
-            setOpponentDeckMenu(null);
-            requestZoneSearch('deck');
-            showGameToast('Waiting for opponent to approve...');
-          }}
-          onShuffleDeck={() => { gameState.shuffleDeck(); setOpponentDeckMenu(null); }}
-          onLookAtTop={(n) => { setOpponentDeckMenu(null); setOpponentLookState({ position: 'top', count: n }); }}
-          onLookAtBottom={(n) => { setOpponentDeckMenu(null); setOpponentLookState({ position: 'bottom', count: n }); }}
-          onLookAtRandom={(n) => { setOpponentDeckMenu(null); setOpponentLookState({ position: 'random', count: n }); }}
-          onDrawTop={(n) => { moveOpponentDeckCardsToZone('top', n, 'hand'); setOpponentDeckMenu(null); }}
-          onRevealTop={(n) => { setOpponentDeckMenu(null); setOpponentPeekState({ position: 'top', count: n }); }}
-          onDiscardTop={(n) => { moveOpponentDeckCardsToZone('top', n, 'discard'); setOpponentDeckMenu(null); }}
-          onReserveTop={(n) => { moveOpponentDeckCardsToZone('top', n, 'reserve'); setOpponentDeckMenu(null); }}
-          onDrawBottom={(n) => { moveOpponentDeckCardsToZone('bottom', n, 'hand'); setOpponentDeckMenu(null); }}
-          onRevealBottom={(n) => { setOpponentDeckMenu(null); setOpponentPeekState({ position: 'bottom', count: n }); }}
-          onDiscardBottom={(n) => { moveOpponentDeckCardsToZone('bottom', n, 'discard'); setOpponentDeckMenu(null); }}
-          onReserveBottom={(n) => { moveOpponentDeckCardsToZone('bottom', n, 'reserve'); setOpponentDeckMenu(null); }}
-          onDrawRandom={(n) => { moveOpponentDeckCardsToZone('random', n, 'hand'); setOpponentDeckMenu(null); }}
-          onRevealRandom={(n) => { setOpponentDeckMenu(null); setOpponentPeekState({ position: 'random', count: n }); }}
-          onDiscardRandom={(n) => { moveOpponentDeckCardsToZone('random', n, 'discard'); setOpponentDeckMenu(null); }}
-          onReserveRandom={(n) => { moveOpponentDeckCardsToZone('random', n, 'reserve'); setOpponentDeckMenu(null); }}
-        />
-      )}
+      {opponentReserveMenu && (() => {
+        const oppReserveRevealed = gameState.opponentPlayer?.reserveRevealed ?? false;
+        const oppReserveCards = opponentCards['reserve'] ?? [];
+        const oppId = gameState.opponentPlayer?.id;
+        const randomOppReserveToDiscard = (count: number) => {
+          if (oppId == null || oppReserveCards.length === 0) return;
+          const pool = [...oppReserveCards];
+          const picks: typeof oppReserveCards = [];
+          for (let i = 0; i < count && pool.length > 0; i++) {
+            const idx = Math.floor(Math.random() * pool.length);
+            picks.push(pool[idx]);
+            pool.splice(idx, 1);
+          }
+          for (const card of picks) {
+            gameState.moveCard(BigInt(card.id), 'discard', '', '', '', String(oppId));
+          }
+        };
+        return (
+          <ReserveContextMenu
+            x={opponentReserveMenu.x}
+            y={opponentReserveMenu.y}
+            cardCount={oppReserveCards.length}
+            isRevealed={oppReserveRevealed}
+            onLookAtReserve={oppReserveRevealed ? () => { setOpponentReserveMenu(null); setBrowseOpponentZone('reserve'); } : undefined}
+            onSearchRequest={!oppReserveRevealed ? () => {
+              requestZoneSearch('reserve');
+              showGameToast('Waiting for opponent to approve...');
+              setOpponentReserveMenu(null);
+            } : undefined}
+            onRandomToDiscard={(count) => { setOpponentReserveMenu(null); randomOppReserveToDiscard(count); }}
+            onClose={() => setOpponentReserveMenu(null)}
+          />
+        );
+      })()}
+
+      {opponentDeckMenu && (() => {
+        const requestAction = (action: string, count?: number) => {
+          const params = count != null ? JSON.stringify({ count }) : '';
+          requestOpponentAction(action, params);
+          setOpponentDeckMenu(null);
+          showGameToast('Waiting for opponent to approve...');
+        };
+        return (
+          <DeckContextMenu
+            x={opponentDeckMenu.x}
+            y={opponentDeckMenu.y}
+            deckSize={(opponentCards['deck'] ?? []).length}
+            onClose={() => setOpponentDeckMenu(null)}
+            hideDrawActions
+            onSearchDeck={() => {
+              setOpponentDeckMenu(null);
+              requestZoneSearch('deck');
+              showGameToast('Waiting for opponent to approve...');
+            }}
+            onShuffleDeck={() => requestAction('shuffle_deck')}
+            onLookAtTop={(n) => requestAction('look_deck_top', n)}
+            onLookAtBottom={(n) => requestAction('look_deck_bottom', n)}
+            onLookAtRandom={(n) => requestAction('look_deck_random', n)}
+            onDrawTop={(n) => requestAction('draw_deck_top', n)}
+            onRevealTop={(n) => requestAction('reveal_deck_top', n)}
+            onDiscardTop={(n) => requestAction('discard_deck_top', n)}
+            onReserveTop={(n) => requestAction('reserve_deck_top', n)}
+            onDrawBottom={(n) => requestAction('draw_deck_bottom', n)}
+            onRevealBottom={(n) => requestAction('reveal_deck_bottom', n)}
+            onDiscardBottom={(n) => requestAction('discard_deck_bottom', n)}
+            onReserveBottom={(n) => requestAction('reserve_deck_bottom', n)}
+            onDrawRandom={(n) => requestAction('draw_deck_random', n)}
+            onRevealRandom={(n) => requestAction('reveal_deck_random', n)}
+            onDiscardRandom={(n) => requestAction('discard_deck_random', n)}
+            onReserveRandom={(n) => requestAction('reserve_deck_random', n)}
+          />
+        );
+      })()}
 
       {lorMenu && (
         <LorContextMenu
@@ -3823,27 +4018,34 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         </div>
       )}
 
-      {/* Search/reveal requests — floating top-center banner */}
-      {incomingSearchRequest && incomingSearchRequest.zone !== 'action-priority' && (
-        <ConsentDialog
-          requesterName={gameState.opponentPlayer?.displayName ?? 'Opponent'}
-          zoneName={incomingSearchRequest.zone === 'hand-reveal' ? 'hand' : incomingSearchRequest.zone}
-          requestType={incomingSearchRequest.zone === 'hand-reveal' ? 'reveal' : 'search'}
-          onAllow={() => {
-            approveZoneSearch(BigInt(incomingSearchRequest.id));
-            if (incomingSearchRequest.zone === 'hand-reveal') {
-              gameState.revealHand(true);
-              // Auto-hide hand after 30 seconds
-              if (revealAutoHideRef.current) clearTimeout(revealAutoHideRef.current);
-              revealAutoHideRef.current = setTimeout(() => {
-                gameState.revealHand(false);
-                revealAutoHideRef.current = null;
-              }, 30_000);
-            }
-          }}
-          onDeny={() => denyZoneSearch(BigInt(incomingSearchRequest.id))}
-        />
-      )}
+      {/* Search/reveal/action requests — floating top-center banner */}
+      {incomingSearchRequest && incomingSearchRequest.zone !== 'action-priority' && (() => {
+        const isAction = !!incomingSearchRequest.action;
+        const actionDescription = isAction
+          ? describeOpponentAction(incomingSearchRequest.action, incomingSearchRequest.actionParams)
+          : undefined;
+        return (
+          <ConsentDialog
+            requesterName={gameState.opponentPlayer?.displayName ?? 'Opponent'}
+            zoneName={incomingSearchRequest.zone === 'hand-reveal' ? 'hand' : incomingSearchRequest.zone}
+            requestType={isAction ? 'action' : incomingSearchRequest.zone === 'hand-reveal' ? 'reveal' : 'search'}
+            actionDescription={actionDescription}
+            onAllow={() => {
+              approveZoneSearch(BigInt(incomingSearchRequest.id));
+              if (incomingSearchRequest.zone === 'hand-reveal') {
+                gameState.revealHand(true);
+                // Auto-hide hand after 30 seconds
+                if (revealAutoHideRef.current) clearTimeout(revealAutoHideRef.current);
+                revealAutoHideRef.current = setTimeout(() => {
+                  gameState.revealHand(false);
+                  revealAutoHideRef.current = null;
+                }, 30_000);
+              }
+            }}
+            onDeny={() => denyZoneSearch(BigInt(incomingSearchRequest.id))}
+          />
+        );
+      })()}
 
       {/* Countdown bar — shrinks over 30s while opponent hand is revealed */}
       {oppHandRevealed && opponentHandRect && mpLayout && (() => {
@@ -3878,7 +4080,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         );
       })()}
 
-      {approvedSearchRequest && approvedSearchRequest.zone !== 'hand-reveal' && approvedSearchRequest.zone !== 'action-priority' && (() => {
+      {approvedSearchRequest && !approvedSearchRequest.action && approvedSearchRequest.zone !== 'hand-reveal' && approvedSearchRequest.zone !== 'action-priority' && (() => {
         const zoneCards = (opponentCards[approvedSearchRequest.zone] ?? [])
           .map((c: any) => cardInstanceToGameCard(c, counters.get(c.id) ?? [], 'player2'));
         return (
@@ -4060,7 +4262,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             style={{
               position: 'fixed',
               pointerEvents: 'none',
-              zIndex: 700,
+              zIndex: 1100,
             }}
           >
             {[...modalDrag.additionalCards.slice(0, 2)].reverse().map((extra, i) => (
@@ -4128,7 +4330,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               border: '2px solid var(--gf-accent)',
               boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
               pointerEvents: 'none',
-              zIndex: 700,
+              zIndex: 1100,
               opacity: 0.9,
             }}
           />
@@ -4143,7 +4345,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             style={{
               position: 'fixed',
               pointerEvents: 'none',
-              zIndex: 700,
+              zIndex: 1100,
             }}
           >
             {[...opponentModalDrag.additionalCards.slice(0, 2)].reverse().map((extra, i) => (
@@ -4211,7 +4413,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               border: '2px solid var(--gf-accent)',
               boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
               pointerEvents: 'none',
-              zIndex: 700,
+              zIndex: 1100,
               opacity: 0.9,
             }}
           />
@@ -4350,7 +4552,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       {/* ================================================================
           Card hover preview — floating tooltip near cursor
           ================================================================ */}
-      {hoveredCard && hoverReady && !isLoupeVisible && !isDraggingRef.current && !contextMenu && !multiCardContextMenu && !deckMenu && !zoneMenu && !lorMenu && !opponentZoneMenu && !handMenu && !reserveMenu && (() => {
+      {hoveredCard && hoverReady && !isLoupeVisible && !isDraggingRef.current && !contextMenu && !multiCardContextMenu && !deckMenu && !zoneMenu && !lorMenu && !opponentZoneMenu && !handMenu && !reserveMenu && !opponentReserveMenu && (() => {
         const previewWidth = 280;
         const previewHeight = Math.round(previewWidth * 1.4);
         const imageUrl = getSharedCardImageUrl(hoveredCard.cardImgFile);

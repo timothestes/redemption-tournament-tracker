@@ -71,6 +71,7 @@ import RemoveCounterReducer from "./remove_counter_reducer";
 import RemoveTokenReducer from "./remove_token_reducer";
 import ReorderHandReducer from "./reorder_hand_reducer";
 import ReorderLobReducer from "./reorder_lob_reducer";
+import RequestOpponentActionReducer from "./request_opponent_action_reducer";
 import RequestRematchReducer from "./request_rematch_reducer";
 import RequestZoneSearchReducer from "./request_zone_search_reducer";
 import ResignGameReducer from "./resign_game_reducer";
@@ -299,6 +300,7 @@ const reducersSchema = __reducers(
   __reducerSchema("remove_token", RemoveTokenReducer),
   __reducerSchema("reorder_hand", ReorderHandReducer),
   __reducerSchema("reorder_lob", ReorderLobReducer),
+  __reducerSchema("request_opponent_action", RequestOpponentActionReducer),
   __reducerSchema("request_rematch", RequestRematchReducer),
   __reducerSchema("request_zone_search", RequestZoneSearchReducer),
   __reducerSchema("resign_game", ResignGameReducer),

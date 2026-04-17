@@ -211,8 +211,10 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
     if (!onClose) return;
     if (hasRemaining) {
       if (action === 'bottom') {
-        // Remove from current positions and push to bottom of deck
-        moveCardsBatch(remainingIds, 'deck');
+        // move_cards_batch to 'deck' preserves each card's existing zoneIndex,
+        // so peeked cards wouldn't actually move. Use move_card_to_bottom_of_deck
+        // per-card, which assigns maxIndex + 1.
+        for (const id of remainingIds) moveCardToBottomOfDeck(id);
       } else if (action === 'shuffle') {
         shuffleDeck();
       }

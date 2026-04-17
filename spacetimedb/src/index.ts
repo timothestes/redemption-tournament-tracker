@@ -2892,9 +2892,58 @@ export const request_zone_search = spacetimedb.reducer(
       zone,
       status: 'pending',
       createdAt: ctx.timestamp,
+      action: '',
+      actionParams: '',
     });
 
     logAction(ctx, gameId, player.id, 'REQUEST_ZONE_SEARCH', JSON.stringify({ zone, targetName: opponent.displayName }), game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: request_opponent_action
+// Creates a pending ZoneSearchRequest tagged with an `action` (e.g.
+// 'shuffle_deck', 'draw_deck_top') and JSON params. The requester waits for
+// approval and then fires the corresponding reducer client-side.
+// ---------------------------------------------------------------------------
+export const request_opponent_action = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    action: t.string(),
+    actionParams: t.string(),
+  },
+  (ctx, { gameId, action, actionParams }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
+
+    const player = findPlayerBySender(ctx, gameId);
+
+    if (!action) throw new SenderError('action required');
+
+    const allPlayers = [...ctx.db.Player.player_game_id.filter(gameId)];
+    const opponent = allPlayers.find(p => p.id !== player.id);
+    if (!opponent) throw new SenderError('Opponent not found');
+
+    for (const req of ctx.db.ZoneSearchRequest.zone_search_request_game_id.filter(gameId)) {
+      if (req.requesterId === player.id && req.status === 'pending') {
+        throw new SenderError('You already have a pending request');
+      }
+    }
+
+    ctx.db.ZoneSearchRequest.insert({
+      id: 0n,
+      gameId,
+      requesterId: player.id,
+      targetPlayerId: opponent.id,
+      zone: 'deck',
+      status: 'pending',
+      createdAt: ctx.timestamp,
+      action,
+      actionParams,
+    });
+
+    logAction(ctx, gameId, player.id, 'REQUEST_OPPONENT_ACTION', JSON.stringify({ action, actionParams, targetName: opponent.displayName }), game.turnNumber, game.currentPhase);
   }
 );
 

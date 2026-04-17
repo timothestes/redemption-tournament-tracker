@@ -108,6 +108,7 @@ export interface GameState {
   logSearchDeck: () => void;
   logLookAtTop: (count: number) => void;
   requestZoneSearch: (zone: string) => void;
+  requestOpponentAction: (action: string, actionParams?: string) => void;
   approveZoneSearch: (requestId: bigint) => void;
   denyZoneSearch: (requestId: bigint) => void;
   completeZoneSearch: (requestId: bigint, shuffled?: boolean) => void;
@@ -572,6 +573,13 @@ export function useGameState(gameId: bigint): GameState {
     [conn, gameId],
   );
 
+  const requestOpponentAction = useCallback(
+    (action: string, actionParams: string = '') => {
+      conn?.reducers.requestOpponentAction({ gameId, action, actionParams });
+    },
+    [conn, gameId],
+  );
+
   const approveZoneSearch = useCallback(
     (requestId: bigint) => {
       conn?.reducers.approveZoneSearch({ gameId, requestId });
@@ -698,6 +706,7 @@ export function useGameState(gameId: bigint): GameState {
     logSearchDeck,
     logLookAtTop,
     requestZoneSearch,
+    requestOpponentAction,
     approveZoneSearch,
     denyZoneSearch,
     completeZoneSearch,

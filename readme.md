@@ -167,18 +167,3 @@ battle phase/zone could be better
 
 Subagent Tasks for Multiplayer mode:
 - reveal reserve function seems buggy. Not able to close it. Also feels awkward right click happens to open reserve and also the right click menu at the same time. Maybe right click doesn't need to reveal the reserve and instead just show the menu?
-- in the logs , we are seeing a lot of "draw multiple cards". This needs to be say how many cards exactly were drawn. And would it be possible to show in the logs to the player that drew the cards what the cards were but hide this information from the opponent? Seems hard to do but would be amazinng. Also would want to indicate somehow that the opponent can't see the thing you are seeing in the logs for this scenario.
-- this mode needs undo button, just like golfish mode. Entire subagent development needed to spec this out and implement it.
-- we have reveal top N cards, but we don't have look at top card feature. The look feature would kinda be like the reveal feature, but instead wouldn't reveal the information to ALL players. Got it?
-- When I open up the reveal feature. Trying to drag cards out of it normally is buggy. Can you have it behave more like a normal modal?
-- annoying but where dragging group of cards around sometimes doesn't preserve card order. some recent bug fix attempts were made but the problem wasn't solved completely. This is high priority fix
-- logs should show what counters are getting added to. It shows counter was added but it doesn't say to what
-- when drawing souls, sometimes it not super obvious you drew a soul because it gets automatically placed in land of bondage. We need to add something to goldifh and multiplayer mode that would help draw attention to the fact a soul was drawn and placed in land of bondage. Maybe any time a card is moved to land of bondage, it could have an animated effect happen? Idk.
-- user dragged a lost soul card from their land of bondage to their deck. it said: jhendrix6426 moved a card to top of their deck. Should be shown what went into the deck, instead of just "a card"
-- For users who want to see chat + logs all in one place, what can we do to make it less annoying for them? Add a "combine" option to see them both together?
-- shuffling multiple cards into deck does one at a time. For example I selected 6 cards from my hand as a group and right clicked shuffle into deck. It proceeded to shuffle one at a time, but we could optimize here
-- the allow search deck prompt toast is  a bit high up... can we try to have it more in the center like where the territory break is?
-- can't discard random cards from a reserve. We need to be able to randomly discard cards from a reserve via a right click menu.
-- revealing opponent's deck doesn't give you the options that are normally available to deck search options. I want al lthe same options to appear as if searching my own deck. Can we just have the oppponent's deck search popup be more like the existing search my deck popup? Why are they different?
-- deck and reserve modals could be draggable? For example, if the user opens up the reserve modal, they should be able to drag it around on the screen using a typicall windows bar feature that people are familiar with
-- add leave open feature for discard pile and reserve modal pop ups. Just like the deck pop up feature,

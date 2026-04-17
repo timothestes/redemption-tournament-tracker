@@ -238,6 +238,11 @@ export const ZoneSearchRequest = table(
     zone: t.string(),
     status: t.string(),
     createdAt: t.timestamp(),
+    // When non-empty, this request is for an atomic action (not an interactive
+    // browse). The requester waits for approval, then fires the corresponding
+    // reducer. Params is JSON-encoded (e.g. '{"count":3}').
+    action: t.string(),
+    actionParams: t.string(),
   }
 );
 

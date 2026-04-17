@@ -151,20 +151,61 @@ export async function searchCommunityDecks(query: string): Promise<{
   }));
 }
 
+export interface LoadUserDecksPagedParams {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  sort?: 'latest' | 'last_played' | 'name';
+}
+
+export interface LoadUserDecksPagedResult {
+  decks: DeckOption[];
+  totalCount: number;
+}
+
 /**
- * Load the current user's decks for the pregame deck picker.
- * Returns the same shape as the lobby page query.
+ * Paginated + searchable loader for the deck picker "My Decks" tab.
+ * Mirrors loadPublicDecksAction's shape for consistency.
  */
-export async function loadUserDecks(): Promise<DeckOption[]> {
+export async function loadUserDecksPaged(
+  params: LoadUserDecksPagedParams = {},
+): Promise<LoadUserDecksPagedResult> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
+  if (!user) return { decks: [], totalCount: 0 };
 
-  const { data: decks } = await supabase
+  const { page = 1, pageSize = 12, search, sort = 'last_played' } = params;
+  const offset = (page - 1) * pageSize;
+
+  let query = supabase
     .from('decks')
-    .select('id, name, format, card_count, preview_card_1, preview_card_2, paragon, last_played_at')
-    .eq('user_id', user.id)
-    .order('updated_at', { ascending: false });
+    .select(
+      'id, name, format, card_count, preview_card_1, preview_card_2, paragon, last_played_at',
+      { count: 'exact' },
+    )
+    .eq('user_id', user.id);
 
-  return decks || [];
+  if (search && search.trim()) {
+    query = query.ilike('name', `%${search.trim()}%`);
+  }
+
+  switch (sort) {
+    case 'name':
+      query = query.order('name', { ascending: true });
+      break;
+    case 'latest':
+      query = query.order('updated_at', { ascending: false });
+      break;
+    case 'last_played':
+    default:
+      query = query
+        .order('last_played_at', { ascending: false, nullsFirst: false })
+        .order('updated_at', { ascending: false });
+      break;
+  }
+
+  query = query.range(offset, offset + pageSize - 1);
+
+  const { data, count } = await query;
+  return { decks: data ?? [], totalCount: count ?? 0 };
 }

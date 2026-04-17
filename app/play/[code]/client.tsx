@@ -24,8 +24,7 @@ import PregameScreen, { PregameCeremonyOverlay } from '../components/PregameScre
 import { DeckPickerModal } from '../components/DeckPickerModal';
 import { getRandomLoadingMessage } from '@/app/shared/constants/loadingMessages';
 import { ArrowLeft } from 'lucide-react';
-import type { DeckOption } from '../components/DeckPickerCard';
-import { loadUserDecks, loadDeckForGame } from '../actions';
+import { loadDeckForGame } from '../actions';
 import { useUndoStack } from '../hooks/useUndoStack';
 import { useGameTimer } from '../hooks/useGameTimer';
 
@@ -45,7 +44,6 @@ interface GameParams {
   deckId: string;
   displayName: string;
   supabaseUserId: string;
-  deckData: string;
   format?: string;
   deckName?: string;
   paragon?: string | null;
@@ -143,14 +141,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
 
   // Deck reload state
   const [showReloadDeckPicker, setShowReloadDeckPicker] = useState(false);
-  const [reloadMyDecks, setReloadMyDecks] = useState<DeckOption[]>([]);
   const [reloadDeckConfirm, setReloadDeckConfirm] = useState<{ deckId: string; deckName: string; deckData: string } | null>(null);
-
-  useEffect(() => {
-    if (showReloadDeckPicker && reloadMyDecks.length === 0) {
-      loadUserDecks().then(setReloadMyDecks).catch(() => {});
-    }
-  }, [showReloadDeckPicker, reloadMyDecks.length]);
 
   // Card preview hook — must be called before any early returns (Rules of Hooks)
   const { isLoupeVisible, toggleLoupe, previewCard } = useCardPreview();
@@ -210,6 +201,32 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       return null;
     }
   });
+
+  // Deck data is loaded here (post-navigation) so the cave loading screen
+  // appears immediately on click. Serialized once and reused for the reducer
+  // call + goldfish practice-while-waiting.
+  const [deckData, setDeckData] = useState<string | null>(null);
+  const [deckLoadError, setDeckLoadError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!gameParams || deckData !== null) return;
+    let cancelled = false;
+    loadDeckForGame(gameParams.deckId)
+      .then((result) => {
+        if (cancelled) return;
+        setDeckData(JSON.stringify(result.deckData));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setDeckLoadError(err instanceof Error ? err.message : 'Failed to load deck.');
+      });
+    return () => { cancelled = true; };
+  }, [gameParams, deckData]);
+
+  useEffect(() => {
+    if (!deckLoadError) return;
+    setErrorMessage(deckLoadError);
+    setLifecycle('error');
+  }, [deckLoadError]);
 
   // Must be declared before the reducer effect so isGamesReady is available
   // in the dependency array (which is evaluated during render).
@@ -305,16 +322,21 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // Gate on isGamesReady (subscription applied) instead of isConnected (WebSocket open)
   // to eliminate the race where allGames is empty and createGame re-fires.
   useEffect(() => {
-    console.log('[game-debug] reducer effect:', { isGamesReady: gameState.isGamesReady, hasConn: !!conn, didCall: didCallReducer.current, role: gameParams?.role });
+    console.log('[game-debug] reducer effect:', { isGamesReady: gameState.isGamesReady, hasConn: !!conn, didCall: didCallReducer.current, role: gameParams?.role, deckReady: deckData !== null });
     if (!gameState.isGamesReady || !conn || didCallReducer.current) return;
-    didCallReducer.current = true;
 
     if (!gameParams) {
       console.log('[game-debug] no gameParams — showing error');
+      didCallReducer.current = true;
       setErrorMessage('No game parameters found. Please return to the lobby.');
       setLifecycle('error');
       return;
     }
+
+    // Wait for the post-navigation deck load to complete before calling the
+    // reducer. The cave loading screen is already visible to the user.
+    if (deckData === null) return;
+    didCallReducer.current = true;
 
     // Reconnect scenario: if we're the creator and the game already exists,
     // skip the createGame call (it would fail with "code already in use").
@@ -342,7 +364,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           displayName: gameParams.displayName,
           format: gameParams.format ?? 'standard',
           supabaseUserId: gameParams.supabaseUserId,
-          deckData: gameParams.deckData,
+          deckData,
           isPublic: gameParams.isPublic ?? true,
           lobbyMessage: gameParams.lobbyMessage ?? '',
         });
@@ -357,7 +379,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             deckId: gameParams.deckId,
             displayName: gameParams.displayName,
             supabaseUserId: gameParams.supabaseUserId,
-            deckData: gameParams.deckData,
+            deckData,
           });
         } catch (joinErr: unknown) {
           // SpacetimeDB SenderError may throw synchronously
@@ -373,7 +395,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       setErrorMessage(e instanceof Error ? e.message : 'Failed to initialize game');
       setLifecycle('error');
     }
-  }, [gameState.isGamesReady, conn, code, gameParams]);
+  }, [gameState.isGamesReady, conn, code, gameParams, deckData]);
 
   // Also get raw game list to find our game by code before we know the ID
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -502,9 +524,9 @@ function GameInner({ code, isConnected }: GameInnerProps) {
 
   // Compute goldfish deck for practice-while-waiting
   const goldfishDeck = useMemo(() => {
-    if (!gameParams?.deckData) return null;
+    if (!gameParams || !deckData) return null;
     try {
-      const cards = JSON.parse(gameParams.deckData) as GameCardData[];
+      const cards = JSON.parse(deckData) as GameCardData[];
       if (cards.length === 0) return null;
       return convertToGoldfishDeck(
         cards,
@@ -516,7 +538,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     } catch {
       return null;
     }
-  }, [gameParams]);
+  }, [gameParams, deckData]);
 
   // -------------------------------------------------------------------------
   // Render
@@ -1044,7 +1066,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               setShowReloadDeckPicker(false);
               setReloadDeckConfirm({ deckId: deck.id, deckName: deck.name, deckData: JSON.stringify(result.deckData) });
             }}
-            myDecks={reloadMyDecks}
           />
 
           {/* Deck reload confirmation dialog */}
@@ -1242,7 +1263,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           setShowReloadDeckPicker(false);
           setReloadDeckConfirm({ deckId: deck.id, deckName: deck.name, deckData: JSON.stringify(result.deckData) });
         }}
-        myDecks={reloadMyDecks}
       />
 
       {/* Deck reload confirmation dialog */}

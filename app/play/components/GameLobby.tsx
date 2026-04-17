@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Loader2 } from 'lucide-react';
 import { getCardImageUrl } from '@/lib/card-images';
-import { loadDeckForGame } from '../actions';
 import { useSpacetimeConnection } from '../hooks/useSpacetimeConnection';
 import { SpacetimeProvider } from '../lib/spacetimedb-provider';
 import { DeckPickerModal } from './DeckPickerModal';
@@ -94,7 +93,7 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
     setPendingLobbyCode(null);
   }
 
-  async function handleJoinFromLobby(code: string, overrideDisplayName?: string) {
+  function handleJoinFromLobby(code: string, overrideDisplayName?: string) {
     if (!hasUsername && !overrideDisplayName) {
       setPendingAction('lobby-join');
       setPendingLobbyCode(code);
@@ -108,30 +107,23 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
     setGameCode(code);
     setIsJoining(true);
     setError(null);
-    try {
-      const { deckData } = await loadDeckForGame(selectedDeck.id);
-      localStorage.setItem('lastPlayedDeckId', selectedDeck.id);
-      sessionStorage.setItem(
-        `stdb_game_params_${code}`,
-        JSON.stringify({
-          role: 'join',
-          deckId: selectedDeck.id,
-          deckName: selectedDeck.name,
-          displayName: overrideDisplayName || displayName,
-          supabaseUserId: userId,
-          format: selectedDeck.format || 'Type 1',
-          paragon: selectedDeck.paragon || null,
-          deckData: JSON.stringify(deckData),
-        })
-      );
-      router.push(`/play/${code}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load deck.');
-      setIsJoining(false);
-    }
+    localStorage.setItem('lastPlayedDeckId', selectedDeck.id);
+    sessionStorage.setItem(
+      `stdb_game_params_${code}`,
+      JSON.stringify({
+        role: 'join',
+        deckId: selectedDeck.id,
+        deckName: selectedDeck.name,
+        displayName: overrideDisplayName || displayName,
+        supabaseUserId: userId,
+        format: selectedDeck.format || 'Type 1',
+        paragon: selectedDeck.paragon || null,
+      })
+    );
+    router.push(`/play/${code}`);
   }
 
-  async function handleCreateGame(overrideDisplayName?: string) {
+  function handleCreateGame(overrideDisplayName?: string) {
     if (!hasUsername && !overrideDisplayName) {
       setPendingAction('create');
       setShowUsernameModal(true);
@@ -143,33 +135,26 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
     }
     setIsCreating(true);
     setError(null);
-    try {
-      const { deckData } = await loadDeckForGame(selectedDeck.id);
-      localStorage.setItem('lastPlayedDeckId', selectedDeck.id);
-      const code = Math.random().toString(36).slice(2, 6).toUpperCase();
-      sessionStorage.setItem(
-        `stdb_game_params_${code}`,
-        JSON.stringify({
-          role: 'create',
-          deckId: selectedDeck.id,
-          deckName: selectedDeck.name,
-          displayName: overrideDisplayName || displayName,
-          supabaseUserId: userId,
-          format: selectedDeck.format || 'Type 1',
-          paragon: selectedDeck.paragon || null,
-          deckData: JSON.stringify(deckData),
-          isPublic: !isPrivate,
-          lobbyMessage: '',
-        })
-      );
-      router.push(`/play/${code}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create game.');
-      setIsCreating(false);
-    }
+    localStorage.setItem('lastPlayedDeckId', selectedDeck.id);
+    const code = Math.random().toString(36).slice(2, 6).toUpperCase();
+    sessionStorage.setItem(
+      `stdb_game_params_${code}`,
+      JSON.stringify({
+        role: 'create',
+        deckId: selectedDeck.id,
+        deckName: selectedDeck.name,
+        displayName: overrideDisplayName || displayName,
+        supabaseUserId: userId,
+        format: selectedDeck.format || 'Type 1',
+        paragon: selectedDeck.paragon || null,
+        isPublic: !isPrivate,
+        lobbyMessage: '',
+      })
+    );
+    router.push(`/play/${code}`);
   }
 
-  async function handleJoinGame(overrideDisplayName?: string) {
+  function handleJoinGame(overrideDisplayName?: string) {
     const code = gameCode.trim().toUpperCase();
     if (code.length !== 4) {
       setError('Game code must be 4 characters.');
@@ -190,27 +175,20 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
     }
     setIsJoining(true);
     setError(null);
-    try {
-      const { deckData } = await loadDeckForGame(selectedDeck.id);
-      localStorage.setItem('lastPlayedDeckId', selectedDeck.id);
-      sessionStorage.setItem(
-        `stdb_game_params_${code}`,
-        JSON.stringify({
-          role: 'join',
-          deckId: selectedDeck.id,
-          deckName: selectedDeck.name,
-          displayName: overrideDisplayName || displayName,
-          supabaseUserId: userId,
-          format: selectedDeck.format || 'Type 1',
-          paragon: selectedDeck.paragon || null,
-          deckData: JSON.stringify(deckData),
-        })
-      );
-      router.push(`/play/${code}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load deck.');
-      setIsJoining(false);
-    }
+    localStorage.setItem('lastPlayedDeckId', selectedDeck.id);
+    sessionStorage.setItem(
+      `stdb_game_params_${code}`,
+      JSON.stringify({
+        role: 'join',
+        deckId: selectedDeck.id,
+        deckName: selectedDeck.name,
+        displayName: overrideDisplayName || displayName,
+        supabaseUserId: userId,
+        format: selectedDeck.format || 'Type 1',
+        paragon: selectedDeck.paragon || null,
+      })
+    );
+    router.push(`/play/${code}`);
   }
 
   // Preview image helpers
@@ -308,7 +286,6 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
         open={pickerOpen}
         onOpenChange={setPickerOpen}
         onSelect={handleSelectDeck}
-        myDecks={decks}
         selectedDeckId={selectedDeck?.id}
       />
 
@@ -416,6 +393,14 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
                   onChange={(e) =>
                     setGameCode(e.target.value.toUpperCase().slice(0, 4))
                   }
+                  onPaste={(e) => {
+                    const pasted = e.clipboardData.getData('text').toUpperCase();
+                    const cleaned = pasted.replace(/[^A-Z0-9]/g, '');
+                    if (cleaned.length > 4 || /[^A-Z0-9]/.test(pasted)) {
+                      e.preventDefault();
+                      setGameCode(cleaned.slice(-4));
+                    }
+                  }}
                   placeholder="Game Code"
                   maxLength={4}
                   className="flex-1 uppercase tracking-widest font-mono text-center h-12 focus-visible:ring-0 focus-visible:border-primary"

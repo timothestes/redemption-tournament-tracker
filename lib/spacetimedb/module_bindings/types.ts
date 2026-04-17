@@ -151,6 +151,8 @@ export const ZoneSearchRequest = __t.object("ZoneSearchRequest", {
   zone: __t.string(),
   status: __t.string(),
   createdAt: __t.timestamp(),
+  action: __t.string(),
+  actionParams: __t.string(),
 });
 export type ZoneSearchRequest = __Infer<typeof ZoneSearchRequest>;
 

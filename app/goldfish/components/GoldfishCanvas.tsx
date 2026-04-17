@@ -46,9 +46,10 @@ interface GoldfishCanvasProps {
   offsetX: number;
   offsetY: number;
   virtualWidth: number;
+  onLoadDeck?: () => void;
 }
 
-export default function GoldfishCanvas({ containerWidth, containerHeight, scale, offsetX, offsetY, virtualWidth }: GoldfishCanvasProps) {
+export default function GoldfishCanvas({ containerWidth, containerHeight, scale, offsetX, offsetY, virtualWidth, onLoadDeck }: GoldfishCanvasProps) {
   const { state, dispatch, drawCard, drawMultiple, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck, shuffleDeck, meekCard, unmeekCard, flipCard, addCounter, removeCounter, addNote, addOpponentLostSoul, removeOpponentToken, addPlayerLostSoul, reorderHand } = useGame();
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const stageRef = useRef<Konva.Stage>(null);
@@ -1089,32 +1090,90 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                   cornerRadius={3}
                   opacity={0.45}
                 />
-                <Text
-                  x={rect.x + 8}
-                  y={rect.y + 6}
-                  text={(useShortenedLabels && SHORT_ZONE_LABELS[zoneId] ? SHORT_ZONE_LABELS[zoneId] : rect.label).toUpperCase()}
-                  fontSize={SIDEBAR_ZONES_WITH_BADGE.includes(zoneId) && useShortenedLabels ? 11 : 14}
-                  fontFamily="Cinzel, Georgia, serif"
-                  fill="#e8d5a3"
-                  letterSpacing={SIDEBAR_ZONES_WITH_BADGE.includes(zoneId) && useShortenedLabels ? 1 : 2}
-                  width={rect.width - 8 - 38}
-                  ellipsis={true}
-                />
-                {/* Count badge for sidebar zones */}
-                {SIDEBAR_ZONES_WITH_BADGE.includes(zoneId) && (
-                  <Group x={rect.x + rect.width - 34} y={rect.y + 4}>
-                    <Rect width={28} height={20} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} />
+                {zoneId === 'territory' || zoneId === 'land-of-bondage' ? (
+                  // Top-right aligned label + count — matches multiplayer style
+                  (() => {
+                    const labelText = rect.label.toUpperCase();
+                    const labelTextWidth = labelText.length * 8.5;
+                    const badgeW = 24;
+                    const labelW = labelTextWidth + 8 + badgeW + 8;
+                    const bgW = Math.min(labelW + 6, rect.width);
+                    const bgX = rect.x + rect.width - bgW;
+                    const labelX = bgX + 6;
+                    const badgeX = labelX + labelTextWidth + 8;
+                    return (
+                      <>
+                        <Rect
+                          x={bgX}
+                          y={rect.y}
+                          width={bgW}
+                          height={20}
+                          fill="rgba(30, 22, 16, 0.85)"
+                          cornerRadius={[0, 3, 0, 4]}
+                        />
+                        <Text
+                          x={labelX}
+                          y={rect.y + 4}
+                          text={labelText}
+                          fontSize={11}
+                          fontFamily="Cinzel, Georgia, serif"
+                          fill="#e8d5a3"
+                          letterSpacing={1}
+                          width={rect.width - 44}
+                          ellipsis={true}
+                        />
+                        <Rect
+                          x={badgeX}
+                          y={rect.y + 3}
+                          width={badgeW}
+                          height={14}
+                          fill="rgba(196, 149, 90, 0.25)"
+                          cornerRadius={3}
+                          stroke="rgba(196, 149, 90, 0.5)"
+                          strokeWidth={0.5}
+                        />
+                        <Text
+                          x={badgeX}
+                          y={rect.y + 4}
+                          width={badgeW}
+                          text={String(cardCount)}
+                          fontSize={11}
+                          fill="#e8d5a3"
+                          align="center"
+                        />
+                      </>
+                    );
+                  })()
+                ) : (
+                  <>
                     <Text
-                      text={String(cardCount)}
-                      fontSize={14}
-                      fontStyle="bold"
+                      x={rect.x + 8}
+                      y={rect.y + 6}
+                      text={(useShortenedLabels && SHORT_ZONE_LABELS[zoneId] ? SHORT_ZONE_LABELS[zoneId] : rect.label).toUpperCase()}
+                      fontSize={SIDEBAR_ZONES_WITH_BADGE.includes(zoneId) && useShortenedLabels ? 11 : 14}
+                      fontFamily="Cinzel, Georgia, serif"
                       fill="#e8d5a3"
-                      width={28}
-                      height={20}
-                      align="center"
-                      verticalAlign="middle"
+                      letterSpacing={SIDEBAR_ZONES_WITH_BADGE.includes(zoneId) && useShortenedLabels ? 1 : 2}
+                      width={rect.width - 8 - 38}
+                      ellipsis={true}
                     />
-                  </Group>
+                    {/* Count badge for sidebar zones */}
+                    {SIDEBAR_ZONES_WITH_BADGE.includes(zoneId) && (
+                      <Group x={rect.x + rect.width - 34} y={rect.y + 4}>
+                        <Rect width={28} height={20} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} />
+                        <Text
+                          text={String(cardCount)}
+                          fontSize={14}
+                          fontStyle="bold"
+                          fill="#e8d5a3"
+                          width={28}
+                          height={20}
+                          align="center"
+                          verticalAlign="middle"
+                        />
+                      </Group>
+                    )}
+                  </>
                 )}
               </Group>
             );
@@ -1599,6 +1658,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
         minScale={MIN_SCALE}
         maxScale={MAX_SCALE}
         step={STEP}
+        onLoadDeck={onLoadDeck}
       />
 
       {contextMenu && (

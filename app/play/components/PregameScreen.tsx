@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import TopNav from '@/components/top-nav';
 import { DeckPickerModal } from './DeckPickerModal';
 import type { DeckOption } from './DeckPickerCard';
-import { loadUserDecks, loadDeckForGame } from '../actions';
+import { loadDeckForGame } from '../actions';
 import type { GameState } from '../hooks/useGameState';
 
 // ---------------------------------------------------------------------------
@@ -289,14 +289,8 @@ function PlayerCards({
   gameState: GameState;
   showDice: boolean;
 }) {
-  const [myDecks, setMyDecks] = useState<DeckOption[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [isChangingDeck, setIsChangingDeck] = useState(false);
-
-  // Load user's decks on mount (for deck picker)
-  useEffect(() => {
-    loadUserDecks().then(setMyDecks).catch(() => {});
-  }, []);
 
   const handleDeckSelected = async (deck: DeckOption) => {
     setPickerOpen(false);
@@ -431,7 +425,6 @@ function PlayerCards({
         open={pickerOpen}
         onOpenChange={setPickerOpen}
         onSelect={handleDeckSelected}
-        myDecks={myDecks}
         selectedDeckId={myPlayer?.deckId}
       />
     </>
@@ -757,7 +750,7 @@ function RollAndChooseArea({
         </div>
       ) : (
         <p className="mt-2 text-xs text-amber-200/40">
-          {myRollAcked ? 'Waiting for them to choose...' : 'Waiting...'}
+          {myRollAcked ? 'Waiting for them to choose who goes first...' : 'Waiting...'}
         </p>
       )}
 

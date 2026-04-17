@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { Trash2, ChevronUp, ChevronDown, Shuffle, Eye, EyeOff } from 'lucide-react';
+import { Trash2, Eye, EyeOff, Search } from 'lucide-react';
 
 // Context to let SubMenuActionRow lock/unlock the parent from auto-closing
 const SubmenuLockContext = createContext<{
@@ -14,13 +14,11 @@ interface ReserveContextMenuProps {
   y: number;
   cardCount: number;
   isRevealed: boolean;
-  onToggleReveal: () => void;
+  onToggleReveal?: () => void;
+  onLookAtReserve?: () => void;
+  onSearchRequest?: () => void;
   onClose: () => void;
   onRandomToDiscard?: (count: number) => void;
-  onRandomToHand?: (count: number) => void;
-  onRandomToDeckTop?: (count: number) => void;
-  onRandomToDeckBottom?: (count: number) => void;
-  onShuffleRandomIntoDeck?: (count: number) => void;
 }
 
 const ITEM_STYLE: React.CSSProperties = {
@@ -224,12 +222,8 @@ function SubMenuActionRow({
 }
 
 export function ReserveContextMenu({
-  x, y, cardCount, isRevealed, onToggleReveal, onClose,
+  x, y, cardCount, isRevealed, onToggleReveal, onLookAtReserve, onSearchRequest, onClose,
   onRandomToDiscard,
-  onRandomToHand,
-  onRandomToDeckTop,
-  onRandomToDeckBottom,
-  onShuffleRandomIntoDeck,
 }: ReserveContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -254,7 +248,7 @@ export function ReserveContextMenu({
   const rightAligned = x + MENU_WIDTH > window.innerWidth;
   const menuLeft = rightAligned ? Math.max(0, x - MENU_WIDTH) : x;
 
-  const hasRandomActions = onRandomToDiscard || onRandomToHand || onRandomToDeckTop || onRandomToDeckBottom || onShuffleRandomIntoDeck;
+  const hasRandomActions = !!onRandomToDiscard;
 
   return (
     <div
@@ -273,31 +267,44 @@ export function ReserveContextMenu({
         whiteSpace: 'nowrap',
       }}
     >
-      {/* Header */}
-      <div style={{
-        padding: '4px 14px 6px',
-        color: 'var(--gf-text-dim)',
-        fontSize: 10,
-        fontFamily: 'var(--font-cinzel), Georgia, serif',
-        letterSpacing: '0.08em',
-        textTransform: 'uppercase',
-        userSelect: 'none',
-      }}>
-        Reserve ({cardCount} cards)
-      </div>
+      {/* Look at Reserve (private browse) */}
+      {onLookAtReserve && cardCount > 0 && (
+        <button
+          style={ITEM_STYLE}
+          onClick={() => { onLookAtReserve(); onClose(); }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+        >
+          <Search size={14} />
+          Look at Reserve
+        </button>
+      )}
 
-      <div style={SEPARATOR_STYLE} />
+      {/* Request search (opponent reserve, unrevealed) */}
+      {onSearchRequest && (
+        <button
+          style={ITEM_STYLE}
+          onClick={() => { onSearchRequest(); onClose(); }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+        >
+          <Search size={14} />
+          Request Search
+        </button>
+      )}
 
-      {/* Reveal / Hide */}
-      <button
-        style={ITEM_STYLE}
-        onClick={() => { onToggleReveal(); onClose(); }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-      >
-        {isRevealed ? <EyeOff size={14} /> : <Eye size={14} />}
-        {isRevealed ? 'Hide Reserve' : 'Reveal Reserve'}
-      </button>
+      {/* Reveal / Hide — only shown for own reserve */}
+      {onToggleReveal && (
+        <button
+          style={ITEM_STYLE}
+          onClick={() => { onToggleReveal(); onClose(); }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+        >
+          {isRevealed ? <EyeOff size={14} /> : <Eye size={14} />}
+          {isRevealed ? 'Hide Reserve' : 'Reveal Reserve'}
+        </button>
+      )}
 
       {/* Random actions — only show when there are cards and callbacks */}
       {hasRandomActions && cardCount > 0 && (
@@ -321,38 +328,6 @@ export function ReserveContextMenu({
               label="Random to Discard"
               max={cardCount}
               onAction={onRandomToDiscard}
-            />
-          )}
-          {onRandomToHand && (
-            <SubMenuActionRow
-              icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>}
-              label="Random to Hand"
-              max={cardCount}
-              onAction={onRandomToHand}
-            />
-          )}
-          {onRandomToDeckTop && (
-            <SubMenuActionRow
-              icon={<ChevronUp size={14} />}
-              label="Random to Deck Top"
-              max={cardCount}
-              onAction={onRandomToDeckTop}
-            />
-          )}
-          {onRandomToDeckBottom && (
-            <SubMenuActionRow
-              icon={<ChevronDown size={14} />}
-              label="Random to Deck Bottom"
-              max={cardCount}
-              onAction={onRandomToDeckBottom}
-            />
-          )}
-          {onShuffleRandomIntoDeck && (
-            <SubMenuActionRow
-              icon={<Shuffle size={14} />}
-              label="Shuffle into Deck"
-              max={cardCount}
-              onAction={onShuffleRandomIntoDeck}
             />
           )}
         </>

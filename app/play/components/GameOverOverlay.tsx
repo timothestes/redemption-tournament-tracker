@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { DeckPickerModal } from './DeckPickerModal';
 import type { DeckOption } from './DeckPickerCard';
-import { loadUserDecks, loadDeckForGame } from '../actions';
+import { loadDeckForGame } from '../actions';
 import type { GameState } from '../hooks/useGameState';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 
@@ -100,16 +100,9 @@ export default function GameOverOverlay({
   }, [playAgainTriggered, rematchRequestedBy, onPlayAgainHandled]);
 
   // Deck picker state
-  const [myDecks, setMyDecks] = useState<DeckOption[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerMode, setPickerMode] = useState<'request' | 'respond'>('request');
   const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    if (pickerOpen && myDecks.length === 0) {
-      loadUserDecks().then(setMyDecks).catch(() => {});
-    }
-  }, [pickerOpen, myDecks.length]);
 
   // When rematch is accepted, the server resets the game in-place.
   // The game status changes from 'finished' to 'pregame/rolling' automatically
@@ -372,7 +365,6 @@ export default function GameOverOverlay({
             open={pickerOpen}
             onOpenChange={setPickerOpen}
             onSelect={handleDeckSelected}
-            myDecks={myDecks}
             selectedDeckId={myPlayer?.deckId}
           />
         </div>

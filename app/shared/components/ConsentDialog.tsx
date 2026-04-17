@@ -3,12 +3,14 @@
 interface ConsentDialogProps {
   requesterName: string;
   zoneName: string;
-  requestType?: 'search' | 'reveal' | 'priority';
+  requestType?: 'search' | 'reveal' | 'priority' | 'action';
+  /** For requestType='action' — a human sentence fragment like "shuffle your deck" */
+  actionDescription?: string;
   onAllow: () => void;
   onDeny: () => void;
 }
 
-export function ConsentDialog({ requesterName, zoneName, requestType = 'search', onAllow, onDeny }: ConsentDialogProps) {
+export function ConsentDialog({ requesterName, zoneName, requestType = 'search', actionDescription, onAllow, onDeny }: ConsentDialogProps) {
   return (
     <div
       style={{
@@ -37,6 +39,8 @@ export function ConsentDialog({ requesterName, zoneName, requestType = 'search',
             <><strong style={{ color: 'var(--gf-accent)' }}>{requesterName}</strong> is requesting <strong style={{ color: 'var(--gf-text-bright)' }}>action priority</strong></>
           ) : requestType === 'reveal' ? (
             <><strong style={{ color: 'var(--gf-accent)' }}>{requesterName}</strong> wants to reveal your <strong style={{ color: 'var(--gf-text-bright)' }}>hand</strong></>
+          ) : requestType === 'action' ? (
+            <><strong style={{ color: 'var(--gf-accent)' }}>{requesterName}</strong> wants to <strong style={{ color: 'var(--gf-text-bright)' }}>{actionDescription ?? 'perform an action on your deck'}</strong></>
           ) : (
             <><strong style={{ color: 'var(--gf-accent)' }}>{requesterName}</strong> wants to search your <strong style={{ color: 'var(--gf-text-bright)' }}>{zoneName}</strong></>
           )}

@@ -189,14 +189,14 @@ export const GameCardNode = memo(function GameCardNode({
       {/* Selection highlight — golden glow border */}
       {isSelected && (
         <Rect
-          x={-3}
-          y={-3}
-          width={cardWidth + 6}
-          height={cardHeight + 6}
+          x={-1}
+          y={-1}
+          width={cardWidth + 2}
+          height={cardHeight + 2}
           fill="transparent"
           stroke="#c4955a"
           strokeWidth={2}
-          cornerRadius={6}
+          cornerRadius={5}
           shadowColor="#c4955a"
           shadowBlur={8}
           shadowOpacity={0.6}
@@ -207,10 +207,10 @@ export const GameCardNode = memo(function GameCardNode({
       {/* Hover highlight — warm golden glow that intensifies over time */}
       {hoverProgress != null && hoverProgress > 0 && !isSelected && (
         <Rect
-          x={-3}
-          y={-3}
-          width={cardWidth + 6}
-          height={cardHeight + 6}
+          x={-1}
+          y={-1}
+          width={cardWidth + 2}
+          height={cardHeight + 2}
           fill="transparent"
           stroke={`rgba(224, 180, 100, ${0.3 + hoverProgress * 0.5})`}
           strokeWidth={1.5 + hoverProgress * 1.5}

@@ -14,6 +14,7 @@ import {
 import { MobileDrawer } from "@/components/ui/mobile-drawer";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { loadPublicDecksAction, type LoadPublicDecksParams } from "@/app/decklist/actions";
+import { loadUserDecksPaged, type LoadUserDecksPagedParams } from "../actions";
 import { DeckPickerCard } from "./DeckPickerCard";
 import type { DeckOption } from "./DeckPickerCard";
 
@@ -28,7 +29,6 @@ interface DeckPickerModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelect: (deck: DeckOption) => void;
-  myDecks: DeckOption[];
   selectedDeckId?: string | null;
 }
 
@@ -41,11 +41,9 @@ function SkeletonCard() {
 // ─── Shared inner content ───────────────────────────────────────────
 
 function DeckPickerContent({
-  myDecks,
   selectedDeckId,
   onSelect,
 }: {
-  myDecks: DeckOption[];
   selectedDeckId?: string | null;
   onSelect: (deck: DeckOption) => void;
 }) {
@@ -53,10 +51,15 @@ function DeckPickerContent({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
-  // ── My Decks state ──
+  // ── My Decks state (server-paginated) ──
   const [mySearch, setMySearch] = useState("");
   const [mySort, setMySort] = useState<"latest" | "last_played" | "name">("last_played");
   const [myPage, setMyPage] = useState(1);
+  const [myResults, setMyResults] = useState<DeckOption[]>([]);
+  const [myTotal, setMyTotal] = useState(0);
+  const [myLoading, setMyLoading] = useState(false);
+  const [myHasLoaded, setMyHasLoaded] = useState(false);
+  const myDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Community state ──
   const [communitySearch, setCommunitySearch] = useState("");
@@ -76,11 +79,43 @@ function DeckPickerContent({
   }, []);
 
   // Reset pagination when filters change
-  useEffect(() => {
-    setCommunityPage(1);
-  }, [communitySearch, communityFormat, communitySort]);
+  useEffect(() => { setMyPage(1); }, [mySearch, mySort]);
+  useEffect(() => { setCommunityPage(1); }, [communitySearch, communityFormat, communitySort]);
 
-  // Community search — debounced, triggers on filter/page changes
+  // ── My Decks fetch ──
+  const fetchMyDecks = useCallback(async () => {
+    setMyLoading(true);
+    try {
+      const params: LoadUserDecksPagedParams = {
+        page: myPage,
+        pageSize: MY_DECKS_PAGE_SIZE,
+        sort: mySort,
+      };
+      if (mySearch.trim().length > 0) params.search = mySearch.trim();
+
+      const result = await loadUserDecksPaged(params);
+      setMyResults(result.decks);
+      setMyTotal(result.totalCount);
+    } catch {
+      setMyResults([]);
+      setMyTotal(0);
+    } finally {
+      setMyLoading(false);
+      setMyHasLoaded(true);
+    }
+  }, [myPage, mySort, mySearch]);
+
+  // Debounce my-decks search; immediate on sort/page changes
+  useEffect(() => {
+    if (activeTab !== "my") return;
+    if (myDebounceRef.current) clearTimeout(myDebounceRef.current);
+    myDebounceRef.current = setTimeout(fetchMyDecks, mySearch ? 300 : 0);
+    return () => {
+      if (myDebounceRef.current) clearTimeout(myDebounceRef.current);
+    };
+  }, [fetchMyDecks, activeTab, mySearch]);
+
+  // ── Community fetch ──
   const fetchCommunity = useCallback(async () => {
     setIsSearching(true);
     try {
@@ -117,7 +152,6 @@ function DeckPickerContent({
     }
   }, [communityPage, communitySort, communitySearch, communityFormat]);
 
-  // Debounce community search on text input, immediate on filter/page changes
   useEffect(() => {
     if (activeTab !== "community") return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -134,37 +168,13 @@ function DeckPickerContent({
     }
   }, [activeTab, hasSearched, fetchCommunity]);
 
-  // ── My Decks sorting, filtering + pagination ──
-  const sortedMyDecks = [...myDecks].sort((a, b) => {
-    if (mySort === "last_played") {
-      // Decks with last_played_at first, then by date descending
-      const aTime = a.last_played_at ? new Date(a.last_played_at).getTime() : 0;
-      const bTime = b.last_played_at ? new Date(b.last_played_at).getTime() : 0;
-      return bTime - aTime;
-    }
-    if (mySort === "name") {
-      return a.name.localeCompare(b.name);
-    }
-    return 0; // "latest" — keep server order (updated_at DESC)
-  });
-  const filteredMyDecks = mySearch.length > 0
-    ? sortedMyDecks.filter((d) => d.name.toLowerCase().includes(mySearch.toLowerCase()))
-    : sortedMyDecks;
-  const myTotalPages = Math.max(1, Math.ceil(filteredMyDecks.length / MY_DECKS_PAGE_SIZE));
-  const myPagedDecks = filteredMyDecks.slice(
-    (myPage - 1) * MY_DECKS_PAGE_SIZE,
-    myPage * MY_DECKS_PAGE_SIZE
-  );
-
-  // Reset my decks page when search or sort changes
-  useEffect(() => { setMyPage(1); }, [mySearch, mySort]);
-
   // Scroll grid to top on page change
   useEffect(() => {
     gridRef.current?.scrollTo({ top: 0 });
   }, [myPage, communityPage]);
 
-  // ── Community pagination ──
+  // ── Pagination totals ──
+  const myTotalPages = Math.max(1, Math.ceil(myTotal / MY_DECKS_PAGE_SIZE));
   const communityTotalPages = Math.max(1, Math.ceil(communityTotal / COMMUNITY_PAGE_SIZE));
 
   // ── Render ──
@@ -255,18 +265,21 @@ function DeckPickerContent({
       {/* Scrollable grid area — fixed flex so modal doesn't jump between pages */}
       <div ref={gridRef} className="flex-1 overflow-y-auto min-h-0" style={{ minHeight: 0 }}>
         {activeTab === "my" ? (
-          // ── My Decks ──
-          myDecks.length === 0 ? (
+          myLoading && !myHasLoaded ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {Array.from({ length: MY_DECKS_PAGE_SIZE }).map((_, i) => (
+                <SkeletonCard key={i} />
+              ))}
+            </div>
+          ) : myResults.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
-              No saved decks yet. Build a deck or try the Community tab.
-            </p>
-          ) : myPagedDecks.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">
-              No decks matching &lsquo;{mySearch}&rsquo;
+              {mySearch.trim().length > 0
+                ? `No decks matching '${mySearch}'`
+                : "No saved decks yet. Build a deck or try the Community tab."}
             </p>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {myPagedDecks.map((deck) => (
+              {myResults.map((deck) => (
                 <DeckPickerCard
                   key={deck.id}
                   deck={deck}
@@ -277,7 +290,6 @@ function DeckPickerContent({
             </div>
           )
         ) : (
-          // ── Community ──
           isSearching ? (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {Array.from({ length: COMMUNITY_PAGE_SIZE }).map((_, i) => (
@@ -317,6 +329,7 @@ function DeckPickerContent({
           </Button>
           <span className="text-xs text-muted-foreground">
             {myPage} / {myTotalPages}
+            {myTotal > 0 && ` (${myTotal} decks)`}
           </span>
           <Button
             variant="ghost"
@@ -365,7 +378,6 @@ export function DeckPickerModal({
   open,
   onOpenChange,
   onSelect,
-  myDecks,
   selectedDeckId,
 }: DeckPickerModalProps) {
   const isDesktop = useMediaQuery("(min-width: 768px)");
@@ -380,7 +392,6 @@ export function DeckPickerModal({
 
   const content = (
     <DeckPickerContent
-      myDecks={myDecks}
       selectedDeckId={selectedDeckId}
       onSelect={handleSelect}
     />
