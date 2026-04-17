@@ -2224,6 +2224,13 @@ export const exchange_cards = spacetimedb.reducer(
       if (card.gameId !== gameId) throw new SenderError('Card not in this game: ' + idStr);
     }
 
+    // Collect card details for the log BEFORE mutating
+    const exchangedCards: { name: string; img: string; fromZone: string }[] = [];
+    for (const idStr of ids) {
+      const card = ctx.db.CardInstance.id.find(BigInt(idStr));
+      if (card) exchangedCards.push({ name: card.cardName, img: card.cardImgFile, fromZone: card.zone });
+    }
+
     // Move all cards to deck, flipped
     for (const idStr of ids) {
       const cardId = BigInt(idStr);
@@ -2262,7 +2269,7 @@ export const exchange_cards = spacetimedb.reducer(
       drawCardsForPlayer(ctx, latestGame, player, ids.length);
     }
 
-    logAction(ctx, gameId, player.id, 'EXCHANGE', JSON.stringify({ count: ids.length }), game.turnNumber, game.currentPhase);
+    logAction(ctx, gameId, player.id, 'EXCHANGE', JSON.stringify({ count: ids.length, cards: exchangedCards }), game.turnNumber, game.currentPhase);
   }
 );
 
@@ -2304,6 +2311,18 @@ export const exchange_from_deck = spacetimedb.reducer(
       if (card.gameId !== gameId) throw new SenderError('Card not in this game: ' + move.cardId);
       if (card.ownerId !== player.id) throw new SenderError('Card not owned by player: ' + move.cardId);
       if (card.zone !== 'deck') throw new SenderError('Replacement card not in deck: ' + move.cardId);
+    }
+
+    // Collect card details for the log BEFORE mutating
+    const exchangedCards: { name: string; img: string; fromZone: string }[] = [];
+    for (const idStr of exchangeIds) {
+      const card = ctx.db.CardInstance.id.find(BigInt(idStr));
+      if (card) exchangedCards.push({ name: card.cardName, img: card.cardImgFile, fromZone: card.zone });
+    }
+    const receivedCards: { name: string; img: string }[] = [];
+    for (const move of moves) {
+      const card = ctx.db.CardInstance.id.find(BigInt(move.cardId));
+      if (card) receivedCards.push({ name: card.cardName, img: card.cardImgFile });
     }
 
     // Step 1: Move replacement cards from deck to their target zones
@@ -2371,7 +2390,7 @@ export const exchange_from_deck = spacetimedb.reducer(
       });
     }
 
-    logAction(ctx, gameId, player.id, 'EXCHANGE', JSON.stringify({ count: exchangeIds.length }), game.turnNumber, game.currentPhase);
+    logAction(ctx, gameId, player.id, 'EXCHANGE', JSON.stringify({ count: exchangeIds.length, cards: exchangedCards, received: receivedCards }), game.turnNumber, game.currentPhase);
   }
 );
 

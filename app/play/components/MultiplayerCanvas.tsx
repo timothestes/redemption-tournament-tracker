@@ -1390,6 +1390,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       isDraggingRef.current = true;
       dragSourceZoneRef.current = card.zone;
 
+      // Turn off Konva's pixel-based hit detection for the duration of the drag.
+      // Hit graph = an offscreen canvas where every listening shape is painted in a
+      // unique color; on every pointermove Konva reads the pixel under the cursor
+      // via getImageData to decide the target. With many visible cards that read
+      // dominates CPU. During a drag we determine the target zone ourselves via
+      // findZoneAtPosition, so Konva's hit test is pure overhead. Re-enabled in
+      // handleCardDragEnd. Konva's drag system captures pointer events at the
+      // document level so the drag itself keeps working while the layer is silenced.
+      const gameLayer = gameLayerRef.current;
+      if (gameLayer) gameLayer.listening(false);
+
       // If there is an active selection and the dragged card is not part of it,
       // clear the selection so the stale highlight doesn't persist.
       if (selectedIds.size > 0 && !selectedIds.has(card.instanceId)) {
@@ -1626,6 +1637,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       dragFollowerOffsets.current = null;
       dragGhostOffsetRef.current = null;
       setDragHoverZone(null);
+
+      // Re-enable layer listening (disabled in handleCardDragStart for perf).
+      const gameLayer = gameLayerRef.current;
+      if (gameLayer) gameLayer.listening(true);
 
       // Clean up ghost image and restore card visibility
       if (dragGhostRef.current) {
@@ -2302,6 +2317,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       const pos = layer.getRelativePointerPosition();
       if (!pos) return;
       startSelectionDrag(pos.x, pos.y, e.evt.shiftKey);
+      // Silence the game layer's hit canvas while the marquee is active — same
+      // reasoning as card drag. Stage-level mouse handlers still fire because
+      // the Stage itself doesn't depend on layer hit detection. Re-enabled in
+      // handleStageMouseUp.
+      layer.listening(false);
     },
     [selectedIds.size, clearSelection, startSelectionDrag],
   );
@@ -2336,6 +2356,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     (e: Konva.KonvaEventObject<MouseEvent>) => {
       if (!isSelectingRef.current) return;
       endSelectionDrag(e.evt.shiftKey);
+      // Re-enable layer listening (silenced in handleStageMouseDown for perf).
+      const layer = gameLayerRef.current;
+      if (layer) layer.listening(true);
     },
     [endSelectionDrag, isSelectingRef],
   );
@@ -2438,6 +2461,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       letterSpacing={1}
                       width={zone.width - 12}
                       ellipsis
+                      listening={false}
                     />
                   </>
                 )}
@@ -2490,6 +2514,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       letterSpacing={1}
                       width={zone.width - 12}
                       ellipsis
+                      listening={false}
                     />
                   </>
                 )}
@@ -2528,8 +2553,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const sx = areaRight - lw - 8 - bw - 6;
             return (
               <>
-                <Text x={sx} y={myHandRect.y + 4} text="HAND" fontSize={12} fontFamily="Cinzel, Georgia, serif" fill="#e8d5a3" letterSpacing={2} />
-                <Group x={sx + lw + 8} y={myHandRect.y + 2}>
+                <Text x={sx} y={myHandRect.y + 4} text="HAND" fontSize={12} fontFamily="Cinzel, Georgia, serif" fill="#e8d5a3" letterSpacing={2} listening={false} />
+                <Group x={sx + lw + 8} y={myHandRect.y + 2} listening={false}>
                   <Rect width={bw} height={18} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} />
                   <Text text={String(myCards['hand']?.length ?? 0)} fontSize={12} fontStyle="bold" fill="#e8d5a3" width={bw} height={18} align="center" verticalAlign="middle" />
                 </Group>
@@ -2564,8 +2589,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const sx = areaRight - totalW - 6;
             return (
               <>
-                <Text x={sx} y={opponentHandRect.y + 4} text="OPPONENT'S HAND" fontSize={12} fontFamily="Cinzel, Georgia, serif" fill="#a3c5e8" letterSpacing={2} />
-                <Group x={sx + lw + 8} y={opponentHandRect.y + 2}>
+                <Text x={sx} y={opponentHandRect.y + 4} text="OPPONENT'S HAND" fontSize={12} fontFamily="Cinzel, Georgia, serif" fill="#a3c5e8" letterSpacing={2} listening={false} />
+                <Group x={sx + lw + 8} y={opponentHandRect.y + 2} listening={false}>
                   <Rect width={bw} height={18} fill="#101828" cornerRadius={4} stroke="#4a7ab5" strokeWidth={1} />
                   <Text text={String(opponentCards['hand']?.length ?? 0)} fontSize={12} fontStyle="bold" fill="#a3c5e8" width={bw} height={18} align="center" verticalAlign="middle" />
                 </Group>
@@ -2797,7 +2822,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               const labelX = bgX + 6;
               const badgeX = labelX + labelTextWidth + 8;
               return (
-                <Group key={`lob-overlay-${isOpponent ? 'opp' : 'my'}`}>
+                <Group key={`lob-overlay-${isOpponent ? 'opp' : 'my'}`} listening={false}>
                   <Rect
                     x={bgX}
                     y={zone.y}
@@ -2863,7 +2888,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               const labelX = bgX + 6;
               const badgeX = labelX + labelTextWidth + 8;
               return (
-                <Group key={`territory-overlay-${isOpponent ? 'opp' : 'my'}`}>
+                <Group key={`territory-overlay-${isOpponent ? 'opp' : 'my'}`} listening={false}>
                   <Rect
                     x={bgX}
                     y={zone.y}
@@ -2966,7 +2991,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 } : undefined}
               >
                 {/* Count badge */}
-                <Group x={zone.x + zone.width - 32} y={zone.y + 2}>
+                <Group x={zone.x + zone.width - 32} y={zone.y + 2} listening={false}>
                   <Rect width={26} height={18} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} />
                   <Text
                     text={String(count)}
@@ -2982,7 +3007,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
                 {/* Revealed indicator for own reserve */}
                 {zoneKey === 'reserve' && (gameState.myPlayer?.reserveRevealed ?? false) && (
-                  <Group x={zone.x + 4} y={zone.y + 2}>
+                  <Group x={zone.x + 4} y={zone.y + 2} listening={false}>
                     <Rect width={18} height={18} fill="#1a2e1a" cornerRadius={4} stroke="#5a9a5a" strokeWidth={1} />
                     <Text
                       text="👁"
@@ -3153,7 +3178,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 } : undefined}
               >
                 {/* Count badge */}
-                <Group x={zone.x + zone.width - 32} y={zone.y + 2}>
+                <Group x={zone.x + zone.width - 32} y={zone.y + 2} listening={false}>
                   <Rect width={26} height={18} fill="#101828" cornerRadius={4} stroke="#4a7ab5" strokeWidth={1} />
                   <Text
                     text={String(count)}
@@ -3169,7 +3194,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
                 {/* Revealed indicator for reserve */}
                 {zoneKey === 'reserve' && oppReserveRevealed && (
-                  <Group x={zone.x + 4} y={zone.y + 2}>
+                  <Group x={zone.x + 4} y={zone.y + 2} listening={false}>
                     <Rect width={18} height={18} fill="#1a2e1a" cornerRadius={4} stroke="#5a9a5a" strokeWidth={1} />
                     <Text
                       text="👁"

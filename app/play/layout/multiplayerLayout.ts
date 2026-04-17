@@ -387,13 +387,14 @@ export function calculateMultiplayerLayout(
     ? ['paragon', 'deck', 'discard', 'reserve', 'banish', 'lor']
     : ['deck', 'discard', 'reserve', 'banish', 'lor'];
 
-  // Player piles: LOR (top) → Reserve → Banish → Deck → Discard (bottom)
+  // Player piles: LOR (top) then 2×2 grid clockwise from TL: Deck → Reserve → Banish → Discard
+  // Grid fills row-by-row, so array order is [TL, TR, BL, BR] = [Deck, Reserve, Discard, Banish]
   const playerPileLabels = isParagon
-    ? ['Land of Redemption', 'Reserve', 'Banish', 'Deck', 'Discard', 'Paragon']
-    : ['Land of Redemption', 'Reserve', 'Banish', 'Deck', 'Discard'];
+    ? ['Land of Redemption', 'Deck', 'Reserve', 'Discard', 'Banish', 'Paragon']
+    : ['Land of Redemption', 'Deck', 'Reserve', 'Discard', 'Banish'];
   const playerPileKeys: PileZone[] = isParagon
-    ? ['lor', 'reserve', 'banish', 'deck', 'discard', 'paragon']
-    : ['lor', 'reserve', 'banish', 'deck', 'discard'];
+    ? ['lor', 'deck', 'reserve', 'discard', 'banish', 'paragon']
+    : ['lor', 'deck', 'reserve', 'discard', 'banish'];
 
   const opponentSidebar = buildSidebar(
     sidebarX, oppSidebarY, oppSidebarHeight,

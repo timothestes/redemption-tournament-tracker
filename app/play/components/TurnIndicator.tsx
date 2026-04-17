@@ -107,6 +107,7 @@ export default function TurnIndicator({
   return (
     <div
       style={{
+        position: 'relative',
         width: '100%',
         height: '100%',
         background: 'rgba(10, 8, 5, 0.96)',
@@ -275,10 +276,15 @@ export default function TurnIndicator({
 
       {/* ================================================================
           CENTER — ‹ Arrow | Phase buttons | › Arrow (matches goldfish)
+          Absolute-positioned so it's true-centered on the bar regardless
+          of left/right cluster widths.
           ================================================================ */}
       <div
         style={{
-          flex: 1,
+          position: 'absolute',
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -397,6 +403,7 @@ export default function TurnIndicator({
           ================================================================ */}
       <div
         style={{
+          marginLeft: 'auto',
           display: 'flex',
           alignItems: 'center',
           gap: 6,

@@ -71,7 +71,8 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   ADD_COUNTER: 'added a counter',
   REMOVE_COUNTER: 'removed a counter',
   SET_NOTE: 'set a note on a card',
-  EXCHANGE_CARDS: 'exchanged cards',
+  EXCHANGE: 'exchanged cards with their deck',
+  EXCHANGE_CARDS: 'exchanged cards with their deck',
   SET_PHASE: 'moved to a new phase',
   END_TURN: 'ended their turn',
   ROLL_DICE: 'rolled dice',
@@ -90,7 +91,7 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
 
 function HoverableCard({ name, img }: { name: string; img?: string }) {
   const { setPreviewCard } = useCardPreview();
-  if (name === 'a face-down card') return <span>{name}</span>;
+  if (name === 'a face-down card' || !img) return <span>{name}</span>;
   return (
     <span
       style={{ textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 2, cursor: 'pointer' }}
@@ -185,6 +186,41 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
   }
   if (actionType === 'SPAWN_LOST_SOUL') {
     return 'spawned a lost soul token';
+  }
+  if ((actionType === 'EXCHANGE' || actionType === 'EXCHANGE_CARDS') && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const count = data.count ? Number(data.count) : 0;
+      const isViewer = actorPlayerId && viewerPlayerId && actorPlayerId === viewerPlayerId;
+      const rawExchanged: { name: string; img: string; fromZone?: string }[] = Array.isArray(data.cards) ? data.cards : [];
+      // Hand cards are private — only reveal names/images to the actor themselves.
+      const exchangedForDisplay = rawExchanged.map((c) => {
+        if (!isViewer && c.fromZone === 'hand') {
+          return { name: 'a card from hand', img: '' };
+        }
+        return { name: c.name, img: c.img };
+      });
+      const received: { name: string; img: string }[] = Array.isArray(data.received) ? data.received : [];
+      const hasExchanged = exchangedForDisplay.length > 0;
+      const hasReceived = received.length > 0;
+      if (hasExchanged && hasReceived) {
+        return (
+          <>
+            exchanged <CardNameList cards={exchangedForDisplay} /> for <CardNameList cards={received} />
+          </>
+        );
+      }
+      if (hasExchanged) {
+        return (
+          <>
+            exchanged <CardNameList cards={exchangedForDisplay} /> with their deck
+          </>
+        );
+      }
+      if (count > 0) {
+        return `exchanged ${count} card${count === 1 ? '' : 's'} with their deck`;
+      }
+    } catch { /* fall through */ }
   }
   if (actionType === 'MOVE_CARD' && payload) {
     try {

@@ -105,11 +105,10 @@ export const GameCardNode = memo(function GameCardNode({
     if (!node) return;
 
     if (lobArrivalGlow) {
-      // Phase 1: bloom in — quick fade-up with stroke + shadow expansion.
-      // Phase 2: settle + fade out — longer, with glow softening.
+      // Phase 1: bloom in — quick fade-up with stroke expansion.
+      // Phase 2: settle + fade out — longer, stroke softens back.
       node.opacity(0);
       node.strokeWidth(2.5);
-      node.shadowBlur(14);
       node.visible(true);
 
       let fade: Konva.Tween | null = null;
@@ -118,7 +117,6 @@ export const GameCardNode = memo(function GameCardNode({
         duration: 0.22,
         opacity: 1,
         strokeWidth: 4,
-        shadowBlur: 30,
         easing: KonvaLib.Easings.EaseOut,
         onFinish: () => {
           fade = new KonvaLib.Tween({
@@ -126,7 +124,6 @@ export const GameCardNode = memo(function GameCardNode({
             duration: 1.55,
             opacity: 0,
             strokeWidth: 2.5,
-            shadowBlur: 12,
             easing: KonvaLib.Easings.EaseOut,
             onFinish: () => {
               node.visible(false);
@@ -170,8 +167,10 @@ export const GameCardNode = memo(function GameCardNode({
       onMouseLeave={onMouseLeave}
       onTouchStart={(e) => onMouseEnter(card, e as unknown as Konva.KonvaEventObject<MouseEvent>)}
     >
-      {/* LOB arrival glow — amber bloom that fades when a card arrives in Land of Bondage.
-          strokeWidth and shadowBlur are animated imperatively in the effect above. */}
+      {/* LOB arrival glow — amber stroke pulse on arrival.
+          opacity + strokeWidth are animated imperatively in the effect above.
+          Shadow blur was removed for perf — canvas shadowBlur forces per-pixel
+          Gaussian blur every frame and was the dominant cost during arrivals. */}
       <Rect
         ref={arrivalGlowRef as any}
         x={-6}
@@ -182,9 +181,6 @@ export const GameCardNode = memo(function GameCardNode({
         stroke="#e8b86a"
         strokeWidth={2.5}
         cornerRadius={7}
-        shadowColor="#e8b86a"
-        shadowBlur={14}
-        shadowOpacity={0.9}
         visible={false}
         opacity={0}
         listening={false}
@@ -204,6 +200,7 @@ export const GameCardNode = memo(function GameCardNode({
           shadowColor="#c4955a"
           shadowBlur={8}
           shadowOpacity={0.6}
+          listening={false}
         />
       )}
 
@@ -221,6 +218,7 @@ export const GameCardNode = memo(function GameCardNode({
           shadowColor={`rgba(255, 215, 140, ${0.3 + hoverProgress * 0.5})`}
           shadowBlur={6 + hoverProgress * 14}
           shadowOpacity={0.4 + hoverProgress * 0.5}
+          listening={false}
         />
       )}
 
