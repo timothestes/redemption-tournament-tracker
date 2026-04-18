@@ -966,6 +966,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           </div>
         </div>
         {rightPanel}
+        {/* Paragon drawer — self-hides when paragons list is empty. */}
+        <ParagonDrawer paragons={paragonEntries} />
       </div>
     );
   }
@@ -1001,6 +1003,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           </div>
         </div>
         {rightPanel}
+        {/* Paragon drawer — self-hides when paragons list is empty. */}
+        <ParagonDrawer paragons={paragonEntries} />
       </div>
     );
   }
@@ -1088,6 +1092,10 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             </div>
           </div>
           {rightPanel}
+
+          {/* Paragon drawer — self-hides when paragons list is empty. Rendered
+              at the top level so it's a DOM sibling to the Konva canvas. */}
+          <ParagonDrawer paragons={paragonEntries} />
 
           {/* Deck reload picker (available after game ends for rematch/practice) */}
           <DeckPickerModal
@@ -1205,6 +1213,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           </div>
         </div>
         {rightPanel}
+        {/* Paragon drawer — self-hides when paragons list is empty. */}
+        <ParagonDrawer paragons={paragonEntries} />
       </div>
     );
   }
