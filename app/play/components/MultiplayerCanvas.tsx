@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Stage, Layer, Rect, Text, Group } from 'react-konva';
 import type Konva from 'konva';
 import KonvaLib from 'konva';
@@ -54,7 +54,7 @@ import DiceOverlay from './DiceOverlay';
 import { getCardImageUrl as getSharedCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import { useVirtualCanvas, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen } from '@/app/shared/layout/virtualCanvas';
 import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '@/app/goldfish/utils/equipLayout';
-import { findCard, isWarrior, isWeapon } from '@/lib/cards/lookup';
+import { findCard, isWarrior, isWeapon, isSite } from '@/lib/cards/lookup';
 import { Link2Off } from 'lucide-react';
 import { useCardScale } from '@/app/shared/hooks/useCardScale';
 import { CardScaleControl } from '@/app/shared/components/CardScaleControl';
@@ -1604,9 +1604,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // Follower set: multi-select takes precedence; otherwise, for a warrior
       // being dragged within my own territory, attached weapons come along.
       const isMultiSelectDrag = selectedIds.has(card.instanceId) && selectedIds.size > 1;
+      // A host being dragged carries its attached accessories along.
+      // Applies to territory warriors (with weapons) and LOB souls (with sites).
+      const followerZones: readonly string[] = ['territory', 'land-of-bondage'];
       const equipFollowerIds: string[] =
-        !isMultiSelectDrag && card.zone === 'territory' && card.ownerId === 'player1'
-          ? (myCards['territory'] ?? [])
+        !isMultiSelectDrag && followerZones.includes(card.zone) && card.ownerId === 'player1'
+          ? (myCards[card.zone] ?? [])
               .filter((c) => c.equippedToInstanceId === BigInt(card.instanceId))
               .map((c) => String(c.id))
           : [];
@@ -1944,6 +1947,89 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           );
           if (hitWarrior) {
             gameState.attachCard(cardId, BigInt(hitWarrior.instanceId));
+            snapBack();
+            return;
+          }
+        }
+      }
+
+      // Site attach in LOB: the site is always the accessory, the other card
+      // is always the host — regardless of which one the user dragged.
+      //   - Dragged site → any free LOB card becomes the host.
+      //   - Dragged non-site → a free LOB site becomes the accessory, the
+      //     dragged card becomes the host.
+      // Gated to single-card drags. Note: we check geometrically against the
+      // LOB zone rect (plus the peek extension above) rather than relying on
+      // `targetZone === 'land-of-bondage'` — attached sites peek above the
+      // zone, and a drop on the peeking portion lands in territory's rect.
+      if (!isGroupDrag && card.ownerId === 'player1') {
+        const myLobZone = myZones['land-of-bondage'];
+        const peekUp = myLobZone
+          ? lobCard.cardHeight * LOB_ATTACH_PEEK_VISIBLE_RATIO
+          : 0;
+        const dropInLobArea = !!(
+          myLobZone &&
+          center.x >= myLobZone.x &&
+          center.x <= myLobZone.x + myLobZone.width &&
+          center.y >= myLobZone.y - peekUp &&
+          center.y <= myLobZone.y + myLobZone.height
+        );
+        const cardMeta = findCard(card.cardName, card.cardSet, card.cardImgFile);
+        const draggedIsSite = isSite(cardMeta);
+        if (myLobZone && dropInLobArea) {
+          const myLobRaw = myCards['land-of-bondage'] ?? [];
+          const sortedLob = [...myLobRaw].sort(
+            (a, b) => Number(a.zoneIndex) - Number(b.zoneIndex),
+          );
+          const lobHosts = sortedLob.filter((c) => c.equippedToInstanceId === 0n);
+          const slotPositions = calculateAutoArrangePositions(
+            lobHosts.length,
+            myLobZone,
+            lobCard.cardWidth,
+            lobCard.cardHeight,
+          );
+          // Build pseudo-GameCards for the candidates with pixel posX/posY
+          // taken from their auto-arrange slot (not their stored posX/posY).
+          const lobCandidates = lobHosts.map((c, i) => {
+            const slot = slotPositions[i];
+            const adapted = cardInstanceToGameCard(c, counters.get(c.id) ?? [], 'player1');
+            return {
+              ...adapted,
+              posX: slot?.x,
+              posY: slot?.y,
+            };
+          });
+          // Filter by role. Dragged site → candidates are any free non-site
+          // LOB cards (that don't already host an accessory). Dragged non-site
+          // → candidates are free sites in LOB.
+          const candidates = lobCandidates.filter((c) => {
+            if (c.instanceId === card.instanceId) return false;
+            if (c.equippedTo) return false;
+            if (c.posX === undefined || c.posY === undefined) return false;
+            const meta = findCard(c.cardName, c.cardSet, c.cardImgFile);
+            const candidateIsSite = isSite(meta);
+            if (draggedIsSite) {
+              // Host candidate: any non-site LOB card with space for an accessory.
+              if (candidateIsSite) return false;
+              const attached = lobCandidates.filter((x) => x.equippedTo === c.instanceId);
+              return attached.length < MAX_EQUIPPED_WEAPONS_PER_WARRIOR;
+            }
+            // Dragged non-site → accessory candidate is a free site.
+            return candidateIsSite;
+          });
+          const hitHost = hitTestWarrior(
+            center.x,
+            center.y,
+            lobCard.cardWidth,
+            lobCard.cardHeight,
+            candidates,
+            card.instanceId,
+          );
+          if (hitHost) {
+            // Site is always the accessory, other card is always the host.
+            const siteId = draggedIsSite ? cardId : BigInt(hitHost.instanceId);
+            const hostId = draggedIsSite ? BigInt(hitHost.instanceId) : cardId;
+            gameState.attachCard(siteId, hostId);
             snapBack();
             return;
           }
@@ -2397,84 +2483,207 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     [counters],
   );
 
-  // ---- Equip: derive per-weapon screen positions + seam (for detach overlay) ----
-  // Weapons attached to a warrior don't use their own posX/posY at render time;
-  // they're anchored to the warrior at a small diagonal offset so they peek out
-  // from behind the warrior. `seam` is the point where the weapon meets the
-  // warrior, used to position the "unlink" icon.
+  // ---- LOB layout: host + attached-accessory positions ----
+  // LOB packs cards in a horizontal strip. Attached sites render BEHIND the
+  // host, with a small portion peeking upward (my side) or downward (opponent
+  // side, rotated 180°). `LOB_ATTACH_PEEK_VISIBLE_RATIO` is the fraction of
+  // the site's height that pokes out beyond the host — the rest (e.g. 85%)
+  // tucks behind. Hosts still use plain auto-arrange slots (no extra slot).
+  const LOB_ATTACH_PEEK_VISIBLE_RATIO = 0.15;
+
+  const myLobLayout = useMemo(() => {
+    const hostPositions = new Map<string, { x: number; y: number }>();
+    const accessoryPositions = new Map<
+      string,
+      { x: number; y: number; seamX: number; seamY: number }
+    >();
+    const cards = myCards['land-of-bondage'] ?? [];
+    const zone = myZones['land-of-bondage'];
+    if (!zone || cards.length === 0) {
+      return { hostPositions, accessoryPositions };
+    }
+    const sorted = [...cards].sort((a, b) => Number(a.zoneIndex) - Number(b.zoneIndex));
+    const hosts = sorted.filter((c) => c.equippedToInstanceId === 0n);
+    const accessoriesByHost = new Map<bigint, CardInstance[]>();
+    for (const c of sorted) {
+      if (c.equippedToInstanceId === 0n) continue;
+      const list = accessoriesByHost.get(c.equippedToInstanceId);
+      if (list) list.push(c);
+      else accessoriesByHost.set(c.equippedToInstanceId, [c]);
+    }
+    const slotPositions = calculateAutoArrangePositions(
+      hosts.length,
+      zone,
+      lobCard.cardWidth,
+      lobCard.cardHeight,
+    );
+    const peekUp = lobCard.cardHeight * LOB_ATTACH_PEEK_VISIBLE_RATIO;
+    hosts.forEach((host, i) => {
+      const hostSlot = slotPositions[i];
+      if (!hostSlot) return;
+      hostPositions.set(String(host.id), hostSlot);
+      const accessories = accessoriesByHost.get(host.id);
+      if (!accessories) return;
+      accessories.forEach((acc, ai) => {
+        // Accessory sits directly above the host, 15% visible above, 85%
+        // tucked behind. Each stacked accessory (rare) peeks a bit higher
+        // than the previous.
+        const ay = hostSlot.y - peekUp * (ai + 1);
+        accessoryPositions.set(String(acc.id), {
+          x: hostSlot.x,
+          y: ay,
+          // Seam in the overlap band (between accessory's bottom and host's
+          // top), horizontally centered on the host.
+          seamX: hostSlot.x + lobCard.cardWidth * 0.5,
+          seamY: hostSlot.y,
+        });
+      });
+    });
+    return { hostPositions, accessoryPositions };
+  }, [myCards, myZones, lobCard.cardWidth, lobCard.cardHeight]);
+
+  const opponentLobLayout = useMemo(() => {
+    const hostPositions = new Map<string, { x: number; y: number }>();
+    const accessoryPositions = new Map<string, { x: number; y: number }>();
+    const cards = opponentCards['land-of-bondage'] ?? [];
+    const zone = opponentZones['land-of-bondage'];
+    if (!zone || cards.length === 0) {
+      return { hostPositions, accessoryPositions };
+    }
+    const sorted = [...cards].sort((a, b) => Number(a.zoneIndex) - Number(b.zoneIndex));
+    const hosts = sorted.filter((c) => c.equippedToInstanceId === 0n);
+    const accessoriesByHost = new Map<bigint, CardInstance[]>();
+    for (const c of sorted) {
+      if (c.equippedToInstanceId === 0n) continue;
+      const list = accessoriesByHost.get(c.equippedToInstanceId);
+      if (list) list.push(c);
+      else accessoriesByHost.set(c.equippedToInstanceId, [c]);
+    }
+    const slotPositions = calculateAutoArrangePositions(
+      hosts.length,
+      zone,
+      lobCard.cardWidth,
+      lobCard.cardHeight,
+    );
+    const peekAmount = lobCard.cardHeight * LOB_ATTACH_PEEK_VISIBLE_RATIO;
+    hosts.forEach((host, i) => {
+      const hostSlot = slotPositions[i];
+      if (!hostSlot) return;
+      hostPositions.set(String(host.id), hostSlot);
+      const accessories = accessoriesByHost.get(host.id);
+      if (!accessories) return;
+      accessories.forEach((acc, ai) => {
+        // Opponent LOB renders rotated 180°. The site should peek DOWNWARD
+        // in screen coords (toward the center of the play area) so it's
+        // visually oriented toward the player who owns it.
+        // Accessory visual rect: (slot.x, slot.y + peekAmount*(ai+1)) to
+        //                         (slot.x + w, slot.y + h + peekAmount*(ai+1)).
+        // Anchor for rotation=180 is bottom-right.
+        const anchorX = hostSlot.x + lobCard.cardWidth;
+        const anchorY = hostSlot.y + lobCard.cardHeight + peekAmount * (ai + 1);
+        accessoryPositions.set(String(acc.id), {
+          x: anchorX,
+          y: anchorY,
+        });
+      });
+    });
+    return { hostPositions, accessoryPositions };
+  }, [opponentCards, opponentZones, lobCard.cardWidth, lobCard.cardHeight]);
+
+  // ---- Derive per-accessory screen positions + seam (for detach overlay) ----
+  // Accessories (weapons in territory, sites in LOB) don't use their own posX/
+  // posY at render time — they're anchored to their host at an offset so they
+  // peek out from behind. `seam` is the point where the accessory meets the
+  // host, used to position the "unlink" icon.
   const myDerivedWeaponPositions = useMemo(() => {
     const result = new Map<string, { x: number; y: number; seamX: number; seamY: number }>();
+
+    // Territory attachments (warrior + weapon)
     const territory = myCards['territory'] ?? [];
-    const myZone = myZones['territory'];
-    if (!myZone || territory.length === 0) return result;
+    const myTerrZone = myZones['territory'];
+    if (myTerrZone && territory.length > 0) {
+      const byHost = new Map<bigint, CardInstance[]>();
+      for (const c of territory) {
+        if (c.equippedToInstanceId === 0n) continue;
+        const list = byHost.get(c.equippedToInstanceId);
+        if (list) list.push(c);
+        else byHost.set(c.equippedToInstanceId, [c]);
+      }
+      for (const [hostId, accessories] of byHost) {
+        const host = territory.find((c) => c.id === hostId);
+        if (!host || !host.posX) continue;
+        const { x: hostX, y: hostY } = toScreenPos(
+          parseFloat(host.posX),
+          parseFloat(host.posY),
+          myTerrZone,
+          'my',
+        );
+        accessories.forEach((w, i) => {
+          const { dx, dy } = computeEquipOffset(cardWidth, cardHeight, i);
+          const x = hostX + dx;
+          const y = hostY + dy;
+          const seam =
+            i === 0
+              ? { x: hostX, y: hostY }
+              : (() => {
+                  const { dx: adx, dy: ady } = computeEquipOffset(cardWidth, cardHeight, i - 1);
+                  return { x: hostX + adx, y: hostY + ady };
+                })();
+          result.set(String(w.id), { x, y, seamX: seam.x, seamY: seam.y });
+        });
+      }
+    }
 
-    const byWarrior = new Map<bigint, CardInstance[]>();
-    for (const c of territory) {
-      if (c.equippedToInstanceId === 0n) continue;
-      const list = byWarrior.get(c.equippedToInstanceId);
-      if (list) list.push(c);
-      else byWarrior.set(c.equippedToInstanceId, [c]);
+    // LOB attachments (soul + site) — positions come from `myLobLayout`.
+    for (const [id, pos] of myLobLayout.accessoryPositions) {
+      result.set(id, pos);
     }
-    for (const [warriorId, weapons] of byWarrior) {
-      const warrior = territory.find((c) => c.id === warriorId);
-      if (!warrior || !warrior.posX) continue;
-      const { x: warriorX, y: warriorY } = toScreenPos(
-        parseFloat(warrior.posX),
-        parseFloat(warrior.posY),
-        myZone,
-        'my',
-      );
-      weapons.forEach((w, i) => {
-        const { dx, dy } = computeEquipOffset(cardWidth, cardHeight, i);
-        const x = warriorX + dx;
-        const y = warriorY + dy;
-        const seam =
-          i === 0
-            ? { x: warriorX, y: warriorY }
-            : (() => {
-                const { dx: adx, dy: ady } = computeEquipOffset(cardWidth, cardHeight, i - 1);
-                return { x: warriorX + adx, y: warriorY + ady };
-              })();
-        result.set(String(w.id), { x, y, seamX: seam.x, seamY: seam.y });
-      });
-    }
+
     return result;
-  }, [myCards, myZones, cardWidth, cardHeight]);
+  }, [myCards, myZones, cardWidth, cardHeight, myLobLayout]);
 
-  // Opponent weapon offsets are mirror-flipped (opponent territory renders
+  // Opponent accessory offsets are mirror-flipped (opponent zones render
   // rotated 180° from the local player's perspective). Seams aren't tracked
   // for the opponent since detach is local-player-only.
   const opponentDerivedWeaponPositions = useMemo(() => {
     const result = new Map<string, { x: number; y: number }>();
-    const territory = opponentCards['territory'] ?? [];
-    const oppZone = opponentZones['territory'];
-    if (!oppZone || territory.length === 0) return result;
 
-    const byWarrior = new Map<bigint, CardInstance[]>();
-    for (const c of territory) {
-      if (c.equippedToInstanceId === 0n) continue;
-      const list = byWarrior.get(c.equippedToInstanceId);
-      if (list) list.push(c);
-      else byWarrior.set(c.equippedToInstanceId, [c]);
+    // Territory attachments (warrior + weapon)
+    const territory = opponentCards['territory'] ?? [];
+    const oppTerrZone = opponentZones['territory'];
+    if (oppTerrZone && territory.length > 0) {
+      const byHost = new Map<bigint, CardInstance[]>();
+      for (const c of territory) {
+        if (c.equippedToInstanceId === 0n) continue;
+        const list = byHost.get(c.equippedToInstanceId);
+        if (list) list.push(c);
+        else byHost.set(c.equippedToInstanceId, [c]);
+      }
+      for (const [hostId, accessories] of byHost) {
+        const host = territory.find((c) => c.id === hostId);
+        if (!host || !host.posX) continue;
+        const { x: hostX, y: hostY } = toScreenPos(
+          parseFloat(host.posX),
+          parseFloat(host.posY),
+          oppTerrZone,
+          'opponent',
+        );
+        accessories.forEach((w, i) => {
+          const { dx, dy } = computeEquipOffset(cardWidth, cardHeight, i);
+          // Rotation=180 anchors cards at their bottom-right; flipping the offset
+          // sign places accessories visually up-and-left from the opponent's perspective.
+          result.set(String(w.id), { x: hostX - dx, y: hostY - dy });
+        });
+      }
     }
-    for (const [warriorId, weapons] of byWarrior) {
-      const warrior = territory.find((c) => c.id === warriorId);
-      if (!warrior || !warrior.posX) continue;
-      const { x: warriorX, y: warriorY } = toScreenPos(
-        parseFloat(warrior.posX),
-        parseFloat(warrior.posY),
-        oppZone,
-        'opponent',
-      );
-      weapons.forEach((w, i) => {
-        const { dx, dy } = computeEquipOffset(cardWidth, cardHeight, i);
-        // Rotation=180 anchors cards at their bottom-right; flipping the offset
-        // sign places weapons visually up-and-left from the opponent's perspective.
-        result.set(String(w.id), { x: warriorX - dx, y: warriorY - dy });
-      });
+
+    // LOB attachments (soul + site) — positions come from `opponentLobLayout`.
+    for (const [id, pos] of opponentLobLayout.accessoryPositions) {
+      result.set(id, pos);
     }
+
     return result;
-  }, [opponentCards, opponentZones, cardWidth, cardHeight]);
+  }, [opponentCards, opponentZones, cardWidth, cardHeight, opponentLobLayout]);
 
   // ---- Card bounds for marquee selection (my + opponent free-form, LOB, hand cards) ----
   const allCardBounds = useMemo((): CardBound[] => {
@@ -2529,19 +2738,35 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       }
     }
 
-    // My auto-arrange zone cards (LOB)
+    // My auto-arrange zone cards (LOB). Attached sites don't get a slot —
+    // their bounds come from the derived offset relative to the host slot.
     for (const zoneKey of AUTO_ARRANGE_ZONES) {
       const cards = myCards[zoneKey] ?? [];
       const zone = myZones[zoneKey];
       if (cards.length > 0 && zone) {
-        const positions = calculateAutoArrangePositions(cards.length, zone, lobCard.cardWidth, lobCard.cardHeight);
-        cards.forEach((card, i) => {
+        const sorted = [...cards].sort((a, b) => Number(a.zoneIndex) - Number(b.zoneIndex));
+        const hosts = sorted.filter((c) => c.equippedToInstanceId === 0n);
+        const positions = calculateAutoArrangePositions(hosts.length, zone, lobCard.cardWidth, lobCard.cardHeight);
+        hosts.forEach((host, i) => {
           const pos = positions[i];
-          if (pos) {
+          if (!pos) return;
+          bounds.push({
+            instanceId: String(host.id),
+            x: pos.x,
+            y: pos.y,
+            width: lobCard.cardWidth,
+            height: lobCard.cardHeight,
+            rotation: 0,
+            owner: 'my',
+          });
+          const attached = sorted.filter((c) => c.equippedToInstanceId === host.id);
+          for (const accessory of attached) {
+            const derived = myDerivedWeaponPositions.get(String(accessory.id));
+            if (!derived) continue;
             bounds.push({
-              instanceId: String(card.id),
-              x: pos.x,
-              y: pos.y,
+              instanceId: String(accessory.id),
+              x: derived.x,
+              y: derived.y,
               width: lobCard.cardWidth,
               height: lobCard.cardHeight,
               rotation: 0,
@@ -2552,20 +2777,38 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       }
     }
 
-    // Opponent auto-arrange zone cards (LOB, rotated 180°)
+    // Opponent auto-arrange zone cards (LOB, rotated 180°). Attached sites
+    // use their derived anchor, which is pre-computed with the mirror offset.
     for (const zoneKey of AUTO_ARRANGE_ZONES) {
       const cards = opponentCards[zoneKey] ?? [];
       const zone = opponentZones[zoneKey];
       if (cards.length > 0 && zone) {
-        const positions = calculateAutoArrangePositions(cards.length, zone, lobCard.cardWidth, lobCard.cardHeight);
-        cards.forEach((card, i) => {
+        const sorted = [...cards].sort((a, b) => Number(a.zoneIndex) - Number(b.zoneIndex));
+        const hosts = sorted.filter((c) => c.equippedToInstanceId === 0n);
+        const positions = calculateAutoArrangePositions(hosts.length, zone, lobCard.cardWidth, lobCard.cardHeight);
+        hosts.forEach((host, i) => {
           const pos = positions[i];
-          if (pos) {
-            // Opponent LOB cards are rendered at (pos.x + w, pos.y + h) with rotation=180
+          if (!pos) return;
+          // Opponent LOB cards render at (pos.x + w, pos.y + h) with rotation=180.
+          // Bounding box is (pos.x, pos.y) to (pos.x + w, pos.y + h).
+          bounds.push({
+            instanceId: String(host.id),
+            x: pos.x,
+            y: pos.y,
+            width: lobCard.cardWidth,
+            height: lobCard.cardHeight,
+            rotation: 180,
+            owner: 'opponent',
+          });
+          const attached = sorted.filter((c) => c.equippedToInstanceId === host.id);
+          for (const accessory of attached) {
+            const derived = opponentDerivedWeaponPositions.get(String(accessory.id));
+            if (!derived) continue;
+            // Derived anchor is bottom-right of the accessory (rotation=180).
             bounds.push({
-              instanceId: String(card.id),
-              x: pos.x,
-              y: pos.y,
+              instanceId: String(accessory.id),
+              x: derived.x - lobCard.cardWidth,
+              y: derived.y - lobCard.cardHeight,
               width: lobCard.cardWidth,
               height: lobCard.cardHeight,
               rotation: 180,
@@ -2603,7 +2846,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     }
 
     return bounds;
-  }, [mpLayout, myHandRect, myZones, myCards, opponentZones, opponentCards, cardWidth, cardHeight, lobCard, isSpreadHand]);
+  }, [mpLayout, myHandRect, myZones, myCards, opponentZones, opponentCards, cardWidth, cardHeight, lobCard, isSpreadHand, myDerivedWeaponPositions, opponentDerivedWeaponPositions]);
 
   // ---- Stage mouse handlers for marquee selection ----
   const handleStageMouseDown = useCallback(
@@ -3099,94 +3342,146 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           })}
 
           {/* ================================================================
-              Cards in auto-arrange zones — My LOB (draggable, horizontal strip)
+              Cards in auto-arrange zones — My LOB (draggable, horizontal strip).
+              Two-pass cluster render: for each unattached LOB card (soul), emit
+              its attached accessories (sites) first (drawn behind) and then the
+              card itself. Attached sites don't occupy their own auto-arrange slot.
               ================================================================ */}
           {AUTO_ARRANGE_ZONES.map((zoneKey) => {
             const cards = myCards[zoneKey];
             if (!cards || cards.length === 0) return null;
             const zone = myZones[zoneKey];
             if (!zone) return null;
-            const positions = calculateAutoArrangePositions(cards.length, zone, lobCard.cardWidth, lobCard.cardHeight);
+            const sorted = [...cards].sort((a, b) => Number(a.zoneIndex) - Number(b.zoneIndex));
+            const hosts = sorted.filter((c) => c.equippedToInstanceId === 0n);
+            const renderLobCard = (card: CardInstance, overridePos: { x: number; y: number }) => {
+              const gameCard = adaptCard(card, 'player1');
+              const cardIdStr = String(card.id);
+              return (
+                <GameCardNode
+                  key={cardIdStr}
+                  card={gameCard}
+                  x={overridePos.x}
+                  y={overridePos.y}
+                  rotation={0}
+                  cardWidth={lobCard.cardWidth}
+                  cardHeight={lobCard.cardHeight}
+                  image={getCardImage(card)}
+                  isSelected={isSelected(cardIdStr)}
+                  isDraggable={true}
+                  hoverProgress={hoveredInstanceId === cardIdStr ? hoverProgress : 0}
+                  lobArrivalGlow={getMyLobGlow(cardIdStr) > 0}
+                  nodeRef={registerCardNode}
+                  onClick={handleCardClick}
+                  onDragStart={handleCardDragStart}
+                  onDragMove={handleCardDragMove}
+                  onDragEnd={handleCardDragEnd}
+                  onContextMenu={handleCardContextMenu}
+                  onDblClick={handleDblClick}
+                  onMouseEnter={handleMouseEnter}
+                  onMouseLeave={handleMouseLeave}
+                />
+              );
+            };
+            // Accessories render FIRST (behind hosts), in a separate group
+            // WITHOUT zone clipping so they can peek above the LOB strip.
+            const accessoryNodes: React.ReactNode[] = [];
+            const hostNodes: React.ReactNode[] = [];
+            for (const host of hosts) {
+              const hostPos = myLobLayout.hostPositions.get(String(host.id));
+              if (!hostPos) continue;
+              const attached = sorted.filter((c) => c.equippedToInstanceId === host.id);
+              for (const accessory of attached) {
+                const pos = myLobLayout.accessoryPositions.get(String(accessory.id));
+                if (!pos) continue;
+                accessoryNodes.push(renderLobCard(accessory, { x: pos.x, y: pos.y }));
+              }
+              hostNodes.push(renderLobCard(host, hostPos));
+            }
             return (
-              <Group key={`my-auto-${zoneKey}`} clipX={zone.x} clipY={zone.y} clipWidth={zone.width} clipHeight={zone.height}>
-                {cards.map((card, i) => {
-                  const gameCard = adaptCard(card, 'player1');
-                  const pos = positions[i];
-                  if (!pos) return null;
-                  const cardIdStr = String(card.id);
-                  return (
-                    <GameCardNode
-                      key={cardIdStr}
-                      card={gameCard}
-                      x={pos.x}
-                      y={pos.y}
-                      rotation={0}
-                      cardWidth={lobCard.cardWidth}
-                      cardHeight={lobCard.cardHeight}
-                      image={getCardImage(card)}
-                      isSelected={isSelected(cardIdStr)}
-                      isDraggable={true}
-                      hoverProgress={hoveredInstanceId === cardIdStr ? hoverProgress : 0}
-                      lobArrivalGlow={getMyLobGlow(cardIdStr) > 0}
-                      nodeRef={registerCardNode}
-                      onClick={handleCardClick}
-                      onDragStart={handleCardDragStart}
-                      onDragMove={handleCardDragMove}
-                      onDragEnd={handleCardDragEnd}
-                      onContextMenu={handleCardContextMenu}
-                      onDblClick={handleDblClick}
-                      onMouseEnter={handleMouseEnter}
-                      onMouseLeave={handleMouseLeave}
-                    />
-                  );
-                })}
-              </Group>
+              <React.Fragment key={`my-auto-${zoneKey}`}>
+                {/* Attached accessories — unclipped so they peek above the zone */}
+                <Group>{accessoryNodes}</Group>
+                {/* Hosts — clipped to the zone rect */}
+                <Group clipX={zone.x} clipY={zone.y} clipWidth={zone.width} clipHeight={zone.height}>
+                  {hostNodes}
+                </Group>
+              </React.Fragment>
             );
           })}
 
           {/* ================================================================
-              Cards in auto-arrange zones — Opponent LOB (draggable, horizontal strip)
+              Cards in auto-arrange zones — Opponent LOB (draggable, horizontal strip).
+              Two-pass cluster render mirroring my LOB, rotated 180°. Accessory
+              anchor comes from opponentDerivedWeaponPositions (already mirrored).
               ================================================================ */}
           {AUTO_ARRANGE_ZONES.map((zoneKey) => {
             const cards = opponentCards[zoneKey];
             if (!cards || cards.length === 0) return null;
             const zone = opponentZones[zoneKey];
             if (!zone) return null;
-            const positions = calculateAutoArrangePositions(cards.length, zone, lobCard.cardWidth, lobCard.cardHeight);
+            const sorted = [...cards].sort((a, b) => Number(a.zoneIndex) - Number(b.zoneIndex));
+            const hosts = sorted.filter((c) => c.equippedToInstanceId === 0n);
+            const renderOppLobCard = (
+              card: CardInstance,
+              anchor: { x: number; y: number },
+            ) => {
+              const gameCard = adaptCard(card, 'player2');
+              const cardIdStr = String(card.id);
+              return (
+                <GameCardNode
+                  key={cardIdStr}
+                  card={gameCard}
+                  x={anchor.x}
+                  y={anchor.y}
+                  rotation={180}
+                  cardWidth={lobCard.cardWidth}
+                  cardHeight={lobCard.cardHeight}
+                  image={getCardImage(card)}
+                  isSelected={isSelected(cardIdStr)}
+                  isDraggable={true}
+                  hoverProgress={hoveredInstanceId === cardIdStr ? hoverProgress : 0}
+                  lobArrivalGlow={getOppLobGlow(cardIdStr) > 0}
+                  nodeRef={registerCardNode}
+                  onClick={handleCardClick}
+                  onDragStart={handleCardDragStart}
+                  onDragMove={handleCardDragMove}
+                  onDragEnd={handleCardDragEnd}
+                  onContextMenu={handleCardContextMenu}
+                  onDblClick={handleDblClick}
+                  onMouseEnter={handleMouseEnter}
+                  onMouseLeave={handleMouseLeave}
+                />
+              );
+            };
+            // Accessories render FIRST (behind hosts), in a separate group
+            // WITHOUT zone clipping so they can peek below the LOB strip
+            // (toward the center of the play area).
+            const accessoryNodes: React.ReactNode[] = [];
+            const hostNodes: React.ReactNode[] = [];
+            for (const host of hosts) {
+              const hostPos = opponentLobLayout.hostPositions.get(String(host.id));
+              if (!hostPos) continue;
+              const attached = sorted.filter((c) => c.equippedToInstanceId === host.id);
+              for (const accessory of attached) {
+                const pos = opponentLobLayout.accessoryPositions.get(String(accessory.id));
+                if (!pos) continue;
+                accessoryNodes.push(renderOppLobCard(accessory, { x: pos.x, y: pos.y }));
+              }
+              hostNodes.push(
+                renderOppLobCard(host, {
+                  x: hostPos.x + lobCard.cardWidth,
+                  y: hostPos.y + lobCard.cardHeight,
+                }),
+              );
+            }
             return (
-              <Group key={`opp-auto-${zoneKey}`} clipX={zone.x} clipY={zone.y} clipWidth={zone.width} clipHeight={zone.height}>
-                {cards.map((card, i) => {
-                  const gameCard = adaptCard(card, 'player2');
-                  const pos = positions[i];
-                  if (!pos) return null;
-                  const cardIdStr = String(card.id);
-                  return (
-                    <GameCardNode
-                      key={cardIdStr}
-                      card={gameCard}
-                      x={pos.x + lobCard.cardWidth}
-                      y={pos.y + lobCard.cardHeight}
-                      rotation={180}
-                      cardWidth={lobCard.cardWidth}
-                      cardHeight={lobCard.cardHeight}
-                      image={getCardImage(card)}
-                      isSelected={isSelected(cardIdStr)}
-                      isDraggable={true}
-                      hoverProgress={hoveredInstanceId === cardIdStr ? hoverProgress : 0}
-                      lobArrivalGlow={getOppLobGlow(cardIdStr) > 0}
-                      nodeRef={registerCardNode}
-                      onClick={handleCardClick}
-                      onDragStart={handleCardDragStart}
-                      onDragMove={handleCardDragMove}
-                      onDragEnd={handleCardDragEnd}
-                      onContextMenu={handleCardContextMenu}
-                      onDblClick={handleDblClick}
-                      onMouseEnter={handleMouseEnter}
-                      onMouseLeave={handleMouseLeave}
-                    />
-                  );
-                })}
-              </Group>
+              <React.Fragment key={`opp-auto-${zoneKey}`}>
+                <Group>{accessoryNodes}</Group>
+                <Group clipX={zone.x} clipY={zone.y} clipWidth={zone.width} clipHeight={zone.height}>
+                  {hostNodes}
+                </Group>
+              </React.Fragment>
             );
           })}
 
@@ -3839,26 +4134,37 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           ================================================================ */}
       {!isCardDraggingUi && myDerivedWeaponPositions.size > 0 && (
         <div className="pointer-events-none absolute inset-0 z-30">
-          {(myCards['territory'] ?? [])
-            .filter((weapon) => weapon.equippedToInstanceId !== 0n)
-            .map((weapon) => {
-              const derived = myDerivedWeaponPositions.get(String(weapon.id));
+          {[
+            ...(myCards['territory'] ?? []),
+            ...(myCards['land-of-bondage'] ?? []),
+          ]
+            .filter((accessory) => accessory.equippedToInstanceId !== 0n)
+            .map((accessory) => {
+              const derived = myDerivedWeaponPositions.get(String(accessory.id));
               if (!derived) return null;
               const seam = virtualToScreen(derived.seamX, derived.seamY, scale, offsetX, offsetY);
-              const myZone = myZones['territory'];
+              const zone = myZones[accessory.zone];
+              const isLob = accessory.zone === 'land-of-bondage';
               return (
                 <button
-                  key={String(weapon.id)}
+                  key={String(accessory.id)}
                   type="button"
                   onClick={() => {
-                    if (!myZone) return;
-                    const db = toDbPos(derived.x, derived.y, myZone, 'my', { cardWidth, cardHeight });
-                    gameState.detachCard(weapon.id, String(db.x), String(db.y));
+                    if (isLob) {
+                      // LOB cards are auto-arranged — stored posX/posY are
+                      // meaningless. Pass empty strings so the reducer keeps
+                      // whatever is currently stored (which is '' anyway).
+                      gameState.detachCard(accessory.id, '', '');
+                      return;
+                    }
+                    if (!zone) return;
+                    const db = toDbPos(derived.x, derived.y, zone, 'my', { cardWidth, cardHeight });
+                    gameState.detachCard(accessory.id, String(db.x), String(db.y));
                   }}
                   className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#1a1510] p-1.5 text-[#c4955a] shadow-md ring-1 ring-[#c4955a]/40 transition hover:bg-[#2a1f14] hover:ring-[#c4955a]"
                   style={{ left: `${seam.x}px`, top: `${seam.y}px` }}
-                  title="Unequip"
-                  aria-label="Unequip weapon"
+                  title="Detach"
+                  aria-label="Detach accessory"
                 >
                   <Link2Off size={14} strokeWidth={2} />
                 </button>

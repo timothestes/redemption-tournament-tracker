@@ -47,6 +47,11 @@ type TimelineEntry =
 // Helpers
 // ---------------------------------------------------------------------------
 
+// Keep in sync with RITUAL_TUMBLE_MS (1200) + dice reveal delay (600) in
+// PregameScreen.tsx — this is how long the rolling animation runs before the
+// die lands, so we hide PREGAME_ROLL log entries until then.
+const PREGAME_ROLL_REVEAL_DELAY_MS = 1800;
+
 function formatTimestamp(micros: bigint): string {
   const ms = Number(micros / BigInt(1000));
   const date = new Date(ms);
@@ -469,6 +474,47 @@ export default function ChatPanel({
   const [inputText, setInputText] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
 
+  // Delay PREGAME_ROLL log entries so they appear when the dice land, not
+  // when the server broadcasts the roll. Actions present on first mount are
+  // considered "already revealed" so a mid-game refresh doesn't re-hide them.
+  const seenActionIdsRef = useRef<Set<string> | null>(null);
+  const [hiddenActionIds, setHiddenActionIds] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => {
+    if (seenActionIdsRef.current === null) {
+      seenActionIdsRef.current = new Set(gameActions.map((a) => a.id.toString()));
+      return;
+    }
+    const newIds: string[] = [];
+    for (const action of gameActions) {
+      const id = action.id.toString();
+      if (seenActionIdsRef.current.has(id)) continue;
+      seenActionIdsRef.current.add(id);
+      if (action.actionType === 'PREGAME_ROLL') newIds.push(id);
+    }
+    if (newIds.length === 0) return;
+    setHiddenActionIds((prev) => {
+      const next = new Set(prev);
+      for (const id of newIds) next.add(id);
+      return next;
+    });
+    const timers = newIds.map((id) =>
+      setTimeout(() => {
+        setHiddenActionIds((prev) => {
+          if (!prev.has(id)) return prev;
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }, PREGAME_ROLL_REVEAL_DELAY_MS),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [gameActions]);
+
+  const visibleGameActions = hiddenActionIds.size === 0
+    ? gameActions
+    : gameActions.filter((a) => !hiddenActionIds.has(a.id.toString()));
+
   const chatEndRef = useRef<HTMLDivElement>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
   const allEndRef = useRef<HTMLDivElement>(null);
@@ -506,7 +552,7 @@ export default function ChatPanel({
       logEndRef.current?.scrollIntoView({ behavior: justSwitched ? 'instant' : 'smooth' });
     }
     prevLogTab.current = activeTab;
-  }, [gameActions, isOpen, activeTab]);
+  }, [gameActions, isOpen, activeTab, hiddenActionIds]);
 
   // Auto-scroll combined "all" tab to bottom
   const prevAllTab = useRef(activeTab);
@@ -516,7 +562,7 @@ export default function ChatPanel({
       allEndRef.current?.scrollIntoView({ behavior: justSwitched ? 'instant' : 'smooth' });
     }
     prevAllTab.current = activeTab;
-  }, [chatMessages, gameActions, isOpen, activeTab]);
+  }, [chatMessages, gameActions, isOpen, activeTab, hiddenActionIds]);
 
   const handleSend = () => {
     const trimmed = inputText.trim();
@@ -875,7 +921,7 @@ export default function ChatPanel({
                 gap: 4,
               }}
             >
-              {gameActions.length === 0 && (
+              {visibleGameActions.length === 0 && (
                 <p
                   style={{
                     color: 'rgba(232, 213, 163, 0.3)',
@@ -888,7 +934,7 @@ export default function ChatPanel({
                   No actions yet.
                 </p>
               )}
-              {gameActions.map((action) => {
+              {visibleGameActions.map((action) => {
                 const playerName =
                   playerNames[action.playerId.toString()] ??
                   `Player ${action.playerId}`;
@@ -943,7 +989,7 @@ export default function ChatPanel({
                   gap: 6,
                 }}
               >
-                {chatMessages.length === 0 && gameActions.length === 0 && (
+                {chatMessages.length === 0 && visibleGameActions.length === 0 && (
                   <p
                     style={{
                       color: 'rgba(232, 213, 163, 0.3)',
@@ -962,7 +1008,7 @@ export default function ChatPanel({
                   for (const msg of chatMessages) {
                     timeline.push({ kind: 'chat', msg, micros: msg.sentAt.microsSinceUnixEpoch });
                   }
-                  for (const action of gameActions) {
+                  for (const action of visibleGameActions) {
                     timeline.push({ kind: 'action', action, micros: action.timestamp.microsSinceUnixEpoch });
                   }
                   timeline.sort((a, b) => (a.micros < b.micros ? -1 : a.micros > b.micros ? 1 : 0));

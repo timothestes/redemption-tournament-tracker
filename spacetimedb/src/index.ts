@@ -1461,10 +1461,14 @@ export const move_card = spacetimedb.reducer(
       );
     }
 
-    // Auto-unlink: if the mover is leaving territory, clear its own equippedTo
-    // and cascade to any weapons pointing at it. Warriors heading to LOB drag
-    // their weapons to Discard; other non-territory destinations just unlink.
-    const clearEquippedOnMover = toZone !== 'territory' && card.equippedToInstanceId !== 0n;
+    // Auto-unlink cascade: when the mover leaves its current zone, clear its
+    // own equippedTo and cascade to any accessories pointing at it.
+    //
+    // Redemption rule: a warrior going from Territory to LOB drags its weapons
+    // to Discard. All other host-leaves-zone cases (soul rescued from LOB,
+    // same-zone reposition, etc.) just unlink accessories in place.
+    const leavingZone = toZone !== fromZone;
+    const clearEquippedOnMover = leavingZone && card.equippedToInstanceId !== 0n;
     ctx.db.CardInstance.id.update({
       ...card,
       zone: toZone,
@@ -1476,21 +1480,23 @@ export const move_card = spacetimedb.reducer(
       equippedToInstanceId: clearEquippedOnMover ? 0n : card.equippedToInstanceId,
     });
 
-    if (toZone !== 'territory') {
-      const attachedWeapons = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+    if (leavingZone) {
+      const sendAccessoriesToDiscard =
+        fromZone === 'territory' && toZone === 'land-of-bondage';
+      const attachedAccessories = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
         (c: any) => c.equippedToInstanceId === cardInstanceId
       );
-      for (const weapon of attachedWeapons) {
-        if (toZone === 'land-of-bondage') {
+      for (const accessory of attachedAccessories) {
+        if (sendAccessoriesToDiscard) {
           // Warrior dragged to LOB — weapons go to Discard.
           let maxDiscardIdx = -1n;
           for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
-            if (c.ownerId === weapon.ownerId && c.zone === 'discard' && c.zoneIndex > maxDiscardIdx) {
+            if (c.ownerId === accessory.ownerId && c.zone === 'discard' && c.zoneIndex > maxDiscardIdx) {
               maxDiscardIdx = c.zoneIndex;
             }
           }
           ctx.db.CardInstance.id.update({
-            ...weapon,
+            ...accessory,
             zone: 'discard',
             zoneIndex: maxDiscardIdx + 1n,
             posX: '',
@@ -1498,7 +1504,7 @@ export const move_card = spacetimedb.reducer(
             equippedToInstanceId: 0n,
           });
         } else {
-          ctx.db.CardInstance.id.update({ ...weapon, equippedToInstanceId: 0n });
+          ctx.db.CardInstance.id.update({ ...accessory, equippedToInstanceId: 0n });
         }
       }
     }
@@ -1556,15 +1562,21 @@ export const move_cards_batch = spacetimedb.reducer(
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
 
-    // Equip cascade pre-pass: weapons in this batch whose warrior is also in
-    // the batch AND we're heading to LOB get redirected to Discard — mirroring
-    // goldfish's MOVE_CARDS_BATCH rule that a warrior going to LOB takes its
-    // weapons down with it.
+    // Accessory cascade pre-pass: redirect accessories-whose-host-is-in-the-batch
+    // to Discard only for the warrior→LOB case (host in Territory, batch going
+    // to LOB). All other cross-zone scenarios let the accessory travel with
+    // the batch (or unlink in place, handled below).
+    //
+    // We also capture each mover's original zone here so the post-pass cascade
+    // can distinguish "actually left zone" from "same-zone reposition".
     const finalZoneById = new Map<string, string>();
+    const originalZoneById = new Map<string, string>();
     for (const idStr of ids) {
       const c = ctx.db.CardInstance.id.find(BigInt(idStr));
       if (!c) continue;
+      originalZoneById.set(idStr, c.zone);
       const redirected =
+        c.zone === 'territory' &&
         toZone === 'land-of-bondage' &&
         c.equippedToInstanceId !== 0n &&
         batchIdSet.has(c.equippedToInstanceId);
@@ -1651,7 +1663,11 @@ export const move_cards_batch = spacetimedb.reducer(
       const pos = { posX: String(rawPos.posX ?? ''), posY: String(rawPos.posY ?? '') };
       const cardOwnerId = newOwnerId ?? card.ownerId;
       const cardFinalZone = finalZoneById.get(idStr) ?? toZone;
-      const leavingTerritory = cardFinalZone !== 'territory';
+      // Clear the attach pointer only when the mover is actually leaving its
+      // current zone. Same-zone reposition preserves the link (both Territory
+      // warriors and LOB souls can shuffle within their zone without losing
+      // attached accessories).
+      const leavingZone = cardFinalZone !== card.zone;
 
       // Auto-fan: if dropping into territory without an explicit position,
       // stagger the card in a small grid so multi-card modal moves don't stack
@@ -1709,30 +1725,35 @@ export const move_cards_batch = spacetimedb.reducer(
         posY: finalPosY,
         isFlipped,
         ownerId: cardOwnerId,
-        equippedToInstanceId: leavingTerritory ? 0n : card.equippedToInstanceId,
+        equippedToInstanceId: leavingZone ? 0n : card.equippedToInstanceId,
       });
     }
 
-    // Equip cascade post-pass: for each mover leaving territory, cascade
-    // to non-batch weapons pointing at it. Warriors heading to LOB drag their
-    // weapons to Discard; other non-territory destinations just unlink.
+    // Accessory cascade post-pass: for each mover that actually changed zone,
+    // cascade to non-batch accessories pointing at it. Warriors going
+    // Territory → LOB drag their weapons to Discard; all other host-leaves-zone
+    // cases (soul rescued from LOB, etc.) just unlink in place.
     for (const idStr of ids) {
       const moverId = BigInt(idStr);
       const moverFinalZone = finalZoneById.get(idStr) ?? toZone;
-      if (moverFinalZone === 'territory') continue;
-      const nonBatchWeapons = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+      const originalZone = originalZoneById.get(idStr);
+      if (originalZone === undefined) continue;
+      if (moverFinalZone === originalZone) continue;
+      const sendToDiscard =
+        originalZone === 'territory' && moverFinalZone === 'land-of-bondage';
+      const nonBatchAccessories = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
         (c: any) => c.equippedToInstanceId === moverId && !batchIdSet.has(c.id)
       );
-      for (const weapon of nonBatchWeapons) {
-        if (moverFinalZone === 'land-of-bondage') {
+      for (const accessory of nonBatchAccessories) {
+        if (sendToDiscard) {
           let maxDiscardIdx = -1n;
           for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
-            if (c.ownerId === weapon.ownerId && c.zone === 'discard' && c.zoneIndex > maxDiscardIdx) {
+            if (c.ownerId === accessory.ownerId && c.zone === 'discard' && c.zoneIndex > maxDiscardIdx) {
               maxDiscardIdx = c.zoneIndex;
             }
           }
           ctx.db.CardInstance.id.update({
-            ...weapon,
+            ...accessory,
             zone: 'discard',
             zoneIndex: maxDiscardIdx + 1n,
             posX: '',
@@ -1740,7 +1761,7 @@ export const move_cards_batch = spacetimedb.reducer(
             equippedToInstanceId: 0n,
           });
         } else {
-          ctx.db.CardInstance.id.update({ ...weapon, equippedToInstanceId: 0n });
+          ctx.db.CardInstance.id.update({ ...accessory, equippedToInstanceId: 0n });
         }
       }
     }
@@ -1763,11 +1784,15 @@ export const move_cards_batch = spacetimedb.reducer(
 
 // ---------------------------------------------------------------------------
 // Reducer: attach_card
-// Attach a weapon to a warrior in Territory. Weapon may come from any zone;
-// it ends up in Territory with equippedToInstanceId pointing at the warrior
-// and inheriting the warrior's position (render layer derives offsets on the
-// client). Enforces the one-weapon-per-warrior cap server-side so a misbehaving
-// client can't stack weapons.
+// Generic "attach accessory to host" — supports warrior+weapon in Territory
+// and soul+site in Land of Bondage. Parameter names stay `weaponInstanceId` /
+// `warriorInstanceId` for backward compatibility with existing client calls,
+// but semantically they are accessory/host.
+//
+// The accessory ends up in the host's zone with equippedToInstanceId pointing
+// at the host. In Territory it inherits the host's position (render layer
+// derives offsets); in LOB the positions are cleared (auto-arranged).
+// Enforces one-accessory-per-host server-side.
 // ---------------------------------------------------------------------------
 export const attach_card = spacetimedb.reducer(
   {
@@ -1780,59 +1805,130 @@ export const attach_card = spacetimedb.reducer(
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
 
-    const weapon = ctx.db.CardInstance.id.find(weaponInstanceId);
-    const warrior = ctx.db.CardInstance.id.find(warriorInstanceId);
-    if (!weapon || !warrior) throw new SenderError('Card not found');
-    if (weapon.gameId !== gameId || warrior.gameId !== gameId) {
+    const accessory = ctx.db.CardInstance.id.find(weaponInstanceId);
+    const host = ctx.db.CardInstance.id.find(warriorInstanceId);
+    if (!accessory || !host) throw new SenderError('Card not found');
+    if (accessory.gameId !== gameId || host.gameId !== gameId) {
       throw new SenderError('Card not in this game');
     }
-    if (weapon.ownerId !== player.id || warrior.ownerId !== player.id) {
+    if (accessory.ownerId !== player.id || host.ownerId !== player.id) {
       throw new SenderError('Cannot attach opponent cards');
-    }
-    if (warrior.zone !== 'territory') {
-      throw new SenderError('Warrior not in territory');
     }
     if (weaponInstanceId === warriorInstanceId) {
       throw new SenderError('Cannot attach a card to itself');
     }
 
-    // Cap at one weapon per warrior (UI enforces this too; server is the source of truth).
+    // Determine the "natural" zone where this attachment lives:
+    //   - Sites attach to souls in Land of Bondage.
+    //   - Weapons attach to warriors in Territory.
+    // We infer from the accessory's cardType: any type containing "site" or
+    // "city" → LOB; otherwise → Territory (the weapon+warrior case). Both
+    // cards end up in the natural zone, even if one of them had to move from
+    // somewhere else (e.g. soul in Territory being dragged onto site in LOB).
+    const accessoryType = accessory.cardType.toLowerCase();
+    const accessoryIsSite =
+      accessoryType.includes('site') || accessoryType.includes('city');
+    const attachZone: string = accessoryIsSite ? 'land-of-bondage' : 'territory';
+
+    // Host must be coming from a sensible zone (Territory, LOB, Hand, Reserve,
+    // LOR). We'll move the host to the attach zone if it's not already there.
+    const validSourceZones = new Set([
+      'territory',
+      'land-of-bondage',
+      'land-of-redemption',
+      'hand',
+      'reserve',
+    ]);
+    if (!validSourceZones.has(host.zone)) {
+      throw new SenderError('Host not in a valid zone to attach');
+    }
+
+    // Cap at one accessory per host (UI enforces this too; server is the source of truth).
     const existing = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
       (c: any) => c.equippedToInstanceId === warriorInstanceId && c.id !== weaponInstanceId
     );
     if (existing.length >= 1) {
-      throw new SenderError('Warrior already has a weapon equipped');
+      throw new SenderError('Host already has an accessory attached');
     }
 
-    const fromZone = weapon.zone;
+    const accessoryFromZone = accessory.zone;
+    const hostFromZone = host.zone;
+    const compactOwners = {
+      hand: new Set<bigint>(),
+      lob: new Set<bigint>(),
+    };
 
-    // Assign weapon a fresh territory zoneIndex above the warrior so ordering
-    // is deterministic if a client falls back to zoneIndex-based rendering.
-    let maxIdx = -1n;
+    // Move the HOST to the attach zone if it's not there yet.
+    if (hostFromZone !== attachZone) {
+      let hostMaxIdx = -1n;
+      for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+        if (c.ownerId === player.id && c.zone === attachZone && c.zoneIndex > hostMaxIdx) {
+          hostMaxIdx = c.zoneIndex;
+        }
+      }
+      const hostInheritPos = attachZone === 'territory';
+      ctx.db.CardInstance.id.update({
+        ...host,
+        zone: attachZone,
+        zoneIndex: hostMaxIdx + 1n,
+        posX: hostInheritPos ? host.posX : '',
+        posY: hostInheritPos ? host.posY : '',
+        isFlipped: false,
+      });
+      if (hostFromZone === 'hand') compactOwners.hand.add(player.id);
+      if (hostFromZone === 'land-of-bondage') compactOwners.lob.add(player.id);
+    }
+
+    // Move the ACCESSORY to the attach zone (inheriting host's position in
+    // Territory; cleared in LOB).
+    let accMaxIdx = -1n;
     for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
-      if (c.ownerId === player.id && c.zone === 'territory' && c.zoneIndex > maxIdx) {
-        maxIdx = c.zoneIndex;
+      if (c.ownerId === player.id && c.zone === attachZone && c.zoneIndex > accMaxIdx) {
+        accMaxIdx = c.zoneIndex;
       }
     }
-
+    const inheritPos = attachZone === 'territory';
+    // Re-read host in case we just updated it, to get fresh posX/posY.
+    const hostNow = ctx.db.CardInstance.id.find(warriorInstanceId);
+    const hostPosX = hostNow?.posX ?? host.posX;
+    const hostPosY = hostNow?.posY ?? host.posY;
     ctx.db.CardInstance.id.update({
-      ...weapon,
-      zone: 'territory',
-      zoneIndex: maxIdx + 1n,
-      posX: warrior.posX,
-      posY: warrior.posY,
+      ...accessory,
+      zone: attachZone,
+      zoneIndex: accMaxIdx + 1n,
+      posX: inheritPos ? hostPosX : '',
+      posY: inheritPos ? hostPosY : '',
       isFlipped: false,
       equippedToInstanceId: warriorInstanceId,
     });
-
-    if (fromZone === 'hand') {
-      compactHandIndices(ctx, gameId, player.id);
-    }
-    if (fromZone === 'land-of-bondage') {
-      compactLobIndices(ctx, gameId, player.id);
+    if (accessoryFromZone === 'hand') compactOwners.hand.add(player.id);
+    if (accessoryFromZone === 'land-of-bondage' && attachZone !== 'land-of-bondage') {
+      compactOwners.lob.add(player.id);
     }
 
-    if (fromZone !== 'territory') {
+    for (const ownerId of compactOwners.hand) compactHandIndices(ctx, gameId, ownerId);
+    for (const ownerId of compactOwners.lob) compactLobIndices(ctx, gameId, ownerId);
+
+    // Log the host move (if any) and the accessory move (if any) as MOVE_CARD
+    // entries so the action log stays consistent with normal moves.
+    if (hostFromZone !== attachZone) {
+      logAction(
+        ctx,
+        gameId,
+        player.id,
+        'MOVE_CARD',
+        JSON.stringify({
+          cardInstanceId: warriorInstanceId.toString(),
+          from: hostFromZone,
+          to: attachZone,
+          cardName: host.cardName,
+          cardImgFile: host.cardImgFile,
+        }),
+        game.turnNumber,
+        game.currentPhase
+      );
+    }
+    if (accessoryFromZone !== attachZone) {
       logAction(
         ctx,
         gameId,
@@ -1840,10 +1936,10 @@ export const attach_card = spacetimedb.reducer(
         'MOVE_CARD',
         JSON.stringify({
           cardInstanceId: weaponInstanceId.toString(),
-          from: fromZone,
-          to: 'territory',
-          cardName: weapon.cardName,
-          cardImgFile: weapon.cardImgFile,
+          from: accessoryFromZone,
+          to: attachZone,
+          cardName: accessory.cardName,
+          cardImgFile: accessory.cardImgFile,
         }),
         game.turnNumber,
         game.currentPhase

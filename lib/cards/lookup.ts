@@ -61,3 +61,12 @@ export function isWarrior(card: CardData | undefined): boolean {
 export function isWeapon(card: CardData | undefined): boolean {
   return classTokens(card).includes('weapon');
 }
+
+export function isSite(card: CardData | undefined): boolean {
+  if (!card?.type) return false;
+  const tokens = card.type
+    .split(/[,\/\s]+/)
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean);
+  return tokens.includes('site') || tokens.includes('city');
+}
