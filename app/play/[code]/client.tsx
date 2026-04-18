@@ -341,17 +341,21 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     if (deckData === null) return;
     didCallReducer.current = true;
 
-    // Reconnect scenario: if we're the creator and the game already exists,
-    // skip the createGame call (it would fail with "code already in use").
-    // Joiners must always call joinGame — they see the game via subscription
-    // before joining, so we can't use game existence as a skip signal for them.
+    // Reconnect scenario: if the game already exists and we already have a
+    // player row in it, skip the create/join call. Both fail otherwise:
+    //   - createGame fails with "code already in use"
+    //   - joinGame fails with "No waiting game found" (status is no longer 'waiting')
     // Filter out finished games — old games with the same code may still exist.
-    if (gameParams.role === 'create') {
-      const existingGames = [...(gameState.allGames || [])];
-      console.log('[game-debug] reconnect check — games with this code:', existingGames.filter((g: any) => g.code === code).map((g: any) => ({ id: String(g.id), status: g.status })));
-      const existingGame = existingGames.find((g: any) => g.code === code && g.status !== 'finished');
-      if (existingGame) {
-        console.log('[game-debug] reconnect — reusing existing game:', String(existingGame.id), existingGame.status);
+    const existingGame = (gameState.allGames || []).find(
+      (g: any) => g.code === code && g.status !== 'finished'
+    );
+    if (existingGame) {
+      const alreadyJoined = (gameState.allPlayers || []).some(
+        (p: any) => p.gameId === existingGame.id
+          && (p.identity as any)?.toHexString?.() === gameState.identityHex
+      );
+      if (gameParams.role === 'create' || alreadyJoined) {
+        console.log('[game-debug] reconnect — reusing existing game:', String(existingGame.id), existingGame.status, 'role:', gameParams.role, 'alreadyJoined:', alreadyJoined);
         setGameId(existingGame.id);
         return; // lifecycle sync effect handles the rest
       }
@@ -899,6 +903,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           }}>
             {previewCard ? (
               <div style={{
+                position: 'relative',
                 width: '100%',
                 aspectRatio: '375 / 525',
                 borderRadius: 6,
@@ -918,6 +923,27 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                     transform: previewCard.isMeek ? 'rotate(180deg)' : undefined,
                   }}
                 />
+                {previewCard.notes && (
+                  <div style={{
+                    position: 'absolute',
+                    left: 8,
+                    right: 8,
+                    bottom: 10,
+                    background: 'rgba(0, 0, 0, 0.88)',
+                    border: '1px solid #c4955a',
+                    borderRadius: 999,
+                    padding: '5px 10px',
+                    color: '#f0d9a8',
+                    fontFamily: 'var(--font-cinzel), Georgia, serif',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    textAlign: 'center',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.8)',
+                    wordBreak: 'break-word',
+                  }}>
+                    {previewCard.notes}
+                  </div>
+                )}
               </div>
             ) : (
               <div style={{
