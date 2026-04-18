@@ -12,13 +12,14 @@ export type ZoneId =
   | 'discard'
   | 'paragon'
   | 'land-of-bondage'
+  | 'soul-deck'
   | 'territory'
   | 'land-of-redemption'
   | 'banish';
 
 export const ALL_ZONES: ZoneId[] = [
   'deck', 'hand', 'reserve', 'discard', 'paragon',
-  'land-of-bondage', 'territory',
+  'land-of-bondage', 'soul-deck', 'territory',
   'land-of-redemption', 'banish',
 ];
 
@@ -29,6 +30,7 @@ export const ZONE_LABELS: Record<ZoneId, string> = {
   'discard': 'Discard',
   'paragon': 'Paragon',
   'land-of-bondage': 'Land of Bondage',
+  'soul-deck': 'Soul Deck',
   'territory': 'Territory',
   'land-of-redemption': 'Land of Redemption',
   'banish': 'Banish Zone',
@@ -72,7 +74,8 @@ export interface GameCard {
   isFlipped: boolean;
   isToken: boolean;
   zone: ZoneId;
-  ownerId: 'player1' | 'player2';
+  ownerId: 'player1' | 'player2' | 'shared';
+  isSoulDeckOrigin?: boolean;
   notes: string;
   posX?: number;
   posY?: number;
