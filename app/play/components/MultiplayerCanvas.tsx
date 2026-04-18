@@ -2009,23 +2009,37 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             }
           }
           // Preserve relative z-order within the group, but place the entire
-          // group above all other cards. Collect the group's Konva nodes,
-          // sort them by their original zoneIndex, and moveToTop in order
-          // (lowest first → highest last = highest on top).
+          // group above all other cards. Collect the group's Konva nodes and
+          // moveToTop in an order that keeps attached weapons BELOW their
+          // warrior (weapons first, then warriors). Within each class, preserve
+          // zoneIndex ordering. moveToTop is last-wins, so emitting weapons
+          // first leaves them beneath the warriors that are moved afterward.
           if (originalParent) {
-            const groupNodes: { node: Konva.Node; zoneIndex: number }[] = [];
+            type GroupNode = { node: Konva.Node; zoneIndex: number; isWeapon: boolean };
+            const groupNodes: GroupNode[] = [];
             const leadCard = findAnyCardById(card.instanceId);
-            groupNodes.push({ node, zoneIndex: Number(leadCard?.zoneIndex ?? 0) });
+            groupNodes.push({
+              node,
+              zoneIndex: Number(leadCard?.zoneIndex ?? 0),
+              isWeapon: !!(leadCard && leadCard.equippedToInstanceId && leadCard.equippedToInstanceId !== 0n),
+            });
             if (followerOffsets) {
               for (const [id] of followerOffsets) {
                 const fNode = cardNodeRefs.current.get(id);
                 if (fNode) {
                   const fCard = findAnyCardById(id);
-                  groupNodes.push({ node: fNode, zoneIndex: Number(fCard?.zoneIndex ?? 0) });
+                  groupNodes.push({
+                    node: fNode,
+                    zoneIndex: Number(fCard?.zoneIndex ?? 0),
+                    isWeapon: !!(fCard && fCard.equippedToInstanceId && fCard.equippedToInstanceId !== 0n),
+                  });
                 }
               }
             }
-            groupNodes.sort((a, b) => a.zoneIndex - b.zoneIndex);
+            groupNodes.sort((a, b) => {
+              if (a.isWeapon !== b.isWeapon) return a.isWeapon ? -1 : 1;
+              return a.zoneIndex - b.zoneIndex;
+            });
             for (const { node: gNode } of groupNodes) {
               gNode.moveToTop();
             }
