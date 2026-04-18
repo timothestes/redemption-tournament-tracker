@@ -30,7 +30,7 @@ function makeCard(overrides: Partial<GameCard>): GameCard {
 function makeState(cards: GameCard[]): GameState {
   const zones: GameState['zones'] = {
     deck: [], hand: [], reserve: [], discard: [], paragon: [],
-    'land-of-bondage': [], territory: [], 'land-of-redemption': [], banish: [],
+    'land-of-bondage': [], 'soul-deck': [], territory: [], 'land-of-redemption': [], banish: [],
   };
   for (const c of cards) zones[c.zone].push(c);
   return {

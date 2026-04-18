@@ -111,6 +111,14 @@ export function calculateZoneLayout(
     label: 'Paragon',
   };
 
+  const soulDeckZone: ZoneRect = {
+    x: -1000,
+    y: -1000,
+    width: 0,
+    height: 0,
+    label: 'Soul Deck',
+  };
+
   // --- Hand ---
   const handZone: ZoneRect = {
     x: 0,
@@ -127,6 +135,7 @@ export function calculateZoneLayout(
     'discard': discardZone,
     'paragon': paragonZone,
     'land-of-bondage': landOfBondageZone,
+    'soul-deck': soulDeckZone,
     'territory': territoryZone,
     'land-of-redemption': landOfRedemptionZone,
     'banish': banishZone,
