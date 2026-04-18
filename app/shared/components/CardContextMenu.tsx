@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef, useMemo, useState } from 'react';
 import { GameCard, ZoneId, ZONE_LABELS, COUNTER_COLORS, CounterColorId } from '../../goldfish/types';
 import { GameActions } from '@/app/shared/types/gameActions';
 
@@ -34,6 +34,7 @@ interface CardContextMenuProps {
 
 export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onExchange, onDetach, onEditNote, zones }: CardContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number; ready: boolean }>({ left: x, top: y, ready: false });
 
   // Read live card data so counters update while menu is open
   const card = useMemo(() => {
@@ -62,10 +63,31 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
     };
   }, [onClose]);
 
+  // Measure after mount, compute final position, then reveal
+  useEffect(() => {
+    const menu = menuRef.current;
+    if (!menu) return;
+    const rect = menu.getBoundingClientRect();
+    const parent = menu.offsetParent as HTMLElement | null;
+    const parentRect = parent?.getBoundingClientRect() ?? { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+
+    let left = x;
+    let top = y;
+
+    if (left + rect.width > parentRect.width) {
+      left = Math.max(0, parentRect.width - rect.width - 8);
+    }
+    if (top + rect.height > parentRect.height) {
+      top = Math.max(8, parentRect.height - rect.height - 8);
+    }
+
+    setPos({ left, top, ready: true });
+  }, [x, y]);
+
   const menuStyle: React.CSSProperties = {
     position: 'fixed',
-    left: Math.min(x, window.innerWidth - 200),
-    top: Math.min(y, window.innerHeight - 400),
+    left: pos.left,
+    top: pos.top,
     background: 'var(--gf-bg)',
     border: '1px solid var(--gf-border)',
     borderRadius: 6,
@@ -75,6 +97,7 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
     overflowY: 'auto',
     boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
     whiteSpace: 'nowrap',
+    visibility: pos.ready ? 'visible' : 'hidden',
   };
 
   const itemStyle: React.CSSProperties = {
@@ -274,16 +297,36 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
       )}
 
       {onEditNote && (
-        <button
-          style={itemStyle}
-          onClick={() => doAction(() => onEditNote(card))}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-        >
-          {card.notes
-            ? `Edit note: "${card.notes.length > 20 ? card.notes.slice(0, 20) + '…' : card.notes}"`
-            : 'Add text note'}
-        </button>
+        <>
+          <button
+            style={itemStyle}
+            onClick={() => doAction(() => onEditNote(card))}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          >
+            {card.notes
+              ? `Edit note: "${card.notes.length > 20 ? card.notes.slice(0, 20) + '…' : card.notes}"`
+              : 'Add text note'}
+          </button>
+          <button
+            style={itemStyle}
+            onClick={() => doAction(() => actions.setNote(card.instanceId, 'Negated'))}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          >
+            Negated
+          </button>
+          {card.notes && (
+            <button
+              style={itemStyle}
+              onClick={() => doAction(() => actions.setNote(card.instanceId, ''))}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              Clear note
+            </button>
+          )}
+        </>
       )}
 
       <div style={separatorStyle} />
