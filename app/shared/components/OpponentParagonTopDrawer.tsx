@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface OpponentParagonTopDrawerProps {
   /** Opponent's paragon name, or null if they have none (drawer hidden). */
@@ -13,6 +13,26 @@ const HANDLE_HEIGHT = 36;
 
 export function OpponentParagonTopDrawer({ paragonName }: OpponentParagonTopDrawerProps) {
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setOpen(false);
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [open]);
 
   if (!paragonName) return null;
 
