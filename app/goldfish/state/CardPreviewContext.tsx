@@ -8,6 +8,7 @@ interface PreviewCard {
   cardName: string;
   cardImgFile: string;
   isMeek?: boolean;
+  notes?: string;
 }
 
 interface CardPreviewContextValue {

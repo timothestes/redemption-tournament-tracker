@@ -148,6 +148,26 @@ export function CardLoupePanel() {
               >
                 {previewCard.cardName}
               </span>
+              {previewCard.notes && (
+                <div
+                  style={{
+                    width: '100%',
+                    background: 'rgba(0, 0, 0, 0.85)',
+                    border: '1px solid #c4955a',
+                    borderRadius: 6,
+                    padding: '6px 10px',
+                    color: '#f0d9a8',
+                    fontFamily: 'var(--font-cinzel), Georgia, serif',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    textAlign: 'center',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
+                    wordBreak: 'break-word',
+                  }}
+                >
+                  {previewCard.notes}
+                </div>
+              )}
             </div>
           ) : (
             <div

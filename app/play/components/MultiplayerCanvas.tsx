@@ -456,7 +456,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // Only update when there's a new card — don't clear on mouseLeave so the last card stays visible
   useEffect(() => {
     if (hoveredCard) {
-      setPreviewCard({ cardName: hoveredCard.cardName, cardImgFile: hoveredCard.cardImgFile, isMeek: hoveredCard.isMeek });
+      setPreviewCard({ cardName: hoveredCard.cardName, cardImgFile: hoveredCard.cardImgFile, isMeek: hoveredCard.isMeek, notes: hoveredCard.notes });
     }
   }, [hoveredCard, setPreviewCard]);
 
