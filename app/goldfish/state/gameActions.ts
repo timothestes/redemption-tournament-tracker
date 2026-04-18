@@ -102,4 +102,12 @@ export const actions = {
   reorderLob(cardInstanceIds: string[]): GameAction {
     return createAction('REORDER_LOB', { cardInstanceIds });
   },
+
+  attachCard(cardInstanceId: string, warriorInstanceId: string): GameAction {
+    return createAction('ATTACH_CARD', { cardInstanceId, warriorInstanceId });
+  },
+
+  detachCard(cardInstanceId: string): GameAction {
+    return createAction('DETACH_CARD', { cardInstanceId });
+  },
 };
