@@ -230,8 +230,10 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   const { cardScale, zoomIn, zoomOut, resetScale, MIN_SCALE, MAX_SCALE, STEP, setCardScale } = useCardScale();
   useKeyboardShortcuts({ onZoomIn: zoomIn, onZoomOut: zoomOut });
 
-  const isParagon = false; // TODO: re-enable paragon zone later
-  const zoneLayout = useMemo(() => calculateZoneLayout(virtualWidth, VIRTUAL_HEIGHT, isParagon, scale), [isParagon, virtualWidth, scale]);
+  const zoneLayout = useMemo(
+    () => calculateZoneLayout(virtualWidth, VIRTUAL_HEIGHT, scale),
+    [virtualWidth, scale],
+  );
   const cardWidth = Math.round(CARD_WIDTH * cardScale);
   const cardHeight = Math.round(CARD_HEIGHT * cardScale);
   // Sidebar pile cards are capped to fit within the sidebar zone height
@@ -305,10 +307,9 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   const ZONE_HIT_ORDER: ZoneId[] = useMemo(() => [
     // Sidebar zones first (small, precise targets)
     'land-of-redemption', 'banish', 'reserve', 'deck', 'discard',
-    ...(isParagon ? ['paragon' as ZoneId] : []),
     // Then main area zones
     'land-of-bondage', 'territory', 'hand',
-  ], [isParagon]);
+  ], []);
 
   const findZoneAtPosition = useCallback(
     (x: number, y: number): ZoneId | null => {
@@ -879,8 +880,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   const nonHandZones: ZoneId[] = useMemo(() => [
     'territory', 'land-of-bondage',
     'land-of-redemption', 'deck', 'discard', 'reserve', 'banish',
-    ...(isParagon ? ['paragon' as ZoneId] : []),
-  ], [isParagon]);
+  ], []);
 
   // Compute card bounds for all visible cards (used for selection rectangle intersection)
   const allCardBounds = useMemo((): CardBound[] => {

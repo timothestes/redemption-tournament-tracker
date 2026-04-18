@@ -25,16 +25,13 @@ export const CARD_HEIGHT = 168;  // 120 * 1.4
  * │                                          │ [Discard]     │
  * │                                          │ [Reserve]     │
  * │  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │ [Banish]      │
- * │  LAND OF BONDAGE                         │ [Paragon*]    │
+ * │  LAND OF BONDAGE                         │               │
  * └──────────────────────────────────────────┴───────────────┘
  *  [HAND]
- *
- * Paragon zone only rendered when format = Paragon (small, in sidebar).
  */
 export function calculateZoneLayout(
   stageWidth: number,
   stageHeight: number,
-  isParagon: boolean = false,
   /** Current scale factor (real pixels / virtual pixels). Used to convert
    *  fixed-pixel HTML overlays (PhaseBar, GameToolbar) into virtual space
    *  so zone content never renders behind them. */
@@ -82,8 +79,7 @@ export function calculateZoneLayout(
   };
 
   // --- Out of Play sidebar ---
-  // Number of sidebar zones depends on whether paragon is shown
-  const sidebarZoneCount = isParagon ? 6 : 5;
+  const sidebarZoneCount = 5;
   const sideZoneHeight = (playAreaHeight - pad * (sidebarZoneCount + 1)) / sidebarZoneCount;
 
   let slotIndex = 0;
@@ -105,10 +101,15 @@ export function calculateZoneLayout(
   const deckZone: ZoneRect = { ...sidebarSlot(), label: 'Deck' };
   const discardZone: ZoneRect = { ...sidebarSlot(), label: 'Discard' };
 
-  // Paragon: small zone at bottom of sidebar, only when format = Paragon
-  const paragonZone: ZoneRect = isParagon
-    ? { ...sidebarSlot(), label: 'Paragon' }
-    : { x: -1000, y: -1000, width: 0, height: 0, label: 'Paragon' }; // off-screen when not paragon
+  // Paragon is no longer rendered on the canvas; the drawer owns it.
+  // Keep the entry so zone-keyed code (iteration over zones record) still works.
+  const paragonZone: ZoneRect = {
+    x: -1000,
+    y: -1000,
+    width: 0,
+    height: 0,
+    label: 'Paragon',
+  };
 
   // --- Hand ---
   const handZone: ZoneRect = {
