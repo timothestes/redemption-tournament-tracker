@@ -98,6 +98,15 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         result.card.isFlipped = false;
       }
       result.card.zone = toZone;
+      // Paragon: rescuing a Soul-Deck-origin card transfers ownership from
+      // the shared sentinel to the rescuing player. Marker stays set.
+      const movedFromSharedLob =
+        result.fromZone === 'land-of-bondage' &&
+        result.card.ownerId === 'shared' &&
+        result.card.isSoulDeckOrigin === true;
+      if (movedFromSharedLob) {
+        result.card.ownerId = 'player1'; // goldfish: only player1 is the seat
+      }
       // Store free-form position for territory only (LOB is auto-arranged)
       const FREE_FORM_ZONES: ZoneId[] = ['territory'];
       if (FREE_FORM_ZONES.includes(toZone) && posX !== undefined && posY !== undefined) {
@@ -141,7 +150,16 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         zones[toZone].push(result.card);
       }
 
-      return { ...state, zones, history };
+      let finalZones = zones;
+      const needsRefill =
+        state.format === 'Paragon' &&
+        result.fromZone === 'land-of-bondage' &&
+        result.card.isSoulDeckOrigin === true &&
+        toZone !== 'land-of-bondage';
+      if (needsRefill) {
+        finalZones = refillSoulDeck(zones);
+      }
+      return { ...state, zones: finalZones, history };
     }
 
     case 'DRAW_CARD': {
@@ -399,6 +417,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           result.card.isFlipped = false;
         }
         result.card.zone = finalZone;
+        const wasSharedSoulFromLob =
+          result.fromZone === 'land-of-bondage' &&
+          result.card.ownerId === 'shared' &&
+          result.card.isSoulDeckOrigin === true;
+        if (wasSharedSoulFromLob) {
+          result.card.ownerId = 'player1';
+        }
         const pos = positions?.[instanceId];
         result.card.posX = finalZone === 'territory' ? pos?.posX : undefined;
         result.card.posY = finalZone === 'territory' ? pos?.posY : undefined;
@@ -436,7 +461,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         }
         zones[finalZone].push(result.card);
       }
-      return { ...state, zones, history };
+      let finalZones = zones;
+      if (state.format === 'Paragon') {
+        // A soul-origin card may have left LoB as part of this batch; refill is idempotent.
+        finalZones = refillSoulDeck(zones);
+      }
+      return { ...state, zones: finalZones, history };
     }
 
     case 'ADD_OPPONENT_LOST_SOUL': {
