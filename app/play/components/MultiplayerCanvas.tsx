@@ -5202,28 +5202,55 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               left,
               top,
               width: previewWidth,
-              height: previewHeight,
               zIndex: 1000,
               pointerEvents: 'none',
-              borderRadius: 6,
-              boxShadow: '0 8px 32px rgba(0,0,0,0.8), 0 0 12px rgba(212,168,103,0.3)',
-              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6,
             }}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={imageUrl}
-              alt={hoveredCard.cardName}
-              width={previewWidth}
-              height={previewHeight}
+            <div
               style={{
-                display: 'block',
                 width: previewWidth,
                 height: previewHeight,
                 borderRadius: 6,
-                transform: hoveredCard.isMeek ? 'rotate(180deg)' : undefined,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.8), 0 0 12px rgba(212,168,103,0.3)',
+                overflow: 'hidden',
               }}
-            />
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={imageUrl}
+                alt={hoveredCard.cardName}
+                width={previewWidth}
+                height={previewHeight}
+                style={{
+                  display: 'block',
+                  width: previewWidth,
+                  height: previewHeight,
+                  borderRadius: 6,
+                  transform: hoveredCard.isMeek ? 'rotate(180deg)' : undefined,
+                }}
+              />
+            </div>
+            {hoveredCard.notes && (
+              <div
+                style={{
+                  background: 'rgba(0, 0, 0, 0.85)',
+                  border: '1px solid #c4955a',
+                  borderRadius: 6,
+                  padding: '6px 10px',
+                  color: '#f0d9a8',
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  textAlign: 'center',
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
+                }}
+              >
+                {hoveredCard.notes}
+              </div>
+            )}
           </div>
         );
       })()}
