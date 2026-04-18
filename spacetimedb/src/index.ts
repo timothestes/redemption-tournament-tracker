@@ -2576,11 +2576,15 @@ export const set_note = spacetimedb.reducer(
   (ctx, { gameId, cardInstanceId, text }) => {
     const player = findPlayerBySender(ctx, gameId);
 
+    const trimmed = text.trim();
+    if (trimmed.length > 40) throw new SenderError('Note too long (max 40 chars)');
+
     const card = ctx.db.CardInstance.id.find(cardInstanceId);
     if (!card) throw new SenderError('Card not found');
     if (card.gameId !== gameId) throw new SenderError('Card not in this game');
+    if (card.ownerId !== player.id) throw new SenderError('Not your card');
 
-    ctx.db.CardInstance.id.update({ ...card, notes: text });
+    ctx.db.CardInstance.id.update({ ...card, notes: trimmed });
     // No logAction
   }
 );
