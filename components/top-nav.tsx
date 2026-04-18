@@ -118,6 +118,10 @@ const TopNav: React.FC = () => {
 
   const isActive = (path: string) => pathname?.startsWith(path);
 
+  const PLAY_ALLOWED_EMAILS = ['baboonytim@gmail.com'];
+  const canSeePlay = !!(user as any)?.email &&
+    PLAY_ALLOWED_EMAILS.includes(((user as any).email as string).toLowerCase());
+
   type NavLink = { href: string; label: string; icon: IconType; highlight?: boolean; authRequired?: boolean; isNew?: boolean };
 
   const navLinks: NavLink[] = [
@@ -296,18 +300,20 @@ const TopNav: React.FC = () => {
               </div>
             )}
 
-            {/* Play link - after Admin */}
-            <Link
-              href="/play"
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
-                ${isActive('/play')
-                ? 'bg-muted text-foreground'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                }`}
-            >
-              <GiCrossedSwords className="w-4 h-4" />
-              Play
-            </Link>
+            {/* Play link - after Admin (gated by allowlist) */}
+            {canSeePlay && (
+              <Link
+                href="/play"
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
+                  ${isActive('/play')
+                  ? 'bg-muted text-foreground'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  }`}
+              >
+                <GiCrossedSwords className="w-4 h-4" />
+                Play
+              </Link>
+            )}
 
             {/* Tournaments Dropdown */}
             <div className="relative">
@@ -578,7 +584,9 @@ const TopNav: React.FC = () => {
         <div className="lg:hidden border-t border-border max-h-[calc(100dvh-4rem)] overflow-y-auto">
           <div className="px-2 pt-2 pb-3 space-y-1">
             {/* Play + Nationals links */}
-            {navLinks.slice(0, 2).map((link) => {
+            {navLinks.slice(0, 2)
+              .filter((link) => link.href !== '/play' || canSeePlay)
+              .map((link) => {
               if (link.authRequired && !user) return null;
               const Icon = link.icon;
               const isHighlight = link.highlight;

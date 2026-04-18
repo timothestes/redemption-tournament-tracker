@@ -310,9 +310,11 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
     try {
       const data = JSON.parse(payload);
       const parts: ReactNode[] = [];
-      const fromSuffix = data.fromSource === 'top-of-deck' ? ' from top of deck'
-        : data.fromSource === 'bottom-of-deck' ? ' from bottom of deck'
-        : data.fromSource === 'random-from-deck' ? ' randomly from deck'
+      const sourceName = data.sourceOwnerId && playerNames?.[data.sourceOwnerId] ? playerNames[data.sourceOwnerId] : null;
+      const deckLabel = sourceName ? `${sourceName}'s deck` : 'deck';
+      const fromSuffix = data.fromSource === 'top-of-deck' ? ` from top of ${deckLabel}`
+        : data.fromSource === 'bottom-of-deck' ? ` from bottom of ${deckLabel}`
+        : data.fromSource === 'random-from-deck' ? ` randomly from ${deckLabel}`
         : '';
       if (data.cards?.length) {
         if (data.toZone === 'discard') parts.push(<span key="discard">discarded <CardNameList cards={data.cards} />{fromSuffix}</span>);

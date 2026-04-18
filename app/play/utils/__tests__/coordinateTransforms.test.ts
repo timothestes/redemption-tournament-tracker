@@ -104,12 +104,32 @@ describe('toDbPos', () => {
   });
 
   it('clamps opponent card within zone bounds (mirror + clamp interaction)', () => {
-    // Screen bottom-right of zone (500, 500) → rawX=1, rawY=1 → clamped → mirrored
+    // Opponent input is the visual bottom-right anchor. (500, 500) places the
+    // bottom-right at the zone's bottom-right corner — card hugs that corner.
+    // Mirrored to the owner's perspective, top-left ends up at (0, 0).
     const result = toDbPos(500, 500, ZONE, 'opponent', { cardWidth: 60, cardHeight: 80 });
-    // rawX=1, maxX=1-60/400=0.85 → clampedX=0.85 → mirroredX=1-0.85=0.15
-    expect(result.x).toBeCloseTo(1 - (1 - 60 / 400), 10);
-    // rawY=1, maxY=1-80/300≈0.733 → clampedY≈0.733 → mirroredY≈0.267
-    expect(result.y).toBeCloseTo(1 - (1 - 80 / 300), 10);
+    expect(result.x).toBeCloseTo(0, 10);
+    expect(result.y).toBeCloseTo(0, 10);
+  });
+
+  it('opponent drop at zone top-left visually → DB (1 - cardRelW, 1 - cardRelH)', () => {
+    // To place the visual card flush with the zone top-left, the bottom-right
+    // anchor lands at (zone.x + cardW, zone.y + cardH) = (160, 280).
+    const result = toDbPos(160, 280, ZONE, 'opponent', { cardWidth: 60, cardHeight: 80 });
+    expect(result.x).toBeCloseTo(1 - 60 / 400, 10);
+    expect(result.y).toBeCloseTo(1 - 80 / 300, 10);
+  });
+
+  it('opponent drop spans full DB range (no 50% cap regression)', () => {
+    // Regression: previously the clamp used top-left semantics on the
+    // bottom-right anchor, collapsing the stored Y to ~[cardH/zoneH, 1-cardH/zoneH]
+    // and snapping cross-player drags to the middle of the territory.
+    const opts = { cardWidth: 60, cardHeight: 80 };
+    const topVisual = toDbPos(160, 280, ZONE, 'opponent', opts);
+    const bottomVisual = toDbPos(500, 500, ZONE, 'opponent', opts);
+    // Top of opponent zone (visually) maps near DB y=1 - cardH/zoneH (≈0.733),
+    // bottom maps to 0. The two ends must be far apart.
+    expect(topVisual.y - bottomVisual.y).toBeGreaterThan(0.5);
   });
 
   it('zero-width zone: no division by zero (uses fallback 1)', () => {

@@ -45,10 +45,23 @@ export function toDbPos(
   let rawX = (screenX - zone.x) / zoneW;
   let rawY = (screenY - zone.y) / zoneH;
   if (clamp) {
-    const maxX = Math.max(0, 1 - clamp.cardWidth / zoneW);
-    const maxY = Math.max(0, 1 - clamp.cardHeight / zoneH);
-    rawX = Math.max(0, Math.min(rawX, maxX));
-    rawY = Math.max(0, Math.min(rawY, maxY));
+    const cardRelW = clamp.cardWidth / zoneW;
+    const cardRelH = clamp.cardHeight / zoneH;
+    if (owner === 'opponent') {
+      // Opponent cards render with rotation=180, so the input position is the
+      // visual bottom-right anchor. Valid range keeps the visual card inside
+      // the zone: rawX ∈ [cardRelW, 1], rawY ∈ [cardRelH, 1].
+      const minX = Math.min(1, cardRelW);
+      const minY = Math.min(1, cardRelH);
+      rawX = Math.max(minX, Math.min(rawX, 1));
+      rawY = Math.max(minY, Math.min(rawY, 1));
+    } else {
+      // Own cards use top-left anchor: rawX ∈ [0, 1 - cardRelW].
+      const maxX = Math.max(0, 1 - cardRelW);
+      const maxY = Math.max(0, 1 - cardRelH);
+      rawX = Math.max(0, Math.min(rawX, maxX));
+      rawY = Math.max(0, Math.min(rawY, maxY));
+    }
   }
   return {
     x: owner === 'opponent' ? 1 - rawX : rawX,

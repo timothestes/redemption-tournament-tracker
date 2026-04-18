@@ -185,25 +185,6 @@ export default function GameOverOverlay({
 
             <div style={{ marginTop: 24, display: 'flex', gap: 12 }}>
               <button
-                onClick={onReturnToLobby}
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  borderRadius: 4,
-                  border: '1px solid rgba(196, 149, 90, 0.45)',
-                  background: 'rgba(196, 149, 90, 0.15)',
-                  color: '#e8d5a3',
-                  fontFamily: 'var(--font-cinzel), Georgia, serif',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                }}
-              >
-                Back to Lobby
-              </button>
-              <button
                 onClick={() => setModalDismissed(true)}
                 style={{
                   flex: 1,
@@ -221,6 +202,25 @@ export default function GameOverOverlay({
                 }}
               >
                 Dismiss
+              </button>
+              <button
+                onClick={onReturnToLobby}
+                style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  borderRadius: 4,
+                  border: '1px solid rgba(196, 149, 90, 0.45)',
+                  background: 'rgba(196, 149, 90, 0.15)',
+                  color: '#e8d5a3',
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                }}
+              >
+                Back to Lobby
               </button>
             </div>
           </div>

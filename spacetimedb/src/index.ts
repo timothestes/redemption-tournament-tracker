@@ -1451,6 +1451,11 @@ export const move_cards_batch = spacetimedb.reducer(
     const cards: { name: string; img: string }[] = [];
     const movedCards: { name: string; img: string }[] = [];
     const redirectedLostSouls: { name: string; img: string }[] = [];
+    // If cards being moved belong to someone other than the actor (e.g. the
+    // requester is acting on the opponent's deck through an approved request),
+    // record that owner so the log can say "from X's deck" instead of just
+    // "from top of deck".
+    let sourceOwnerId: bigint | null = null;
     const handCompactOwners = new Set<bigint>(); // Track owners whose hand needs compaction
     const lobCompactOwners = new Set<bigint>(); // Track owners whose LOB needs compaction
 
@@ -1497,6 +1502,9 @@ export const move_cards_batch = spacetimedb.reducer(
       const logName = hideIdentity ? 'a face-down card' : card.cardName;
       const logImg = hideIdentity ? '' : card.cardImgFile;
       cards.push({ name: logName, img: logImg });
+      if (sourceOwnerId === null && card.ownerId !== player.id) {
+        sourceOwnerId = card.ownerId;
+      }
       const cardOwnerChanged = newOwnerId !== null && newOwnerId !== card.ownerId;
       if (card.zone !== toZone || cardOwnerChanged) {
         movedCards.push({ name: logName, img: logImg });
@@ -1581,7 +1589,7 @@ export const move_cards_batch = spacetimedb.reducer(
 
     // Only log if cards actually changed zones (not just repositioned within the same zone)
     if (movedCards.length > 0 || redirectedLostSouls.length > 0) {
-      logAction(ctx, gameId, player.id, 'MOVE_CARDS_BATCH', JSON.stringify({ count: movedCards.length, toZone, cards: movedCards, redirectedLostSouls, targetOwnerId: targetOwnerId || '', fromSource: fromSource || '' }), game.turnNumber, game.currentPhase);
+      logAction(ctx, gameId, player.id, 'MOVE_CARDS_BATCH', JSON.stringify({ count: movedCards.length, toZone, cards: movedCards, redirectedLostSouls, targetOwnerId: targetOwnerId || '', fromSource: fromSource || '', sourceOwnerId: sourceOwnerId !== null ? sourceOwnerId.toString() : '' }), game.turnNumber, game.currentPhase);
     }
 
     // Compact hand indices for any owners whose hand had cards removed

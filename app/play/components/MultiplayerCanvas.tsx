@@ -3971,7 +3971,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               <strong style={{ color: '#c4955a' }}>
                 {gameState.opponentPlayer?.displayName ?? 'Opponent'}
               </strong>{' '}
-              requests priority
+              requests action priority
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button
