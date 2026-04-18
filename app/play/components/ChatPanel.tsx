@@ -451,6 +451,24 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       if (data.cardName) return <>removed {data.color} counter from <HoverableCard name={data.cardName} img={data.cardImgFile} /></>;
     } catch { /* fall through */ }
   }
+  if (actionType === 'SET_NOTE' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      if (data.cardName) {
+        const note = typeof data.note === 'string' ? data.note : '';
+        const previous = typeof data.previousNote === 'string' ? data.previousNote : '';
+        if (!note && previous) {
+          return <>cleared note on <HoverableCard name={data.cardName} img={data.cardImgFile} /></>;
+        }
+        if (note && !previous) {
+          return <>added note &ldquo;{note}&rdquo; to <HoverableCard name={data.cardName} img={data.cardImgFile} /></>;
+        }
+        if (note && previous) {
+          return <>edited note on <HoverableCard name={data.cardName} img={data.cardImgFile} /> to &ldquo;{note}&rdquo;</>;
+        }
+      }
+    } catch { /* fall through */ }
+  }
   return ACTION_TYPE_LABELS[actionType] ?? actionType.toLowerCase().replace(/_/g, ' ');
 }
 
