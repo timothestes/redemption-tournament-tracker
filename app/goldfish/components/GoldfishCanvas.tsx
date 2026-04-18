@@ -385,7 +385,18 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     stopHoverAnimation();
 
     // Multi-card drag: build a single rasterized ghost of all follower cards
-    if (selectedIds.has(card.instanceId) && selectedIds.size > 1) {
+    // Follower set: multi-select takes precedence; else attached weapons in territory.
+    const multiSelectFollowerIds: string[] = (selectedIds.has(card.instanceId) && selectedIds.size > 1)
+      ? Array.from(selectedIds).filter(id => id !== card.instanceId)
+      : [];
+    const equipFollowerIds: string[] = card.zone === 'territory'
+      ? state.zones.territory.filter(c => c.equippedTo === card.instanceId).map(c => c.instanceId)
+      : [];
+    const followerIds = multiSelectFollowerIds.length > 0
+      ? multiSelectFollowerIds
+      : equipFollowerIds;
+
+    if (followerIds.length > 0) {
       const dragNode = cardNodeRefs.current.get(card.instanceId);
       if (dragNode) {
         const offsets = new Map<string, { dx: number; dy: number }>();
@@ -394,8 +405,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
 
         // Collect follower nodes and compute offsets
         const followers: { id: string; node: Konva.Group; dx: number; dy: number }[] = [];
-        for (const id of selectedIds) {
-          if (id === card.instanceId) continue;
+        for (const id of followerIds) {
           const node = cardNodeRefs.current.get(id);
           if (node) {
             const dx = node.x() - baseX;
@@ -476,7 +486,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     } else {
       dragFollowerOffsets.current = null;
     }
-  }, [selectedIds, cardWidth, cardHeight, scale, offsetX, offsetY]);
+  }, [selectedIds, cardWidth, cardHeight, scale, offsetX, offsetY, state.zones.territory]);
 
   const canvasDragZoneRef = useRef<ZoneId | null>(null);
   // Track the ghost's offset from the drag card origin for repositioning
@@ -589,9 +599,17 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       const centerY = dropY + cardHeight / 2;
       const targetZone = findZoneAtPosition(centerX, centerY);
 
-      // Group drag: if this card is selected and there are multiple selections
-      const isGroupDrag = selectedIds.has(card.instanceId) && selectedIds.size > 1;
-      const cardIds = isGroupDrag ? Array.from(selectedIds) : [card.instanceId];
+      // Group drag: multi-select takes precedence; else attached weapons travel with warrior.
+      const multiSelectFollowerIds = selectedIds.has(card.instanceId) && selectedIds.size > 1
+        ? Array.from(selectedIds)
+        : null;
+      const equipFollowerIds = card.zone === 'territory'
+        ? state.zones.territory
+            .filter(c => c.equippedTo === card.instanceId)
+            .map(c => c.instanceId)
+        : [];
+      const isGroupDrag = multiSelectFollowerIds !== null || equipFollowerIds.length > 0;
+      const cardIds = multiSelectFollowerIds ?? [card.instanceId, ...equipFollowerIds];
 
       // Hand-to-hand reorder: when a hand card is dropped back on the hand zone
       if (targetZone === 'hand' && card.zone === 'hand' && state.zones.hand.length > 1) {
