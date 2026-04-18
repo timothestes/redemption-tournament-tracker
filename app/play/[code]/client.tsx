@@ -17,7 +17,6 @@ import { GameToolbar } from '@/app/shared/components/GameToolbar';
 import { useGameHotkeys } from '@/app/shared/hooks/useGameHotkeys';
 import { GameToastContainer, showGameToast } from '@/app/shared/components/GameToast';
 import { ParagonDrawer } from '@/app/shared/components/ParagonDrawer';
-import { OpponentParagonTopDrawer } from '@/app/shared/components/OpponentParagonTopDrawer';
 import { buildParagonEntries } from '@/app/shared/utils/paragonEntries';
 import type { GameActions } from '@/app/shared/types/gameActions';
 import WaitingRoomGoldfish from '../components/WaitingRoomGoldfish';
@@ -990,7 +989,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         {rightPanel}
         {/* Paragon drawer — self-hides when paragons list is empty. */}
         <ParagonDrawer paragons={paragonEntries} />
-          <OpponentParagonTopDrawer paragonName={gameState.opponentPlayer?.paragon || null} />
       </div>
     );
   }
@@ -1028,7 +1026,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         {rightPanel}
         {/* Paragon drawer — self-hides when paragons list is empty. */}
         <ParagonDrawer paragons={paragonEntries} />
-          <OpponentParagonTopDrawer paragonName={gameState.opponentPlayer?.paragon || null} />
       </div>
     );
   }
@@ -1120,7 +1117,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           {/* Paragon drawer — self-hides when paragons list is empty. Rendered
               at the top level so it's a DOM sibling to the Konva canvas. */}
           <ParagonDrawer paragons={paragonEntries} />
-          <OpponentParagonTopDrawer paragonName={gameState.opponentPlayer?.paragon || null} />
 
           {/* Deck reload picker (available after game ends for rematch/practice) */}
           <DeckPickerModal
@@ -1240,7 +1236,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         {rightPanel}
         {/* Paragon drawer — self-hides when paragons list is empty. */}
         <ParagonDrawer paragons={paragonEntries} />
-          <OpponentParagonTopDrawer paragonName={gameState.opponentPlayer?.paragon || null} />
       </div>
     );
   }
@@ -1325,7 +1320,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       {/* Paragon drawer — self-hides when paragons list is empty. Rendered at
           the top level so it's a DOM sibling to the Konva canvas, not inside. */}
       <ParagonDrawer paragons={paragonEntries} />
-          <OpponentParagonTopDrawer paragonName={gameState.opponentPlayer?.paragon || null} />
 
       {/* Deck reload picker */}
       <DeckPickerModal
