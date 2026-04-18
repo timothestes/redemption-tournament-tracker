@@ -101,8 +101,8 @@ export interface GameState {
   pregameSkipToReveal: (chosenSeat: bigint) => void;
   pregameChangeDeck: (deckId: string, deckData: string) => void;
   // Rematch actions
-  requestRematch: (deckId: string, deckData: string) => void;
-  respondRematch: (accepted: boolean, deckId: string, deckData: string) => void;
+  requestRematch: (deckId: string, deckData: string, paragon: string) => void;
+  respondRematch: (accepted: boolean, deckId: string, deckData: string, paragon: string) => void;
   revealCards: (cardIds: string) => void;
   clearRevealedCards: () => void;
   logSearchDeck: () => void;
@@ -547,12 +547,12 @@ export function useGameState(gameId: bigint): GameState {
     conn?.reducers.pregameChangeDeck({ gameId, deckId, deckData });
   }, [conn, gameId]);
 
-  const requestRematch = useCallback((deckId: string, deckData: string) => {
-    conn?.reducers.requestRematch({ gameId, deckId, deckData });
+  const requestRematch = useCallback((deckId: string, deckData: string, paragon: string) => {
+    conn?.reducers.requestRematch({ gameId, deckId, deckData, paragon });
   }, [conn, gameId]);
 
-  const respondRematch = useCallback((accepted: boolean, deckId: string, deckData: string) => {
-    conn?.reducers.respondRematch({ gameId, accepted, deckId, deckData });
+  const respondRematch = useCallback((accepted: boolean, deckId: string, deckData: string, paragon: string) => {
+    conn?.reducers.respondRematch({ gameId, accepted, deckId, deckData, paragon });
   }, [conn, gameId]);
 
   const logSearchDeck = useCallback(() => {

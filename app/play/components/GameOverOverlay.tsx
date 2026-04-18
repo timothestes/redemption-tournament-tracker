@@ -115,10 +115,11 @@ export default function GameOverOverlay({
     try {
       const result = await loadDeckForGame(deck.id);
       const deckData = JSON.stringify(result.deckData);
+      const paragon = deck.paragon || '';
       if (pickerMode === 'request') {
-        gameState.requestRematch(deck.id, deckData);
+        gameState.requestRematch(deck.id, deckData, paragon);
       } else {
-        gameState.respondRematch(true, deck.id, deckData);
+        gameState.respondRematch(true, deck.id, deckData, paragon);
       }
     } catch (e) {
       console.error('Failed to load deck:', e);
@@ -305,7 +306,7 @@ export default function GameOverOverlay({
             Accept
           </button>
           <button
-            onClick={() => gameState.respondRematch(false, '', '')}
+            onClick={() => gameState.respondRematch(false, '', '', '')}
             style={{
               padding: '6px 16px',
               borderRadius: 4,
