@@ -36,6 +36,7 @@ import { GameToastContainer, showGameToast } from './GameToast';
 import { DiceRollOverlay } from './DiceRollOverlay';
 import { useCardPreview } from '../state/CardPreviewContext';
 import { useLobArrivalEffect } from '@/app/shared/hooks/useLobArrivalEffect';
+import { computeEquipOffset } from '../utils/equipLayout';
 
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 
@@ -882,6 +883,23 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     ...(isParagon ? ['paragon' as ZoneId] : []),
   ], [isParagon]);
 
+  // Map weapon instanceId → { x, y } derived from the warrior it's attached to.
+  // Weapons render at warrior.posX + offset. Only applies in Territory.
+  const derivedWeaponPositions = useMemo(() => {
+    const { dx, dy } = computeEquipOffset(cardWidth, cardHeight);
+    const result = new Map<string, { x: number; y: number }>();
+    for (const card of state.zones.territory) {
+      if (!card.equippedTo) continue;
+      const warrior = state.zones.territory.find(c => c.instanceId === card.equippedTo);
+      if (!warrior || warrior.posX === undefined || warrior.posY === undefined) continue;
+      result.set(card.instanceId, {
+        x: warrior.posX + dx,
+        y: warrior.posY + dy,
+      });
+    }
+    return result;
+  }, [state.zones.territory, cardWidth, cardHeight]);
+
   // Compute card bounds for all visible cards (used for selection rectangle intersection)
   const allCardBounds = useMemo((): CardBound[] => {
     const bounds: CardBound[] = [];
@@ -1421,12 +1439,44 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
               );
             }
 
-            // Territory: free-form placement using stored positions
+            // Territory: free-form placement using stored positions.
+            // Two-pass render so attached weapons draw BEHIND warriors:
+            //   Pass 1: attached weapons at warrior-relative position (drawn first).
+            //   Pass 2: all non-attached cards at their own stored position (drawn on top).
             if (zoneId === 'territory') {
               const zone = zoneLayout[zoneId];
               return (
                 <Group key={zoneId} clipX={zone.x} clipY={zone.y} clipWidth={zone.width} clipHeight={zone.height}>
-                  {cards.map((card, i) => {
+                  {/* Pass 1: attached weapons (behind warriors) */}
+                  {cards.filter(c => c.equippedTo).map(card => {
+                    const derived = derivedWeaponPositions.get(card.instanceId);
+                    if (!derived) return null;
+                    return (
+                      <GameCardNode
+                        key={card.instanceId}
+                        card={card}
+                        x={derived.x}
+                        y={derived.y}
+                        rotation={0}
+                        cardWidth={cardWidth}
+                        cardHeight={cardHeight}
+                        image={getImage(card.cardImgFile)}
+                        isSelected={selectedIds.has(card.instanceId)}
+                        hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
+                        nodeRef={registerCardNode}
+                        onDragStart={handleCardDragStart}
+                        onDragMove={handleCardDragMove}
+                        onDragEnd={handleCardDragEnd}
+                        onContextMenu={handleCardContextMenu}
+                        onClick={handleCardClick}
+                        onDblClick={handleCardDblClick}
+                        onMouseEnter={handleCardMouseEnter}
+                        onMouseLeave={handleCardMouseLeave}
+                      />
+                    );
+                  })}
+                  {/* Pass 2: non-attached cards (in front) */}
+                  {cards.filter(c => !c.equippedTo).map((card, i) => {
                     const x = card.posX ?? (zone.x + 8 + (i % 8) * (cardWidth + 4));
                     const y = card.posY ?? (zone.y + 20 + Math.floor(i / 8) * (cardHeight * 0.35));
                     return (
