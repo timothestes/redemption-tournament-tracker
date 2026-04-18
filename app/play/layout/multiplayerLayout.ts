@@ -249,7 +249,7 @@ function buildSidebar(
       };
     }
   } else {
-    // Fallback: simple vertical stack fallback
+    // Fallback: simple vertical stack
     const count = labels.length;
     const slotHeight = Math.round(
       (areaHeight - slotPad * (count + 1)) / count
