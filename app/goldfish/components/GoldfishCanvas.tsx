@@ -1804,6 +1804,10 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
           zones={state.zones}
           onClose={() => setContextMenu(null)}
           onExchange={(ids) => setExchangeCardIds(ids)}
+          onDetach={(id) => {
+            const derived = derivedWeaponPositions.get(id);
+            detachCard(id, derived?.x, derived?.y);
+          }}
         />
       )}
 
