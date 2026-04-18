@@ -10,6 +10,7 @@ interface OpponentParagonTopDrawerProps {
 const DRAWER_WIDTH = 620;
 const HANDLE_WIDTH = 200;
 const HANDLE_HEIGHT = 36;
+const HANDLE_TOP = 200;
 
 export function OpponentParagonTopDrawer({ paragonName }: OpponentParagonTopDrawerProps) {
   const [open, setOpen] = useState(false);
@@ -49,7 +50,7 @@ export function OpponentParagonTopDrawer({ paragonName }: OpponentParagonTopDraw
         style={{
           position: 'fixed',
           right: 400,
-          top: 200,
+          top: HANDLE_TOP,
           zIndex: 899,
           display: 'flex',
           alignItems: 'center',
@@ -100,24 +101,28 @@ export function OpponentParagonTopDrawer({ paragonName }: OpponentParagonTopDraw
         style={{
           position: 'fixed',
           right: 396,
-          top: 0,
+          top: HANDLE_TOP + HANDLE_HEIGHT,
           zIndex: 900,
           width: DRAWER_WIDTH,
           maxWidth: 'calc(100vw - 32px)',
-          transform: open ? 'translateY(0)' : 'translateY(-100%)',
-          transition: 'transform 360ms cubic-bezier(0.32, 0.72, 0, 1)',
-          willChange: 'transform',
+          display: 'grid',
+          gridTemplateRows: open ? '1fr' : '0fr',
+          transition: 'grid-template-rows 360ms cubic-bezier(0.32, 0.72, 0, 1)',
           pointerEvents: open ? 'auto' : 'none',
         }}
       >
         <div
           style={{
+            overflow: 'hidden',
             background: 'rgba(14, 10, 6, 0.98)',
             border: '1px solid rgba(196, 149, 90, 0.5)',
             borderTop: 'none',
             borderBottomLeftRadius: 10,
             borderBottomRightRadius: 10,
             boxShadow: '0 10px 40px rgba(0, 0, 0, 0.55)',
+          }}
+        >
+          <div style={{
             padding: 14,
             display: 'flex',
             flexDirection: 'column',
@@ -177,6 +182,7 @@ export function OpponentParagonTopDrawer({ paragonName }: OpponentParagonTopDraw
               boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
             }}
           />
+          </div>
         </div>
       </div>
     </>
