@@ -17,6 +17,7 @@ import { GameToolbar } from '@/app/shared/components/GameToolbar';
 import { useGameHotkeys } from '@/app/shared/hooks/useGameHotkeys';
 import { GameToastContainer, showGameToast } from '@/app/shared/components/GameToast';
 import { ParagonDrawer } from '@/app/shared/components/ParagonDrawer';
+import { OpponentParagonTopDrawer } from '@/app/shared/components/OpponentParagonTopDrawer';
 import { buildParagonEntries } from '@/app/shared/utils/paragonEntries';
 import type { GameActions } from '@/app/shared/types/gameActions';
 import WaitingRoomGoldfish from '../components/WaitingRoomGoldfish';
@@ -29,6 +30,7 @@ import { ArrowLeft } from 'lucide-react';
 import { loadDeckForGame } from '../actions';
 import { useUndoStack } from '../hooks/useUndoStack';
 import { useGameTimer } from '../hooks/useGameTimer';
+import { normalizeDeckFormat } from '@/lib/deck-format';
 
 // Konva requires browser APIs — lazy-load to avoid SSR issues
 const MultiplayerCanvas = dynamic(
@@ -376,12 +378,32 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         setLifecycle('waiting');
       } else {
         setLifecycle('joining');
+
+        // Pre-flight: reject obvious format mismatch before calling the reducer
+        // so the user gets a crisp error instead of a generic SenderError toast.
+        // The server performs the authoritative check (see spacetimedb/src/index.ts).
+        const hostGame = (gameState.allGames || []).find(
+          (g: any) => g.code === code && g.status === 'waiting'
+        );
+        if (hostGame) {
+          const joinerFormat = normalizeDeckFormat(gameParams.format ?? 'Type 1');
+          const hostFormat = normalizeDeckFormat(hostGame.format);
+          if (joinerFormat !== hostFormat) {
+            setErrorMessage(
+              `This game is ${hostFormat}. Your selected deck is ${joinerFormat} — pick a ${hostFormat} deck to join.`
+            );
+            setLifecycle('error');
+            return;
+          }
+        }
+
         try {
           conn.reducers.joinGame({
             code,
             deckId: gameParams.deckId,
             displayName: gameParams.displayName,
             paragon: gameParams.paragon || '',
+            format: gameParams.format ?? 'Type 1',
             supabaseUserId: gameParams.supabaseUserId,
             deckData,
           });
@@ -968,6 +990,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         {rightPanel}
         {/* Paragon drawer — self-hides when paragons list is empty. */}
         <ParagonDrawer paragons={paragonEntries} />
+          <OpponentParagonTopDrawer paragonName={gameState.opponentPlayer?.paragon || null} />
       </div>
     );
   }
@@ -1005,6 +1028,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         {rightPanel}
         {/* Paragon drawer — self-hides when paragons list is empty. */}
         <ParagonDrawer paragons={paragonEntries} />
+          <OpponentParagonTopDrawer paragonName={gameState.opponentPlayer?.paragon || null} />
       </div>
     );
   }
@@ -1096,6 +1120,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           {/* Paragon drawer — self-hides when paragons list is empty. Rendered
               at the top level so it's a DOM sibling to the Konva canvas. */}
           <ParagonDrawer paragons={paragonEntries} />
+          <OpponentParagonTopDrawer paragonName={gameState.opponentPlayer?.paragon || null} />
 
           {/* Deck reload picker (available after game ends for rematch/practice) */}
           <DeckPickerModal
@@ -1215,6 +1240,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         {rightPanel}
         {/* Paragon drawer — self-hides when paragons list is empty. */}
         <ParagonDrawer paragons={paragonEntries} />
+          <OpponentParagonTopDrawer paragonName={gameState.opponentPlayer?.paragon || null} />
       </div>
     );
   }
@@ -1299,6 +1325,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       {/* Paragon drawer — self-hides when paragons list is empty. Rendered at
           the top level so it's a DOM sibling to the Konva canvas, not inside. */}
       <ParagonDrawer paragons={paragonEntries} />
+          <OpponentParagonTopDrawer paragonName={gameState.opponentPlayer?.paragon || null} />
 
       {/* Deck reload picker */}
       <DeckPickerModal
