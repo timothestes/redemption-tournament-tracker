@@ -6,6 +6,7 @@ import {
   PHASE_ORDER,
 } from '../types';
 import { buildInitialGameState } from './gameInitializer';
+import { refillSoulDeck } from '@/app/shared/paragon/refill';
 
 const MAX_HISTORY = 20;
 const HAND_LIMIT = 16;
@@ -360,6 +361,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         );
         newState.history = history;
         newState.drawnThisTurn = true;
+      }
+      if (newState.format === 'Paragon') {
+        newState = { ...newState, zones: refillSoulDeck(newState.zones) };
       }
       return newState;
     }
