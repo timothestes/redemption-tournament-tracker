@@ -133,11 +133,13 @@ export function useGameHotkeys(config: GameHotkeysConfig) {
           }
           break;
 
-        // R — roll dice (always enabled)
+        // R — roll dice (skip only on Cmd/Ctrl+Shift+R so hard reload works)
         case 'r':
         case 'R':
-          e.preventDefault();
-          onRollDice?.();
+          if (!((e.ctrlKey || e.metaKey) && e.shiftKey)) {
+            e.preventDefault();
+            onRollDice?.();
+          }
           break;
 
         // H — toggle hand spread

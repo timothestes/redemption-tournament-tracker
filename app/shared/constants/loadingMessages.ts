@@ -61,7 +61,7 @@ export const LOADING_MESSAGES = [
   'Naming the animals...',
   'Climbing Jacob\'s ladder...',
   'Cooking a bowl of red stew...',
-  'Tuning David\'s harp',
+  'Tuning David\'s harp...',
   'Wrestling principalities and powers...',
 ];
 

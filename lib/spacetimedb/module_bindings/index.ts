@@ -36,11 +36,13 @@ import {
 // Import all reducer arg schemas
 import AddCounterReducer from "./add_counter_reducer";
 import ApproveZoneSearchReducer from "./approve_zone_search_reducer";
+import AttachCardReducer from "./attach_card_reducer";
 import ClaimTimeoutVictoryReducer from "./claim_timeout_victory_reducer";
 import ClearRevealedCardsReducer from "./clear_revealed_cards_reducer";
 import CompleteZoneSearchReducer from "./complete_zone_search_reducer";
 import CreateGameReducer from "./create_game_reducer";
 import DenyZoneSearchReducer from "./deny_zone_search_reducer";
+import DetachCardReducer from "./detach_card_reducer";
 import DrawCardReducer from "./draw_card_reducer";
 import DrawMultipleReducer from "./draw_multiple_reducer";
 import EndTurnReducer from "./end_turn_reducer";
@@ -265,11 +267,13 @@ const tablesSchema = __schema({
 const reducersSchema = __reducers(
   __reducerSchema("add_counter", AddCounterReducer),
   __reducerSchema("approve_zone_search", ApproveZoneSearchReducer),
+  __reducerSchema("attach_card", AttachCardReducer),
   __reducerSchema("claim_timeout_victory", ClaimTimeoutVictoryReducer),
   __reducerSchema("clear_revealed_cards", ClearRevealedCardsReducer),
   __reducerSchema("complete_zone_search", CompleteZoneSearchReducer),
   __reducerSchema("create_game", CreateGameReducer),
   __reducerSchema("deny_zone_search", DenyZoneSearchReducer),
+  __reducerSchema("detach_card", DetachCardReducer),
   __reducerSchema("draw_card", DrawCardReducer),
   __reducerSchema("draw_multiple", DrawMultipleReducer),
   __reducerSchema("end_turn", EndTurnReducer),

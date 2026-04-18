@@ -33,4 +33,8 @@ export interface GameActions {
   // Deck inspection (optional — may not be available in all modes)
   searchDeck?(): void;
   peekTopN?(count: number): void;
+
+  // Equip weapon to warrior (optional — implemented by both goldfish and multiplayer)
+  attachCard?(weaponId: string, warriorId: string): void;
+  detachCard?(cardId: string, posX?: number, posY?: number): void;
 }

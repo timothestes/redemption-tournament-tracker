@@ -460,6 +460,7 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
               <h3 className="text-sm font-medium text-muted-foreground">Open Games</h3>
               <LobbyList
                 selectedDeckId={selectedDeck?.id ?? null}
+                selectedDeckFormat={selectedDeck?.format ?? null}
                 joiningCode={isJoining ? gameCode : null}
                 onJoinGame={handleJoinFromLobby}
               />

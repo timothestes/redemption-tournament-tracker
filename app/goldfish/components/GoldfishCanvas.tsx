@@ -174,6 +174,13 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   const [deckDropPopup, setDeckDropPopup] = useState<{ cardInstanceId: string; x: number; y: number } | null>(null);
   const [canvasDragZone, setCanvasDragZone] = useState<ZoneId | null>(null);
   const isCanvasDragging = useRef(false);
+  // React-visible drag flag used to hide the HTML unlink overlay during drag
+  // (HTML overlay reads warrior.posX from state, which doesn't update until
+  // drag-end, so without this the icon lags visibly behind the card).
+  const [isCardDraggingUi, setIsCardDraggingUi] = useState(false);
+  // When true, disable zone-level clipping so a card dragged out of a clipped
+  // zone (territory, land-of-bondage) isn't visually cut off by the zone rect.
+  const [isDraggingAnyCard, setIsDraggingAnyCard] = useState(false);
   const [multiCardContextMenu, setMultiCardContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [batchDeckDropIds, setBatchDeckDropIds] = useState<string[] | null>(null);
   const [exchangeCardIds, setExchangeCardIds] = useState<string[] | null>(null);
@@ -377,6 +384,8 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   const handleCardDragStart = useCallback((card: GameCard) => {
     isDraggingRef.current = true;
     isCanvasDragging.current = true;
+    setIsCardDraggingUi(true);
+    setIsDraggingAnyCard(true);
     dragSourceZoneRef.current = card.zone;
     if (hoverTimerRef.current) {
       clearTimeout(hoverTimerRef.current);
@@ -540,11 +549,13 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       const followerOffsets = dragFollowerOffsets.current;
       isDraggingRef.current = false;
       isCanvasDragging.current = false;
+      setIsCardDraggingUi(false);
       canvasDragZoneRef.current = null;
       dragSourceZoneRef.current = null;
       dragFollowerOffsets.current = null;
       dragGhostOffsetRef.current = null;
       setCanvasDragZone(null);
+      setIsDraggingAnyCard(false);
 
       // Clean up ghost image
       if (dragGhostRef.current) {
@@ -1526,56 +1537,56 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             }
 
             // Territory: free-form placement using stored positions.
-            // Two-pass render so attached weapons draw BEHIND warriors:
-            //   Pass 1: attached weapons at warrior-relative position (drawn first).
-            //   Pass 2: all non-attached cards at their own stored position (drawn on top).
+            // Per-cluster render so each warrior's weapons draw directly behind
+            // THAT warrior (not globally behind all warriors). We walk the
+            // non-attached cards in territory order; for each warrior, its
+            // attached weapons are emitted first (higher-index first so fan
+            // z-order is correct), then the warrior itself.
             if (zoneId === 'territory') {
               const zone = zoneLayout[zoneId];
+              const clipProps = isDraggingAnyCard
+                ? {}
+                : { clipX: zone.x, clipY: zone.y, clipWidth: zone.width, clipHeight: zone.height };
               return (
-                <Group key={zoneId} clipX={zone.x} clipY={zone.y} clipWidth={zone.width} clipHeight={zone.height}>
-                  {/* Pass 1: attached weapons (behind warriors).
-                      Within a warrior group, higher-index weapons must draw FIRST so
-                      lower-index weapons render on top of them (correct fan z-order). */}
-                  {cards
-                    .filter(c => c.equippedTo)
-                    .slice()
-                    .sort((a, b) => {
-                      if (a.equippedTo !== b.equippedTo) return 0;
-                      const warriorWeapons = cards.filter(c => c.equippedTo === a.equippedTo);
-                      return warriorWeapons.indexOf(b) - warriorWeapons.indexOf(a);
-                    })
-                    .map(card => {
-                    const derived = derivedWeaponPositions.get(card.instanceId);
-                    if (!derived) return null;
-                    return (
-                      <GameCardNode
-                        key={card.instanceId}
-                        card={card}
-                        x={derived.x}
-                        y={derived.y}
-                        rotation={0}
-                        cardWidth={cardWidth}
-                        cardHeight={cardHeight}
-                        image={getImage(card.cardImgFile)}
-                        isSelected={selectedIds.has(card.instanceId)}
-                        hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
-                        nodeRef={registerCardNode}
-                        onDragStart={handleCardDragStart}
-                        onDragMove={handleCardDragMove}
-                        onDragEnd={handleCardDragEnd}
-                        onContextMenu={handleCardContextMenu}
-                        onClick={handleCardClick}
-                        onDblClick={handleCardDblClick}
-                        onMouseEnter={handleCardMouseEnter}
-                        onMouseLeave={handleCardMouseLeave}
-                      />
-                    );
-                  })}
-                  {/* Pass 2: non-attached cards (in front) */}
-                  {cards.filter(c => !c.equippedTo).map((card, i) => {
+                <Group key={zoneId} {...clipProps}>
+                  {cards.filter(c => !c.equippedTo).flatMap((card, i) => {
+                    const attached = cards
+                      .filter(w => w.equippedTo === card.instanceId)
+                      .slice()
+                      .sort((a, b) => {
+                        const warriorWeapons = cards.filter(c => c.equippedTo === a.equippedTo);
+                        return warriorWeapons.indexOf(b) - warriorWeapons.indexOf(a);
+                      });
+                    const weaponNodes = attached.map(w => {
+                      const derived = derivedWeaponPositions.get(w.instanceId);
+                      if (!derived) return null;
+                      return (
+                        <GameCardNode
+                          key={w.instanceId}
+                          card={w}
+                          x={derived.x}
+                          y={derived.y}
+                          rotation={0}
+                          cardWidth={cardWidth}
+                          cardHeight={cardHeight}
+                          image={getImage(w.cardImgFile)}
+                          isSelected={selectedIds.has(w.instanceId)}
+                          hoverProgress={hoveredInstanceId === w.instanceId ? hoverProgress : 0}
+                          nodeRef={registerCardNode}
+                          onDragStart={handleCardDragStart}
+                          onDragMove={handleCardDragMove}
+                          onDragEnd={handleCardDragEnd}
+                          onContextMenu={handleCardContextMenu}
+                          onClick={handleCardClick}
+                          onDblClick={handleCardDblClick}
+                          onMouseEnter={handleCardMouseEnter}
+                          onMouseLeave={handleCardMouseLeave}
+                        />
+                      );
+                    });
                     const x = card.posX ?? (zone.x + 8 + (i % 8) * (cardWidth + 4));
                     const y = card.posY ?? (zone.y + 20 + Math.floor(i / 8) * (cardHeight * 0.35));
-                    return (
+                    const warriorNode = (
                       <GameCardNode
                         key={card.instanceId}
                         card={card}
@@ -1598,6 +1609,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                         onMouseLeave={handleCardMouseLeave}
                       />
                     );
+                    return [...weaponNodes, warriorNode];
                   })}
                 </Group>
               );
@@ -1607,8 +1619,11 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             if (zoneId === 'land-of-bondage') {
               const zone = zoneLayout[zoneId];
               const lobPositions = calculateAutoArrangePositions(cards.length, zone, cardWidth, cardHeight);
+              const lobClipProps = isDraggingAnyCard
+                ? {}
+                : { clipX: zone.x, clipY: zone.y, clipWidth: zone.width, clipHeight: zone.height };
               return (
-                <Group key={zoneId} clipX={zone.x} clipY={zone.y} clipWidth={zone.width} clipHeight={zone.height}>
+                <Group key={zoneId} {...lobClipProps}>
                   {cards.map((card, i) => {
                     const pos = lobPositions[i];
                     if (!pos) return null;
@@ -1734,12 +1749,14 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       </Stage>
 
       {/* Equip unlink icons — one per attached weapon, anchored at that weapon's seam
-          (top-left of whatever sits in front of it: warrior for index 0, weapon N-1 otherwise). */}
+          (top-left of whatever sits in front of it: warrior for index 0, weapon N-1 otherwise).
+          Hidden during drag because the overlay reads from state (which doesn't update until
+          drag-end), so leaving it visible would lag behind the dragging card. */}
       <div
         className="pointer-events-none absolute inset-0 z-10"
         aria-hidden="false"
       >
-        {state.zones.territory
+        {!isCardDraggingUi && state.zones.territory
           .filter(c => c.equippedTo)
           .map(weapon => {
             const derived = derivedWeaponPositions.get(weapon.instanceId);

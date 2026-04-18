@@ -5,7 +5,7 @@ import type { GameCard } from '../types';
 export const EQUIP_OFFSET_RATIO = 0.18;
 
 /** Safety cap on how many weapons can be attached to a single warrior. */
-export const MAX_EQUIPPED_WEAPONS_PER_WARRIOR = 3;
+export const MAX_EQUIPPED_WEAPONS_PER_WARRIOR = 1;
 
 export function computeEquipOffset(
   cardWidth: number,
@@ -27,9 +27,15 @@ export function getAttachedWeapons(
   return zoneCards.filter((c) => c.equippedTo === warrior.instanceId);
 }
 
-/** Return the first card in `candidates` whose rect contains (dropX, dropY),
- *  skipping the card with `skipInstanceId` (usually the card being dragged).
- *  Candidates without posX/posY are treated as unplaced and ignored. */
+/** Minimum fraction of a card's area that must overlap for a drop to count
+ *  as "on" a warrior. 25% matches human intuition: if the dropped card looks
+ *  obviously on the warrior, it attaches. */
+const EQUIP_HIT_OVERLAP_RATIO = 0.25;
+
+/** Return the first card in `candidates` whose rect overlaps the dropped card's
+ *  rect by at least `EQUIP_HIT_OVERLAP_RATIO` of a card area. The dropped card
+ *  is assumed to be centered on (dropX, dropY) with the same width/height as
+ *  the candidates. Skips `skipInstanceId` and candidates without posX/posY. */
 export function hitTestWarrior(
   dropX: number,
   dropY: number,
@@ -38,16 +44,21 @@ export function hitTestWarrior(
   candidates: GameCard[],
   skipInstanceId: string,
 ): GameCard | null {
+  const threshold = cardWidth * cardHeight * EQUIP_HIT_OVERLAP_RATIO;
+  const wL = dropX - cardWidth / 2;
+  const wR = dropX + cardWidth / 2;
+  const wT = dropY - cardHeight / 2;
+  const wB = dropY + cardHeight / 2;
   for (const c of candidates) {
     if (c.instanceId === skipInstanceId) continue;
     if (c.posX === undefined || c.posY === undefined) continue;
-    const left = c.posX;
-    const right = c.posX + cardWidth;
-    const top = c.posY;
-    const bottom = c.posY + cardHeight;
-    if (dropX >= left && dropX <= right && dropY >= top && dropY <= bottom) {
-      return c;
-    }
+    const hL = c.posX;
+    const hR = c.posX + cardWidth;
+    const hT = c.posY;
+    const hB = c.posY + cardHeight;
+    const overlapW = Math.max(0, Math.min(wR, hR) - Math.max(wL, hL));
+    const overlapH = Math.max(0, Math.min(wB, hB) - Math.max(wT, hT));
+    if (overlapW * overlapH >= threshold) return c;
   }
   return null;
 }

@@ -16,4 +16,5 @@ export default {
   deckId: __t.string(),
   deckData: __t.string(),
   paragon: __t.string(),
+  format: __t.string(),
 };

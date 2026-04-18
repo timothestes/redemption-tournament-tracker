@@ -106,16 +106,30 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         result.card.posX = undefined;
         result.card.posY = undefined;
       }
-      // Auto-detach on exit from territory: clear this mover's equippedTo (if any),
-      // and clear equippedTo on any card that pointed at this mover.
+      // Auto-detach on exit from territory. Clear this mover's equippedTo
+      // (if any). For cards that pointed at this mover: normally just unlink,
+      // but if the destination is Land of Bondage, auto-discard them (a warrior
+      // going to LOB takes its weapons down with it).
       if (toZone !== 'territory') {
         if (result.card.equippedTo) {
           result.card.equippedTo = undefined;
         }
         for (const zoneId of Object.keys(zones) as ZoneId[]) {
           for (let i = 0; i < zones[zoneId].length; i++) {
-            if (zones[zoneId][i].equippedTo === cardInstanceId) {
-              zones[zoneId][i] = { ...zones[zoneId][i], equippedTo: undefined };
+            const other = zones[zoneId][i];
+            if (other.equippedTo !== cardInstanceId) continue;
+            if (toZone === 'land-of-bondage') {
+              zones[zoneId].splice(i, 1);
+              i--;
+              zones.discard.push({
+                ...other,
+                zone: 'discard',
+                equippedTo: undefined,
+                posX: undefined,
+                posY: undefined,
+              });
+            } else {
+              zones[zoneId][i] = { ...other, equippedTo: undefined };
             }
           }
         }
@@ -355,34 +369,68 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (!cardInstanceIds || !toZone) return state;
 
       const movedIds = new Set(cardInstanceIds);
+      // Pre-compute per-card final destination. Weapons whose attached warrior
+      // is also in this batch and going to LOB get redirected to discard — a
+      // warrior heading to LOB takes its weapons down with it.
+      const finalZoneById = new Map<string, ZoneId>();
+      for (const id of cardInstanceIds) {
+        let cardObj: GameCard | undefined;
+        for (const zoneId of Object.keys(zones) as ZoneId[]) {
+          const found = zones[zoneId].find(c => c.instanceId === id);
+          if (found) { cardObj = found; break; }
+        }
+        if (!cardObj) continue;
+        const redirected =
+          toZone === 'land-of-bondage' &&
+          !!cardObj.equippedTo &&
+          movedIds.has(cardObj.equippedTo);
+        finalZoneById.set(id, redirected ? 'discard' : toZone);
+      }
+
       for (const instanceId of cardInstanceIds) {
         const result = findAndRemoveCard(zones, instanceId);
         if (!result) continue;
-        if (result.fromZone === 'deck' && toZone !== 'deck') {
+        const finalZone = finalZoneById.get(instanceId) ?? toZone;
+        if (result.fromZone === 'deck' && finalZone !== 'deck') {
           result.card.isFlipped = false;
         }
-        result.card.zone = toZone;
+        result.card.zone = finalZone;
         const pos = positions?.[instanceId];
-        result.card.posX = pos?.posX;
-        result.card.posY = pos?.posY;
-        // Auto-detach on exit from territory, unless the partner is also moving
-        // together — e.g. dragging a warrior + its attached weapon as a group.
-        if (toZone !== 'territory') {
-          if (result.card.equippedTo && !movedIds.has(result.card.equippedTo)) {
+        result.card.posX = finalZone === 'territory' ? pos?.posX : undefined;
+        result.card.posY = finalZone === 'territory' ? pos?.posY : undefined;
+        // Leaving territory — always unlink (batch grouping doesn't preserve
+        // the attach the way it used to). If destination is LOB, any weapon
+        // pointing at this mover that's NOT already in the batch auto-discards.
+        if (finalZone !== 'territory') {
+          if (result.card.equippedTo) {
             result.card.equippedTo = undefined;
           }
           for (const zoneId of Object.keys(zones) as ZoneId[]) {
             for (let i = 0; i < zones[zoneId].length; i++) {
-              if (
-                zones[zoneId][i].equippedTo === instanceId &&
-                !movedIds.has(zones[zoneId][i].instanceId)
-              ) {
-                zones[zoneId][i] = { ...zones[zoneId][i], equippedTo: undefined };
+              const other = zones[zoneId][i];
+              if (other.equippedTo !== instanceId) continue;
+              if (movedIds.has(other.instanceId)) {
+                // Batch-member weapon — finalZoneById already routes it.
+                zones[zoneId][i] = { ...other, equippedTo: undefined };
+                continue;
+              }
+              if (finalZone === 'land-of-bondage') {
+                zones[zoneId].splice(i, 1);
+                i--;
+                zones.discard.push({
+                  ...other,
+                  zone: 'discard',
+                  equippedTo: undefined,
+                  posX: undefined,
+                  posY: undefined,
+                });
+              } else {
+                zones[zoneId][i] = { ...other, equippedTo: undefined };
               }
             }
           }
         }
-        zones[toZone].push(result.card);
+        zones[finalZone].push(result.card);
       }
       return { ...state, zones, history };
     }
@@ -511,30 +559,63 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'ATTACH_CARD': {
       const { cardInstanceId, warriorInstanceId } = action.payload;
       if (!cardInstanceId || !warriorInstanceId) return state;
-      // Validate warrior exists in territory
       const warrior = zones.territory.find(c => c.instanceId === warriorInstanceId);
-      const weaponIdx = zones.territory.findIndex(c => c.instanceId === cardInstanceId);
-      if (!warrior || weaponIdx === -1) return state;
-      zones.territory[weaponIdx] = { ...zones.territory[weaponIdx], equippedTo: warriorInstanceId };
+      if (!warrior) return state;
+      // Weapon may be in ANY zone (e.g. hand, territory). Pull it out, move
+      // it into territory, and set equippedTo. Insert it in the territory
+      // array immediately BEFORE the warrior so render order places it behind.
+      const found = findAndRemoveCard(zones, cardInstanceId);
+      if (!found) return state;
+      const attachedWeapon: GameCard = {
+        ...found.card,
+        zone: 'territory',
+        equippedTo: warriorInstanceId,
+        posX: warrior.posX,
+        posY: warrior.posY,
+        isFlipped: false,
+      };
+      const warriorIdx = zones.territory.findIndex(c => c.instanceId === warriorInstanceId);
+      if (warriorIdx >= 0) {
+        zones.territory.splice(warriorIdx, 0, attachedWeapon);
+      } else {
+        zones.territory.push(attachedWeapon);
+      }
       return { ...state, zones, history };
     }
 
     case 'DETACH_CARD': {
       const { cardInstanceId, posX, posY } = action.payload;
       if (!cardInstanceId) return state;
+      // Remove the weapon wherever it is, then reinsert it into territory
+      // immediately BEFORE its (former) warrior — this keeps it rendered
+      // behind the warrior after the link is broken.
+      let foundIdx = -1;
+      let foundZone: ZoneId | null = null;
       for (const zoneId of Object.keys(zones) as ZoneId[]) {
         const idx = zones[zoneId].findIndex(c => c.instanceId === cardInstanceId);
-        if (idx >= 0) {
-          zones[zoneId][idx] = {
-            ...zones[zoneId][idx],
-            equippedTo: undefined,
-            posX: posX ?? zones[zoneId][idx].posX,
-            posY: posY ?? zones[zoneId][idx].posY,
-          };
-          return { ...state, zones, history };
-        }
+        if (idx >= 0) { foundIdx = idx; foundZone = zoneId; break; }
       }
-      return state;
+      if (foundIdx === -1 || !foundZone) return state;
+      const weapon = zones[foundZone][foundIdx];
+      const warriorId = weapon.equippedTo;
+      const detached: GameCard = {
+        ...weapon,
+        equippedTo: undefined,
+        posX: posX ?? weapon.posX,
+        posY: posY ?? weapon.posY,
+      };
+      zones[foundZone].splice(foundIdx, 1);
+      if (foundZone === 'territory' && warriorId) {
+        const warriorIdxAfter = zones.territory.findIndex(c => c.instanceId === warriorId);
+        if (warriorIdxAfter >= 0) {
+          zones.territory.splice(warriorIdxAfter, 0, detached);
+        } else {
+          zones.territory.push(detached);
+        }
+      } else {
+        zones[foundZone].splice(foundIdx, 0, detached);
+      }
+      return { ...state, zones, history };
     }
 
     default:

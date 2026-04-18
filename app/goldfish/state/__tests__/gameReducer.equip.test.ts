@@ -120,7 +120,7 @@ describe('auto-detach', () => {
     expect(outWeapon?.equippedTo).toBe('h1');
   });
 
-  it('preserves equippedTo when warrior and weapon are moved together via MOVE_CARDS_BATCH', () => {
+  it('unlinks weapon from warrior when the pair is batch-moved out of territory', () => {
     const weapon = makeCard({ instanceId: 'w1', equippedTo: 'h1' });
     const warrior = makeCard({ instanceId: 'h1' });
     const next = gameReducer(makeState([weapon, warrior]), act('MOVE_CARDS_BATCH', {
@@ -128,7 +128,7 @@ describe('auto-detach', () => {
       toZone: 'discard' as ZoneId,
     }));
     const outWeapon = next.zones.discard.find(c => c.instanceId === 'w1');
-    expect(outWeapon?.equippedTo).toBe('h1');
+    expect(outWeapon?.equippedTo).toBeUndefined();
   });
 
   it('clears weapon equippedTo when warrior alone is batch-moved out of territory', () => {
@@ -151,5 +151,31 @@ describe('auto-detach', () => {
     }));
     const outWeapon = next.zones.banish.find(c => c.instanceId === 'w1');
     expect(outWeapon?.equippedTo).toBeUndefined();
+  });
+});
+
+describe('LOB cascade', () => {
+  it('MOVE_CARD sends a warrior to LOB and cascades its weapons to discard', () => {
+    const weapon = makeCard({ instanceId: 'w1', equippedTo: 'h1' });
+    const warrior = makeCard({ instanceId: 'h1' });
+    const next = gameReducer(makeState([weapon, warrior]), act('MOVE_CARD', {
+      cardInstanceId: 'h1',
+      toZone: 'land-of-bondage' as ZoneId,
+    }));
+    expect(next.zones['land-of-bondage'].find(c => c.instanceId === 'h1')).toBeTruthy();
+    expect(next.zones.discard.find(c => c.instanceId === 'w1')).toBeTruthy();
+    expect(next.zones.territory.find(c => c.instanceId === 'w1')).toBeUndefined();
+  });
+
+  it('MOVE_CARDS_BATCH routing: warrior to LOB, weapon to discard when both in batch', () => {
+    const weapon = makeCard({ instanceId: 'w1', equippedTo: 'h1' });
+    const warrior = makeCard({ instanceId: 'h1' });
+    const next = gameReducer(makeState([weapon, warrior]), act('MOVE_CARDS_BATCH', {
+      cardInstanceIds: ['h1', 'w1'],
+      toZone: 'land-of-bondage' as ZoneId,
+    }));
+    expect(next.zones['land-of-bondage'].find(c => c.instanceId === 'h1')).toBeTruthy();
+    expect(next.zones.discard.find(c => c.instanceId === 'w1')).toBeTruthy();
+    expect(next.zones['land-of-bondage'].find(c => c.instanceId === 'w1')).toBeUndefined();
   });
 });

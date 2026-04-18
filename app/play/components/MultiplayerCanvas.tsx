@@ -53,6 +53,9 @@ import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import DiceOverlay from './DiceOverlay';
 import { getCardImageUrl as getSharedCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import { useVirtualCanvas, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen } from '@/app/shared/layout/virtualCanvas';
+import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '@/app/goldfish/utils/equipLayout';
+import { findCard, isWarrior, isWeapon } from '@/lib/cards/lookup';
+import { Link2Off } from 'lucide-react';
 import { useCardScale } from '@/app/shared/hooks/useCardScale';
 import { CardScaleControl } from '@/app/shared/components/CardScaleControl';
 import { useLobArrivalEffect } from '@/app/shared/hooks/useLobArrivalEffect';
@@ -121,6 +124,7 @@ function cardInstanceToGameCard(
     notes: card.notes,
     posX: card.posX ? parseFloat(card.posX) : undefined,
     posY: card.posY ? parseFloat(card.posY) : undefined,
+    equippedTo: card.equippedToInstanceId !== 0n ? String(card.equippedToInstanceId) : undefined,
     counters: counters.map((c) => ({
       color: c.color as Counter['color'],
       count: Number(c.count),
@@ -848,6 +852,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     randomReserveToZone: (count, toZone, deckPosition) =>
       gameState.randomReserveToZone(count, toZone, deckPosition),
     reloadDeck: (deckId, deckData, paragon) => gameState.reloadDeck(deckId, deckData, paragon),
+    attachCard: (weaponId, warriorId) => {
+      gameState.attachCard(BigInt(weaponId), BigInt(warriorId));
+    },
+    detachCard: (cardId, posX, posY) => {
+      gameState.detachCard(
+        BigInt(cardId),
+        posX !== undefined ? String(posX) : '',
+        posY !== undefined ? String(posY) : '',
+      );
+    },
   }), [gameState, findMyCardById, checkReserveProtection, checkReserveBatchProtection, undoStack]);
 
   // ---- ModalGameProvider value (for shared deck modals) ----
@@ -1010,6 +1024,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const dragOriginalZIndexRef = useRef<number | null>(null);
   const [dragHoverZone, setDragHoverZone] = useState<DropZoneKey | null>(null);
   const dragHoverZoneRef = useRef<DropZoneKey | null>(null);
+  // Re-renderable signal so overlays (e.g. detach icons) can hide during drag.
+  const [isCardDraggingUi, setIsCardDraggingUi] = useState(false);
 
   // Card node ref map for imperative multi-card drag
   const cardNodeRefs = useRef<Map<string, Konva.Group>>(new Map());
@@ -1508,6 +1524,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const handleCardDragStart = useCallback(
     (card: GameCard) => {
       isDraggingRef.current = true;
+      setIsCardDraggingUi(true);
       dragSourceZoneRef.current = card.zone;
 
       // Turn off Konva's pixel-based hit detection for the duration of the drag.
@@ -1577,8 +1594,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       if (hoverTimerRef.current) { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = null; }
       stopHoverAnimation();
 
-      // Multi-card drag: rasterize followers into a single ghost image
-      if (selectedIds.has(card.instanceId) && selectedIds.size > 1) {
+      // Multi-card drag: rasterize followers into a single ghost image.
+      // Follower set: multi-select takes precedence; otherwise, for a warrior
+      // being dragged within my own territory, attached weapons come along.
+      const isMultiSelectDrag = selectedIds.has(card.instanceId) && selectedIds.size > 1;
+      const equipFollowerIds: string[] =
+        !isMultiSelectDrag && card.zone === 'territory' && card.ownerId === 'player1'
+          ? (myCards['territory'] ?? [])
+              .filter((c) => c.equippedToInstanceId === BigInt(card.instanceId))
+              .map((c) => String(c.id))
+          : [];
+      const followerIds: string[] = isMultiSelectDrag
+        ? Array.from(selectedIds).filter((id) => id !== card.instanceId)
+        : equipFollowerIds;
+
+      if (followerIds.length > 0) {
         const dragNode = cardNodeRefs.current.get(card.instanceId);
         if (dragNode) {
           const offsets = new Map<string, { dx: number; dy: number }>();
@@ -1586,8 +1616,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           const baseY = dragNode.y();
 
           const followers: { id: string; node: Konva.Group; dx: number; dy: number }[] = [];
-          for (const id of selectedIds) {
-            if (id === card.instanceId) continue;
+          for (const id of followerIds) {
             const node = cardNodeRefs.current.get(id);
             if (node) {
               const dx = node.x() - baseX;
@@ -1681,7 +1710,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         dragFollowerOffsets.current = null;
       }
     },
-    [selectedIds, stopHoverAnimation, cardWidth, cardHeight, pileCardWidth, pileCardHeight, lobCard.cardWidth, lobCard.cardHeight, scale, offsetX, offsetY, findAnyCardById],
+    [selectedIds, stopHoverAnimation, cardWidth, cardHeight, pileCardWidth, pileCardHeight, lobCard.cardWidth, lobCard.cardHeight, scale, offsetX, offsetY, findAnyCardById, myCards],
   );
 
   const handleCardDragMove = useCallback(
@@ -1746,6 +1775,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
       // Reset drag state
       isDraggingRef.current = false;
+      setIsCardDraggingUi(false);
       dragEndTimeRef.current = performance.now();
       dragSourceZoneRef.current = null;
       dragOriginalPosRef.current = null;
@@ -1786,16 +1816,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       const center = cardCenter(dropX, dropY, dragW, dragH, dropRot);
       const hit = findZoneAtPosition(center.x, center.y);
 
-      const isGroupDrag = selectedIds.has(card.instanceId) && selectedIds.size > 1;
+      const isMultiSelectDrag = selectedIds.has(card.instanceId) && selectedIds.size > 1;
+      const hasEquipFollowers =
+        !isMultiSelectDrag && followerOffsets !== null && followerOffsets.size > 0;
+      const isGroupDrag = isMultiSelectDrag || hasEquipFollowers;
       // Sort selected card IDs by their current zoneIndex so the server
       // assigns new zoneIndices in the same relative order — prevents
       // card order from getting scrambled during group drags.
-      const cardIds = isGroupDrag
+      const cardIds = isMultiSelectDrag
         ? Array.from(selectedIds).sort((a, b) => {
             const aCard = findAnyCardById(a);
             const bCard = findAnyCardById(b);
             return Number(aCard?.zoneIndex ?? BigInt(0)) - Number(bCard?.zoneIndex ?? BigInt(0));
           })
+        : hasEquipFollowers
+        ? [card.instanceId, ...Array.from(followerOffsets!.keys())]
         : [card.instanceId];
       const cardId = BigInt(card.instanceId);
 
@@ -1849,6 +1884,44 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // Same zone = same zone name AND same owner (my hand ≠ opponent hand)
       const sourceOwner = card.ownerId === 'player1' ? 'my' : 'opponent';
       const isSameZone = targetZone === sourceZone && hit.owner === sourceOwner;
+
+      // Equip: if a weapon is dropped on a warrior in the local player's
+      // territory, attach instead of moving. Gated to single-card drags
+      // (group drags are intentional batch moves, not equip intents).
+      if (
+        !isGroupDrag &&
+        targetZone === 'territory' &&
+        hit.owner === 'my' &&
+        card.ownerId === 'player1'
+      ) {
+        const cardMeta = findCard(card.cardName, card.cardSet, card.cardImgFile);
+        if (isWeapon(cardMeta)) {
+          const myTerritoryCards = (myCards['territory'] ?? []).map((c) =>
+            cardInstanceToGameCard(c, counters.get(c.id) ?? [], 'player1')
+          );
+          const warriorCandidates = myTerritoryCards.filter((c) => {
+            if (c.instanceId === card.instanceId) return false;
+            if (c.equippedTo) return false;
+            const meta = findCard(c.cardName, c.cardSet, c.cardImgFile);
+            if (!isWarrior(meta)) return false;
+            const attached = myTerritoryCards.filter((x) => x.equippedTo === c.instanceId);
+            return attached.length < MAX_EQUIPPED_WEAPONS_PER_WARRIOR;
+          });
+          const hitWarrior = hitTestWarrior(
+            center.x,
+            center.y,
+            cardWidth,
+            cardHeight,
+            warriorCandidates,
+            card.instanceId,
+          );
+          if (hitWarrior) {
+            gameState.attachCard(cardId, BigInt(hitWarrior.instanceId));
+            snapBack();
+            return;
+          }
+        }
+      }
 
       // Resolve the zone rect for the drop target so we can store normalized positions
       // (0–1 ratios). This ensures cards render at the correct proportional position
@@ -2158,6 +2231,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       myCards,
       isMyFirstTurn,
       hasOpponent,
+      gameState,
+      counters,
     ],
   );
 
@@ -2280,6 +2355,85 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     },
     [counters],
   );
+
+  // ---- Equip: derive per-weapon screen positions + seam (for detach overlay) ----
+  // Weapons attached to a warrior don't use their own posX/posY at render time;
+  // they're anchored to the warrior at a small diagonal offset so they peek out
+  // from behind the warrior. `seam` is the point where the weapon meets the
+  // warrior, used to position the "unlink" icon.
+  const myDerivedWeaponPositions = useMemo(() => {
+    const result = new Map<string, { x: number; y: number; seamX: number; seamY: number }>();
+    const territory = myCards['territory'] ?? [];
+    const myZone = myZones['territory'];
+    if (!myZone || territory.length === 0) return result;
+
+    const byWarrior = new Map<bigint, CardInstance[]>();
+    for (const c of territory) {
+      if (c.equippedToInstanceId === 0n) continue;
+      const list = byWarrior.get(c.equippedToInstanceId);
+      if (list) list.push(c);
+      else byWarrior.set(c.equippedToInstanceId, [c]);
+    }
+    for (const [warriorId, weapons] of byWarrior) {
+      const warrior = territory.find((c) => c.id === warriorId);
+      if (!warrior || !warrior.posX) continue;
+      const { x: warriorX, y: warriorY } = toScreenPos(
+        parseFloat(warrior.posX),
+        parseFloat(warrior.posY),
+        myZone,
+        'my',
+      );
+      weapons.forEach((w, i) => {
+        const { dx, dy } = computeEquipOffset(cardWidth, cardHeight, i);
+        const x = warriorX + dx;
+        const y = warriorY + dy;
+        const seam =
+          i === 0
+            ? { x: warriorX, y: warriorY }
+            : (() => {
+                const { dx: adx, dy: ady } = computeEquipOffset(cardWidth, cardHeight, i - 1);
+                return { x: warriorX + adx, y: warriorY + ady };
+              })();
+        result.set(String(w.id), { x, y, seamX: seam.x, seamY: seam.y });
+      });
+    }
+    return result;
+  }, [myCards, myZones, cardWidth, cardHeight]);
+
+  // Opponent weapon offsets are mirror-flipped (opponent territory renders
+  // rotated 180° from the local player's perspective). Seams aren't tracked
+  // for the opponent since detach is local-player-only.
+  const opponentDerivedWeaponPositions = useMemo(() => {
+    const result = new Map<string, { x: number; y: number }>();
+    const territory = opponentCards['territory'] ?? [];
+    const oppZone = opponentZones['territory'];
+    if (!oppZone || territory.length === 0) return result;
+
+    const byWarrior = new Map<bigint, CardInstance[]>();
+    for (const c of territory) {
+      if (c.equippedToInstanceId === 0n) continue;
+      const list = byWarrior.get(c.equippedToInstanceId);
+      if (list) list.push(c);
+      else byWarrior.set(c.equippedToInstanceId, [c]);
+    }
+    for (const [warriorId, weapons] of byWarrior) {
+      const warrior = territory.find((c) => c.id === warriorId);
+      if (!warrior || !warrior.posX) continue;
+      const { x: warriorX, y: warriorY } = toScreenPos(
+        parseFloat(warrior.posX),
+        parseFloat(warrior.posY),
+        oppZone,
+        'opponent',
+      );
+      weapons.forEach((w, i) => {
+        const { dx, dy } = computeEquipOffset(cardWidth, cardHeight, i);
+        // Rotation=180 anchors cards at their bottom-right; flipping the offset
+        // sign places weapons visually up-and-left from the opponent's perspective.
+        result.set(String(w.id), { x: warriorX - dx, y: warriorY - dy });
+      });
+    }
+    return result;
+  }, [opponentCards, opponentZones, cardWidth, cardHeight]);
 
   // ---- Card bounds for marquee selection (my + opponent free-form, LOB, hand cards) ----
   const allCardBounds = useMemo((): CardBound[] => {
@@ -2755,13 +2909,55 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           })()}
 
           {/* ================================================================
-              Cards in free-form zones — My territory (draggable, clipped)
+              Cards in free-form zones — My territory (draggable, clipped).
+              Two-pass per-cluster render: for each unequipped card, emit its
+              attached weapons first (drawn behind) and then the card itself.
+              This keeps equipped weapons visually tucked behind their warriors.
               ================================================================ */}
           {FREE_FORM_ZONES.map((zoneKey) => {
             const cards = myCards[zoneKey];
             if (!cards || cards.length === 0) return null;
             const zone = myZones[zoneKey];
             const sorted = [...cards].sort((a, b) => Number(a.zoneIndex) - Number(b.zoneIndex));
+            const unequipped = sorted.filter((c) => c.equippedToInstanceId === 0n);
+            const renderCard = (card: CardInstance, overridePos?: { x: number; y: number }) => {
+              const gameCard = adaptCard(card, 'player1');
+              const myZone = myZones[zoneKey];
+              let x: number, y: number;
+              if (overridePos) {
+                x = overridePos.x;
+                y = overridePos.y;
+              } else if (card.posX && myZone) {
+                ({ x, y } = toScreenPos(parseFloat(card.posX), parseFloat(card.posY), myZone, 'my'));
+              } else {
+                x = (myZone?.x ?? 0) + 20;
+                y = (myZone?.y ?? 0) + 24;
+              }
+              return (
+                <GameCardNode
+                  key={String(card.id)}
+                  card={gameCard}
+                  x={x}
+                  y={y}
+                  rotation={0}
+                  cardWidth={cardWidth}
+                  cardHeight={cardHeight}
+                  image={getCardImage(card)}
+                  isSelected={isSelected(String(card.id))}
+                  isDraggable={true}
+                  hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
+                  nodeRef={registerCardNode}
+                  onClick={handleCardClick}
+                  onDragStart={handleCardDragStart}
+                  onDragMove={handleCardDragMove}
+                  onDragEnd={handleCardDragEnd}
+                  onContextMenu={handleCardContextMenu}
+                  onDblClick={handleDblClick}
+                  onMouseEnter={handleMouseEnter}
+                  onMouseLeave={handleMouseLeave}
+                />
+              );
+            };
             return (
               <Group
                 key={`my-cards-${zoneKey}`}
@@ -2770,53 +2966,73 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 clipWidth={zone?.width ?? VIRTUAL_WIDTH}
                 clipHeight={zone?.height ?? VIRTUAL_HEIGHT}
               >
-                {sorted.map((card) => {
-                  const gameCard = adaptCard(card, 'player1');
-                  const myZone = myZones[zoneKey];
-                  let x: number, y: number;
-                  if (card.posX && myZone) {
-                    ({ x, y } = toScreenPos(parseFloat(card.posX), parseFloat(card.posY), myZone, 'my'));
-                  } else {
-                    x = (myZone?.x ?? 0) + 20;
-                    y = (myZone?.y ?? 0) + 24;
-                  }
-                  return (
-                    <GameCardNode
-                      key={String(card.id)}
-                      card={gameCard}
-                      x={x}
-                      y={y}
-                      rotation={0}
-                      cardWidth={cardWidth}
-                      cardHeight={cardHeight}
-                      image={getCardImage(card)}
-                      isSelected={isSelected(String(card.id))}
-                      isDraggable={true}
-                      hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
-                      nodeRef={registerCardNode}
-                      onClick={handleCardClick}
-                      onDragStart={handleCardDragStart}
-                      onDragMove={handleCardDragMove}
-                      onDragEnd={handleCardDragEnd}
-                      onContextMenu={handleCardContextMenu}
-                      onDblClick={handleDblClick}
-                      onMouseEnter={handleMouseEnter}
-                      onMouseLeave={handleMouseLeave}
-                    />
+                {unequipped.flatMap((card) => {
+                  const attachedWeapons = sorted.filter(
+                    (w) => w.equippedToInstanceId === card.id
                   );
+                  const nodes: React.ReactNode[] = [];
+                  for (const weapon of attachedWeapons) {
+                    const derived = myDerivedWeaponPositions.get(String(weapon.id));
+                    nodes.push(renderCard(weapon, derived ? { x: derived.x, y: derived.y } : undefined));
+                  }
+                  nodes.push(renderCard(card));
+                  return nodes;
                 })}
               </Group>
             );
           })}
 
           {/* ================================================================
-              Cards in free-form zones — Opponent territory (draggable)
+              Cards in free-form zones — Opponent territory (draggable).
+              Same two-pass cluster render as my territory, mirrored at 180°.
               ================================================================ */}
           {FREE_FORM_ZONES.map((zoneKey) => {
             const cards = opponentCards[zoneKey];
             if (!cards || cards.length === 0) return null;
             const zone = opponentZones[zoneKey];
             const sorted = [...cards].sort((a, b) => Number(a.zoneIndex) - Number(b.zoneIndex));
+            const unequipped = sorted.filter((c) => c.equippedToInstanceId === 0n);
+            const renderCard = (card: CardInstance, overridePos?: { x: number; y: number }) => {
+              const gameCard = adaptCard(card, 'player2');
+              const oppZone = opponentZones[zoneKey];
+              if (!oppZone) return null;
+              let x: number, y: number;
+              if (overridePos) {
+                x = overridePos.x;
+                y = overridePos.y;
+              } else {
+                ({ x, y } = toScreenPos(
+                  card.posX ? parseFloat(card.posX) : 0,
+                  card.posY ? parseFloat(card.posY) : 0,
+                  oppZone,
+                  'opponent',
+                ));
+              }
+              return (
+                <GameCardNode
+                  key={String(card.id)}
+                  card={gameCard}
+                  x={x}
+                  y={y}
+                  rotation={180}
+                  cardWidth={cardWidth}
+                  cardHeight={cardHeight}
+                  image={getCardImage(card)}
+                  isSelected={isSelected(String(card.id))}
+                  isDraggable={true}
+                  hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
+                  nodeRef={registerCardNode}
+                  onClick={handleCardClick}
+                  onDragStart={handleCardDragStart}
+                  onDragMove={handleCardDragMove}
+                  onDragEnd={handleCardDragEnd}
+                  onContextMenu={handleCardContextMenu}
+                  onDblClick={noopDblClick}
+                  onMouseEnter={handleMouseEnter}
+                  onMouseLeave={handleMouseLeave}
+                />
+              );
+            };
             return (
               <Group
                 key={`opp-cards-${zoneKey}`}
@@ -2825,39 +3041,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 clipWidth={zone?.width ?? VIRTUAL_WIDTH}
                 clipHeight={zone?.height ?? VIRTUAL_HEIGHT}
               >
-                {sorted.map((card) => {
-                  const gameCard = adaptCard(card, 'player2');
-                  const oppZone = opponentZones[zoneKey];
-                  if (!oppZone) return null;
-                  const { x, y } = toScreenPos(
-                    card.posX ? parseFloat(card.posX) : 0,
-                    card.posY ? parseFloat(card.posY) : 0,
-                    oppZone, 'opponent',
+                {unequipped.flatMap((card) => {
+                  const attachedWeapons = sorted.filter(
+                    (w) => w.equippedToInstanceId === card.id
                   );
-                  return (
-                    <GameCardNode
-                      key={String(card.id)}
-                      card={gameCard}
-                      x={x}
-                      y={y}
-                      rotation={180}
-                      cardWidth={cardWidth}
-                      cardHeight={cardHeight}
-                      image={getCardImage(card)}
-                      isSelected={isSelected(String(card.id))}
-                      isDraggable={true}
-                      hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
-                      nodeRef={registerCardNode}
-                      onClick={handleCardClick}
-                      onDragStart={handleCardDragStart}
-                      onDragMove={handleCardDragMove}
-                      onDragEnd={handleCardDragEnd}
-                      onContextMenu={handleCardContextMenu}
-                      onDblClick={noopDblClick}
-                      onMouseEnter={handleMouseEnter}
-                      onMouseLeave={handleMouseLeave}
-                    />
-                  );
+                  const nodes: React.ReactNode[] = [];
+                  for (const weapon of attachedWeapons) {
+                    const derived = opponentDerivedWeaponPositions.get(String(weapon.id));
+                    nodes.push(renderCard(weapon, derived));
+                  }
+                  nodes.push(renderCard(card));
+                  return nodes;
                 })}
               </Group>
             );
@@ -3595,6 +3789,43 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         </Layer>
       </Stage>
 
+      {/* ================================================================
+          Detach ("unlink") icons at each weapon/warrior seam.
+          HTML overlay — only local-player weapons get the icon, since
+          you can't unequip the opponent's cards.
+          Hidden during drag because the overlay reads from state which
+          doesn't update live while dragging.
+          ================================================================ */}
+      {!isCardDraggingUi && myDerivedWeaponPositions.size > 0 && (
+        <div className="pointer-events-none absolute inset-0 z-30">
+          {(myCards['territory'] ?? [])
+            .filter((weapon) => weapon.equippedToInstanceId !== 0n)
+            .map((weapon) => {
+              const derived = myDerivedWeaponPositions.get(String(weapon.id));
+              if (!derived) return null;
+              const seam = virtualToScreen(derived.seamX, derived.seamY, scale, offsetX, offsetY);
+              const myZone = myZones['territory'];
+              return (
+                <button
+                  key={String(weapon.id)}
+                  type="button"
+                  onClick={() => {
+                    if (!myZone) return;
+                    const db = toDbPos(derived.x, derived.y, myZone, 'my', { cardWidth, cardHeight });
+                    gameState.detachCard(weapon.id, String(db.x), String(db.y));
+                  }}
+                  className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#1a1510] p-1.5 text-[#c4955a] shadow-md ring-1 ring-[#c4955a]/40 transition hover:bg-[#2a1f14] hover:ring-[#c4955a]"
+                  style={{ left: `${seam.x}px`, top: `${seam.y}px` }}
+                  title="Unequip"
+                  aria-label="Unequip weapon"
+                >
+                  <Link2Off size={14} strokeWidth={2} />
+                </button>
+              );
+            })}
+        </div>
+      )}
+
       {/* Card size settings gear */}
       <CardScaleControl
         cardScale={cardScale}
@@ -3704,6 +3935,20 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           actions={multiplayerActions}
           onClose={() => setContextMenu(null)}
           onExchange={(cardIds) => { setContextMenu(null); setExchangeCardIds(cardIds); }}
+          onDetach={
+            contextMenu.card.ownerId === 'player1'
+              ? (weaponId) => {
+                  const derived = myDerivedWeaponPositions.get(weaponId);
+                  const myZone = myZones['territory'];
+                  if (derived && myZone) {
+                    const db = toDbPos(derived.x, derived.y, myZone, 'my', { cardWidth, cardHeight });
+                    gameState.detachCard(BigInt(weaponId), String(db.x), String(db.y));
+                  } else {
+                    gameState.detachCard(BigInt(weaponId));
+                  }
+                }
+              : undefined
+          }
           zones={allZonesForContextMenu as any}
         />
       )}

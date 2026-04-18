@@ -92,4 +92,11 @@ describe('hitTestWarrior', () => {
     expect(hitTestWarrior(201, 100, 100, 140, [c], 'skip')).toBeNull();
     expect(hitTestWarrior(100, 241, 100, 140, [c], 'skip')).toBeNull();
   });
+
+  it('attaches when dropped card overlaps warrior by 25%+ even if center is outside', () => {
+    // Warrior at (100, 100); drop centered at (200, 170) — center is 1px past
+    // warrior's right edge, but rects overlap by 50% of a card area.
+    const c = card({ instanceId: 'h1', posX: 100, posY: 100 });
+    expect(hitTestWarrior(200, 170, 100, 140, [c], 'skip')?.instanceId).toBe('h1');
+  });
 });

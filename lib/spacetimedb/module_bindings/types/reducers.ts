@@ -8,11 +8,13 @@ import { type Infer as __Infer } from "spacetimedb";
 // Import all reducer arg schemas
 import AddCounterReducer from "../add_counter_reducer";
 import ApproveZoneSearchReducer from "../approve_zone_search_reducer";
+import AttachCardReducer from "../attach_card_reducer";
 import ClaimTimeoutVictoryReducer from "../claim_timeout_victory_reducer";
 import ClearRevealedCardsReducer from "../clear_revealed_cards_reducer";
 import CompleteZoneSearchReducer from "../complete_zone_search_reducer";
 import CreateGameReducer from "../create_game_reducer";
 import DenyZoneSearchReducer from "../deny_zone_search_reducer";
+import DetachCardReducer from "../detach_card_reducer";
 import DrawCardReducer from "../draw_card_reducer";
 import DrawMultipleReducer from "../draw_multiple_reducer";
 import EndTurnReducer from "../end_turn_reducer";
@@ -66,11 +68,13 @@ import UpdateLobbyMessageReducer from "../update_lobby_message_reducer";
 
 export type AddCounterParams = __Infer<typeof AddCounterReducer>;
 export type ApproveZoneSearchParams = __Infer<typeof ApproveZoneSearchReducer>;
+export type AttachCardParams = __Infer<typeof AttachCardReducer>;
 export type ClaimTimeoutVictoryParams = __Infer<typeof ClaimTimeoutVictoryReducer>;
 export type ClearRevealedCardsParams = __Infer<typeof ClearRevealedCardsReducer>;
 export type CompleteZoneSearchParams = __Infer<typeof CompleteZoneSearchReducer>;
 export type CreateGameParams = __Infer<typeof CreateGameReducer>;
 export type DenyZoneSearchParams = __Infer<typeof DenyZoneSearchReducer>;
+export type DetachCardParams = __Infer<typeof DetachCardReducer>;
 export type DrawCardParams = __Infer<typeof DrawCardReducer>;
 export type DrawMultipleParams = __Infer<typeof DrawMultipleReducer>;
 export type EndTurnParams = __Infer<typeof EndTurnReducer>;

@@ -6,14 +6,16 @@ import { tables } from '@/lib/spacetimedb/module_bindings';
 import type { Game } from '@/lib/spacetimedb/module_bindings/types';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
+import { normalizeDeckFormat } from '@/lib/deck-format';
 
 interface LobbyListProps {
   selectedDeckId: string | null;
+  selectedDeckFormat: string | null;
   joiningCode: string | null;
   onJoinGame: (code: string) => void;
 }
 
-export function LobbyList({ selectedDeckId, joiningCode, onJoinGame }: LobbyListProps) {
+export function LobbyList({ selectedDeckId, selectedDeckFormat, joiningCode, onJoinGame }: LobbyListProps) {
   // Follow existing codebase pattern: useSpacetimeDB() returns a context object,
   // not the connection directly. Use .getConnection() to get the actual DbConnection.
   const spacetimeCtx = useSpacetimeDB() as any;
@@ -86,6 +88,10 @@ export function LobbyList({ selectedDeckId, joiningCode, onJoinGame }: LobbyList
     );
   }
 
+  const selectedFormat = selectedDeckId
+    ? normalizeDeckFormat(selectedDeckFormat)
+    : null;
+
   return (
     <div className="flex flex-col gap-2">
       {openGames.map((game) => {
@@ -99,6 +105,12 @@ export function LobbyList({ selectedDeckId, joiningCode, onJoinGame }: LobbyList
         const timeLabel =
           minutesAgo < 1 ? 'Just now' : `${minutesAgo} min ago`;
 
+        const gameFormat = normalizeDeckFormat(game.format);
+        const formatMismatch =
+          selectedFormat !== null && selectedFormat !== gameFormat;
+        const disabled =
+          !selectedDeckId || joiningCode !== null || formatMismatch;
+
         return (
           <div
             key={game.code}
@@ -110,7 +122,7 @@ export function LobbyList({ selectedDeckId, joiningCode, onJoinGame }: LobbyList
                   {game.createdByName || 'Unknown'}
                 </span>
                 <span className="text-xs text-muted-foreground shrink-0">
-                  {game.format}
+                  {gameFormat}
                 </span>
                 <span className="text-xs text-muted-foreground shrink-0">
                   · {timeLabel}
@@ -121,11 +133,21 @@ export function LobbyList({ selectedDeckId, joiningCode, onJoinGame }: LobbyList
                   {game.lobbyMessage}
                 </p>
               )}
+              {formatMismatch && (
+                <p className="text-xs text-muted-foreground">
+                  Select a {gameFormat} deck to join
+                </p>
+              )}
             </div>
             <Button
               size="sm"
               onClick={() => onJoinGame(game.code)}
-              disabled={!selectedDeckId || joiningCode !== null}
+              disabled={disabled}
+              title={
+                formatMismatch
+                  ? `This game is ${gameFormat}. Your selected deck is ${selectedFormat}.`
+                  : undefined
+              }
               className="shrink-0"
             >
               {joiningCode === game.code ? (

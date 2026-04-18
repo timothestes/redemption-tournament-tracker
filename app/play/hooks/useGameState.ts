@@ -65,6 +65,8 @@ export interface GameState {
   drawMultiple: (count: bigint) => void;
   moveCard: (cardInstanceId: bigint, toZone: string, zoneIndex?: string, posX?: string, posY?: string, targetOwnerId?: string) => void;
   moveCardsBatch: (cardInstanceIds: string, toZone: string, positions?: string, targetOwnerId?: string, fromSource?: string) => void;
+  attachCard: (weaponInstanceId: bigint, warriorInstanceId: bigint) => void;
+  detachCard: (weaponInstanceId: bigint, posX?: string, posY?: string) => void;
   shuffleDeck: () => void;
   shuffleCardIntoDeck: (cardInstanceId: bigint) => void;
   reloadDeck: (deckId: string, deckData: string, paragon: string) => void;
@@ -101,8 +103,8 @@ export interface GameState {
   pregameSkipToReveal: (chosenSeat: bigint) => void;
   pregameChangeDeck: (deckId: string, deckData: string) => void;
   // Rematch actions
-  requestRematch: (deckId: string, deckData: string, paragon: string) => void;
-  respondRematch: (accepted: boolean, deckId: string, deckData: string, paragon: string) => void;
+  requestRematch: (deckId: string, deckData: string, paragon: string, format: string) => void;
+  respondRematch: (accepted: boolean, deckId: string, deckData: string, paragon: string, format: string) => void;
   revealCards: (cardIds: string) => void;
   clearRevealedCards: () => void;
   logSearchDeck: () => void;
@@ -322,6 +324,25 @@ export function useGameState(gameId: bigint): GameState {
         positions: positions || '{}',
         targetOwnerId: targetOwnerId || '',
         fromSource: fromSource || '',
+      });
+    },
+    [conn, gameId],
+  );
+
+  const attachCard = useCallback(
+    (weaponInstanceId: bigint, warriorInstanceId: bigint) => {
+      conn?.reducers.attachCard({ gameId, weaponInstanceId, warriorInstanceId });
+    },
+    [conn, gameId],
+  );
+
+  const detachCard = useCallback(
+    (weaponInstanceId: bigint, posX?: string, posY?: string) => {
+      conn?.reducers.detachCard({
+        gameId,
+        weaponInstanceId,
+        posX: posX || '',
+        posY: posY || '',
       });
     },
     [conn, gameId],
@@ -547,12 +568,12 @@ export function useGameState(gameId: bigint): GameState {
     conn?.reducers.pregameChangeDeck({ gameId, deckId, deckData });
   }, [conn, gameId]);
 
-  const requestRematch = useCallback((deckId: string, deckData: string, paragon: string) => {
-    conn?.reducers.requestRematch({ gameId, deckId, deckData, paragon });
+  const requestRematch = useCallback((deckId: string, deckData: string, paragon: string, format: string) => {
+    conn?.reducers.requestRematch({ gameId, deckId, deckData, paragon, format });
   }, [conn, gameId]);
 
-  const respondRematch = useCallback((accepted: boolean, deckId: string, deckData: string, paragon: string) => {
-    conn?.reducers.respondRematch({ gameId, accepted, deckId, deckData, paragon });
+  const respondRematch = useCallback((accepted: boolean, deckId: string, deckData: string, paragon: string, format: string) => {
+    conn?.reducers.respondRematch({ gameId, accepted, deckId, deckData, paragon, format });
   }, [conn, gameId]);
 
   const logSearchDeck = useCallback(() => {
@@ -662,6 +683,8 @@ export function useGameState(gameId: bigint): GameState {
     drawMultiple,
     moveCard,
     moveCardsBatch,
+    attachCard,
+    detachCard,
     shuffleDeck,
     shuffleCardIntoDeck,
     randomHandToZone,

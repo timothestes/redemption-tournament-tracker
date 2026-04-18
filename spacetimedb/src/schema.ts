@@ -109,6 +109,9 @@ export const CardInstance = table(
     specialAbility: t.string(),
     reference: t.string(),
     notes: t.string(),
+    // Instance id of the warrior this card (a weapon) is attached to.
+    // `0n` sentinel = unattached (matches the empty-string convention used for posX/posY).
+    equippedToInstanceId: t.u64().default(0n),
   }
 );
 

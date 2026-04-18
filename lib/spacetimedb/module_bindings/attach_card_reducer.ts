@@ -11,11 +11,7 @@ import {
 } from "spacetimedb";
 
 export default {
-  code: __t.string(),
-  deckId: __t.string(),
-  displayName: __t.string(),
-  paragon: __t.string(),
-  format: __t.string(),
-  supabaseUserId: __t.string(),
-  deckData: __t.string(),
+  gameId: __t.u64(),
+  weaponInstanceId: __t.u64(),
+  warriorInstanceId: __t.u64(),
 };

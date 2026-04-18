@@ -30,6 +30,19 @@ function logAction(
 }
 
 // ---------------------------------------------------------------------------
+// Helper: normalizeFormat
+// Maps any deck-format string (e.g. "Type 1", "t2", "Paragon Type 1",
+// "Multi-player") to the canonical "T1" | "T2" | "Paragon" used by game rules.
+// Mirrors client-side `formatDeckType` in app/play/components/DeckPickerCard.tsx.
+// ---------------------------------------------------------------------------
+function normalizeFormat(format: string): 'T1' | 'T2' | 'Paragon' {
+  const fmt = (format || '').toLowerCase();
+  if (fmt.includes('paragon')) return 'Paragon';
+  if (fmt.includes('type 2') || fmt.includes('multi') || fmt === 't2') return 'T2';
+  return 'T1';
+}
+
+// ---------------------------------------------------------------------------
 // Helper: findPlayerBySender
 // ---------------------------------------------------------------------------
 function findPlayerBySender(ctx: any, gameId: bigint) {
@@ -186,6 +199,7 @@ function insertCardsShuffleDraw(
       specialAbility: card.specialAbility || '',
       reference: card.reference || '',
       notes: '',
+      equippedToInstanceId: 0n,
     });
   }
 
@@ -316,10 +330,11 @@ export const join_game = spacetimedb.reducer(
     deckId: t.string(),
     displayName: t.string(),
     paragon: t.string(),
+    format: t.string(),
     supabaseUserId: t.string(),
     deckData: t.string(),
   },
-  (ctx, { code, deckId, displayName, paragon, supabaseUserId, deckData }) => {
+  (ctx, { code, deckId, displayName, paragon, format, supabaseUserId, deckData }) => {
     // Find game by code
     let game: any = null;
     for (const g of ctx.db.Game.game_code.filter(code)) {
@@ -343,6 +358,15 @@ export const join_game = spacetimedb.reducer(
     // Prevent a player from joining their own game
     if (creator && creator.supabaseUserId === supabaseUserId) {
       throw new SenderError('You cannot join your own game');
+    }
+
+    // Reject format mismatch (T1 can't join a Paragon game, etc.)
+    const joinerFormat = normalizeFormat(format);
+    const gameFormat = normalizeFormat(game.format);
+    if (joinerFormat !== gameFormat) {
+      throw new SenderError(
+        `Deck format (${joinerFormat}) does not match game format (${gameFormat})`
+      );
     }
 
     // Insert player (seat=1) with pending deck data (cards loaded later during pregame)
@@ -749,14 +773,24 @@ export const request_rematch = spacetimedb.reducer(
     deckId: t.string(),
     deckData: t.string(),
     paragon: t.string(),
+    format: t.string(),
   },
-  (ctx, { gameId, deckId, deckData, paragon }) => {
+  (ctx, { gameId, deckId, deckData, paragon, format }) => {
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
     if (game.status !== 'finished') throw new SenderError('Game is not finished');
     if (game.rematchRequestedBy !== '') throw new SenderError('Rematch already requested');
 
     const player = findPlayerBySender(ctx, gameId);
+
+    // Reject rematch with a deck in a different format than the original game
+    const requesterFormat = normalizeFormat(format);
+    const gameFormat = normalizeFormat(game.format);
+    if (requesterFormat !== gameFormat) {
+      throw new SenderError(
+        `Rematch deck format (${requesterFormat}) must match original game format (${gameFormat})`
+      );
+    }
 
     // Validate deck data
     try {
@@ -794,8 +828,9 @@ export const respond_rematch = spacetimedb.reducer(
     deckId: t.string(),
     deckData: t.string(),
     paragon: t.string(),
+    format: t.string(),
   },
-  (ctx, { gameId, accepted, deckId, deckData, paragon }) => {
+  (ctx, { gameId, accepted, deckId, deckData, paragon, format }) => {
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
     if (game.status !== 'finished') throw new SenderError('Game is not finished');
@@ -808,6 +843,15 @@ export const respond_rematch = spacetimedb.reducer(
     }
 
     if (accepted) {
+      // Reject rematch acceptance with a format-mismatched deck
+      const responderFormat = normalizeFormat(format);
+      const gameFormat = normalizeFormat(game.format);
+      if (responderFormat !== gameFormat) {
+        throw new SenderError(
+          `Rematch deck format (${responderFormat}) must match original game format (${gameFormat})`
+        );
+      }
+
       // Validate deck data
       try {
         const parsed = JSON.parse(deckData);
@@ -1417,6 +1461,10 @@ export const move_card = spacetimedb.reducer(
       );
     }
 
+    // Auto-unlink: if the mover is leaving territory, clear its own equippedTo
+    // and cascade to any weapons pointing at it. Warriors heading to LOB drag
+    // their weapons to Discard; other non-territory destinations just unlink.
+    const clearEquippedOnMover = toZone !== 'territory' && card.equippedToInstanceId !== 0n;
     ctx.db.CardInstance.id.update({
       ...card,
       zone: toZone,
@@ -1425,7 +1473,35 @@ export const move_card = spacetimedb.reducer(
       posY,
       isFlipped,
       ownerId: newOwnerId,
+      equippedToInstanceId: clearEquippedOnMover ? 0n : card.equippedToInstanceId,
     });
+
+    if (toZone !== 'territory') {
+      const attachedWeapons = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+        (c: any) => c.equippedToInstanceId === cardInstanceId
+      );
+      for (const weapon of attachedWeapons) {
+        if (toZone === 'land-of-bondage') {
+          // Warrior dragged to LOB — weapons go to Discard.
+          let maxDiscardIdx = -1n;
+          for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+            if (c.ownerId === weapon.ownerId && c.zone === 'discard' && c.zoneIndex > maxDiscardIdx) {
+              maxDiscardIdx = c.zoneIndex;
+            }
+          }
+          ctx.db.CardInstance.id.update({
+            ...weapon,
+            zone: 'discard',
+            zoneIndex: maxDiscardIdx + 1n,
+            posX: '',
+            posY: '',
+            equippedToInstanceId: 0n,
+          });
+        } else {
+          ctx.db.CardInstance.id.update({ ...weapon, equippedToInstanceId: 0n });
+        }
+      }
+    }
 
     // Log when the card changes zones OR changes ownership (e.g. territory → opponent's territory)
     const ownerChanged = newOwnerId !== card.ownerId;
@@ -1465,6 +1541,7 @@ export const move_cards_batch = spacetimedb.reducer(
     const ids: string[] = JSON.parse(cardInstanceIds);
     const posMap: Record<string, { posX: string; posY: string }> = positions ? JSON.parse(positions) : {};
     const newOwnerId = targetOwnerId ? BigInt(targetOwnerId) : null;
+    const batchIdSet = new Set(ids.map((s) => BigInt(s)));
     const cards: { name: string; img: string }[] = [];
     const movedCards: { name: string; img: string }[] = [];
     const redirectedLostSouls: { name: string; img: string }[] = [];
@@ -1478,6 +1555,21 @@ export const move_cards_batch = spacetimedb.reducer(
 
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
+
+    // Equip cascade pre-pass: weapons in this batch whose warrior is also in
+    // the batch AND we're heading to LOB get redirected to Discard — mirroring
+    // goldfish's MOVE_CARDS_BATCH rule that a warrior going to LOB takes its
+    // weapons down with it.
+    const finalZoneById = new Map<string, string>();
+    for (const idStr of ids) {
+      const c = ctx.db.CardInstance.id.find(BigInt(idStr));
+      if (!c) continue;
+      const redirected =
+        toZone === 'land-of-bondage' &&
+        c.equippedToInstanceId !== 0n &&
+        batchIdSet.has(c.equippedToInstanceId);
+      finalZoneById.set(idStr, redirected ? 'discard' : toZone);
+    }
 
     // For free-form zones (territory), pre-compute the current max zoneIndex
     // so new cards render on top of existing ones. Each card in the batch
@@ -1558,11 +1650,13 @@ export const move_cards_batch = spacetimedb.reducer(
       // Ensure posX/posY are strings — client may send numbers via JSON positions map
       const pos = { posX: String(rawPos.posX ?? ''), posY: String(rawPos.posY ?? '') };
       const cardOwnerId = newOwnerId ?? card.ownerId;
+      const cardFinalZone = finalZoneById.get(idStr) ?? toZone;
+      const leavingTerritory = cardFinalZone !== 'territory';
 
       // Auto-fan: if dropping into territory without an explicit position,
       // stagger the card in a small grid so multi-card modal moves don't stack
       // at the zone origin. Positions are normalized 0–1 within the zone.
-      if (toZone === 'territory' && pos.posX === '' && pos.posY === '') {
+      if (cardFinalZone === 'territory' && pos.posX === '' && pos.posY === '') {
         const cardsPerRow = 10;
         const col = autoFanIndex % cardsPerRow;
         const row = Math.floor(autoFanIndex / cardsPerRow);
@@ -1572,7 +1666,7 @@ export const move_cards_batch = spacetimedb.reducer(
       }
 
       // For hand zone, assign sequential zoneIndex (count of existing hand cards for this owner)
-      const handZoneIndex = toZone === 'hand' ? BigInt(
+      const handZoneIndex = cardFinalZone === 'hand' ? BigInt(
         [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
           (c: any) => c.ownerId === cardOwnerId && c.zone === 'hand'
         ).length
@@ -1581,11 +1675,21 @@ export const move_cards_batch = spacetimedb.reducer(
       // Determine the zoneIndex for this card:
       // - hand: use computed sequential index
       // - free-form zones (territory): assign incrementing index so cards render on top
-      // - same zone (repositioning): preserve existing zoneIndex
+      // - redirected to discard (equip cascade): compute discard max + 1
       // - other zones: preserve existing zoneIndex
       let finalZoneIndex = card.zoneIndex;
-      if (toZone === 'hand') {
+      if (cardFinalZone === 'hand') {
         finalZoneIndex = handZoneIndex;
+      } else if (cardFinalZone !== toZone) {
+        // Redirected (weapon → discard). Compute max zoneIndex for the
+        // redirected owner's discard and put the weapon after it.
+        let maxDiscardIdx = -1n;
+        for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+          if (c.ownerId === cardOwnerId && c.zone === 'discard' && c.zoneIndex > maxDiscardIdx) {
+            maxDiscardIdx = c.zoneIndex;
+          }
+        }
+        finalZoneIndex = maxDiscardIdx + 1n;
       } else if (isFreeFormTarget) {
         // Assign ascending zoneIndex for free-form zones — both cross-zone moves
         // and same-zone repositioning — so moved cards render on top for all clients.
@@ -1593,15 +1697,52 @@ export const move_cards_batch = spacetimedb.reducer(
         nextFreeFormIndex += 1n;
       }
 
+      // Clear pos when redirected (the client-supplied coords were for `toZone`, not discard)
+      const finalPosX = cardFinalZone === toZone ? pos.posX : '';
+      const finalPosY = cardFinalZone === toZone ? pos.posY : '';
+
       ctx.db.CardInstance.id.update({
         ...card,
-        zone: toZone,
+        zone: cardFinalZone,
         zoneIndex: finalZoneIndex,
-        posX: pos.posX,
-        posY: pos.posY,
+        posX: finalPosX,
+        posY: finalPosY,
         isFlipped,
         ownerId: cardOwnerId,
+        equippedToInstanceId: leavingTerritory ? 0n : card.equippedToInstanceId,
       });
+    }
+
+    // Equip cascade post-pass: for each mover leaving territory, cascade
+    // to non-batch weapons pointing at it. Warriors heading to LOB drag their
+    // weapons to Discard; other non-territory destinations just unlink.
+    for (const idStr of ids) {
+      const moverId = BigInt(idStr);
+      const moverFinalZone = finalZoneById.get(idStr) ?? toZone;
+      if (moverFinalZone === 'territory') continue;
+      const nonBatchWeapons = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+        (c: any) => c.equippedToInstanceId === moverId && !batchIdSet.has(c.id)
+      );
+      for (const weapon of nonBatchWeapons) {
+        if (moverFinalZone === 'land-of-bondage') {
+          let maxDiscardIdx = -1n;
+          for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+            if (c.ownerId === weapon.ownerId && c.zone === 'discard' && c.zoneIndex > maxDiscardIdx) {
+              maxDiscardIdx = c.zoneIndex;
+            }
+          }
+          ctx.db.CardInstance.id.update({
+            ...weapon,
+            zone: 'discard',
+            zoneIndex: maxDiscardIdx + 1n,
+            posX: '',
+            posY: '',
+            equippedToInstanceId: 0n,
+          });
+        } else {
+          ctx.db.CardInstance.id.update({ ...weapon, equippedToInstanceId: 0n });
+        }
+      }
     }
 
     // Only log if cards actually changed zones (not just repositioned within the same zone)
@@ -1617,6 +1758,127 @@ export const move_cards_batch = spacetimedb.reducer(
     for (const ownerId of lobCompactOwners) {
       compactLobIndices(ctx, gameId, ownerId);
     }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: attach_card
+// Attach a weapon to a warrior in Territory. Weapon may come from any zone;
+// it ends up in Territory with equippedToInstanceId pointing at the warrior
+// and inheriting the warrior's position (render layer derives offsets on the
+// client). Enforces the one-weapon-per-warrior cap server-side so a misbehaving
+// client can't stack weapons.
+// ---------------------------------------------------------------------------
+export const attach_card = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    weaponInstanceId: t.u64(),
+    warriorInstanceId: t.u64(),
+  },
+  (ctx, { gameId, weaponInstanceId, warriorInstanceId }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+
+    const weapon = ctx.db.CardInstance.id.find(weaponInstanceId);
+    const warrior = ctx.db.CardInstance.id.find(warriorInstanceId);
+    if (!weapon || !warrior) throw new SenderError('Card not found');
+    if (weapon.gameId !== gameId || warrior.gameId !== gameId) {
+      throw new SenderError('Card not in this game');
+    }
+    if (weapon.ownerId !== player.id || warrior.ownerId !== player.id) {
+      throw new SenderError('Cannot attach opponent cards');
+    }
+    if (warrior.zone !== 'territory') {
+      throw new SenderError('Warrior not in territory');
+    }
+    if (weaponInstanceId === warriorInstanceId) {
+      throw new SenderError('Cannot attach a card to itself');
+    }
+
+    // Cap at one weapon per warrior (UI enforces this too; server is the source of truth).
+    const existing = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+      (c: any) => c.equippedToInstanceId === warriorInstanceId && c.id !== weaponInstanceId
+    );
+    if (existing.length >= 1) {
+      throw new SenderError('Warrior already has a weapon equipped');
+    }
+
+    const fromZone = weapon.zone;
+
+    // Assign weapon a fresh territory zoneIndex above the warrior so ordering
+    // is deterministic if a client falls back to zoneIndex-based rendering.
+    let maxIdx = -1n;
+    for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+      if (c.ownerId === player.id && c.zone === 'territory' && c.zoneIndex > maxIdx) {
+        maxIdx = c.zoneIndex;
+      }
+    }
+
+    ctx.db.CardInstance.id.update({
+      ...weapon,
+      zone: 'territory',
+      zoneIndex: maxIdx + 1n,
+      posX: warrior.posX,
+      posY: warrior.posY,
+      isFlipped: false,
+      equippedToInstanceId: warriorInstanceId,
+    });
+
+    if (fromZone === 'hand') {
+      compactHandIndices(ctx, gameId, player.id);
+    }
+    if (fromZone === 'land-of-bondage') {
+      compactLobIndices(ctx, gameId, player.id);
+    }
+
+    if (fromZone !== 'territory') {
+      logAction(
+        ctx,
+        gameId,
+        player.id,
+        'MOVE_CARD',
+        JSON.stringify({
+          cardInstanceId: weaponInstanceId.toString(),
+          from: fromZone,
+          to: 'territory',
+          cardName: weapon.cardName,
+          cardImgFile: weapon.cardImgFile,
+        }),
+        game.turnNumber,
+        game.currentPhase
+      );
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: detach_card
+// Break the equip link on a weapon. The weapon stays in its current zone
+// (typically Territory) at the client-supplied position, which lets the UI
+// keep the weapon visually in place after the link is severed.
+// ---------------------------------------------------------------------------
+export const detach_card = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    weaponInstanceId: t.u64(),
+    posX: t.string(),
+    posY: t.string(),
+  },
+  (ctx, { gameId, weaponInstanceId, posX, posY }) => {
+    const player = findPlayerBySender(ctx, gameId);
+
+    const weapon = ctx.db.CardInstance.id.find(weaponInstanceId);
+    if (!weapon) throw new SenderError('Card not found');
+    if (weapon.gameId !== gameId) throw new SenderError('Card not in this game');
+    if (weapon.ownerId !== player.id) throw new SenderError('Not your card');
+
+    ctx.db.CardInstance.id.update({
+      ...weapon,
+      equippedToInstanceId: 0n,
+      posX: posX || weapon.posX,
+      posY: posY || weapon.posY,
+    });
   }
 );
 
@@ -2597,6 +2859,7 @@ export const spawn_lost_soul = spacetimedb.reducer(
       specialAbility: '',
       reference: '',
       notes: '',
+      equippedToInstanceId: 0n,
     });
 
     logAction(ctx, gameId, player.id, 'SPAWN_LOST_SOUL', JSON.stringify({ testament }), game.turnNumber, game.currentPhase);
