@@ -2584,8 +2584,27 @@ export const set_note = spacetimedb.reducer(
     if (card.gameId !== gameId) throw new SenderError('Card not in this game');
     if (card.ownerId !== player.id) throw new SenderError('Not your card');
 
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+
+    const previousNote = card.notes;
     ctx.db.CardInstance.id.update({ ...card, notes: trimmed });
-    // No logAction
+
+    logAction(
+      ctx,
+      gameId,
+      player.id,
+      'SET_NOTE',
+      JSON.stringify({
+        cardInstanceId: cardInstanceId.toString(),
+        cardName: card.cardName,
+        cardImgFile: card.cardImgFile,
+        note: trimmed,
+        previousNote,
+      }),
+      game.turnNumber,
+      game.currentPhase,
+    );
   }
 );
 
