@@ -107,7 +107,7 @@ export const actions = {
     return createAction('ATTACH_CARD', { cardInstanceId, warriorInstanceId });
   },
 
-  detachCard(cardInstanceId: string): GameAction {
-    return createAction('DETACH_CARD', { cardInstanceId });
+  detachCard(cardInstanceId: string, posX?: number, posY?: number): GameAction {
+    return createAction('DETACH_CARD', { cardInstanceId, posX, posY });
   },
 };

@@ -35,7 +35,7 @@ interface GameContextValue {
   reorderHand: (cardInstanceIds: string[]) => void;
   reorderLob: (cardInstanceIds: string[]) => void;
   attachCard: (cardInstanceId: string, warriorInstanceId: string) => void;
-  detachCard: (cardInstanceId: string) => void;
+  detachCard: (cardInstanceId: string, posX?: number, posY?: number) => void;
   toggleSpreadHand: () => void;
 }
 
@@ -149,7 +149,8 @@ export function GameProvider({ children, deck, optionsOverrides }: GameProviderP
     [dispatch]
   );
   const detachCard = useCallback(
-    (cardInstanceId: string) => dispatch(actions.detachCard(cardInstanceId)),
+    (cardInstanceId: string, posX?: number, posY?: number) =>
+      dispatch(actions.detachCard(cardInstanceId, posX, posY)),
     [dispatch]
   );
 

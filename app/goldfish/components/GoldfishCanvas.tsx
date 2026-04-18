@@ -38,6 +38,7 @@ import { useCardPreview } from '../state/CardPreviewContext';
 import { useLobArrivalEffect } from '@/app/shared/hooks/useLobArrivalEffect';
 import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '../utils/equipLayout';
 import { findCard, isWeapon, isWarrior } from '@/lib/cards/lookup';
+import { Link2Off } from 'lucide-react';
 
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 
@@ -52,7 +53,7 @@ interface GoldfishCanvasProps {
 }
 
 export default function GoldfishCanvas({ containerWidth, containerHeight, scale, offsetX, offsetY, virtualWidth, onLoadDeck }: GoldfishCanvasProps) {
-  const { state, dispatch, drawCard, drawMultiple, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck, shuffleDeck, meekCard, unmeekCard, flipCard, addCounter, removeCounter, addNote, addOpponentLostSoul, removeOpponentToken, addPlayerLostSoul, reorderHand, attachCard } = useGame();
+  const { state, dispatch, drawCard, drawMultiple, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck, shuffleDeck, meekCard, unmeekCard, flipCard, addCounter, removeCounter, addNote, addOpponentLostSoul, removeOpponentToken, addPlayerLostSoul, reorderHand, attachCard, detachCard } = useGame();
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const stageRef = useRef<Konva.Stage>(null);
   const gameLayerRef = useRef<Konva.Layer>(null);
@@ -1689,6 +1690,36 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
           />
         </Layer>
       </Stage>
+
+      {/* Equip unlink icons — one per attached weapon, anchored at the seam (warrior's top-left) */}
+      <div
+        className="pointer-events-none absolute inset-0 z-10"
+        aria-hidden="false"
+      >
+        {state.zones.territory
+          .filter(c => c.equippedTo)
+          .map(weapon => {
+            const warrior = state.zones.territory.find(c => c.instanceId === weapon.equippedTo);
+            if (!warrior || warrior.posX === undefined || warrior.posY === undefined) return null;
+            // Seam is the warrior's top-left corner. Convert from virtual canvas coords
+            // to screen coords so the HTML button aligns over the rendered Konva card.
+            const seam = virtualToScreen(warrior.posX, warrior.posY, scale, offsetX, offsetY);
+            const derived = derivedWeaponPositions.get(weapon.instanceId);
+            return (
+              <button
+                key={weapon.instanceId}
+                type="button"
+                onClick={() => detachCard(weapon.instanceId, derived?.x, derived?.y)}
+                className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#1a1510] p-1.5 text-[#c4955a] shadow-md ring-1 ring-[#c4955a]/40 transition hover:bg-[#2a1f14] hover:ring-[#c4955a]"
+                style={{ left: `${seam.x}px`, top: `${seam.y}px` }}
+                title="Unequip"
+                aria-label={`Unequip ${weapon.cardName} from ${warrior.cardName}`}
+              >
+                <Link2Off size={14} strokeWidth={2} />
+              </button>
+            );
+          })}
+      </div>
 
       {/* DOM overlays */}
 

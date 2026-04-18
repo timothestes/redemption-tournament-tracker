@@ -520,12 +520,17 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case 'DETACH_CARD': {
-      const { cardInstanceId } = action.payload;
+      const { cardInstanceId, posX, posY } = action.payload;
       if (!cardInstanceId) return state;
       for (const zoneId of Object.keys(zones) as ZoneId[]) {
         const idx = zones[zoneId].findIndex(c => c.instanceId === cardInstanceId);
         if (idx >= 0) {
-          zones[zoneId][idx] = { ...zones[zoneId][idx], equippedTo: undefined };
+          zones[zoneId][idx] = {
+            ...zones[zoneId][idx],
+            equippedTo: undefined,
+            posX: posX ?? zones[zoneId][idx].posX,
+            posY: posY ?? zones[zoneId][idx].posY,
+          };
           return { ...state, zones, history };
         }
       }
