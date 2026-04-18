@@ -36,6 +36,8 @@ export default __t.row({
   rematchDeckData0: __t.string().name("rematch_deck_data_0"),
   rematchDeckId1: __t.string().name("rematch_deck_id_1"),
   rematchDeckData1: __t.string().name("rematch_deck_data_1"),
+  rematchParagon0: __t.string().name("rematch_paragon_0"),
+  rematchParagon1: __t.string().name("rematch_paragon_1"),
   rematchResponse: __t.string().name("rematch_response"),
   rematchCode: __t.string().name("rematch_code"),
   disconnectTimeoutFired: __t.bool().name("disconnect_timeout_fired"),

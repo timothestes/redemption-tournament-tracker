@@ -99,6 +99,8 @@ export const Game = __t.object("Game", {
   rematchDeckData0: __t.string(),
   rematchDeckId1: __t.string(),
   rematchDeckData1: __t.string(),
+  rematchParagon0: __t.string(),
+  rematchParagon1: __t.string(),
   rematchResponse: __t.string(),
   rematchCode: __t.string(),
   disconnectTimeoutFired: __t.bool(),

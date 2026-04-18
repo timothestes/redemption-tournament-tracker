@@ -37,6 +37,8 @@ export const Game = table(
     rematchDeckData0: t.string(),   // seat 0's deck data for rematch
     rematchDeckId1: t.string(),     // seat 1's deck ID for rematch
     rematchDeckData1: t.string(),   // seat 1's deck data for rematch
+    rematchParagon0: t.string(),    // seat 0's paragon name for rematch (empty string when absent)
+    rematchParagon1: t.string(),    // seat 1's paragon name for rematch
     rematchResponse: t.string(),    // "" | "accepted" | "declined"
     rematchCode: t.string(),        // new game code for rematch
     disconnectTimeoutFired: t.bool().default(false), // true when timeout fired during active game

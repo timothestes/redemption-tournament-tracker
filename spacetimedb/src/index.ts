@@ -275,6 +275,8 @@ export const create_game = spacetimedb.reducer(
       rematchDeckData0: '',
       rematchDeckId1: '',
       rematchDeckData1: '',
+      rematchParagon0: '',
+      rematchParagon1: '',
       rematchResponse: '',
       rematchCode: '',
       disconnectTimeoutFired: false,
@@ -746,8 +748,9 @@ export const request_rematch = spacetimedb.reducer(
     gameId: t.u64(),
     deckId: t.string(),
     deckData: t.string(),
+    paragon: t.string(),
   },
-  (ctx, { gameId, deckId, deckData }) => {
+  (ctx, { gameId, deckId, deckData, paragon }) => {
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
     if (game.status !== 'finished') throw new SenderError('Game is not finished');
@@ -767,9 +770,11 @@ export const request_rematch = spacetimedb.reducer(
     if (player.seat === 0n) {
       updates.rematchDeckId0 = deckId;
       updates.rematchDeckData0 = deckData;
+      updates.rematchParagon0 = paragon;
     } else {
       updates.rematchDeckId1 = deckId;
       updates.rematchDeckData1 = deckData;
+      updates.rematchParagon1 = paragon;
     }
     ctx.db.Game.id.update(updates);
 
@@ -788,8 +793,9 @@ export const respond_rematch = spacetimedb.reducer(
     accepted: t.bool(),
     deckId: t.string(),
     deckData: t.string(),
+    paragon: t.string(),
   },
-  (ctx, { gameId, accepted, deckId, deckData }) => {
+  (ctx, { gameId, accepted, deckId, deckData, paragon }) => {
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
     if (game.status !== 'finished') throw new SenderError('Game is not finished');
@@ -815,9 +821,11 @@ export const respond_rematch = spacetimedb.reducer(
       if (player.seat === 0n) {
         updates.rematchDeckId0 = deckId;
         updates.rematchDeckData0 = deckData;
+        updates.rematchParagon0 = paragon;
       } else {
         updates.rematchDeckId1 = deckId;
         updates.rematchDeckData1 = deckData;
+        updates.rematchParagon1 = paragon;
       }
       ctx.db.Game.id.update(updates);
 
@@ -839,7 +847,8 @@ export const respond_rematch = spacetimedb.reducer(
         if (!latestGame) throw new SenderError('Game not found');
         const newDeckId = p.seat === 0n ? latestGame.rematchDeckId0 : latestGame.rematchDeckId1;
         const newDeckData = p.seat === 0n ? latestGame.rematchDeckData0 : latestGame.rematchDeckData1;
-        ctx.db.Player.id.update({ ...p, deckId: newDeckId, pendingDeckData: '' });
+        const newParagon = p.seat === 0n ? latestGame.rematchParagon0 : latestGame.rematchParagon1;
+        ctx.db.Player.id.update({ ...p, deckId: newDeckId, paragon: newParagon, pendingDeckData: '' });
 
         // 3. Insert new cards, shuffle, draw opening hand
         const currentGame = ctx.db.Game.id.find(gameId);
@@ -889,6 +898,8 @@ export const respond_rematch = spacetimedb.reducer(
         rematchDeckData0: '',
         rematchDeckId1: '',
         rematchDeckData1: '',
+        rematchParagon0: '',
+        rematchParagon1: '',
         rematchResponse: '',
         rematchCode: '',
         choosingDeadlineMicros: ctx.timestamp.microsSinceUnixEpoch + CHOOSE_DEADLINE_MICROS,
@@ -906,6 +917,8 @@ export const respond_rematch = spacetimedb.reducer(
         rematchDeckData0: '',
         rematchDeckId1: '',
         rematchDeckData1: '',
+        rematchParagon0: '',
+        rematchParagon1: '',
         rematchResponse: '',
         rematchCode: '',
       });

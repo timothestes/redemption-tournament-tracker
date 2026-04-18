@@ -15,4 +15,5 @@ export default {
   accepted: __t.bool(),
   deckId: __t.string(),
   deckData: __t.string(),
+  paragon: __t.string(),
 };
