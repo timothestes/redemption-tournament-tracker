@@ -1026,6 +1026,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const dragHoverZoneRef = useRef<DropZoneKey | null>(null);
   // Re-renderable signal so overlays (e.g. detach icons) can hide during drag.
   const [isCardDraggingUi, setIsCardDraggingUi] = useState(false);
+  // Timer that delays revealing drag-only overlays until DB state settles.
+  const dragSettleTimerRef = useRef<number | null>(null);
 
   // Card node ref map for imperative multi-card drag
   const cardNodeRefs = useRef<Map<string, Konva.Group>>(new Map());
@@ -1524,6 +1526,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const handleCardDragStart = useCallback(
     (card: GameCard) => {
       isDraggingRef.current = true;
+      if (dragSettleTimerRef.current !== null) {
+        clearTimeout(dragSettleTimerRef.current);
+        dragSettleTimerRef.current = null;
+      }
       setIsCardDraggingUi(true);
       dragSourceZoneRef.current = card.zone;
 
@@ -1775,7 +1781,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
       // Reset drag state
       isDraggingRef.current = false;
-      setIsCardDraggingUi(false);
+      // Delay revealing drag-only overlays (e.g. detach icons) until the
+      // SpacetimeDB subscription has a chance to deliver the new posX/posY.
+      // Without the delay, the overlay renders from stale state for a frame
+      // and the icon visibly flashes at the pre-drag position.
+      if (dragSettleTimerRef.current !== null) {
+        clearTimeout(dragSettleTimerRef.current);
+      }
+      dragSettleTimerRef.current = window.setTimeout(() => {
+        dragSettleTimerRef.current = null;
+        setIsCardDraggingUi(false);
+      }, 220);
       dragEndTimeRef.current = performance.now();
       dragSourceZoneRef.current = null;
       dragOriginalPosRef.current = null;
@@ -1888,6 +1904,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // Equip: if a weapon is dropped on a warrior in the local player's
       // territory, attach instead of moving. Gated to single-card drags
       // (group drags are intentional batch moves, not equip intents).
+      //
+      // Note: `hitTestWarrior` was written for goldfish where GameCard.posX/posY
+      // are pixel coords. In multiplayer they're normalized 0–1 DB values, so
+      // we convert each candidate's position to virtual-canvas pixels first.
       if (
         !isGroupDrag &&
         targetZone === 'territory' &&
@@ -1895,10 +1915,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         card.ownerId === 'player1'
       ) {
         const cardMeta = findCard(card.cardName, card.cardSet, card.cardImgFile);
-        if (isWeapon(cardMeta)) {
-          const myTerritoryCards = (myCards['territory'] ?? []).map((c) =>
-            cardInstanceToGameCard(c, counters.get(c.id) ?? [], 'player1')
-          );
+        const myTerritoryZone = myZones['territory'];
+        if (isWeapon(cardMeta) && myTerritoryZone) {
+          const myTerritoryRaw = myCards['territory'] ?? [];
+          const myTerritoryCards = myTerritoryRaw.map((c) => {
+            const adapted = cardInstanceToGameCard(c, counters.get(c.id) ?? [], 'player1');
+            if (adapted.posX !== undefined && adapted.posY !== undefined) {
+              const { x, y } = toScreenPos(adapted.posX, adapted.posY, myTerritoryZone, 'my');
+              return { ...adapted, posX: x, posY: y };
+            }
+            return adapted;
+          });
           const warriorCandidates = myTerritoryCards.filter((c) => {
             if (c.instanceId === card.instanceId) return false;
             if (c.equippedTo) return false;
