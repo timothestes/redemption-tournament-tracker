@@ -36,6 +36,7 @@ export function calculateZoneLayout(
    *  fixed-pixel HTML overlays (PhaseBar, GameToolbar) into virtual space
    *  so zone content never renders behind them. */
   scale: number = 1,
+  format: 'T1' | 'T2' | 'Paragon' = 'T1',
 ): Record<ZoneId, ZoneRect> {
   const sidebarWidth = stageWidth * 0.17;
   const sidebarX = stageWidth - sidebarWidth;
@@ -78,6 +79,30 @@ export function calculateZoneLayout(
     label: 'Land of Bondage',
   };
 
+  // Soul Deck pile: occupies the left ~1 card width of the LoB when Paragon.
+  // For non-Paragon, render off-canvas (consistent with paragonZone pattern).
+  const soulDeckWidth = format === 'Paragon'
+    ? Math.min(CARD_WIDTH + 8, landOfBondageZone.width * 0.2)
+    : 0;
+  const soulDeckZone: ZoneRect = format === 'Paragon'
+    ? {
+        x: landOfBondageZone.x,
+        y: landOfBondageZone.y,
+        width: soulDeckWidth,
+        height: landOfBondageZone.height,
+        label: 'Soul Deck',
+      }
+    : { x: -1000, y: -1000, width: 0, height: 0, label: 'Soul Deck' };
+
+  // Shrink LoB rect to the right of the Soul Deck so cards don't overlap the pile
+  const lobZoneFinal: ZoneRect = format === 'Paragon'
+    ? {
+        ...landOfBondageZone,
+        x: landOfBondageZone.x + soulDeckWidth + 4,
+        width: landOfBondageZone.width - soulDeckWidth - 4,
+      }
+    : landOfBondageZone;
+
   // --- Out of Play sidebar ---
   const sidebarZoneCount = 5;
   const sideZoneHeight = (playAreaHeight - pad * (sidebarZoneCount + 1)) / sidebarZoneCount;
@@ -111,14 +136,6 @@ export function calculateZoneLayout(
     label: 'Paragon',
   };
 
-  const soulDeckZone: ZoneRect = {
-    x: -1000,
-    y: -1000,
-    width: 0,
-    height: 0,
-    label: 'Soul Deck',
-  };
-
   // --- Hand ---
   const handZone: ZoneRect = {
     x: 0,
@@ -134,7 +151,7 @@ export function calculateZoneLayout(
     'reserve': reserveZone,
     'discard': discardZone,
     'paragon': paragonZone,
-    'land-of-bondage': landOfBondageZone,
+    'land-of-bondage': lobZoneFinal,
     'soul-deck': soulDeckZone,
     'territory': territoryZone,
     'land-of-redemption': landOfRedemptionZone,

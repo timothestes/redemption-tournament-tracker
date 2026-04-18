@@ -241,8 +241,8 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   useKeyboardShortcuts({ onZoomIn: zoomIn, onZoomOut: zoomOut });
 
   const zoneLayout = useMemo(
-    () => calculateZoneLayout(virtualWidth, VIRTUAL_HEIGHT, scale),
-    [virtualWidth, scale],
+    () => calculateZoneLayout(virtualWidth, VIRTUAL_HEIGHT, scale, state.format),
+    [virtualWidth, scale, state.format],
   );
   const cardWidth = Math.round(CARD_WIDTH * cardScale);
   const cardHeight = Math.round(CARD_HEIGHT * cardScale);
