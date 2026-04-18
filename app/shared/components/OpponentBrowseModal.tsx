@@ -256,7 +256,7 @@ export function OpponentBrowseModal({
     e.preventDefault();
     onCardMouseLeave();
     setContextCard({ card, x: e.clientX, y: e.clientY });
-    setPreviewCard({ cardName: card.cardName, cardImgFile: card.cardImgFile, isMeek: card.isMeek });
+    setPreviewCard({ cardName: card.cardName, cardImgFile: card.cardImgFile, isMeek: card.isMeek, notes: card.notes });
   }, [onCardMouseLeave, setPreviewCard]);
 
   const pointerDownCardRef = useRef<string | null>(null);

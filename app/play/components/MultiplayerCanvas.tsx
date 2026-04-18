@@ -569,6 +569,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const [opponentRevealDismissed, setOpponentRevealDismissed] = useState(false);
   const [opponentRevealSnapshot, setOpponentRevealSnapshot] = useState<string[]>([]);
   const [handMenu, setHandMenu] = useState<{ x: number; y: number } | null>(null);
+  const [opponentHandMenu, setOpponentHandMenu] = useState<{ x: number; y: number } | null>(null);
   const [reserveMenu, setReserveMenu] = useState<{ x: number; y: number } | null>(null);
   const [opponentReserveMenu, setOpponentReserveMenu] = useState<{ x: number; y: number } | null>(null);
   const revealAutoHideRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -969,6 +970,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     setOpponentPeekState(null);
     setOpponentLookState(null);
     setHandMenu(null);
+    setOpponentHandMenu(null);
     setReserveMenu(null);
     setOpponentReserveMenu(null);
   }, []);
@@ -2452,6 +2454,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       cardName: card.cardName,
       cardImgFile: card.cardImgFile,
       isMeek: willBeMeek,
+      notes: card.notes,
     });
   }, [multiplayerActions, setPreviewCard]);
   const noopDblClick = useCallback((_card: GameCard) => {}, []);

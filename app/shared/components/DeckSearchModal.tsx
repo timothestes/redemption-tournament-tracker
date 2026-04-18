@@ -277,7 +277,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
     onCardMouseLeave();
     setContextCard({ card, x: e.clientX, y: e.clientY });
     // Re-set the loupe preview so it keeps showing the right-clicked card
-    setPreviewCard({ cardName: card.cardName, cardImgFile: card.cardImgFile, isMeek: card.isMeek });
+    setPreviewCard({ cardName: card.cardName, cardImgFile: card.cardImgFile, isMeek: card.isMeek, notes: card.notes });
   };
 
   // Track pointer down card to distinguish click from drag on pointer up
