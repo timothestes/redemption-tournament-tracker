@@ -1385,7 +1385,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                         cardHeight={sidebarCardHeight}
                         image={getImage(card.cardImgFile)}
                         isSelected={selectedIds.has(card.instanceId)}
-                      hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
+                        hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
                         nodeRef={registerCardNode}
                         onDragStart={handleCardDragStart}
                         onDragMove={handleCardDragMove}
@@ -1490,7 +1490,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                         cardHeight={cardHeight}
                         image={getImage(card.cardImgFile)}
                         isSelected={selectedIds.has(card.instanceId)}
-                      hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
+                        hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
                         nodeRef={registerCardNode}
                         onDragStart={handleCardDragStart}
                         onDragMove={handleCardDragMove}
