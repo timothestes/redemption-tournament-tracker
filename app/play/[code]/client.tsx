@@ -684,7 +684,13 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // is dismissed but the server hasn't transitioned game.status to 'playing' yet
   // (waiting for the opponent's ack). Show the game board without any overlay
   // during this brief gap to avoid flashing the lobby/dice screen.
-  const isAwaitingGameStart = lifecycle === 'pregame' && myAckedRevealing && pregamePhase === 'revealing';
+  // Also covers the one-frame window where the server has already transitioned
+  // to 'playing' (both acks received) but the lifecycle useEffect hasn't fired
+  // yet — without this, the PregameScreen (with TopNav) briefly renders.
+  const isAwaitingGameStart = lifecycle === 'pregame' && (
+    (myAckedRevealing && pregamePhase === 'revealing') ||
+    gameState.game?.status === 'playing'
+  );
 
   // Whether we've requested a rematch and are waiting for the opponent's response
   const rematchPending = (() => {
