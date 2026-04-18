@@ -8,18 +8,21 @@ interface ParagonDrawerProps {
   paragons: ParagonEntry[];
 }
 
+const DRAWER_WIDTH = 480;
+const HANDLE_HEIGHT = 40;
+
 /**
- * Bottom-right pull-tab that expands into a full-screen overlay showing
- * the current paragon card at its native landscape aspect (1.4:1).
+ * Bottom-left slide-up drawer. Handle peeks above the viewport edge; clicking
+ * it toggles the drawer open, revealing the paragon card at its native
+ * landscape aspect (1.4:1). Positioned away from the right-side chat/preview.
  *
- * In multiplayer with ≥2 paragons, a tab row appears above the card.
- * Pull-tab click opens; backdrop, close button, or `Esc` closes.
+ * In multiplayer with ≥2 paragons, a tab row sits above the card.
+ * Handle click toggles; `Esc` closes while open.
  */
 export function ParagonDrawer({ paragons }: ParagonDrawerProps) {
   const [open, setOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  // Default active tab: the local player's paragon, or first entry.
   useEffect(() => {
     if (paragons.length === 0) {
       setActiveId(null);
@@ -27,7 +30,6 @@ export function ParagonDrawer({ paragons }: ParagonDrawerProps) {
     }
     const self = paragons.find((p) => p.isSelf);
     setActiveId((curr) => {
-      // keep existing choice if still valid
       if (curr && paragons.some((p) => p.playerId === curr)) return curr;
       return (self ?? paragons[0]).playerId;
     });
@@ -52,164 +54,142 @@ export function ParagonDrawer({ paragons }: ParagonDrawerProps) {
   const showTabs = paragons.length >= 2;
 
   return (
-    <>
-      {/* Pull-tab (always rendered when there's at least one paragon) */}
+    <div
+      style={{
+        position: 'fixed',
+        left: 16,
+        bottom: 0,
+        width: DRAWER_WIDTH,
+        maxWidth: 'calc(100vw - 32px)',
+        zIndex: 900,
+        transform: open
+          ? 'translateY(0)'
+          : `translateY(calc(100% - ${HANDLE_HEIGHT}px))`,
+        transition: 'transform 340ms cubic-bezier(0.32, 0.72, 0, 1)',
+        willChange: 'transform',
+        pointerEvents: 'auto',
+      }}
+    >
       <button
         type="button"
-        onClick={() => setOpen(true)}
-        aria-label="Open paragon"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-label={open ? 'Close paragon drawer' : 'Open paragon drawer'}
         style={{
-          position: 'fixed',
-          right: 16,
-          bottom: 16,
-          zIndex: 900,
           display: 'flex',
           alignItems: 'center',
-          gap: 8,
-          height: 44,
-          padding: '4px 10px 4px 4px',
-          background: 'rgba(14, 10, 6, 0.92)',
+          justifyContent: 'space-between',
+          width: '100%',
+          height: HANDLE_HEIGHT,
+          padding: '0 14px 0 6px',
+          background: 'rgba(14, 10, 6, 0.96)',
           border: '1px solid rgba(196, 149, 90, 0.5)',
-          borderRadius: 6,
+          borderBottom: 'none',
+          borderTopLeftRadius: 8,
+          borderTopRightRadius: 8,
           color: '#e8d5a3',
           fontFamily: 'Cinzel, Georgia, serif',
           fontSize: 12,
-          letterSpacing: 1,
+          letterSpacing: 1.5,
           cursor: 'pointer',
-          boxShadow: '0 6px 20px rgba(0,0,0,0.6)',
+          boxShadow: '0 -4px 16px rgba(0, 0, 0, 0.35)',
         }}
       >
-        <img
-          src={selfEntry.imageUrl}
-          alt=""
+        <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <img
+            src={selfEntry.imageUrl}
+            alt=""
+            style={{
+              width: 42,
+              height: 30,
+              objectFit: 'cover',
+              borderRadius: 2,
+              border: '1px solid rgba(196, 149, 90, 0.3)',
+            }}
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.visibility = 'hidden';
+            }}
+          />
+          PARAGON
+        </span>
+        <span
+          aria-hidden
           style={{
-            width: 50,
-            height: 36,
-            objectFit: 'cover',
-            borderRadius: 3,
-            border: '1px solid rgba(196, 149, 90, 0.3)',
-          }}
-          onError={(e) => {
-            (e.currentTarget as HTMLImageElement).style.visibility = 'hidden';
-          }}
-        />
-        PARAGON
-      </button>
-
-      {/* Backdrop + drawer (rendered when open) */}
-      {open && (
-        <div
-          onClick={() => setOpen(false)}
-          role="presentation"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 950,
-            background: 'rgba(0, 0, 0, 0.75)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-            paddingBottom: 24,
+            fontSize: 16,
+            opacity: 0.8,
+            transition: 'transform 340ms cubic-bezier(0.32, 0.72, 0, 1)',
+            transform: open ? 'rotate(0deg)' : 'rotate(180deg)',
+            lineHeight: 1,
           }}
         >
+          ▾
+        </span>
+      </button>
+
+      <div
+        role="dialog"
+        aria-label={`Paragon: ${activeEntry.paragonName}`}
+        style={{
+          background: 'rgba(14, 10, 6, 0.96)',
+          border: '1px solid rgba(196, 149, 90, 0.5)',
+          borderBottomLeftRadius: 8,
+          borderBottomRightRadius: 8,
+          padding: 14,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
+        }}
+      >
+        {showTabs && (
           <div
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-label={`Paragon: ${activeEntry.paragonName}`}
             style={{
-              position: 'relative',
               display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 12,
-              padding: 16,
-              paddingTop: 28,
-              background: 'rgba(14, 10, 6, 0.97)',
-              border: '1px solid rgba(196, 149, 90, 0.3)',
-              borderRadius: 8,
-              boxShadow: '0 12px 48px rgba(0,0,0,0.7)',
-              maxWidth: '90vw',
+              flexWrap: 'wrap',
+              gap: 4,
+              justifyContent: 'center',
+              borderBottom: '1px solid rgba(196, 149, 90, 0.2)',
+              paddingBottom: 8,
             }}
           >
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              aria-label="Close paragon drawer"
-              style={{
-                position: 'absolute',
-                top: 6,
-                right: 8,
-                width: 26,
-                height: 26,
-                padding: 0,
-                background: 'transparent',
-                border: 'none',
-                color: 'rgba(196, 149, 90, 0.7)',
-                fontSize: 20,
-                lineHeight: 1,
-                cursor: 'pointer',
-                fontFamily: 'Georgia, serif',
-              }}
-            >
-              ×
-            </button>
-            {/* Tabs (only when ≥2 paragons) */}
-            {showTabs && (
-              <div
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: 4,
-                  borderBottom: '1px solid rgba(196, 149, 90, 0.2)',
-                  paddingBottom: 8,
-                  width: '100%',
-                  justifyContent: 'center',
-                }}
-              >
-                {paragons.map((p) => {
-                  const active = p.playerId === activeEntry.playerId;
-                  return (
-                    <button
-                      key={p.playerId}
-                      type="button"
-                      onClick={() => setActiveId(p.playerId)}
-                      style={{
-                        padding: '6px 14px',
-                        background: active ? 'rgba(196, 149, 90, 0.25)' : 'transparent',
-                        border: '1px solid rgba(196, 149, 90, 0.4)',
-                        borderRadius: 4,
-                        color: active ? '#f3e2b4' : 'rgba(196, 149, 90, 0.7)',
-                        fontFamily: 'Cinzel, Georgia, serif',
-                        fontSize: 12,
-                        letterSpacing: 1,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {p.displayName.toUpperCase()}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Paragon image, landscape aspect preserved */}
-            <img
-              src={activeEntry.imageUrl}
-              alt={`Paragon ${activeEntry.paragonName}`}
-              style={{
-                width: 'min(90vw, 600px)',
-                height: 'auto',
-                aspectRatio: '1.4 / 1',
-                objectFit: 'contain',
-                borderRadius: 4,
-                boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-              }}
-            />
+            {paragons.map((p) => {
+              const active = p.playerId === activeEntry.playerId;
+              return (
+                <button
+                  key={p.playerId}
+                  type="button"
+                  onClick={() => setActiveId(p.playerId)}
+                  style={{
+                    padding: '5px 12px',
+                    background: active ? 'rgba(196, 149, 90, 0.25)' : 'transparent',
+                    border: '1px solid rgba(196, 149, 90, 0.4)',
+                    borderRadius: 3,
+                    color: active ? '#f3e2b4' : 'rgba(196, 149, 90, 0.7)',
+                    fontFamily: 'Cinzel, Georgia, serif',
+                    fontSize: 11,
+                    letterSpacing: 1,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {p.displayName.toUpperCase()}
+                </button>
+              );
+            })}
           </div>
-        </div>
-      )}
-    </>
+        )}
+
+        <img
+          src={activeEntry.imageUrl}
+          alt={`Paragon ${activeEntry.paragonName}`}
+          style={{
+            width: '100%',
+            height: 'auto',
+            aspectRatio: '1.4 / 1',
+            objectFit: 'contain',
+            borderRadius: 4,
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
+          }}
+        />
+      </div>
+    </div>
   );
 }
