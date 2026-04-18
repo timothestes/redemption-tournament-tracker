@@ -29,7 +29,6 @@ export function ParagonDrawer({ paragons }: ParagonDrawerProps) {
   }, [paragons]);
 
   useEffect(() => {
-    if (!open) return;
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (
@@ -37,6 +36,13 @@ export function ParagonDrawer({ paragons }: ParagonDrawerProps) {
         target.tagName === 'TEXTAREA' ||
         target.isContentEditable
       ) {
+        return;
+      }
+      if (!open) {
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setOpen(true);
+        }
         return;
       }
       if (e.key === 'Escape' || e.key === 'ArrowDown') {
@@ -59,6 +65,15 @@ export function ParagonDrawer({ paragons }: ParagonDrawerProps) {
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, [open, paragons]);
+
+  const cycleParagon = (step: 1 | -1) => {
+    setActiveId((curr) => {
+      const idx = paragons.findIndex((p) => p.playerId === curr);
+      const base = idx === -1 ? 0 : idx;
+      const next = (base + step + paragons.length) % paragons.length;
+      return paragons[next].playerId;
+    });
+  };
 
   if (paragons.length === 0) return null;
 
@@ -116,7 +131,7 @@ export function ParagonDrawer({ paragons }: ParagonDrawerProps) {
           }}
         />
         <span style={{ flex: 1, textAlign: 'left' }}>PARAGON</span>
-        <span aria-hidden style={{ fontSize: 10, opacity: 0.6 }}>
+        <span aria-hidden style={{ fontSize: 14, opacity: 0.85, lineHeight: 1 }}>
           ▴
         </span>
       </button>
@@ -175,20 +190,33 @@ export function ParagonDrawer({ paragons }: ParagonDrawerProps) {
               type="button"
               onClick={() => setOpen(false)}
               aria-label="Close paragon drawer"
+              title="Close (↓ or Esc)"
               style={{
-                width: 28,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
                 height: 28,
-                padding: 0,
+                padding: '0 6px',
                 background: 'transparent',
                 border: 'none',
                 color: 'rgba(196, 149, 90, 0.75)',
-                fontSize: 20,
-                lineHeight: 1,
                 cursor: 'pointer',
                 fontFamily: 'Georgia, serif',
+                lineHeight: 1,
               }}
             >
-              ×
+              <span
+                aria-hidden
+                style={{
+                  fontSize: 12,
+                  opacity: 0.6,
+                  fontFamily: 'Cinzel, Georgia, serif',
+                  letterSpacing: 0.5,
+                }}
+              >
+                ▾
+              </span>
+              <span aria-hidden style={{ fontSize: 20 }}>×</span>
             </button>
           </div>
 
@@ -196,36 +224,87 @@ export function ParagonDrawer({ paragons }: ParagonDrawerProps) {
             <div
               style={{
                 display: 'flex',
-                flexWrap: 'wrap',
-                gap: 4,
+                alignItems: 'center',
+                gap: 8,
                 justifyContent: 'center',
                 borderBottom: '1px solid rgba(196, 149, 90, 0.2)',
                 paddingBottom: 8,
               }}
             >
-              {paragons.map((p) => {
-                const active = p.playerId === activeEntry.playerId;
-                return (
-                  <button
-                    key={p.playerId}
-                    type="button"
-                    onClick={() => setActiveId(p.playerId)}
-                    style={{
-                      padding: '5px 12px',
-                      background: active ? 'rgba(196, 149, 90, 0.25)' : 'transparent',
-                      border: '1px solid rgba(196, 149, 90, 0.4)',
-                      borderRadius: 3,
-                      color: active ? '#f3e2b4' : 'rgba(196, 149, 90, 0.7)',
-                      fontFamily: 'Cinzel, Georgia, serif',
-                      fontSize: 11,
-                      letterSpacing: 1,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {p.displayName.toUpperCase()}
-                  </button>
-                );
-              })}
+              <button
+                type="button"
+                onClick={() => cycleParagon(-1)}
+                aria-label="Previous paragon"
+                title="Previous (←)"
+                style={{
+                  width: 26,
+                  height: 26,
+                  padding: 0,
+                  background: 'transparent',
+                  border: '1px solid rgba(196, 149, 90, 0.35)',
+                  borderRadius: 3,
+                  color: 'rgba(196, 149, 90, 0.8)',
+                  fontSize: 14,
+                  lineHeight: 1,
+                  cursor: 'pointer',
+                  fontFamily: 'Cinzel, Georgia, serif',
+                }}
+              >
+                ◂
+              </button>
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 4,
+                  justifyContent: 'center',
+                }}
+              >
+                {paragons.map((p) => {
+                  const active = p.playerId === activeEntry.playerId;
+                  return (
+                    <button
+                      key={p.playerId}
+                      type="button"
+                      onClick={() => setActiveId(p.playerId)}
+                      style={{
+                        padding: '5px 12px',
+                        background: active ? 'rgba(196, 149, 90, 0.25)' : 'transparent',
+                        border: '1px solid rgba(196, 149, 90, 0.4)',
+                        borderRadius: 3,
+                        color: active ? '#f3e2b4' : 'rgba(196, 149, 90, 0.7)',
+                        fontFamily: 'Cinzel, Georgia, serif',
+                        fontSize: 11,
+                        letterSpacing: 1,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {p.displayName.toUpperCase()}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                onClick={() => cycleParagon(1)}
+                aria-label="Next paragon"
+                title="Next (→)"
+                style={{
+                  width: 26,
+                  height: 26,
+                  padding: 0,
+                  background: 'transparent',
+                  border: '1px solid rgba(196, 149, 90, 0.35)',
+                  borderRadius: 3,
+                  color: 'rgba(196, 149, 90, 0.8)',
+                  fontSize: 14,
+                  lineHeight: 1,
+                  cursor: 'pointer',
+                  fontFamily: 'Cinzel, Georgia, serif',
+                }}
+              >
+                ▸
+              </button>
             </div>
           )}
 
