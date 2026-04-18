@@ -29,7 +29,7 @@ export function OpponentParagonTopDrawer({ paragonName }: OpponentParagonTopDraw
         style={{
           position: 'fixed',
           right: 400,
-          top: 16,
+          top: 200,
           zIndex: 899,
           display: 'flex',
           alignItems: 'center',
