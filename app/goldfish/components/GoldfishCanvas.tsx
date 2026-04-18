@@ -36,7 +36,8 @@ import { GameToastContainer, showGameToast } from './GameToast';
 import { DiceRollOverlay } from './DiceRollOverlay';
 import { useCardPreview } from '../state/CardPreviewContext';
 import { useLobArrivalEffect } from '@/app/shared/hooks/useLobArrivalEffect';
-import { computeEquipOffset } from '../utils/equipLayout';
+import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '../utils/equipLayout';
+import { findCard, isWeapon, isWarrior } from '@/lib/cards/lookup';
 
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 
@@ -51,7 +52,7 @@ interface GoldfishCanvasProps {
 }
 
 export default function GoldfishCanvas({ containerWidth, containerHeight, scale, offsetX, offsetY, virtualWidth, onLoadDeck }: GoldfishCanvasProps) {
-  const { state, dispatch, drawCard, drawMultiple, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck, shuffleDeck, meekCard, unmeekCard, flipCard, addCounter, removeCounter, addNote, addOpponentLostSoul, removeOpponentToken, addPlayerLostSoul, reorderHand } = useGame();
+  const { state, dispatch, drawCard, drawMultiple, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck, shuffleDeck, meekCard, unmeekCard, flipCard, addCounter, removeCounter, addNote, addOpponentLostSoul, removeOpponentToken, addPlayerLostSoul, reorderHand, attachCard } = useGame();
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const stageRef = useRef<Konva.Stage>(null);
   const gameLayerRef = useRef<Konva.Layer>(null);
@@ -546,6 +547,40 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
           if (node) node.visible(true);
         }
       }
+
+      // Equip: if a weapon is dropped on top of a warrior in territory, attach.
+      // Runs only for single-card drags (group drags are intentional batch moves).
+      const isGroupDragForEquip = selectedIds.has(card.instanceId) && selectedIds.size > 1;
+      if (!isGroupDragForEquip) {
+        const cardMeta = findCard(card.cardName, card.cardSet, card.cardImgFile);
+        if (isWeapon(cardMeta)) {
+          const dropNode = e.target;
+          const dropCenterX = dropNode.x() + cardWidth / 2;
+          const dropCenterY = dropNode.y() + cardHeight / 2;
+          const targetZoneForEquip = findZoneAtPosition(dropCenterX, dropCenterY);
+          if (targetZoneForEquip === 'territory') {
+            // Candidates: territory cards that are themselves warriors, not already
+            // attached to someone else, not the card being dragged, and not yet at the cap.
+            const warriorCandidates = state.zones.territory.filter(c => {
+              if (c.instanceId === card.instanceId) return false;
+              if (c.equippedTo) return false; // a weapon attached to someone else isn't a valid target
+              const meta = findCard(c.cardName, c.cardSet, c.cardImgFile);
+              if (!isWarrior(meta)) return false;
+              const attached = state.zones.territory.filter(x => x.equippedTo === c.instanceId);
+              return attached.length < MAX_EQUIPPED_WEAPONS_PER_WARRIOR;
+            });
+            const hit = hitTestWarrior(
+              dropCenterX, dropCenterY, cardWidth, cardHeight, warriorCandidates, card.instanceId,
+            );
+            if (hit) {
+              // Consume the drop: attach instead of continuing into the move path.
+              attachCard(card.instanceId, hit.instanceId);
+              return;
+            }
+          }
+        }
+      }
+
       const node = e.target;
       const dropX = node.x();
       const dropY = node.y();
@@ -665,7 +700,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
         }, 700);
       }
     },
-    [findZoneAtPosition, moveCard, moveCardsBatch, handleDeckDrop, cardWidth, cardHeight, selectedIds, clearSelection, state.turn, scale, offsetX, offsetY, state.zones.hand, state.zones['land-of-bondage'], state.isSpreadHand, virtualWidth, reorderHand, zoneLayout]
+    [findZoneAtPosition, moveCard, moveCardsBatch, handleDeckDrop, cardWidth, cardHeight, selectedIds, clearSelection, state.turn, scale, offsetX, offsetY, state.zones.hand, state.zones['land-of-bondage'], state.zones.territory, state.isSpreadHand, virtualWidth, reorderHand, zoneLayout, attachCard]
   );
 
   const handleCardContextMenu = useCallback(
