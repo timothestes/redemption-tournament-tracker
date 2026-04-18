@@ -13,7 +13,7 @@ interface ParagonDrawerProps {
  * the current paragon card at its native landscape aspect (1.4:1).
  *
  * In multiplayer with ≥2 paragons, a tab row appears above the card.
- * `P` toggles; backdrop click or `Esc` closes.
+ * Pull-tab click opens; backdrop, close button, or `Esc` closes.
  */
 export function ParagonDrawer({ paragons }: ParagonDrawerProps) {
   const [open, setOpen] = useState(false);
@@ -33,29 +33,17 @@ export function ParagonDrawer({ paragons }: ParagonDrawerProps) {
     });
   }, [paragons]);
 
-  // Keyboard: P toggles, Esc closes. Ignore when typing in inputs.
   useEffect(() => {
-    if (paragons.length === 0) return;
+    if (!open) return;
     const handler = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable
-      ) {
-        return;
-      }
-      if ((e.key === 'p' || e.key === 'P') && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        e.preventDefault();
-        setOpen((o) => !o);
-      } else if (e.key === 'Escape' && open) {
+      if (e.key === 'Escape') {
         e.preventDefault();
         setOpen(false);
       }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [paragons.length, open]);
+  }, [open]);
 
   if (paragons.length === 0) return null;
 
