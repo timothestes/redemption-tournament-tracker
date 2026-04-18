@@ -131,3 +131,45 @@ describe('Paragon rescue + refill on MOVE_CARD', () => {
     expect(next.zones['land-of-bondage'].filter(c => c.isSoulDeckOrigin)).toHaveLength(3);
   });
 });
+
+describe('Paragon rescue + refill on MOVE_CARDS_BATCH', () => {
+  it('transfers ownership and refills when batch-rescuing a soul-origin card', () => {
+    const soulDeck = [makeCard({ instanceId: 's-top' })];
+    const lob = [
+      makeCard({ instanceId: 'l1', zone: 'land-of-bondage' }),
+      makeCard({ instanceId: 'l2', zone: 'land-of-bondage' }),
+      makeCard({ instanceId: 'l3', zone: 'land-of-bondage' }),
+    ];
+    const state = makeState({ 'soul-deck': soulDeck, 'land-of-bondage': lob });
+    const next = gameReducer(state, act('MOVE_CARDS_BATCH', {
+      cardInstanceIds: ['l1'],
+      toZone: 'land-of-redemption',
+    }));
+    const rescued = next.zones['land-of-redemption'].find(c => c.instanceId === 'l1');
+    expect(rescued?.ownerId).toBe('player1');
+    expect(rescued?.isSoulDeckOrigin).toBe(true);
+    expect(next.zones['land-of-bondage'].filter(c => c.isSoulDeckOrigin)).toHaveLength(3);
+    expect(next.zones['soul-deck']).toHaveLength(0);
+  });
+
+  it('does NOT transfer ownership or refill when a non-soul-origin card leaves LoB via batch', () => {
+    const soulDeck = [makeCard({ instanceId: 's-top' })];
+    const lob = [
+      makeCard({ instanceId: 'l1', zone: 'land-of-bondage' }),
+      makeCard({ instanceId: 'l2', zone: 'land-of-bondage' }),
+      makeCard({ instanceId: 'l3', zone: 'land-of-bondage' }),
+      makeCard({ instanceId: 'token', zone: 'land-of-bondage', isToken: true, isSoulDeckOrigin: false, ownerId: 'player2' }),
+    ];
+    const state = makeState({ 'soul-deck': soulDeck, 'land-of-bondage': lob });
+    const next = gameReducer(state, act('MOVE_CARDS_BATCH', {
+      cardInstanceIds: ['token'],
+      toZone: 'land-of-redemption',
+    }));
+    // The token's ownerId should remain player2 (not transferred)
+    const movedToken = next.zones['land-of-redemption'].find(c => c.instanceId === 'token');
+    expect(movedToken?.ownerId).toBe('player2');
+    // Soul deck should still have its card (refill is no-op because 3 soul-origin remain in LoB)
+    expect(next.zones['soul-deck']).toHaveLength(1);
+    expect(next.zones['land-of-bondage'].filter(c => c.isSoulDeckOrigin)).toHaveLength(3);
+  });
+});
