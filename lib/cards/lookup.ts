@@ -43,3 +43,21 @@ export function findCard(
 
   return CARD_BY_NAME.get(name) ?? CARD_BY_NAME_LOWER.get(lower);
 }
+
+function classTokens(card: CardData | undefined): string[] {
+  if (!card?.class) return [];
+  // Class strings use ',', '/', or ' / ' as separators — split on any run of
+  // commas, slashes, or whitespace, then lowercase for case-insensitive matching.
+  return card.class
+    .split(/[,\/\s]+/)
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function isWarrior(card: CardData | undefined): boolean {
+  return classTokens(card).includes('warrior');
+}
+
+export function isWeapon(card: CardData | undefined): boolean {
+  return classTokens(card).includes('weapon');
+}
