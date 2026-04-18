@@ -13,6 +13,8 @@ import { getCardImageUrl } from '../../shared/utils/cardImageUrl';
 import { useVirtualCanvas } from '@/app/shared/layout/virtualCanvas';
 import { DeckPickerModal } from '@/app/play/components/DeckPickerModal';
 import type { DeckOption } from '@/app/play/components/DeckPickerCard';
+import { ParagonDrawer } from '@/app/shared/components/ParagonDrawer';
+import { buildParagonEntries } from '@/app/shared/utils/paragonEntries';
 
 const GoldfishCanvas = dynamic(() => import('../components/GoldfishCanvas'), { ssr: false });
 
@@ -36,6 +38,20 @@ function GoldfishGameArea({ deck, onLoadDeck }: { deck: DeckDataForGoldfish; onL
   }, [deck.cards]);
 
   const { isReady, progress } = useImagePreloader(imageUrls);
+
+  const paragonEntries = useMemo(
+    () => buildParagonEntries({
+      players: [
+        {
+          id: 'goldfish-self',
+          displayName: 'You',
+          paragonName: deck.paragon ?? null,
+          isSelf: true,
+        },
+      ],
+    }),
+    [deck.paragon],
+  );
 
   if (!isReady) {
     return <LoadingScreen progress={progress} />;
@@ -98,6 +114,9 @@ function GoldfishGameArea({ deck, onLoadDeck }: { deck: DeckDataForGoldfish; onL
 
       {/* Loupe preview panel — right side */}
       <CardLoupePanel />
+
+      {/* Paragon drawer — DOM overlay; self-hides when no paragon */}
+      <ParagonDrawer paragons={paragonEntries} />
     </div>
   );
 }
