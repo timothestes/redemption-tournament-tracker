@@ -31,14 +31,34 @@ export function ParagonDrawer({ paragons }: ParagonDrawerProps) {
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        return;
+      }
       if (e.key === 'Escape') {
         e.preventDefault();
         setOpen(false);
+        return;
+      }
+      if (paragons.length < 2) return;
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        setActiveId((curr) => {
+          const idx = paragons.findIndex((p) => p.playerId === curr);
+          const base = idx === -1 ? 0 : idx;
+          const step = e.key === 'ArrowRight' ? 1 : -1;
+          const next = (base + step + paragons.length) % paragons.length;
+          return paragons[next].playerId;
+        });
       }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [open]);
+  }, [open, paragons]);
 
   if (paragons.length === 0) return null;
 
