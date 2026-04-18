@@ -16,6 +16,8 @@ import TopNav from '@/components/top-nav';
 import { GameToolbar } from '@/app/shared/components/GameToolbar';
 import { useGameHotkeys } from '@/app/shared/hooks/useGameHotkeys';
 import { GameToastContainer, showGameToast } from '@/app/shared/components/GameToast';
+import { ParagonDrawer } from '@/app/shared/components/ParagonDrawer';
+import { buildParagonEntries } from '@/app/shared/utils/paragonEntries';
 import type { GameActions } from '@/app/shared/types/gameActions';
 import WaitingRoomGoldfish from '../components/WaitingRoomGoldfish';
 import { SpreadHandProvider, useSpreadHand } from '../contexts/SpreadHandContext';
@@ -522,6 +524,28 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     if (gameState.myPlayer) map[gameState.myPlayer.id.toString()] = gameState.myPlayer.displayName;
     if (gameState.opponentPlayer) map[gameState.opponentPlayer.id.toString()] = gameState.opponentPlayer.displayName;
     return map;
+  }, [gameState.myPlayer, gameState.opponentPlayer]);
+
+  // Build paragon entries for the ParagonDrawer overlay (0-2 entries).
+  const paragonEntries = useMemo(() => {
+    const players: Array<{ id: string; displayName: string; paragonName: string | null; isSelf: boolean }> = [];
+    if (gameState.myPlayer) {
+      players.push({
+        id: String(gameState.myPlayer.id),
+        displayName: gameState.myPlayer.displayName,
+        paragonName: gameState.myPlayer.paragon || null,
+        isSelf: true,
+      });
+    }
+    if (gameState.opponentPlayer) {
+      players.push({
+        id: String(gameState.opponentPlayer.id),
+        displayName: gameState.opponentPlayer.displayName,
+        paragonName: gameState.opponentPlayer.paragon || null,
+        isSelf: false,
+      });
+    }
+    return buildParagonEntries({ players });
   }, [gameState.myPlayer, gameState.opponentPlayer]);
 
   // Compute goldfish deck for practice-while-waiting
@@ -1261,6 +1285,10 @@ function GameInner({ code, isConnected }: GameInnerProps) {
 
       {/* Right panel — preview on top, chat below */}
       {rightPanel}
+
+      {/* Paragon drawer — self-hides when paragons list is empty. Rendered at
+          the top level so it's a DOM sibling to the Konva canvas, not inside. */}
+      <ParagonDrawer paragons={paragonEntries} />
 
       {/* Deck reload picker */}
       <DeckPickerModal
