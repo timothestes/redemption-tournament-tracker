@@ -45,7 +45,7 @@ export function ParagonDrawer({ paragons }: ParagonDrawerProps) {
       ) {
         return;
       }
-      if (e.key === 'p' || e.key === 'P') {
+      if ((e.key === 'p' || e.key === 'P') && !e.metaKey && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
         setOpen((o) => !o);
       } else if (e.key === 'Escape' && open) {
@@ -127,12 +127,17 @@ export function ParagonDrawer({ paragons }: ParagonDrawerProps) {
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Paragon: ${activeEntry.paragonName}`}
             style={{
+              position: 'relative',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               gap: 12,
               padding: 16,
+              paddingTop: 28,
               background: 'rgba(14, 10, 6, 0.97)',
               border: '1px solid rgba(196, 149, 90, 0.3)',
               borderRadius: 8,
@@ -140,6 +145,28 @@ export function ParagonDrawer({ paragons }: ParagonDrawerProps) {
               maxWidth: '90vw',
             }}
           >
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              aria-label="Close paragon drawer"
+              style={{
+                position: 'absolute',
+                top: 6,
+                right: 8,
+                width: 26,
+                height: 26,
+                padding: 0,
+                background: 'transparent',
+                border: 'none',
+                color: 'rgba(196, 149, 90, 0.7)',
+                fontSize: 20,
+                lineHeight: 1,
+                cursor: 'pointer',
+                fontFamily: 'Georgia, serif',
+              }}
+            >
+              ×
+            </button>
             {/* Tabs (only when ≥2 paragons) */}
             {showTabs && (
               <div
