@@ -8,7 +8,7 @@ interface ParagonDrawerProps {
   paragons: ParagonEntry[];
 }
 
-const DRAWER_WIDTH = 480;
+const DRAWER_WIDTH = 340;
 const HANDLE_HEIGHT = 40;
 
 /**
