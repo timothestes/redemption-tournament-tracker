@@ -847,7 +847,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       gameState.randomHandToZone(count, toZone, deckPosition),
     randomReserveToZone: (count, toZone, deckPosition) =>
       gameState.randomReserveToZone(count, toZone, deckPosition),
-    reloadDeck: (deckId, deckData) => gameState.reloadDeck(deckId, deckData),
+    reloadDeck: (deckId, deckData, paragon) => gameState.reloadDeck(deckId, deckData, paragon),
   }), [gameState, findMyCardById, checkReserveProtection, checkReserveBatchProtection, undoStack]);
 
   // ---- ModalGameProvider value (for shared deck modals) ----

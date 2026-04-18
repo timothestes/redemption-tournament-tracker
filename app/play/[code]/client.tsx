@@ -143,7 +143,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
 
   // Deck reload state
   const [showReloadDeckPicker, setShowReloadDeckPicker] = useState(false);
-  const [reloadDeckConfirm, setReloadDeckConfirm] = useState<{ deckId: string; deckName: string; deckData: string } | null>(null);
+  const [reloadDeckConfirm, setReloadDeckConfirm] = useState<{ deckId: string; deckName: string; deckData: string; paragon: string } | null>(null);
 
   // Card preview hook — must be called before any early returns (Rules of Hooks)
   const { isLoupeVisible, toggleLoupe, previewCard } = useCardPreview();
@@ -1063,7 +1063,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                   moveCardToBottomOfDeck: (id) => gameState.moveCardToBottomOfDeck(BigInt(id)),
                   randomHandToZone: (count, toZone, deckPosition) => gameState.randomHandToZone(count, toZone, deckPosition),
                   randomReserveToZone: (count, toZone, deckPosition) => gameState.randomReserveToZone(count, toZone, deckPosition),
-                  reloadDeck: (deckId, deckData) => gameState.reloadDeck(deckId, deckData),
+                  reloadDeck: (deckId, deckData, paragon) => gameState.reloadDeck(deckId, deckData, paragon),
                 } satisfies GameActions}
                 mode="multiplayer"
                 isMyTurn={true}
@@ -1104,7 +1104,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             onSelect={async (deck) => {
               const result = await loadDeckForGame(deck.id);
               setShowReloadDeckPicker(false);
-              setReloadDeckConfirm({ deckId: deck.id, deckName: deck.name, deckData: JSON.stringify(result.deckData) });
+              setReloadDeckConfirm({ deckId: deck.id, deckName: deck.name, deckData: JSON.stringify(result.deckData), paragon: deck.paragon || '' });
             }}
           />
 
@@ -1151,7 +1151,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                   </button>
                   <button
                     onClick={() => {
-                      gameState.reloadDeck(reloadDeckConfirm.deckId, reloadDeckConfirm.deckData);
+                      gameState.reloadDeck(reloadDeckConfirm.deckId, reloadDeckConfirm.deckData, reloadDeckConfirm.paragon);
                       gameTimer.reset();
                       setReloadDeckConfirm(null);
                     }}
@@ -1271,7 +1271,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               moveCardToBottomOfDeck: (id) => gameState.moveCardToBottomOfDeck(BigInt(id)),
               randomHandToZone: (count, toZone, deckPosition) => gameState.randomHandToZone(count, toZone, deckPosition),
               randomReserveToZone: (count, toZone, deckPosition) => gameState.randomReserveToZone(count, toZone, deckPosition),
-              reloadDeck: (deckId, deckData) => gameState.reloadDeck(deckId, deckData),
+              reloadDeck: (deckId, deckData, paragon) => gameState.reloadDeck(deckId, deckData, paragon),
             } satisfies GameActions}
             mode="multiplayer"
             isMyTurn={gameState.isMyTurn}
@@ -1307,7 +1307,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         onSelect={async (deck) => {
           const result = await loadDeckForGame(deck.id);
           setShowReloadDeckPicker(false);
-          setReloadDeckConfirm({ deckId: deck.id, deckName: deck.name, deckData: JSON.stringify(result.deckData) });
+          setReloadDeckConfirm({ deckId: deck.id, deckName: deck.name, deckData: JSON.stringify(result.deckData), paragon: deck.paragon || '' });
         }}
       />
 
@@ -1354,7 +1354,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               </button>
               <button
                 onClick={() => {
-                  gameState.reloadDeck(reloadDeckConfirm.deckId, reloadDeckConfirm.deckData);
+                  gameState.reloadDeck(reloadDeckConfirm.deckId, reloadDeckConfirm.deckData, reloadDeckConfirm.paragon);
                   gameTimer.reset();
                   setReloadDeckConfirm(null);
                 }}
