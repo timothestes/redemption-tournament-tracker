@@ -19,6 +19,8 @@ export function CardNotePopover({ x, y, initialValue, onSave, onCancel }: CardNo
   const [value, setValue] = useState(initialValue);
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const valueRef = useRef(value);
+  valueRef.current = value;
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -27,7 +29,9 @@ export function CardNotePopover({ x, y, initialValue, onSave, onCancel }: CardNo
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onCancel();
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        onSave(valueRef.current.trim());
+      }
     };
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onCancel();
@@ -38,7 +42,7 @@ export function CardNotePopover({ x, y, initialValue, onSave, onCancel }: CardNo
       document.removeEventListener('mousedown', handleClick);
       document.removeEventListener('keydown', handleKey);
     };
-  }, [onCancel]);
+  }, [onSave, onCancel]);
 
   const left = Math.max(8, Math.min(x, window.innerWidth - WIDTH - 8));
   const top = Math.max(8, Math.min(y, window.innerHeight - HEIGHT - 8));
@@ -102,7 +106,7 @@ export function CardNotePopover({ x, y, initialValue, onSave, onCancel }: CardNo
           color: 'var(--gf-text-dim)',
         }}
       >
-        <span>Enter to save · Esc to cancel</span>
+        <span>Enter or click away to save · Esc to cancel</span>
         <span>{value.length} / {MAX_LEN}</span>
       </div>
     </motion.div>
