@@ -41,7 +41,7 @@ export interface CardDimensions {
   cardHeight: number;
 }
 
-export type PileZone = 'lor' | 'banish' | 'reserve' | 'deck' | 'discard' | 'paragon';
+export type PileZone = 'lor' | 'banish' | 'reserve' | 'deck' | 'discard';
 
 export interface MultiplayerLayout {
   zones: {
@@ -249,7 +249,7 @@ function buildSidebar(
       };
     }
   } else {
-    // Fallback: simple vertical stack (e.g. paragon format with 6 zones)
+    // Fallback: simple vertical stack fallback
     const count = labels.length;
     const slotHeight = Math.round(
       (areaHeight - slotPad * (count + 1)) / count
@@ -276,12 +276,10 @@ function buildSidebar(
  *
  * @param stageWidth   Konva canvas width (loupe is outside)
  * @param stageHeight  Konva canvas height
- * @param isParagon    Whether to include the Paragon zone in each sidebar
  */
 export function calculateMultiplayerLayout(
   stageWidth: number,
   stageHeight: number,
-  isParagon: boolean = false,
 ): MultiplayerLayout {
   const profile = getProfile(stageWidth);
   const pad = 6;
@@ -380,21 +378,13 @@ export function calculateMultiplayerLayout(
   const playerSidebarHeight = playerHandY - playerSidebarY;
 
   // Opponent piles: Deck (top) → Discard → Reserve → Banish → LOR (bottom)
-  const oppPileLabels = isParagon
-    ? ['Paragon', 'Deck', 'Discard', 'Reserve', 'Banish', 'Land of Redemption']
-    : ['Deck', 'Discard', 'Reserve', 'Banish', 'Land of Redemption'];
-  const oppPileKeys: PileZone[] = isParagon
-    ? ['paragon', 'deck', 'discard', 'reserve', 'banish', 'lor']
-    : ['deck', 'discard', 'reserve', 'banish', 'lor'];
+  const oppPileLabels = ['Deck', 'Discard', 'Reserve', 'Banish', 'Land of Redemption'];
+  const oppPileKeys: PileZone[] = ['deck', 'discard', 'reserve', 'banish', 'lor'];
 
   // Player piles: LOR (top) then 2×2 grid clockwise from TL: Deck → Reserve → Banish → Discard
   // Grid fills row-by-row, so array order is [TL, TR, BL, BR] = [Deck, Reserve, Discard, Banish]
-  const playerPileLabels = isParagon
-    ? ['Land of Redemption', 'Deck', 'Reserve', 'Discard', 'Banish', 'Paragon']
-    : ['Land of Redemption', 'Deck', 'Reserve', 'Discard', 'Banish'];
-  const playerPileKeys: PileZone[] = isParagon
-    ? ['lor', 'deck', 'reserve', 'discard', 'banish', 'paragon']
-    : ['lor', 'deck', 'reserve', 'discard', 'banish'];
+  const playerPileLabels = ['Land of Redemption', 'Deck', 'Reserve', 'Discard', 'Banish'];
+  const playerPileKeys: PileZone[] = ['lor', 'deck', 'reserve', 'discard', 'banish'];
 
   const opponentSidebar = buildSidebar(
     sidebarX, oppSidebarY, oppSidebarHeight,
@@ -414,12 +404,12 @@ export function calculateMultiplayerLayout(
   // Pile card size based on grid slot height (3 rows: LOR + 2×2 grid)
   const slotPad = 4;
   const sidebarHalfHeight = Math.min(oppSidebarHeight, playerSidebarHeight);
-  const pileRowCount = isParagon ? 6 : 3; // 2×2 grid = 3 rows (LOR + 2 grid rows), paragon falls back to 6
+  const pileRowCount = 3; // 2×2 grid = 3 rows (LOR + 2 grid rows)
   const pileSlotHeight = Math.round(
     (sidebarHalfHeight - slotPad * (pileRowCount + 1)) / pileRowCount
   );
   // For 2×2 grid, use half the sidebar width for card sizing
-  const pileEffectiveWidth = isParagon ? sidebarWidth : Math.round((sidebarWidth - zonePad * 2 - slotPad) / 2 + zonePad * 2);
+  const pileEffectiveWidth = Math.round((sidebarWidth - zonePad * 2 - slotPad) / 2 + zonePad * 2);
   const pileCard = getPileCardDimensions(pileSlotHeight, pileEffectiveWidth, zonePad, profile.pileLabelRatio);
 
   return {

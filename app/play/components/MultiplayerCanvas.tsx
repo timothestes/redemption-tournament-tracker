@@ -307,7 +307,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
   // ---- Layout ----
   const mpLayout = useMemo(
-    () => calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT, false),
+    () => calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT),
     [virtualWidth],
   );
 
@@ -335,7 +335,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       reserve: mpLayout.sidebar.player.reserve!,
       deck: mpLayout.sidebar.player.deck!,
       discard: mpLayout.sidebar.player.discard!,
-      ...(mpLayout.sidebar.player.paragon ? { paragon: mpLayout.sidebar.player.paragon } : {}),
     };
   }, [mpLayout]);
 
@@ -349,7 +348,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       reserve: mpLayout.sidebar.opponent.reserve!,
       deck: mpLayout.sidebar.opponent.deck!,
       discard: mpLayout.sidebar.opponent.discard!,
-      ...(mpLayout.sidebar.opponent.paragon ? { paragon: mpLayout.sidebar.opponent.paragon } : {}),
     };
   }, [mpLayout]);
 
