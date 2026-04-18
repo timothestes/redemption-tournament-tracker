@@ -106,9 +106,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         result.card.posX = undefined;
         result.card.posY = undefined;
       }
-      // Auto-detach: if the mover is a weapon leaving territory, clear its equippedTo.
-      // If the mover is a warrior leaving territory, clear equippedTo on every weapon
-      // that pointed at it.
+      // Auto-detach on exit from territory: clear this mover's equippedTo (if any),
+      // and clear equippedTo on any card that pointed at this mover.
       if (toZone !== 'territory') {
         if (result.card.equippedTo) {
           result.card.equippedTo = undefined;

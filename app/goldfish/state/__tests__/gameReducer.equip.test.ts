@@ -119,4 +119,37 @@ describe('auto-detach', () => {
     const outWeapon = next.zones.territory.find(c => c.instanceId === 'w1');
     expect(outWeapon?.equippedTo).toBe('h1');
   });
+
+  it('preserves equippedTo when warrior and weapon are moved together via MOVE_CARDS_BATCH', () => {
+    const weapon = makeCard({ instanceId: 'w1', equippedTo: 'h1' });
+    const warrior = makeCard({ instanceId: 'h1' });
+    const next = gameReducer(makeState([weapon, warrior]), act('MOVE_CARDS_BATCH', {
+      cardInstanceIds: ['h1', 'w1'],
+      toZone: 'discard' as ZoneId,
+    }));
+    const outWeapon = next.zones.discard.find(c => c.instanceId === 'w1');
+    expect(outWeapon?.equippedTo).toBe('h1');
+  });
+
+  it('clears weapon equippedTo when warrior alone is batch-moved out of territory', () => {
+    const weapon = makeCard({ instanceId: 'w1', equippedTo: 'h1' });
+    const warrior = makeCard({ instanceId: 'h1' });
+    const next = gameReducer(makeState([weapon, warrior]), act('MOVE_CARDS_BATCH', {
+      cardInstanceIds: ['h1'],
+      toZone: 'discard' as ZoneId,
+    }));
+    const outWeapon = next.zones.territory.find(c => c.instanceId === 'w1');
+    expect(outWeapon?.equippedTo).toBeUndefined();
+  });
+
+  it('clears weapon equippedTo when weapon alone is batch-moved out of territory', () => {
+    const weapon = makeCard({ instanceId: 'w1', equippedTo: 'h1' });
+    const warrior = makeCard({ instanceId: 'h1' });
+    const next = gameReducer(makeState([weapon, warrior]), act('MOVE_CARDS_BATCH', {
+      cardInstanceIds: ['w1'],
+      toZone: 'banish' as ZoneId,
+    }));
+    const outWeapon = next.zones.banish.find(c => c.instanceId === 'w1');
+    expect(outWeapon?.equippedTo).toBeUndefined();
+  });
 });
