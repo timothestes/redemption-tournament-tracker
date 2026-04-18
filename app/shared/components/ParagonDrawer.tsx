@@ -39,7 +39,7 @@ export function ParagonDrawer({ paragons }: ParagonDrawerProps) {
       ) {
         return;
       }
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' || e.key === 'ArrowDown') {
         e.preventDefault();
         setOpen(false);
         return;
