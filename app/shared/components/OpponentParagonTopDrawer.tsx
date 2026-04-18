@@ -10,7 +10,7 @@ interface OpponentParagonTopDrawerProps {
 const DRAWER_WIDTH = 620;
 const HANDLE_WIDTH = 200;
 const HANDLE_HEIGHT = 36;
-const HANDLE_TOP = 200;
+const HANDLE_TOP = 72;
 
 export function OpponentParagonTopDrawer({ paragonName }: OpponentParagonTopDrawerProps) {
   const [open, setOpen] = useState(false);
