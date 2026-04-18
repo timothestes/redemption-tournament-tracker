@@ -406,6 +406,11 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
         case 'reserve_deck_top': return `asked to send the top ${count} card${plural} of ${targetName}'s deck to reserve`;
         case 'reserve_deck_bottom': return `asked to send the bottom ${count} card${plural} of ${targetName}'s deck to reserve`;
         case 'reserve_deck_random': return `asked to send ${count} random card${plural} from ${targetName}'s deck to reserve`;
+        case 'random_hand_to_discard': return `asked to discard ${count} random card${plural} from ${targetName}'s hand`;
+        case 'random_hand_to_reserve': return `asked to send ${count} random card${plural} from ${targetName}'s hand to reserve`;
+        case 'random_hand_to_deck_top': return `asked to send ${count} random card${plural} from ${targetName}'s hand to the top of their deck`;
+        case 'random_hand_to_deck_bottom': return `asked to send ${count} random card${plural} from ${targetName}'s hand to the bottom of their deck`;
+        case 'random_hand_to_deck_shuffle': return `asked to shuffle ${count} random card${plural} from ${targetName}'s hand into their deck`;
         default: return `asked to perform an action on ${targetName}'s deck`;
       }
     } catch { /* fall through */ }

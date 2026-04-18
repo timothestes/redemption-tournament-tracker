@@ -28,6 +28,8 @@ interface HandContextMenuProps {
   onShuffleRandomIntoDeck: (count: number) => void;
   isHandRevealed?: boolean;
   onRevealHand?: (revealed: boolean) => void;
+  /** 'own' uses "Hand" + "Reveal/Hide Hand"; 'opponent' uses "Opponent's Hand" + "Request Reveal Hand" and relabels random actions */
+  mode?: 'own' | 'opponent';
 }
 
 const ITEM_STYLE: React.CSSProperties = {
@@ -334,7 +336,11 @@ export function HandContextMenu({
   onShuffleRandomIntoDeck,
   isHandRevealed,
   onRevealHand,
+  mode = 'own',
 }: HandContextMenuProps) {
+  const revealLabel = mode === 'opponent'
+    ? (isHandRevealed ? 'Hide Hand' : 'Request Reveal Hand')
+    : (isHandRevealed ? 'Hide Hand' : 'Reveal Hand');
   const menuRef = useRef<HTMLDivElement>(null);
   const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
   const submenuCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -378,21 +384,6 @@ export function HandContextMenu({
         whiteSpace: 'nowrap',
       }}
     >
-      {/* Header */}
-      <div style={{
-        padding: '4px 14px 6px',
-        color: 'var(--gf-text-dim)',
-        fontSize: 10,
-        fontFamily: 'var(--font-cinzel), Georgia, serif',
-        letterSpacing: '0.08em',
-        textTransform: 'uppercase',
-        userSelect: 'none',
-      }}>
-        Hand ({handSize} cards)
-      </div>
-
-      <div style={SEPARATOR_STYLE} />
-
       {onRevealHand && (
         <button
           style={ITEM_STYLE}
@@ -401,7 +392,7 @@ export function HandContextMenu({
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
         >
           {isHandRevealed ? <EyeOff size={14} /> : <Eye size={14} />}
-          {isHandRevealed ? 'Hide Hand' : 'Reveal Hand'}
+          {revealLabel}
         </button>
       )}
 

@@ -67,6 +67,7 @@ import PregameChooseFirstReducer from "./pregame_choose_first_reducer";
 import PregameReadyReducer from "./pregame_ready_reducer";
 import PregameSkipToRevealReducer from "./pregame_skip_to_reveal_reducer";
 import RandomHandToZoneReducer from "./random_hand_to_zone_reducer";
+import RandomOpponentHandToZoneReducer from "./random_opponent_hand_to_zone_reducer";
 import RandomReserveToZoneReducer from "./random_reserve_to_zone_reducer";
 import ReloadDeckReducer from "./reload_deck_reducer";
 import RemoveCounterReducer from "./remove_counter_reducer";
@@ -298,6 +299,7 @@ const reducersSchema = __reducers(
   __reducerSchema("pregame_ready", PregameReadyReducer),
   __reducerSchema("pregame_skip_to_reveal", PregameSkipToRevealReducer),
   __reducerSchema("random_hand_to_zone", RandomHandToZoneReducer),
+  __reducerSchema("random_opponent_hand_to_zone", RandomOpponentHandToZoneReducer),
   __reducerSchema("random_reserve_to_zone", RandomReserveToZoneReducer),
   __reducerSchema("reload_deck", ReloadDeckReducer),
   __reducerSchema("remove_counter", RemoveCounterReducer),

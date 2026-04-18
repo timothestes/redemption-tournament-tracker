@@ -154,9 +154,5 @@ probably improve right click top/bottom/random menu?
 create system where cards can have custom abilities coded
 add ability to use card tokens
 save game, load game, invite to game?
-add text notes?
 Ghost cards... from exchange option
-site in souls don't really work right now
 battle phase/zone could be better
-add equip feature?
-add paragon to online play?

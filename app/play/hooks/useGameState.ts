@@ -33,6 +33,8 @@ type DisconnectTimeoutRow = DisconnectTimeout;
 export interface GameState {
   // All games (used for game discovery by code before gameId is known)
   allGames: GameRow[];
+  // All players (used for joiner reconnect detection before gameId is known)
+  allPlayers: PlayerRow[];
 
   // Core data
   game: GameRow | undefined;
@@ -72,6 +74,7 @@ export interface GameState {
   reloadDeck: (deckId: string, deckData: string, paragon: string) => void;
   randomHandToZone: (count: number, toZone: string, deckPosition: string) => void;
   randomReserveToZone: (count: number, toZone: string, deckPosition: string) => void;
+  randomOpponentHandToZone: (requestId: bigint, count: number, toZone: string, deckPosition: string) => void;
   meekCard: (cardInstanceId: bigint) => void;
   unmeekCard: (cardInstanceId: bigint) => void;
   flipCard: (cardInstanceId: bigint) => void;
@@ -373,6 +376,13 @@ export function useGameState(gameId: bigint): GameState {
     [conn, gameId],
   );
 
+  const randomOpponentHandToZone = useCallback(
+    (requestId: bigint, count: number, toZone: string, deckPosition: string) => {
+      conn?.reducers.randomOpponentHandToZone({ gameId, requestId, count: BigInt(count), toZone, deckPosition });
+    },
+    [conn, gameId],
+  );
+
   const reloadDeck = useCallback(
     (deckId: string, deckData: string, paragon: string) => {
       conn?.reducers.reloadDeck({ gameId, deckId, deckData, paragon });
@@ -663,6 +673,7 @@ export function useGameState(gameId: bigint): GameState {
 
   return {
     allGames,
+    allPlayers,
     game,
     myPlayer,
     opponentPlayer,
@@ -689,6 +700,7 @@ export function useGameState(gameId: bigint): GameState {
     shuffleCardIntoDeck,
     randomHandToZone,
     randomReserveToZone,
+    randomOpponentHandToZone,
     reloadDeck,
     meekCard,
     unmeekCard,

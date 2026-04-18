@@ -171,6 +171,11 @@ function describeOpponentAction(action: string, paramsJson: string): string {
     case 'reserve_deck_top': return `send the top ${count} card${plural} of your deck to reserve`;
     case 'reserve_deck_bottom': return `send the bottom ${count} card${plural} of your deck to reserve`;
     case 'reserve_deck_random': return `send ${count} random card${plural} from your deck to reserve`;
+    case 'random_hand_to_discard': return `discard ${count} random card${plural} from your hand`;
+    case 'random_hand_to_reserve': return `send ${count} random card${plural} from your hand to reserve`;
+    case 'random_hand_to_deck_top': return `send ${count} random card${plural} from your hand to the top of your deck`;
+    case 'random_hand_to_deck_bottom': return `send ${count} random card${plural} from your hand to the bottom of your deck`;
+    case 'random_hand_to_deck_shuffle': return `shuffle ${count} random card${plural} from your hand into your deck`;
     default: return 'perform an action on your deck';
   }
 }
@@ -1409,12 +1414,32 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         moveOpponentDeckCardsToZone('random', count, 'reserve');
         complete();
         break;
+      case 'random_hand_to_discard':
+        gameState.randomOpponentHandToZone(reqIdBig, count, 'discard', '');
+        complete();
+        break;
+      case 'random_hand_to_reserve':
+        gameState.randomOpponentHandToZone(reqIdBig, count, 'reserve', '');
+        complete();
+        break;
+      case 'random_hand_to_deck_top':
+        gameState.randomOpponentHandToZone(reqIdBig, count, 'deck', 'top');
+        complete();
+        break;
+      case 'random_hand_to_deck_bottom':
+        gameState.randomOpponentHandToZone(reqIdBig, count, 'deck', 'bottom');
+        complete();
+        break;
+      case 'random_hand_to_deck_shuffle':
+        gameState.randomOpponentHandToZone(reqIdBig, count, 'deck', 'shuffle');
+        complete();
+        break;
       default:
         // Unknown action — complete to unblock, then warn.
         complete();
         console.warn('Unknown opponent action:', action);
     }
-  }, [approvedSearchRequest, completeZoneSearch, shuffleOpponentDeck, moveOpponentDeckCardsToZone]);
+  }, [approvedSearchRequest, completeZoneSearch, shuffleOpponentDeck, moveOpponentDeckCardsToZone, gameState]);
 
   // Track opponent hand reveal — show/hide countdown bar
   const oppHandRevealed = gameState.opponentPlayer?.handRevealed ?? false;
@@ -3189,11 +3214,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             onContextMenu={(e: Konva.KonvaEventObject<PointerEvent>) => {
               e.evt.preventDefault();
               closeAllMenus();
-              setOpponentZoneMenu({
+              setOpponentHandMenu({
                 x: e.evt.clientX,
                 y: e.evt.clientY,
-                zone: 'hand',
-                zoneName: 'Hand',
               });
             }}
           />
@@ -4027,15 +4050,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 clipHeight={opponentHandRect!.height}
                 onContextMenu={(e: Konva.KonvaEventObject<PointerEvent>) => {
                   e.evt.preventDefault();
-                  const stage = stageRef.current;
-                  if (!stage) return;
-                  const container = stage.container().getBoundingClientRect();
                   closeAllMenus();
-                  setOpponentZoneMenu({
+                  setOpponentHandMenu({
                     x: e.evt.clientX,
                     y: e.evt.clientY,
-                    zone: 'hand',
-                    zoneName: 'Hand',
                   });
                 }}
               >
@@ -4418,6 +4436,35 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           onRevealHand={(revealed) => { setHandMenu(null); gameState.revealHand(revealed); }}
         />
       )}
+
+      {opponentHandMenu && (() => {
+        const requestAction = (action: string, count: number) => {
+          const params = JSON.stringify({ count });
+          requestOpponentAction(action, params);
+          setOpponentHandMenu(null);
+          showGameToast('Waiting for opponent to approve...');
+        };
+        return (
+          <HandContextMenu
+            mode="opponent"
+            x={opponentHandMenu.x}
+            y={opponentHandMenu.y}
+            handSize={opponentCards['hand']?.length ?? 0}
+            onClose={() => setOpponentHandMenu(null)}
+            onRandomToDiscard={(count) => requestAction('random_hand_to_discard', count)}
+            onRandomToReserve={(count) => requestAction('random_hand_to_reserve', count)}
+            onRandomToDeckTop={(count) => requestAction('random_hand_to_deck_top', count)}
+            onRandomToDeckBottom={(count) => requestAction('random_hand_to_deck_bottom', count)}
+            onShuffleRandomIntoDeck={(count) => requestAction('random_hand_to_deck_shuffle', count)}
+            isHandRevealed={gameState.opponentPlayer?.handRevealed ?? false}
+            onRevealHand={() => {
+              setOpponentHandMenu(null);
+              requestZoneSearch('hand-reveal');
+              showGameToast('Asking opponent to reveal hand...');
+            }}
+          />
+        );
+      })()}
 
       {reserveMenu && (
         <ReserveContextMenu
@@ -5190,7 +5237,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       {/* ================================================================
           Card hover preview — floating tooltip near cursor
           ================================================================ */}
-      {hoveredCard && hoverReady && !isLoupeVisible && !isDraggingRef.current && !contextMenu && !multiCardContextMenu && !deckMenu && !zoneMenu && !lorMenu && !opponentZoneMenu && !handMenu && !reserveMenu && !opponentReserveMenu && (() => {
+      {hoveredCard && hoverReady && !isLoupeVisible && !isDraggingRef.current && !contextMenu && !multiCardContextMenu && !deckMenu && !zoneMenu && !lorMenu && !opponentZoneMenu && !handMenu && !opponentHandMenu && !reserveMenu && !opponentReserveMenu && (() => {
         const previewWidth = 280;
         const previewHeight = Math.round(previewWidth * 1.4);
         const imageUrl = getSharedCardImageUrl(hoveredCard.cardImgFile);

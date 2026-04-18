@@ -2234,6 +2234,111 @@ export const random_hand_to_zone = spacetimedb.reducer(
 );
 
 // ---------------------------------------------------------------------------
+// Reducer: random_opponent_hand_to_zone
+// Authorised via an approved ZoneSearchRequest — the requester moves random
+// cards from the target's hand to a destination zone. Mirrors random_hand_to_zone
+// but operates on the request's targetPlayerId.
+// ---------------------------------------------------------------------------
+export const random_opponent_hand_to_zone = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    requestId: t.u64(),
+    count: t.u64(),
+    toZone: t.string(),
+    deckPosition: t.string(),
+  },
+  (ctx, { gameId, requestId, count, toZone, deckPosition }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in progress');
+
+    const player = findPlayerBySender(ctx, gameId);
+
+    const req = ctx.db.ZoneSearchRequest.id.find(requestId);
+    if (!req) throw new SenderError('Search request not found');
+    if (req.gameId !== gameId) throw new SenderError('Request not in this game');
+    if (req.requesterId !== player.id) throw new SenderError('Not your search request');
+    if (req.status !== 'approved') throw new SenderError('Search request not approved');
+
+    const targetId = req.targetPlayerId;
+
+    const handCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+      (c: any) => c.ownerId === targetId && c.zone === 'hand'
+    );
+
+    if (handCards.length === 0) throw new SenderError('Target has no cards in hand');
+    const actualCount = Math.min(Number(count), handCards.length);
+
+    const newRngCounter = game.rngCounter + 1n;
+    ctx.db.Game.id.update({ ...game, rngCounter: newRngCounter });
+    const seed = makeSeed(ctx.timestamp.microsSinceUnixEpoch, gameId, targetId, newRngCounter);
+    const rng = xorshift64(seed);
+
+    const indices = handCards.map((_: any, i: number) => i);
+    for (let i = indices.length - 1; i > indices.length - 1 - actualCount && i > 0; i--) {
+      const j = Number(rng.next() % BigInt(i + 1));
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    const pickedCards = indices.slice(indices.length - actualCount).map((i: number) => handCards[i]);
+
+    let maxDeckIndex = 0n;
+    if (toZone === 'deck') {
+      for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+        if (c.ownerId === targetId && c.zone === 'deck' && c.zoneIndex > maxDeckIndex) {
+          maxDeckIndex = c.zoneIndex;
+        }
+      }
+    }
+
+    for (let i = 0; i < pickedCards.length; i++) {
+      const card = pickedCards[i];
+
+      let newZoneIndex = 0n;
+      if (toZone === 'deck') {
+        if (deckPosition === 'top') {
+          newZoneIndex = BigInt(-(i + 1));
+        } else if (deckPosition === 'bottom') {
+          newZoneIndex = maxDeckIndex + BigInt(i + 1);
+        }
+      }
+
+      ctx.db.CardInstance.id.update({
+        ...card,
+        zone: toZone,
+        zoneIndex: newZoneIndex,
+        posX: '',
+        posY: '',
+        isFlipped: toZone === 'deck' || toZone === 'reserve' ? true : card.isFlipped,
+      });
+    }
+
+    if (toZone === 'deck' && deckPosition === 'shuffle') {
+      const latestGame = ctx.db.Game.id.find(gameId);
+      if (!latestGame) return;
+      const shuffleRng = latestGame.rngCounter + 1n;
+      ctx.db.Game.id.update({ ...latestGame, rngCounter: shuffleRng });
+
+      const allDeckCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+        (c: any) => c.ownerId === targetId && c.zone === 'deck'
+      );
+      const shuffleIndices = allDeckCards.map((_: any, idx: number) => idx);
+      const shuffleSeed = makeSeed(ctx.timestamp.microsSinceUnixEpoch, gameId, targetId, shuffleRng);
+      seededShuffle(shuffleIndices, shuffleSeed);
+      for (let i = 0; i < allDeckCards.length; i++) {
+        ctx.db.CardInstance.id.update({ ...allDeckCards[i], zoneIndex: BigInt(shuffleIndices[i]) });
+      }
+    }
+
+    compactHandIndices(ctx, gameId, targetId);
+
+    const destLabel = toZone === 'deck' ? `deck (${deckPosition})` : toZone;
+    logAction(ctx, gameId, player.id, 'RANDOM_OPPONENT_HAND_TO_ZONE',
+      JSON.stringify({ destination: destLabel, count: actualCount, targetPlayerId: targetId.toString() }),
+      game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
 // Reducer: random_reserve_to_zone
 // ---------------------------------------------------------------------------
 export const random_reserve_to_zone = spacetimedb.reducer(
