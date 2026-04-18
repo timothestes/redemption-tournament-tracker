@@ -38,6 +38,10 @@ interface DeckContextMenuProps {
   onLookAtRandom?: (count: number) => void;
   /** When true, hides all draw-related actions (for opponent's deck) */
   hideDrawActions?: boolean;
+  /** When true, hides the Discard row inside each Top/Bottom/Random submenu */
+  hideDiscardActions?: boolean;
+  /** When true, hides the Reserve row inside each Top/Bottom/Random submenu */
+  hideReserveActions?: boolean;
 }
 
 const SUBMENU_STYLE: React.CSSProperties = {
@@ -160,6 +164,8 @@ export function DeckContextMenu({
   onLookAtBottom,
   onLookAtRandom,
   hideDrawActions,
+  hideDiscardActions,
+  hideReserveActions,
 }: DeckContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [showDrawX, setShowDrawX] = useState(false);
@@ -248,22 +254,22 @@ export function DeckContextMenu({
           {!hideDrawActions && <SubMenuActionRow icon={<Play size={14} />} label="Draw" max={deckSize} onAction={onDrawTop} />}
           {onLookAtTop && <SubMenuActionRow icon={<Eye size={14} />} label="Look" max={deckSize} onAction={onLookAtTop} />}
           <SubMenuActionRow icon={<Sparkles size={14} />} label="Reveal" max={deckSize} onAction={onRevealTop} />
-          <SubMenuActionRow icon={<Trash2 size={14} />} label="Discard" max={deckSize} onAction={onDiscardTop} />
-          <SubMenuActionRow icon={<Archive size={14} />} label="Reserve" max={deckSize} onAction={onReserveTop} />
+          {!hideDiscardActions && <SubMenuActionRow icon={<Trash2 size={14} />} label="Discard" max={deckSize} onAction={onDiscardTop} />}
+          {!hideReserveActions && <SubMenuActionRow icon={<Archive size={14} />} label="Reserve" max={deckSize} onAction={onReserveTop} />}
         </SubmenuTrigger>
         <SubmenuTrigger label="Bottom Card">
           {!hideDrawActions && <SubMenuActionRow icon={<Play size={14} />} label="Draw" max={deckSize} onAction={onDrawBottom} />}
           {onLookAtBottom && <SubMenuActionRow icon={<Eye size={14} />} label="Look" max={deckSize} onAction={onLookAtBottom} />}
           <SubMenuActionRow icon={<Sparkles size={14} />} label="Reveal" max={deckSize} onAction={onRevealBottom} />
-          <SubMenuActionRow icon={<Trash2 size={14} />} label="Discard" max={deckSize} onAction={onDiscardBottom} />
-          <SubMenuActionRow icon={<Archive size={14} />} label="Reserve" max={deckSize} onAction={onReserveBottom} />
+          {!hideDiscardActions && <SubMenuActionRow icon={<Trash2 size={14} />} label="Discard" max={deckSize} onAction={onDiscardBottom} />}
+          {!hideReserveActions && <SubMenuActionRow icon={<Archive size={14} />} label="Reserve" max={deckSize} onAction={onReserveBottom} />}
         </SubmenuTrigger>
         <SubmenuTrigger label="Random Card">
           {!hideDrawActions && <SubMenuActionRow icon={<Play size={14} />} label="Draw" max={deckSize} onAction={onDrawRandom} />}
           {onLookAtRandom && <SubMenuActionRow icon={<Eye size={14} />} label="Look" max={deckSize} onAction={onLookAtRandom} />}
           <SubMenuActionRow icon={<Sparkles size={14} />} label="Reveal" max={deckSize} onAction={onRevealRandom} />
-          <SubMenuActionRow icon={<Trash2 size={14} />} label="Discard" max={deckSize} onAction={onDiscardRandom} />
-          <SubMenuActionRow icon={<Archive size={14} />} label="Reserve" max={deckSize} onAction={onReserveRandom} />
+          {!hideDiscardActions && <SubMenuActionRow icon={<Trash2 size={14} />} label="Discard" max={deckSize} onAction={onDiscardRandom} />}
+          {!hideReserveActions && <SubMenuActionRow icon={<Archive size={14} />} label="Reserve" max={deckSize} onAction={onReserveRandom} />}
         </SubmenuTrigger>
       </ActiveSubmenuContext.Provider>
 
