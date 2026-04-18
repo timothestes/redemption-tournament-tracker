@@ -1979,8 +1979,9 @@ export const reload_deck = spacetimedb.reducer(
     gameId: t.u64(),
     deckId: t.string(),
     deckData: t.string(),
+    paragon: t.string(),
   },
-  (ctx, { gameId, deckId, deckData }) => {
+  (ctx, { gameId, deckId, deckData, paragon }) => {
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
     if (game.status !== 'playing' && game.status !== 'finished') throw new SenderError('Game is not in progress');
@@ -2001,8 +2002,8 @@ export const reload_deck = spacetimedb.reducer(
       ctx.db.CardInstance.id.delete(card.id);
     }
 
-    // 2. Update player's deck ID
-    ctx.db.Player.id.update({ ...player, deckId });
+    // 2. Update player's deck ID and paragon so the ParagonDrawer refreshes
+    ctx.db.Player.id.update({ ...player, deckId, paragon });
 
     // 3. Insert new cards, shuffle, draw opening hand (reuses existing helper)
     const currentGame = ctx.db.Game.id.find(gameId);
