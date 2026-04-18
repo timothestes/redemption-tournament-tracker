@@ -151,19 +151,12 @@ Fallow audit: https://github.com/fallow-rs/fallow
 
 # play features
 probably improve right click top/bottom/random menu?
-start of game takes a bit to load
 create system where cards can have custom abilities coded
 add ability to use meek tokens
 save game, load game, invite to game?
 add paragon to online play?
 add text notes?
-
-
 Ghost cards... from exchange option
 site in souls don't really work right now
 add equip feature?
 battle phase/zone could be better
-
-
-Subagent Tasks for Multiplayer mode:
-- reveal reserve function seems buggy. Not able to close it. Also feels awkward right click happens to open reserve and also the right click menu at the same time. Maybe right click doesn't need to reveal the reserve and instead just show the menu?

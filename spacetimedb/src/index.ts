@@ -2966,7 +2966,10 @@ export const approve_zone_search = spacetimedb.reducer(
     ctx.db.ZoneSearchRequest.id.update({ ...req, status: 'approved' });
 
     const game = ctx.db.Game.id.find(gameId);
-    if (game) {
+    // Suppress the approval log for action requests — the action itself will
+    // log a specific entry (e.g. "discarded X"), which is clearer than a
+    // generic "allowed deck search" line.
+    if (game && !req.action) {
       logAction(ctx, gameId, player.id, 'APPROVE_ZONE_SEARCH', JSON.stringify({ zone: req.zone }), game.turnNumber, game.currentPhase);
     }
   }
@@ -3038,9 +3041,13 @@ export const complete_zone_search = spacetimedb.reducer(
       }
     }
 
+    const wasAction = !!req.action;
     ctx.db.ZoneSearchRequest.id.delete(requestId);
 
-    if (game) {
+    // Suppress the "finished searching..." completion log for action requests —
+    // the executing reducer (move_cards_batch, shuffle_opponent_deck, etc.)
+    // already logs the action it performed.
+    if (game && !wasAction) {
       logAction(ctx, gameId, player.id, 'COMPLETE_ZONE_SEARCH', JSON.stringify({ zone: req.zone, targetName, shuffled }), game.turnNumber, game.currentPhase);
     }
   }

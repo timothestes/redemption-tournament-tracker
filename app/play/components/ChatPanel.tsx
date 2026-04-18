@@ -375,6 +375,34 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       return `requested to search ${targetName}'s ${zoneName}`;
     } catch { /* fall through */ }
   }
+  if (actionType === 'REQUEST_OPPONENT_ACTION' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const targetName = data.targetName ?? 'opponent';
+      let count = 0;
+      try { count = data.actionParams ? (JSON.parse(data.actionParams).count ?? 0) : 0; } catch {}
+      const plural = count === 1 ? '' : 's';
+      switch (data.action) {
+        case 'shuffle_deck': return `asked to shuffle ${targetName}'s deck`;
+        case 'look_deck_top': return `asked to look at the top ${count} card${plural} of ${targetName}'s deck`;
+        case 'look_deck_bottom': return `asked to look at the bottom ${count} card${plural} of ${targetName}'s deck`;
+        case 'look_deck_random': return `asked to look at ${count} random card${plural} from ${targetName}'s deck`;
+        case 'reveal_deck_top': return `asked to reveal the top ${count} card${plural} of ${targetName}'s deck`;
+        case 'reveal_deck_bottom': return `asked to reveal the bottom ${count} card${plural} of ${targetName}'s deck`;
+        case 'reveal_deck_random': return `asked to reveal ${count} random card${plural} from ${targetName}'s deck`;
+        case 'draw_deck_top': return `asked to draw ${count} from the top of ${targetName}'s deck`;
+        case 'draw_deck_bottom': return `asked to draw ${count} from the bottom of ${targetName}'s deck`;
+        case 'draw_deck_random': return `asked to draw ${count} random card${plural} from ${targetName}'s deck`;
+        case 'discard_deck_top': return `asked to discard the top ${count} card${plural} of ${targetName}'s deck`;
+        case 'discard_deck_bottom': return `asked to discard the bottom ${count} card${plural} of ${targetName}'s deck`;
+        case 'discard_deck_random': return `asked to discard ${count} random card${plural} from ${targetName}'s deck`;
+        case 'reserve_deck_top': return `asked to send the top ${count} card${plural} of ${targetName}'s deck to reserve`;
+        case 'reserve_deck_bottom': return `asked to send the bottom ${count} card${plural} of ${targetName}'s deck to reserve`;
+        case 'reserve_deck_random': return `asked to send ${count} random card${plural} from ${targetName}'s deck to reserve`;
+        default: return `asked to perform an action on ${targetName}'s deck`;
+      }
+    } catch { /* fall through */ }
+  }
   if (actionType === 'APPROVE_ZONE_SEARCH' && payload) {
     try {
       const data = JSON.parse(payload);
