@@ -29,6 +29,7 @@ import type {
   CardCounter,
 } from '@/lib/spacetimedb/module_bindings/types';
 import { CardContextMenu } from '@/app/shared/components/CardContextMenu';
+import { CardNotePopover } from './CardNotePopover';
 import { MultiCardContextMenu } from '@/app/shared/components/MultiCardContextMenu';
 import { ZoneContextMenu } from '@/app/shared/components/ZoneContextMenu';
 import { DeckContextMenu } from '@/app/shared/components/DeckContextMenu';
@@ -548,6 +549,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const contextMenuRef = useRef(contextMenu);
   contextMenuRef.current = contextMenu;
   const [multiCardContextMenu, setMultiCardContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [notePopover, setNotePopover] = useState<{
+    cardId: string;
+    x: number;
+    y: number;
+    initialValue: string;
+  } | null>(null);
 
   // ---- Zone browse overlay state ----
   const [browseMyZone, setBrowseMyZone] = useState<string | null>(null);
@@ -935,6 +942,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const closeAllMenus = useCallback(() => {
     setContextMenu(null);
     setMultiCardContextMenu(null);
+    setNotePopover(null);
     setZoneMenu(null);
     setDeckMenu(null);
     setLorMenu(null);
@@ -4296,6 +4304,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 }
               : undefined
           }
+          onEditNote={
+            contextMenu.card.ownerId === 'player1'
+              ? (card) => {
+                  setNotePopover({
+                    cardId: card.instanceId,
+                    x: contextMenu.x,
+                    y: contextMenu.y,
+                    initialValue: card.notes ?? '',
+                  });
+                  setContextMenu(null);
+                }
+              : undefined
+          }
           zones={allZonesForContextMenu as any}
         />
       )}
@@ -4313,6 +4334,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           onClose={() => setMultiCardContextMenu(null)}
           onClearSelection={() => { clearSelection(); setMultiCardContextMenu(null); }}
           zones={allZonesForContextMenu as any}
+        />
+      )}
+
+      {notePopover && (
+        <CardNotePopover
+          x={notePopover.x}
+          y={notePopover.y}
+          initialValue={notePopover.initialValue}
+          onSave={(text) => {
+            gameState.setNote(BigInt(notePopover.cardId), text);
+            setNotePopover(null);
+          }}
+          onCancel={() => setNotePopover(null)}
         />
       )}
 
