@@ -21,9 +21,10 @@ This creates two concrete issues:
 
 ## Goals
 
-- Make the count-of-1 action visibly obvious without adding new click targets.
+- Make the count-of-1 action visibly obvious by giving it the same boxed-chip affordance as `3` / `6` / `X`.
 - Render quick-counts in ascending reading order (`1 -> 3 -> 6 -> X`).
-- Preserve current click behavior: clicking the label still fires `onAction(1)`. (Required for consistency with Look / Reveal / Discard / Reserve, which also rely on the label as their 1-action target.)
+- Preserve the wide label click target as a muscle-memory shortcut for count-of-1.
+- Equalize the visual weight of the `X` custom-count chip with its numeric siblings.
 - No changes to the public `DeckContextMenuProps` API.
 - No changes to callsites in `MultiplayerCanvas.tsx` or `GoldfishCanvas.tsx`.
 
@@ -39,46 +40,47 @@ This creates two concrete issues:
 ### New row layout
 
 ```
-[icon Draw 1]    [3]  [6]  [X]
-[icon Look 1]    [3]  [6]  [X]
-[icon Reveal 1]  [3]  [6]  [X]
-[icon Discard 1] [3]  [6]  [X]
-[icon Reserve 1] [3]  [6]  [X]
+[icon Draw]    [1]  [3]  [6]  [X]
+[icon Look]    [1]  [3]  [6]  [X]
+[icon Reveal]  [1]  [3]  [6]  [X]
+[icon Discard] [1]  [3]  [6]  [X]
+[icon Reserve] [1]  [3]  [6]  [X]
 ```
 
 Lucide icons per row (unchanged from today): `Play` (Draw), `Eye` (Look), `Sparkles` (Reveal), `Trash2` (Discard), `Archive` (Reserve).
 
-- **Label (left):** icon + `"{verb} 1"` — for example, `Draw 1`, `Look 1`. The `1` is rendered as normal label text with no separate styling, so the verb and its count read as a single phrase. The label takes `flex: 1` and remains the primary click target, firing `onAction(1)`.
-- **Quick-count chips (right):** `[3]`, `[6]`, `[X]` in ascending order.
-  - `[3]` → `onAction(3)`
-  - `[6]` → `onAction(6)`
-  - `[X]` → toggles the custom-count stepper (behavior unchanged)
+- **Label (left):** icon + verb text (e.g. `Draw`, `Look`). The label takes `flex: 1` and is a wide click target that fires `onAction(1)`.
+- **`[1]` chip:** same 36×36 boxed style as `[3]` / `[6]`; fires `onAction(1)`. Deliberately redundant with the label click — the label provides the wide Fitts's-Law target (muscle memory), the chip provides visible affordance so every count shares the same chip vocabulary.
+- **`[3]` / `[6]` chips:** same as today — `onAction(3)` and `onAction(6)`.
+- **`[X]` chip:** toggles the custom-count stepper (behavior unchanged). Font size equalized with its numeric siblings (11px, inherited from `QUICK_COUNT_STYLE`); retains `letterSpacing: '0.05em'` so `X` stays visually distinct in kind, not size.
 - **Custom-count stepper:** when `X` is expanded, the stepper row (`− / count / + / Go`) renders below exactly as today.
 
 ### Conditional rendering
 
-Unchanged from today:
+- `[1]` always renders (matches the always-rendering label button pattern).
 - `[3]` hides when `max < 3`.
 - `[6]` hides when `max < 6`.
-- `[X]` and the label always render when the row is shown (any non-empty deck).
+- `[X]` and the label always render when the row is shown.
 
 ### Styling
 
 - Label color: `var(--gf-text)` at rest, `var(--gf-text-bright)` on hover — same as today.
 - Row-level hover: whole row gets `var(--gf-hover)` background — same as today.
-- Per-chip hover: stronger accent (`rgba(196,149,90,0.35)` background, `var(--gf-accent)` border) — same as today.
-- Horizontal spacing: label takes left padding consistent with today's right-anchored label; chip group takes right padding symmetric with that value so the row is visually balanced.
-- Chip gaps between `3`, `6`, `X`: 2px (matches current value).
-- Gap between label and first chip: preserved as the natural result of `flex: 1` on the label.
+- Per-chip hover (applies uniformly to `[1]`, `[3]`, `[6]`, `[X]`): background toggles between `rgba(196,149,90,0.12)` and `rgba(196,149,90,0.35)`; borderColor toggles between `var(--gf-border)` and `var(--gf-accent)`.
+- `[1]` chip styling matches `[3]` and `[6]` exactly — no "default marker" distinction. The wide label click target is the muscle-memory shortcut; the chip is visual consistency.
+- Chip gaps: 2px between all chips (`marginLeft: 2`). Right edge: `marginRight: 10` on `[X]` for breathing room.
+- Gap between label and `[1]` chip: natural result of `flex: 1` on the label.
 
 ### What changes in code
 
 Within `SubMenuActionRow` ([DeckContextMenu.tsx:135-261](app/shared/components/DeckContextMenu.tsx#L135-L261)):
 
-1. Reorder JSX children of the row so the label (icon + text) comes first, followed by `[3]`, `[6]`, `[X]` in that order.
-2. Change the label text from `{label}` to `{label} 1`.
-3. Adjust `marginLeft` values on chips so the first chip now has minimal left gap (it sits next to the flex-filling label) and the last chip has right padding matching the row's left padding.
-4. Ensure the label button retains `flex: 1` so it fills available width and remains a large click target.
+1. Move the label button (`icon` + `{label}`) from the trailing position to the leading position. Label text is `{label}` (no appended count).
+2. Insert a new `[1]` chip button between the label button and the `{max >= 3 && ...}` block. The chip uses `{ ...QUICK_COUNT_STYLE, marginLeft: 2 }`, fires `onAction(1)`, has hover handlers matching the `[3]` / `[6]` chips, `title={\`${label} 1\`}`, and renders the text `1`.
+3. Change the `[3]` chip's `marginLeft` from `10` to `2` (no longer the leftmost element in the chip group).
+4. Add `marginRight: 10` to the `[X]` toggle's style (now the rightmost element).
+5. Remove the `fontSize: 9` override on the `[X]` toggle so it inherits `fontSize: 11` from `QUICK_COUNT_STYLE`. Keep `letterSpacing: '0.05em'`.
+6. Keep the label button's `flex: 1`, `paddingLeft: 8`, `background: 'transparent'`, and `onClick={() => onAction(1)}`.
 
 ## Risk & Rollback
 
@@ -89,8 +91,9 @@ Within `SubMenuActionRow` ([DeckContextMenu.tsx:135-261](app/shared/components/D
 
 - Open the deck right-click menu in Goldfish mode and confirm each of the three positional submenus renders the new layout correctly for all five action rows.
 - Open the same menu in Multiplayer mode (both own deck and opponent's deck with `hideDrawActions`) and confirm the `Draw` row is hidden on opponent decks while the rest render correctly.
-- Confirm clicking the label still fires `onAction(1)`.
+- Confirm clicking the label still fires `onAction(1)` and clicking the `[1]` chip also fires `onAction(1)`.
 - Confirm `[3]`, `[6]` still fire their respective counts.
 - Confirm `[X]` still opens the stepper and `Go` fires the custom count.
-- Confirm `[3]` hides when the deck has `< 3` cards and `[6]` hides when the deck has `< 6` cards.
+- Confirm `[1]` always renders; confirm `[3]` hides when the deck has `< 3` cards and `[6]` hides when the deck has `< 6` cards.
+- Confirm `[X]` now renders at the same font size as `[1]` / `[3]` / `[6]` while remaining visually distinct via letter-spacing.
 - Confirm submenu hover auto-close timing is unchanged (no regressions in `SubmenuTrigger`).
