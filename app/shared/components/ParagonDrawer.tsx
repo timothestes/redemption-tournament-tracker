@@ -57,7 +57,7 @@ export function ParagonDrawer({ paragons }: ParagonDrawerProps) {
     <div
       style={{
         position: 'fixed',
-        left: 16,
+        right: 396,
         bottom: 0,
         width: DRAWER_WIDTH,
         maxWidth: 'calc(100vw - 32px)',
