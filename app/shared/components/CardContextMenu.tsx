@@ -22,11 +22,14 @@ interface CardContextMenuProps {
   actions: GameActions;
   onClose: () => void;
   onExchange?: (cardIds: string[]) => void;
+  /** Invoked when the user clicks "Unequip" on an attached weapon. Only renders the menu
+   *  entry when this handler is provided AND card.equippedTo is set. */
+  onDetach?: (cardInstanceId: string) => void;
   /** Live zone state for reading updated card data (counters, etc.) */
   zones?: Record<ZoneId, GameCard[]>;
 }
 
-export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onExchange, zones }: CardContextMenuProps) {
+export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onExchange, onDetach, zones }: CardContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Read live card data so counters update while menu is open
@@ -255,6 +258,17 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
       >
         {card.isFlipped ? 'Turn Face-Up' : 'Turn Face-Down'}
       </button>
+
+      {card.equippedTo && onDetach && (
+        <button
+          style={itemStyle}
+          onClick={() => doAction(() => onDetach(card.instanceId))}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+        >
+          Unequip
+        </button>
+      )}
 
       <div style={separatorStyle} />
 

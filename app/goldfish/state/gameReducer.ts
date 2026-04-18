@@ -106,6 +106,20 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         result.card.posX = undefined;
         result.card.posY = undefined;
       }
+      // Auto-detach on exit from territory: clear this mover's equippedTo (if any),
+      // and clear equippedTo on any card that pointed at this mover.
+      if (toZone !== 'territory') {
+        if (result.card.equippedTo) {
+          result.card.equippedTo = undefined;
+        }
+        for (const zoneId of Object.keys(zones) as ZoneId[]) {
+          for (let i = 0; i < zones[zoneId].length; i++) {
+            if (zones[zoneId][i].equippedTo === cardInstanceId) {
+              zones[zoneId][i] = { ...zones[zoneId][i], equippedTo: undefined };
+            }
+          }
+        }
+      }
       if (toIndex !== undefined && toIndex >= 0) {
         zones[toZone].splice(toIndex, 0, result.card);
       } else {
@@ -340,6 +354,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const { cardInstanceIds, toZone, positions } = action.payload;
       if (!cardInstanceIds || !toZone) return state;
 
+      const movedIds = new Set(cardInstanceIds);
       for (const instanceId of cardInstanceIds) {
         const result = findAndRemoveCard(zones, instanceId);
         if (!result) continue;
@@ -350,6 +365,23 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         const pos = positions?.[instanceId];
         result.card.posX = pos?.posX;
         result.card.posY = pos?.posY;
+        // Auto-detach on exit from territory, unless the partner is also moving
+        // together — e.g. dragging a warrior + its attached weapon as a group.
+        if (toZone !== 'territory') {
+          if (result.card.equippedTo && !movedIds.has(result.card.equippedTo)) {
+            result.card.equippedTo = undefined;
+          }
+          for (const zoneId of Object.keys(zones) as ZoneId[]) {
+            for (let i = 0; i < zones[zoneId].length; i++) {
+              if (
+                zones[zoneId][i].equippedTo === instanceId &&
+                !movedIds.has(zones[zoneId][i].instanceId)
+              ) {
+                zones[zoneId][i] = { ...zones[zoneId][i], equippedTo: undefined };
+              }
+            }
+          }
+        }
         zones[toZone].push(result.card);
       }
       return { ...state, zones, history };
@@ -474,6 +506,35 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
       zones['land-of-bondage'] = reordered;
       return { ...state, zones, history };
+    }
+
+    case 'ATTACH_CARD': {
+      const { cardInstanceId, warriorInstanceId } = action.payload;
+      if (!cardInstanceId || !warriorInstanceId) return state;
+      // Validate warrior exists in territory
+      const warrior = zones.territory.find(c => c.instanceId === warriorInstanceId);
+      const weaponIdx = zones.territory.findIndex(c => c.instanceId === cardInstanceId);
+      if (!warrior || weaponIdx === -1) return state;
+      zones.territory[weaponIdx] = { ...zones.territory[weaponIdx], equippedTo: warriorInstanceId };
+      return { ...state, zones, history };
+    }
+
+    case 'DETACH_CARD': {
+      const { cardInstanceId, posX, posY } = action.payload;
+      if (!cardInstanceId) return state;
+      for (const zoneId of Object.keys(zones) as ZoneId[]) {
+        const idx = zones[zoneId].findIndex(c => c.instanceId === cardInstanceId);
+        if (idx >= 0) {
+          zones[zoneId][idx] = {
+            ...zones[zoneId][idx],
+            equippedTo: undefined,
+            posX: posX ?? zones[zoneId][idx].posX,
+            posY: posY ?? zones[zoneId][idx].posY,
+          };
+          return { ...state, zones, history };
+        }
+      }
+      return state;
     }
 
     default:

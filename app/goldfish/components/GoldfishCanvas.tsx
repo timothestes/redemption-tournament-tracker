@@ -36,6 +36,9 @@ import { GameToastContainer, showGameToast } from './GameToast';
 import { DiceRollOverlay } from './DiceRollOverlay';
 import { useCardPreview } from '../state/CardPreviewContext';
 import { useLobArrivalEffect } from '@/app/shared/hooks/useLobArrivalEffect';
+import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '../utils/equipLayout';
+import { findCard, isWeapon, isWarrior } from '@/lib/cards/lookup';
+import { Link2Off } from 'lucide-react';
 
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 
@@ -50,7 +53,7 @@ interface GoldfishCanvasProps {
 }
 
 export default function GoldfishCanvas({ containerWidth, containerHeight, scale, offsetX, offsetY, virtualWidth, onLoadDeck }: GoldfishCanvasProps) {
-  const { state, dispatch, drawCard, drawMultiple, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck, shuffleDeck, meekCard, unmeekCard, flipCard, addCounter, removeCounter, addNote, addOpponentLostSoul, removeOpponentToken, addPlayerLostSoul, reorderHand } = useGame();
+  const { state, dispatch, drawCard, drawMultiple, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck, shuffleDeck, meekCard, unmeekCard, flipCard, addCounter, removeCounter, addNote, addOpponentLostSoul, removeOpponentToken, addPlayerLostSoul, reorderHand, attachCard, detachCard } = useGame();
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const stageRef = useRef<Konva.Stage>(null);
   const gameLayerRef = useRef<Konva.Layer>(null);
@@ -384,7 +387,18 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     stopHoverAnimation();
 
     // Multi-card drag: build a single rasterized ghost of all follower cards
-    if (selectedIds.has(card.instanceId) && selectedIds.size > 1) {
+    // Follower set: multi-select takes precedence; else attached weapons in territory.
+    const multiSelectFollowerIds: string[] = (selectedIds.has(card.instanceId) && selectedIds.size > 1)
+      ? Array.from(selectedIds).filter(id => id !== card.instanceId)
+      : [];
+    const equipFollowerIds: string[] = card.zone === 'territory'
+      ? state.zones.territory.filter(c => c.equippedTo === card.instanceId).map(c => c.instanceId)
+      : [];
+    const followerIds = multiSelectFollowerIds.length > 0
+      ? multiSelectFollowerIds
+      : equipFollowerIds;
+
+    if (followerIds.length > 0) {
       const dragNode = cardNodeRefs.current.get(card.instanceId);
       if (dragNode) {
         const offsets = new Map<string, { dx: number; dy: number }>();
@@ -393,8 +407,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
 
         // Collect follower nodes and compute offsets
         const followers: { id: string; node: Konva.Group; dx: number; dy: number }[] = [];
-        for (const id of selectedIds) {
-          if (id === card.instanceId) continue;
+        for (const id of followerIds) {
           const node = cardNodeRefs.current.get(id);
           if (node) {
             const dx = node.x() - baseX;
@@ -475,7 +488,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     } else {
       dragFollowerOffsets.current = null;
     }
-  }, [selectedIds, cardWidth, cardHeight, scale, offsetX, offsetY]);
+  }, [selectedIds, cardWidth, cardHeight, scale, offsetX, offsetY, state.zones.territory]);
 
   const canvasDragZoneRef = useRef<ZoneId | null>(null);
   // Track the ghost's offset from the drag card origin for repositioning
@@ -546,6 +559,40 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
           if (node) node.visible(true);
         }
       }
+
+      // Equip: if a weapon is dropped on top of a warrior in territory, attach.
+      // Runs only for single-card drags (group drags are intentional batch moves).
+      const isGroupDragForEquip = selectedIds.has(card.instanceId) && selectedIds.size > 1;
+      if (!isGroupDragForEquip) {
+        const cardMeta = findCard(card.cardName, card.cardSet, card.cardImgFile);
+        if (isWeapon(cardMeta)) {
+          const dropNode = e.target;
+          const dropCenterX = dropNode.x() + cardWidth / 2;
+          const dropCenterY = dropNode.y() + cardHeight / 2;
+          const targetZoneForEquip = findZoneAtPosition(dropCenterX, dropCenterY);
+          if (targetZoneForEquip === 'territory') {
+            // Candidates: territory cards that are themselves warriors, not already
+            // attached to someone else, not the card being dragged, and not yet at the cap.
+            const warriorCandidates = state.zones.territory.filter(c => {
+              if (c.instanceId === card.instanceId) return false;
+              if (c.equippedTo) return false; // a weapon attached to someone else isn't a valid target
+              const meta = findCard(c.cardName, c.cardSet, c.cardImgFile);
+              if (!isWarrior(meta)) return false;
+              const attached = state.zones.territory.filter(x => x.equippedTo === c.instanceId);
+              return attached.length < MAX_EQUIPPED_WEAPONS_PER_WARRIOR;
+            });
+            const hit = hitTestWarrior(
+              dropCenterX, dropCenterY, cardWidth, cardHeight, warriorCandidates, card.instanceId,
+            );
+            if (hit) {
+              // Consume the drop: attach instead of continuing into the move path.
+              attachCard(card.instanceId, hit.instanceId);
+              return;
+            }
+          }
+        }
+      }
+
       const node = e.target;
       const dropX = node.x();
       const dropY = node.y();
@@ -554,9 +601,17 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       const centerY = dropY + cardHeight / 2;
       const targetZone = findZoneAtPosition(centerX, centerY);
 
-      // Group drag: if this card is selected and there are multiple selections
-      const isGroupDrag = selectedIds.has(card.instanceId) && selectedIds.size > 1;
-      const cardIds = isGroupDrag ? Array.from(selectedIds) : [card.instanceId];
+      // Group drag: multi-select takes precedence; else attached weapons travel with warrior.
+      const multiSelectFollowerIds = selectedIds.has(card.instanceId) && selectedIds.size > 1
+        ? Array.from(selectedIds)
+        : null;
+      const equipFollowerIds = card.zone === 'territory'
+        ? state.zones.territory
+            .filter(c => c.equippedTo === card.instanceId)
+            .map(c => c.instanceId)
+        : [];
+      const isGroupDrag = multiSelectFollowerIds !== null || equipFollowerIds.length > 0;
+      const cardIds = multiSelectFollowerIds ?? [card.instanceId, ...equipFollowerIds];
 
       // Hand-to-hand reorder: when a hand card is dropped back on the hand zone
       if (targetZone === 'hand' && card.zone === 'hand' && state.zones.hand.length > 1) {
@@ -665,7 +720,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
         }, 700);
       }
     },
-    [findZoneAtPosition, moveCard, moveCardsBatch, handleDeckDrop, cardWidth, cardHeight, selectedIds, clearSelection, state.turn, scale, offsetX, offsetY, state.zones.hand, state.zones['land-of-bondage'], state.isSpreadHand, virtualWidth, reorderHand, zoneLayout]
+    [findZoneAtPosition, moveCard, moveCardsBatch, handleDeckDrop, cardWidth, cardHeight, selectedIds, clearSelection, state.turn, scale, offsetX, offsetY, state.zones.hand, state.zones['land-of-bondage'], state.zones.territory, state.isSpreadHand, virtualWidth, reorderHand, zoneLayout, attachCard]
   );
 
   const handleCardContextMenu = useCallback(
@@ -882,6 +937,44 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     'land-of-redemption', 'deck', 'discard', 'reserve', 'banish',
   ], []);
 
+  // Map weapon instanceId → { x, y, seamX, seamY } derived from the warrior it's
+  // attached to. Weapons fan diagonally: index 0 sits closest to the warrior;
+  // higher indices peek out further behind. `seam` is the top-left of whatever
+  // sits in front of this weapon (warrior for index 0, weapon N-1 otherwise) —
+  // used to anchor the unlink icon at the visible attach point.
+  // Only applies in Territory.
+  const derivedWeaponPositions = useMemo(() => {
+    const result = new Map<string, { x: number; y: number; seamX: number; seamY: number }>();
+    // Group weapons by their warrior id, preserving territory array order.
+    const byWarrior = new Map<string, typeof state.zones.territory>();
+    for (const card of state.zones.territory) {
+      if (!card.equippedTo) continue;
+      const list = byWarrior.get(card.equippedTo);
+      if (list) list.push(card);
+      else byWarrior.set(card.equippedTo, [card]);
+    }
+    for (const [warriorId, weapons] of byWarrior) {
+      const warrior = state.zones.territory.find(c => c.instanceId === warriorId);
+      if (!warrior || warrior.posX === undefined || warrior.posY === undefined) continue;
+      weapons.forEach((weapon, index) => {
+        const { dx, dy } = computeEquipOffset(cardWidth, cardHeight, index);
+        // This weapon's top-left in canvas coords.
+        const x = warrior.posX! + dx;
+        const y = warrior.posY! + dy;
+        // "Seam" for this weapon's detach icon: the top-left corner of whatever is
+        // in front of it. For index 0 that's the warrior; for index N that's weapon N-1.
+        const ahead = index === 0
+          ? { x: warrior.posX!, y: warrior.posY! }
+          : (() => {
+              const { dx: adx, dy: ady } = computeEquipOffset(cardWidth, cardHeight, index - 1);
+              return { x: warrior.posX! + adx, y: warrior.posY! + ady };
+            })();
+        result.set(weapon.instanceId, { x, y, seamX: ahead.x, seamY: ahead.y });
+      });
+    }
+    return result;
+  }, [state.zones.territory, cardWidth, cardHeight]);
+
   // Compute card bounds for all visible cards (used for selection rectangle intersection)
   const allCardBounds = useMemo((): CardBound[] => {
     const bounds: CardBound[] = [];
@@ -893,12 +986,23 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       if (pos) bounds.push({ instanceId: card.instanceId, x: pos.x, y: pos.y, width: cardWidth, height: cardHeight, rotation: pos.rotation });
     });
 
-    // Territory cards (free-form)
+    // Territory cards (free-form). Attached weapons don't carry their own posX/posY —
+    // look them up in derivedWeaponPositions so rect-select hits them where they're
+    // actually rendered, not at the autogrid fallback.
     const tZone = zoneLayout['territory'];
     if (tZone) {
       state.zones.territory.forEach((card, i) => {
-        const x = card.posX ?? (tZone.x + 8 + (i % 8) * (cardWidth + 4));
-        const y = card.posY ?? (tZone.y + 20 + Math.floor(i / 8) * (cardHeight * 0.35));
+        let x: number;
+        let y: number;
+        if (card.equippedTo) {
+          const derived = derivedWeaponPositions.get(card.instanceId);
+          if (!derived) return; // can't place without derived — skip from selection bounds
+          x = derived.x;
+          y = derived.y;
+        } else {
+          x = card.posX ?? (tZone.x + 8 + (i % 8) * (cardWidth + 4));
+          y = card.posY ?? (tZone.y + 20 + Math.floor(i / 8) * (cardHeight * 0.35));
+        }
         bounds.push({ instanceId: card.instanceId, x, y, width: cardWidth, height: cardHeight, rotation: 0 });
       });
     }
@@ -940,7 +1044,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     }
 
     return bounds;
-  }, [state.zones, state.isSpreadHand, zoneLayout, cardWidth, cardHeight]);
+  }, [state.zones, state.isSpreadHand, zoneLayout, cardWidth, cardHeight, derivedWeaponPositions]);
 
   // Stage event handlers for rectangular selection drag
   const handleStageMouseDown = useCallback(
@@ -1367,7 +1471,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                         cardHeight={sidebarCardHeight}
                         image={getImage(card.cardImgFile)}
                         isSelected={selectedIds.has(card.instanceId)}
-                      hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
+                        hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
                         nodeRef={registerCardNode}
                         onDragStart={handleCardDragStart}
                         onDragMove={handleCardDragMove}
@@ -1421,12 +1525,54 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
               );
             }
 
-            // Territory: free-form placement using stored positions
+            // Territory: free-form placement using stored positions.
+            // Two-pass render so attached weapons draw BEHIND warriors:
+            //   Pass 1: attached weapons at warrior-relative position (drawn first).
+            //   Pass 2: all non-attached cards at their own stored position (drawn on top).
             if (zoneId === 'territory') {
               const zone = zoneLayout[zoneId];
               return (
                 <Group key={zoneId} clipX={zone.x} clipY={zone.y} clipWidth={zone.width} clipHeight={zone.height}>
-                  {cards.map((card, i) => {
+                  {/* Pass 1: attached weapons (behind warriors).
+                      Within a warrior group, higher-index weapons must draw FIRST so
+                      lower-index weapons render on top of them (correct fan z-order). */}
+                  {cards
+                    .filter(c => c.equippedTo)
+                    .slice()
+                    .sort((a, b) => {
+                      if (a.equippedTo !== b.equippedTo) return 0;
+                      const warriorWeapons = cards.filter(c => c.equippedTo === a.equippedTo);
+                      return warriorWeapons.indexOf(b) - warriorWeapons.indexOf(a);
+                    })
+                    .map(card => {
+                    const derived = derivedWeaponPositions.get(card.instanceId);
+                    if (!derived) return null;
+                    return (
+                      <GameCardNode
+                        key={card.instanceId}
+                        card={card}
+                        x={derived.x}
+                        y={derived.y}
+                        rotation={0}
+                        cardWidth={cardWidth}
+                        cardHeight={cardHeight}
+                        image={getImage(card.cardImgFile)}
+                        isSelected={selectedIds.has(card.instanceId)}
+                        hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
+                        nodeRef={registerCardNode}
+                        onDragStart={handleCardDragStart}
+                        onDragMove={handleCardDragMove}
+                        onDragEnd={handleCardDragEnd}
+                        onContextMenu={handleCardContextMenu}
+                        onClick={handleCardClick}
+                        onDblClick={handleCardDblClick}
+                        onMouseEnter={handleCardMouseEnter}
+                        onMouseLeave={handleCardMouseLeave}
+                      />
+                    );
+                  })}
+                  {/* Pass 2: non-attached cards (in front) */}
+                  {cards.filter(c => !c.equippedTo).map((card, i) => {
                     const x = card.posX ?? (zone.x + 8 + (i % 8) * (cardWidth + 4));
                     const y = card.posY ?? (zone.y + 20 + Math.floor(i / 8) * (cardHeight * 0.35));
                     return (
@@ -1440,7 +1586,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                         cardHeight={cardHeight}
                         image={getImage(card.cardImgFile)}
                         isSelected={selectedIds.has(card.instanceId)}
-                      hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
+                        hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
                         nodeRef={registerCardNode}
                         onDragStart={handleCardDragStart}
                         onDragMove={handleCardDragMove}
@@ -1587,6 +1733,37 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
         </Layer>
       </Stage>
 
+      {/* Equip unlink icons — one per attached weapon, anchored at that weapon's seam
+          (top-left of whatever sits in front of it: warrior for index 0, weapon N-1 otherwise). */}
+      <div
+        className="pointer-events-none absolute inset-0 z-10"
+        aria-hidden="false"
+      >
+        {state.zones.territory
+          .filter(c => c.equippedTo)
+          .map(weapon => {
+            const derived = derivedWeaponPositions.get(weapon.instanceId);
+            if (!derived) return null;
+            // Convert the weapon's own seam from virtual canvas coords to screen coords
+            // so the HTML button aligns over the rendered Konva cards.
+            const seam = virtualToScreen(derived.seamX, derived.seamY, scale, offsetX, offsetY);
+            const warrior = state.zones.territory.find(c => c.instanceId === weapon.equippedTo);
+            return (
+              <button
+                key={weapon.instanceId}
+                type="button"
+                onClick={() => detachCard(weapon.instanceId, derived.x, derived.y)}
+                className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#1a1510] p-1.5 text-[#c4955a] shadow-md ring-1 ring-[#c4955a]/40 transition hover:bg-[#2a1f14] hover:ring-[#c4955a]"
+                style={{ left: `${seam.x}px`, top: `${seam.y}px` }}
+                title="Unequip"
+                aria-label={warrior ? `Unequip ${weapon.cardName} from ${warrior.cardName}` : 'Unequip'}
+              >
+                <Link2Off size={14} strokeWidth={2} />
+              </button>
+            );
+          })}
+      </div>
+
       {/* DOM overlays */}
 
       {/* Reserve lock indicator on turn 1 */}
@@ -1670,6 +1847,10 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
           zones={state.zones}
           onClose={() => setContextMenu(null)}
           onExchange={(ids) => setExchangeCardIds(ids)}
+          onDetach={(id) => {
+            const derived = derivedWeaponPositions.get(id);
+            detachCard(id, derived?.x, derived?.y);
+          }}
         />
       )}
 

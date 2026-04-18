@@ -76,6 +76,10 @@ export interface GameCard {
   notes: string;
   posX?: number;
   posY?: number;
+  /** Instance id of the warrior this card (a weapon) is attached to.
+   *  Undefined when unattached. Cleared automatically by the reducer when
+   *  either card leaves Territory. */
+  equippedTo?: string;
 }
 
 export type ActionType =
@@ -101,7 +105,9 @@ export type ActionType =
   | 'MOVE_CARDS_BATCH'
   | 'ADD_PLAYER_LOST_SOUL'
   | 'REORDER_HAND'
-  | 'REORDER_LOB';
+  | 'REORDER_LOB'
+  | 'ATTACH_CARD'
+  | 'DETACH_CARD';
 
 export interface GameAction {
   id: string;
@@ -110,6 +116,7 @@ export interface GameAction {
   timestamp: number;
   payload: {
     cardInstanceId?: string;
+    warriorInstanceId?: string;
     cardInstanceIds?: string[];
     fromZone?: ZoneId;
     toZone?: ZoneId;
