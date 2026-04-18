@@ -125,6 +125,7 @@ export const Player = __t.object("Player", {
   seat: __t.u64(),
   deckId: __t.string(),
   displayName: __t.string(),
+  paragon: __t.string(),
   supabaseUserId: __t.string(),
   isConnected: __t.bool(),
   autoRouteLostSouls: __t.bool(),

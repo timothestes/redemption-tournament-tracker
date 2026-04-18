@@ -231,13 +231,14 @@ export const create_game = spacetimedb.reducer(
     code: t.string(),
     deckId: t.string(),
     displayName: t.string(),
+    paragon: t.string(),
     format: t.string(),
     supabaseUserId: t.string(),
     deckData: t.string(),
     isPublic: t.bool(),
     lobbyMessage: t.string(),
   },
-  (ctx, { code, deckId, displayName, format, supabaseUserId, deckData, isPublic, lobbyMessage }) => {
+  (ctx, { code, deckId, displayName, paragon, format, supabaseUserId, deckData, isPublic, lobbyMessage }) => {
     console.log('[stdb-debug] create_game called — code:', code, 'sender:', ctx.sender.toHexString());
     // Validate code is not already in use by an active game
     for (const g of ctx.db.Game.game_code.filter(code)) {
@@ -288,6 +289,7 @@ export const create_game = spacetimedb.reducer(
       seat: 0n,
       deckId,
       displayName,
+      paragon,
       supabaseUserId,
       isConnected: true,
       autoRouteLostSouls: true,
@@ -311,10 +313,11 @@ export const join_game = spacetimedb.reducer(
     code: t.string(),
     deckId: t.string(),
     displayName: t.string(),
+    paragon: t.string(),
     supabaseUserId: t.string(),
     deckData: t.string(),
   },
-  (ctx, { code, deckId, displayName, supabaseUserId, deckData }) => {
+  (ctx, { code, deckId, displayName, paragon, supabaseUserId, deckData }) => {
     // Find game by code
     let game: any = null;
     for (const g of ctx.db.Game.game_code.filter(code)) {
@@ -348,6 +351,7 @@ export const join_game = spacetimedb.reducer(
       seat: 1n,
       deckId,
       displayName,
+      paragon,
       supabaseUserId,
       isConnected: true,
       autoRouteLostSouls: true,

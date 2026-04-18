@@ -62,6 +62,7 @@ export const Player = table(
     seat: t.u64(),                // 0 or 1
     deckId: t.string(),
     displayName: t.string(),
+    paragon: t.string(),
     supabaseUserId: t.string(),
     isConnected: t.bool(),
     autoRouteLostSouls: t.bool(),

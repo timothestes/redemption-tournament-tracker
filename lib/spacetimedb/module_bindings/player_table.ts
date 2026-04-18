@@ -17,6 +17,7 @@ export default __t.row({
   seat: __t.u64(),
   deckId: __t.string().name("deck_id"),
   displayName: __t.string().name("display_name"),
+  paragon: __t.string(),
   supabaseUserId: __t.string().name("supabase_user_id"),
   isConnected: __t.bool().name("is_connected"),
   autoRouteLostSouls: __t.bool().name("auto_route_lost_souls"),
