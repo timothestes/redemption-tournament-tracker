@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useCallback, useEffect, useRef } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Group, Rect, Image as KonvaImage, Circle, Text } from 'react-konva';
 import type Konva from 'konva';
 import KonvaLib from 'konva';
@@ -96,6 +96,7 @@ export const GameCardNode = memo(function GameCardNode({
 }: GameCardNodeProps) {
   const isToken = card.isToken;
   const showFace = !card.isFlipped && image;
+  const [isDragging, setIsDragging] = useState(false);
 
   // Ref for the LOB arrival glow rect — used to run an imperative Konva Tween
   const arrivalGlowRef = useRef<Konva.Rect | null>(null);
@@ -155,9 +156,9 @@ export const GameCardNode = memo(function GameCardNode({
       y={y}
       rotation={rotation}
       draggable={isDraggable}
-      onDragStart={() => onDragStart(card)}
+      onDragStart={() => { setIsDragging(true); onDragStart(card); }}
       onDragMove={onDragMove}
-      onDragEnd={(e) => onDragEnd(card, e)}
+      onDragEnd={(e) => { setIsDragging(false); onDragEnd(card, e); }}
       onContextMenu={(e) => onContextMenu(card, e)}
       onClick={onClick ? (e) => onClick(card, e) : undefined}
       onTap={onClick ? (e) => onClick(card, e as unknown as Konva.KonvaEventObject<MouseEvent>) : undefined}
@@ -303,15 +304,43 @@ export const GameCardNode = memo(function GameCardNode({
           );
         })}
 
-        {/* Notes indicator */}
-        {card.notes && (
-          <Circle
-            x={cardWidth - 14}
-            y={cardHeight - 8}
-            radius={5}
-            fill="#c4955a"
-          />
-        )}
+        {/* Note text pill — bottom of card, hidden during drag */}
+        {card.notes && !isDragging && (() => {
+          const pillHeight = Math.max(14, cardHeight * 0.1);
+          const pillX = cardWidth * 0.06;
+          const pillY = cardHeight - pillHeight - cardHeight * 0.04;
+          const pillWidth = cardWidth - pillX * 2;
+          const fontSize = Math.max(9, Math.round(cardHeight * 0.065));
+          return (
+            <Group listening={false}>
+              <Rect
+                x={pillX}
+                y={pillY}
+                width={pillWidth}
+                height={pillHeight}
+                cornerRadius={pillHeight / 2}
+                fill="rgba(0, 0, 0, 0.78)"
+                stroke="#c4955a"
+                strokeWidth={1}
+              />
+              <Text
+                x={pillX}
+                y={pillY}
+                width={pillWidth}
+                height={pillHeight}
+                text={card.notes}
+                fontSize={fontSize}
+                fill="#f0d9a8"
+                fontStyle="bold"
+                align="center"
+                verticalAlign="middle"
+                padding={4}
+                ellipsis
+                wrap="none"
+              />
+            </Group>
+          );
+        })()}
       </Group>
     </Group>
   );
