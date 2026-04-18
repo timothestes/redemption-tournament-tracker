@@ -452,13 +452,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     setHoverProgress(0);
   }, []);
 
-  // Propagate hoveredCard to the shared CardPreview context (drives CardLoupePanel)
-  // Only update when there's a new card — don't clear on mouseLeave so the last card stays visible
-  useEffect(() => {
-    if (hoveredCard) {
-      setPreviewCard({ cardName: hoveredCard.cardName, cardImgFile: hoveredCard.cardImgFile, isMeek: hoveredCard.isMeek, notes: hoveredCard.notes });
-    }
-  }, [hoveredCard, setPreviewCard]);
+  // (Hover → CardPreview context sync moved below findAnyCardById.)
 
   // ---- Hand spread toggle (fan vs flat) ----
   const { isSpreadHand } = useSpreadHand();
@@ -652,6 +646,23 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     }
     return undefined;
   }, [myCards, opponentCards]);
+
+  // Propagate hoveredCard to the shared CardPreview context (drives CardLoupePanel).
+  // Resolve the live card (by instanceId) from the current zone data so fields like
+  // `notes` stay fresh while the mouse is still hovering.
+  const liveHoveredNotes = hoveredCard
+    ? findAnyCardById(hoveredCard.instanceId)?.notes ?? hoveredCard.notes
+    : '';
+  useEffect(() => {
+    if (hoveredCard) {
+      setPreviewCard({
+        cardName: hoveredCard.cardName,
+        cardImgFile: hoveredCard.cardImgFile,
+        isMeek: hoveredCard.isMeek,
+        notes: liveHoveredNotes,
+      });
+    }
+  }, [hoveredCard, liveHoveredNotes, setPreviewCard]);
 
   /**
    * Check if a move should be intercepted by the Turn 1 reserve protection rule.
