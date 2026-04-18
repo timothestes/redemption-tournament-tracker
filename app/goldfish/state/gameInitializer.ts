@@ -1,3 +1,4 @@
+import { PARAGON_SOULS } from '@/app/shared/paragon/soulDeck';
 import {
   GameCard,
   GameState,
@@ -129,6 +130,36 @@ function parseFormat(format: string | undefined): 'T1' | 'T2' | 'Paragon' {
   return 'T1';
 }
 
+function buildSoulDeckZones(): { soulDeck: GameCard[]; lob: GameCard[] } {
+  const defs = shuffleArray([...PARAGON_SOULS]);
+  const cards: GameCard[] = defs.map(def => ({
+    instanceId: crypto.randomUUID(),
+    cardName: def.cardName,
+    cardSet: def.cardSet,
+    cardImgFile: def.cardImgFile,
+    type: def.type,
+    brigade: def.brigade,
+    strength: def.strength,
+    toughness: def.toughness,
+    specialAbility: def.specialAbility,
+    identifier: def.identifier,
+    reference: def.reference,
+    alignment: def.alignment,
+    isMeek: false,
+    counters: [],
+    isFlipped: true,
+    isToken: false,
+    zone: 'soul-deck',
+    ownerId: 'shared',
+    notes: '',
+    isSoulDeckOrigin: true,
+  }));
+  // Reveal top 3 into Land of Bondage
+  const revealed = cards.slice(0, 3).map(c => ({ ...c, zone: 'land-of-bondage' as const, isFlipped: false }));
+  const remaining = cards.slice(3);
+  return { soulDeck: remaining, lob: revealed };
+}
+
 export function buildInitialGameState(
   deck: DeckDataForGoldfish,
   optionsOverrides?: Partial<GoldfishOptions>
@@ -151,6 +182,12 @@ export function buildInitialGameState(
   const zones = createEmptyZones();
   zones.deck = shuffledMain;
   zones.reserve = reserve;
+
+  if (format === 'Paragon') {
+    const { soulDeck, lob } = buildSoulDeckZones();
+    zones['soul-deck'] = soulDeck;
+    zones['land-of-bondage'] = lob;
+  }
 
   // Draw opening hand
   const zonesAfterDraw = drawOpeningHand(
