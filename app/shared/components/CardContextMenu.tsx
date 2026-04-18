@@ -25,11 +25,14 @@ interface CardContextMenuProps {
   /** Invoked when the user clicks "Unequip" on an attached weapon. Only renders the menu
    *  entry when this handler is provided AND card.equippedTo is set. */
   onDetach?: (cardInstanceId: string) => void;
+  /** Invoked when the user clicks "Add text note" / "Edit note". When omitted, the
+   *  menu entry is not rendered (used to gate the action to card owners). */
+  onEditNote?: (card: GameCard) => void;
   /** Live zone state for reading updated card data (counters, etc.) */
   zones?: Record<ZoneId, GameCard[]>;
 }
 
-export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onExchange, onDetach, zones }: CardContextMenuProps) {
+export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onExchange, onDetach, onEditNote, zones }: CardContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Read live card data so counters update while menu is open
@@ -267,6 +270,19 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
         >
           Unequip
+        </button>
+      )}
+
+      {onEditNote && (
+        <button
+          style={itemStyle}
+          onClick={() => doAction(() => onEditNote(card))}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+        >
+          {card.notes
+            ? `Edit note: "${card.notes.length > 20 ? card.notes.slice(0, 20) + '…' : card.notes}"`
+            : 'Add text note'}
         </button>
       )}
 
