@@ -362,6 +362,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           code,
           deckId: gameParams.deckId,
           displayName: gameParams.displayName,
+          paragon: gameParams.paragon || '',
           format: gameParams.format ?? 'standard',
           supabaseUserId: gameParams.supabaseUserId,
           deckData,
@@ -378,6 +379,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             code,
             deckId: gameParams.deckId,
             displayName: gameParams.displayName,
+            paragon: gameParams.paragon || '',
             supabaseUserId: gameParams.supabaseUserId,
             deckData,
           });
