@@ -67,4 +67,17 @@ describe('hitTestWarrior', () => {
     const ghost = card({ instanceId: 'h3' });
     expect(hitTestWarrior(150, 150, 100, 140, [ghost], 'skipme')).toBeNull();
   });
+
+  it('inclusive boundaries: a point at the exact top-left corner is a hit', () => {
+    const c = card({ instanceId: 'h1', posX: 100, posY: 100 });
+    expect(hitTestWarrior(100, 100, 100, 140, [c], 'skip')?.instanceId).toBe('h1');
+  });
+
+  it('one pixel outside the rect is a miss', () => {
+    const c = card({ instanceId: 'h1', posX: 100, posY: 100 });
+    expect(hitTestWarrior(99, 100, 100, 140, [c], 'skip')).toBeNull();
+    expect(hitTestWarrior(100, 99, 100, 140, [c], 'skip')).toBeNull();
+    expect(hitTestWarrior(201, 100, 100, 140, [c], 'skip')).toBeNull();
+    expect(hitTestWarrior(100, 241, 100, 140, [c], 'skip')).toBeNull();
+  });
 });
