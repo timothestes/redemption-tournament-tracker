@@ -24,6 +24,18 @@ describe('computeEquipOffset', () => {
     expect(dx).toBeCloseTo(-100 * EQUIP_OFFSET_RATIO);
     expect(dy).toBeCloseTo(-140 * EQUIP_OFFSET_RATIO);
   });
+
+  it('scales offset by (weaponIndex + 1) so multiple weapons fan out', () => {
+    const o0 = computeEquipOffset(100, 140, 0);
+    const o1 = computeEquipOffset(100, 140, 1);
+    const o2 = computeEquipOffset(100, 140, 2);
+    expect(o0.dx).toBeCloseTo(-100 * EQUIP_OFFSET_RATIO);
+    expect(o1.dx).toBeCloseTo(-100 * EQUIP_OFFSET_RATIO * 2);
+    expect(o2.dx).toBeCloseTo(-100 * EQUIP_OFFSET_RATIO * 3);
+    expect(o0.dy).toBeCloseTo(-140 * EQUIP_OFFSET_RATIO);
+    expect(o1.dy).toBeCloseTo(-140 * EQUIP_OFFSET_RATIO * 2);
+    expect(o2.dy).toBeCloseTo(-140 * EQUIP_OFFSET_RATIO * 3);
+  });
 });
 
 describe('getAttachedWeapons', () => {

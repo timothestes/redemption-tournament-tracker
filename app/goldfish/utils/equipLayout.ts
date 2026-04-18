@@ -10,10 +10,13 @@ export const MAX_EQUIPPED_WEAPONS_PER_WARRIOR = 3;
 export function computeEquipOffset(
   cardWidth: number,
   cardHeight: number,
+  weaponIndex: number = 0,
 ): { dx: number; dy: number } {
+  // Fan weapons diagonally so each one past the first peeks out further.
+  const multiplier = weaponIndex + 1;
   return {
-    dx: -cardWidth * EQUIP_OFFSET_RATIO,
-    dy: -cardHeight * EQUIP_OFFSET_RATIO,
+    dx: -cardWidth * EQUIP_OFFSET_RATIO * multiplier,
+    dy: -cardHeight * EQUIP_OFFSET_RATIO * multiplier,
   };
 }
 

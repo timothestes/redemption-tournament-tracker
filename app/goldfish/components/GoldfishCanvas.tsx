@@ -937,18 +937,39 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     ...(isParagon ? ['paragon' as ZoneId] : []),
   ], [isParagon]);
 
-  // Map weapon instanceId → { x, y } derived from the warrior it's attached to.
-  // Weapons render at warrior.posX + offset. Only applies in Territory.
+  // Map weapon instanceId → { x, y, seamX, seamY } derived from the warrior it's
+  // attached to. Weapons fan diagonally: index 0 sits closest to the warrior;
+  // higher indices peek out further behind. `seam` is the top-left of whatever
+  // sits in front of this weapon (warrior for index 0, weapon N-1 otherwise) —
+  // used to anchor the unlink icon at the visible attach point.
+  // Only applies in Territory.
   const derivedWeaponPositions = useMemo(() => {
-    const { dx, dy } = computeEquipOffset(cardWidth, cardHeight);
-    const result = new Map<string, { x: number; y: number }>();
+    const result = new Map<string, { x: number; y: number; seamX: number; seamY: number }>();
+    // Group weapons by their warrior id, preserving territory array order.
+    const byWarrior = new Map<string, typeof state.zones.territory>();
     for (const card of state.zones.territory) {
       if (!card.equippedTo) continue;
-      const warrior = state.zones.territory.find(c => c.instanceId === card.equippedTo);
+      const list = byWarrior.get(card.equippedTo);
+      if (list) list.push(card);
+      else byWarrior.set(card.equippedTo, [card]);
+    }
+    for (const [warriorId, weapons] of byWarrior) {
+      const warrior = state.zones.territory.find(c => c.instanceId === warriorId);
       if (!warrior || warrior.posX === undefined || warrior.posY === undefined) continue;
-      result.set(card.instanceId, {
-        x: warrior.posX + dx,
-        y: warrior.posY + dy,
+      weapons.forEach((weapon, index) => {
+        const { dx, dy } = computeEquipOffset(cardWidth, cardHeight, index);
+        // This weapon's top-left in canvas coords.
+        const x = warrior.posX! + dx;
+        const y = warrior.posY! + dy;
+        // "Seam" for this weapon's detach icon: the top-left corner of whatever is
+        // in front of it. For index 0 that's the warrior; for index N that's weapon N-1.
+        const ahead = index === 0
+          ? { x: warrior.posX!, y: warrior.posY! }
+          : (() => {
+              const { dx: adx, dy: ady } = computeEquipOffset(cardWidth, cardHeight, index - 1);
+              return { x: warrior.posX! + adx, y: warrior.posY! + ady };
+            })();
+        result.set(weapon.instanceId, { x, y, seamX: ahead.x, seamY: ahead.y });
       });
     }
     return result;
@@ -965,12 +986,23 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       if (pos) bounds.push({ instanceId: card.instanceId, x: pos.x, y: pos.y, width: cardWidth, height: cardHeight, rotation: pos.rotation });
     });
 
-    // Territory cards (free-form)
+    // Territory cards (free-form). Attached weapons don't carry their own posX/posY —
+    // look them up in derivedWeaponPositions so rect-select hits them where they're
+    // actually rendered, not at the autogrid fallback.
     const tZone = zoneLayout['territory'];
     if (tZone) {
       state.zones.territory.forEach((card, i) => {
-        const x = card.posX ?? (tZone.x + 8 + (i % 8) * (cardWidth + 4));
-        const y = card.posY ?? (tZone.y + 20 + Math.floor(i / 8) * (cardHeight * 0.35));
+        let x: number;
+        let y: number;
+        if (card.equippedTo) {
+          const derived = derivedWeaponPositions.get(card.instanceId);
+          if (!derived) return; // can't place without derived — skip from selection bounds
+          x = derived.x;
+          y = derived.y;
+        } else {
+          x = card.posX ?? (tZone.x + 8 + (i % 8) * (cardWidth + 4));
+          y = card.posY ?? (tZone.y + 20 + Math.floor(i / 8) * (cardHeight * 0.35));
+        }
         bounds.push({ instanceId: card.instanceId, x, y, width: cardWidth, height: cardHeight, rotation: 0 });
       });
     }
@@ -1012,7 +1044,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     }
 
     return bounds;
-  }, [state.zones, state.isSpreadHand, zoneLayout, cardWidth, cardHeight]);
+  }, [state.zones, state.isSpreadHand, zoneLayout, cardWidth, cardHeight, derivedWeaponPositions]);
 
   // Stage event handlers for rectangular selection drag
   const handleStageMouseDown = useCallback(
@@ -1501,8 +1533,18 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
               const zone = zoneLayout[zoneId];
               return (
                 <Group key={zoneId} clipX={zone.x} clipY={zone.y} clipWidth={zone.width} clipHeight={zone.height}>
-                  {/* Pass 1: attached weapons (behind warriors) */}
-                  {cards.filter(c => c.equippedTo).map(card => {
+                  {/* Pass 1: attached weapons (behind warriors).
+                      Within a warrior group, higher-index weapons must draw FIRST so
+                      lower-index weapons render on top of them (correct fan z-order). */}
+                  {cards
+                    .filter(c => c.equippedTo)
+                    .slice()
+                    .sort((a, b) => {
+                      if (a.equippedTo !== b.equippedTo) return 0;
+                      const warriorWeapons = cards.filter(c => c.equippedTo === a.equippedTo);
+                      return warriorWeapons.indexOf(b) - warriorWeapons.indexOf(a);
+                    })
+                    .map(card => {
                     const derived = derivedWeaponPositions.get(card.instanceId);
                     if (!derived) return null;
                     return (
@@ -1691,7 +1733,8 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
         </Layer>
       </Stage>
 
-      {/* Equip unlink icons — one per attached weapon, anchored at the seam (warrior's top-left) */}
+      {/* Equip unlink icons — one per attached weapon, anchored at that weapon's seam
+          (top-left of whatever sits in front of it: warrior for index 0, weapon N-1 otherwise). */}
       <div
         className="pointer-events-none absolute inset-0 z-10"
         aria-hidden="false"
@@ -1699,21 +1742,21 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
         {state.zones.territory
           .filter(c => c.equippedTo)
           .map(weapon => {
-            const warrior = state.zones.territory.find(c => c.instanceId === weapon.equippedTo);
-            if (!warrior || warrior.posX === undefined || warrior.posY === undefined) return null;
-            // Seam is the warrior's top-left corner. Convert from virtual canvas coords
-            // to screen coords so the HTML button aligns over the rendered Konva card.
-            const seam = virtualToScreen(warrior.posX, warrior.posY, scale, offsetX, offsetY);
             const derived = derivedWeaponPositions.get(weapon.instanceId);
+            if (!derived) return null;
+            // Convert the weapon's own seam from virtual canvas coords to screen coords
+            // so the HTML button aligns over the rendered Konva cards.
+            const seam = virtualToScreen(derived.seamX, derived.seamY, scale, offsetX, offsetY);
+            const warrior = state.zones.territory.find(c => c.instanceId === weapon.equippedTo);
             return (
               <button
                 key={weapon.instanceId}
                 type="button"
-                onClick={() => detachCard(weapon.instanceId, derived?.x, derived?.y)}
+                onClick={() => detachCard(weapon.instanceId, derived.x, derived.y)}
                 className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#1a1510] p-1.5 text-[#c4955a] shadow-md ring-1 ring-[#c4955a]/40 transition hover:bg-[#2a1f14] hover:ring-[#c4955a]"
                 style={{ left: `${seam.x}px`, top: `${seam.y}px` }}
                 title="Unequip"
-                aria-label={`Unequip ${weapon.cardName} from ${warrior.cardName}`}
+                aria-label={warrior ? `Unequip ${weapon.cardName} from ${warrior.cardName}` : 'Unequip'}
               >
                 <Link2Off size={14} strokeWidth={2} />
               </button>
