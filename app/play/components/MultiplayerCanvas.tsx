@@ -409,6 +409,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     const allCards = [
       ...Object.values(myCards).flat(),
       ...Object.values(opponentCards).flat(),
+      ...Object.values(sharedCards).flat(),
     ];
     for (const card of allCards) {
       if (card.cardImgFile) {
@@ -416,7 +417,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       }
     }
     return [...new Set(urls)];
-  }, [myCards, opponentCards]);
+  }, [myCards, opponentCards, sharedCards]);
 
   const { getImage } = useMultiplayerImagePreloader(allImageUrls);
 
@@ -431,6 +432,20 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       if (idx >= 0) cardBackListeners.splice(idx, 1);
     };
   }, []);
+
+  // Soul Deck back image (Paragon-only). Load once; re-render when ready.
+  const soulDeckBackRef = useRef<HTMLImageElement | null>(null);
+  const [soulDeckBackReady, setSoulDeckBackReady] = useState(false);
+  useEffect(() => {
+    if (normalizedFormat !== 'Paragon') return;
+    if (soulDeckBackRef.current) return;
+    const img = new window.Image();
+    img.onload = () => {
+      soulDeckBackRef.current = img;
+      setSoulDeckBackReady(true);
+    };
+    img.src = SOUL_DECK_BACK_IMG;
+  }, [normalizedFormat]);
 
   // ---- Hover state ----
   const [hoveredInstanceId, setHoveredInstanceId] = useState<string | null>(null);
@@ -603,6 +618,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       exchangeCardIds !== null ||
       opponentPeekState !== null ||
       opponentLookState !== null ||
+      browseSoulDeck ||
+      soulDeckLookState !== null ||
       (approvedSearchRequest != null &&
         !approvedSearchRequest.action &&
         approvedSearchRequest.zone !== 'hand-reveal' &&
@@ -617,6 +634,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     exchangeCardIds,
     opponentPeekState,
     opponentLookState,
+    browseSoulDeck,
+    soulDeckLookState,
     approvedSearchRequest,
   ]);
 
@@ -955,6 +974,27 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     },
   }), [opponentCards, counters, gameState]);
 
+  // ---- ModalGameProvider value for shared Soul Deck modals (Paragon). Shared
+  //      pile — no reserve protection, no consent flow. ----
+  const soulDeckModalGameValue = useMemo<ModalGameContextValue>(() => ({
+    zones: Object.fromEntries(
+      Object.entries(sharedCards).map(([zone, cards]) => [
+        zone,
+        cards.map(c => cardInstanceToGameCard(c, counters.get(c.id) ?? [], 'player1'))
+      ])
+    ),
+    actions: {
+      moveCard: (id, toZone, _idx, posX, posY) =>
+        gameState.moveCard(BigInt(id), String(toZone), undefined, posX?.toString(), posY?.toString()),
+      moveCardsBatch: (ids, toZone) =>
+        gameState.moveCardsBatch(JSON.stringify(ids), String(toZone)),
+      moveCardToTopOfDeck: (id) => gameState.moveCardToTopOfDeck(BigInt(id)),
+      moveCardToBottomOfDeck: (id) => gameState.moveCardToBottomOfDeck(BigInt(id)),
+      shuffleDeck: () => gameState.shuffleSoulDeck(),
+      shuffleCardIntoDeck: (id) => gameState.shuffleCardIntoDeck(BigInt(id)),
+    },
+  }), [sharedCards, counters, gameState]);
+
   // ---- Combined zones for context menu (includes both players' cards so counters
   //      update live when right-clicking opponent cards) ----
   const allZonesForContextMenu = useMemo(() => {
@@ -991,6 +1031,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     setOpponentHandMenu(null);
     setReserveMenu(null);
     setOpponentReserveMenu(null);
+    setSoulDeckMenu(null);
+    setBrowseSoulDeck(false);
+    setSoulDeckLookState(null);
   }, []);
 
   // ---- moveDeckCardsToZone helper ----
@@ -1046,6 +1089,84 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     const fromSource = position === 'top' ? 'top-of-deck' : position === 'bottom' ? 'bottom-of-deck' : 'random-from-deck';
     if (ids.length > 0) gameState.moveCardsBatch(JSON.stringify(ids), targetZone, undefined, undefined, fromSource);
   }, [opponentCards, gameState]);
+
+  // ---- Shared Soul Deck handlers (Paragon). Pick N card IDs from the shared
+  //      soul-deck by position, then reveal (→ shared LoB) or look (private). ----
+  const handleSharedSoulDeckContextMenu = useCallback(
+    (e: Konva.KonvaEventObject<PointerEvent>) => {
+      e.evt.preventDefault();
+      e.cancelBubble = true;
+      setSoulDeckMenu({ x: e.evt.clientX, y: e.evt.clientY });
+    },
+    [],
+  );
+
+  const pickSoulDeckIds = useCallback(
+    (mode: 'top' | 'bottom' | 'random', n: number): string[] => {
+      const pile = [...(sharedCards['soul-deck'] ?? [])].sort(
+        (a, b) => Number(a.zoneIndex) - Number(b.zoneIndex),
+      );
+      if (pile.length === 0) return [];
+      const count = Math.min(n, pile.length);
+      if (mode === 'top') return pile.slice(0, count).map(c => String(c.id));
+      if (mode === 'bottom') return pile.slice(-count).map(c => String(c.id));
+      const shuffled = [...pile];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      return shuffled.slice(0, count).map(c => String(c.id));
+    },
+    [sharedCards],
+  );
+
+  const revealFromSoulDeck = useCallback(
+    (mode: 'top' | 'bottom' | 'random', n: number) => {
+      setSoulDeckMenu(null);
+      if ((sharedCards['soul-deck'] ?? []).length === 0) {
+        showGameToast('Soul Deck is empty');
+        return;
+      }
+      const ids = pickSoulDeckIds(mode, n);
+      if (ids.length === 0) return;
+      if (ids.length === 1) {
+        moveCard(BigInt(ids[0]), 'land-of-bondage');
+      } else {
+        moveCardsBatch(JSON.stringify(ids), 'land-of-bondage');
+      }
+    },
+    [sharedCards, pickSoulDeckIds, moveCard, moveCardsBatch],
+  );
+
+  const lookAtSoulDeck = useCallback(
+    (mode: 'top' | 'bottom' | 'random', n: number) => {
+      setSoulDeckMenu(null);
+      if ((sharedCards['soul-deck'] ?? []).length === 0) {
+        showGameToast('Soul Deck is empty');
+        return;
+      }
+      const ids = pickSoulDeckIds(mode, n);
+      if (ids.length === 0) return;
+      const count = ids.length;
+      const title = mode === 'top'
+        ? `Looking at Top ${count} of Soul Deck`
+        : mode === 'bottom'
+          ? `Looking at Bottom ${count} of Soul Deck`
+          : `Looking at Random ${count} from Soul Deck`;
+      setSoulDeckLookState({ cardIds: ids, title });
+    },
+    [sharedCards, pickSoulDeckIds],
+  );
+
+  const searchSoulDeck = useCallback(() => {
+    setSoulDeckMenu(null);
+    setBrowseSoulDeck(true);
+  }, []);
+
+  const handleShuffleSoulDeck = useCallback(() => {
+    setSoulDeckMenu(null);
+    gameState.shuffleSoulDeck();
+  }, [gameState]);
 
   // ---- Drag state ----
   const isDraggingRef = useRef(false);
@@ -2650,6 +2771,54 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     return { hostPositions, accessoryPositions };
   }, [opponentCards, opponentZones, lobCard.cardWidth, lobCard.cardHeight]);
 
+  // Paragon-only: shared LoB hosts/accessory positions. No rotation mirror —
+  // cards render upright (rotation=0) in the shared band between territories.
+  const sharedLobLayout = useMemo(() => {
+    const hostPositions = new Map<string, { x: number; y: number }>();
+    const accessoryPositions = new Map<
+      string,
+      { x: number; y: number; seamX: number; seamY: number }
+    >();
+    const cards = sharedCards['land-of-bondage'] ?? [];
+    const zone = mpLayout?.zones.sharedLob;
+    if (!zone || cards.length === 0) {
+      return { hostPositions, accessoryPositions };
+    }
+    const sorted = [...cards].sort((a, b) => Number(a.zoneIndex) - Number(b.zoneIndex));
+    const hosts = sorted.filter((c) => c.equippedToInstanceId === 0n);
+    const accessoriesByHost = new Map<bigint, CardInstance[]>();
+    for (const c of sorted) {
+      if (c.equippedToInstanceId === 0n) continue;
+      const list = accessoriesByHost.get(c.equippedToInstanceId);
+      if (list) list.push(c);
+      else accessoriesByHost.set(c.equippedToInstanceId, [c]);
+    }
+    const slotPositions = calculateAutoArrangePositions(
+      hosts.length,
+      zone,
+      lobCard.cardWidth,
+      lobCard.cardHeight,
+    );
+    const peekUp = lobCard.cardHeight * LOB_ATTACH_PEEK_VISIBLE_RATIO;
+    hosts.forEach((host, i) => {
+      const hostSlot = slotPositions[i];
+      if (!hostSlot) return;
+      hostPositions.set(String(host.id), hostSlot);
+      const accessories = accessoriesByHost.get(host.id);
+      if (!accessories) return;
+      accessories.forEach((acc, ai) => {
+        const ay = hostSlot.y - peekUp * (ai + 1);
+        accessoryPositions.set(String(acc.id), {
+          x: hostSlot.x,
+          y: ay,
+          seamX: hostSlot.x + lobCard.cardWidth * 0.5,
+          seamY: hostSlot.y,
+        });
+      });
+    });
+    return { hostPositions, accessoryPositions };
+  }, [sharedCards, mpLayout, lobCard.cardWidth, lobCard.cardHeight]);
+
   // ---- Derive per-accessory screen positions + seam (for detach overlay) ----
   // Accessories (weapons in territory, sites in LOB) don't use their own posX/
   // posY at render time — they're anchored to their host at an offset so they
@@ -3404,8 +3573,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               Two-pass cluster render: for each unattached LOB card (soul), emit
               its attached accessories (sites) first (drawn behind) and then the
               card itself. Attached sites don't occupy their own auto-arrange slot.
+              Paragon: skipped — the shared LoB render block handles both seats.
               ================================================================ */}
-          {AUTO_ARRANGE_ZONES.map((zoneKey) => {
+          {normalizedFormat !== 'Paragon' && AUTO_ARRANGE_ZONES.map((zoneKey) => {
             const cards = myCards[zoneKey];
             if (!cards || cards.length === 0) return null;
             const zone = myZones[zoneKey];
@@ -3472,8 +3642,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               Cards in auto-arrange zones — Opponent LOB (draggable, horizontal strip).
               Two-pass cluster render mirroring my LOB, rotated 180°. Accessory
               anchor comes from opponentDerivedWeaponPositions (already mirrored).
+              Paragon: skipped — the shared LoB render block handles both seats.
               ================================================================ */}
-          {AUTO_ARRANGE_ZONES.map((zoneKey) => {
+          {normalizedFormat !== 'Paragon' && AUTO_ARRANGE_ZONES.map((zoneKey) => {
             const cards = opponentCards[zoneKey];
             if (!cards || cards.length === 0) return null;
             const zone = opponentZones[zoneKey];
@@ -3544,9 +3715,164 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           })}
 
           {/* ================================================================
+              Paragon-only: shared Land of Bondage render. Both seats draw from
+              `sharedCards['land-of-bondage']` with rotation=0 (no mirror). We
+              reuse `adaptCard(c, 'player1')` because sharedCards don't have a
+              seat — authorization lives server-side.
+              ================================================================ */}
+          {normalizedFormat === 'Paragon' && (() => {
+            const zoneKey = 'land-of-bondage';
+            const cards = sharedCards[zoneKey] ?? [];
+            if (cards.length === 0) return null;
+            const zone = mpLayout?.zones.sharedLob;
+            if (!zone) return null;
+            const sorted = [...cards].sort((a, b) => Number(a.zoneIndex) - Number(b.zoneIndex));
+            const hosts = sorted.filter((c) => c.equippedToInstanceId === 0n);
+            const renderSharedLobCard = (card: CardInstance, overridePos: { x: number; y: number }) => {
+              const gameCard = adaptCard(card, 'player1');
+              const cardIdStr = String(card.id);
+              return (
+                <GameCardNode
+                  key={cardIdStr}
+                  card={gameCard}
+                  x={overridePos.x}
+                  y={overridePos.y}
+                  rotation={0}
+                  cardWidth={lobCard.cardWidth}
+                  cardHeight={lobCard.cardHeight}
+                  image={getCardImage(card)}
+                  isSelected={isSelected(cardIdStr)}
+                  isDraggable={true}
+                  hoverProgress={hoveredInstanceId === cardIdStr ? hoverProgress : 0}
+                  nodeRef={registerCardNode}
+                  onClick={handleCardClick}
+                  onDragStart={handleCardDragStart}
+                  onDragMove={handleCardDragMove}
+                  onDragEnd={handleCardDragEnd}
+                  onContextMenu={handleCardContextMenu}
+                  onDblClick={handleDblClick}
+                  onMouseEnter={handleMouseEnter}
+                  onMouseLeave={handleMouseLeave}
+                />
+              );
+            };
+            const accessoryNodes: React.ReactNode[] = [];
+            const hostNodes: React.ReactNode[] = [];
+            for (const host of hosts) {
+              const hostPos = sharedLobLayout.hostPositions.get(String(host.id));
+              if (!hostPos) continue;
+              const attached = sorted.filter((c) => c.equippedToInstanceId === host.id);
+              for (const accessory of attached) {
+                const pos = sharedLobLayout.accessoryPositions.get(String(accessory.id));
+                if (!pos) continue;
+                accessoryNodes.push(renderSharedLobCard(accessory, { x: pos.x, y: pos.y }));
+              }
+              hostNodes.push(renderSharedLobCard(host, hostPos));
+            }
+            return (
+              <React.Fragment key="shared-auto-land-of-bondage">
+                <Group>{accessoryNodes}</Group>
+                <Group clipX={zone.x} clipY={zone.y} clipWidth={zone.width} clipHeight={zone.height}>
+                  {hostNodes}
+                </Group>
+              </React.Fragment>
+            );
+          })()}
+
+          {/* ================================================================
+              Paragon-only: Soul Deck pile. Face-down stack anchored in the
+              soul-deck rect (left of shared LoB). Right-click opens a deck-
+              style context menu (Search / Shuffle / Look / Reveal).
+              ================================================================ */}
+          {normalizedFormat === 'Paragon' && mpLayout?.zones.soulDeck && (sharedCards['soul-deck']?.length ?? 0) > 0 && (() => {
+            const zone = mpLayout.zones.soulDeck!;
+            const count = sharedCards['soul-deck']?.length ?? 0;
+            const pileWidth = Math.min(lobCard.cardWidth, zone.width - 4);
+            const pileHeight = Math.round(pileWidth * 1.4);
+            const px = zone.x + (zone.width - pileWidth) / 2;
+            const py = zone.y + (zone.height - pileHeight) / 2;
+            return (
+              <Group
+                key="soul-deck-pile"
+                onContextMenu={handleSharedSoulDeckContextMenu}
+              >
+                {count > 1 && (
+                  soulDeckBackReady && soulDeckBackRef.current ? (
+                    <KonvaImage
+                      image={soulDeckBackRef.current}
+                      x={px - 2}
+                      y={py - 2}
+                      width={pileWidth}
+                      height={pileHeight}
+                      cornerRadius={4}
+                      opacity={0.85}
+                    />
+                  ) : (
+                    <Rect
+                      x={px - 2}
+                      y={py - 2}
+                      width={pileWidth}
+                      height={pileHeight}
+                      fill="#2a1410"
+                      stroke="#6b4e27"
+                      strokeWidth={1}
+                      cornerRadius={4}
+                    />
+                  )
+                )}
+                {soulDeckBackReady && soulDeckBackRef.current ? (
+                  <KonvaImage
+                    image={soulDeckBackRef.current}
+                    x={px}
+                    y={py}
+                    width={pileWidth}
+                    height={pileHeight}
+                    cornerRadius={4}
+                  />
+                ) : (
+                  <Rect
+                    x={px}
+                    y={py}
+                    width={pileWidth}
+                    height={pileHeight}
+                    fill="#3a1e18"
+                    stroke="#c4955a"
+                    strokeWidth={1}
+                    cornerRadius={4}
+                  />
+                )}
+                <Group x={px + pileWidth - 30} y={py + 4}>
+                  <Rect width={28} height={20} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} />
+                  <Text
+                    text={String(count)}
+                    fontSize={14}
+                    fontStyle="bold"
+                    fill="#e8d5a3"
+                    width={28}
+                    height={20}
+                    align="center"
+                    verticalAlign="middle"
+                  />
+                </Group>
+                <Text
+                  x={px}
+                  y={py + pileHeight - 16}
+                  width={pileWidth}
+                  text="SOUL DECK"
+                  fontSize={9}
+                  fontFamily="Cinzel, Georgia, serif"
+                  fill="#e8d5a3"
+                  letterSpacing={1}
+                  align="center"
+                />
+              </Group>
+            );
+          })()}
+
+          {/* ================================================================
               LOB label overlays — rendered AFTER cards so labels sit on top
               ================================================================ */}
-          {(() => {
+          {normalizedFormat !== 'Paragon' && (() => {
             const lobEntries: { zone: typeof myZones[string]; isOpponent: boolean }[] = [];
             const myLob = myZones['land-of-bondage'];
             const oppLob = opponentZones['land-of-bondage'];
@@ -3608,6 +3934,67 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 </Group>
               );
             });
+          })()}
+
+          {/* ================================================================
+              Paragon-only: shared LoB label overlay ("Land of Bondage (Shared)").
+              ================================================================ */}
+          {normalizedFormat === 'Paragon' && mpLayout?.zones.sharedLob && (() => {
+            const zone = mpLayout.zones.sharedLob!;
+            const cards = sharedCards['land-of-bondage'] ?? [];
+            const labelTextWidth = zone.label.toUpperCase().length * 8.5;
+            const fillColor = '#e8d5a3';
+            const badgeFill = 'rgba(196, 149, 90, 0.25)';
+            const badgeStroke = 'rgba(196, 149, 90, 0.5)';
+            const bgFill = 'rgba(30, 22, 16, 0.85)';
+            const badgeW = 24;
+            const labelW = labelTextWidth + 8 + badgeW + 8;
+            const bgW = Math.min(labelW + 6, zone.width);
+            const bgX = zone.x + zone.width - bgW;
+            const labelX = bgX + 6;
+            const badgeX = labelX + labelTextWidth + 8;
+            return (
+              <Group key="lob-overlay-shared" listening={false}>
+                <Rect
+                  x={bgX}
+                  y={zone.y}
+                  width={bgW}
+                  height={20}
+                  fill={bgFill}
+                  cornerRadius={[0, 3, 0, 4]}
+                />
+                <Text
+                  x={labelX}
+                  y={zone.y + 4}
+                  text={zone.label.toUpperCase()}
+                  fontSize={11}
+                  fontFamily="Cinzel, Georgia, serif"
+                  fill={fillColor}
+                  letterSpacing={1}
+                  width={zone.width - 44}
+                  ellipsis={true}
+                />
+                <Rect
+                  x={badgeX}
+                  y={zone.y + 3}
+                  width={badgeW}
+                  height={14}
+                  fill={badgeFill}
+                  cornerRadius={3}
+                  stroke={badgeStroke}
+                  strokeWidth={0.5}
+                />
+                <Text
+                  x={badgeX}
+                  y={zone.y + 4}
+                  width={badgeW}
+                  text={String(cards.length)}
+                  fontSize={11}
+                  fill={fillColor}
+                  align="center"
+                />
+              </Group>
+            );
           })()}
 
           {/* ================================================================
@@ -4434,6 +4821,35 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         />
       )}
 
+      {soulDeckMenu && (
+        <DeckContextMenu
+          x={soulDeckMenu.x}
+          y={soulDeckMenu.y}
+          deckSize={sharedCards['soul-deck']?.length ?? 0}
+          hideDrawActions
+          hideDiscardActions
+          hideReserveActions
+          onClose={() => setSoulDeckMenu(null)}
+          onSearchDeck={searchSoulDeck}
+          onShuffleDeck={handleShuffleSoulDeck}
+          onLookAtTop={(n) => lookAtSoulDeck('top', n)}
+          onLookAtBottom={(n) => lookAtSoulDeck('bottom', n)}
+          onLookAtRandom={(n) => lookAtSoulDeck('random', n)}
+          onRevealTop={(n) => revealFromSoulDeck('top', n)}
+          onRevealBottom={(n) => revealFromSoulDeck('bottom', n)}
+          onRevealRandom={(n) => revealFromSoulDeck('random', n)}
+          onDrawTop={() => {}}
+          onDrawBottom={() => {}}
+          onDrawRandom={() => {}}
+          onDiscardTop={() => {}}
+          onDiscardBottom={() => {}}
+          onDiscardRandom={() => {}}
+          onReserveTop={() => {}}
+          onReserveBottom={() => {}}
+          onReserveRandom={() => {}}
+        />
+      )}
+
       {handMenu && (
         <HandContextMenu
           x={handMenu.x}
@@ -4933,6 +5349,35 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             didDragRef={modalDidDragRef}
             isDragActive={modalDrag.isDragging}
             isPrivateLook
+          />
+        )}
+      </ModalGameProvider>
+
+      {/* ================================================================
+          Paragon-only: shared Soul Deck modals (Search + private Look).
+          ================================================================ */}
+      <ModalGameProvider value={soulDeckModalGameValue}>
+        {browseSoulDeck && (
+          <ZoneBrowseModal
+            zoneId="soul-deck"
+            onClose={() => setBrowseSoulDeck(false)}
+            onStartDrag={modalStartDrag}
+            onStartMultiDrag={modalStartMultiDrag}
+            didDragRef={modalDidDragRef}
+            isDragActive={modalDrag.isDragging}
+          />
+        )}
+        {soulDeckLookState && (
+          <DeckPeekModal
+            cardIds={soulDeckLookState.cardIds}
+            title={soulDeckLookState.title}
+            onClose={() => setSoulDeckLookState(null)}
+            onStartDrag={modalStartDrag}
+            onStartMultiDrag={modalStartMultiDrag}
+            didDragRef={modalDidDragRef}
+            isDragActive={modalDrag.isDragging}
+            isPrivateLook
+            sourceZone="soul-deck"
           />
         )}
       </ModalGameProvider>
