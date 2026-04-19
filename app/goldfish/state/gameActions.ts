@@ -114,4 +114,8 @@ export const actions = {
   detachCard(cardInstanceId: string, posX?: number, posY?: number): GameAction {
     return createAction('DETACH_CARD', { cardInstanceId, posX, posY });
   },
+
+  executeCardAbility(cardInstanceId: string, abilityIndex: number): GameAction {
+    return createAction('EXECUTE_CARD_ABILITY', { cardInstanceId, abilityIndex });
+  },
 };

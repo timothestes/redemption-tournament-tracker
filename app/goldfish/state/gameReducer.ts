@@ -7,6 +7,11 @@ import {
 } from '../types';
 import { buildInitialGameState } from './gameInitializer';
 import { refillSoulDeck } from '@/app/shared/paragon/refill';
+import { findCard } from '@/lib/cards/lookup';
+import {
+  type CardAbility,
+  getAbilitiesForCard,
+} from '@/lib/cards/cardAbilities';
 
 const MAX_HISTORY = 20;
 const HAND_LIMIT = 16;
@@ -30,6 +35,55 @@ function cloneZones(zones: GameState['zones']): GameState['zones'] {
     cloned[key] = zones[key].map(c => ({ ...c }));
   }
   return cloned;
+}
+
+const PLAY_ZONES: ReadonlyArray<ZoneId> = ['territory', 'land-of-bondage', 'land-of-redemption'];
+
+function spawnTokenInState(
+  state: GameState,
+  source: GameCard,
+  ability: Extract<CardAbility, { type: 'spawn_token' }>,
+): GameState {
+  // Phase 1 — validate. Any failure returns state unchanged.
+  const tokenData = findCard(ability.tokenName);
+  if (!tokenData) {
+    console.warn('[cardAbilities] unknown token', ability.tokenName);
+    return state;
+  }
+  const count = ability.count ?? 1;
+  if (count < 1) return state;
+
+  const targetZone: ZoneId = PLAY_ZONES.includes(source.zone)
+    ? source.zone
+    : (ability.defaultZone ?? 'territory');
+
+  // Phase 2 — build all new cards in memory. No state mutation yet.
+  const newCards: GameCard[] = Array.from({ length: count }, () => ({
+    instanceId: crypto.randomUUID(),
+    cardName: tokenData.name,
+    cardSet: tokenData.set,
+    cardImgFile: tokenData.imgFile,
+    type: tokenData.type,
+    brigade: tokenData.brigade ?? '',
+    strength: tokenData.strength ?? '',
+    toughness: tokenData.toughness ?? '',
+    specialAbility: tokenData.specialAbility ?? '',
+    identifier: tokenData.identifier ?? '',
+    reference: tokenData.reference ?? '',
+    alignment: tokenData.alignment ?? '',
+    isMeek: false,
+    counters: [],
+    isFlipped: false,
+    isToken: true,
+    zone: targetZone,
+    ownerId: source.ownerId,
+    notes: '',
+  }));
+
+  // Phase 3 — commit in a single shallow clone.
+  const zones = cloneZones(state.zones);
+  zones[targetZone] = [...zones[targetZone], ...newCards];
+  return { ...state, zones };
 }
 
 function pushHistory(state: GameState): GameState[] {
@@ -662,6 +716,35 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         zones[foundZone].splice(foundIdx, 0, detached);
       }
       return { ...state, zones, history };
+    }
+
+    case 'EXECUTE_CARD_ABILITY': {
+      const { cardInstanceId, abilityIndex } = action.payload;
+      if (!cardInstanceId || abilityIndex === undefined) return state;
+
+      // Locate the source across all zones.
+      let source: GameCard | undefined;
+      for (const zone of Object.values(state.zones)) {
+        const found = zone.find(c => c.instanceId === cardInstanceId);
+        if (found) { source = found; break; }
+      }
+      if (!source) return state;
+
+      const ability = getAbilitiesForCard(source.identifier)[abilityIndex];
+      if (!ability) return state;
+
+      switch (ability.type) {
+        case 'spawn_token':
+          return spawnTokenInState(state, source, ability);
+        case 'shuffle_and_draw':
+          // Reserved for future — v1 ships spawn_token only.
+          return state;
+        case 'custom':
+          // Custom abilities are dispatched client-side in multiplayer and
+          // never reach the goldfish reducer in v1. No-op defensively.
+          return state;
+      }
+      return state;
     }
 
     default:
