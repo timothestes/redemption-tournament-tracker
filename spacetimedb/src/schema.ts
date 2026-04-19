@@ -113,6 +113,7 @@ export const CardInstance = table(
     // `0n` sentinel = unattached (matches the empty-string convention used for posX/posY).
     equippedToInstanceId: t.u64().default(0n),
     isSoulDeckOrigin: t.bool().default(false),
+    isToken: t.bool().default(false),
   }
 );
 
