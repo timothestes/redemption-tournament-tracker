@@ -292,6 +292,14 @@ const PARAGON_SOUL_DEFS: Array<{ identifier: string; cardName: string; cardImgFi
   });
 
 function initializeSoulDeck(ctx: any, game: any) {
+  // Idempotence: if any shared soul cards already exist for this game, skip.
+  // Lets multiple pregame hook points call this safely (rolling → choosing,
+  // choose-first fallback, game-start fallback) without doubling the pile.
+  const existing = [...ctx.db.CardInstance.card_instance_game_id.filter(game.id)].filter(
+    (c: any) => c.ownerId === 0n && (c.zone === 'soul-deck' || c.zone === 'land-of-bondage')
+  );
+  if (existing.length > 0) return;
+
   // Insert 21 shared soul cards (ownerId = 0n sentinel)
   for (let i = 0; i < PARAGON_SOUL_DEFS.length; i++) {
     const def = PARAGON_SOUL_DEFS[i];
@@ -804,6 +812,11 @@ export const pregame_choose_first = spacetimedb.reducer(
     // Transition to revealing phase — show who goes first before starting
     const latestGame = ctx.db.Game.id.find(gameId);
     if (!latestGame) throw new SenderError('Game not found');
+    // Paragon fallback: ensure soul deck is populated for games that missed
+    // the acknowledge-roll init hook (idempotent).
+    if (normalizeFormat(latestGame.format) === 'Paragon') {
+      initializeSoulDeck(ctx, latestGame);
+    }
     ctx.db.Game.id.update({
       ...latestGame,
       pregamePhase: 'revealing',
@@ -854,9 +867,12 @@ export const pregame_acknowledge_first = spacetimedb.reducer(
         }
       }
 
-      // Paragon soul deck was initialized earlier, when the phase first
-      // transitioned out of 'rolling' (see pregame_acknowledge_roll and
-      // pregame_skip_to_reveal).
+      // Paragon: soul deck is normally initialized earlier in the pregame
+      // (see pregame_acknowledge_roll and pregame_skip_to_reveal). Call
+      // again here as a final fallback; initializeSoulDeck is idempotent.
+      if (normalizeFormat(game.format) === 'Paragon') {
+        initializeSoulDeck(ctx, game);
+      }
 
       ctx.db.Game.id.update({
         ...updatedGame,
