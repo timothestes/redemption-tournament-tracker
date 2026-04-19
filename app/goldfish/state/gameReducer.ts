@@ -731,7 +731,11 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       }
       if (!source) return state;
 
-      const ability = getAbilitiesForCard(source.identifier)[abilityIndex];
+      // Registry keys match GameCard.cardName (includes the set suffix for the
+      // v1 cards, e.g., "Two Possessed (GoC)"). The card's identifier field is
+      // a taxonomy descriptor ("Generic, Demon", etc.) and is NOT unique enough
+      // to key the registry.
+      const ability = getAbilitiesForCard(source.cardName)[abilityIndex];
       if (!ability) return state;
 
       switch (ability.type) {

@@ -6,7 +6,10 @@ import type { GameCard, GameState, GameAction } from '../../types';
 function makeCard(overrides: Partial<GameCard>): GameCard {
   return {
     instanceId: 'source-1',
-    cardName: 'Two Possessed',
+    // Registry keys match cardName (which carries the set suffix). The
+    // identifier field is a taxonomy descriptor from carddata and is NOT the
+    // lookup key — set it to a representative value so tests mirror real data.
+    cardName: 'Two Possessed (GoC)',
     cardSet: 'GoC',
     cardImgFile: 'two-possessed.png',
     type: 'EC',
@@ -14,7 +17,7 @@ function makeCard(overrides: Partial<GameCard>): GameCard {
     strength: '',
     toughness: '',
     specialAbility: '',
-    identifier: 'Two Possessed (GoC)',
+    identifier: 'Generic, Demon',
     reference: '',
     alignment: 'Evil',
     isMeek: false,
@@ -59,7 +62,7 @@ function act(cardInstanceId: string, abilityIndex: number): GameAction {
 
 describe('EXECUTE_CARD_ABILITY — spawn_token', () => {
   it('Two Possessed spawns 2 Violent Possessor Tokens in the same zone', () => {
-    const source = makeCard({ zone: 'territory', identifier: 'Two Possessed (GoC)' });
+    const source = makeCard({ zone: 'territory', cardName: 'Two Possessed (GoC)' });
     const state = makeState([source]);
 
     const next = gameReducer(state, act('source-1', 0));
@@ -74,7 +77,7 @@ describe('EXECUTE_CARD_ABILITY — spawn_token', () => {
   });
 
   it('single-count ability spawns exactly one token', () => {
-    const source = makeCard({ identifier: 'The Proselytizers (GoC)', cardName: 'The Proselytizers' });
+    const source = makeCard({ cardName: 'The Proselytizers (GoC)' });
     const state = makeState([source]);
 
     const next = gameReducer(state, act('source-1', 0));
@@ -85,7 +88,7 @@ describe('EXECUTE_CARD_ABILITY — spawn_token', () => {
   });
 
   it('spawn from a non-play zone falls back to territory', () => {
-    const source = makeCard({ zone: 'hand', identifier: 'The Proselytizers (GoC)' });
+    const source = makeCard({ zone: 'hand', cardName: 'The Proselytizers (GoC)' });
     const state = makeState([source]);
 
     const next = gameReducer(state, act('source-1', 0));
@@ -102,21 +105,21 @@ describe('EXECUTE_CARD_ABILITY — spawn_token', () => {
   });
 
   it('out-of-range abilityIndex is a no-op (returns same state reference)', () => {
-    const source = makeCard({ identifier: 'Two Possessed (GoC)' });
+    const source = makeCard({ cardName: 'Two Possessed (GoC)' });
     const state = makeState([source]);
     const next = gameReducer(state, act('source-1', 99));
     expect(next).toBe(state);
   });
 
   it('card with no registered abilities is a no-op', () => {
-    const source = makeCard({ identifier: 'No Such Ability Card' });
+    const source = makeCard({ cardName: 'No Such Ability Card' });
     const state = makeState([source]);
     const next = gameReducer(state, act('source-1', 0));
     expect(next).toBe(state);
   });
 
   it('ownerId is inherited from source (player2 source → player2 tokens)', () => {
-    const source = makeCard({ ownerId: 'player2', identifier: 'The Proselytizers (GoC)' });
+    const source = makeCard({ ownerId: 'player2', cardName: 'The Proselytizers (GoC)' });
     const state = makeState([source]);
     const next = gameReducer(state, act('source-1', 0));
     const tokens = next.zones.territory.filter(c => c.isToken);
@@ -125,7 +128,7 @@ describe('EXECUTE_CARD_ABILITY — spawn_token', () => {
   });
 
   it('spawning pushes history so the spawn can be undone', () => {
-    const source = makeCard({ identifier: 'Two Possessed (GoC)' });
+    const source = makeCard({ cardName: 'Two Possessed (GoC)' });
     const state = makeState([source]);
 
     const next = gameReducer(state, act('source-1', 0));

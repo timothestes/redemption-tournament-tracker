@@ -2135,7 +2135,9 @@ export const execute_card_ability = spacetimedb.reducer(
     if (source.gameId !== gameId) throw new SenderError('Card not in this game');
     if (source.ownerId !== player.id) throw new SenderError('Not your card');
 
-    const abilities = getAbilitiesForCard(source.identifier);
+    // Registry keys match cardName (e.g., "Two Possessed (GoC)"). The
+    // identifier field is a taxonomy descriptor and is not unique enough.
+    const abilities = getAbilitiesForCard(source.cardName);
     const ability = abilities[Number(abilityIndex)];
     if (!ability) throw new SenderError('No such ability');
 

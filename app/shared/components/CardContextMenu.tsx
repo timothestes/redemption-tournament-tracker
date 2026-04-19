@@ -142,8 +142,10 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
     return c?.count ?? 0;
   };
 
-  // Per-card abilities from the CARD_ABILITIES registry
-  const abilities = getAbilitiesForCard(card.identifier);
+  // Per-card abilities from the CARD_ABILITIES registry. Keyed by cardName
+  // (includes the set suffix, e.g., "Two Possessed (GoC)") — the identifier
+  // field is a taxonomy descriptor, not a stable lookup key.
+  const abilities = getAbilitiesForCard(card.cardName);
   const isOwnedByLocalPlayer = true; // multiplayer server enforces ownership; UX predicate is a separate concern
   const canExecuteAbilities =
     abilities.length > 0 &&
