@@ -2064,14 +2064,27 @@ function spawnTokenImpl(
 
   // Stagger each token relative to the source IF the source is already in
   // territory (so tokens appear next to their source card). Otherwise use a
-  // sensible default position. Cascade: +55 X, +15 Y per token.
-  const STAGGER_X = 55;
-  const STAGGER_Y = 15;
+  // sensible default position. Multiplayer uses NORMALIZED 0–1 coordinates
+  // (NOT pixel coords like goldfish) — the client scales them to the zone's
+  // pixel size at render time. Card width is roughly 10% of territory width,
+  // so ~0.05 between centers leaves each card visibly distinct.
+  const STAGGER_X = 0.05;
+  const STAGGER_Y = 0.03;
   const sourceInTerritory = source.zone === 'territory';
   const sourcePosX = source.posX ? Number(source.posX) : NaN;
   const sourcePosY = source.posY ? Number(source.posY) : NaN;
-  const baseX = sourceInTerritory && Number.isFinite(sourcePosX) ? sourcePosX : 200;
-  const baseY = sourceInTerritory && Number.isFinite(sourcePosY) ? sourcePosY : 200;
+  const baseX = sourceInTerritory && Number.isFinite(sourcePosX) ? sourcePosX : 0.3;
+  const baseY = sourceInTerritory && Number.isFinite(sourcePosY) ? sourcePosY : 0.4;
+
+  console.log(
+    '[spawn_token] source.posX=', source.posX,
+    'source.posY=', source.posY,
+    'baseX=', baseX,
+    'baseY=', baseY,
+    'count=', count,
+    'targetZone=', targetZone,
+    'tokenName=', ability.tokenName,
+  );
 
   // Phase 3 — all-or-nothing inserts. SpacetimeDB rolls back the whole
   // reducer if any insert throws.
@@ -2079,6 +2092,7 @@ function spawnTokenImpl(
     maxIdx += 1n;
     const posX = targetZone === 'territory' ? String(baseX + (i + 1) * STAGGER_X) : '';
     const posY = targetZone === 'territory' ? String(baseY + (i + 1) * STAGGER_Y) : '';
+    console.log(`[spawn_token] inserting token ${i + 1}/${count} at posX=${posX} posY=${posY} zone=${targetZone} ownerId=${source.ownerId} zoneIndex=${maxIdx}`);
     ctx.db.CardInstance.insert({
       id: 0n,
       gameId,
