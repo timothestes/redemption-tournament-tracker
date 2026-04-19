@@ -2,7 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship a per-card custom-ability system for the goldfish practice mode (PR 1) and the SpacetimeDB multiplayer mode (PR 2), starting with a `spawn_token` ability that lets players right-click cards like *Two Possessed (GoC)* to atomically spawn one or more named token cards.
+**Goal:** Ship a per-card custom-ability system for the goldfish practice mode and the SpacetimeDB multiplayer mode in a single PR, starting with a `spawn_token` ability that lets players right-click cards like *Two Possessed (GoC)* to atomically spawn one or more named token cards.
+
+**Delivery:** All 16 tasks land in one PR. Tasks are still ordered goldfish-first → multiplayer so the PR reviewer can follow the incremental build (registry → shared types → goldfish reducer → context menu → SpacetimeDB schema → server reducer → move_card cleanup → bindings regen → client adapter → manual QA).
 
 **Architecture:** A single shared TypeScript registry maps each card's `identifier` to an array of typed abilities. The shared `CardContextMenu` reads the registry and renders one menu item per ability. Goldfish dispatches via a new reducer action; multiplayer dispatches via a new SpacetimeDB reducer that re-reads the registry server-side for authority. Both paths are atomic — either all tokens spawn or none do. Future ability kinds (shuffle-and-draw, counter manipulations, `custom` escape hatch) slot into the same dispatch without refactoring.
 
@@ -14,12 +16,12 @@
 
 ## File Structure
 
-**PR 1 — Goldfish (new files):**
+**New files:**
 - `lib/cards/cardAbilities.ts` — the ability registry, types, and label helper.
 - `lib/cards/__tests__/cardAbilities.test.ts` — registry integrity tests.
 - `app/goldfish/state/__tests__/gameReducer.customAbilities.test.ts` — reducer tests for `EXECUTE_CARD_ABILITY` + `spawnTokenInState`.
 
-**PR 1 — Goldfish (modified):**
+**Modified files — goldfish path:**
 - `app/shared/types/gameActions.ts` — add optional `executeCardAbility` method.
 - `app/shared/types/gameCard.ts` — add `EXECUTE_CARD_ABILITY` to `ActionType`; add `abilityIndex?` to `GameAction.payload`.
 - `app/goldfish/state/gameActions.ts` — new action creator `executeCardAbility`.
@@ -27,7 +29,7 @@
 - `app/goldfish/state/GameContext.tsx` — wire `executeCardAbility` into the context.
 - `app/shared/components/CardContextMenu.tsx` — render one menu item per registered ability at the top of the menu.
 
-**PR 2 — Multiplayer (modified):**
+**Modified files — multiplayer path:**
 - `spacetimedb/src/schema.ts` — add `isToken: t.bool()` to `CardInstance`.
 - `spacetimedb/src/index.ts` — new `execute_card_ability` reducer + `spawnTokenImpl` helper; extend `move_card` with token cleanup branch.
 - `lib/spacetimedb/module_bindings/` — regenerated via `spacetime generate` (never hand-edited).
@@ -35,7 +37,7 @@
 
 ---
 
-# PR 1 — Goldfish
+# Phase 1 — Goldfish implementation
 
 ## Task 1: Create the ability registry
 
@@ -646,14 +648,14 @@ Inside the component, right after the props are destructured, compute:
   // Goldfish is single-seat (everything is "yours"), so this is effectively
   // always true there. Re-use whatever ownership predicate the file already
   // has; if none exists yet, fall back to `true`.
-  const isOwnedByLocalPlayer = true; // TODO(plan Task 16): replace with the file's owner predicate when PR 2 lands
+  const isOwnedByLocalPlayer = true; // Set to the file's owner predicate if one exists (see note below); otherwise leave as true
   const canExecuteAbilities =
     abilities.length > 0 &&
     typeof actions.executeCardAbility === 'function' &&
     isOwnedByLocalPlayer;
 ```
 
-If the shared component already threads an `isLocalPlayerCard` (or similar) prop, replace the `true` fallback with it during the edit. Otherwise leave the fallback as `true` — the server still rejects unauthorized `execute_card_ability` calls in multiplayer (Task 12, `SenderError('Not your card')`), so this is a UX polish, not a security boundary.
+If the shared component already threads an `isLocalPlayerCard` (or similar) prop, replace the `true` fallback with it during the edit. Otherwise leave the fallback as `true` — the server still rejects unauthorized `execute_card_ability` calls in multiplayer (Task 11, `SenderError('Not your card')`), so this is a UX polish, not a security boundary.
 
 - [ ] **Step 3: Render the abilities section at the top of the menu**
 
@@ -745,48 +747,9 @@ Right-click a card that is NOT in the registry (e.g., any Lost Soul or a generic
 
 ---
 
-## Task 10: Open PR 1
+# Phase 2 — Multiplayer / SpacetimeDB implementation
 
-- [ ] **Step 1: Run the complete test suite one more time**
-
-```bash
-npx vitest run lib/cards/__tests__/cardAbilities.test.ts app/goldfish/state/__tests__
-```
-
-Expected: all tests pass.
-
-- [ ] **Step 2: Push and open the PR**
-
-```bash
-git push -u origin HEAD
-gh pr create --title "feat: per-card custom abilities (goldfish, spawn_token)" --body "$(cat <<'EOF'
-## Summary
-- Introduce a shared ability registry at `lib/cards/cardAbilities.ts` keyed by card identifier.
-- Add `EXECUTE_CARD_ABILITY` reducer case with a `spawnTokenInState` helper that is atomic (validate-then-build-then-commit).
-- Render per-card abilities at the top of the shared `CardContextMenu`.
-- Ship v1 with `spawn_token` for six GoC cards (Two Possessed spawns 2; the rest spawn 1).
-
-Multiplayer support follows in a separate PR (adds `isToken` to `CardInstance` and an `execute_card_ability` reducer).
-
-Spec: [`docs/superpowers/specs/2026-04-18-card-custom-abilities-design.md`](docs/superpowers/specs/2026-04-18-card-custom-abilities-design.md)
-
-## Test plan
-- [x] Registry integrity tests (every key + tokenName resolves via findCard)
-- [x] `spawnTokenInState` unit tests (count > 1, fallback zone, no-op on unknown card/ability, owner inheritance, atomic failure)
-- [x] Manual QA in goldfish per plan Task 9
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-EOF
-)"
-```
-
----
-
-# PR 2 — Multiplayer / SpacetimeDB
-
-**Branch off main after PR 1 merges.** The SpacetimeDB schema change and generated bindings are invasive enough that they should land as a separate, clearly-titled PR.
-
-## Task 11: Add `isToken` to `CardInstance` schema
+## Task 10: Add `isToken` to `CardInstance` schema
 
 **Files:**
 - Modify: `spacetimedb/src/schema.ts:81-117`
@@ -807,7 +770,7 @@ Per spec §Open implementation decisions, default behavior is **new rows only** 
 
 SpacetimeDB's handling of added bool columns on existing rows depends on how the module is republished: a plain `spacetime publish` (no `--clear-database`) will attempt a schema migration and may fail if the field has no server-side default. The simplest safe path for this repo:
 
-- If the live SpacetimeDB database has no production games worth preserving, republish with `--clear-database -y` (see Task 14). All rows reset.
+- If the live SpacetimeDB database has no production games worth preserving, republish with `--clear-database -y` (see Task 13). All rows reset.
 - If there are games worth preserving, add `isToken: t.bool()` with a field-level default and accept that every existing row becomes `false` (which is what we want — actual `isToken` rows today are only goldfish-side and have no corresponding SpacetimeDB rows).
 
 Either way, no dedicated backfill reducer is needed. Note the decision made in the PR description.
@@ -821,7 +784,7 @@ git commit -m "feat(spacetime): add isToken bool to CardInstance"
 
 ---
 
-## Task 12: Add the `execute_card_ability` server reducer
+## Task 11: Add the `execute_card_ability` server reducer
 
 **Files:**
 - Modify: `spacetimedb/src/index.ts` (add reducer; add `spawnTokenImpl` helper)
@@ -837,7 +800,7 @@ import { findCard } from '../../lib/cards/lookup';
 import { getAbilitiesForCard, type CardAbility } from '../../lib/cards/cardAbilities';
 ```
 
-Try `spacetime publish` (see Task 14). If publish fails with module-resolution errors, revert to the duplication approach:
+Try `spacetime publish` (see Task 13). If publish fails with module-resolution errors, revert to the duplication approach:
 
 - Copy the contents of `lib/cards/cardAbilities.ts` into `spacetimedb/src/cardAbilities.ts`.
 - Copy a minimal `findCard` shim or inline the `CARDS` lookup into the same file.
@@ -988,7 +951,7 @@ git commit -m "feat(spacetime): execute_card_ability reducer + spawn_token impl"
 
 ---
 
-## Task 13: Extend `move_card` with token cleanup
+## Task 12: Extend `move_card` with token cleanup
 
 **Files:**
 - Modify: `spacetimedb/src/index.ts:1569-1621`
@@ -1034,7 +997,7 @@ git commit -m "feat(spacetime): delete tokens moved to non-play zones in move_ca
 
 ---
 
-## Task 14: Publish the module and regenerate bindings
+## Task 13: Publish the module and regenerate bindings
 
 **Files:**
 - Modify (auto-generated): `lib/spacetimedb/module_bindings/**`
@@ -1050,7 +1013,7 @@ grep -n "is_token\|isToken" lib/spacetimedb/module_bindings/card_instance_type.t
 grep -rn "execute_card_ability\|executeCardAbility" lib/spacetimedb/module_bindings/
 ```
 
-Both greps should return matches. If not, the publish/generate step did not succeed — inspect `spacetime publish` output and fix errors (most likely a missing field on the `CardInstance.insert(...)` object from Task 12).
+Both greps should return matches. If not, the publish/generate step did not succeed — inspect `spacetime publish` output and fix errors (most likely a missing field on the `CardInstance.insert(...)` object from Task 11).
 
 - [ ] **Step 3: Commit generated bindings**
 
@@ -1061,7 +1024,7 @@ git commit -m "chore(spacetime): regenerate client bindings for execute_card_abi
 
 ---
 
-## Task 15: Wire `executeCardAbility` through the multiplayer `GameActions` adapter
+## Task 14: Wire `executeCardAbility` through the multiplayer `GameActions` adapter
 
 **Files:**
 - Modify: `app/play/hooks/useGameState.ts` (find the object that implements `GameActions`)
@@ -1099,7 +1062,7 @@ git commit -m "feat(play): wire executeCardAbility through multiplayer adapter"
 
 ---
 
-## Task 16: Manual QA for multiplayer
+## Task 15: Manual QA for multiplayer
 
 **Files:** none — pure verification.
 
@@ -1121,11 +1084,11 @@ Player A drags a spawned Violent Possessor Token into Discard. It should disappe
 
 - [ ] **Step 5: Verify atomicity on server error**
 
-Temporarily break the registry to reference a nonexistent token (e.g., change Two Possessed's tokenName to `'Nonexistent Token'` in `lib/cards/cardAbilities.ts`). Re-run `spacetime publish` + `spacetime generate`. Spawning should now throw `SenderError('Unknown token …')` and produce zero tokens on both clients. Revert the edit and re-publish before completing the PR.
+Temporarily break the registry to reference a nonexistent token (e.g., change Two Possessed's tokenName to `'Nonexistent Token'` in `lib/cards/cardAbilities.ts`). Re-run `spacetime publish` + `spacetime generate`. Spawning should now throw `SenderError('Unknown token …')` and produce zero tokens on both clients. Revert the edit and re-publish before moving on to Task 16.
 
 ---
 
-## Task 17: Open PR 2
+## Task 16: Open the single combined PR
 
 - [ ] **Step 1: Run the full test suite**
 
@@ -1139,22 +1102,28 @@ Expected: all tests pass (including the parity test if the registry was duplicat
 
 ```bash
 git push -u origin HEAD
-gh pr create --title "feat: per-card custom abilities — multiplayer (SpacetimeDB)" --body "$(cat <<'EOF'
+gh pr create --title "feat: per-card custom abilities (goldfish + multiplayer)" --body "$(cat <<'EOF'
 ## Summary
-- Add `isToken: bool` to the `CardInstance` table.
-- New `execute_card_ability` reducer dispatches ability types from the shared `CARD_ABILITIES` registry; v1 ships `spawn_token`.
-- `move_card` now deletes tokens dropped into non-play zones (parallels the goldfish cleanup).
+- Introduce a shared ability registry at `lib/cards/cardAbilities.ts` keyed by card identifier.
+- Add `EXECUTE_CARD_ABILITY` goldfish reducer case with a `spawnTokenInState` helper (validate → build → commit atomicity).
+- Render per-card abilities at the top of the shared `CardContextMenu`.
+- Add `isToken: bool` to the SpacetimeDB `CardInstance` table.
+- New `execute_card_ability` server reducer dispatches ability types from the shared `CARD_ABILITIES` registry; v1 ships `spawn_token`.
+- `move_card` now deletes tokens dropped into non-play zones (parallels the goldfish cleanup at `gameReducer.ts:92`).
 - Multiplayer client adapter wires `GameActions.executeCardAbility` through `conn.reducers.executeCardAbility`.
 - Regenerated TypeScript bindings under `lib/spacetimedb/module_bindings/`.
 
-Follows PR 1 which shipped the goldfish implementation of the same feature.
+V1 ships with six GoC cards registered: Two Possessed spawns 2× Violent Possessor Token; the others each spawn 1 of their respective tokens.
 
 Spec: [`docs/superpowers/specs/2026-04-18-card-custom-abilities-design.md`](docs/superpowers/specs/2026-04-18-card-custom-abilities-design.md)
+Plan: [`docs/superpowers/plans/2026-04-18-card-custom-abilities-implementation.md`](docs/superpowers/plans/2026-04-18-card-custom-abilities-implementation.md)
 
 ## Test plan
+- [x] Registry integrity tests (every key + tokenName resolves via findCard)
+- [x] `spawnTokenInState` unit tests (count > 1, fallback zone, no-op on unknown card/ability, owner inheritance, atomic failure)
 - [x] `spacetime publish` succeeds with the new `isToken` field + `execute_card_ability` reducer
-- [x] Manual QA in two browsers per plan Task 16 (sync, ownership rejection, cleanup, atomic failure)
-- [x] Registry integrity + goldfish reducer suites still pass
+- [x] Manual QA in goldfish per plan Task 9 (each of six source cards, fallback zone, atomicity, cleanup)
+- [x] Manual QA in multiplayer per plan Task 15 (two browsers: sync, ownership rejection, cleanup, atomic failure)
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
