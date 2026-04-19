@@ -123,4 +123,16 @@ describe('EXECUTE_CARD_ABILITY — spawn_token', () => {
     expect(tokens).toHaveLength(1);
     expect(tokens[0].ownerId).toBe('player2');
   });
+
+  it('spawning pushes history so the spawn can be undone', () => {
+    const source = makeCard({ identifier: 'Two Possessed (GoC)' });
+    const state = makeState([source]);
+
+    const next = gameReducer(state, act('source-1', 0));
+
+    // 2 tokens spawned
+    expect(next.zones.territory.filter(c => c.isToken)).toHaveLength(2);
+    // History gained exactly one entry — the pre-spawn snapshot
+    expect(next.history.length).toBe(state.history.length + 1);
+  });
 });

@@ -43,6 +43,7 @@ function spawnTokenInState(
   state: GameState,
   source: GameCard,
   ability: Extract<CardAbility, { type: 'spawn_token' }>,
+  history: GameState[],
 ): GameState {
   // Phase 1 — validate. Any failure returns state unchanged.
   const tokenData = findCard(ability.tokenName);
@@ -83,7 +84,7 @@ function spawnTokenInState(
   // Phase 3 — commit in a single shallow clone.
   const zones = cloneZones(state.zones);
   zones[targetZone] = [...zones[targetZone], ...newCards];
-  return { ...state, zones };
+  return { ...state, zones, history };
 }
 
 function pushHistory(state: GameState): GameState[] {
@@ -735,7 +736,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
       switch (ability.type) {
         case 'spawn_token':
-          return spawnTokenInState(state, source, ability);
+          return spawnTokenInState(state, source, ability, history);
         case 'shuffle_and_draw':
           // Reserved for future — v1 ships spawn_token only.
           return state;
@@ -743,8 +744,11 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           // Custom abilities are dispatched client-side in multiplayer and
           // never reach the goldfish reducer in v1. No-op defensively.
           return state;
+        default: {
+          const _exhaustive: never = ability;
+          return state;
+        }
       }
-      return state;
     }
 
     default:
