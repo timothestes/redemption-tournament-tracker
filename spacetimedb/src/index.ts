@@ -239,6 +239,142 @@ function insertCardsShuffleDraw(
 }
 
 // ---------------------------------------------------------------------------
+// Helper: initializeSoulDeck (Paragon only)
+// Seeds 21 shared soul cards into 'soul-deck', then reveals 3 to
+// 'land-of-bondage' face-up. Uses the game's seeded PRNG for shuffle.
+// ---------------------------------------------------------------------------
+const PARAGON_SOUL_DEFS: Array<{ identifier: string; cardName: string; cardImgFile: string }> =
+  Array.from({ length: 21 }, (_, i) => {
+    const padded = String(i + 1).padStart(2, '0');
+    return {
+      identifier: `paragon-soul-${padded}`,
+      cardName: `Lost Soul ${padded}`,
+      cardImgFile: `/paragon-souls/Lost Soul ${padded}.png`,
+    };
+  });
+
+function initializeSoulDeck(ctx: any, game: any) {
+  // Insert 21 shared soul cards (ownerId = 0n sentinel)
+  for (let i = 0; i < PARAGON_SOUL_DEFS.length; i++) {
+    const def = PARAGON_SOUL_DEFS[i];
+    ctx.db.CardInstance.insert({
+      id: 0n,
+      gameId: game.id,
+      ownerId: 0n,
+      zone: 'soul-deck',
+      zoneIndex: BigInt(i),
+      posX: '',
+      posY: '',
+      isMeek: false,
+      isFlipped: true,
+      cardName: def.cardName,
+      cardSet: 'ParagonSoul',
+      cardImgFile: def.cardImgFile,
+      cardType: 'Lost Soul',
+      brigade: '',
+      strength: '',
+      toughness: '',
+      alignment: 'Evil',
+      identifier: def.identifier,
+      specialAbility: '',
+      reference: '',
+      notes: '',
+      equippedToInstanceId: 0n,
+      isSoulDeckOrigin: true,
+    });
+  }
+
+  // Shuffle soul deck using seeded PRNG (same pattern as insertCardsShuffleDraw)
+  const shuffleSeed = makeSeed(
+    ctx.timestamp.microsSinceUnixEpoch,
+    game.id,
+    0n,          // ownerId sentinel — keeps seed distinct from player decks
+    game.rngCounter
+  );
+  const soulCards = [...ctx.db.CardInstance.card_instance_game_id.filter(game.id)].filter(
+    (c: any) => c.ownerId === 0n && c.zone === 'soul-deck'
+  );
+  const indices = soulCards.map((_: any, idx: number) => idx);
+  seededShuffle(indices, shuffleSeed);
+  for (let i = 0; i < soulCards.length; i++) {
+    ctx.db.CardInstance.id.update({ ...soulCards[i], zoneIndex: BigInt(indices[i]) });
+  }
+
+  // Bump rngCounter after PRNG use
+  const latestGame = ctx.db.Game.id.find(game.id);
+  ctx.db.Game.id.update({ ...latestGame, rngCounter: latestGame.rngCounter + 1n });
+
+  // Reveal top 3 shuffled cards into land-of-bondage (face-up)
+  const shuffledSoulCards = [...ctx.db.CardInstance.card_instance_game_id.filter(game.id)]
+    .filter((c: any) => c.ownerId === 0n && c.zone === 'soul-deck')
+    .sort((a: any, b: any) => (a.zoneIndex < b.zoneIndex ? -1 : a.zoneIndex > b.zoneIndex ? 1 : 0));
+
+  for (let i = 0; i < 3 && i < shuffledSoulCards.length; i++) {
+    ctx.db.CardInstance.id.update({
+      ...shuffledSoulCards[i],
+      zone: 'land-of-bondage',
+      zoneIndex: BigInt(i),
+      isFlipped: false,
+    });
+  }
+
+  // Re-index remaining soul-deck cards to 0..N-1
+  const remainingSoulDeck = [...ctx.db.CardInstance.card_instance_game_id.filter(game.id)]
+    .filter((c: any) => c.ownerId === 0n && c.zone === 'soul-deck')
+    .sort((a: any, b: any) => (a.zoneIndex < b.zoneIndex ? -1 : a.zoneIndex > b.zoneIndex ? 1 : 0));
+  for (let i = 0; i < remainingSoulDeck.length; i++) {
+    if (remainingSoulDeck[i].zoneIndex !== BigInt(i)) {
+      ctx.db.CardInstance.id.update({ ...remainingSoulDeck[i], zoneIndex: BigInt(i) });
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Helper: refillSoulDeck (server-side, Paragon only)
+// Mirrors the goldfish client helper — tops up the shared LoB to 3
+// soul-origin souls from the soul-deck. Ignores captured characters and
+// LS tokens already in LoB (they don't count toward the rule of 3).
+// ---------------------------------------------------------------------------
+function refillSoulDeck(ctx: any, gameId: bigint) {
+  const gameCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)];
+
+  const lob = gameCards.filter((c: any) => c.zone === 'land-of-bondage');
+  const inPlayOrigin = lob.filter((c: any) => c.isSoulDeckOrigin === true).length;
+  const needed = 3 - inPlayOrigin;
+  if (needed <= 0) return;
+
+  const soulDeck = gameCards
+    .filter((c: any) => c.ownerId === 0n && c.zone === 'soul-deck')
+    .sort((a: any, b: any) => (a.zoneIndex < b.zoneIndex ? -1 : a.zoneIndex > b.zoneIndex ? 1 : 0));
+  if (soulDeck.length === 0) return;
+
+  // LoB index assignment — continue after current highest
+  let maxLobIdx = -1n;
+  for (const c of lob) {
+    if (c.zoneIndex > maxLobIdx) maxLobIdx = c.zoneIndex;
+  }
+
+  const take = Math.min(needed, soulDeck.length);
+  for (let i = 0; i < take; i++) {
+    maxLobIdx = maxLobIdx + 1n;
+    ctx.db.CardInstance.id.update({
+      ...soulDeck[i],
+      zone: 'land-of-bondage',
+      zoneIndex: maxLobIdx,
+      isFlipped: false,
+    });
+  }
+
+  // Re-index remaining soul-deck cards to close gaps
+  const remaining = soulDeck.slice(take);
+  for (let i = 0; i < remaining.length; i++) {
+    if (remaining[i].zoneIndex !== BigInt(i)) {
+      ctx.db.CardInstance.id.update({ ...remaining[i], zoneIndex: BigInt(i) });
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Reducer: create_game
 // ---------------------------------------------------------------------------
 export const create_game = spacetimedb.reducer(
@@ -670,6 +806,11 @@ export const pregame_acknowledge_first = spacetimedb.reducer(
           chosenName = p.displayName;
           break;
         }
+      }
+
+      const normalized = normalizeFormat(game.format);
+      if (normalized === 'Paragon') {
+        initializeSoulDeck(ctx, game);
       }
 
       ctx.db.Game.id.update({
