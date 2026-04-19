@@ -149,7 +149,9 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
   const isOwnedByLocalPlayer = true; // multiplayer server enforces ownership; UX predicate is a separate concern
   // Only allow abilities to fire when the source card is actually in play.
   // Cards in hand/deck/reserve/discard/banish can't trigger in-play effects.
-  const ABILITY_SOURCE_ZONES: ReadonlyArray<ZoneId> = ['territory', 'land-of-bondage'];
+  // "In play" means Territory, Land of Bondage, or Land of Redemption — heroes
+  // rest in LoR between battles, so omitting it blocks most Hero-source cards.
+  const ABILITY_SOURCE_ZONES: ReadonlyArray<ZoneId> = ['territory', 'land-of-bondage', 'land-of-redemption'];
   const isInAbilityZone = ABILITY_SOURCE_ZONES.includes(card.zone);
   const canExecuteAbilities =
     abilities.length > 0 &&

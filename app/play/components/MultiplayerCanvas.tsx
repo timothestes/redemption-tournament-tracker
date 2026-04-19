@@ -121,7 +121,7 @@ function cardInstanceToGameCard(
     alignment: card.alignment,
     isMeek: card.isMeek,
     isFlipped: card.isFlipped,
-    isToken: false,
+    isToken: card.isToken,
     zone: card.zone as GameCard['zone'],
     ownerId: owner,
     notes: card.notes,

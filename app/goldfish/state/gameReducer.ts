@@ -757,8 +757,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
       // Abilities only fire when the source card is in play. Matches the
       // CardContextMenu gate — a malformed dispatch from elsewhere still
-      // no-ops here rather than leaving weird state.
-      const ABILITY_SOURCE_ZONES: ZoneId[] = ['territory', 'land-of-bondage'];
+      // no-ops here rather than leaving weird state. Includes Land of
+      // Redemption so resting Heroes can trigger abilities.
+      const ABILITY_SOURCE_ZONES: ZoneId[] = ['territory', 'land-of-bondage', 'land-of-redemption'];
       if (!ABILITY_SOURCE_ZONES.includes(source.zone)) return state;
 
       // Registry keys match GameCard.cardName (includes the set suffix for the

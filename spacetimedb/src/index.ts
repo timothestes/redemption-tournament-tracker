@@ -2153,9 +2153,10 @@ export const execute_card_ability = spacetimedb.reducer(
 
     // Abilities only fire when the source card is in play. Matches the
     // client-side menu gate but the server enforces independently.
-    const ABILITY_SOURCE_ZONES = ['territory', 'land-of-bondage'];
+    // LoR included so resting Heroes (Angel of the Harvest, etc.) can spawn.
+    const ABILITY_SOURCE_ZONES = ['territory', 'land-of-bondage', 'land-of-redemption'];
     if (!ABILITY_SOURCE_ZONES.includes(source.zone)) {
-      throw new SenderError('Source card must be in play (territory or land-of-bondage)');
+      throw new SenderError('Source card must be in play');
     }
 
     // Registry keys match cardName (e.g., "Two Possessed (GoC)"). The
