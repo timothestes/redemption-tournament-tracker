@@ -19,11 +19,12 @@ const MOVE_ZONES: { id: ZoneId; label: string }[] = [
 ];
 
 function PeekCardContextPopup({
-  card, count, x, y, onClose, onMove, onMoveToTop, onMoveToBottom, onShuffleIn,
+  card, count, x, y, onClose, onMove, onMoveToTop, onMoveToBottom, onShuffleIn, sourceZone = 'deck',
 }: {
   card: GameCard; count?: number; x: number; y: number;
   onClose: () => void; onMove: (zone: ZoneId) => void;
   onMoveToTop: () => void; onMoveToBottom: () => void; onShuffleIn: () => void;
+  sourceZone?: ZoneId;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -58,19 +59,23 @@ function PeekCardContextPopup({
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
         >{zoneLabel}</button>
       ))}
-      <div style={{ height: 1, background: 'var(--gf-border)', margin: '4px 8px', opacity: 0.5 }} />
-      <button style={itemStyle} onClick={() => { onMoveToTop(); onClose(); }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-      >Top of Deck</button>
-      <button style={itemStyle} onClick={() => { onMoveToBottom(); onClose(); }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-      >Bottom of Deck</button>
-      <button style={itemStyle} onClick={() => { onShuffleIn(); onClose(); }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-      >Shuffle into Deck</button>
+      {sourceZone === 'deck' && (
+        <>
+          <div style={{ height: 1, background: 'var(--gf-border)', margin: '4px 8px', opacity: 0.5 }} />
+          <button style={itemStyle} onClick={() => { onMoveToTop(); onClose(); }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          >Top of Deck</button>
+          <button style={itemStyle} onClick={() => { onMoveToBottom(); onClose(); }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          >Bottom of Deck</button>
+          <button style={itemStyle} onClick={() => { onShuffleIn(); onClose(); }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          >Shuffle into Deck</button>
+        </>
+      )}
     </div>
   );
 }
@@ -609,6 +614,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
                 shuffleDeck();
               }
             }}
+            sourceZone={sourceZone}
           />
         );
       })()}
