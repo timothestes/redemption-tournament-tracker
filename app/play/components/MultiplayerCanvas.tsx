@@ -3312,16 +3312,22 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const SIDEBAR_ZONES = SIDEBAR_PILE_ZONES;
 
   // Build combined zone rect map for drag highlight overlay
-  const allZoneRects: { key: string; rect: ZoneRect; owner: 'my' | 'opponent' }[] = [];
+  const allZoneRects: { key: string; rect: ZoneRect; owner: 'my' | 'opponent' | 'shared' }[] = [];
   for (const [key, rect] of Object.entries(myZones)) {
+    // Skip the collapsed zero-height per-seat LoB rect in Paragon — shared LoB takes over.
+    if (normalizedFormat === 'Paragon' && key === 'land-of-bondage') continue;
     allZoneRects.push({ key: `my:${key}`, rect, owner: 'my' });
   }
   allZoneRects.push({ key: 'my:hand', rect: myHandRect, owner: 'my' });
   for (const [key, rect] of Object.entries(opponentZones)) {
+    if (normalizedFormat === 'Paragon' && key === 'land-of-bondage') continue;
     allZoneRects.push({ key: `opponent:${key}`, rect, owner: 'opponent' });
   }
   if (opponentHandRect) {
     allZoneRects.push({ key: 'opponent:hand', rect: opponentHandRect, owner: 'opponent' });
+  }
+  if (normalizedFormat === 'Paragon' && mpLayout?.zones.sharedLob) {
+    allZoneRects.push({ key: 'shared:land-of-bondage', rect: mpLayout.zones.sharedLob, owner: 'shared' });
   }
 
   return (
@@ -4815,22 +4821,15 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             if (key === sourceKey) return null;
 
             const isHovered = dragHoverZone === key;
-            const borderColor =
-              owner === 'my'
-                ? isHovered
-                  ? 'rgba(196,149,90,0.6)'
-                  : 'rgba(196,149,90,0.2)'
-                : isHovered
-                  ? 'rgba(100,149,237,0.6)'
-                  : 'rgba(100,149,237,0.2)';
-            const bgColor =
-              owner === 'my'
-                ? isHovered
-                  ? 'rgba(196,149,90,0.12)'
-                  : 'transparent'
-                : isHovered
-                  ? 'rgba(100,149,237,0.12)'
-                  : 'transparent';
+            // Shared Paragon zones use the same warm tone as own zones so the
+            // shared LoB glows the same way as per-seat zones during drag.
+            const warm = owner === 'my' || owner === 'shared';
+            const borderColor = warm
+              ? isHovered ? 'rgba(196,149,90,0.6)' : 'rgba(196,149,90,0.2)'
+              : isHovered ? 'rgba(100,149,237,0.6)' : 'rgba(100,149,237,0.2)';
+            const bgColor = warm
+              ? isHovered ? 'rgba(196,149,90,0.12)' : 'transparent'
+              : isHovered ? 'rgba(100,149,237,0.12)' : 'transparent';
 
             const screenTopLeft = virtualToScreen(rect.x, rect.y, scale, offsetX, offsetY);
             const screenBottomRight = virtualToScreen(rect.x + rect.width, rect.y + rect.height, scale, offsetX, offsetY);
