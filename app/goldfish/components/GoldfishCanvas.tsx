@@ -222,6 +222,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   const [peekState, setPeekState] = useState<{ cardIds: string[]; title: string; sourceZone?: ZoneId } | null>(null);
   const [lookState, setLookState] = useState<{ cardIds: string[]; title: string; sourceZone?: ZoneId } | null>(null);
   const [deckDropPopup, setDeckDropPopup] = useState<{ cardInstanceId: string; x: number; y: number } | null>(null);
+  const [soulDeckDropPopup, setSoulDeckDropPopup] = useState<{ cardInstanceId: string; batchIds?: string[]; x: number; y: number } | null>(null);
   const [canvasDragZone, setCanvasDragZone] = useState<ZoneId | null>(null);
   const isCanvasDragging = useRef(false);
   // React-visible drag flag used to hide the HTML unlink overlay during drag
@@ -367,6 +368,8 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   const ZONE_HIT_ORDER: ZoneId[] = useMemo(() => [
     // Sidebar zones first (small, precise targets)
     'land-of-redemption', 'banish', 'reserve', 'deck', 'discard',
+    // Soul deck pile (Paragon only, narrow column inside land-of-bondage)
+    'soul-deck',
     // Then main area zones
     'land-of-bondage', 'territory', 'hand',
   ], []);
@@ -728,6 +731,27 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
           }
           const screenPos = virtualToScreen(centerX, centerY, scale, offsetX, offsetY);
           handleDeckDrop(card.instanceId, rect.left + screenPos.x, rect.top + screenPos.y);
+        }
+      } else if (targetZone === 'soul-deck' && card.zone !== 'soul-deck') {
+        // Paragon: dropping on the soul deck pile opens a top/bottom/shuffle popup.
+        let cardGroup: Konva.Node | null = node;
+        while (cardGroup && !cardGroup.draggable()) {
+          cardGroup = cardGroup.parent;
+        }
+        if (cardGroup) {
+          cardGroup.visible(false);
+          cardGroup.getLayer()?.batchDraw();
+        }
+        const stage = stageRef.current;
+        if (stage) {
+          const rect = stage.container().getBoundingClientRect();
+          const screenPos = virtualToScreen(centerX, centerY, scale, offsetX, offsetY);
+          setSoulDeckDropPopup({
+            cardInstanceId: card.instanceId,
+            batchIds: isGroupDrag ? cardIds : undefined,
+            x: rect.left + screenPos.x,
+            y: rect.top + screenPos.y,
+          });
         }
       } else if (targetZone && (targetZone !== card.zone || targetZone === 'territory')) {
         // Hide the dragged card group immediately so it doesn't linger at the drop position
@@ -2562,6 +2586,33 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
           onCancel={() => { setDeckDropPopup(null); setBatchDeckDropIds(null); setCardRenderKey(k => k + 1); }}
         />
       )}
+
+      {soulDeckDropPopup && (() => {
+        const ids = soulDeckDropPopup.batchIds ?? [soulDeckDropPopup.cardInstanceId];
+        return (
+          <DeckDropPopup
+            x={soulDeckDropPopup.x}
+            y={soulDeckDropPopup.y}
+            onShuffleIn={() => {
+              for (const id of ids) moveCard(id, 'soul-deck');
+              dispatch(gameActionCreators.shuffleSoulDeck());
+              setSoulDeckDropPopup(null);
+              if (soulDeckDropPopup.batchIds) clearSelection();
+            }}
+            onTopDeck={() => {
+              for (const id of ids) moveCard(id, 'soul-deck', 0);
+              setSoulDeckDropPopup(null);
+              if (soulDeckDropPopup.batchIds) clearSelection();
+            }}
+            onBottomDeck={() => {
+              for (const id of ids) moveCard(id, 'soul-deck');
+              setSoulDeckDropPopup(null);
+              if (soulDeckDropPopup.batchIds) clearSelection();
+            }}
+            onCancel={() => { setSoulDeckDropPopup(null); setCardRenderKey(k => k + 1); }}
+          />
+        );
+      })()}
 
         {exchangeCardIds && (
           <DeckExchangeModal
