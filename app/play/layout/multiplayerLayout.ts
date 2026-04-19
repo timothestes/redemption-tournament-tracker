@@ -387,46 +387,63 @@ export function calculateMultiplayerLayout(
   let paragonOpponentLob: ZoneRect | undefined;
   let paragonPlayerLob: ZoneRect | undefined;
   let paragonDivider: ZoneRect | undefined;
+  let paragonOpponentTerritory: ZoneRect | undefined;
   let paragonPlayerTerritory: ZoneRect | undefined;
   let paragonPlayerHand: ZoneRect | undefined;
   if (format === 'Paragon') {
     const SOUL_DECK_GUTTER = 4;
-    // Shared band = (old oppLob + old divider + old playerLob) vertical budget
-    const sharedBandHeight = oppLobHeight + dividerHeight + playerLobHeight;
-    const sharedBandY = oppTerritoryY + oppTerritoryHeight;
-    // Player territory shifts UP to sit directly under the shared band.
-    const paragonPlayerTerritoryY = sharedBandY + sharedBandHeight;
-    const paragonPlayerHandY = paragonPlayerTerritoryY + playerTerritoryHeight;
+
+    // 1. Drop the unused opp LoB slot at the top — shift opp territory up.
+    const paragonOppTerritoryY = oppHandHeight;
+
+    // 2. Shrink the shared band to roughly one per-seat LoB's visual weight.
+    const paragonSharedBandHeight = oppLobHeight + gap * 2;
+
+    // 3. Distribute the freed budget evenly into the two territories.
+    const freedBudget = dividerHeight + playerLobHeight - gap * 2;
+    const territoryBonus = Math.floor(freedBudget / 2);
+    const paragonOppTerritoryHeight = oppTerritoryHeight + territoryBonus;
+    const paragonPlayerTerritoryHeight = playerTerritoryHeight + (freedBudget - territoryBonus);
+
+    const paragonSharedBandY = paragonOppTerritoryY + paragonOppTerritoryHeight;
+    const paragonPlayerTerritoryY = paragonSharedBandY + paragonSharedBandHeight;
+    const paragonPlayerHandY = paragonPlayerTerritoryY + paragonPlayerTerritoryHeight;
     const paragonPlayerHandHeight = stageHeight - paragonPlayerHandY;
 
     const soulDeckWidth = Math.round(Math.min(100, (playAreaWidth - pad * 2) * 0.12));
 
     sharedLob = {
       x: pad + soulDeckWidth + SOUL_DECK_GUTTER,
-      y: sharedBandY + gap,
+      y: paragonSharedBandY + gap,
       width: playAreaWidth - pad * 2 - soulDeckWidth - SOUL_DECK_GUTTER,
-      height: sharedBandHeight - gap * 2,
+      height: paragonSharedBandHeight - gap * 2,
       label: 'Land of Bondage (Shared)',
     };
     soulDeck = {
       x: pad,
-      y: sharedBandY + gap,
+      y: paragonSharedBandY + gap,
       width: soulDeckWidth,
-      height: sharedBandHeight - gap * 2,
+      height: paragonSharedBandHeight - gap * 2,
       label: 'Soul Deck',
     };
 
-    // Collapse the legacy LoB / divider rects to zero-height at the shared
-    // band's Y position so forgotten render sites are silent no-ops rather
-    // than out-of-place overlays.
-    paragonOpponentLob = { x: pad, y: sharedBandY, width: playAreaWidth - pad * 2, height: 0, label: '' };
-    paragonDivider = { x: 0, y: sharedBandY, width: stageWidth, height: 0, label: '' };
-    paragonPlayerLob = { x: pad, y: paragonPlayerTerritoryY + playerTerritoryHeight, width: playAreaWidth - pad * 2, height: 0, label: '' };
+    // Collapse legacy LoB / divider rects to zero-height at the shared band's Y
+    // so any forgotten render sites are silent no-ops.
+    paragonOpponentLob = { x: pad, y: paragonSharedBandY, width: playAreaWidth - pad * 2, height: 0, label: '' };
+    paragonDivider    = { x: 0,   y: paragonSharedBandY, width: stageWidth,           height: 0, label: '' };
+    paragonPlayerLob  = { x: pad, y: paragonPlayerTerritoryY + paragonPlayerTerritoryHeight, width: playAreaWidth - pad * 2, height: 0, label: '' };
 
-    // Shift the player territory + player hand down.
+    // Replace opponent territory + player territory + player hand rects with the
+    // reallocated geometry so downstream code reads the correct dimensions.
+    paragonOpponentTerritory = {
+      ...opponentTerritory,
+      y: paragonOppTerritoryY + gap,
+      height: paragonOppTerritoryHeight - gap,
+    };
     paragonPlayerTerritory = {
       ...playerTerritory,
       y: paragonPlayerTerritoryY,
+      height: paragonPlayerTerritoryHeight - gap,
     };
     paragonPlayerHand = {
       x: 0,
@@ -439,14 +456,25 @@ export function calculateMultiplayerLayout(
 
   // ── Sidebars ─────────────────────────────────────────────────────────
   // Split at the center divider so each sidebar mirrors its half of the board.
-  const oppSidebarY = oppLobY;
-  const oppSidebarHeight = (format === 'Paragon' ? oppTerritoryY + oppTerritoryHeight : dividerY) - oppLobY;
-  const playerSidebarY = format === 'Paragon'
-    ? (paragonPlayerTerritory?.y ?? (dividerY + dividerHeight))
-    : dividerY + dividerHeight;
-  const playerSidebarHeight = (format === 'Paragon'
-    ? (paragonPlayerHand?.y ?? playerHandY)
-    : playerHandY) - playerSidebarY;
+  const sharedBandMidY = format === 'Paragon' && sharedLob
+    ? sharedLob.y + sharedLob.height / 2
+    : null;
+
+  const oppSidebarY = format === 'Paragon' ? oppHandHeight : oppLobY;
+  const oppSidebarHeight =
+    format === 'Paragon' && sharedBandMidY !== null
+      ? sharedBandMidY - oppSidebarY
+      : dividerY - oppSidebarY;
+
+  const playerSidebarY =
+    format === 'Paragon' && sharedBandMidY !== null
+      ? sharedBandMidY
+      : dividerY + dividerHeight;
+
+  const playerSidebarHeight =
+    (format === 'Paragon'
+      ? (paragonPlayerHand?.y ?? playerHandY)
+      : playerHandY) - playerSidebarY;
 
   // Opponent piles: Deck (top) → Discard → Reserve → Banish → LOR (bottom)
   const oppPileLabels = ['Deck', 'Discard', 'Reserve', 'Banish', 'Land of Redemption'];
@@ -467,7 +495,11 @@ export function calculateMultiplayerLayout(
   );
 
   // ── Card dimensions (four tiers, derived from actual virtual width) ──
-  const computed = computeCardDimensions(playAreaWidth, oppLobHeight, profile);
+  const lobHeightForCardSizing =
+    format === 'Paragon' && sharedLob
+      ? sharedLob.height
+      : oppLobHeight;
+  const computed = computeCardDimensions(playAreaWidth, lobHeightForCardSizing, profile);
   const mainCard = computed.mainCard;
   const lobCard = computed.lobCard;
   const opponentHandCard = computed.oppHandCard;
@@ -486,7 +518,7 @@ export function calculateMultiplayerLayout(
   return {
     zones: {
       opponentHand,
-      opponentTerritory,
+      opponentTerritory: paragonOpponentTerritory ?? opponentTerritory,
       opponentLob: paragonOpponentLob ?? opponentLob,
       divider: paragonDivider ?? divider,
       playerLob: paragonPlayerLob ?? playerLob,
