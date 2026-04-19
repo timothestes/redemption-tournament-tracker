@@ -595,6 +595,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const [soulDeckLookState, setSoulDeckLookState] = useState<
     { cardIds: string[]; title: string } | null
   >(null);
+  // Public reveal of N soul-deck cards — shows a modal for both players and
+  // broadcasts via revealCards. Cards stay in the soul deck until dragged out.
+  const [soulDeckPeekState, setSoulDeckPeekState] = useState<
+    { cardIds: string[]; title: string } | null
+  >(null);
   const [lorMenu, setLorMenu] = useState<{ x: number; y: number } | null>(null);
   const [deckDrop, setDeckDrop] = useState<{ x: number; y: number; cardId: string; batchIds?: string[] } | null>(null);
   const pendingBatchRef = useRef<string[] | null>(null);
@@ -629,6 +634,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       opponentLookState !== null ||
       browseSoulDeck ||
       soulDeckLookState !== null ||
+      soulDeckPeekState !== null ||
       (approvedSearchRequest != null &&
         !approvedSearchRequest.action &&
         approvedSearchRequest.zone !== 'hand-reveal' &&
@@ -645,6 +651,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     opponentLookState,
     browseSoulDeck,
     soulDeckLookState,
+    soulDeckPeekState,
     approvedSearchRequest,
   ]);
 
@@ -1068,6 +1075,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     setSoulDeckMenu(null);
     setBrowseSoulDeck(false);
     setSoulDeckLookState(null);
+    setSoulDeckPeekState(null);
   }, []);
 
   // ---- moveDeckCardsToZone helper ----
@@ -1154,6 +1162,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     [sharedCards],
   );
 
+  // Reveal: show the top/bottom/random N soul-deck cards in a public modal
+  // for both players. Cards STAY in the soul deck until the player drags
+  // them out or closes the modal.
   const revealFromSoulDeck = useCallback(
     (mode: 'top' | 'bottom' | 'random', n: number) => {
       setSoulDeckMenu(null);
@@ -1163,7 +1174,28 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       }
       const ids = pickSoulDeckIds(mode, n);
       if (ids.length === 0) return;
-      // Rescue-attempt reveals are intentionally non-undoable — skip the undo wrapper.
+      const count = ids.length;
+      const title = mode === 'top'
+        ? `Top ${count} of Soul Deck`
+        : mode === 'bottom'
+          ? `Bottom ${count} of Soul Deck`
+          : `Random ${count} from Soul Deck`;
+      setSoulDeckPeekState({ cardIds: ids, title });
+    },
+    [sharedCards, pickSoulDeckIds],
+  );
+
+  // Draw: move the top/bottom/random N soul-deck cards directly into the
+  // shared LoB, face-up. Non-undoable rescue-attempt reveal semantics.
+  const drawFromSoulDeck = useCallback(
+    (mode: 'top' | 'bottom' | 'random', n: number) => {
+      setSoulDeckMenu(null);
+      if ((sharedCards['soul-deck'] ?? []).length === 0) {
+        showGameToast('Soul Deck is empty');
+        return;
+      }
+      const ids = pickSoulDeckIds(mode, n);
+      if (ids.length === 0) return;
       if (ids.length === 1) {
         gameState.moveCard(BigInt(ids[0]), 'land-of-bondage');
       } else {
@@ -1748,6 +1780,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       : '';
     gameState.revealCards(serialized, context);
   }, [peekCardIds, peekState]);
+
+  // Broadcast the soul-deck reveal to both players. The soul-deck IDs already
+  // live in sharedCards (visible to both seats) — revealCards tells the
+  // opponent to open a matching modal over the same IDs.
+  const soulDeckPeekIdsRef = useRef<string>('');
+  useEffect(() => {
+    if (!soulDeckPeekState || soulDeckPeekState.cardIds.length === 0) {
+      soulDeckPeekIdsRef.current = '';
+      return;
+    }
+    const serialized = JSON.stringify(soulDeckPeekState.cardIds);
+    if (soulDeckPeekIdsRef.current === serialized) return;
+    soulDeckPeekIdsRef.current = serialized;
+    gameState.revealCards(serialized);
+  }, [soulDeckPeekState, gameState]);
 
   // Opponent's revealed cards — driven by SpacetimeDB player.revealedCards
   const opponentRevealedCardIds = useMemo(() => {
@@ -5021,11 +5068,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           onRevealTop={(n) => revealFromSoulDeck('top', n)}
           onRevealBottom={(n) => revealFromSoulDeck('bottom', n)}
           onRevealRandom={(n) => revealFromSoulDeck('random', n)}
-          // For the soul deck, Draw == Reveal: the card leaves the soul deck
-          // and lands face-up in the shared LoB. There's no private equivalent.
-          onDrawTop={(n) => revealFromSoulDeck('top', n)}
-          onDrawBottom={(n) => revealFromSoulDeck('bottom', n)}
-          onDrawRandom={(n) => revealFromSoulDeck('random', n)}
+          // Draw moves the card face-up into the shared LoB directly.
+          // Reveal shows a public modal without moving the card.
+          onDrawTop={(n) => drawFromSoulDeck('top', n)}
+          onDrawBottom={(n) => drawFromSoulDeck('bottom', n)}
+          onDrawRandom={(n) => drawFromSoulDeck('random', n)}
           onDiscardTop={() => {}}
           onDiscardBottom={() => {}}
           onDiscardRandom={() => {}}
@@ -5563,6 +5610,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             didDragRef={modalDidDragRef}
             isDragActive={modalDrag.isDragging}
             isPrivateLook
+            sourceZone="soul-deck"
+          />
+        )}
+        {soulDeckPeekState && (
+          <DeckPeekModal
+            cardIds={soulDeckPeekState.cardIds}
+            title={soulDeckPeekState.title}
+            onClose={() => { setSoulDeckPeekState(null); gameState.clearRevealedCards(); }}
+            onStartDrag={modalStartDrag}
+            onStartMultiDrag={modalStartMultiDrag}
+            didDragRef={modalDidDragRef}
+            isDragActive={modalDrag.isDragging}
             sourceZone="soul-deck"
           />
         )}
