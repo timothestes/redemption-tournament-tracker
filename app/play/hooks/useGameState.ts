@@ -99,6 +99,7 @@ export interface GameState {
   moveCardToBottomOfDeck: (cardInstanceId: bigint) => void;
   spawnLostSoul: (testament: string, posX: string, posY: string, targetPlayerId?: string) => void;
   removeToken: (cardInstanceId: bigint) => void;
+  executeCardAbility: (sourceInstanceId: string, abilityIndex: number) => void;
   resignGame: () => void;
   leaveGame: () => void;
   claimTimeoutVictory: () => void;
@@ -557,6 +558,20 @@ export function useGameState(gameId: bigint): GameState {
     [conn, gameId],
   );
 
+  const executeCardAbility = useCallback(
+    (sourceInstanceId: string, abilityIndex: number) => {
+      // v1 registry has no `type: 'custom'` entries, so every ability routes
+      // through the generic reducer. When the first custom ability ships,
+      // branch here and call conn.reducers[ability.reducerName] directly.
+      conn?.reducers.executeCardAbility({
+        gameId,
+        cardInstanceId: BigInt(sourceInstanceId),
+        abilityIndex: BigInt(abilityIndex),
+      });
+    },
+    [conn, gameId],
+  );
+
   const resignGame = useCallback(() => {
     conn?.reducers.resignGame({ gameId });
   }, [conn, gameId]);
@@ -742,6 +757,7 @@ export function useGameState(gameId: bigint): GameState {
     moveCardToBottomOfDeck,
     spawnLostSoul,
     removeToken,
+    executeCardAbility,
     resignGame,
     leaveGame,
     claimTimeoutVictory,

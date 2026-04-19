@@ -903,6 +903,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       gameState.spawnLostSoul(testament, posX ?? '0.5', posY ?? '0.5'),
     removeToken: (cardId) => gameState.removeToken(BigInt(cardId)),
     removeOpponentToken: undefined,
+    executeCardAbility: (sourceInstanceId, abilityIndex) =>
+      gameState.executeCardAbility(sourceInstanceId, abilityIndex),
     randomHandToZone: (count, toZone, deckPosition) =>
       gameState.randomHandToZone(count, toZone, deckPosition),
     randomReserveToZone: (count, toZone, deckPosition) =>
