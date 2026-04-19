@@ -2321,7 +2321,6 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
           x={soulDeckMenu.x}
           y={soulDeckMenu.y}
           deckSize={state.zones['soul-deck'].length}
-          hideDrawActions
           hideDiscardActions
           hideReserveActions
           onClose={() => setSoulDeckMenu(null)}
@@ -2333,10 +2332,11 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
           onRevealTop={(n) => revealFromSoulDeck('top', n)}
           onRevealBottom={(n) => revealFromSoulDeck('bottom', n)}
           onRevealRandom={(n) => revealFromSoulDeck('random', n)}
+          // Draw == Reveal for the shared pile: the card leaves face-up into LoB.
+          onDrawTop={(n) => revealFromSoulDeck('top', n)}
+          onDrawBottom={(n) => revealFromSoulDeck('bottom', n)}
+          onDrawRandom={(n) => revealFromSoulDeck('random', n)}
           // Hidden actions — still required by the prop contract
-          onDrawTop={() => {}}
-          onDrawBottom={() => {}}
-          onDrawRandom={() => {}}
           onDiscardTop={() => {}}
           onDiscardBottom={() => {}}
           onDiscardRandom={() => {}}
