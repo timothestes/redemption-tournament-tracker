@@ -37,4 +37,8 @@ export interface GameActions {
   // Equip weapon to warrior (optional — implemented by both goldfish and multiplayer)
   attachCard?(weaponId: string, warriorId: string): void;
   detachCard?(cardId: string, posX?: number, posY?: number): void;
+
+  // Custom per-card abilities (optional — registry-driven right-click actions).
+  // Implemented by both goldfish and multiplayer. See lib/cards/cardAbilities.ts.
+  executeCardAbility?(sourceInstanceId: string, abilityIndex: number): void;
 }
