@@ -316,9 +316,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   }, [gameState.disconnectTimeoutFired]);
 
   // ---- Layout ----
+  // Normalize the raw game.format string (e.g. "Paragon Type 1", "Type 2") to
+  // the canonical 'T1' | 'T2' | 'Paragon' expected by the layout function.
+  const rawFormat = gameState.game?.format ?? '';
+  const normalizedFormat: 'T1' | 'T2' | 'Paragon' = rawFormat.toLowerCase().includes('paragon')
+    ? 'Paragon'
+    : rawFormat.toLowerCase().includes('type 2') || rawFormat.toLowerCase() === 't2'
+      ? 'T2'
+      : 'T1';
   const mpLayout = useMemo(
-    () => calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT),
-    [virtualWidth],
+    () => calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT, normalizedFormat),
+    [virtualWidth, normalizedFormat],
   );
 
   // Card scale preference

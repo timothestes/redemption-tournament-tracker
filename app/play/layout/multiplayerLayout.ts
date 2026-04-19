@@ -52,6 +52,8 @@ export interface MultiplayerLayout {
     playerLob: ZoneRect;
     playerTerritory: ZoneRect;
     playerHand: ZoneRect;
+    sharedLob?: ZoneRect;     // NEW — present when Paragon
+    soulDeck?: ZoneRect;      // NEW — present when Paragon
   };
   sidebar: {
     opponent: Partial<Record<PileZone, ZoneRect>>;
@@ -280,6 +282,7 @@ function buildSidebar(
 export function calculateMultiplayerLayout(
   stageWidth: number,
   stageHeight: number,
+  format: 'T1' | 'T2' | 'Paragon' = 'T1',
 ): MultiplayerLayout {
   const profile = getProfile(stageWidth);
   const pad = 6;
@@ -362,6 +365,30 @@ export function calculateMultiplayerLayout(
     label: 'Land of Bondage',
   };
 
+  // Paragon: collapse both per-seat LoBs into a single shared band sitting
+  // on top of the center divider. Soul Deck pile anchors the left end.
+  let sharedLob: ZoneRect | undefined;
+  let soulDeck: ZoneRect | undefined;
+  if (format === 'Paragon') {
+    const sharedBandY = oppTerritoryY + oppTerritoryHeight + gap;
+    const sharedBandHeight = oppLobHeight + dividerHeight + playerLobHeight - gap * 2;
+    const soulDeckWidth = Math.round(Math.min(100, (playAreaWidth - pad * 2) * 0.12));
+    sharedLob = {
+      x: pad + soulDeckWidth + 4,
+      y: sharedBandY,
+      width: playAreaWidth - pad * 2 - soulDeckWidth - 4,
+      height: sharedBandHeight,
+      label: 'Land of Bondage (Shared)',
+    };
+    soulDeck = {
+      x: pad,
+      y: sharedBandY,
+      width: soulDeckWidth,
+      height: sharedBandHeight,
+      label: 'Soul Deck',
+    };
+  }
+
   const playerHand: ZoneRect = {
     x: 0,
     y: playerHandY,
@@ -421,6 +448,8 @@ export function calculateMultiplayerLayout(
       playerLob,
       playerTerritory,
       playerHand,
+      sharedLob,
+      soulDeck,
     },
     sidebar: {
       opponent: opponentSidebar,
