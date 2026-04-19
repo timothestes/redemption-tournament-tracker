@@ -987,7 +987,28 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     [state.zones],
   );
 
+  // Reveal: show the top/bottom/random N soul-deck cards in a peek modal.
+  // Cards stay in the soul deck until the user drags them out or closes.
   const revealFromSoulDeck = useCallback(
+    (mode: 'top' | 'bottom' | 'random', n: number) => {
+      setSoulDeckMenu(null);
+      const pile = state.zones['soul-deck'];
+      if (pile.length === 0) { showGameToast('Soul Deck is empty'); return; }
+      const ids = pickSoulDeckIds(mode, n);
+      if (ids.length === 0) return;
+      const count = ids.length;
+      const title = mode === 'top'
+        ? `Top ${count} of Soul Deck`
+        : mode === 'bottom'
+          ? `Bottom ${count} of Soul Deck`
+          : `Random ${count} from Soul Deck`;
+      setPeekState({ cardIds: ids, title, sourceZone: 'soul-deck' });
+    },
+    [state.zones, pickSoulDeckIds],
+  );
+
+  // Draw: move the top/bottom/random N soul-deck cards face-up into the LoB.
+  const drawFromSoulDeck = useCallback(
     (mode: 'top' | 'bottom' | 'random', n: number) => {
       setSoulDeckMenu(null);
       const pile = state.zones['soul-deck'];
@@ -2332,10 +2353,10 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
           onRevealTop={(n) => revealFromSoulDeck('top', n)}
           onRevealBottom={(n) => revealFromSoulDeck('bottom', n)}
           onRevealRandom={(n) => revealFromSoulDeck('random', n)}
-          // Draw == Reveal for the shared pile: the card leaves face-up into LoB.
-          onDrawTop={(n) => revealFromSoulDeck('top', n)}
-          onDrawBottom={(n) => revealFromSoulDeck('bottom', n)}
-          onDrawRandom={(n) => revealFromSoulDeck('random', n)}
+          // Draw moves the card face-up into LoB; Reveal shows a peek modal.
+          onDrawTop={(n) => drawFromSoulDeck('top', n)}
+          onDrawBottom={(n) => drawFromSoulDeck('bottom', n)}
+          onDrawRandom={(n) => drawFromSoulDeck('random', n)}
           // Hidden actions — still required by the prop contract
           onDiscardTop={() => {}}
           onDiscardBottom={() => {}}
