@@ -755,6 +755,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       }
       if (!source) return state;
 
+      // Abilities only fire when the source card is in play. Matches the
+      // CardContextMenu gate — a malformed dispatch from elsewhere still
+      // no-ops here rather than leaving weird state.
+      const ABILITY_SOURCE_ZONES: ZoneId[] = ['territory', 'land-of-bondage'];
+      if (!ABILITY_SOURCE_ZONES.includes(source.zone)) return state;
+
       // Registry keys match GameCard.cardName (includes the set suffix for the
       // v1 cards, e.g., "Two Possessed (GoC)"). The card's identifier field is
       // a taxonomy descriptor ("Generic, Demon", etc.) and is NOT unique enough

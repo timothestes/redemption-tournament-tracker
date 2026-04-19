@@ -55,7 +55,7 @@ interface GoldfishCanvasProps {
 }
 
 export default function GoldfishCanvas({ containerWidth, containerHeight, scale, offsetX, offsetY, virtualWidth, onLoadDeck }: GoldfishCanvasProps) {
-  const { state, dispatch, drawCard, drawMultiple, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck, shuffleDeck, meekCard, unmeekCard, flipCard, addCounter, removeCounter, addNote, addOpponentLostSoul, removeOpponentToken, addPlayerLostSoul, reorderHand, attachCard, detachCard } = useGame();
+  const { state, dispatch, drawCard, drawMultiple, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck, shuffleDeck, meekCard, unmeekCard, flipCard, addCounter, removeCounter, addNote, addOpponentLostSoul, removeOpponentToken, executeCardAbility, addPlayerLostSoul, reorderHand, attachCard, detachCard } = useGame();
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const stageRef = useRef<Konva.Stage>(null);
   const gameLayerRef = useRef<Konva.Layer>(null);
@@ -85,10 +85,11 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     moveCardToTopOfDeck: (cardId) => moveCardToTopOfDeck(cardId),
     moveCardToBottomOfDeck: (cardId) => moveCardToBottomOfDeck(cardId),
     removeOpponentToken: (cardId) => removeOpponentToken(cardId),
+    executeCardAbility: (cardId, abilityIndex) => executeCardAbility(cardId, abilityIndex),
     randomHandToZone: () => {}, // not used in goldfish
     randomReserveToZone: () => {}, // not used in goldfish
     reloadDeck: () => {}, // not used in goldfish
-  }), [moveCard, moveCardsBatch, flipCard, meekCard, unmeekCard, addCounter, removeCounter, shuffleCardIntoDeck, shuffleDeck, addNote, drawCard, drawMultiple, moveCardToTopOfDeck, moveCardToBottomOfDeck, removeOpponentToken]);
+  }), [moveCard, moveCardsBatch, flipCard, meekCard, unmeekCard, addCounter, removeCounter, shuffleCardIntoDeck, shuffleDeck, addNote, drawCard, drawMultiple, moveCardToTopOfDeck, moveCardToBottomOfDeck, removeOpponentToken, executeCardAbility]);
 
   // Bridge goldfish game state into the shared ModalGameContext for shared modal components
   const modalGameValue = useMemo<ModalGameContextValue>(() => ({

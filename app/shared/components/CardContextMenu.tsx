@@ -147,10 +147,15 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
   // field is a taxonomy descriptor, not a stable lookup key.
   const abilities = getAbilitiesForCard(card.cardName);
   const isOwnedByLocalPlayer = true; // multiplayer server enforces ownership; UX predicate is a separate concern
+  // Only allow abilities to fire when the source card is actually in play.
+  // Cards in hand/deck/reserve/discard/banish can't trigger in-play effects.
+  const ABILITY_SOURCE_ZONES: ReadonlyArray<ZoneId> = ['territory', 'land-of-bondage'];
+  const isInAbilityZone = ABILITY_SOURCE_ZONES.includes(card.zone);
   const canExecuteAbilities =
     abilities.length > 0 &&
     typeof actions.executeCardAbility === 'function' &&
-    isOwnedByLocalPlayer;
+    isOwnedByLocalPlayer &&
+    isInAbilityZone;
 
   // Opponent tokens get a simplified menu
   if (card.isToken) {

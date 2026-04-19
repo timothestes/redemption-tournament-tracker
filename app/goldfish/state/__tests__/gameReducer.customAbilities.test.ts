@@ -87,15 +87,25 @@ describe('EXECUTE_CARD_ABILITY — spawn_token', () => {
     expect(tokens[0].cardName).toBe('Proselyte Token');
   });
 
-  it('spawn from a non-play zone falls back to territory', () => {
+  it('spawn from a non-play zone is blocked (cards in hand cannot trigger abilities)', () => {
     const source = makeCard({ zone: 'hand', cardName: 'The Proselytizers (GoC)' });
     const state = makeState([source]);
 
     const next = gameReducer(state, act('source-1', 0));
 
-    const tokens = next.zones.territory.filter(c => c.isToken);
+    // No tokens spawned anywhere; state reference unchanged.
+    expect(next).toBe(state);
+  });
+
+  it('spawn from land-of-bondage works (a play zone)', () => {
+    const source = makeCard({ zone: 'land-of-bondage', cardName: 'The Proselytizers (GoC)' });
+    const state = makeState([source]);
+
+    const next = gameReducer(state, act('source-1', 0));
+
+    // Spawned into land-of-bondage (same play zone as source).
+    const tokens = next.zones['land-of-bondage'].filter(c => c.isToken);
     expect(tokens).toHaveLength(1);
-    expect(next.zones.hand.filter(c => c.isToken)).toHaveLength(0);
   });
 
   it('unknown source instanceId is a no-op (returns same state reference)', () => {

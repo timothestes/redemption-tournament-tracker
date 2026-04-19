@@ -2151,6 +2151,13 @@ export const execute_card_ability = spacetimedb.reducer(
     if (source.gameId !== gameId) throw new SenderError('Card not in this game');
     if (source.ownerId !== player.id) throw new SenderError('Not your card');
 
+    // Abilities only fire when the source card is in play. Matches the
+    // client-side menu gate but the server enforces independently.
+    const ABILITY_SOURCE_ZONES = ['territory', 'land-of-bondage'];
+    if (!ABILITY_SOURCE_ZONES.includes(source.zone)) {
+      throw new SenderError('Source card must be in play (territory or land-of-bondage)');
+    }
+
     // Registry keys match cardName (e.g., "Two Possessed (GoC)"). The
     // identifier field is a taxonomy descriptor and is not unique enough.
     const abilities = getAbilitiesForCard(source.cardName);
