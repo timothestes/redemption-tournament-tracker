@@ -97,6 +97,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (result.fromZone === 'deck' && toZone !== 'deck') {
         result.card.isFlipped = false;
       }
+      // Paragon: revealing a card from the Soul Deck flips it face-up as it leaves.
+      if (result.fromZone === 'soul-deck' && toZone !== 'soul-deck') {
+        result.card.isFlipped = false;
+      }
       result.card.zone = toZone;
       // Paragon: rescuing a Soul-Deck-origin card transfers ownership from
       // the shared sentinel to the rescuing player. Marker stays set.
@@ -224,6 +228,11 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'SHUFFLE_DECK': {
       zones.deck = shuffleArray(zones.deck);
+      return { ...state, zones, history };
+    }
+
+    case 'SHUFFLE_SOUL_DECK': {
+      zones['soul-deck'] = shuffleArray(zones['soul-deck']);
       return { ...state, zones, history };
     }
 
@@ -414,6 +423,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         if (!result) continue;
         const finalZone = finalZoneById.get(instanceId) ?? toZone;
         if (result.fromZone === 'deck' && finalZone !== 'deck') {
+          result.card.isFlipped = false;
+        }
+        if (result.fromZone === 'soul-deck' && finalZone !== 'soul-deck') {
           result.card.isFlipped = false;
         }
         result.card.zone = finalZone;

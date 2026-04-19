@@ -38,6 +38,10 @@ export const actions = {
     return createAction('SHUFFLE_DECK');
   },
 
+  shuffleSoulDeck(): GameAction {
+    return createAction('SHUFFLE_SOUL_DECK');
+  },
+
   shuffleCardIntoDeck(cardInstanceId: string): GameAction {
     // Move card to deck, then shuffle
     return createAction('MOVE_CARD', { cardInstanceId, toZone: 'deck' });

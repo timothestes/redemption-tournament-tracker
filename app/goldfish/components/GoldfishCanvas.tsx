@@ -41,6 +41,8 @@ import { findCard, isWeapon, isWarrior } from '@/lib/cards/lookup';
 import { Link2Off } from 'lucide-react';
 
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
+import { SOUL_DECK_BACK_IMG } from '@/app/shared/paragon/soulDeck';
+import { actions as gameActionCreators } from '../state/gameActions';
 
 interface GoldfishCanvasProps {
   containerWidth: number;
@@ -137,6 +139,20 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     };
   }, []);
 
+  // Soul Deck back image (Paragon-only). Load once; re-render when ready.
+  const soulDeckBackRef = useRef<HTMLImageElement | null>(null);
+  const [soulDeckBackReady, setSoulDeckBackReady] = useState(false);
+  useEffect(() => {
+    if (state.format !== 'Paragon') return;
+    if (soulDeckBackRef.current) return;
+    const img = new window.Image();
+    img.onload = () => {
+      soulDeckBackRef.current = img;
+      setSoulDeckBackReady(true);
+    };
+    img.src = SOUL_DECK_BACK_IMG;
+  }, [state.format]);
+
   const [contextMenu, setContextMenu] = useState<{
     card: GameCard;
     x: number;
@@ -169,8 +185,10 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   }, [state.zones, hoverCard?.card.instanceId]);
   const [showDeckSearch, setShowDeckSearch] = useState(false);
   const [deckMenu, setDeckMenu] = useState<{ x: number; y: number } | null>(null);
-  const [peekState, setPeekState] = useState<{ cardIds: string[]; title: string } | null>(null);
-  const [lookState, setLookState] = useState<{ cardIds: string[]; title: string } | null>(null);
+  const [soulDeckMenu, setSoulDeckMenu] = useState<{ x: number; y: number } | null>(null);
+  const [browseSoulDeck, setBrowseSoulDeck] = useState(false);
+  const [peekState, setPeekState] = useState<{ cardIds: string[]; title: string; sourceZone?: ZoneId } | null>(null);
+  const [lookState, setLookState] = useState<{ cardIds: string[]; title: string; sourceZone?: ZoneId } | null>(null);
   const [deckDropPopup, setDeckDropPopup] = useState<{ cardInstanceId: string; x: number; y: number } | null>(null);
   const [canvasDragZone, setCanvasDragZone] = useState<ZoneId | null>(null);
   const isCanvasDragging = useRef(false);
@@ -879,6 +897,83 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     },
     []
   );
+
+  const handleSoulDeckContextMenu = useCallback(
+    (e: Konva.KonvaEventObject<PointerEvent>) => {
+      e.evt.preventDefault();
+      const stage = stageRef.current;
+      if (!stage) return;
+      const container = stage.container().getBoundingClientRect();
+      setSoulDeckMenu({
+        x: e.evt.clientX - container.left,
+        y: e.evt.clientY - container.top,
+      });
+    },
+    []
+  );
+
+  // Pop N card IDs from the soul-deck by position (top/bottom/random).
+  const pickSoulDeckIds = useCallback(
+    (mode: 'top' | 'bottom' | 'random', n: number): string[] => {
+      const pile = state.zones['soul-deck'];
+      if (pile.length === 0) return [];
+      const count = Math.min(n, pile.length);
+      if (mode === 'top') return pile.slice(0, count).map(c => c.instanceId);
+      if (mode === 'bottom') return pile.slice(-count).map(c => c.instanceId);
+      // random
+      const shuffled = [...pile];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      return shuffled.slice(0, count).map(c => c.instanceId);
+    },
+    [state.zones],
+  );
+
+  const revealFromSoulDeck = useCallback(
+    (mode: 'top' | 'bottom' | 'random', n: number) => {
+      setSoulDeckMenu(null);
+      const pile = state.zones['soul-deck'];
+      if (pile.length === 0) { showGameToast('Soul Deck is empty'); return; }
+      const ids = pickSoulDeckIds(mode, n);
+      if (ids.length === 0) return;
+      if (ids.length === 1) {
+        moveCard(ids[0], 'land-of-bondage');
+      } else {
+        moveCardsBatch(ids, 'land-of-bondage');
+      }
+    },
+    [state.zones, pickSoulDeckIds, moveCard, moveCardsBatch],
+  );
+
+  const lookAtSoulDeck = useCallback(
+    (mode: 'top' | 'bottom' | 'random', n: number) => {
+      setSoulDeckMenu(null);
+      const pile = state.zones['soul-deck'];
+      if (pile.length === 0) { showGameToast('Soul Deck is empty'); return; }
+      const ids = pickSoulDeckIds(mode, n);
+      if (ids.length === 0) return;
+      const count = ids.length;
+      const title = mode === 'top'
+        ? `Looking at Top ${count} of Soul Deck`
+        : mode === 'bottom'
+          ? `Looking at Bottom ${count} of Soul Deck`
+          : `Looking at Random ${count} from Soul Deck`;
+      setLookState({ cardIds: ids, title, sourceZone: 'soul-deck' });
+    },
+    [state.zones, pickSoulDeckIds],
+  );
+
+  const searchSoulDeck = useCallback(() => {
+    setSoulDeckMenu(null);
+    setBrowseSoulDeck(true);
+  }, []);
+
+  const shuffleSoulDeck = useCallback(() => {
+    setSoulDeckMenu(null);
+    dispatch(gameActionCreators.shuffleSoulDeck());
+  }, [dispatch]);
 
   const handleZoneClick = useCallback(
     (zoneId: ZoneId) => {
@@ -1698,6 +1793,100 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             );
           })}
 
+          {/* Soul Deck pile — Paragon only. Face-down stack anchored in the
+              soul-deck rect (left side of Land of Bondage). Right-click opens
+              a deck-style context menu (Search / Shuffle / Look / Reveal). */}
+          {state.format === 'Paragon' && state.zones['soul-deck'].length > 0 && (() => {
+            const zone = zoneLayout['soul-deck'];
+            if (!zone || zone.width <= 0) return null;
+            const count = state.zones['soul-deck'].length;
+            // Fit the card inside the narrow soul-deck column.
+            const pileWidth = Math.min(cardWidth, zone.width - 4);
+            const pileHeight = Math.round(pileWidth * CARD_ASPECT_RATIO);
+            const px = zone.x + (zone.width - pileWidth) / 2;
+            const py = zone.y + (zone.height - pileHeight) / 2;
+            // TODO: drag-from-Soul-Deck — right-click reveal is the primary path for now.
+            return (
+              <Group
+                key="soul-deck-pile"
+                onContextMenu={handleSoulDeckContextMenu}
+              >
+                {/* Back-stack hint — a slight offset shows depth when there's more than one */}
+                {count > 1 && (
+                  soulDeckBackReady && soulDeckBackRef.current ? (
+                    <KonvaImage
+                      image={soulDeckBackRef.current}
+                      x={px - 2}
+                      y={py - 2}
+                      width={pileWidth}
+                      height={pileHeight}
+                      cornerRadius={4}
+                      opacity={0.85}
+                    />
+                  ) : (
+                    <Rect
+                      x={px - 2}
+                      y={py - 2}
+                      width={pileWidth}
+                      height={pileHeight}
+                      fill="#2a1410"
+                      stroke="#6b4e27"
+                      strokeWidth={1}
+                      cornerRadius={4}
+                    />
+                  )
+                )}
+                {soulDeckBackReady && soulDeckBackRef.current ? (
+                  <KonvaImage
+                    image={soulDeckBackRef.current}
+                    x={px}
+                    y={py}
+                    width={pileWidth}
+                    height={pileHeight}
+                    cornerRadius={4}
+                  />
+                ) : (
+                  <Rect
+                    x={px}
+                    y={py}
+                    width={pileWidth}
+                    height={pileHeight}
+                    fill="#3a1e18"
+                    stroke="#c4955a"
+                    strokeWidth={1}
+                    cornerRadius={4}
+                  />
+                )}
+                {/* Count badge anchored to the top-right of the pile */}
+                <Group x={px + pileWidth - 30} y={py + 4}>
+                  <Rect width={28} height={20} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} />
+                  <Text
+                    text={String(count)}
+                    fontSize={14}
+                    fontStyle="bold"
+                    fill="#e8d5a3"
+                    width={28}
+                    height={20}
+                    align="center"
+                    verticalAlign="middle"
+                  />
+                </Group>
+                {/* Small "SOUL" label at the bottom so the pile is identifiable */}
+                <Text
+                  x={px}
+                  y={py + pileHeight - 16}
+                  width={pileWidth}
+                  text="SOUL DECK"
+                  fontSize={9}
+                  fontFamily="Cinzel, Georgia, serif"
+                  fill="#e8d5a3"
+                  letterSpacing={1}
+                  align="center"
+                />
+              </Group>
+            );
+          })()}
+
           {/* Hand cards */}
           {state.zones.hand.map((card, i) => {
             const pos = handPositions[i];
@@ -2071,6 +2260,36 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
         />
       )}
 
+      {soulDeckMenu && (
+        <DeckContextMenu
+          x={soulDeckMenu.x}
+          y={soulDeckMenu.y}
+          deckSize={state.zones['soul-deck'].length}
+          hideDrawActions
+          hideDiscardActions
+          hideReserveActions
+          onClose={() => setSoulDeckMenu(null)}
+          onSearchDeck={searchSoulDeck}
+          onShuffleDeck={shuffleSoulDeck}
+          onLookAtTop={(n) => lookAtSoulDeck('top', n)}
+          onLookAtBottom={(n) => lookAtSoulDeck('bottom', n)}
+          onLookAtRandom={(n) => lookAtSoulDeck('random', n)}
+          onRevealTop={(n) => revealFromSoulDeck('top', n)}
+          onRevealBottom={(n) => revealFromSoulDeck('bottom', n)}
+          onRevealRandom={(n) => revealFromSoulDeck('random', n)}
+          // Hidden actions — still required by the prop contract
+          onDrawTop={() => {}}
+          onDrawBottom={() => {}}
+          onDrawRandom={() => {}}
+          onDiscardTop={() => {}}
+          onDiscardBottom={() => {}}
+          onDiscardRandom={() => {}}
+          onReserveTop={() => {}}
+          onReserveBottom={() => {}}
+          onReserveRandom={() => {}}
+        />
+      )}
+
       {hoverCard && (
         <CardHoverPreview
           card={hoverCard.card}
@@ -2110,6 +2329,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             onStartMultiDrag={modalStartMultiDrag}
             didDragRef={modalDidDragRef}
             isDragActive={modalDrag.isDragging}
+            sourceZone={peekState.sourceZone}
           />
         )}
 
@@ -2123,6 +2343,18 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             didDragRef={modalDidDragRef}
             isDragActive={modalDrag.isDragging}
             isPrivateLook
+            sourceZone={lookState.sourceZone}
+          />
+        )}
+
+        {browseSoulDeck && (
+          <ZoneBrowseModal
+            zoneId="soul-deck"
+            onClose={() => setBrowseSoulDeck(false)}
+            onStartDrag={modalStartDrag}
+            onStartMultiDrag={modalStartMultiDrag}
+            didDragRef={modalDidDragRef}
+            isDragActive={modalDrag.isDragging}
           />
         )}
 

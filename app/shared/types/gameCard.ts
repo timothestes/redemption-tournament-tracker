@@ -90,6 +90,7 @@ export type ActionType =
   | 'DRAW_CARD'
   | 'DRAW_MULTIPLE'
   | 'SHUFFLE_DECK'
+  | 'SHUFFLE_SOUL_DECK'
   | 'ADD_COUNTER'
   | 'REMOVE_COUNTER'
   | 'MEEK_CARD'

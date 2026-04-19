@@ -132,9 +132,11 @@ interface DeckPeekModalProps {
   isDragActive?: boolean;
   /** When true, shows a "private" indicator — only you can see these cards */
   isPrivateLook?: boolean;
+  /** Zone to look up peeked cards in. Defaults to 'deck'. */
+  sourceZone?: ZoneId;
 }
 
-export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive, isPrivateLook }: DeckPeekModalProps) {
+export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive, isPrivateLook, sourceZone = 'deck' }: DeckPeekModalProps) {
   const { dragHandleProps, modalStyle } = useDraggableModal();
   const { zones, actions } = useModalGame();
   const { moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleDeck, shuffleCardIntoDeck } = actions;
@@ -194,7 +196,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
 
   // Derive live cards from current state (they may have been moved already)
   const peekedCards = peekedIds
-    .map(id => zones.deck.find(c => c.instanceId === id))
+    .map(id => zones[sourceZone].find(c => c.instanceId === id))
     .filter((c): c is GameCard => !!c);
 
   const remainingIds = peekedCards.map(c => c.instanceId);
@@ -545,7 +547,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
           gap: 8,
           flexWrap: 'wrap',
         }}>
-          {hasRemaining && onClose ? (
+          {hasRemaining && onClose && sourceZone === 'deck' ? (
             <>
               <span style={{
                 fontFamily: 'var(--font-cinzel), Georgia, serif',
