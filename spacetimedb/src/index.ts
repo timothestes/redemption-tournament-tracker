@@ -243,6 +243,14 @@ function insertCardsShuffleDraw(
 // Seeds 21 shared soul cards into 'soul-deck', then reveals 3 to
 // 'land-of-bondage' face-up. Uses the game's seeded PRNG for shuffle.
 // ---------------------------------------------------------------------------
+// Unique tag XOR'd into the soul-deck shuffle seed so it cannot collide
+// with any player-keyed seed regardless of future Player id allocation.
+const SOUL_DECK_SEED_TAG = 0xDEADBEEFCAFEBABEn;
+
+// NOTE: This mirrors PARAGON_SOULS in app/shared/paragon/soulDeck.ts —
+// keep the two in sync. The server module compiles independently of the
+// Next.js app and cannot import from app/shared. If the identifier
+// convention or image path shape changes, update both files.
 const PARAGON_SOUL_DEFS: Array<{ identifier: string; cardName: string; cardImgFile: string }> =
   Array.from({ length: 21 }, (_, i) => {
     const padded = String(i + 1).padStart(2, '0');
@@ -288,9 +296,9 @@ function initializeSoulDeck(ctx: any, game: any) {
   const shuffleSeed = makeSeed(
     ctx.timestamp.microsSinceUnixEpoch,
     game.id,
-    0n,          // ownerId sentinel — keeps seed distinct from player decks
+    0n,
     game.rngCounter
-  );
+  ) ^ SOUL_DECK_SEED_TAG;
   const soulCards = [...ctx.db.CardInstance.card_instance_game_id.filter(game.id)].filter(
     (c: any) => c.ownerId === 0n && c.zone === 'soul-deck'
   );
