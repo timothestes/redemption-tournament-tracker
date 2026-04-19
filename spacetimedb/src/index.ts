@@ -1744,6 +1744,22 @@ export const move_card = spacetimedb.reducer(
       );
     }
 
+    // Paragon: inserting into the soul deck at a specific index shifts the
+    // existing shared soul-deck cards at that index and above up by 1 — same
+    // semantics as move_card_to_top_of_deck. Without this, a "topdeck" would
+    // duplicate index 0 and a later "draw top" would pull an arbitrary card.
+    if (toZone === 'soul-deck' && zoneIndex) {
+      const insertIdx = BigInt(zoneIndex);
+      const soulDeckCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+        (c: any) => c.ownerId === 0n && c.zone === 'soul-deck' && c.id !== cardInstanceId
+      );
+      for (const sc of soulDeckCards) {
+        if (sc.zoneIndex >= insertIdx) {
+          ctx.db.CardInstance.id.update({ ...sc, zoneIndex: sc.zoneIndex + 1n });
+        }
+      }
+    }
+
     // Auto-unlink cascade: when the mover leaves its current zone, clear its
     // own equippedTo and cascade to any accessories pointing at it.
     //

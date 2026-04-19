@@ -56,9 +56,14 @@ export function MultiCardContextMenu({ selectedIds, x, y, actions, onClose, onCl
   const allInHand = selectedZones.size === 1 && selectedZones.has('hand');
   const HAND_EXCLUDED_TARGETS: ZoneId[] = ['land-of-bondage', 'land-of-redemption'];
   const allLostSouls = selectedCards.length > 0 && selectedCards.every(c => isLostSoul(c));
+  // Hide a target zone if ALL selected cards already live there — moving into
+  // your current zone is a no-op and adds noise to the menu.
+  const allInSameZone = selectedZones.size === 1;
+  const currentSharedZone = allInSameZone ? [...selectedZones][0] : null;
   const filteredTargets = MOVE_TARGETS
     .filter(z => !allInHand || !HAND_EXCLUDED_TARGETS.includes(z))
-    .filter(z => !allLostSouls || !LOST_SOUL_EXCLUDED_TARGETS.includes(z));
+    .filter(z => !allLostSouls || !LOST_SOUL_EXCLUDED_TARGETS.includes(z))
+    .filter(z => z !== currentSharedZone);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {

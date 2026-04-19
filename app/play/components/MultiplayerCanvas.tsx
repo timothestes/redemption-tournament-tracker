@@ -5045,21 +5045,51 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         );
       })()}
 
-      {multiCardContextMenu && (
-        <MultiCardContextMenu
-          selectedIds={Array.from(selectedIds).sort((a, b) => {
-            const aCard = findAnyCardById(a);
-            const bCard = findAnyCardById(b);
-            return Number(aCard?.zoneIndex ?? BigInt(0)) - Number(bCard?.zoneIndex ?? BigInt(0));
-          })}
-          x={multiCardContextMenu.x}
-          y={multiCardContextMenu.y}
-          actions={multiplayerActions}
-          onClose={() => setMultiCardContextMenu(null)}
-          onClearSelection={() => { clearSelection(); setMultiCardContextMenu(null); }}
-          zones={allZonesForContextMenu as any}
-        />
-      )}
+      {multiCardContextMenu && (() => {
+        const sortedIds = Array.from(selectedIds).sort((a, b) => {
+          const aCard = findAnyCardById(a);
+          const bCard = findAnyCardById(b);
+          return Number(aCard?.zoneIndex ?? BigInt(0)) - Number(bCard?.zoneIndex ?? BigInt(0));
+        });
+        // Detect a pure shared-soul selection (all cards in shared LoB with
+        // ownerId=0n). Route deck actions to the shared Soul Deck instead of
+        // the player's private deck.
+        const allShared =
+          sortedIds.length > 0 &&
+          sortedIds.every((id) => {
+            const c = findAnyCardById(id);
+            return c?.ownerId === 0n && c?.zone === 'land-of-bondage';
+          });
+        const sharedSoulActions = allShared
+          ? {
+              moveCardToTopOfDeck: (id: string) => gameState.moveCard(BigInt(id), 'soul-deck', '0'),
+              moveCardToBottomOfDeck: (id: string) => gameState.moveCard(BigInt(id), 'soul-deck'),
+              shuffleCardIntoDeck: (id: string) => {
+                gameState.moveCard(BigInt(id), 'soul-deck');
+                gameState.shuffleSoulDeck();
+              },
+              moveCardsBatch: (ids: string[], toZone: ZoneId | string) => {
+                if (toZone === 'deck') {
+                  gameState.moveCardsBatch(JSON.stringify(ids), 'soul-deck');
+                } else {
+                  gameState.moveCardsBatch(JSON.stringify(ids), String(toZone));
+                }
+              },
+              shuffleDeck: () => gameState.shuffleSoulDeck(),
+            }
+          : null;
+        return (
+          <MultiCardContextMenu
+            selectedIds={sortedIds}
+            x={multiCardContextMenu.x}
+            y={multiCardContextMenu.y}
+            actions={{ ...multiplayerActions, ...(sharedSoulActions ?? {}) }}
+            onClose={() => setMultiCardContextMenu(null)}
+            onClearSelection={() => { clearSelection(); setMultiCardContextMenu(null); }}
+            zones={allZonesForContextMenu as any}
+          />
+        );
+      })()}
 
       {notePopover && (
         <CardNotePopover
