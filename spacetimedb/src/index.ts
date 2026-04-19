@@ -2076,23 +2076,12 @@ function spawnTokenImpl(
   const baseX = sourceInTerritory && Number.isFinite(sourcePosX) ? sourcePosX : 0.3;
   const baseY = sourceInTerritory && Number.isFinite(sourcePosY) ? sourcePosY : 0.4;
 
-  console.log(
-    '[spawn_token] source.posX=', source.posX,
-    'source.posY=', source.posY,
-    'baseX=', baseX,
-    'baseY=', baseY,
-    'count=', count,
-    'targetZone=', targetZone,
-    'tokenName=', ability.tokenName,
-  );
-
   // Phase 3 — all-or-nothing inserts. SpacetimeDB rolls back the whole
   // reducer if any insert throws.
   for (let i = 0; i < count; i++) {
     maxIdx += 1n;
     const posX = targetZone === 'territory' ? String(baseX + (i + 1) * STAGGER_X) : '';
     const posY = targetZone === 'territory' ? String(baseY + (i + 1) * STAGGER_Y) : '';
-    console.log(`[spawn_token] inserting token ${i + 1}/${count} at posX=${posX} posY=${posY} zone=${targetZone} ownerId=${source.ownerId} zoneIndex=${maxIdx}`);
     ctx.db.CardInstance.insert({
       id: 0n,
       gameId,
