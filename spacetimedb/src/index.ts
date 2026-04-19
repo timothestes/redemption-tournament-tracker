@@ -1702,14 +1702,18 @@ export const move_card = spacetimedb.reducer(
       newOwnerId = 0n;
     }
 
-    // Paragon: rescuing a shared soul transfers ownership to the acting seat.
+    // Paragon: rescuing a shared soul transfers ownership. Default to the
+    // acting seat (self-rescue), but honor an explicit targetOwnerId when the
+    // caller dragged the soul into a specific player's zone (e.g. opponent's
+    // LoR or opponent's Territory).
     let resolvedOwnerId = newOwnerId;
     if (
       card.ownerId === 0n &&
       card.isSoulDeckOrigin === true &&
       card.zone === 'land-of-bondage' &&
       toZone !== 'land-of-bondage' &&
-      toZone !== 'soul-deck'
+      toZone !== 'soul-deck' &&
+      !targetOwnerId
     ) {
       resolvedOwnerId = player.id;
     }
@@ -1951,14 +1955,17 @@ export const move_cards_batch = spacetimedb.reducer(
       const pos = { posX: String(rawPos.posX ?? ''), posY: String(rawPos.posY ?? '') };
       const cardOwnerId = newOwnerId ?? card.ownerId;
       const cardFinalZone = finalZoneById.get(idStr) ?? toZone;
-      // Paragon: rescuing a shared soul transfers ownership to the acting seat.
+      // Paragon: rescuing a shared soul transfers ownership. Default to the
+      // acting seat, but honor an explicit targetOwnerId when the caller
+      // dragged the soul into a specific player's zone.
       let resolvedCardOwnerId = cardOwnerId;
       if (
         card.ownerId === 0n &&
         card.isSoulDeckOrigin === true &&
         card.zone === 'land-of-bondage' &&
         cardFinalZone !== 'land-of-bondage' &&
-        cardFinalZone !== 'soul-deck'
+        cardFinalZone !== 'soul-deck' &&
+        !targetOwnerId
       ) {
         resolvedCardOwnerId = player.id;
       }

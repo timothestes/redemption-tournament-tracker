@@ -602,6 +602,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   >(null);
   const [lorMenu, setLorMenu] = useState<{ x: number; y: number } | null>(null);
   const [deckDrop, setDeckDrop] = useState<{ x: number; y: number; cardId: string; batchIds?: string[] } | null>(null);
+  // Paragon: drop popup when a card is dragged onto the soul deck pile —
+  // lets the player choose top / bottom / shuffle in.
+  const [soulDeckDrop, setSoulDeckDrop] = useState<{ x: number; y: number; cardId: string; batchIds?: string[] } | null>(null);
   const pendingBatchRef = useRef<string[] | null>(null);
   const [showDeckSearch, setShowDeckSearch] = useState(false);
   const [peekState, setPeekState] = useState<{ position: 'top' | 'bottom' | 'random'; count: number; source?: { cardName: string } } | null>(null);
@@ -1297,6 +1300,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // Paragon: the shared LoB is a drop target that resets ownership to the shared sentinel.
       if (normalizedFormat === 'Paragon' && mpLayout.zones.sharedLob && pointInRect(x, y, mpLayout.zones.sharedLob)) {
         return { zone: 'land-of-bondage', owner: 'shared' };
+      }
+      // Paragon: the soul deck pile is a drop target — opens a put-top/
+      // put-bottom/shuffle popup like the normal deck.
+      if (normalizedFormat === 'Paragon' && mpLayout.zones.soulDeck && pointInRect(x, y, mpLayout.zones.soulDeck)) {
+        return { zone: 'soul-deck', owner: 'shared' };
       }
 
       // Check my zones (all: free-form + sidebar piles)
@@ -2582,6 +2590,31 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // destroying the node. This prevents the card from disappearing if the
       // user cancels the popup without picking an option.
       const isDeckDropWithPopup = targetZone === 'deck' && stageRef.current;
+      const isSoulDeckDropWithPopup = targetZone === 'soul-deck' && hit.owner === 'shared' && stageRef.current;
+
+      if (isSoulDeckDropWithPopup) {
+        if (followerOffsets && originalPos) {
+          for (const [id, offset] of followerOffsets) {
+            const fNode = cardNodeRefs.current.get(id);
+            if (fNode) {
+              fNode.x(originalPos.x + offset.dx);
+              fNode.y(originalPos.y + offset.dy);
+            }
+          }
+        }
+        snapBack();
+        const stage = stageRef.current;
+        if (stage) {
+          const screenPos = virtualToScreen(center.x, center.y, scale, offsetX, offsetY);
+          if (isGroupDrag) {
+            pendingBatchRef.current = cardIds;
+            setSoulDeckDrop({ x: screenPos.x, y: screenPos.y, cardId: cardIds[0], batchIds: cardIds });
+          } else {
+            setSoulDeckDrop({ x: screenPos.x, y: screenPos.y, cardId: String(cardId) });
+          }
+        }
+        return;
+      }
 
       if (isDeckDropWithPopup) {
         // Deck drop: snap card back to original position while popup is open.
@@ -3188,6 +3221,30 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       }
     }
 
+    // Shared LoB cards (Paragon only). Positions come from sharedLobLayout.
+    // Rendered with rotation=0 and owner='my' (viewer-local) so marquee picks
+    // them up like own cards for selection/drag.
+    if (normalizedFormat === 'Paragon' && mpLayout?.zones.sharedLob) {
+      const cards = sharedCards['land-of-bondage'] ?? [];
+      for (const card of cards) {
+        const idStr = String(card.id);
+        const isAccessory = card.equippedToInstanceId !== 0n;
+        const pos = isAccessory
+          ? sharedLobLayout.accessoryPositions.get(idStr)
+          : sharedLobLayout.hostPositions.get(idStr);
+        if (!pos) continue;
+        bounds.push({
+          instanceId: idStr,
+          x: pos.x,
+          y: pos.y,
+          width: lobCard.cardWidth,
+          height: lobCard.cardHeight,
+          rotation: 0,
+          owner: 'my',
+        });
+      }
+    }
+
     // Opponent auto-arrange zone cards (LOB, rotated 180°). Attached sites
     // use their derived anchor, which is pre-computed with the mirror offset.
     for (const zoneKey of AUTO_ARRANGE_ZONES) {
@@ -3257,7 +3314,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     }
 
     return bounds;
-  }, [mpLayout, myHandRect, myZones, myCards, opponentZones, opponentCards, cardWidth, cardHeight, lobCard, isSpreadHand, myDerivedWeaponPositions, opponentDerivedWeaponPositions]);
+  }, [mpLayout, myHandRect, myZones, myCards, opponentZones, opponentCards, cardWidth, cardHeight, lobCard, isSpreadHand, myDerivedWeaponPositions, opponentDerivedWeaponPositions, normalizedFormat, sharedCards, sharedLobLayout]);
 
   // ---- Stage mouse handlers for marquee selection ----
   const handleStageMouseDown = useCallback(
@@ -5255,6 +5312,37 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             }}
             onExchange={!isBatch ? () => { setDeckDrop(null); setExchangeState({ cardIds: [deckDrop.cardId], targetZone: 'deck' }); } : undefined}
             onCancel={() => setDeckDrop(null)}
+          />
+        );
+      })()}
+
+      {soulDeckDrop && (() => {
+        const ids = soulDeckDrop.batchIds ?? [soulDeckDrop.cardId];
+        const isBatch = ids.length > 1;
+        return (
+          <DeckDropPopup
+            x={soulDeckDrop.x}
+            y={soulDeckDrop.y}
+            onShuffleIn={() => {
+              // Move each card to soul-deck then shuffle. moveCardsBatch for >1.
+              if (ids.length === 1) {
+                gameState.moveCard(BigInt(ids[0]), 'soul-deck');
+              } else {
+                gameState.moveCardsBatch(JSON.stringify(ids), 'soul-deck');
+              }
+              gameState.shuffleSoulDeck();
+              setSoulDeckDrop(null);
+            }}
+            onTopDeck={() => {
+              for (const id of ids) gameState.moveCard(BigInt(id), 'soul-deck', '0');
+              setSoulDeckDrop(null);
+            }}
+            onBottomDeck={() => {
+              for (const id of ids) gameState.moveCard(BigInt(id), 'soul-deck');
+              setSoulDeckDrop(null);
+            }}
+            onExchange={!isBatch ? () => { setSoulDeckDrop(null); setExchangeState({ cardIds: [soulDeckDrop.cardId], targetZone: 'soul-deck' }); } : undefined}
+            onCancel={() => setSoulDeckDrop(null)}
           />
         );
       })()}
