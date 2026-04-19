@@ -1203,6 +1203,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     gameState.shuffleSoulDeck();
   }, [gameState]);
 
+  const soulDeckDragTopIdRef = useRef<string | null>(null);
+
   // ---- Drag state ----
   const isDraggingRef = useRef(false);
   const dragEndTimeRef = useRef<number>(0);
@@ -1290,6 +1292,51 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       return null;
     },
     [mpLayout, myZones, opponentZones, myHandRect, opponentHandRect, normalizedFormat],
+  );
+
+  // Dragging the Soul Deck pile: capture the top soul's ID at drag-start,
+  // hit-test the drop point at drag-end, move the top soul into the shared
+  // LoB if dropped there. Pile always snaps back to (0,0) since its inner
+  // shapes carry absolute coords.
+  const handleSoulDeckPileDragStart = useCallback(
+    (_e: Konva.KonvaEventObject<DragEvent>) => {
+      const sorted = [...(sharedCards['soul-deck'] ?? [])].sort(
+        (a, b) => Number(a.zoneIndex) - Number(b.zoneIndex),
+      );
+      soulDeckDragTopIdRef.current = sorted.length > 0 ? String(sorted[0].id) : null;
+    },
+    [sharedCards],
+  );
+
+  const handleSoulDeckPileDragEnd = useCallback(
+    (e: Konva.KonvaEventObject<DragEvent>) => {
+      const topId = soulDeckDragTopIdRef.current;
+      soulDeckDragTopIdRef.current = null;
+      const dragNode = e.target;
+      const dragX = dragNode.x();
+      const dragY = dragNode.y();
+      dragNode.position({ x: 0, y: 0 });
+
+      if (!topId) return;
+      const sharedLobRect = mpLayout?.zones.sharedLob;
+      const soulDeckZone = mpLayout?.zones.soulDeck;
+      if (!sharedLobRect || !soulDeckZone) return;
+
+      const pileWidth = Math.min(lobCard.cardWidth, soulDeckZone.width - 4);
+      const pileHeight = Math.round(pileWidth * 1.4);
+      const centerX = soulDeckZone.x + (soulDeckZone.width - pileWidth) / 2 + pileWidth / 2 + dragX;
+      const centerY = soulDeckZone.y + (soulDeckZone.height - pileHeight) / 2 + pileHeight / 2 + dragY;
+
+      const hit = findZoneAtPosition(centerX, centerY);
+      if (!hit || hit.owner !== 'shared' || hit.zone !== 'land-of-bondage') return;
+
+      const db = toDbPos(centerX - pileWidth / 2, centerY - pileHeight / 2, sharedLobRect, 'my', {
+        cardWidth: lobCard.cardWidth,
+        cardHeight: lobCard.cardHeight,
+      });
+      gameState.moveCard(BigInt(topId), 'land-of-bondage', undefined, String(db.x), String(db.y), '0');
+    },
+    [sharedCards, mpLayout, lobCard.cardWidth, lobCard.cardHeight, findZoneAtPosition, gameState],
   );
 
   // ---- Modal card drag hook (for dragging cards from modals to canvas) ----
@@ -3909,7 +3956,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             return (
               <Group
                 key="soul-deck-pile"
+                draggable={true}
                 onContextMenu={handleSharedSoulDeckContextMenu}
+                onDragStart={handleSoulDeckPileDragStart}
+                onDragEnd={handleSoulDeckPileDragEnd}
               >
                 {count > 1 && (
                   soulDeckBackReady && soulDeckBackRef.current ? (
