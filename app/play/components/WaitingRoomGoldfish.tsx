@@ -1,12 +1,14 @@
 'use client';
 
-import { useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { CardPreviewProvider } from '@/app/goldfish/state/CardPreviewContext';
 import { GameProvider } from '@/app/goldfish/state/GameContext';
 import { CardLoupePanel } from '@/app/goldfish/components/CardLoupePanel';
 import type { DeckDataForGoldfish } from '@/app/goldfish/types';
 import { useVirtualCanvas } from '@/app/shared/layout/virtualCanvas';
+import { ParagonDrawer } from '@/app/shared/components/ParagonDrawer';
+import { buildParagonEntries } from '@/app/shared/utils/paragonEntries';
 
 const DynamicGoldfishCanvas = dynamic(
   () => import('@/app/goldfish/components/GoldfishCanvas'),
@@ -19,9 +21,23 @@ interface WaitingRoomGoldfishProps {
   deck: DeckDataForGoldfish;
 }
 
-function GoldfishArea() {
+function GoldfishArea({ deck }: { deck: DeckDataForGoldfish }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { scale, offsetX, offsetY, containerWidth, containerHeight, virtualWidth } = useVirtualCanvas(containerRef);
+
+  const paragonEntries = useMemo(
+    () => buildParagonEntries({
+      players: [
+        {
+          id: 'goldfish-self',
+          displayName: 'You',
+          paragonName: deck.paragon ?? null,
+          isSelf: true,
+        },
+      ],
+    }),
+    [deck.paragon],
+  );
 
   return (
     <div
@@ -77,6 +93,9 @@ function GoldfishArea() {
 
       {/* Card preview panel */}
       <CardLoupePanel />
+
+      {/* Paragon drawer — DOM overlay; self-hides when no paragon */}
+      <ParagonDrawer paragons={paragonEntries} />
     </div>
   );
 }
@@ -85,7 +104,7 @@ export default function WaitingRoomGoldfish({ deck }: WaitingRoomGoldfishProps) 
   return (
     <CardPreviewProvider>
       <GameProvider deck={deck}>
-        <GoldfishArea />
+        <GoldfishArea deck={deck} />
       </GameProvider>
     </CardPreviewProvider>
   );
