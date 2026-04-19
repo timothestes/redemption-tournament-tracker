@@ -45,6 +45,7 @@ import type { GameActions } from '@/app/shared/types/gameActions';
 import { ModalGameProvider, type ModalGameContextValue } from '@/app/shared/contexts/ModalGameContext';
 import { DeckSearchModal } from '@/app/shared/components/DeckSearchModal';
 import { DeckPeekModal } from '@/app/shared/components/DeckPeekModal';
+import { getAbilitiesForCard } from '@/lib/cards/cardAbilities';
 import { DeckExchangeModal } from '@/app/shared/components/DeckExchangeModal';
 import { ZoneBrowseModal } from '@/app/shared/components/ZoneBrowseModal';
 import { useModalCardDrag } from '@/app/shared/hooks/useModalCardDrag';
@@ -153,9 +154,15 @@ function isAutoArrangeZone(zone: string): boolean {
 /** Build a human-readable fragment for an opponent-action request, used in the
  *  consent dialog (e.g. "draw 3 from the top of your deck"). */
 function describeOpponentAction(action: string, paramsJson: string): string {
-  let count = 0;
-  try { count = (paramsJson ? JSON.parse(paramsJson) : {}).count ?? 0; } catch {}
+  let parsed: any = {};
+  try { parsed = paramsJson ? JSON.parse(paramsJson) : {}; } catch {}
+  const count = parsed.count ?? 0;
   const plural = count === 1 ? '' : 's';
+  if (action === 'shuffle_and_draw') {
+    const s = parsed.shuffleCount ?? 0;
+    const d = parsed.drawCount ?? 0;
+    return `shuffle ${s} random card${s === 1 ? '' : 's'} from your hand into your deck and draw ${d}`;
+  }
   switch (action) {
     case 'shuffle_deck': return 'shuffle your deck';
     case 'look_deck_top': return `look at the top ${count} card${plural} of your deck`;
@@ -592,7 +599,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const [deckDrop, setDeckDrop] = useState<{ x: number; y: number; cardId: string; batchIds?: string[] } | null>(null);
   const pendingBatchRef = useRef<string[] | null>(null);
   const [showDeckSearch, setShowDeckSearch] = useState(false);
-  const [peekState, setPeekState] = useState<{ position: 'top' | 'bottom' | 'random'; count: number } | null>(null);
+  const [peekState, setPeekState] = useState<{ position: 'top' | 'bottom' | 'random'; count: number; source?: { cardName: string } } | null>(null);
   const [lookState, setLookState] = useState<{ count: number; position: 'top' | 'bottom' | 'random' } | null>(null);
   const [exchangeCardIds, setExchangeCardIds] = useState<string[] | null>(null);
   const [opponentZoneMenu, setOpponentZoneMenu] = useState<{ x: number; y: number; zone: string; zoneName: string } | null>(null);
@@ -904,8 +911,22 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       gameState.spawnLostSoul(testament, posX ?? '0.5', posY ?? '0.5'),
     removeToken: (cardId) => gameState.removeToken(BigInt(cardId)),
     removeOpponentToken: undefined,
-    executeCardAbility: (sourceInstanceId, abilityIndex) =>
-      gameState.executeCardAbility(sourceInstanceId, abilityIndex),
+    executeCardAbility: (sourceInstanceId, abilityIndex) => {
+      // Intercept modal-driven abilities (reveal_own_deck) client-side — the
+      // server reducer throws SenderError for these. setPeekState → existing
+      // useEffect broadcasts via revealCards so the opponent sees the reveal.
+      const source = findMyCardById(sourceInstanceId);
+      const ability = source ? getAbilitiesForCard(source.cardName)[abilityIndex] : undefined;
+      if (ability?.type === 'reveal_own_deck') {
+        setPeekState({
+          position: ability.position,
+          count: ability.count,
+          source: { cardName: source!.cardName },
+        });
+        return;
+      }
+      gameState.executeCardAbility(sourceInstanceId, abilityIndex);
+    },
     randomHandToZone: (count, toZone, deckPosition) =>
       gameState.randomHandToZone(count, toZone, deckPosition),
     randomReserveToZone: (count, toZone, deckPosition) =>
@@ -1484,7 +1505,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     dispatchedActionRef.current = reqId;
 
     const { action, actionParams } = approvedSearchRequest;
-    let params: { count?: number } = {};
+    let params: { count?: number; shuffleCount?: number; drawCount?: number } = {};
     try { params = actionParams ? JSON.parse(actionParams) : {}; } catch {}
     const count = params.count ?? 0;
     const reqIdBig = BigInt(approvedSearchRequest.id);
@@ -1576,6 +1597,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         gameState.randomOpponentHandToZone(reqIdBig, count, 'deck', 'shuffle');
         complete();
         break;
+      case 'shuffle_and_draw':
+        gameState.opponentShuffleAndDraw(reqIdBig, params.shuffleCount ?? 0, params.drawCount ?? 0);
+        complete();
+        break;
       default:
         // Unknown action — complete to unblock, then warn.
         complete();
@@ -1643,14 +1668,28 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     return selected.map(c => String(c.id));
   }, [lookState, myCards]);
 
-  // Broadcast revealed cards to opponent via SpacetimeDB
-  const peekCardIdsRef = useRef<string[]>([]);
+  // Broadcast revealed cards to opponent via SpacetimeDB. Dedup: peekCardIds
+  // returns a fresh array reference whenever myCards updates (which happens
+  // on any subscription event), so compare serialized contents against the
+  // last-sent ref to avoid firing the reducer twice for the same reveal.
+  const peekCardIdsRef = useRef<string>('');
   useEffect(() => {
-    if (peekCardIds.length > 0) {
-      peekCardIdsRef.current = peekCardIds;
-      gameState.revealCards(JSON.stringify(peekCardIds));
+    if (peekCardIds.length === 0) {
+      peekCardIdsRef.current = '';
+      return;
     }
-  }, [peekCardIds]);
+    const serialized = JSON.stringify(peekCardIds);
+    if (peekCardIdsRef.current === serialized) return;
+    peekCardIdsRef.current = serialized;
+    const context = peekState?.source
+      ? JSON.stringify({
+          sourceCardName: peekState.source.cardName,
+          position: peekState.position,
+          count: peekState.count,
+        })
+      : '';
+    gameState.revealCards(serialized, context);
+  }, [peekCardIds, peekState]);
 
   // Opponent's revealed cards — driven by SpacetimeDB player.revealedCards
   const opponentRevealedCardIds = useMemo(() => {
@@ -2563,6 +2602,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     [],
   );
 
+  const handleSharedLobContextMenu = useCallback(
+    (_e: Konva.KonvaEventObject<PointerEvent>) => {
+      /* wired in Task 4 */
+    },
+    [],
+  );
+
   // Universal card click handler — shift-click toggles selection
   const handleCardClick = useCallback(
     (card: GameCard, e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -3220,6 +3266,33 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           {/* ================================================================
               Zone backgrounds — My zones
               ================================================================ */}
+          {normalizedFormat === 'Paragon' && mpLayout?.zones.sharedLob && (
+            <Rect
+              x={mpLayout.zones.sharedLob.x}
+              y={mpLayout.zones.sharedLob.y}
+              width={mpLayout.zones.sharedLob.width}
+              height={mpLayout.zones.sharedLob.height}
+              fill="#1e1610"
+              stroke="#6b4e27"
+              strokeWidth={1}
+              cornerRadius={3}
+              opacity={0.45}
+              onContextMenu={handleSharedLobContextMenu}
+            />
+          )}
+          {normalizedFormat === 'Paragon' && mpLayout?.zones.soulDeck && (
+            <Rect
+              x={mpLayout.zones.soulDeck.x}
+              y={mpLayout.zones.soulDeck.y}
+              width={mpLayout.zones.soulDeck.width}
+              height={mpLayout.zones.soulDeck.height}
+              fill="#1e1610"
+              stroke="#6b4e27"
+              strokeWidth={1}
+              cornerRadius={3}
+              opacity={0.45}
+            />
+          )}
           {Object.entries(myZones).map(([key, zone]) => {
             // LOB + territory zones get their label+badge rendered as an overlay after cards
             const isLob = isAutoArrangeZone(key);
