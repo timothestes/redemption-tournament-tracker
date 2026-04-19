@@ -55,6 +55,22 @@ function findPlayerBySender(ctx: any, gameId: bigint) {
 }
 
 // ---------------------------------------------------------------------------
+// Helper: canSenderActOnCard
+// Normal cards: only the owner can act. Shared cards (ownerId = 0n) in a
+// Paragon game can be acted on by either seat when the card is in a shared
+// zone (land-of-bondage or soul-deck). Prevents cross-seat interference with
+// player-owned cards while allowing both players to interact with the Soul
+// Deck and shared LoB.
+// ---------------------------------------------------------------------------
+function canSenderActOnCard(game: any, card: any, player: any): boolean {
+  if (card.ownerId === player.id) return true;
+  if (card.ownerId !== 0n) return false;
+  const fmt = normalizeFormat(game.format);
+  if (fmt !== 'Paragon') return false;
+  return card.zone === 'land-of-bondage' || card.zone === 'soul-deck';
+}
+
+// ---------------------------------------------------------------------------
 // Helper: compactHandIndices
 // After a card leaves the hand, re-index remaining hand cards to close gaps
 // so zoneIndex values are always sequential: 0, 1, 2, ...
@@ -1485,6 +1501,11 @@ export const end_turn = spacetimedb.reducer(
       drawCardsForPlayer(ctx, latestGame, newActivePlayer, 3);
     }
 
+    // Paragon: refill the shared LoB back to 3 at the start of the new turn.
+    if (normalizeFormat(game.format) === 'Paragon') {
+      refillSoulDeck(ctx, gameId);
+    }
+
     logAction(ctx, gameId, player.id, 'END_TURN', JSON.stringify({ newTurn: newTurnNumber.toString() }), newTurnNumber, 'draw');
   }
 );
@@ -1592,6 +1613,18 @@ export const move_card = spacetimedb.reducer(
     // Optionally transfer ownership (e.g. rescue lost soul, capture hero)
     const newOwnerId = targetOwnerId ? BigInt(targetOwnerId) : card.ownerId;
 
+    // Paragon: rescuing a shared soul transfers ownership to the acting seat.
+    let resolvedOwnerId = newOwnerId;
+    if (
+      card.ownerId === 0n &&
+      card.isSoulDeckOrigin === true &&
+      card.zone === 'land-of-bondage' &&
+      toZone !== 'land-of-bondage' &&
+      toZone !== 'soul-deck'
+    ) {
+      resolvedOwnerId = player.id;
+    }
+
     // For free-form zones (territory), auto-assign highest zoneIndex so new cards render on top
     let finalZoneIndex = zoneIndex ? BigInt(zoneIndex) : 0n;
     if (!zoneIndex && toZone !== 'deck' && toZone !== 'hand') {
@@ -1626,7 +1659,7 @@ export const move_card = spacetimedb.reducer(
       posX,
       posY,
       isFlipped,
-      ownerId: newOwnerId,
+      ownerId: resolvedOwnerId,
       equippedToInstanceId: clearEquippedOnMover ? 0n : card.equippedToInstanceId,
     });
 
@@ -1675,6 +1708,15 @@ export const move_card = spacetimedb.reducer(
       if (fromZone === 'land-of-bondage') {
         compactLobIndices(ctx, gameId, card.ownerId);
       }
+    }
+
+    // Paragon: if a soul-origin card left the shared LoB, refill back to 3.
+    const triggeredRefill =
+      card.isSoulDeckOrigin === true &&
+      card.zone === 'land-of-bondage' &&
+      toZone !== 'land-of-bondage';
+    if (triggeredRefill) {
+      refillSoulDeck(ctx, game.id);
     }
   }
 );
@@ -1813,6 +1855,17 @@ export const move_cards_batch = spacetimedb.reducer(
       const pos = { posX: String(rawPos.posX ?? ''), posY: String(rawPos.posY ?? '') };
       const cardOwnerId = newOwnerId ?? card.ownerId;
       const cardFinalZone = finalZoneById.get(idStr) ?? toZone;
+      // Paragon: rescuing a shared soul transfers ownership to the acting seat.
+      let resolvedCardOwnerId = cardOwnerId;
+      if (
+        card.ownerId === 0n &&
+        card.isSoulDeckOrigin === true &&
+        card.zone === 'land-of-bondage' &&
+        cardFinalZone !== 'land-of-bondage' &&
+        cardFinalZone !== 'soul-deck'
+      ) {
+        resolvedCardOwnerId = player.id;
+      }
       // Clear the attach pointer only when the mover is actually leaving its
       // current zone. Same-zone reposition preserves the link (both Territory
       // warriors and LOB souls can shuffle within their zone without losing
@@ -1874,7 +1927,7 @@ export const move_cards_batch = spacetimedb.reducer(
         posX: finalPosX,
         posY: finalPosY,
         isFlipped,
-        ownerId: cardOwnerId,
+        ownerId: resolvedCardOwnerId,
         equippedToInstanceId: leavingZone ? 0n : card.equippedToInstanceId,
       });
     }
@@ -1928,6 +1981,11 @@ export const move_cards_batch = spacetimedb.reducer(
     // Compact LOB indices for any owners whose LOB had cards removed
     for (const ownerId of lobCompactOwners) {
       compactLobIndices(ctx, gameId, ownerId);
+    }
+
+    // Paragon: batch may have rescued soul-origin cards from LoB — refill.
+    if (normalizeFormat(game.format) === 'Paragon') {
+      refillSoulDeck(ctx, game.id);
     }
   }
 );
