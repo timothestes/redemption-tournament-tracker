@@ -7,10 +7,10 @@ import {
 } from '../types';
 import { buildInitialGameState } from './gameInitializer';
 import { refillSoulDeck } from '@/app/shared/paragon/refill';
-import { findCard } from '@/lib/cards/lookup';
 import {
   type CardAbility,
   getAbilitiesForCard,
+  resolveTokenCard,
 } from '@/lib/cards/cardAbilities';
 
 const MAX_HISTORY = 20;
@@ -46,7 +46,10 @@ function spawnTokenInState(
   history: GameState[],
 ): GameState {
   // Phase 1 — validate. Any failure returns state unchanged.
-  const tokenData = findCard(ability.tokenName);
+  // resolveTokenCard checks SPECIAL_TOKEN_CARDS first (handcrafted lost-soul
+  // tokens under public/gameplay/) then falls back to findCard() for tokens
+  // that exist in the generated CARDS dataset.
+  const tokenData = resolveTokenCard(ability.tokenName);
   if (!tokenData) {
     console.warn('[cardAbilities] unknown token', ability.tokenName);
     return state;

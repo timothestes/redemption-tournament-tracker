@@ -1,7 +1,7 @@
 // lib/cards/__tests__/cardAbilities.test.ts
 import { describe, it, expect } from 'vitest';
 import { findCard } from '../lookup';
-import { CARD_ABILITIES, abilityLabel, getAbilitiesForCard } from '../cardAbilities';
+import { CARD_ABILITIES, SPECIAL_TOKEN_CARDS, abilityLabel, getAbilitiesForCard, resolveTokenCard } from '../cardAbilities';
 
 describe('CARD_ABILITIES registry', () => {
   it('every key resolves to a real card via findCard()', () => {
@@ -12,16 +12,24 @@ describe('CARD_ABILITIES registry', () => {
     expect(bad).toEqual([]);
   });
 
-  it('every spawn_token.tokenName resolves to a real card via findCard()', () => {
+  it('every spawn_token.tokenName resolves via resolveTokenCard()', () => {
+    // Real carddata tokens (Proselyte, etc.) resolve via findCard; handcrafted
+    // tokens (Harvest Soul, Daniel Soul, etc.) resolve via SPECIAL_TOKEN_CARDS.
     const bad: Array<{ source: string; tokenName: string }> = [];
     for (const [source, abilities] of Object.entries(CARD_ABILITIES)) {
       for (const a of abilities) {
-        if (a.type === 'spawn_token' && !findCard(a.tokenName)) {
+        if (a.type === 'spawn_token' && !resolveTokenCard(a.tokenName)) {
           bad.push({ source, tokenName: a.tokenName });
         }
       }
     }
     expect(bad).toEqual([]);
+  });
+
+  it('every SPECIAL_TOKEN_CARDS image path resolves to a public/gameplay asset', () => {
+    for (const [name, data] of Object.entries(SPECIAL_TOKEN_CARDS)) {
+      expect(data.imgFile, `${name} imgFile`).toMatch(/^\/gameplay\/.+\.(png|jpg|jpeg|svg|webp)$/i);
+    }
   });
 
   it('getAbilitiesForCard returns [] for unknown identifiers', () => {

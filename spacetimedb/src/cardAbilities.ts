@@ -23,12 +23,17 @@ export type CardAbility =
   | { type: 'custom'; reducerName: string; label: string };
 
 export const CARD_ABILITIES: Record<string, CardAbility[]> = {
-  'Two Possessed (GoC)':        [{ type: 'spawn_token', tokenName: 'Violent Possessor Token', count: 2 }],
-  'The Accumulator (GoC)':      [{ type: 'spawn_token', tokenName: 'Wicked Spirit Token', count: 7 }],
-  'The Proselytizers (GoC)':    [{ type: 'spawn_token', tokenName: 'Proselyte Token' }],
-  'The Church of Christ (GoC)': [{ type: 'spawn_token', tokenName: 'Follower Token' }],
-  'Angel of the Harvest (GoC)': [{ type: 'spawn_token', tokenName: 'Heavenly Host Token' }],
-  'The Heavenly Host (GoC)':    [{ type: 'spawn_token', tokenName: 'Heavenly Host Token' }],
+  'Two Possessed (GoC)':                                 [{ type: 'spawn_token', tokenName: 'Violent Possessor Token', count: 2 }],
+  'The Accumulator (GoC)':                               [{ type: 'spawn_token', tokenName: 'Wicked Spirit Token', count: 7 }],
+  'The Proselytizers (GoC)':                             [{ type: 'spawn_token', tokenName: 'Proselyte Token' }],
+  'The Church of Christ (GoC)':                          [{ type: 'spawn_token', tokenName: 'Follower Token' }],
+  'Angel of the Harvest (GoC)':                          [{ type: 'spawn_token', tokenName: 'Harvest Soul Token' }],
+  'The Heavenly Host (GoC)':                             [{ type: 'spawn_token', tokenName: 'Heavenly Host Token' }],
+  'Kingdom of the Divine':                               [{ type: 'spawn_token', tokenName: 'Daniel Soul Token' }],
+  'Kingdom of the Divine [T2C AB]':                      [{ type: 'spawn_token', tokenName: 'Daniel Soul Token' }],
+  'Lost Soul "Harvest" [John 4:35]':                     [{ type: 'spawn_token', tokenName: 'Harvest Soul Token' }],
+  'Lost Soul "Harvest" [John 4:35] [2023 - 2nd Place]':  [{ type: 'spawn_token', tokenName: 'Harvest Soul Token' }],
+  'Lost Soul "Lost Souls" [Proverbs 2:16-17]':           [{ type: 'spawn_token', tokenName: 'Lost Souls Token' }],
 };
 
 export function getAbilitiesForCard(identifier: string): CardAbility[] {
@@ -114,6 +119,48 @@ export const TOKEN_CARD_DATA: Record<string, TokenCardData> = {
     identifier: 'Generic, Nativity, Angel',
     specialAbility: '',
     reference: 'Luke 2:13',
+  },
+  // Handcrafted lost-soul tokens — images under public/gameplay/. imgFile
+  // carries the full path with leading slash (unlike real carddata tokens
+  // which use bare filenames resolved elsewhere).
+  'Harvest Soul Token': {
+    name: 'Lost Soul Token "Harvest"',
+    set: '',
+    imgFile: '/gameplay/harvest_soul_token.jpg',
+    cardType: 'Lost Soul',
+    brigade: '',
+    strength: '',
+    toughness: '',
+    alignment: 'Neutral',
+    identifier: '',
+    specialAbility: '',
+    reference: 'John 4:35',
+  },
+  'Lost Souls Token': {
+    name: 'Lost Soul Token "Lost Souls"',
+    set: '',
+    imgFile: '/gameplay/lost_souls_token.jpg',
+    cardType: 'Lost Soul',
+    brigade: '',
+    strength: '',
+    toughness: '',
+    alignment: 'Neutral',
+    identifier: '',
+    specialAbility: '',
+    reference: 'Proverbs 2:16-17',
+  },
+  'Daniel Soul Token': {
+    name: 'Daniel Soul Token',
+    set: '',
+    imgFile: '/gameplay/daniel_soul_token.png',
+    cardType: 'Lost Soul',
+    brigade: '',
+    strength: '',
+    toughness: '',
+    alignment: 'Neutral',
+    identifier: '',
+    specialAbility: '',
+    reference: '',
   },
 };
 
