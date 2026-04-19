@@ -30,6 +30,7 @@ interface GameContextValue {
   addNote: (cardInstanceId: string, note: string) => void;
   addOpponentLostSoul: (testament?: 'NT' | 'OT', posX?: number, posY?: number) => void;
   removeOpponentToken: (cardInstanceId: string) => void;
+  executeCardAbility: (cardInstanceId: string, abilityIndex: number) => void;
   moveCardsBatch: (cardInstanceIds: string[], toZone: ZoneId, positions?: Record<string, { posX: number; posY: number }>) => void;
   addPlayerLostSoul: () => void;
   reorderHand: (cardInstanceIds: string[]) => void;
@@ -129,6 +130,11 @@ export function GameProvider({ children, deck, optionsOverrides }: GameProviderP
     (id: string) => dispatch(actions.removeOpponentToken(id)),
     [dispatch]
   );
+  const executeCardAbility = useCallback(
+    (cardInstanceId: string, abilityIndex: number) =>
+      dispatch(actions.executeCardAbility(cardInstanceId, abilityIndex)),
+    [dispatch]
+  );
   const moveCardsBatch = useCallback(
     (cardInstanceIds: string[], toZone: ZoneId, positions?: Record<string, { posX: number; posY: number }>) =>
       dispatch(actions.moveCardsBatch(cardInstanceIds, toZone, positions)),
@@ -190,6 +196,7 @@ export function GameProvider({ children, deck, optionsOverrides }: GameProviderP
       addNote,
       addOpponentLostSoul,
       removeOpponentToken,
+      executeCardAbility,
       moveCardsBatch,
       addPlayerLostSoul,
       reorderHand,
@@ -203,7 +210,7 @@ export function GameProvider({ children, deck, optionsOverrides }: GameProviderP
       moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck,
       shuffleDeck, undo, newGame, advancePhase, regressPhase, endTurn,
       addCounter, removeCounter, meekCard, unmeekCard, flipCard,
-      addNote, addOpponentLostSoul, removeOpponentToken, moveCardsBatch, addPlayerLostSoul, reorderHand, reorderLob, attachCard, detachCard, toggleSpreadHand,
+      addNote, addOpponentLostSoul, removeOpponentToken, executeCardAbility, moveCardsBatch, addPlayerLostSoul, reorderHand, reorderLob, attachCard, detachCard, toggleSpreadHand,
     ]
   );
 
