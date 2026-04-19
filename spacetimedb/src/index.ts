@@ -3493,9 +3493,12 @@ export const spawn_lost_soul = spacetimedb.reducer(
 
     const player = findPlayerBySender(ctx, gameId);
 
-    // Determine owner: self or target player
+    // Determine owner: self, target player, or shared sentinel (Paragon shared LoB).
     let ownerId = player.id;
-    if (targetPlayerId) {
+    if (targetPlayerId === '0') {
+      // Paragon: spawn into the shared Land of Bondage.
+      ownerId = 0n;
+    } else if (targetPlayerId) {
       const target = ctx.db.Player.id.find(BigInt(targetPlayerId));
       if (!target) throw new SenderError('Target player not found');
       if (target.gameId !== gameId) throw new SenderError('Target player not in this game');

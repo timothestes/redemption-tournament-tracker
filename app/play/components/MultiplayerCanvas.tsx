@@ -2617,10 +2617,24 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   );
 
   const handleSharedLobContextMenu = useCallback(
-    (_e: Konva.KonvaEventObject<PointerEvent>) => {
-      /* wired in Task 4 */
+    (e: Konva.KonvaEventObject<PointerEvent>) => {
+      e.evt.preventDefault();
+      closeAllMenus();
+      const sharedRect = mpLayout?.zones.sharedLob;
+      if (!sharedRect) return;
+      const layer = gameLayerRef.current;
+      const pointer = layer?.getRelativePointerPosition();
+      const spawnX = pointer ? (pointer.x - sharedRect.x) / sharedRect.width : 0.5;
+      const spawnY = pointer ? (pointer.y - sharedRect.y) / sharedRect.height : 0.5;
+      setZoneMenu({
+        x: e.evt.clientX,
+        y: e.evt.clientY,
+        spawnX,
+        spawnY,
+        targetPlayerId: '0',
+      });
     },
-    [],
+    [mpLayout, closeAllMenus],
   );
 
   // Universal card click handler — shift-click toggles selection
