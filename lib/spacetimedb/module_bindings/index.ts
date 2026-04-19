@@ -48,6 +48,7 @@ import DrawMultipleReducer from "./draw_multiple_reducer";
 import EndTurnReducer from "./end_turn_reducer";
 import ExchangeCardsReducer from "./exchange_cards_reducer";
 import ExchangeFromDeckReducer from "./exchange_from_deck_reducer";
+import ExecuteCardAbilityReducer from "./execute_card_ability_reducer";
 import FlipCardReducer from "./flip_card_reducer";
 import JoinAsSpectatorReducer from "./join_as_spectator_reducer";
 import JoinGameReducer from "./join_game_reducer";
@@ -281,6 +282,7 @@ const reducersSchema = __reducers(
   __reducerSchema("end_turn", EndTurnReducer),
   __reducerSchema("exchange_cards", ExchangeCardsReducer),
   __reducerSchema("exchange_from_deck", ExchangeFromDeckReducer),
+  __reducerSchema("execute_card_ability", ExecuteCardAbilityReducer),
   __reducerSchema("flip_card", FlipCardReducer),
   __reducerSchema("join_as_spectator", JoinAsSpectatorReducer),
   __reducerSchema("join_game", JoinGameReducer),
