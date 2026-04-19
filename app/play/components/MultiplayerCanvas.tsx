@@ -4823,12 +4823,28 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       {/* ================================================================
           Shared context menu — positioned relative to canvas container
           ================================================================ */}
-      {contextMenu && (
+      {contextMenu && (() => {
+        const ctxCard = contextMenu.card;
+        const isSharedSoul =
+          ctxCard?.zone === 'land-of-bondage' &&
+          ctxCard?.ownerId === 'player1' &&
+          findAnyCardById(ctxCard.instanceId)?.ownerId === 0n;
+        const sharedSoulActions = isSharedSoul
+          ? {
+              moveCardToTopOfDeck: (id: string) => gameState.moveCard(BigInt(id), 'soul-deck', '0'),
+              moveCardToBottomOfDeck: (id: string) => gameState.moveCard(BigInt(id), 'soul-deck'),
+              shuffleCardIntoDeck: (id: string) => {
+                gameState.moveCard(BigInt(id), 'soul-deck');
+                gameState.shuffleSoulDeck();
+              },
+            }
+          : null;
+        return (
         <CardContextMenu
           card={contextMenu.card}
           x={contextMenu.x}
           y={contextMenu.y}
-          actions={multiplayerActions}
+          actions={{ ...multiplayerActions, ...(sharedSoulActions ?? {}) }}
           onClose={() => setContextMenu(null)}
           onExchange={(cardIds) => { setContextMenu(null); setExchangeCardIds(cardIds); }}
           onDetach={
@@ -4860,7 +4876,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           }
           zones={allZonesForContextMenu as any}
         />
-      )}
+        );
+      })()}
 
       {multiCardContextMenu && (
         <MultiCardContextMenu
