@@ -230,6 +230,7 @@ function insertCardsShuffleDraw(
       notes: '',
       equippedToInstanceId: 0n,
       isSoulDeckOrigin: false,
+      isToken: false,
     });
   }
 
@@ -318,6 +319,7 @@ function initializeSoulDeck(ctx: any, game: any) {
       notes: '',
       equippedToInstanceId: 0n,
       isSoulDeckOrigin: true,
+      isToken: false,
     });
   }
 
@@ -3495,6 +3497,7 @@ export const spawn_lost_soul = spacetimedb.reducer(
       notes: '',
       equippedToInstanceId: 0n,
       isSoulDeckOrigin: false,
+      isToken: true,
     });
 
     logAction(ctx, gameId, player.id, 'SPAWN_LOST_SOUL', JSON.stringify({ testament }), game.turnNumber, game.currentPhase);
