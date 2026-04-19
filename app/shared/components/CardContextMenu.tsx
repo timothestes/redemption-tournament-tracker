@@ -3,6 +3,7 @@
 import { useEffect, useRef, useMemo, useState } from 'react';
 import { GameCard, ZoneId, ZONE_LABELS, COUNTER_COLORS, CounterColorId } from '../../goldfish/types';
 import { GameActions } from '@/app/shared/types/gameActions';
+import { getAbilitiesForCard, abilityLabel } from '@/lib/cards/cardAbilities';
 
 const MOVE_TARGETS: ZoneId[] = [
   'territory',
@@ -141,6 +142,14 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
     return c?.count ?? 0;
   };
 
+  // Per-card abilities from the CARD_ABILITIES registry
+  const abilities = getAbilitiesForCard(card.identifier);
+  const isOwnedByLocalPlayer = true; // multiplayer server enforces ownership; UX predicate is a separate concern
+  const canExecuteAbilities =
+    abilities.length > 0 &&
+    typeof actions.executeCardAbility === 'function' &&
+    isOwnedByLocalPlayer;
+
   // Opponent tokens get a simplified menu
   if (card.isToken) {
     return (
@@ -173,6 +182,27 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
 
   return (
     <div ref={menuRef} style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
+
+      {/* Card abilities from CARD_ABILITIES registry */}
+      {canExecuteAbilities && (
+        <>
+          {abilities.map((ability, index) => (
+            <button
+              key={index}
+              style={itemStyle}
+              onClick={() => {
+                actions.executeCardAbility?.(card.instanceId, index);
+                onClose();
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              {abilityLabel(ability)}
+            </button>
+          ))}
+          <div style={separatorStyle} />
+        </>
+      )}
 
       {/* Counter swatches — only for territory and land-of-bondage */}
       {(card.zone === 'territory' || card.zone === 'land-of-bondage') && (
