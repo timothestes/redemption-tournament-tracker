@@ -2986,8 +2986,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     return { hostPositions, accessoryPositions };
   }, [opponentCards, opponentZones, lobCard.cardWidth, lobCard.cardHeight]);
 
-  // Paragon-only: shared LoB hosts/accessory positions. No rotation mirror —
-  // cards render upright (rotation=0) in the shared band between territories.
+  // Paragon-only: shared LoB hosts/accessory positions. Three FIXED slots
+  // indexed by zoneIndex so rescued souls' slots stay empty (no visual shift)
+  // until the refill re-populates the same slot.
   const sharedLobLayout = useMemo(() => {
     const hostPositions = new Map<string, { x: number; y: number }>();
     const accessoryPositions = new Map<
@@ -2999,28 +3000,31 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     if (!zone || cards.length === 0) {
       return { hostPositions, accessoryPositions };
     }
-    const sorted = [...cards].sort((a, b) => Number(a.zoneIndex) - Number(b.zoneIndex));
-    const hosts = sorted.filter((c) => c.equippedToInstanceId === 0n);
+    const hosts = cards.filter((c) => c.equippedToInstanceId === 0n);
     const accessoriesByHost = new Map<bigint, CardInstance[]>();
-    for (const c of sorted) {
+    for (const c of cards) {
       if (c.equippedToInstanceId === 0n) continue;
       const list = accessoriesByHost.get(c.equippedToInstanceId);
       if (list) list.push(c);
       else accessoriesByHost.set(c.equippedToInstanceId, [c]);
     }
+    const SHARED_SLOT_COUNT = 3;
     const slotPositions = calculateAutoArrangePositions(
-      hosts.length,
+      SHARED_SLOT_COUNT,
       zone,
       lobCard.cardWidth,
       lobCard.cardHeight,
     );
     const peekUp = lobCard.cardHeight * LOB_ATTACH_PEEK_VISIBLE_RATIO;
-    hosts.forEach((host, i) => {
-      const hostSlot = slotPositions[i];
-      if (!hostSlot) return;
+    for (const host of hosts) {
+      // Place each host at its zoneIndex-indexed slot; out-of-range hosts
+      // fall back to the first empty slot so we never silently drop them.
+      const idx = Number(host.zoneIndex);
+      const hostSlot = slotPositions[idx] ?? slotPositions[0];
+      if (!hostSlot) continue;
       hostPositions.set(String(host.id), hostSlot);
       const accessories = accessoriesByHost.get(host.id);
-      if (!accessories) return;
+      if (!accessories) continue;
       accessories.forEach((acc, ai) => {
         const ay = hostSlot.y - peekUp * (ai + 1);
         accessoryPositions.set(String(acc.id), {
@@ -3030,7 +3034,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           seamY: hostSlot.y,
         });
       });
-    });
+    }
     return { hostPositions, accessoryPositions };
   }, [sharedCards, mpLayout, lobCard.cardWidth, lobCard.cardHeight]);
 
@@ -5728,19 +5732,31 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       </ModalGameProvider>
 
       {/* Opponent's server-revealed cards — shown from snapshot so it persists even after revealer closes their reveal */}
-      {opponentRevealSnapshot.length > 0 && !opponentRevealDismissed && (
-        <ModalGameProvider value={opponentModalGameValue}>
-          <DeckPeekModal
-            cardIds={opponentRevealSnapshot}
-            title={`${gameState.opponentPlayer?.displayName ?? 'Opponent'} Revealed ${opponentRevealSnapshot.length}`}
-            onClose={opponentRevealedCardIds.length > 0 ? undefined : () => setOpponentRevealDismissed(true)}
-            onStartDrag={modalStartDrag}
-            onStartMultiDrag={modalStartMultiDrag}
-            didDragRef={modalDidDragRef}
-            isDragActive={modalDrag.isDragging}
-          />
-        </ModalGameProvider>
-      )}
+      {opponentRevealSnapshot.length > 0 && !opponentRevealDismissed && (() => {
+        // Detect a soul-deck reveal: any revealed ID in sharedCards['soul-deck']
+        // means the opponent revealed from the shared pile. Use the soul-deck
+        // provider so the modal can resolve the cards.
+        const sharedSoulIds = new Set(
+          (sharedCards['soul-deck'] ?? []).map((c) => String(c.id)),
+        );
+        const isSoulDeckReveal = opponentRevealSnapshot.some((id) => sharedSoulIds.has(id));
+        const provider = isSoulDeckReveal ? soulDeckModalGameValue : opponentModalGameValue;
+        const sourceZone: ZoneId = isSoulDeckReveal ? 'soul-deck' : 'deck';
+        return (
+          <ModalGameProvider value={provider}>
+            <DeckPeekModal
+              cardIds={opponentRevealSnapshot}
+              title={`${gameState.opponentPlayer?.displayName ?? 'Opponent'} Revealed ${opponentRevealSnapshot.length}`}
+              onClose={opponentRevealedCardIds.length > 0 ? undefined : () => setOpponentRevealDismissed(true)}
+              onStartDrag={modalStartDrag}
+              onStartMultiDrag={modalStartMultiDrag}
+              didDragRef={modalDidDragRef}
+              isDragActive={modalDrag.isDragging}
+              sourceZone={sourceZone}
+            />
+          </ModalGameProvider>
+        );
+      })()}
 
       {/* Floating drag ghost (modal → canvas drag) */}
       {modalDrag.isDragging && modalDrag.imageUrl && (

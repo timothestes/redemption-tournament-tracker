@@ -108,6 +108,10 @@ function compactHandIndices(ctx: any, gameId: bigint, playerId: bigint) {
 // so zoneIndex values are always sequential: 0, 1, 2, ...
 // ---------------------------------------------------------------------------
 function compactLobIndices(ctx: any, gameId: bigint, playerId: bigint) {
+  // Paragon shared LoB (ownerId=0n) intentionally keeps sparse zoneIndices so
+  // that when a soul is rescued, its slot stays empty until refill places a
+  // new soul there — preventing the other souls from visually shifting.
+  if (playerId === 0n) return;
   const lobCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
     (c: any) => c.ownerId === playerId && c.zone === 'land-of-bondage'
   );
@@ -385,9 +389,10 @@ function initializeSoulDeck(ctx: any, game: any) {
 function refillSoulDeck(ctx: any, gameId: bigint) {
   const gameCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)];
 
-  const lob = gameCards.filter((c: any) => c.zone === 'land-of-bondage');
-  const inPlayOrigin = lob.filter((c: any) => c.isSoulDeckOrigin === true).length;
-  const needed = 3 - inPlayOrigin;
+  const sharedLob = gameCards.filter(
+    (c: any) => c.ownerId === 0n && c.zone === 'land-of-bondage' && c.isSoulDeckOrigin === true
+  );
+  const needed = 3 - sharedLob.length;
   if (needed <= 0) return;
 
   const soulDeck = gameCards
@@ -395,19 +400,21 @@ function refillSoulDeck(ctx: any, gameId: bigint) {
     .sort((a: any, b: any) => (a.zoneIndex < b.zoneIndex ? -1 : a.zoneIndex > b.zoneIndex ? 1 : 0));
   if (soulDeck.length === 0) return;
 
-  // LoB index assignment — continue after current highest
-  let maxLobIdx = -1n;
-  for (const c of lob) {
-    if (c.zoneIndex > maxLobIdx) maxLobIdx = c.zoneIndex;
+  // Slot-preserving refill: find which of the three canonical slots (0, 1, 2)
+  // are currently empty and fill those specific slots so remaining souls keep
+  // their visual positions.
+  const occupied = new Set<bigint>(sharedLob.map((c: any) => c.zoneIndex));
+  const emptySlots: bigint[] = [];
+  for (let i = 0n; i < 3n; i++) {
+    if (!occupied.has(i)) emptySlots.push(i);
   }
 
-  const take = Math.min(needed, soulDeck.length);
+  const take = Math.min(needed, soulDeck.length, emptySlots.length);
   for (let i = 0; i < take; i++) {
-    maxLobIdx = maxLobIdx + 1n;
     ctx.db.CardInstance.id.update({
       ...soulDeck[i],
       zone: 'land-of-bondage',
-      zoneIndex: maxLobIdx,
+      zoneIndex: emptySlots[i],
       isFlipped: false,
     });
   }
