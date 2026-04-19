@@ -682,7 +682,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     return undefined;
   }, [myCards]);
 
-  /** Look up a card instance by its string ID across both players' cards. */
+  /** Look up a card instance by its string ID across both players' cards and shared zones. */
   const findAnyCardById = useCallback((id: string): CardInstance | undefined => {
     for (const cards of Object.values(myCards)) {
       const found = cards.find(c => String(c.id) === id);
@@ -692,8 +692,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       const found = cards.find(c => String(c.id) === id);
       if (found) return found;
     }
+    for (const cards of Object.values(sharedCards)) {
+      const found = cards.find(c => String(c.id) === id);
+      if (found) return found;
+    }
     return undefined;
-  }, [myCards, opponentCards]);
+  }, [myCards, opponentCards, sharedCards]);
 
   // Propagate hoveredCard to the shared CardPreview context (drives CardLoupePanel).
   // Resolve the live card (by instanceId) from the current zone data so fields like
