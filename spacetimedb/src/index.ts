@@ -1647,8 +1647,8 @@ export const move_card = spacetimedb.reducer(
       return;
     }
 
-    // Moving to deck = face-down; leaving deck or reserve = face-up; otherwise preserve
-    const isFlipped = toZone === 'deck' ? true : (fromZone === 'deck' || fromZone === 'reserve') ? false : card.isFlipped;
+    // Moving to deck/soul-deck = face-down; leaving deck, reserve, or soul-deck = face-up; otherwise preserve
+    const isFlipped = (toZone === 'deck' || toZone === 'soul-deck') ? true : (fromZone === 'deck' || fromZone === 'reserve' || fromZone === 'soul-deck') ? false : card.isFlipped;
     // Optionally transfer ownership (e.g. rescue lost soul, capture hero)
     let newOwnerId = targetOwnerId ? BigInt(targetOwnerId) : card.ownerId;
     // Paragon: dropping a soul-origin card back into the shared LoB resets ownership to the shared sentinel.
@@ -1861,8 +1861,8 @@ export const move_cards_batch = spacetimedb.reducer(
       // Allow moves by either player in the game (cards move between zones during battles)
       if (card.gameId !== gameId) throw new SenderError('Card not in this game: ' + idStr);
 
-      // Moving to deck = face-down; leaving deck or reserve = face-up; otherwise preserve
-      const isFlipped = toZone === 'deck' ? true : (card.zone === 'deck' || card.zone === 'reserve') ? false : card.isFlipped;
+      // Moving to deck/soul-deck = face-down; leaving deck, reserve, or soul-deck = face-up; otherwise preserve
+      const isFlipped = (toZone === 'deck' || toZone === 'soul-deck') ? true : (card.zone === 'deck' || card.zone === 'reserve' || card.zone === 'soul-deck') ? false : card.isFlipped;
 
       // Hide card identity when moving from hand to hidden zones (deck/reserve) — hand contents are private
       const hideIdentity = isFlipped || (card.zone === 'hand' && (toZone === 'deck' || toZone === 'reserve'));
@@ -4072,8 +4072,8 @@ export const move_opponent_card = spacetimedb.reducer(
     if (card.gameId !== gameId) throw new SenderError('Card not in this game');
 
     const fromZone = card.zone;
-    // Moving to deck = face-down; leaving deck or reserve = face-up; otherwise preserve
-    const isFlipped = toZone === 'deck' ? true : (fromZone === 'deck' || fromZone === 'reserve') ? false : card.isFlipped;
+    // Moving to deck/soul-deck = face-down; leaving deck, reserve, or soul-deck = face-up; otherwise preserve
+    const isFlipped = (toZone === 'deck' || toZone === 'soul-deck') ? true : (fromZone === 'deck' || fromZone === 'reserve' || fromZone === 'soul-deck') ? false : card.isFlipped;
 
     // For free-form zones, auto-assign highest zoneIndex so new cards render on top
     let finalZoneIndex = 0n;
