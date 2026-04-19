@@ -3008,7 +3008,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       if (list) list.push(c);
       else accessoriesByHost.set(c.equippedToInstanceId, [c]);
     }
-    const SHARED_SLOT_COUNT = 3;
+    // Base 3 slots (canonical rescue-slot grid). Expand the grid if any host
+    // has zoneIndex beyond slot 2 — e.g., a stray card dropped into an
+    // overflow slot must render in its own position, not stacked on slot 0.
+    const maxZoneIdx = hosts.reduce<number>(
+      (m, h) => Math.max(m, Number(h.zoneIndex)),
+      -1,
+    );
+    const SHARED_SLOT_COUNT = Math.max(3, maxZoneIdx + 1);
     const slotPositions = calculateAutoArrangePositions(
       SHARED_SLOT_COUNT,
       zone,

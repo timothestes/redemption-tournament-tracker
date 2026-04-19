@@ -1736,6 +1736,29 @@ export const move_card = spacetimedb.reducer(
       }
       finalZoneIndex = maxIdx + 1n;
     }
+
+    // Paragon shared LoB: zoneIndexes are slot-preserving (gaps stay open so
+    // remaining souls don't shift when one is rescued). Override the simple
+    // maxIdx+1 assignment above to find the first empty slot in [0..2] first,
+    // only falling back to maxIdx+1 when the canonical slots are all occupied.
+    if (!zoneIndex && toZone === 'land-of-bondage' && newOwnerId === 0n) {
+      const sharedLob = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+        (c: any) => c.ownerId === 0n && c.zone === 'land-of-bondage' && c.id !== cardInstanceId
+      );
+      const occupied = new Set<bigint>(sharedLob.map((c: any) => c.zoneIndex));
+      let chosen: bigint | null = null;
+      for (let i = 0n; i < 3n; i++) {
+        if (!occupied.has(i)) { chosen = i; break; }
+      }
+      if (chosen === null) {
+        let maxIdx = -1n;
+        for (const c of sharedLob) {
+          if (c.zoneIndex > maxIdx) maxIdx = c.zoneIndex;
+        }
+        chosen = maxIdx + 1n;
+      }
+      finalZoneIndex = chosen;
+    }
     if (!zoneIndex && toZone === 'hand') {
       finalZoneIndex = BigInt(
         [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
@@ -2039,6 +2062,7 @@ export const move_cards_batch = spacetimedb.reducer(
       // - hand: use computed sequential index
       // - free-form zones (territory): assign incrementing index so cards render on top
       // - redirected to discard (equip cascade): compute discard max + 1
+      // - Paragon shared LoB: slot-preserving — fill the first empty slot in [0..2]
       // - other zones: preserve existing zoneIndex
       let finalZoneIndex = card.zoneIndex;
       if (cardFinalZone === 'hand') {
@@ -2058,6 +2082,24 @@ export const move_cards_batch = spacetimedb.reducer(
         // and same-zone repositioning — so moved cards render on top for all clients.
         finalZoneIndex = nextFreeFormIndex;
         nextFreeFormIndex += 1n;
+      } else if (cardFinalZone === 'land-of-bondage' && resolvedCardOwnerId === 0n) {
+        // Shared LoB slot assignment: find the first empty slot in [0..2].
+        const sharedLob = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+          (c: any) => c.ownerId === 0n && c.zone === 'land-of-bondage' && c.id !== cardId
+        );
+        const occupied = new Set<bigint>(sharedLob.map((c: any) => c.zoneIndex));
+        let chosen: bigint | null = null;
+        for (let i = 0n; i < 3n; i++) {
+          if (!occupied.has(i)) { chosen = i; break; }
+        }
+        if (chosen === null) {
+          let maxIdx = -1n;
+          for (const c of sharedLob) {
+            if (c.zoneIndex > maxIdx) maxIdx = c.zoneIndex;
+          }
+          chosen = maxIdx + 1n;
+        }
+        finalZoneIndex = chosen;
       }
 
       // Clear pos when redirected (the client-supplied coords were for `toZone`, not discard)
