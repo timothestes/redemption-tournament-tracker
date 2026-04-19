@@ -1757,12 +1757,14 @@ export const move_card = spacetimedb.reducer(
       }
     }
 
-    // Paragon: if a soul-origin card left the shared LoB, refill back to 3.
+    // Paragon: refill the shared LoB only when a soul-origin card is rescued
+    // into a land-of-redemption. Drag-back, soul-deck round-trips, and other
+    // destinations leave the LoB short and do not refill.
     const triggeredRefill =
       normalizeFormat(game.format) === 'Paragon' &&
       card.isSoulDeckOrigin === true &&
       card.zone === 'land-of-bondage' &&
-      toZone !== 'land-of-bondage';
+      toZone === 'land-of-redemption';
     if (triggeredRefill) {
       refillSoulDeck(ctx, game.id);
     }
@@ -1798,6 +1800,10 @@ export const move_cards_batch = spacetimedb.reducer(
     let sourceOwnerId: bigint | null = null;
     const handCompactOwners = new Set<bigint>(); // Track owners whose hand needs compaction
     const lobCompactOwners = new Set<bigint>(); // Track owners whose LOB needs compaction
+    // Paragon: track whether any card in this batch was a soul-origin card
+    // rescued from the shared LoB into a land-of-redemption. Only those rescues
+    // trigger a soul-deck refill.
+    let anyRescueToLor = false;
 
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
@@ -1913,6 +1919,16 @@ export const move_cards_batch = spacetimedb.reducer(
         cardFinalZone !== 'soul-deck'
       ) {
         resolvedCardOwnerId = player.id;
+      }
+      // Paragon: track rescues-to-LoR so we only refill the shared soul deck
+      // when a rescue actually occurred. Drag-backs, soul-deck round-trips,
+      // and other destinations must not trigger a refill.
+      if (
+        card.isSoulDeckOrigin === true &&
+        card.zone === 'land-of-bondage' &&
+        cardFinalZone === 'land-of-redemption'
+      ) {
+        anyRescueToLor = true;
       }
       // Paragon: dropping a soul-origin card back into the shared LoB resets ownership to the shared sentinel.
       if (
@@ -2039,8 +2055,9 @@ export const move_cards_batch = spacetimedb.reducer(
       compactLobIndices(ctx, gameId, ownerId);
     }
 
-    // Paragon: batch may have rescued soul-origin cards from LoB — refill.
-    if (normalizeFormat(game.format) === 'Paragon') {
+    // Paragon: only refill when this batch actually rescued a soul-origin
+    // card into a land-of-redemption. Other destinations leave the LoB short.
+    if (normalizeFormat(game.format) === 'Paragon' && anyRescueToLor) {
       refillSoulDeck(ctx, game.id);
     }
   }
