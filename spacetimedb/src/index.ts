@@ -200,6 +200,7 @@ function insertCardsShuffleDraw(
       reference: card.reference || '',
       notes: '',
       equippedToInstanceId: 0n,
+      isSoulDeckOrigin: false,
     });
   }
 
@@ -3084,6 +3085,7 @@ export const spawn_lost_soul = spacetimedb.reducer(
       reference: '',
       notes: '',
       equippedToInstanceId: 0n,
+      isSoulDeckOrigin: false,
     });
 
     logAction(ctx, gameId, player.id, 'SPAWN_LOST_SOUL', JSON.stringify({ testament }), game.turnNumber, game.currentPhase);
