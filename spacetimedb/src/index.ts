@@ -2050,11 +2050,9 @@ function spawnTokenImpl(
   const count = ability.count ?? 1;
   if (count < 1) throw new SenderError('Invalid count');
 
-  // Phase 2 — compute target zone.
-  const PLAY_ZONES = ['territory', 'land-of-bondage', 'land-of-redemption'];
-  const targetZone = PLAY_ZONES.includes(source.zone)
-    ? source.zone
-    : (ability.defaultZone ?? 'territory');
+  // Phase 2 — compute target zone. Always Territory by default — it's the
+  // visible main play area. Registry can override via ability.defaultZone.
+  const targetZone = ability.defaultZone ?? 'territory';
 
   // Compute starting zoneIndex based on existing cards for (targetZone, ownerId).
   let maxIdx = -1n;
@@ -2064,16 +2062,16 @@ function spawnTokenImpl(
     }
   }
 
-  // Stagger each token relative to the source so they don't stack on top
-  // of each other. Mirrors the goldfish cascade (+55 X, +15 Y per token).
-  // Only applies in territory (free-form zone); other play zones are
-  // auto-arranged by the client.
+  // Stagger each token relative to the source IF the source is already in
+  // territory (so tokens appear next to their source card). Otherwise use a
+  // sensible default position. Cascade: +55 X, +15 Y per token.
   const STAGGER_X = 55;
   const STAGGER_Y = 15;
+  const sourceInTerritory = source.zone === 'territory';
   const sourcePosX = source.posX ? Number(source.posX) : NaN;
   const sourcePosY = source.posY ? Number(source.posY) : NaN;
-  const baseX = Number.isFinite(sourcePosX) ? sourcePosX : 120;
-  const baseY = Number.isFinite(sourcePosY) ? sourcePosY : 120;
+  const baseX = sourceInTerritory && Number.isFinite(sourcePosX) ? sourcePosX : 200;
+  const baseY = sourceInTerritory && Number.isFinite(sourcePosY) ? sourcePosY : 200;
 
   // Phase 3 — all-or-nothing inserts. SpacetimeDB rolls back the whole
   // reducer if any insert throws.

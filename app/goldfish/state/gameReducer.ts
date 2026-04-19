@@ -37,8 +37,6 @@ function cloneZones(zones: GameState['zones']): GameState['zones'] {
   return cloned;
 }
 
-const PLAY_ZONES: ReadonlyArray<ZoneId> = ['territory', 'land-of-bondage', 'land-of-redemption'];
-
 function spawnTokenInState(
   state: GameState,
   source: GameCard,
@@ -57,28 +55,32 @@ function spawnTokenInState(
   const count = ability.count ?? 1;
   if (count < 1) return state;
 
-  const targetZone: ZoneId = PLAY_ZONES.includes(source.zone)
-    ? source.zone
-    : (ability.defaultZone ?? 'territory');
+  // Always spawn tokens in Territory by default — it's the visible main play
+  // area and cards in LoR/LoB strips can't lay out free-form. A registry
+  // entry can override via ability.defaultZone (e.g., for tokens that
+  // thematically belong in LoB).
+  const targetZone: ZoneId = ability.defaultZone ?? 'territory';
 
-  // Stagger each token relative to the source so they don't land on top of
-  // each other. Horizontal cascade with a small vertical drift — card widths
-  // in territory are ~100-120px, so ~55px between centers leaves each card
-  // visibly distinct with light overlap.
+  // Stagger each token relative to the source's position IF the source is
+  // already in territory. Otherwise use a reasonable default near the
+  // center-ish area so tokens appear together and visible.
   const STAGGER_X = 55;
   const STAGGER_Y = 15;
-  const baseX =
+  const sourceInTerritory = source.zone === 'territory';
+  const sourcePosX =
     typeof source.posX === 'number'
       ? source.posX
       : typeof source.posX === 'string' && source.posX !== ''
         ? Number(source.posX)
-        : 120;
-  const baseY =
+        : NaN;
+  const sourcePosY =
     typeof source.posY === 'number'
       ? source.posY
       : typeof source.posY === 'string' && source.posY !== ''
         ? Number(source.posY)
-        : 120;
+        : NaN;
+  const baseX = sourceInTerritory && Number.isFinite(sourcePosX) ? sourcePosX : 200;
+  const baseY = sourceInTerritory && Number.isFinite(sourcePosY) ? sourcePosY : 200;
 
   // Phase 2 — build all new cards in memory. No state mutation yet.
   const newCards: GameCard[] = Array.from({ length: count }, (_, i) => ({

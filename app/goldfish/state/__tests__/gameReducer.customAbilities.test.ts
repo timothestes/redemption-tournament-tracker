@@ -97,15 +97,17 @@ describe('EXECUTE_CARD_ABILITY — spawn_token', () => {
     expect(next).toBe(state);
   });
 
-  it('spawn from land-of-bondage works (a play zone)', () => {
+  it('spawn from land-of-bondage always lands in Territory (default target zone)', () => {
     const source = makeCard({ zone: 'land-of-bondage', cardName: 'The Proselytizers (GoC)' });
     const state = makeState([source]);
 
     const next = gameReducer(state, act('source-1', 0));
 
-    // Spawned into land-of-bondage (same play zone as source).
-    const tokens = next.zones['land-of-bondage'].filter(c => c.isToken);
+    // Regardless of source zone, default target is Territory (the visible
+    // free-form play area). Registry can override via ability.defaultZone.
+    const tokens = next.zones.territory.filter(c => c.isToken);
     expect(tokens).toHaveLength(1);
+    expect(next.zones['land-of-bondage'].filter(c => c.isToken)).toHaveLength(0);
   });
 
   it('unknown source instanceId is a no-op (returns same state reference)', () => {
