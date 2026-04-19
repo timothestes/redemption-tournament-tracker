@@ -2064,18 +2064,31 @@ function spawnTokenImpl(
     }
   }
 
+  // Stagger each token relative to the source so they don't stack on top
+  // of each other. Mirrors the goldfish cascade (+55 X, +15 Y per token).
+  // Only applies in territory (free-form zone); other play zones are
+  // auto-arranged by the client.
+  const STAGGER_X = 55;
+  const STAGGER_Y = 15;
+  const sourcePosX = source.posX ? Number(source.posX) : NaN;
+  const sourcePosY = source.posY ? Number(source.posY) : NaN;
+  const baseX = Number.isFinite(sourcePosX) ? sourcePosX : 120;
+  const baseY = Number.isFinite(sourcePosY) ? sourcePosY : 120;
+
   // Phase 3 — all-or-nothing inserts. SpacetimeDB rolls back the whole
   // reducer if any insert throws.
   for (let i = 0; i < count; i++) {
     maxIdx += 1n;
+    const posX = targetZone === 'territory' ? String(baseX + (i + 1) * STAGGER_X) : '';
+    const posY = targetZone === 'territory' ? String(baseY + (i + 1) * STAGGER_Y) : '';
     ctx.db.CardInstance.insert({
       id: 0n,
       gameId,
       ownerId: source.ownerId,
       zone: targetZone,
       zoneIndex: maxIdx,
-      posX: '',
-      posY: '',
+      posX,
+      posY,
       isMeek: false,
       isFlipped: false,
       isToken: true,

@@ -58,8 +58,27 @@ function spawnTokenInState(
     ? source.zone
     : (ability.defaultZone ?? 'territory');
 
+  // Stagger each token relative to the source so they don't land on top of
+  // each other. Horizontal cascade with a small vertical drift — card widths
+  // in territory are ~100-120px, so ~55px between centers leaves each card
+  // visibly distinct with light overlap.
+  const STAGGER_X = 55;
+  const STAGGER_Y = 15;
+  const baseX =
+    typeof source.posX === 'number'
+      ? source.posX
+      : typeof source.posX === 'string' && source.posX !== ''
+        ? Number(source.posX)
+        : 120;
+  const baseY =
+    typeof source.posY === 'number'
+      ? source.posY
+      : typeof source.posY === 'string' && source.posY !== ''
+        ? Number(source.posY)
+        : 120;
+
   // Phase 2 — build all new cards in memory. No state mutation yet.
-  const newCards: GameCard[] = Array.from({ length: count }, () => ({
+  const newCards: GameCard[] = Array.from({ length: count }, (_, i) => ({
     instanceId: crypto.randomUUID(),
     cardName: tokenData.name,
     cardSet: tokenData.set,
@@ -79,6 +98,8 @@ function spawnTokenInState(
     zone: targetZone,
     ownerId: source.ownerId,
     notes: '',
+    posX: targetZone === 'territory' ? baseX + (i + 1) * STAGGER_X : undefined,
+    posY: targetZone === 'territory' ? baseY + (i + 1) * STAGGER_Y : undefined,
   }));
 
   // Phase 3 — commit in a single shallow clone.

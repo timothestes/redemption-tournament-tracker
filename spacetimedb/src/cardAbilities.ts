@@ -24,7 +24,7 @@ export type CardAbility =
 
 export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'Two Possessed (GoC)':        [{ type: 'spawn_token', tokenName: 'Violent Possessor Token', count: 2 }],
-  'The Accumulator (GoC)':      [{ type: 'spawn_token', tokenName: 'Wicked Spirit Token' }],
+  'The Accumulator (GoC)':      [{ type: 'spawn_token', tokenName: 'Wicked Spirit Token', count: 7 }],
   'The Proselytizers (GoC)':    [{ type: 'spawn_token', tokenName: 'Proselyte Token' }],
   'The Church of Christ (GoC)': [{ type: 'spawn_token', tokenName: 'Follower Token' }],
   'Angel of the Harvest (GoC)': [{ type: 'spawn_token', tokenName: 'Heavenly Host Token' }],
