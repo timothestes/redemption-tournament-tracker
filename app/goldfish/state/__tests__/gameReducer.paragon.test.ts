@@ -173,3 +173,55 @@ describe('Paragon rescue + refill on MOVE_CARDS_BATCH', () => {
     expect(next.zones['land-of-bondage'].filter(c => c.isSoulDeckOrigin)).toHaveLength(3);
   });
 });
+
+describe('Paragon rescue-only refill semantics', () => {
+  it('does NOT refill when a soul moves from shared LoB to territory', () => {
+    const soulDeck = [makeCard({ instanceId: 's1' })];
+    const lob = [
+      makeCard({ instanceId: 'l1', zone: 'land-of-bondage' }),
+      makeCard({ instanceId: 'l2', zone: 'land-of-bondage' }),
+      makeCard({ instanceId: 'l3', zone: 'land-of-bondage' }),
+    ];
+    const state = makeState({ 'soul-deck': soulDeck, 'land-of-bondage': lob });
+    const next = gameReducer(state, act('MOVE_CARD', {
+      cardInstanceId: 'l1',
+      toZone: 'territory',
+    }));
+    expect(next.zones['soul-deck']).toHaveLength(1);
+    expect(next.zones['land-of-bondage'].filter(c => c.isSoulDeckOrigin)).toHaveLength(2);
+    expect(next.zones.territory).toHaveLength(1);
+  });
+
+  it('does NOT refill when a soul moves back into the soul deck', () => {
+    const soulDeck = [makeCard({ instanceId: 's1' })];
+    const lob = [
+      makeCard({ instanceId: 'l1', zone: 'land-of-bondage' }),
+      makeCard({ instanceId: 'l2', zone: 'land-of-bondage' }),
+      makeCard({ instanceId: 'l3', zone: 'land-of-bondage' }),
+    ];
+    const state = makeState({ 'soul-deck': soulDeck, 'land-of-bondage': lob });
+    const next = gameReducer(state, act('MOVE_CARD', {
+      cardInstanceId: 'l1',
+      toZone: 'soul-deck',
+    }));
+    expect(next.zones['soul-deck']).toHaveLength(2);
+    expect(next.zones['land-of-bondage'].filter(c => c.isSoulDeckOrigin)).toHaveLength(2);
+  });
+
+  it('does NOT refill when a soul moves to hand', () => {
+    const soulDeck = [makeCard({ instanceId: 's1' })];
+    const lob = [
+      makeCard({ instanceId: 'l1', zone: 'land-of-bondage' }),
+      makeCard({ instanceId: 'l2', zone: 'land-of-bondage' }),
+      makeCard({ instanceId: 'l3', zone: 'land-of-bondage' }),
+    ];
+    const state = makeState({ 'soul-deck': soulDeck, 'land-of-bondage': lob });
+    const next = gameReducer(state, act('MOVE_CARD', {
+      cardInstanceId: 'l1',
+      toZone: 'hand',
+    }));
+    expect(next.zones['soul-deck']).toHaveLength(1);
+    expect(next.zones['land-of-bondage'].filter(c => c.isSoulDeckOrigin)).toHaveLength(2);
+    expect(next.zones.hand).toHaveLength(1);
+  });
+});
