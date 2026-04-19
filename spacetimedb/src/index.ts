@@ -593,6 +593,13 @@ export const join_game = spacetimedb.reducer(
       }
     }
 
+    // Paragon: populate the shared soul deck + 3 LoB souls at the same
+    // moment player hands are dealt (idempotent).
+    const gameForSoulInit = ctx.db.Game.id.find(game.id);
+    if (gameForSoulInit && normalizeFormat(gameForSoulInit.format) === 'Paragon') {
+      initializeSoulDeck(ctx, gameForSoulInit);
+    }
+
     // Roll dice to determine who chooses first player
     const gameAfterCards = ctx.db.Game.id.find(game.id);
     if (!gameAfterCards) throw new SenderError('Game not found');
@@ -690,6 +697,13 @@ export const pregame_ready = spacetimedb.reducer(
       if (latestPlayer) {
         ctx.db.Player.id.update({ ...latestPlayer, pendingDeckData: '' });
       }
+    }
+
+    // Paragon: populate the shared soul deck + 3 LoB souls at the same
+    // moment player hands are dealt (idempotent — rematch-safe).
+    const gameForSoulInit = ctx.db.Game.id.find(gameId);
+    if (gameForSoulInit && normalizeFormat(gameForSoulInit.format) === 'Paragon') {
+      initializeSoulDeck(ctx, gameForSoulInit);
     }
 
     // Now roll dice using single PRNG instance

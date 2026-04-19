@@ -5010,7 +5010,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           x={soulDeckMenu.x}
           y={soulDeckMenu.y}
           deckSize={sharedCards['soul-deck']?.length ?? 0}
-          hideDrawActions
           hideDiscardActions
           hideReserveActions
           onClose={() => setSoulDeckMenu(null)}
@@ -5022,9 +5021,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           onRevealTop={(n) => revealFromSoulDeck('top', n)}
           onRevealBottom={(n) => revealFromSoulDeck('bottom', n)}
           onRevealRandom={(n) => revealFromSoulDeck('random', n)}
-          onDrawTop={() => {}}
-          onDrawBottom={() => {}}
-          onDrawRandom={() => {}}
+          // For the soul deck, Draw == Reveal: the card leaves the soul deck
+          // and lands face-up in the shared LoB. There's no private equivalent.
+          onDrawTop={(n) => revealFromSoulDeck('top', n)}
+          onDrawBottom={(n) => revealFromSoulDeck('bottom', n)}
+          onDrawRandom={(n) => revealFromSoulDeck('random', n)}
           onDiscardTop={() => {}}
           onDiscardBottom={() => {}}
           onDiscardRandom={() => {}}
