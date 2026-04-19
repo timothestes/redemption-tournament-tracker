@@ -111,7 +111,8 @@ export type ActionType =
   | 'REORDER_HAND'
   | 'REORDER_LOB'
   | 'ATTACH_CARD'
-  | 'DETACH_CARD';
+  | 'DETACH_CARD'
+  | 'EXECUTE_CARD_ABILITY';
 
 export interface GameAction {
   id: string;
@@ -131,6 +132,7 @@ export interface GameAction {
     posX?: number;
     posY?: number;
     positions?: Record<string, { posX: number; posY: number }>;
+    abilityIndex?: number;
   };
 }
 
