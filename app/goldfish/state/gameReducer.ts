@@ -240,7 +240,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         state.format === 'Paragon' &&
         result.fromZone === 'land-of-bondage' &&
         result.card.isSoulDeckOrigin === true &&
-        toZone !== 'land-of-bondage';
+        toZone === 'land-of-redemption';
       if (needsRefill) {
         finalZones = refillSoulDeck(zones);
       }
@@ -499,6 +499,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         finalZoneById.set(id, redirected ? 'discard' : toZone);
       }
 
+      let anyRescue = false;
       for (const instanceId of cardInstanceIds) {
         const result = findAndRemoveCard(zones, instanceId);
         if (!result) continue;
@@ -516,6 +517,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           result.card.isSoulDeckOrigin === true;
         if (wasSharedSoulFromLob) {
           result.card.ownerId = 'player1';
+        }
+        if (
+          result.fromZone === 'land-of-bondage' &&
+          result.card.isSoulDeckOrigin === true &&
+          finalZone === 'land-of-redemption'
+        ) {
+          anyRescue = true;
         }
         const pos = positions?.[instanceId];
         result.card.posX = finalZone === 'territory' ? pos?.posX : undefined;
@@ -555,8 +563,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         zones[finalZone].push(result.card);
       }
       let finalZones = zones;
-      if (state.format === 'Paragon') {
-        // A soul-origin card may have left LoB as part of this batch; refill is idempotent.
+      if (state.format === 'Paragon' && anyRescue) {
         finalZones = refillSoulDeck(zones);
       }
       return { ...state, zones: finalZones, history };
