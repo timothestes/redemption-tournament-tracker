@@ -2102,7 +2102,10 @@ function spawnTokenImpl(
       ctx, gameId, player.id, 'SPAWN_TOKEN',
       JSON.stringify({
         sourceInstanceId: source.id.toString(),
+        sourceCardName: source.cardName,
+        sourceCardImgFile: source.cardImgFile,
         tokenName: tokenData.name,
+        tokenImgFile: tokenData.imgFile,
         count,
         targetZone,
       }),

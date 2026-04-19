@@ -647,17 +647,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     | { kind: 'batch'; execute: () => void };
   const [pendingReserveMove, setPendingReserveMove] = useState<PendingReserveMove | null>(null);
 
+  // turnNumber only increments when play cycles back to seat 0 (see END_TURN reducer),
+  // so both players' first turns share turnNumber === 1n — distinguish by currentTurn.
   const isMyFirstTurn = useMemo(() => {
     const { game, myPlayer } = gameState;
     if (!game || !myPlayer) return false;
-    // Seat 0 plays on turnNumber 1, seat 1 plays on turnNumber 2
-    return myPlayer.seat === BigInt(0) ? game.turnNumber === BigInt(1) : game.turnNumber === BigInt(2);
+    return game.turnNumber === BigInt(1) && game.currentTurn === myPlayer.seat;
   }, [gameState]);
 
   const isOpponentFirstTurn = useMemo(() => {
     const { game, opponentPlayer } = gameState;
     if (!game || !opponentPlayer) return false;
-    return opponentPlayer.seat === BigInt(0) ? game.turnNumber === BigInt(1) : game.turnNumber === BigInt(2);
+    return game.turnNumber === BigInt(1) && game.currentTurn === opponentPlayer.seat;
   }, [gameState]);
 
   // Skip reserve protection in goldfish/practice mode (no opponent)

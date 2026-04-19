@@ -192,6 +192,27 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
   if (actionType === 'SPAWN_LOST_SOUL') {
     return 'spawned a lost soul token';
   }
+  if (actionType === 'SPAWN_TOKEN' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const count = Number(data.count ?? 1);
+      const tokenName: string = data.tokenName ?? 'a token';
+      const tokenImg: string = data.tokenImgFile ?? '';
+      const sourceName: string = data.sourceCardName ?? '';
+      const sourceImg: string = data.sourceCardImgFile ?? '';
+      const tokenLabel = count > 1 ? `${count}× ${tokenName}` : tokenName;
+      return (
+        <>
+          created <HoverableCard name={tokenLabel} img={tokenImg} />
+          {sourceName ? (
+            <>
+              {' '}from <HoverableCard name={sourceName} img={sourceImg} />
+            </>
+          ) : null}
+        </>
+      );
+    } catch { /* fall through */ }
+  }
   if ((actionType === 'EXCHANGE' || actionType === 'EXCHANGE_CARDS') && payload) {
     try {
       const data = JSON.parse(payload);
