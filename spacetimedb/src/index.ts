@@ -756,6 +756,13 @@ export const pregame_acknowledge_roll = spacetimedb.reducer(
       pregamePhase: 'choosing',
     });
 
+    // Paragon: populate the shared soul deck + 3 LoB souls now (instead of
+    // at game-start) so they're already visible when the "choosing" / "reveal"
+    // overlay dismisses.
+    if (normalizeFormat(latestGame.format) === 'Paragon') {
+      initializeSoulDeck(ctx, latestGame);
+    }
+
     // Schedule server-side timeout — auto-choose if winner doesn't pick in 30s
     const CHOOSE_TIMEOUT_MICROS = 30_000_000n; // 30 seconds
     const futureTime = ctx.timestamp.microsSinceUnixEpoch + CHOOSE_TIMEOUT_MICROS;
@@ -847,10 +854,9 @@ export const pregame_acknowledge_first = spacetimedb.reducer(
         }
       }
 
-      const normalized = normalizeFormat(game.format);
-      if (normalized === 'Paragon') {
-        initializeSoulDeck(ctx, game);
-      }
+      // Paragon soul deck was initialized earlier, when the phase first
+      // transitioned out of 'rolling' (see pregame_acknowledge_roll and
+      // pregame_skip_to_reveal).
 
       ctx.db.Game.id.update({
         ...updatedGame,
@@ -903,6 +909,12 @@ export const pregame_skip_to_reveal = spacetimedb.reducer(
       pregameReady0: false,
       pregameReady1: false,
     });
+
+    // Paragon: populate the shared soul deck + 3 LoB souls now so they're
+    // already visible when the reveal overlay dismisses.
+    if (normalizeFormat(latestGame.format) === 'Paragon') {
+      initializeSoulDeck(ctx, latestGame);
+    }
   }
 );
 
