@@ -1,65 +1,30 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useRef, useMemo, useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 import { GameProvider } from '../state/GameContext';
-import { CardPreviewProvider, useCardPreview } from '../state/CardPreviewContext';
+import { CardPreviewProvider } from '../state/CardPreviewContext';
 import { LoadingScreen } from '../components/LoadingScreen';
-import { CardLoupePanel, LOUPE_PANEL_WIDTH, LOUPE_COLLAPSED_WIDTH } from '../components/CardLoupePanel';
+import { CardLoupePanel } from '../components/CardLoupePanel';
 import { useImagePreloader } from '../hooks/useImagePreloader';
 import type { DeckDataForGoldfish } from '../types';
+import { getCardImageUrl } from '../../shared/utils/cardImageUrl';
+import { useVirtualCanvas } from '@/app/shared/layout/virtualCanvas';
+import { DeckPickerModal } from '@/app/play/components/DeckPickerModal';
+import type { DeckOption } from '@/app/play/components/DeckPickerCard';
+import { ParagonDrawer } from '@/app/shared/components/ParagonDrawer';
+import { buildParagonEntries } from '@/app/shared/utils/paragonEntries';
 
 const GoldfishCanvas = dynamic(() => import('../components/GoldfishCanvas'), { ssr: false });
-
-const BLOB_BASE_URL = process.env.NEXT_PUBLIC_BLOB_BASE_URL || '';
-
-function sanitizeImgFile(f: string): string {
-  return f.replace(/\.jpe?g$/i, '');
-}
-
-function getCardImageUrl(imgFile: string): string {
-  if (imgFile.startsWith('/')) return imgFile;
-  return `${BLOB_BASE_URL}/card-images/${sanitizeImgFile(imgFile)}.jpg`;
-}
 
 interface GoldfishClientProps {
   deck: DeckDataForGoldfish;
 }
 
-// Cap the game area width so the layout doesn't break on ultrawide monitors.
-// Beyond this ratio, the extra width becomes visible cave background.
-const MAX_ASPECT_RATIO = 2.0;
-
-function getEffectiveDimensions(viewportWidth: number, viewportHeight: number, loupeWidth: number) {
-  const availableWidth = viewportWidth - loupeWidth;
-  const ar = availableWidth / viewportHeight;
-  const effectiveWidth = ar > MAX_ASPECT_RATIO
-    ? Math.round(viewportHeight * MAX_ASPECT_RATIO)
-    : availableWidth;
-  return { width: effectiveWidth, height: viewportHeight };
-}
-
-function GoldfishGameArea({ deck }: { deck: DeckDataForGoldfish }) {
-  const { isLoupeVisible } = useCardPreview();
-
-  const [viewport, setViewport] = useState({
-    width: typeof window !== 'undefined' ? window.innerWidth : 1280,
-    height: typeof window !== 'undefined' ? window.innerHeight : 800,
-  });
-
-  useEffect(() => {
-    const onResize = () =>
-      setViewport({ width: window.innerWidth, height: window.innerHeight });
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
-  const loupeWidth = isLoupeVisible ? LOUPE_PANEL_WIDTH : LOUPE_COLLAPSED_WIDTH;
-
-  const dimensions = useMemo(
-    () => getEffectiveDimensions(viewport.width, viewport.height, loupeWidth),
-    [viewport.width, viewport.height, loupeWidth]
-  );
+function GoldfishGameArea({ deck, onLoadDeck }: { deck: DeckDataForGoldfish; onLoadDeck: () => void }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { scale, offsetX, offsetY, containerWidth, containerHeight, virtualWidth } = useVirtualCanvas(containerRef);
 
   // Collect all unique image URLs to preload
   const imageUrls = useMemo(() => {
@@ -73,6 +38,20 @@ function GoldfishGameArea({ deck }: { deck: DeckDataForGoldfish }) {
   }, [deck.cards]);
 
   const { isReady, progress } = useImagePreloader(imageUrls);
+
+  const paragonEntries = useMemo(
+    () => buildParagonEntries({
+      players: [
+        {
+          id: 'goldfish-self',
+          displayName: 'You',
+          paragonName: deck.paragon ?? null,
+          isSelf: true,
+        },
+      ],
+    }),
+    [deck.paragon],
+  );
 
   if (!isReady) {
     return <LoadingScreen progress={progress} />;
@@ -118,39 +97,117 @@ function GoldfishGameArea({ deck }: { deck: DeckDataForGoldfish }) {
         }}
       />
 
-      {/* Game area container */}
-      <div
-        style={{
-          position: 'relative',
-          flex: 1,
-          height: '100%',
-        }}
-      >
-        {/* Game area — capped width, centered. Acts as positioning context for all overlays. */}
-        <div
-          style={{
-            position: 'relative',
-            width: dimensions.width,
-            height: '100%',
-            margin: '0 auto',
-          }}
-        >
-          <GoldfishCanvas width={dimensions.width} height={dimensions.height} />
-        </div>
+      {/* Game area container — ref measures available space after loupe */}
+      <div ref={containerRef} style={{ position: 'relative', flex: 1, minWidth: 0, height: '100%', overflow: 'hidden' }}>
+        {containerWidth > 0 && containerHeight > 0 && (
+          <GoldfishCanvas
+            containerWidth={containerWidth}
+            containerHeight={containerHeight}
+            scale={scale}
+            offsetX={offsetX}
+            offsetY={offsetY}
+            virtualWidth={virtualWidth}
+            onLoadDeck={onLoadDeck}
+          />
+        )}
       </div>
 
       {/* Loupe preview panel — right side */}
       <CardLoupePanel />
+
+      {/* Paragon drawer — DOM overlay; self-hides when no paragon */}
+      <ParagonDrawer paragons={paragonEntries} />
     </div>
   );
 }
 
 export default function GoldfishClient({ deck }: GoldfishClientProps) {
+  const router = useRouter();
+  const [showDeckPicker, setShowDeckPicker] = useState(false);
+  const [pendingDeck, setPendingDeck] = useState<DeckOption | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem('lastPlayedDeckId', deck.id);
+  }, [deck.id]);
+
   return (
     <CardPreviewProvider>
       <GameProvider deck={deck}>
-        <GoldfishGameArea deck={deck} />
+        <GoldfishGameArea deck={deck} onLoadDeck={() => setShowDeckPicker(true)} />
       </GameProvider>
+
+      <DeckPickerModal
+        open={showDeckPicker}
+        onOpenChange={setShowDeckPicker}
+        onSelect={(picked) => {
+          setShowDeckPicker(false);
+          if (picked.id === deck.id) return;
+          setPendingDeck(picked);
+        }}
+        selectedDeckId={deck.id}
+      />
+
+      {pendingDeck && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              background: 'rgba(14, 10, 6, 0.97)',
+              border: '1px solid rgba(107, 78, 39, 0.3)',
+              borderRadius: 8,
+              padding: '20px 28px',
+              maxWidth: 320,
+              width: '100%',
+              textAlign: 'center',
+              boxShadow: '0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(196, 149, 90, 0.08)',
+            }}
+          >
+            <p style={{ fontFamily: 'Georgia, serif', color: '#e8d5a3', fontSize: 13, lineHeight: 1.5 }}>
+              Clear the current game and load <strong>{pendingDeck.name}</strong>?
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 18 }}>
+              <button
+                onClick={() => setPendingDeck(null)}
+                style={{
+                  padding: '7px 18px',
+                  background: 'transparent',
+                  border: '1px solid rgba(107, 78, 39, 0.3)',
+                  borderRadius: 4,
+                  color: 'rgba(196, 149, 90, 0.6)',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  fontFamily: 'Georgia, serif',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const id = pendingDeck.id;
+                  setPendingDeck(null);
+                  router.push(`/goldfish/${id}`);
+                }}
+                style={{
+                  padding: '7px 18px',
+                  background: 'rgba(196, 149, 90, 0.15)',
+                  border: '1px solid rgba(196, 149, 90, 0.5)',
+                  borderRadius: 4,
+                  color: '#e8d5a3',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  fontFamily: 'Georgia, serif',
+                }}
+              >
+                Load Deck
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </CardPreviewProvider>
   );
 }

@@ -38,6 +38,10 @@ export const actions = {
     return createAction('SHUFFLE_DECK');
   },
 
+  shuffleSoulDeck(): GameAction {
+    return createAction('SHUFFLE_SOUL_DECK');
+  },
+
   shuffleCardIntoDeck(cardInstanceId: string): GameAction {
     // Move card to deck, then shuffle
     return createAction('MOVE_CARD', { cardInstanceId, toZone: 'deck' });
@@ -93,5 +97,25 @@ export const actions = {
 
   addPlayerLostSoul(): GameAction {
     return createAction('ADD_PLAYER_LOST_SOUL');
+  },
+
+  reorderHand(cardInstanceIds: string[]): GameAction {
+    return createAction('REORDER_HAND', { cardInstanceIds });
+  },
+
+  reorderLob(cardInstanceIds: string[]): GameAction {
+    return createAction('REORDER_LOB', { cardInstanceIds });
+  },
+
+  attachCard(cardInstanceId: string, warriorInstanceId: string): GameAction {
+    return createAction('ATTACH_CARD', { cardInstanceId, warriorInstanceId });
+  },
+
+  detachCard(cardInstanceId: string, posX?: number, posY?: number): GameAction {
+    return createAction('DETACH_CARD', { cardInstanceId, posX, posY });
+  },
+
+  executeCardAbility(cardInstanceId: string, abilityIndex: number): GameAction {
+    return createAction('EXECUTE_CARD_ABILITY', { cardInstanceId, abilityIndex });
   },
 };

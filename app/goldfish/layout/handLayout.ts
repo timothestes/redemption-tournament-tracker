@@ -1,5 +1,3 @@
-import { getCardDimensions } from './zoneLayout';
-
 export interface HandCardPosition {
   x: number;
   y: number;
@@ -14,11 +12,11 @@ export function calculateHandPositions(
   cardCount: number,
   stageWidth: number,
   stageHeight: number,
-  isSpread: boolean
+  isSpread: boolean,
+  cardWidth: number,
+  cardHeight: number,
 ): HandCardPosition[] {
   if (cardCount === 0) return [];
-
-  const { cardWidth, cardHeight } = getCardDimensions(stageWidth, stageHeight);
   const handZoneTop = stageHeight - stageHeight * 0.22;
   const centerX = stageWidth / 2;
   const handAreaWidth = stageWidth * 0.75;

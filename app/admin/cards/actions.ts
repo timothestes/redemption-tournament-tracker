@@ -2,6 +2,7 @@
 
 import { createClient } from "../../../utils/supabase/server";
 import { requirePermission } from "../../../utils/adminUtils";
+import { CARDS } from "@/lib/cards/lookup";
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -573,30 +574,15 @@ export async function detectPotentialDuplicates(): Promise<{
     }
   }
 
-  // Fetch carddata.txt
-  const CARD_DATA_URL =
-    "https://raw.githubusercontent.com/jalstad/RedemptionLackeyCCG/master/RedemptionQuick/sets/carddata.txt";
-
-  const res = await fetch(CARD_DATA_URL);
-  if (!res.ok) {
-    return { suggestions: [], error: "Failed to fetch carddata.txt" };
-  }
-
-  const text = await res.text();
-  const lines = text.split("\n").slice(1).filter((l) => l.trim());
-
-  // Parse all cards from carddata
-  const allCards: { name: string; type: string; reference: string; specialAbility: string; identifier: string }[] = [];
-  for (const line of lines) {
-    const cols = line.split("\t");
-    const name = cols[0]?.trim();
-    const type = cols[4]?.trim() || "";
-    const specialAbility = cols[10]?.trim() || "";
-    const reference = cols[12]?.trim() || "";
-    const identifier = cols[9]?.trim() || "";
-    if (!name) continue;
-    allCards.push({ name, type, reference, specialAbility, identifier });
-  }
+  const allCards: { name: string; type: string; reference: string; specialAbility: string; identifier: string }[] = CARDS
+    .filter((c) => c.name)
+    .map((c) => ({
+      name: c.name,
+      type: c.type,
+      reference: c.reference,
+      specialAbility: c.specialAbility,
+      identifier: c.identifier,
+    }));
 
   // ─── Pass 1: New group suggestions ────────────────────────────
   // Cards sharing baseName + type that aren't in any existing group

@@ -1,72 +1,56 @@
 'use client';
 
-import { useEffect, useCallback } from 'react';
+import { useMemo } from 'react';
 import { useGame } from '../state/GameContext';
 import { useCardPreview } from '../state/CardPreviewContext';
-import { showGameToast } from '../components/GameToast';
 import { triggerDiceRoll } from '../components/DiceRollOverlay';
+import { useGameHotkeys } from '../../shared/hooks/useGameHotkeys';
+import type { GameActions } from '../../shared/types/gameActions';
 
-export function useKeyboardShortcuts() {
-  const { state, drawCard, shuffleDeck, undo, newGame, advancePhase, endTurn, toggleSpreadHand } = useGame();
+interface KeyboardShortcutOptions {
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
+}
+
+export function useKeyboardShortcuts(options?: KeyboardShortcutOptions) {
+  const { state, drawCard, shuffleDeck, undo, advancePhase, toggleSpreadHand } = useGame();
   const { toggleLoupe } = useCardPreview();
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger shortcuts when typing in an input
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
-        return;
-      }
+  // Build a GameActions-compatible shim from the goldfish context.
+  // Only drawCard and shuffleDeck are invoked by the hotkeys hook;
+  // the remaining methods are stubbed to satisfy the interface.
+  const actions: GameActions = useMemo(() => ({
+    drawCard,
+    shuffleDeck,
+    moveCard: () => {},
+    moveCardsBatch: () => {},
+    flipCard: () => {},
+    meekCard: () => {},
+    unmeekCard: () => {},
+    addCounter: () => {},
+    removeCounter: () => {},
+    shuffleCardIntoDeck: () => {},
+    setNote: () => {},
+    exchangeCards: () => {},
+    drawMultiple: () => {},
+    moveCardToTopOfDeck: () => {},
+    moveCardToBottomOfDeck: () => {},
+    randomHandToZone: () => {},
+    randomReserveToZone: () => {},
+    reloadDeck: () => {},
+  }), [drawCard, shuffleDeck]);
 
-      // Ctrl/Cmd+Z for undo
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
-        e.preventDefault();
-        undo();
-        return;
-      }
-
-      switch (e.key) {
-        case 'Tab':
-          e.preventDefault();
-          toggleLoupe();
-          break;
-        case 'd':
-        case 'D':
-          e.preventDefault();
-          if (state.zones.hand.length >= 16) {
-            showGameToast('Hand is full (max 16 cards)');
-          } else if (state.zones.deck.length === 0) {
-            showGameToast('Deck is empty');
-          } else {
-            drawCard();
-          }
-          break;
-        case 's':
-        case 'S':
-          if (!e.ctrlKey && !e.metaKey) {
-            e.preventDefault();
-            shuffleDeck();
-          }
-          break;
-        case 'r':
-        case 'R': {
-          e.preventDefault();
-          triggerDiceRoll();
-          break;
-        }
-        case 'h':
-        case 'H':
-          e.preventDefault();
-          toggleSpreadHand();
-          break;
-        case 'Enter':
-          e.preventDefault();
-          advancePhase();
-          break;
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [state.zones.hand.length, state.zones.deck.length, drawCard, shuffleDeck, undo, newGame, advancePhase, endTurn, toggleSpreadHand, toggleLoupe]);
+  useGameHotkeys({
+    actions,
+    mode: 'goldfish',
+    onToggleLoupe: toggleLoupe,
+    onToggleSpreadHand: toggleSpreadHand,
+    onRollDice: triggerDiceRoll,
+    onUndo: undo,
+    onAdvancePhase: advancePhase,
+    onZoomIn: options?.onZoomIn,
+    onZoomOut: options?.onZoomOut,
+    handSize: state.zones.hand.length,
+    deckSize: state.zones.deck.length,
+  });
 }

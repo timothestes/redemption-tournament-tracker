@@ -16,13 +16,11 @@ import { createClient } from "@supabase/supabase-js";
 import { execSync } from "child_process";
 import { join } from "path";
 import { config } from "dotenv";
+import { CARDS } from "../lib/cards/lookup";
 
 config({ path: join(__dirname, "..", ".env.local") });
 
 const DRY_RUN = process.argv.includes("--dry-run");
-
-const CARD_DATA_URL =
-  "https://raw.githubusercontent.com/jalstad/RedemptionLackeyCCG/master/RedemptionQuick/sets/carddata.txt";
 
 const PDF_PATH = join(__dirname, "..", "ORDIR_PDF_7.0.0.pdf");
 
@@ -294,11 +292,7 @@ interface CardDataNames {
 }
 
 async function fetchCardNames(): Promise<CardDataNames> {
-  console.log("Fetching carddata.txt...");
-  const res = await fetch(CARD_DATA_URL);
-  const text = await res.text();
-  const lines = text.split("\n");
-  const dataLines = lines.slice(1).filter((l) => l.trim());
+  console.log("Loading card names from generated module...");
 
   const fullNames = new Set<string>();
   const baseToFull = new Map<string, string[]>();
@@ -310,9 +304,8 @@ async function fetchCardNames(): Promise<CardDataNames> {
     baseToFull.get(baseName)!.push(fullName);
   }
 
-  for (const line of dataLines) {
-    const cols = line.split("\t");
-    const name = cols[0]?.trim();
+  for (const card of CARDS) {
+    const name = card.name;
     if (!name) continue;
 
     fullNames.add(name);

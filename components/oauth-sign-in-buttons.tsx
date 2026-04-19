@@ -3,22 +3,26 @@
 import { createClient } from "../utils/supabase/client";
 import type { Provider } from "@supabase/supabase-js";
 
-function signInWithProvider(provider: Provider) {
+function signInWithProvider(provider: Provider, redirectTo?: string) {
   const supabase = createClient();
+  const callbackUrl = new URL('/auth/callback', window.location.origin);
+  if (redirectTo) {
+    callbackUrl.searchParams.set('redirect_to', redirectTo);
+  }
   supabase.auth.signInWithOAuth({
     provider,
     options: {
-      redirectTo: `${window.location.origin}/auth/callback`,
+      redirectTo: callbackUrl.toString(),
     },
   });
 }
 
-export function OAuthSignInButtons() {
+export function OAuthSignInButtons({ redirectTo }: { redirectTo?: string }) {
   return (
     <div className="flex flex-col gap-3">
       <button
         type="button"
-        onClick={() => signInWithProvider("google")}
+        onClick={() => signInWithProvider("google", redirectTo)}
         className="w-full flex items-center justify-center gap-3 h-11 px-4 rounded-md border border-border bg-background [.jayden_&]:bg-muted hover:bg-muted [.jayden_&]:hover:bg-muted/80 text-foreground font-medium text-sm transition-colors"
       >
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
@@ -44,7 +48,7 @@ export function OAuthSignInButtons() {
 
       <button
         type="button"
-        onClick={() => signInWithProvider("discord")}
+        onClick={() => signInWithProvider("discord", redirectTo)}
         className="w-full flex items-center justify-center gap-3 h-11 px-4 rounded-md border border-border bg-background [.jayden_&]:bg-muted hover:bg-muted [.jayden_&]:hover:bg-muted/80 text-foreground font-medium text-sm transition-colors"
       >
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">

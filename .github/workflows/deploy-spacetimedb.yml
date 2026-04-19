@@ -18,7 +18,7 @@ jobs:
           node-version: '20'
 
       - name: Install SpacetimeDB CLI
-        run: curl -sSf https://install.spacetimedb.com | sh
+        run: curl -sSf https://install.spacetimedb.com | sh -s -- --yes
 
       - name: Add SpacetimeDB to PATH
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH
@@ -39,7 +39,7 @@ jobs:
           fi
 
       - name: Publish module
-        run: spacetime publish ${{ steps.module.outputs.name }} --module-path spacetimedb
+        run: spacetime publish ${{ steps.module.outputs.name }} --module-path spacetimedb --server maincloud --no-config --yes
 
       - name: Generate client bindings
         if: github.ref_name == 'main'

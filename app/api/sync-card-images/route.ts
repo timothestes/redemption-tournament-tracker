@@ -1,13 +1,10 @@
 import { put, head } from '@vercel/blob';
 import { NextRequest, NextResponse } from 'next/server';
+import { CARDS } from '@/lib/cards/lookup';
 
-const CARD_DATA_URL = "https://raw.githubusercontent.com/jalstad/RedemptionLackeyCCG/master/RedemptionQuick/sets/carddata.txt";
 const CARD_IMAGE_BASE_URL = "https://raw.githubusercontent.com/jalstad/RedemptionLackeyCCG/master/RedemptionQuick/sets/setimages/general/";
-const BLOB_PATH_PREFIX = 'card-images/';
 
-function sanitizeImgFile(f: string): string {
-  return f.replace(/\.jpe?g$/i, "");
-}
+const BLOB_PATH_PREFIX = 'card-images/';
 
 async function fetchBuffer(url: string): Promise<Buffer | null> {
   try {
@@ -59,17 +56,10 @@ export async function GET(request: NextRequest) {
   try {
     console.log('Starting card image sync...');
 
-    const response = await fetch(CARD_DATA_URL);
-    const text = await response.text();
-    const lines = text.split('\n');
-    const dataLines = lines.slice(1).filter(l => l.trim());
-
-    // Deduplicate image filenames
+    // Dedup image filenames across all cards (CARDS.imgFile is already extension-stripped)
     const imageSet = new Set<string>();
-    for (const line of dataLines) {
-      const cols = line.split('\t');
-      const imgFile = cols[2]?.trim();
-      if (imgFile) imageSet.add(sanitizeImgFile(imgFile));
+    for (const card of CARDS) {
+      if (card.imgFile) imageSet.add(card.imgFile);
     }
 
     const images = [...imageSet];

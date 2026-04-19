@@ -2,12 +2,13 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, useMemo, type ReactNode } from 'react';
 
-const STORAGE_KEY = 'goldfish-loupe-visible';
+const DEFAULT_STORAGE_KEY = 'goldfish-loupe-visible';
 
 interface PreviewCard {
   cardName: string;
   cardImgFile: string;
   isMeek?: boolean;
+  notes?: string;
 }
 
 interface CardPreviewContextValue {
@@ -23,11 +24,21 @@ interface CardPreviewContextValue {
 
 const CardPreviewContext = createContext<CardPreviewContextValue | null>(null);
 
-export function CardPreviewProvider({ children }: { children: ReactNode }) {
+export function CardPreviewProvider({
+  children,
+  storageKey = DEFAULT_STORAGE_KEY,
+  defaultVisible,
+}: {
+  children: ReactNode;
+  storageKey?: string;
+  /** When true, always start expanded (on desktop) regardless of stored preference */
+  defaultVisible?: boolean;
+}) {
   const [previewCard, setPreviewCard] = useState<PreviewCard | null>(null);
   const [isLoupeVisible, setIsLoupeVisible] = useState(() => {
     if (typeof window === 'undefined') return false;
-    const stored = localStorage.getItem(STORAGE_KEY);
+    if (defaultVisible) return window.innerWidth >= 1200;
+    const stored = localStorage.getItem(storageKey);
     // Default to true for first-time users on desktop
     if (stored === null) return window.innerWidth >= 1200;
     return stored === 'true';
@@ -36,10 +47,10 @@ export function CardPreviewProvider({ children }: { children: ReactNode }) {
   const toggleLoupe = useCallback(() => {
     setIsLoupeVisible(prev => {
       const next = !prev;
-      localStorage.setItem(STORAGE_KEY, String(next));
+      localStorage.setItem(storageKey, String(next));
       return next;
     });
-  }, []);
+  }, [storageKey]);
 
   // Auto-hide on narrow viewports
   useEffect(() => {

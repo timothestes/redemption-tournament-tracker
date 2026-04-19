@@ -8,27 +8,11 @@ export interface ZoneRect {
   label: string;
 }
 
-// Card dimensions as proportions of stage width
-export const CARD_WIDTH_RATIO = 0.052; // ~100px at 1920
-export const CARD_HEIGHT_RATIO = 0.093; // ~100 * 1.4 aspect ratio at 1080
+// Fixed card dimensions in virtual canvas coordinates (1920x1080).
+// Sized larger than multiplayer since goldfish has only one player's zones.
 export const CARD_ASPECT_RATIO = 1.4;
-
-export function getCardDimensions(stageWidth: number, stageHeight?: number) {
-  const widthBased = Math.round(stageWidth * CARD_WIDTH_RATIO);
-
-  if (stageHeight) {
-    // Ensure a card fits inside a sidebar zone (5 zones in play area, ~24px label padding)
-    const playAreaHeight = stageHeight * 0.73; // after phase bar and hand
-    const sidebarZoneHeight = playAreaHeight / 5;
-    const maxCardHeight = sidebarZoneHeight - 28; // room for label + padding
-    const heightBased = Math.round(maxCardHeight / CARD_ASPECT_RATIO);
-    const w = Math.min(widthBased, heightBased);
-    return { cardWidth: w, cardHeight: Math.round(w * CARD_ASPECT_RATIO) };
-  }
-
-  const height = Math.round(widthBased * CARD_ASPECT_RATIO);
-  return { cardWidth: widthBased, cardHeight: height };
-}
+export const CARD_WIDTH = 120;
+export const CARD_HEIGHT = 168;  // 120 * 1.4
 
 /**
  * Calculate zone positions and sizes as proportions of the stage.
@@ -41,31 +25,39 @@ export function getCardDimensions(stageWidth: number, stageHeight?: number) {
  * │                                          │ [Discard]     │
  * │                                          │ [Reserve]     │
  * │  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │ [Banish]      │
- * │  LAND OF BONDAGE                         │ [Paragon*]    │
+ * │  LAND OF BONDAGE                         │               │
  * └──────────────────────────────────────────┴───────────────┘
  *  [HAND]
- *
- * Paragon zone only rendered when format = Paragon (small, in sidebar).
  */
 export function calculateZoneLayout(
   stageWidth: number,
   stageHeight: number,
-  isParagon: boolean = false
+  /** Current scale factor (real pixels / virtual pixels). Used to convert
+   *  fixed-pixel HTML overlays (PhaseBar, GameToolbar) into virtual space
+   *  so zone content never renders behind them. */
+  scale: number = 1,
+  format: 'T1' | 'T2' | 'Paragon' = 'T1',
 ): Record<ZoneId, ZoneRect> {
-  const sidebarWidth = stageWidth * 0.15;
+  const sidebarWidth = stageWidth * 0.17;
   const sidebarX = stageWidth - sidebarWidth;
   const mainWidth = stageWidth - sidebarWidth;
 
-  const phaseBarHeight = stageHeight * 0.05; // top phase bar
+  // PhaseBar is a 40px fixed-height HTML overlay at the top of the canvas.
+  // GameToolbar is ~48px at the bottom. Convert real pixels → virtual coords.
+  const PHASE_BAR_REAL_PX = 44; // 40px bar + 4px breathing room
+  const TOOLBAR_REAL_PX = 56;   // ~48px toolbar + 8px bottom offset
+  const phaseBarHeight = scale > 0 ? Math.ceil(PHASE_BAR_REAL_PX / scale) : 50;
+  const toolbarHeight = scale > 0 ? Math.ceil(TOOLBAR_REAL_PX / scale) : 60;
   const handHeight = stageHeight * 0.22; // bottom hand area
-  const playAreaHeight = stageHeight - phaseBarHeight - handHeight;
+  const effectiveHandHeight = Math.max(handHeight, toolbarHeight + 80); // ensure hand clears toolbar
+  const playAreaHeight = stageHeight - phaseBarHeight - effectiveHandHeight;
 
   const lobHeight = playAreaHeight * 0.22; // Land of Bondage at the bottom of play area
   const territoryHeight = playAreaHeight - lobHeight;
 
   const territoryY = phaseBarHeight;
   const lobY = territoryY + territoryHeight;
-  const handY = stageHeight - handHeight;
+  const handY = stageHeight - effectiveHandHeight;
 
   const pad = 6;
   const zonePad = 4;
@@ -87,9 +79,32 @@ export function calculateZoneLayout(
     label: 'Land of Bondage',
   };
 
+  // Soul Deck pile: occupies the left ~1 card width of the LoB when Paragon.
+  // For non-Paragon, render off-canvas (consistent with paragonZone pattern).
+  const soulDeckWidth = format === 'Paragon'
+    ? Math.min(CARD_WIDTH + 8, landOfBondageZone.width * 0.2)
+    : 0;
+  const soulDeckZone: ZoneRect = format === 'Paragon'
+    ? {
+        x: landOfBondageZone.x,
+        y: landOfBondageZone.y,
+        width: soulDeckWidth,
+        height: landOfBondageZone.height,
+        label: 'Soul Deck',
+      }
+    : { x: -1000, y: -1000, width: 0, height: 0, label: 'Soul Deck' };
+
+  // Shrink LoB rect to the right of the Soul Deck so cards don't overlap the pile
+  const lobZoneFinal: ZoneRect = format === 'Paragon'
+    ? {
+        ...landOfBondageZone,
+        x: landOfBondageZone.x + soulDeckWidth + 4,
+        width: landOfBondageZone.width - soulDeckWidth - 4,
+      }
+    : landOfBondageZone;
+
   // --- Out of Play sidebar ---
-  // Number of sidebar zones depends on whether paragon is shown
-  const sidebarZoneCount = isParagon ? 6 : 5;
+  const sidebarZoneCount = 5;
   const sideZoneHeight = (playAreaHeight - pad * (sidebarZoneCount + 1)) / sidebarZoneCount;
 
   let slotIndex = 0;
@@ -111,17 +126,22 @@ export function calculateZoneLayout(
   const deckZone: ZoneRect = { ...sidebarSlot(), label: 'Deck' };
   const discardZone: ZoneRect = { ...sidebarSlot(), label: 'Discard' };
 
-  // Paragon: small zone at bottom of sidebar, only when format = Paragon
-  const paragonZone: ZoneRect = isParagon
-    ? { ...sidebarSlot(), label: 'Paragon' }
-    : { x: -1000, y: -1000, width: 0, height: 0, label: 'Paragon' }; // off-screen when not paragon
+  // Paragon is no longer rendered on the canvas; the drawer owns it.
+  // Keep the entry so zone-keyed code (iteration over zones record) still works.
+  const paragonZone: ZoneRect = {
+    x: -1000,
+    y: -1000,
+    width: 0,
+    height: 0,
+    label: 'Paragon',
+  };
 
   // --- Hand ---
   const handZone: ZoneRect = {
     x: 0,
     y: handY,
     width: stageWidth,
-    height: handHeight,
+    height: effectiveHandHeight,
     label: 'Hand',
   };
 
@@ -131,7 +151,8 @@ export function calculateZoneLayout(
     'reserve': reserveZone,
     'discard': discardZone,
     'paragon': paragonZone,
-    'land-of-bondage': landOfBondageZone,
+    'land-of-bondage': lobZoneFinal,
+    'soul-deck': soulDeckZone,
     'territory': territoryZone,
     'land-of-redemption': landOfRedemptionZone,
     'banish': banishZone,

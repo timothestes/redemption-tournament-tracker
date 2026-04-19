@@ -22,8 +22,8 @@ export interface Card {
   isGospel: boolean;
 }
 
-// sanitize imgFile to avoid duplicate extensions
-export const sanitizeImgFile = (f: string) => f.replace(/\.jpe?g$/i, "");
+// Re-export from shared utils so existing imports from this module still work
+export { sanitizeImgFile } from "../../shared/utils/cardImageUrl";
 
 // Rarity categorization helper
 export const categorizeRarity = (rarity: string, officialSet: string): string => {

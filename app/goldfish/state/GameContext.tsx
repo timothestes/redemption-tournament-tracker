@@ -30,8 +30,13 @@ interface GameContextValue {
   addNote: (cardInstanceId: string, note: string) => void;
   addOpponentLostSoul: (testament?: 'NT' | 'OT', posX?: number, posY?: number) => void;
   removeOpponentToken: (cardInstanceId: string) => void;
+  executeCardAbility: (cardInstanceId: string, abilityIndex: number) => void;
   moveCardsBatch: (cardInstanceIds: string[], toZone: ZoneId, positions?: Record<string, { posX: number; posY: number }>) => void;
   addPlayerLostSoul: () => void;
+  reorderHand: (cardInstanceIds: string[]) => void;
+  reorderLob: (cardInstanceIds: string[]) => void;
+  attachCard: (cardInstanceId: string, warriorInstanceId: string) => void;
+  detachCard: (cardInstanceId: string, posX?: number, posY?: number) => void;
   toggleSpreadHand: () => void;
 }
 
@@ -125,12 +130,35 @@ export function GameProvider({ children, deck, optionsOverrides }: GameProviderP
     (id: string) => dispatch(actions.removeOpponentToken(id)),
     [dispatch]
   );
+  const executeCardAbility = useCallback(
+    (cardInstanceId: string, abilityIndex: number) =>
+      dispatch(actions.executeCardAbility(cardInstanceId, abilityIndex)),
+    [dispatch]
+  );
   const moveCardsBatch = useCallback(
     (cardInstanceIds: string[], toZone: ZoneId, positions?: Record<string, { posX: number; posY: number }>) =>
       dispatch(actions.moveCardsBatch(cardInstanceIds, toZone, positions)),
     [dispatch]
   );
   const addPlayerLostSoul = useCallback(() => dispatch(actions.addPlayerLostSoul()), [dispatch]);
+  const reorderHand = useCallback(
+    (cardInstanceIds: string[]) => dispatch(actions.reorderHand(cardInstanceIds)),
+    [dispatch]
+  );
+  const reorderLob = useCallback(
+    (cardInstanceIds: string[]) => dispatch(actions.reorderLob(cardInstanceIds)),
+    [dispatch]
+  );
+  const attachCard = useCallback(
+    (cardInstanceId: string, warriorInstanceId: string) =>
+      dispatch(actions.attachCard(cardInstanceId, warriorInstanceId)),
+    [dispatch]
+  );
+  const detachCard = useCallback(
+    (cardInstanceId: string, posX?: number, posY?: number) =>
+      dispatch(actions.detachCard(cardInstanceId, posX, posY)),
+    [dispatch]
+  );
 
   const toggleSpreadHand = useCallback(() => {
     // Spread hand toggle — handled via a special action or direct state
@@ -168,8 +196,13 @@ export function GameProvider({ children, deck, optionsOverrides }: GameProviderP
       addNote,
       addOpponentLostSoul,
       removeOpponentToken,
+      executeCardAbility,
       moveCardsBatch,
       addPlayerLostSoul,
+      reorderHand,
+      reorderLob,
+      attachCard,
+      detachCard,
       toggleSpreadHand,
     }),
     [
@@ -177,7 +210,7 @@ export function GameProvider({ children, deck, optionsOverrides }: GameProviderP
       moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck,
       shuffleDeck, undo, newGame, advancePhase, regressPhase, endTurn,
       addCounter, removeCounter, meekCard, unmeekCard, flipCard,
-      addNote, addOpponentLostSoul, removeOpponentToken, moveCardsBatch, addPlayerLostSoul, toggleSpreadHand,
+      addNote, addOpponentLostSoul, removeOpponentToken, executeCardAbility, moveCardsBatch, addPlayerLostSoul, reorderHand, reorderLob, attachCard, detachCard, toggleSpreadHand,
     ]
   );
 

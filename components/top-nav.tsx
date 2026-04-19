@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import type { IconType } from "react-icons";
 import { HiMenu, HiDocumentText, HiArrowSmRight, HiUserAdd, HiShieldCheck, HiGlobeAlt, HiSparkles, HiCalendar, HiCollection } from "react-icons/hi";
+import { GiCrossedSwords } from "react-icons/gi";
 import { IoClose } from "react-icons/io5";
 import { FaTrophy, FaBookOpen } from "react-icons/fa6";
 import { PiPencilLineBold } from "react-icons/pi";
 import { TbCardsFilled, TbSearch } from "react-icons/tb";
 import Image from "next/image";
 import Link from "next/link";
-import { useTheme } from "next-themes";
 import { usePathname } from "next/navigation";
 import { Button } from "./ui/button";
 import { ThemeSwitcher } from "./theme-switcher";
@@ -22,9 +23,6 @@ const TopNav: React.FC = () => {
   const [isResourcesOpen, setIsResourcesOpen] = useState(false);
   const [isDecksOpen, setIsDecksOpen] = useState(false);
   const [isTournamentsOpen, setIsTournamentsOpen] = useState(false);
-  const { theme, resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  const [logoSrc, setLogoSrc] = useState('/darkmode_redemptionccgapp.webp');
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const { isAdmin, permissions, loading: adminLoading } = useIsAdmin();
@@ -83,12 +81,6 @@ const TopNav: React.FC = () => {
     setIsTournamentsOpen(next);
   };
 
-  // Theme / logo effect — runs when theme changes
-  useEffect(() => {
-    setMounted(true);
-    const currentTheme = theme === 'system' ? resolvedTheme : theme;
-    setLogoSrc(currentTheme === 'light' ? '/lightmode_redemptionccgapp.webp' : '/darkmode_redemptionccgapp.webp');
-  }, [theme, resolvedTheme]);
 
   // Auth effect — runs once on mount, listens for session changes
   useEffect(() => {
@@ -126,18 +118,25 @@ const TopNav: React.FC = () => {
 
   const isActive = (path: string) => pathname?.startsWith(path);
 
-  const navLinks = [
+  const PLAY_ALLOWED_EMAILS = ['baboonytim@gmail.com'];
+  const canSeePlay = !!(user as any)?.email &&
+    PLAY_ALLOWED_EMAILS.includes(((user as any).email as string).toLowerCase());
+
+  type NavLink = { href: string; label: string; icon: IconType; highlight?: boolean; authRequired?: boolean; isNew?: boolean };
+
+  const navLinks: NavLink[] = [
     { href: "/register", label: NATIONALS_CONFIG.adminOnly ? `${NATIONALS_CONFIG.displayName} (Admin Only)` : `${NATIONALS_CONFIG.displayName}`, icon: HiUserAdd, highlight: true },
+    { href: "/play", label: "Play", icon: GiCrossedSwords },
     { href: "/decklist/card-search?new=true", label: "Deck Builder", icon: TbSearch },
     { href: "/spoilers", label: "Spoilers", icon: HiSparkles },
   ];
 
-  const tournamentLinks = [
+  const tournamentLinks: NavLink[] = [
     { href: "/tournaments", label: "Upcoming Events", icon: HiCalendar },
     { href: "/tracker/tournaments", label: "My Tournaments", icon: FaTrophy, authRequired: true },
   ];
 
-  const deckLinks = [
+  const deckLinks: NavLink[] = [
     { href: "/decklist/community", label: "Community Decks", icon: HiGlobeAlt, isNew: true },
     { href: "/decklist/my-decks", label: "My Decks", icon: TbCardsFilled, authRequired: true },
     { href: "/decklist/generate", label: "Deck Check PDF", icon: TbCardsFilled },
@@ -176,12 +175,21 @@ const TopNav: React.FC = () => {
           <Link href="/decklist/community" className="flex-shrink-0">
             <div className="cursor-pointer" style={{ width: 120, height: 32 }}>
               <Image
-                src={logoSrc}
+                src="/lightmode_redemptionccgapp.webp"
                 alt="RedemptionCCG App Logo"
                 width={120}
                 height={32}
                 style={{ width: "auto", height: "auto", maxHeight: "32px" }}
-                className={`transition-opacity duration-150 ${mounted ? 'opacity-100' : 'opacity-0'}`}
+                className="dark:hidden [.jayden_&]:hidden"
+                priority
+              />
+              <Image
+                src="/darkmode_redemptionccgapp.webp"
+                alt="RedemptionCCG App Logo"
+                width={120}
+                height={32}
+                style={{ width: "auto", height: "auto", maxHeight: "32px" }}
+                className="hidden dark:block [.jayden_&]:block"
                 priority
               />
             </div>
@@ -292,6 +300,21 @@ const TopNav: React.FC = () => {
               </div>
             )}
 
+            {/* Play link - after Admin (gated by allowlist) */}
+            {canSeePlay && (
+              <Link
+                href="/play"
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
+                  ${isActive('/play')
+                  ? 'bg-muted text-foreground'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  }`}
+              >
+                <GiCrossedSwords className="w-4 h-4" />
+                Play
+              </Link>
+            )}
+
             {/* Tournaments Dropdown */}
             <div className="relative">
               <button
@@ -338,7 +361,8 @@ const TopNav: React.FC = () => {
             </div>
 
             {/* Rest of nav links */}
-            {navLinks.slice(1).map((link) => {
+            {navLinks.slice(2).map((link) => {
+              if (link.authRequired && !user) return null;
               const Icon = link.icon;
               const isHighlight = link.highlight;
               return (
@@ -559,8 +583,11 @@ const TopNav: React.FC = () => {
       {isMobileMenuOpen && (
         <div className="lg:hidden border-t border-border max-h-[calc(100dvh-4rem)] overflow-y-auto">
           <div className="px-2 pt-2 pb-3 space-y-1">
-            {/* Nationals link */}
-            {navLinks.slice(0, 1).map((link) => {
+            {/* Play + Nationals links */}
+            {navLinks.slice(0, 2)
+              .filter((link) => link.href !== '/play' || canSeePlay)
+              .map((link) => {
+              if (link.authRequired && !user) return null;
               const Icon = link.icon;
               const isHighlight = link.highlight;
               return (
@@ -702,7 +729,8 @@ const TopNav: React.FC = () => {
             </div>
 
             {/* Rest of nav links */}
-            {navLinks.slice(1).map((link) => {
+            {navLinks.slice(2).map((link) => {
+              if (link.authRequired && !user) return null;
               const Icon = link.icon;
               const isHighlight = link.highlight;
               return (

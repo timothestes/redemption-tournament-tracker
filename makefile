@@ -5,6 +5,9 @@ PROJECT_NAME = redemption-tournament-tracker
 PARAGON_CSV_URL = https://docs.google.com/spreadsheets/d/e/2PACX-1vSGru8yp-5e84cRUuEghnUasXtf2Ep_MfZ4XAYHC81VTfCw9PdkRL1VblX1U_PVl8HuWG3f_4XL6PdO/pub?output=csv
 PARAGON_CSV_PATH = app/decklist/card-search/data/paragons.csv
 PARAGON_TS_PATH = app/decklist/card-search/data/paragons.ts
+CARD_DATA_URL = https://raw.githubusercontent.com/jalstad/RedemptionLackeyCCG/master/RedemptionQuick/sets/carddata.txt
+CARD_DATA_TXT_PATH = scripts/data/carddata.txt
+CARD_DATA_TS_PATH = lib/cards/generated/cardData.ts
 
 # Default target
 all: setup
@@ -27,6 +30,10 @@ help:
 	@echo "Paragon Data:"
 	@echo "  make update-paragons - Download latest Paragon data and regenerate TypeScript"
 	@echo "  make paragons        - Alias for update-paragons"
+	@echo ""
+	@echo "Card Data:"
+	@echo "  make update-cards    - Download latest card data and regenerate TypeScript"
+	@echo "  make cards           - Alias for update-cards"
 	@echo ""
 
 # Install dependencies
@@ -76,4 +83,16 @@ update-paragons:
 # Check Paragon data (download and generate)
 paragons: update-paragons
 
-.PHONY: all install run dev dev-windows build start setup clean fresh update-paragons paragons
+# Card data management
+update-cards:
+	@echo "📥 Downloading latest card data from GitHub..."
+	@mkdir -p $(dir $(CARD_DATA_TXT_PATH))
+	@curl -sL "$(CARD_DATA_URL)" > $(CARD_DATA_TXT_PATH)
+	@echo "✅ Downloaded to $(CARD_DATA_TXT_PATH)"
+	@echo "🔄 Generating TypeScript data..."
+	@node scripts/parse-carddata.js
+	@echo "✅ Card data updated successfully!"
+
+cards: update-cards
+
+.PHONY: all install run dev dev-windows build start setup clean fresh update-paragons paragons update-cards cards

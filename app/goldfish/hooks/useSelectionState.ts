@@ -7,6 +7,8 @@ export interface CardBound {
   width: number;
   height: number;
   rotation: number;
+  /** Owner identifier — marquee selection restricts to a single owner. */
+  owner?: string;
 }
 
 export interface SelectionRect {
@@ -59,12 +61,36 @@ function computeHitIds(
     return shiftKey ? new Set(baseSelection) : new Set();
   }
 
-  const result = shiftKey ? new Set(baseSelection) : new Set<string>();
+  // First pass: collect all cards hit by the marquee
+  const hits: { instanceId: string; owner?: string }[] = [];
   for (const bound of allCardBounds) {
     const aabb = getRotatedAABB(bound.x, bound.y, bound.width, bound.height, bound.rotation);
     if (rectsOverlap(sx, sy, sw, sh, aabb.x, aabb.y, aabb.w, aabb.h)) {
-      result.add(bound.instanceId);
+      hits.push({ instanceId: bound.instanceId, owner: bound.owner });
     }
+  }
+
+  // Restrict to a single owner: if marquee hits cards from multiple owners,
+  // keep only the owner that has the most hits (or the first owner on tie).
+  let allowedOwner: string | undefined;
+  if (hits.some(h => h.owner !== undefined)) {
+    const counts = new Map<string, number>();
+    for (const h of hits) {
+      if (h.owner) counts.set(h.owner, (counts.get(h.owner) ?? 0) + 1);
+    }
+    let maxCount = 0;
+    for (const [owner, count] of counts) {
+      if (count > maxCount) {
+        maxCount = count;
+        allowedOwner = owner;
+      }
+    }
+  }
+
+  const result = shiftKey ? new Set(baseSelection) : new Set<string>();
+  for (const h of hits) {
+    if (allowedOwner !== undefined && h.owner !== allowedOwner) continue;
+    result.add(h.instanceId);
   }
   return result;
 }

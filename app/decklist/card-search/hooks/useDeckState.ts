@@ -1,104 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Card, sanitizeImgFile, normalizeBrigadeField } from "../utils";
+import { Card, sanitizeImgFile } from "../utils";
 import { Deck, DeckCard, DeckStats } from "../types/deck";
 import { saveDeckAction, loadDeckByIdAction, DeckCardData } from "../../actions";
-import { CARD_DATA_URL, OT_BOOKS, NT_BOOKS, GOSPEL_BOOKS } from "../constants";
+import { CARD_BY_FULL_KEY } from "../data/cardIndex";
 
 const STORAGE_KEY = "redemption-deck-builder-current-deck";
-
-/**
- * Fetch and parse full card database
- */
-async function fetchCardDatabase(): Promise<Map<string, Card>> {
-  const response = await fetch(CARD_DATA_URL);
-  const text = await response.text();
-  const lines = text.split("\n");
-  const dataLines = lines.slice(1).filter((l) => l.trim());
-  
-  const cardMap = new Map<string, Card>();
-  
-  dataLines.forEach((line) => {
-    const cols = line.split("\t");
-    const cardName = cols[0] || "";
-    const cardSet = cols[1] || "";
-    const imgFile = sanitizeImgFile(cols[2] || "");
-    
-    // Enhanced testament and gospel tagging logic
-    const reference = cols[12] || "";
-    let references: string[] = [];
-    for (let refGroup of reference.split(";")) {
-      refGroup = refGroup.trim();
-      if (refGroup.includes("(") && refGroup.includes(")")) {
-        const mainRef = refGroup.split("(")[0].trim();
-        if (mainRef) references.push(mainRef);
-        const parenContent = refGroup.substring(refGroup.indexOf("(") + 1, refGroup.indexOf(")"));
-        const parenRefs = parenContent.split(",").map(pr => pr.trim()).filter(Boolean);
-        references.push(...parenRefs);
-      } else {
-        if (refGroup) references.push(refGroup);
-      }
-    }
-    
-    const referencesLower = references.map(r => r.toLowerCase());
-    function normalizeBookName(ref: string) {
-      return ref.replace(/^(i{1,3}|1|2|3|4|one|two|three|four)\s+/i, '').trim();
-    }
-    
-    const foundTestaments = new Set<string>();
-    for (const ref of referencesLower) {
-      const book = ref.split(' ')[0];
-      const normalizedBook = normalizeBookName(ref).split(' ')[0];
-      if (NT_BOOKS.some(b => book === b.toLowerCase() || normalizedBook === b.toLowerCase())) foundTestaments.add('NT');
-      if (OT_BOOKS.some(b => book === b.toLowerCase() || normalizedBook === b.toLowerCase())) foundTestaments.add('OT');
-    }
-    
-    let testament: string | string[] = '';
-    if (foundTestaments.size === 1) {
-      testament = Array.from(foundTestaments)[0];
-    } else if (foundTestaments.size > 1) {
-      testament = Array.from(foundTestaments);
-    }
-    
-    const gospelBooksLower = GOSPEL_BOOKS.map(b => b.toLowerCase());
-    const isGospel = referencesLower.some(ref => gospelBooksLower.some(b => ref.startsWith(b)));
-    
-    const rawBrigade = cols[5] || "";
-    const alignment = cols[14] || "";
-    let normalizedBrigades: string[] = [];
-    try {
-      normalizedBrigades = normalizeBrigadeField(rawBrigade, alignment, cardName);
-    } catch (e) {
-      normalizedBrigades = rawBrigade ? [rawBrigade] : [];
-    }
-    
-    const card: Card = {
-      dataLine: line,
-      name: cardName,
-      set: cardSet,
-      imgFile: imgFile,
-      officialSet: cols[3] || "",
-      type: cols[4] || "",
-      brigade: normalizedBrigades.join("/"),
-      strength: cols[6] || "",
-      toughness: cols[7] || "",
-      class: cols[8] || "",
-      identifier: cols[9] || "",
-      specialAbility: cols[10] || "",
-      rarity: cols[11] || "",
-      reference: reference,
-      alignment: alignment,
-      legality: cols[15] || "",
-      testament: Array.isArray(testament) ? testament.join("/") : testament,
-      isGospel: isGospel,
-    };
-    
-    // Use combination of name+set+imgFile as key for exact matching
-    const key = `${cardName}|${cardSet}|${imgFile}`;
-    cardMap.set(key, card);
-  });
-  
-  return cardMap;
-}
 
 /**
  * Sync status for cloud operations
@@ -203,10 +109,7 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
       if (result.success && result.deck) {
         const cloudDeck = result.deck;
         const isOwner = result.isOwner ?? false;
-        
-        // Fetch full card database to reconstruct complete card data
-        const cardDatabase = await fetchCardDatabase();
-        
+
         // Convert database format to Deck format with full card data
         // If not the owner, clear the ID so saving creates a new copy instead of trying to update
         const loadedDeck: Deck = {
@@ -222,7 +125,7 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
           cards: cloudDeck.cards.map((dbCard: any) => {
             // Reconstruct the lookup key
             const key = `${dbCard.card_name}|${dbCard.card_set}|${sanitizeImgFile(dbCard.card_img_file)}`;
-            const fullCard = cardDatabase.get(key);
+            const fullCard = CARD_BY_FULL_KEY.get(key);
             
             if (fullCard) {
               // Use full card data from database

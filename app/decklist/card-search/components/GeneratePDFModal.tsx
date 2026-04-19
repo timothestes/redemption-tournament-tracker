@@ -134,7 +134,7 @@ export default function GeneratePDFModal({ deck, onClose, isLegal }: GeneratePDF
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     maxLength={50}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm"
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-card text-sm"
                     placeholder="Enter your name"
                   />
                 </div>
@@ -145,7 +145,7 @@ export default function GeneratePDFModal({ deck, onClose, isLegal }: GeneratePDF
                     value={event}
                     onChange={(e) => setEvent(e.target.value)}
                     maxLength={100}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm"
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-card text-sm"
                     placeholder="Tournament name"
                   />
                 </div>
@@ -156,7 +156,7 @@ export default function GeneratePDFModal({ deck, onClose, isLegal }: GeneratePDF
                 <select
                   value={deckType}
                   onChange={(e) => setDeckType(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm"
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-card text-sm"
                 >
                   <option value="type_1">Type 1</option>
                   <option value="type_2">Type 2</option>

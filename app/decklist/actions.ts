@@ -1020,6 +1020,15 @@ export async function loadPublicDeckAction(deckId: string) {
         .then(() => {});
     }
 
+    // Stamp last_played_at for owner's decks (fire-and-forget)
+    if (isOwner) {
+      supabase
+        .from("decks")
+        .update({ last_played_at: new Date().toISOString() })
+        .eq("id", deckId)
+        .then(() => {});
+    }
+
     // Fetch total and budget prices
     let totalPrice: number | null = null;
     let budgetPrice: number | null = null;

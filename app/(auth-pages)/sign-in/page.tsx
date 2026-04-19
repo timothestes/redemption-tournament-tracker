@@ -9,6 +9,7 @@ import Link from "next/link";
 type SearchParams = {
   email?: string;
   error?: string;
+  redirectTo?: string;
 }
 
 export default async function Login({ 
@@ -33,7 +34,7 @@ export default async function Login({
         </Link>
       </p>
       
-      <OAuthSignInButtons />
+      <OAuthSignInButtons redirectTo={params.redirectTo} />
 
       <div className="relative my-6">
         <div className="absolute inset-0 flex items-center">
@@ -45,6 +46,7 @@ export default async function Login({
       </div>
 
       <form className="flex flex-col w-full">
+        {params.redirectTo && <input type="hidden" name="redirectTo" value={params.redirectTo} />}
         <div className="space-y-6 mb-8">
           <div className="space-y-3">
             <Label htmlFor="email" className="text-foreground font-medium text-base">Email</Label>

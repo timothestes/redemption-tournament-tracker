@@ -2,18 +2,7 @@
 
 import { useCardPreview } from '../state/CardPreviewContext';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-
-const BLOB_BASE_URL = process.env.NEXT_PUBLIC_BLOB_BASE_URL || '';
-
-function sanitizeImgFile(f: string): string {
-  return f.replace(/\.jpe?g$/i, '');
-}
-
-function getCardImageUrl(imgFile: string): string {
-  if (!imgFile) return '';
-  if (imgFile.startsWith('/')) return imgFile;
-  return `${BLOB_BASE_URL}/card-images/${sanitizeImgFile(imgFile)}.jpg`;
-}
+import { getCardImageUrl } from '../../shared/utils/cardImageUrl';
 
 const PANEL_WIDTH = 260;
 const COLLAPSED_WIDTH = 36;
@@ -123,6 +112,7 @@ export function CardLoupePanel() {
             >
               <div
                 style={{
+                  position: 'relative',
                   borderRadius: 6,
                   boxShadow: '0 4px 24px rgba(0,0,0,0.7), 0 0 8px rgba(212,168,103,0.2)',
                   overflow: 'hidden',
@@ -142,6 +132,29 @@ export function CardLoupePanel() {
                     transform: previewCard.isMeek ? 'rotate(180deg)' : undefined,
                   }}
                 />
+                {previewCard.notes && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: 8,
+                      right: 8,
+                      bottom: 10,
+                      background: 'rgba(0, 0, 0, 0.88)',
+                      border: '1px solid #c4955a',
+                      borderRadius: 999,
+                      padding: '5px 10px',
+                      color: '#f0d9a8',
+                      fontFamily: 'var(--font-cinzel), Georgia, serif',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      textAlign: 'center',
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.8)',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {previewCard.notes}
+                  </div>
+                )}
               </div>
               <span
                 style={{

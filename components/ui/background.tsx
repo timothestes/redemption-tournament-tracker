@@ -1,16 +1,16 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useTheme } from "next-themes";
+import React, { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { useTheme } from "next-themes";
 import Image from "next/image";
 
 // Routes where the background image is fully covered and doesn't need to render
-const SKIP_BACKGROUND_PREFIXES = ["/decklist/", "/tracker/", "/admin/"];
+const SKIP_BACKGROUND_PREFIXES = ["/decklist/", "/tracker/", "/admin/", "/play"];
 
 const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
-  const { theme, resolvedTheme } = useTheme();
   const pathname = usePathname();
+  const { theme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   // Only run on client to avoid hydration mismatch
@@ -27,7 +27,7 @@ const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
 
   if (skipBackground) {
     return (
-      <div className={`min-h-screen w-full ${isJaydenTheme ? 'bg-[hsl(270,20%,4%)]' : 'bg-white dark:bg-gray-900'}`}>
+      <div className="min-h-screen w-full bg-background">
         {children}
       </div>
     );
@@ -38,32 +38,40 @@ const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
       {/* Different background styling based on theme */}
       <div className="fixed inset-0 overflow-hidden">
         {/* Base background color */}
-        <div className={`absolute inset-0 ${isJaydenTheme ? 'bg-[hsl(270,20%,4%)]' : 'bg-white dark:bg-gray-900'}`}></div>
+        <div className={`absolute inset-0 bg-background`}></div>
 
-        {/* Image background with extremely reduced opacity for light mode */}
+      {/* Hero image container */}
+      <div className="fixed inset-x-0 top-14 bottom-0 overflow-hidden">
+        {/* Base background color */}
+        <div className="absolute inset-0 bg-background" />
+
+        {/* Hero image */}
         <Image
           src="/lor-login-splash.webp"
-          alt="Background"
+          alt=""
           fill
           sizes="100vw"
-          className={`object-cover ${isLightTheme ? 'opacity-10' : isJaydenTheme ? 'opacity-50' : 'opacity-75'}`}
+          className={`object-cover object-top ${isLightTheme ? 'opacity-10' : isJaydenTheme ? 'opacity-40' : 'opacity-75'}`}
           style={{
             filter: isLightTheme
               ? 'brightness(1.8) contrast(0.7) saturate(0.3) blur(1.5px)'
               : isJaydenTheme
-              ? 'brightness(0.6) contrast(1.2) saturate(1.8) hue-rotate(280deg)'
+              ? 'brightness(0.7) contrast(1.15) saturate(2.2) hue-rotate(280deg)'
               : 'brightness(1.05) contrast(0.95)'
           }}
           priority
-          placeholder="blur"
-          blurDataURL="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiPjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiNmZmZmZmYiLz48L3N2Zz4="
         />
 
         {/* Overlay for readability */}
         <div
           className={`absolute inset-0 ${isLightTheme ? 'bg-white/50 mix-blend-overlay' : !isJaydenTheme ? 'bg-black/40' : ''}`}
-          style={isJaydenTheme ? { background: 'linear-gradient(135deg, hsla(0, 60%, 15%, 0.7) 0%, hsla(270, 40%, 10%, 0.7) 50%, hsla(230, 50%, 12%, 0.7) 100%)' } : undefined}
+          style={isJaydenTheme ? { background: 'linear-gradient(135deg, hsla(0, 90%, 30%, 0.7) 0%, hsla(330, 85%, 35%, 0.55) 35%, hsla(270, 70%, 30%, 0.45) 60%, hsla(230, 85%, 35%, 0.7) 100%)' } : undefined}
         ></div>
+
+        {/* Top vignette (darkens the bright top edge in Jayden mode) */}
+        {isJaydenTheme && (
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, hsl(270, 20%, 4%) 0%, hsla(270, 20%, 4%, 0.7) 15%, transparent 45%)' }}></div>
+        )}
 
         {/* Bottom vignette */}
         <div className={`absolute inset-0 bg-gradient-to-t ${isJaydenTheme ? 'from-[hsl(230,40%,5%)]/60' : 'from-gray-300/10 dark:from-black/40'} via-transparent to-transparent`}></div>
@@ -71,7 +79,7 @@ const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
         {/* Bottom gradient */}
         <div className={`absolute inset-x-0 bottom-0 h-3/4 bg-gradient-to-t ${isJaydenTheme ? 'from-[hsl(230,40%,5%)]/50' : 'from-gray-200/10 dark:from-black/30'} via-transparent to-transparent`}></div>
 
-        {/* Custom gradient */}
+        {/* Depth gradient */}
         <div style={{
             position: 'absolute',
             top: '0px',
@@ -81,10 +89,11 @@ const Background: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
             backgroundImage: isLightTheme
               ? 'linear-gradient(to top, rgba(0, 0, 0, 0.08) 0%, rgba(0, 0, 0, 0.03) 35%, transparent 65%)'
               : isJaydenTheme
-              ? 'linear-gradient(to top, rgba(30, 0, 50, 0.5) 0%, rgba(20, 0, 40, 0.25) 40%, transparent 80%)'
+              ? 'linear-gradient(135deg, rgba(120, 0, 0, 0.35) 0%, rgba(140, 0, 80, 0.15) 40%, rgba(60, 0, 120, 0.15) 60%, rgba(0, 20, 120, 0.35) 100%)'
               : 'linear-gradient(to top, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.15) 40%, transparent 80%)',
             pointerEvents: 'none',
           }}></div>
+      </div>
       </div>
 
       <div className="relative z-10">{children}</div>

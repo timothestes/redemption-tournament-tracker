@@ -25,13 +25,13 @@ export default function ClearDeckModal({ deckName, onConfirm, onClose }: ClearDe
         </svg>
       }
     >
-      <p className="text-gray-700 dark:text-gray-300 mb-2">
+      <p className="text-muted-foreground mb-2">
         Are you sure you want to delete:
       </p>
-      <p className="text-lg font-semibold text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-900 px-3 py-2 rounded border border-gray-200 dark:border-gray-700">
+      <p className="text-lg font-semibold text-foreground bg-muted px-3 py-2 rounded border border-border">
         {deckName}
       </p>
-      <p className="text-sm text-gray-600 dark:text-gray-400 mt-3">
+      <p className="text-sm text-muted-foreground mt-3">
         This will permanently delete the deck.
       </p>
     </ConfirmationDialog>

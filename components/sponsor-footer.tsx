@@ -32,7 +32,8 @@ export default function SponsorFooter() {
     setMounted(true);
   }, []);
 
-  const isDark = mounted && (theme === "system" ? resolvedTheme : theme) === "dark";
+  const activeTheme = mounted ? (theme === "system" ? resolvedTheme : theme) : undefined;
+  const isDark = activeTheme === "dark" || activeTheme === "jayden";
 
   return (
     <footer className="w-full mt-auto">

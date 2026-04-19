@@ -1,8 +1,8 @@
 "use client";
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { CARD_DATA_URL } from "../constants";
-import { Card, sanitizeImgFile, normalizeBrigadeField } from "../utils";
+import { Card } from "../utils";
+import { ALL_CARDS } from "../data/cardIndex";
 import { useCardImageUrl } from "../hooks/useCardImageUrl";
 import { useCardPrices } from "../hooks/useCardPrices";
 import { openYTGSearchPage } from "../ytgUtils";
@@ -12,137 +12,47 @@ export default function RandomCardClient() {
   const { getImageUrl } = useCardImageUrl();
   const { getPrice, getProductUrl } = useCardPrices();
   const [card, setCard] = useState<Card | null>(null);
-  const [allCards, setAllCards] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRevealing, setIsRevealing] = useState(true);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
 
-  // Load card data once, then pick randomly from it
+  // Initial load: pick a card and preload its image, then fade in
   useEffect(() => {
-    (async () => {
-      try {
-        const response = await fetch(CARD_DATA_URL);
-        const text = await response.text();
-        const lines = text.split("\n");
-        const dataLines = lines.slice(1).filter((l) => l.trim());
-        if (dataLines.length === 0) {
-          setError("No cards found");
-          setLoading(false);
-          return;
-        }
-        setAllCards(dataLines);
-        // Initial load: pick a card and preload its image, then fade in
-        const randomIndex = Math.floor(Math.random() * dataLines.length);
-        const parsed = parseCard(dataLines[randomIndex]);
-        setCard(parsed);
-        setLoading(false);
-
-        const imgUrl = getImageUrl(parsed.imgFile);
-        const img = new Image();
-        img.src = imgUrl;
-        img.onload = () => {
-          setImageLoaded(true);
-          requestAnimationFrame(() => setIsRevealing(false));
-        };
-        img.onerror = () => {
-          setImageError(true);
-          requestAnimationFrame(() => setIsRevealing(false));
-        };
-        // Safety timeout
-        setTimeout(() => setIsRevealing(false), 3000);
-      } catch {
-        setError("Failed to load card data");
-        setLoading(false);
-      }
-    })();
-  }, []);
-
-  const parseCard = useCallback((line: string): Card => {
-    const cols = line.split("\t");
-    const cardName = cols[0] || "";
-    const cardSet = cols[1] || "";
-    const imgFile = sanitizeImgFile(cols[2] || "");
-    const reference = cols[12] || "";
-    const alignment = cols[14] || "";
-    const rawBrigade = cols[5] || "";
-
-    // Parse testament
-    let references: string[] = [];
-    for (let refGroup of reference.split(";")) {
-      refGroup = refGroup.trim();
-      if (refGroup.includes("(") && refGroup.includes(")")) {
-        const mainRef = refGroup.split("(")[0].trim();
-        if (mainRef) references.push(mainRef);
-        const parenContent = refGroup.substring(refGroup.indexOf("(") + 1, refGroup.indexOf(")"));
-        const parenRefs = parenContent.split(",").map(pr => pr.trim()).filter(Boolean);
-        references.push(...parenRefs);
-      } else {
-        if (refGroup) references.push(refGroup);
-      }
+    if (ALL_CARDS.length === 0) {
+      setError("No cards found");
+      setLoading(false);
+      return;
     }
 
-    const referencesLower = references.map(r => r.toLowerCase());
-    const gospelBooksLower = ['matthew', 'mark', 'luke', 'john'];
-    const isGospel = referencesLower.some(ref => gospelBooksLower.some(b => ref.startsWith(b)));
+    const randomIndex = Math.floor(Math.random() * ALL_CARDS.length);
+    const parsed = ALL_CARDS[randomIndex];
+    setCard(parsed);
+    setLoading(false);
 
-    const foundTestaments = new Set<string>();
-    const OT_BOOKS = ['genesis', 'exodus', 'leviticus', 'numbers', 'deuteronomy', 'joshua', 'judges', 'ruth', 'samuel', 'kings', 'chronicles', 'ezra', 'nehemiah', 'esther', 'job', 'psalms', 'proverbs', 'ecclesiastes', 'song of solomon', 'isaiah', 'jeremiah', 'lamentations', 'ezekiel', 'daniel', 'hosea', 'joel', 'amos', 'obadiah', 'jonah', 'micah', 'nahum', 'habakkuk', 'zephaniah', 'haggai', 'zechariah', 'malachi'];
-    const NT_BOOKS = ['matthew', 'mark', 'luke', 'john', 'acts', 'romans', 'corinthians', 'galatians', 'ephesians', 'philippians', 'colossians', 'thessalonians', 'timothy', 'titus', 'philemon', 'hebrews', 'james', 'peter', 'john', 'jude', 'revelation'];
-
-    const normalizeBookName = (ref: string) => ref.replace(/^(i{1,3}|1|2|3|4|one|two|three|four)\s+/i, '').trim();
-
-    for (const ref of referencesLower) {
-      const book = ref.split(' ')[0];
-      const normalizedBook = normalizeBookName(ref).split(' ')[0];
-      if (NT_BOOKS.some(b => book === b.toLowerCase() || normalizedBook === b.toLowerCase())) foundTestaments.add('NT');
-      if (OT_BOOKS.some(b => book === b.toLowerCase() || normalizedBook === b.toLowerCase())) foundTestaments.add('OT');
-    }
-
-    let testament: string | string[] = '';
-    if (foundTestaments.size === 1) {
-      testament = Array.from(foundTestaments)[0];
-    } else if (foundTestaments.size > 1) {
-      testament = Array.from(foundTestaments);
-    }
-
-    let normalizedBrigades: string[] = [];
-    try {
-      normalizedBrigades = normalizeBrigadeField(rawBrigade, alignment, cardName);
-    } catch {
-      normalizedBrigades = rawBrigade ? [rawBrigade] : [];
-    }
-
-    return {
-      dataLine: line,
-      name: cardName,
-      set: cardSet,
-      imgFile,
-      officialSet: cols[3] || "",
-      type: cols[4] || "",
-      brigade: normalizedBrigades.join("/"),
-      strength: cols[6] || "",
-      toughness: cols[7] || "",
-      class: cols[8] || "",
-      identifier: cols[9] || "",
-      specialAbility: cols[10] || "",
-      rarity: cols[11] || "",
-      reference,
-      alignment,
-      legality: cols[15] || "",
-      testament: Array.isArray(testament) ? testament.join("/") : testament,
-      isGospel,
+    const imgUrl = getImageUrl(parsed.imgFile);
+    const img = new Image();
+    img.src = imgUrl;
+    img.onload = () => {
+      setImageLoaded(true);
+      requestAnimationFrame(() => setIsRevealing(false));
     };
+    img.onerror = () => {
+      setImageError(true);
+      requestAnimationFrame(() => setIsRevealing(false));
+    };
+    // Safety timeout
+    setTimeout(() => setIsRevealing(false), 3000);
   }, []);
 
-  const pickRandomCard = useCallback((cards: string[] = allCards) => {
-    if (cards.length === 0) return;
+  const pickRandomCard = useCallback(() => {
+    if (ALL_CARDS.length === 0) return;
     setIsRevealing(true);
 
     // Pick a new card and preload its image before swapping
-    const randomIndex = Math.floor(Math.random() * cards.length);
-    const parsed = parseCard(cards[randomIndex]);
+    const randomIndex = Math.floor(Math.random() * ALL_CARDS.length);
+    const parsed = ALL_CARDS[randomIndex];
     const imgUrl = getImageUrl(parsed.imgFile);
 
     const img = new Image();
@@ -185,7 +95,7 @@ export default function RandomCardClient() {
         swap();
       }
     }, 3000);
-  }, [allCards, parseCard, getImageUrl]);
+  }, [getImageUrl, isRevealing]);
 
   if (error || (!loading && !card)) {
     return (

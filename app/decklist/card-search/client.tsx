@@ -8,14 +8,13 @@ import FilterGrid from "./components/FilterGrid";
 import CardImage from "./components/CardImage";
 import DeckBuilderPanel, { TabType } from "./components/DeckBuilderPanel";
 import SpotlightPanel from "./components/SpotlightPanel";
-import { CARD_DATA_URL, OT_BOOKS, NT_BOOKS, GOSPEL_BOOKS } from "./constants";
-import { 
-  Card, 
-  categorizeRarity, 
-  isNativityReference, 
-  iconPredicates, 
-  normalizeBrigadeField 
+import {
+  Card,
+  categorizeRarity,
+  isNativityReference,
+  iconPredicates,
 } from "./utils";
+import { ALL_CARDS } from "./data/cardIndex";
 import { useDeckState } from "./hooks/useDeckState";
 import { useDeckCheck } from "./hooks/useDeckCheck";
 import { parseDeckText, generateDeckText, downloadDeckAsFile, copyDeckToClipboard } from "./utils/deckImportExport";
@@ -689,95 +688,9 @@ export default function CardSearchClient() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [user, syncStatus?.isSaving, saveDeckToCloud, handleExportDeck, showSearch, showDeckBuilder, modalCard, getDeckStats]);
 
-  // sanitize imgFile to avoid duplicate extensions - now imported from utils
-
-  // Adjust parsing to skip header row
+  // Card data is built once at module load from the generated CARDS artifact.
   useEffect(() => {
-    fetch(CARD_DATA_URL)
-      .then((res) => res.text())
-      .then((text) => {
-        const lines = text.split("\n");
-        const dataLines = lines.slice(1).filter((l) => l.trim());
-        const parsed = dataLines.map((line) => {
-          const cols = line.split("\t");
-          // Enhanced testament and gospel tagging logic
-          const reference = cols[12] || "";
-          let references: string[] = [];
-          for (let refGroup of reference.split(";")) {
-            refGroup = refGroup.trim();
-            if (refGroup.includes("(") && refGroup.includes(")")) {
-              // Extract main reference
-              const mainRef = refGroup.split("(")[0].trim();
-              if (mainRef) references.push(mainRef);
-              // Extract parenthetical references
-              const parenContent = refGroup.substring(refGroup.indexOf("(") + 1, refGroup.indexOf(")"));
-              const parenRefs = parenContent.split(",").map(pr => pr.trim()).filter(Boolean);
-              references.push(...parenRefs);
-            } else {
-              if (refGroup) references.push(refGroup);
-            }
-          }
-          // Lowercase all references for matching
-          const referencesLower = references.map(r => r.toLowerCase());
-          // Helper to normalize book names with numbers (e.g., II Samuel -> Samuel)
-          function normalizeBookName(ref) {
-            // Remove leading roman numerals or numbers (I, II, 1, 2, 3, 4, one, two, three, four)\s+/i, '')
-            return ref.replace(/^(i{1,3}|1|2|3|4|one|two|three|four)\s+/i, '').trim();
-          }
-          // Tagging strategy: collect all matching testaments
-          const foundTestaments = new Set<string>();
-          for (const ref of referencesLower) {
-            // Try both original and normalized book name
-            const book = ref.split(' ')[0];
-            const normalizedBook = normalizeBookName(ref).split(' ')[0];
-            if (NT_BOOKS.some(b => book === b.toLowerCase() || normalizedBook === b.toLowerCase())) foundTestaments.add('NT');
-            if (OT_BOOKS.some(b => book === b.toLowerCase() || normalizedBook === b.toLowerCase())) foundTestaments.add('OT');
-          }
-          let testament: string | string[] = '';
-          if (foundTestaments.size === 1) {
-            testament = Array.from(foundTestaments)[0];
-          } else if (foundTestaments.size > 1) {
-            testament = Array.from(foundTestaments);
-          }
-          // IsGospel: true if any reference starts with a Gospel book name
-          const gospelBooksLower = GOSPEL_BOOKS.map(b => b.toLowerCase());
-          const isGospel = referencesLower.some(ref => gospelBooksLower.some(b => ref.startsWith(b)));
-          // Normalize brigade field
-          const rawBrigade = cols[5] || "";
-          const alignment = cols[14] || "";
-          const cardName = cols[0] || "";
-          let normalizedBrigades = [];
-          try {
-            normalizedBrigades = normalizeBrigadeField(rawBrigade, alignment, cardName);
-          } catch (e) {
-            // fallback to raw brigade if normalization fails
-            normalizedBrigades = rawBrigade ? [rawBrigade] : [];
-          }
-          const brigade = normalizedBrigades.join("/");
-          return {
-            dataLine: line,
-            name: cols[0] || "",
-            set: cols[1] || "",
-            imgFile: cols[2] || "",
-            officialSet: cols[3] || "",
-            type: cols[4] || "",
-            brigade,
-            strength: cols[6] || "",
-            toughness: cols[7] || "",
-            class: cols[8] || "",
-            identifier: cols[9] || "",
-            specialAbility: cols[10] || "",
-            rarity: cols[11] || "",
-            reference,
-            alignment: cols[14] || "",
-            legality: cols[15] || "",
-            testament,
-            isGospel,
-          } as Card;
-        });
-        setCards(parsed);
-      })
-      .catch(console.error);
+    setCards(ALL_CARDS);
   }, []);
 
   // Quick icon filters for type-based icons (reordered) and color-coded brigades
@@ -1709,7 +1622,7 @@ export default function CardSearchClient() {
               </span>
               {idx < selectedIconFilters.length - 1 && (
                 <span 
-                  className="animate-pill-enter mx-1 font-bold text-xs text-gray-500 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors px-2 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                  className="animate-pill-enter mx-1 font-bold text-xs text-muted-foreground cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors px-2 py-1 rounded hover:bg-muted"
                   onClick={(e) => {
                     e.preventDefault();
                     // Left-click: cycle through AND → OR → AND NOT → AND
@@ -1978,7 +1891,7 @@ export default function CardSearchClient() {
                           addCard(c, false);
                           setOpenSearchMenuCard(null);
                         }}
-                        className="w-10 h-10 hover:scale-110 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 flex items-center justify-center text-gray-700 dark:text-gray-200 transition-all"
+                        className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-muted-foreground transition-all"
                         title="Add to deck"
                       >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1993,7 +1906,7 @@ export default function CardSearchClient() {
                           addCard(c, true);
                           setOpenSearchMenuCard(null);
                         }}
-                        className="w-10 h-10 hover:scale-110 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 flex items-center justify-center text-gray-700 dark:text-gray-200 transition-all"
+                        className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-muted-foreground transition-all"
                         title="Add to reserve"
                       >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -2009,7 +1922,7 @@ export default function CardSearchClient() {
                             removeCard(c.name, c.set, false);
                             setOpenSearchMenuCard(null);
                           }}
-                          className="w-10 h-10 hover:scale-110 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 flex items-center justify-center text-red-600 dark:text-red-400 transition-all"
+                          className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-red-600 dark:text-red-400 transition-all"
                           title="Remove from deck"
                         >
                           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -2026,7 +1939,7 @@ export default function CardSearchClient() {
                             removeCard(c.name, c.set, true);
                             setOpenSearchMenuCard(null);
                           }}
-                          className="w-10 h-10 hover:scale-110 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 flex items-center justify-center text-orange-600 dark:text-orange-400 transition-all"
+                          className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-orange-600 dark:text-orange-400 transition-all"
                           title="Remove from reserve"
                         >
                           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -2134,7 +2047,7 @@ export default function CardSearchClient() {
                     const priceKey = `${c.name}|${c.set}|${c.imgFile}`;
                     const priceInfo = getPrice(priceKey);
                     return priceInfo ? (
-                      <p className="text-xs sm:text-xs text-center text-gray-500 dark:text-gray-400 font-medium">${priceInfo.price.toFixed(2)}</p>
+                      <p className="text-xs sm:text-xs text-center text-muted-foreground font-medium">${priceInfo.price.toFixed(2)}</p>
                     ) : null;
                   })()}
                 </div>
@@ -2146,15 +2059,15 @@ export default function CardSearchClient() {
           </div>
           {visibleCount < filtered.length && (
             <div ref={sentinelRef} className="h-8 flex items-center justify-center mt-2">
-              <div className="text-sm text-gray-400 dark:text-gray-500">Loading more...</div>
+              <div className="text-sm text-muted-foreground">Loading more...</div>
             </div>
           )}
           </>
         ) : (
           <div className="flex items-center justify-center mt-16 mb-16">
             <div className="text-center">
-              <p className="text-xl text-gray-500 dark:text-gray-400 mb-2">Ready to filter cards</p>
-              <p className="text-sm text-gray-400 dark:text-gray-500">Use the search or filters above to find cards</p>
+              <p className="text-xl text-muted-foreground mb-2">Ready to filter cards</p>
+              <p className="text-sm text-muted-foreground">Use the search or filters above to find cards</p>
             </div>
           </div>
         )}
@@ -2183,7 +2096,7 @@ export default function CardSearchClient() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M15 19l-7-7 7-7" />
               </svg>
               {/* Tooltip */}
-              <span className="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
+              <span className="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
                 Hide Search (right arrow key)
               </span>
             </button>
@@ -2198,7 +2111,7 @@ export default function CardSearchClient() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M9 5l7 7-7 7" />
               </svg>
               {/* Tooltip */}
-              <span className="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
+              <span className="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
                 Hide Deck (left arrow key)
               </span>
             </button>
@@ -2353,10 +2266,10 @@ export default function CardSearchClient() {
 
       {/* Mobile Deck View (replaces search when Deck tab is active) */}
       {isMobileDeckDrawerOpen && (
-        <div className="md:hidden fixed inset-x-0 top-[64px] bottom-[3.5rem] z-40 bg-white dark:bg-gray-900 flex flex-col overflow-hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <div className="md:hidden fixed inset-x-0 top-[64px] bottom-[3.5rem] z-40 bg-background flex flex-col overflow-hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
           {isInitializing ? (
             <div className="flex-1 flex items-center justify-center p-8">
-              <div className="text-gray-400 dark:text-gray-500 text-sm">Loading deck...</div>
+              <div className="text-muted-foreground text-sm">Loading deck...</div>
             </div>
           ) : (
             <DeckBuilderPanel
@@ -2422,18 +2335,18 @@ export default function CardSearchClient() {
           }}
         >
           <div 
-            className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full p-6"
+            className="bg-card rounded-lg shadow-xl max-w-2xl w-full p-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+            <h3 className="text-xl font-semibold mb-4 text-foreground">
               Import Deck
             </h3>
-            <div className="text-sm text-gray-600 dark:text-gray-400 mb-4 space-y-2">
+            <div className="text-sm text-muted-foreground mb-4 space-y-2">
               <p>
                 <strong>From Lackey CCG:</strong> Click the "Copy" button in your deck editor, then paste here.
               </p>
               <p>
-                <strong>Format:</strong> Each line should be: <code className="px-1 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">Quantity[TAB]Card Name</code>
+                <strong>Format:</strong> Each line should be: <code className="px-1 py-0.5 bg-muted rounded text-xs">Quantity[TAB]Card Name</code>
               </p>
               <p className="text-xs">
                 Add "Reserve:" on its own line to separate reserve cards.
@@ -2441,7 +2354,7 @@ export default function CardSearchClient() {
             </div>
             <textarea
               id="import-deck-textarea"
-              className="w-full h-64 p-3 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white font-mono text-sm"
+              className="w-full h-64 p-3 border border-border rounded bg-background text-foreground font-mono text-sm"
               placeholder={`1\tSon of God "Manger" (Promo)\n1\tThe Second Coming (CoW AB)\n1\tAngel of the Lord (2017 Promo)\n\nReserve:\n1\tGibeonite Trickery (Roots)\n1\tNot Among You`}
               value={importText}
               onChange={(e) => setImportText(e.target.value)}
@@ -2462,7 +2375,7 @@ export default function CardSearchClient() {
             <div className="mt-6 flex gap-3 items-center">
               <label
                 htmlFor="import-deck-file"
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded cursor-pointer transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-muted-foreground bg-muted hover:bg-muted/80 rounded cursor-pointer transition-colors"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
@@ -2489,7 +2402,7 @@ export default function CardSearchClient() {
               />
               <div className="ml-auto flex gap-3">
               <button
-                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                className="px-4 py-2 text-muted-foreground hover:bg-muted rounded transition-colors"
                 onClick={() => {
                   setShowImportModal(false);
                   setImportText("");
@@ -2518,7 +2431,7 @@ export default function CardSearchClient() {
           onClick={() => setShowUnsavedChangesModal(false)}
         >
           <div 
-            className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden animate-in zoom-in-95 duration-200"
+            className="bg-card rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header - Less vibrant, more subtle */}
@@ -2538,12 +2451,12 @@ export default function CardSearchClient() {
             
             {/* Content */}
             <div className="px-6 py-6">
-              <p className="text-gray-600 dark:text-gray-300 mb-5 leading-relaxed">
+              <p className="text-muted-foreground mb-5 leading-relaxed">
                 Your deck is saved locally. {user ? 'Would you like to save it to the cloud before continuing?' : 'Sign in to save it to the cloud and access it from any device.'}
               </p>
               
               {/* Deck info card */}
-              <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/50 dark:to-gray-900/30 rounded-xl p-4 border border-gray-200 dark:border-gray-700 shadow-sm">
+              <div className="bg-muted/30 rounded-xl p-4 border border-border shadow-sm">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-10 h-10 bg-green-600/10 dark:bg-green-600/20 rounded-lg flex items-center justify-center">
                     <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -2551,18 +2464,18 @@ export default function CardSearchClient() {
                     </svg>
                   </div>
                   <div>
-                    <div className="font-semibold text-gray-900 dark:text-white text-base">
+                    <div className="font-semibold text-foreground text-base">
                       {deck.name || "Untitled Deck"}
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                    <div className="text-xs text-muted-foreground flex items-center gap-2">
                       <span>{getDeckStats().mainDeckCount + getDeckStats().reserveCount} cards</span>
-                      <span className="text-gray-400 dark:text-gray-600">•</span>
+                      <span className="text-muted-foreground/50">•</span>
                       <span>{deck.format || "Type 1"}</span>
                     </div>
                   </div>
                 </div>
                 {!user && (
-                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                  <div className="mt-3 pt-3 border-t border-border">
                     <p className="text-xs text-amber-600 dark:text-amber-400 flex items-start gap-2">
                       <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -2575,7 +2488,7 @@ export default function CardSearchClient() {
             </div>
             
             {/* Actions - Using tournament modal style */}
-            <div className="px-6 py-5 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-700">
+            <div className="px-6 py-5 bg-muted/50 border-t border-border">
               <div className="flex flex-col gap-3">
                 <button
                   onClick={async () => {
@@ -2603,7 +2516,7 @@ export default function CardSearchClient() {
                     setPendingNavigation(null);
                   }}
                   disabled={!user}
-                  className="w-full px-6 py-3 bg-white dark:bg-gray-800 rounded-lg transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border-2 hover:bg-green-50 dark:hover:bg-green-950/20"
+                  className="w-full px-6 py-3 bg-card rounded-lg transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border-2 hover:bg-green-50 dark:hover:bg-green-950/20"
                   style={{
                     borderImage: 'linear-gradient(to right, rgb(34 197 94), rgb(59 130 246)) 1',
                   }}
@@ -2611,7 +2524,7 @@ export default function CardSearchClient() {
                   <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
                   </svg>
-                  <span className="text-gray-900 dark:text-white">
+                  <span className="text-foreground">
                     Save & Continue
                   </span>
                 </button>
@@ -2633,7 +2546,7 @@ export default function CardSearchClient() {
                       }
                     }, 0);
                   }}
-                  className="w-full px-6 py-3 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg transition-all font-semibold flex items-center justify-center gap-2 border-2 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  className="w-full px-6 py-3 bg-card text-muted-foreground rounded-lg transition-all font-semibold flex items-center justify-center gap-2 border-2 border-border hover:bg-muted"
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
@@ -2647,7 +2560,7 @@ export default function CardSearchClient() {
                     setShowUnsavedChangesModal(false);
                     setPendingNavigation(null);
                   }}
-                  className="w-full px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+                  className="w-full px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Cancel
                 </button>

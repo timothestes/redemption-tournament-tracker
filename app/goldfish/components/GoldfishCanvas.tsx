@@ -1,284 +1,139 @@
 'use client';
 
-import { useRef, useState, useCallback, useEffect, useMemo, memo } from 'react';
+import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { Stage, Layer, Rect, Text, Image as KonvaImage, Group, Circle } from 'react-konva';
 import type Konva from 'konva';
 import KonvaLib from 'konva';
 import { useGame } from '../state/GameContext';
-import { calculateZoneLayout, getCardDimensions, calculateCardPositionsInZone, type ZoneRect } from '../layout/zoneLayout';
+import { calculateZoneLayout, calculateCardPositionsInZone, type ZoneRect } from '../layout/zoneLayout';
+import { CARD_WIDTH, CARD_HEIGHT, CARD_ASPECT_RATIO } from '../layout/zoneLayout';
 import { calculateHandPositions } from '../layout/handLayout';
-import { GameCard, ZoneId, ZONE_LABELS, COUNTER_COLORS } from '../types';
+import { calculateAutoArrangePositions } from '../../play/layout/multiplayerAutoArrange';
+import { VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen } from '@/app/shared/layout/virtualCanvas';
+import { GameCard, ZoneId, ZONE_LABELS } from '../types';
+import { GameCardNode, CardBackShape, cardBackListeners, cardBackLoaded } from '../../shared/components/GameCardNode';
 import { PhaseBar } from './PhaseBar';
 import { GameToolbar } from './GameToolbar';
-import { CardContextMenu } from './CardContextMenu';
+import { CardContextMenu } from '@/app/shared/components/CardContextMenu';
 import { CardHoverPreview } from './CardHoverPreview';
-import { ZoneBrowseModal } from './ZoneBrowseModal';
-import { DeckSearchModal } from './DeckSearchModal';
-import { DeckContextMenu } from './DeckContextMenu';
-import { DeckPeekModal } from './DeckPeekModal';
-import { DeckDropPopup } from './DeckDropPopup';
-import { DeckExchangeModal } from './DeckExchangeModal';
-import { ZoneContextMenu } from './ZoneContextMenu';
-import { LorContextMenu } from './LorContextMenu';
+import { ZoneBrowseModal } from '@/app/shared/components/ZoneBrowseModal';
+import { DeckSearchModal } from '@/app/shared/components/DeckSearchModal';
+import { DeckContextMenu } from '@/app/shared/components/DeckContextMenu';
+import { DeckPeekModal } from '@/app/shared/components/DeckPeekModal';
+import { DeckDropPopup } from '@/app/shared/components/DeckDropPopup';
+import { DeckExchangeModal } from '@/app/shared/components/DeckExchangeModal';
+import { ModalGameProvider, type ModalGameContextValue } from '@/app/shared/contexts/ModalGameContext';
+import { ZoneContextMenu } from '@/app/shared/components/ZoneContextMenu';
+import { LorContextMenu } from '@/app/shared/components/LorContextMenu';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
-import { useModalCardDrag } from '../hooks/useModalCardDrag';
+import { useCardScale } from '@/app/shared/hooks/useCardScale';
+import { CardScaleControl } from '@/app/shared/components/CardScaleControl';
+import { useModalCardDrag } from '@/app/shared/hooks/useModalCardDrag';
 import { useSelectionState, type CardBound } from '../hooks/useSelectionState';
-import { MultiCardContextMenu } from './MultiCardContextMenu';
+import { MultiCardContextMenu } from '@/app/shared/components/MultiCardContextMenu';
+import { GameActions } from '@/app/shared/types/gameActions';
 import { GameToastContainer, showGameToast } from './GameToast';
 import { DiceRollOverlay } from './DiceRollOverlay';
 import { useCardPreview } from '../state/CardPreviewContext';
+import { useLobArrivalEffect } from '@/app/shared/hooks/useLobArrivalEffect';
+import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '../utils/equipLayout';
+import { findCard, isWeapon, isWarrior } from '@/lib/cards/lookup';
+import { getAbilitiesForCard } from '@/lib/cards/cardAbilities';
+import { Link2Off } from 'lucide-react';
 
-const BLOB_BASE_URL = process.env.NEXT_PUBLIC_BLOB_BASE_URL || '';
-
-function sanitizeImgFile(f: string): string {
-  return f.replace(/\.jpe?g$/i, '');
-}
-
-function getCardImageUrl(imgFile: string): string {
-  if (!imgFile) return '';
-  if (imgFile.startsWith('/')) return imgFile;
-  return `${BLOB_BASE_URL}/card-images/${sanitizeImgFile(imgFile)}.jpg`;
-}
-
-// Card back image — loaded once and shared across all instances
-let cardBackImage: HTMLImageElement | null = null;
-let cardBackLoaded = false;
-const cardBackListeners: (() => void)[] = [];
-if (typeof window !== 'undefined') {
-  cardBackImage = new window.Image();
-  cardBackImage.onload = () => {
-    cardBackLoaded = true;
-    cardBackListeners.forEach(fn => fn());
-    cardBackListeners.length = 0;
-  };
-  cardBackImage.src = '/gameplay/cardback.webp';
-}
-
-function CardBackShape({ width, height }: { width: number; height: number }) {
-  if (cardBackImage && cardBackLoaded) {
-    return (
-      <KonvaImage
-        image={cardBackImage}
-        width={width}
-        height={height}
-        cornerRadius={4}
-      />
-    );
-  }
-  // Fallback while image loads
-  return (
-    <Rect
-      width={width}
-      height={height}
-      fill="#2a1f12"
-      stroke="#6b4e27"
-      strokeWidth={1}
-      cornerRadius={4}
-    />
-  );
-}
-
-// Individual card component — memoized to avoid re-rendering cards that haven't changed
-const GameCardNode = memo(function GameCardNode({
-  card,
-  x,
-  y,
-  rotation,
-  cardWidth,
-  cardHeight,
-  image,
-  isSelected,
-  hoverProgress,
-  nodeRef,
-  onDragStart,
-  onDragMove,
-  onDragEnd,
-  onContextMenu,
-  onClick,
-  onDblClick,
-  onMouseEnter,
-  onMouseLeave,
-}: {
-  card: GameCard;
-  x: number;
-  y: number;
-  rotation: number;
-  cardWidth: number;
-  cardHeight: number;
-  image: HTMLImageElement | undefined;
-  isSelected?: boolean;
-  hoverProgress?: number;
-  nodeRef?: (instanceId: string, node: Konva.Group | null) => void;
-  onDragStart: (card: GameCard) => void;
-  onDragMove: (e: Konva.KonvaEventObject<DragEvent>) => void;
-  onDragEnd: (card: GameCard, e: Konva.KonvaEventObject<DragEvent>) => void;
-  onContextMenu: (card: GameCard, e: Konva.KonvaEventObject<PointerEvent>) => void;
-  onClick?: (card: GameCard, e: Konva.KonvaEventObject<MouseEvent>) => void;
-  onDblClick: (card: GameCard) => void;
-  onMouseEnter: (card: GameCard, e: Konva.KonvaEventObject<MouseEvent>) => void;
-  onMouseLeave: () => void;
-}) {
-  const isToken = card.ownerId === 'player2';
-  const showFace = !card.isFlipped && image;
-
-  const groupRefCb = useCallback((node: Konva.Group | null) => {
-    nodeRef?.(card.instanceId, node);
-  }, [card.instanceId, nodeRef]);
-
-  return (
-    <Group
-      ref={groupRefCb as any}
-      x={x}
-      y={y}
-      rotation={rotation}
-      draggable
-      onDragStart={() => onDragStart(card)}
-      onDragMove={onDragMove}
-      onDragEnd={(e) => onDragEnd(card, e)}
-      onContextMenu={(e) => onContextMenu(card, e)}
-      onClick={onClick ? (e) => onClick(card, e) : undefined}
-      onTap={onClick ? (e) => onClick(card, e as unknown as Konva.KonvaEventObject<MouseEvent>) : undefined}
-      onDblClick={() => onDblClick(card)}
-      onDblTap={() => onDblClick(card)}
-      onMouseEnter={(e) => onMouseEnter(card, e)}
-      onMouseLeave={onMouseLeave}
-    >
-      {/* Selection highlight — golden glow border */}
-      {isSelected && (
-        <Rect
-          x={-3}
-          y={-3}
-          width={cardWidth + 6}
-          height={cardHeight + 6}
-          fill="transparent"
-          stroke="#c4955a"
-          strokeWidth={2}
-          cornerRadius={6}
-          shadowColor="#c4955a"
-          shadowBlur={8}
-          shadowOpacity={0.6}
-        />
-      )}
-
-      {/* Hover highlight — warm golden glow that intensifies over time */}
-      {hoverProgress != null && hoverProgress > 0 && !isSelected && (
-        <Rect
-          x={-3}
-          y={-3}
-          width={cardWidth + 6}
-          height={cardHeight + 6}
-          fill="transparent"
-          stroke={`rgba(224, 180, 100, ${0.3 + hoverProgress * 0.5})`}
-          strokeWidth={1.5 + hoverProgress * 1.5}
-          cornerRadius={6}
-          shadowColor={`rgba(255, 215, 140, ${0.3 + hoverProgress * 0.5})`}
-          shadowBlur={6 + hoverProgress * 14}
-          shadowOpacity={0.4 + hoverProgress * 0.5}
-        />
-      )}
-
-      {/* Inner group handles meek rotation around card center without affecting drag */}
-      <Group
-        rotation={card.isMeek ? 180 : 0}
-        offsetX={card.isMeek ? cardWidth / 2 : 0}
-        offsetY={card.isMeek ? cardHeight / 2 : 0}
-        x={card.isMeek ? cardWidth / 2 : 0}
-        y={card.isMeek ? cardHeight / 2 : 0}
-      >
-        {/* Token or regular card rendering */}
-        {showFace ? (
-          <KonvaImage
-            image={image}
-            width={cardWidth}
-            height={cardHeight}
-            cornerRadius={4}
-          />
-        ) : (
-          <CardBackShape width={cardWidth} height={cardHeight} />
-        )}
-
-        {/* Token overlay — dashed border + badge to distinguish from player's cards */}
-        {isToken && (
-          <>
-            <Rect
-              width={cardWidth}
-              height={cardHeight}
-              fill="transparent"
-              stroke="#c4955a"
-              strokeWidth={1.5}
-              cornerRadius={4}
-              dash={[5, 3]}
-            />
-            {/* "TOKEN" badge at bottom */}
-            <Rect
-              x={cardWidth * 0.1}
-              y={cardHeight - Math.max(14, cardHeight * 0.1)}
-              width={cardWidth * 0.8}
-              height={Math.max(12, cardHeight * 0.08)}
-              fill="rgba(26,21,16,0.85)"
-              cornerRadius={2}
-            />
-            <Text
-              x={cardWidth * 0.1}
-              y={cardHeight - Math.max(14, cardHeight * 0.1)}
-              width={cardWidth * 0.8}
-              height={Math.max(12, cardHeight * 0.08)}
-              text="TOKEN"
-              fontSize={Math.max(6, Math.min(9, cardWidth * 0.1))}
-              fontFamily="Cinzel, Georgia, serif"
-              fill="#c4955a"
-              align="center"
-              verticalAlign="middle"
-              letterSpacing={2}
-            />
-          </>
-        )}
-
-        {/* Counter badges — top-right, stacked down the side */}
-        {card.counters.map((counter, idx) => {
-          const colorDef = COUNTER_COLORS.find(c => c.id === counter.color);
-          return (
-            <Group key={counter.color} x={cardWidth - 12} y={8 + idx * 22}>
-              <Circle radius={10} fill={colorDef?.hex ?? '#8b1a1a'} stroke="rgba(0,0,0,0.5)" strokeWidth={1} />
-              <Text
-                text={String(counter.count)}
-                fontSize={11}
-                fill="white"
-                fontStyle="bold"
-                width={20}
-                height={20}
-                align="center"
-                verticalAlign="middle"
-                offsetX={10}
-                offsetY={10}
-              />
-            </Group>
-          );
-        })}
-
-        {/* Notes indicator */}
-        {card.notes && (
-          <Circle
-            x={cardWidth - 14}
-            y={cardHeight - 8}
-            radius={5}
-            fill="#c4955a"
-          />
-        )}
-      </Group>
-    </Group>
-  );
-});
+import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
+import { SOUL_DECK_BACK_IMG } from '@/app/shared/paragon/soulDeck';
+import { actions as gameActionCreators } from '../state/gameActions';
 
 interface GoldfishCanvasProps {
-  width: number;
-  height: number;
+  containerWidth: number;
+  containerHeight: number;
+  scale: number;
+  offsetX: number;
+  offsetY: number;
+  virtualWidth: number;
+  onLoadDeck?: () => void;
 }
 
-export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
-  const { state, dispatch, drawCard, drawMultiple, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleDeck, meekCard, unmeekCard, removeOpponentToken, addPlayerLostSoul } = useGame();
+export default function GoldfishCanvas({ containerWidth, containerHeight, scale, offsetX, offsetY, virtualWidth, onLoadDeck }: GoldfishCanvasProps) {
+  const { state, dispatch, drawCard, drawMultiple, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck, shuffleDeck, meekCard, unmeekCard, flipCard, addCounter, removeCounter, addNote, addOpponentLostSoul, removeOpponentToken, executeCardAbility, addPlayerLostSoul, reorderHand, attachCard, detachCard } = useGame();
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const stageRef = useRef<Konva.Stage>(null);
+  const gameLayerRef = useRef<Konva.Layer>(null);
+
+  // ---- LOB arrival glow effect ----
+  const lobCardIds = useMemo(
+    () => (state.zones['land-of-bondage'] ?? []).map(c => c.instanceId),
+    [state.zones],
+  );
+  const { getGlowIntensity: getLobGlow } = useLobArrivalEffect(lobCardIds);
+
+  // Adapter: bridge goldfish game context to shared GameActions interface
+  const goldfishActions: GameActions = useMemo(() => ({
+    moveCard: (cardId, toZone, posX, posY) => moveCard(cardId, toZone as ZoneId, undefined, posX !== undefined ? Number(posX) : undefined, posY !== undefined ? Number(posY) : undefined),
+    moveCardsBatch: (cardIds, toZone) => moveCardsBatch(cardIds, toZone as ZoneId),
+    flipCard: (cardId) => flipCard(cardId),
+    meekCard: (cardId) => meekCard(cardId),
+    unmeekCard: (cardId) => unmeekCard(cardId),
+    addCounter: (cardId, color) => addCounter(cardId, color as any),
+    removeCounter: (cardId, color) => removeCounter(cardId, color as any),
+    shuffleCardIntoDeck: (cardId) => shuffleCardIntoDeck(cardId),
+    shuffleDeck: () => shuffleDeck(),
+    setNote: (cardId, text) => addNote(cardId, text),
+    exchangeCards: () => { /* handled via onExchange callback */ },
+    drawCard: () => drawCard(),
+    drawMultiple: (count) => drawMultiple(count),
+    moveCardToTopOfDeck: (cardId) => moveCardToTopOfDeck(cardId),
+    moveCardToBottomOfDeck: (cardId) => moveCardToBottomOfDeck(cardId),
+    removeOpponentToken: (cardId) => removeOpponentToken(cardId),
+    executeCardAbility: (cardId, abilityIndex) => {
+      // Intercept modal-driven abilities (reveal_own_deck) — the goldfish
+      // reducer no-ops them; the modal lives in component state.
+      let source: GameCard | undefined;
+      for (const zone of Object.values(state.zones)) {
+        const found = zone.find(c => c.instanceId === cardId);
+        if (found) { source = found; break; }
+      }
+      const ability = source ? getAbilitiesForCard(source.cardName)[abilityIndex] : undefined;
+      if (ability?.type === 'reveal_own_deck') {
+        const deck = state.zones.deck;
+        if (deck.length === 0) { showGameToast('Deck is empty'); return; }
+        const n = Math.min(ability.count, deck.length);
+        let ids: string[];
+        let title: string;
+        if (ability.position === 'top') {
+          ids = deck.slice(0, n).map(c => c.instanceId);
+          title = `Top ${n} of Deck`;
+        } else if (ability.position === 'bottom') {
+          ids = deck.slice(-n).map(c => c.instanceId);
+          title = `Bottom ${n} of Deck`;
+        } else {
+          const shuffled = [...deck].sort(() => Math.random() - 0.5);
+          ids = shuffled.slice(0, n).map(c => c.instanceId);
+          title = `Random ${n} from Deck`;
+        }
+        setPeekState({ cardIds: ids, title });
+        return;
+      }
+      executeCardAbility(cardId, abilityIndex);
+    },
+    randomHandToZone: () => {}, // not used in goldfish
+    randomReserveToZone: () => {}, // not used in goldfish
+    reloadDeck: () => {}, // not used in goldfish
+  }), [moveCard, moveCardsBatch, flipCard, meekCard, unmeekCard, addCounter, removeCounter, shuffleCardIntoDeck, shuffleDeck, addNote, drawCard, drawMultiple, moveCardToTopOfDeck, moveCardToBottomOfDeck, removeOpponentToken, executeCardAbility, state.zones]);
+
+  // Bridge goldfish game state into the shared ModalGameContext for shared modal components
+  const modalGameValue = useMemo<ModalGameContextValue>(() => ({
+    zones: state.zones,
+    actions: {
+      moveCard,
+      moveCardsBatch,
+      moveCardToTopOfDeck,
+      moveCardToBottomOfDeck,
+      shuffleDeck,
+      shuffleCardIntoDeck,
+    },
+  }), [state.zones, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleDeck, shuffleCardIntoDeck]);
 
   // Prevent browser-native drag on the canvas container.
   // Without this, the browser can hijack card drags (especially multi-select)
@@ -316,6 +171,20 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
     };
   }, []);
 
+  // Soul Deck back image (Paragon-only). Load once; re-render when ready.
+  const soulDeckBackRef = useRef<HTMLImageElement | null>(null);
+  const [soulDeckBackReady, setSoulDeckBackReady] = useState(false);
+  useEffect(() => {
+    if (state.format !== 'Paragon') return;
+    if (soulDeckBackRef.current) return;
+    const img = new window.Image();
+    img.onload = () => {
+      soulDeckBackRef.current = img;
+      setSoulDeckBackReady(true);
+    };
+    img.src = SOUL_DECK_BACK_IMG;
+  }, [state.format]);
+
   const [contextMenu, setContextMenu] = useState<{
     card: GameCard;
     x: number;
@@ -348,10 +217,21 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
   }, [state.zones, hoverCard?.card.instanceId]);
   const [showDeckSearch, setShowDeckSearch] = useState(false);
   const [deckMenu, setDeckMenu] = useState<{ x: number; y: number } | null>(null);
-  const [peekState, setPeekState] = useState<{ cardIds: string[]; title: string } | null>(null);
+  const [soulDeckMenu, setSoulDeckMenu] = useState<{ x: number; y: number } | null>(null);
+  const [browseSoulDeck, setBrowseSoulDeck] = useState(false);
+  const [peekState, setPeekState] = useState<{ cardIds: string[]; title: string; sourceZone?: ZoneId } | null>(null);
+  const [lookState, setLookState] = useState<{ cardIds: string[]; title: string; sourceZone?: ZoneId } | null>(null);
   const [deckDropPopup, setDeckDropPopup] = useState<{ cardInstanceId: string; x: number; y: number } | null>(null);
+  const [soulDeckDropPopup, setSoulDeckDropPopup] = useState<{ cardInstanceId: string; batchIds?: string[]; x: number; y: number } | null>(null);
   const [canvasDragZone, setCanvasDragZone] = useState<ZoneId | null>(null);
   const isCanvasDragging = useRef(false);
+  // React-visible drag flag used to hide the HTML unlink overlay during drag
+  // (HTML overlay reads warrior.posX from state, which doesn't update until
+  // drag-end, so without this the icon lags visibly behind the card).
+  const [isCardDraggingUi, setIsCardDraggingUi] = useState(false);
+  // When true, disable zone-level clipping so a card dragged out of a clipped
+  // zone (territory, land-of-bondage) isn't visually cut off by the zone rect.
+  const [isDraggingAnyCard, setIsDraggingAnyCard] = useState(false);
   const [multiCardContextMenu, setMultiCardContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [batchDeckDropIds, setBatchDeckDropIds] = useState<string[] | null>(null);
   const [exchangeCardIds, setExchangeCardIds] = useState<string[] | null>(null);
@@ -408,14 +288,22 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
     layer.batchDraw();
   }, []);
 
-  useKeyboardShortcuts();
+  const { cardScale, zoomIn, zoomOut, resetScale, MIN_SCALE, MAX_SCALE, STEP, setCardScale } = useCardScale();
+  useKeyboardShortcuts({ onZoomIn: zoomIn, onZoomOut: zoomOut });
 
-  const isParagon = false; // TODO: re-enable paragon zone later
-  const zoneLayout = useMemo(() => calculateZoneLayout(width, height, isParagon), [width, height, isParagon]);
-  const { cardWidth, cardHeight } = useMemo(() => getCardDimensions(width, height), [width, height]);
-  // Rotate deck/discard/banish sideways when the aspect ratio is wide enough
-  // that cards would overflow their sidebar zones vertically
-  const rotateSidebarPiles = width / height > 1.9;
+  const zoneLayout = useMemo(
+    () => calculateZoneLayout(virtualWidth, VIRTUAL_HEIGHT, scale, state.format),
+    [virtualWidth, scale, state.format],
+  );
+  const cardWidth = Math.round(CARD_WIDTH * cardScale);
+  const cardHeight = Math.round(CARD_HEIGHT * cardScale);
+  // Sidebar pile cards are capped to fit within the sidebar zone height
+  const sidebarZoneHeight = zoneLayout['deck']?.height ?? 0;
+  const maxSidebarCardHeight = sidebarZoneHeight - 28; // room for label + padding
+  const sidebarCardHeight = Math.min(cardHeight, maxSidebarCardHeight);
+  const sidebarCardWidth = Math.round(sidebarCardHeight / CARD_ASPECT_RATIO);
+  // Virtual canvas is always 16:9 — no need to rotate sidebar piles
+  const rotateSidebarPiles = false;
 
   // Escape key clears selection
   useEffect(() => {
@@ -435,7 +323,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
     const urlsToLoad: string[] = [];
 
     for (const card of allCards) {
-      if (card.cardImgFile && !card.isFlipped) {
+      if (card.cardImgFile) {
         const url = getCardImageUrl(card.cardImgFile);
         if (!cache.has(url)) {
           urlsToLoad.push(url);
@@ -480,10 +368,11 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
   const ZONE_HIT_ORDER: ZoneId[] = useMemo(() => [
     // Sidebar zones first (small, precise targets)
     'land-of-redemption', 'banish', 'reserve', 'deck', 'discard',
-    ...(isParagon ? ['paragon' as ZoneId] : []),
+    // Soul deck pile (Paragon only, narrow column inside land-of-bondage)
+    'soul-deck',
     // Then main area zones
     'land-of-bondage', 'territory', 'hand',
-  ], [isParagon]);
+  ], []);
 
   const findZoneAtPosition = useCallback(
     (x: number, y: number): ZoneId | null => {
@@ -509,7 +398,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
     // Tokens dragged onto deck are silently removed
     const allCards = Object.values(state.zones).flat();
     const card = allCards.find(c => c.instanceId === cardInstanceId);
-    if (card?.ownerId === 'player2') {
+    if (card?.isToken) {
       removeOpponentToken(cardInstanceId);
       return;
     }
@@ -539,12 +428,17 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
     onBatchDeckDrop: handleBatchDeckDrop,
     cardWidth,
     cardHeight,
+    scale,
+    offsetX,
+    offsetY,
   });
 
   // Clear hover state and mark dragging on drag start
   const handleCardDragStart = useCallback((card: GameCard) => {
     isDraggingRef.current = true;
     isCanvasDragging.current = true;
+    setIsCardDraggingUi(true);
+    setIsDraggingAnyCard(true);
     dragSourceZoneRef.current = card.zone;
     if (hoverTimerRef.current) {
       clearTimeout(hoverTimerRef.current);
@@ -555,7 +449,18 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
     stopHoverAnimation();
 
     // Multi-card drag: build a single rasterized ghost of all follower cards
-    if (selectedIds.has(card.instanceId) && selectedIds.size > 1) {
+    // Follower set: multi-select takes precedence; else attached weapons in territory.
+    const multiSelectFollowerIds: string[] = (selectedIds.has(card.instanceId) && selectedIds.size > 1)
+      ? Array.from(selectedIds).filter(id => id !== card.instanceId)
+      : [];
+    const equipFollowerIds: string[] = card.zone === 'territory'
+      ? state.zones.territory.filter(c => c.equippedTo === card.instanceId).map(c => c.instanceId)
+      : [];
+    const followerIds = multiSelectFollowerIds.length > 0
+      ? multiSelectFollowerIds
+      : equipFollowerIds;
+
+    if (followerIds.length > 0) {
       const dragNode = cardNodeRefs.current.get(card.instanceId);
       if (dragNode) {
         const offsets = new Map<string, { dx: number; dy: number }>();
@@ -564,8 +469,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
 
         // Collect follower nodes and compute offsets
         const followers: { id: string; node: Konva.Group; dx: number; dy: number }[] = [];
-        for (const id of selectedIds) {
-          if (id === card.instanceId) continue;
+        for (const id of followerIds) {
           const node = cardNodeRefs.current.get(id);
           if (node) {
             const dx = node.x() - baseX;
@@ -598,7 +502,8 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
             ctx.scale(2, 2);
             ctx.globalAlpha = 0.5;
             for (const f of followers) {
-              // Rasterize this individual card node
+              // Don't pass x/y — let Konva use getClientRect() defaults
+              // so the card renders correctly regardless of its absolute position
               const cardCanvas = f.node.toCanvas({ pixelRatio: 1 });
               ctx.drawImage(cardCanvas, f.dx - minX, f.dy - minY, cardWidth, cardHeight);
             }
@@ -614,7 +519,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
               opacity: 1,
             }) as Konva.Image;
 
-            // Add to a dedicated ghost layer
+            // Add to a dedicated ghost layer (scaled to match game layer)
             const stage = stageRef.current;
             if (stage) {
               let ghostLayer = dragGhostLayerRef.current;
@@ -623,6 +528,11 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                 dragGhostLayerRef.current = ghostLayer;
                 stage.add(ghostLayer);
               }
+              // Match the game layer's transform so ghost aligns with cards
+              ghostLayer.scaleX(scale);
+              ghostLayer.scaleY(scale);
+              ghostLayer.x(offsetX);
+              ghostLayer.y(offsetY);
               ghostLayer.add(ghostImage);
               ghostLayer.moveToTop();
               ghostLayer.batchDraw();
@@ -640,7 +550,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
     } else {
       dragFollowerOffsets.current = null;
     }
-  }, [selectedIds, cardWidth, cardHeight]);
+  }, [selectedIds, cardWidth, cardHeight, scale, offsetX, offsetY, state.zones.territory]);
 
   const canvasDragZoneRef = useRef<ZoneId | null>(null);
   // Track the ghost's offset from the drag card origin for repositioning
@@ -649,9 +559,9 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
     (e: Konva.KonvaEventObject<DragEvent>) => {
       const node = e.target;
 
-      // Clamp card position to stage bounds
-      const clampedX = Math.max(-cardWidth / 2, Math.min(node.x(), width - cardWidth / 2));
-      const clampedY = Math.max(-cardHeight / 2, Math.min(node.y(), height - cardHeight / 2));
+      // Clamp card position to virtual canvas bounds
+      const clampedX = Math.max(-cardWidth / 2, Math.min(node.x(), virtualWidth - cardWidth / 2));
+      const clampedY = Math.max(-cardHeight / 2, Math.min(node.y(), VIRTUAL_HEIGHT - cardHeight / 2));
       if (clampedX !== node.x() || clampedY !== node.y()) {
         node.x(clampedX);
         node.y(clampedY);
@@ -683,7 +593,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
         dragGhostLayerRef.current?.batchDraw();
       }
     },
-    [findZoneAtPosition, cardWidth, cardHeight, width, height]
+    [findZoneAtPosition, cardWidth, cardHeight]
   );
 
   const handleCardDragEnd = useCallback(
@@ -692,11 +602,13 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
       const followerOffsets = dragFollowerOffsets.current;
       isDraggingRef.current = false;
       isCanvasDragging.current = false;
+      setIsCardDraggingUi(false);
       canvasDragZoneRef.current = null;
       dragSourceZoneRef.current = null;
       dragFollowerOffsets.current = null;
       dragGhostOffsetRef.current = null;
       setCanvasDragZone(null);
+      setIsDraggingAnyCard(false);
 
       // Clean up ghost image
       if (dragGhostRef.current) {
@@ -711,6 +623,40 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
           if (node) node.visible(true);
         }
       }
+
+      // Equip: if a weapon is dropped on top of a warrior in territory, attach.
+      // Runs only for single-card drags (group drags are intentional batch moves).
+      const isGroupDragForEquip = selectedIds.has(card.instanceId) && selectedIds.size > 1;
+      if (!isGroupDragForEquip) {
+        const cardMeta = findCard(card.cardName, card.cardSet, card.cardImgFile);
+        if (isWeapon(cardMeta)) {
+          const dropNode = e.target;
+          const dropCenterX = dropNode.x() + cardWidth / 2;
+          const dropCenterY = dropNode.y() + cardHeight / 2;
+          const targetZoneForEquip = findZoneAtPosition(dropCenterX, dropCenterY);
+          if (targetZoneForEquip === 'territory') {
+            // Candidates: territory cards that are themselves warriors, not already
+            // attached to someone else, not the card being dragged, and not yet at the cap.
+            const warriorCandidates = state.zones.territory.filter(c => {
+              if (c.instanceId === card.instanceId) return false;
+              if (c.equippedTo) return false; // a weapon attached to someone else isn't a valid target
+              const meta = findCard(c.cardName, c.cardSet, c.cardImgFile);
+              if (!isWarrior(meta)) return false;
+              const attached = state.zones.territory.filter(x => x.equippedTo === c.instanceId);
+              return attached.length < MAX_EQUIPPED_WEAPONS_PER_WARRIOR;
+            });
+            const hit = hitTestWarrior(
+              dropCenterX, dropCenterY, cardWidth, cardHeight, warriorCandidates, card.instanceId,
+            );
+            if (hit) {
+              // Consume the drop: attach instead of continuing into the move path.
+              attachCard(card.instanceId, hit.instanceId);
+              return;
+            }
+          }
+        }
+      }
+
       const node = e.target;
       const dropX = node.x();
       const dropY = node.y();
@@ -719,11 +665,55 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
       const centerY = dropY + cardHeight / 2;
       const targetZone = findZoneAtPosition(centerX, centerY);
 
-      // Group drag: if this card is selected and there are multiple selections
-      const isGroupDrag = selectedIds.has(card.instanceId) && selectedIds.size > 1;
-      const cardIds = isGroupDrag ? Array.from(selectedIds) : [card.instanceId];
+      // Group drag: multi-select takes precedence; else attached weapons travel with warrior.
+      const multiSelectFollowerIds = selectedIds.has(card.instanceId) && selectedIds.size > 1
+        ? Array.from(selectedIds)
+        : null;
+      const equipFollowerIds = card.zone === 'territory'
+        ? state.zones.territory
+            .filter(c => c.equippedTo === card.instanceId)
+            .map(c => c.instanceId)
+        : [];
+      const isGroupDrag = multiSelectFollowerIds !== null || equipFollowerIds.length > 0;
+      const cardIds = multiSelectFollowerIds ?? [card.instanceId, ...equipFollowerIds];
 
-      if (targetZone === 'deck' && card.zone !== 'deck') {
+      // Hand-to-hand reorder: when a hand card is dropped back on the hand zone
+      if (targetZone === 'hand' && card.zone === 'hand' && state.zones.hand.length > 1) {
+        // Calculate current hand positions to find the closest slot to the drop point
+        const currentHandPositions = calculateHandPositions(
+          state.zones.hand.length, virtualWidth, VIRTUAL_HEIGHT, state.isSpreadHand, cardWidth, cardHeight
+        );
+        let targetIdx = 0;
+        let minDist = Infinity;
+        for (let i = 0; i < currentHandPositions.length; i++) {
+          const dist = Math.abs(currentHandPositions[i].x + cardWidth / 2 - centerX);
+          if (dist < minDist) {
+            minDist = dist;
+            targetIdx = i;
+          }
+        }
+        const currentIdx = state.zones.hand.findIndex(c => c.instanceId === card.instanceId);
+        if (currentIdx !== -1 && currentIdx !== targetIdx) {
+          const newOrder = [...state.zones.hand];
+          const [dragged] = newOrder.splice(currentIdx, 1);
+          newOrder.splice(targetIdx, 0, dragged);
+          reorderHand(newOrder.map(c => c.instanceId));
+        }
+      } else if (targetZone === 'land-of-bondage' && card.zone === 'land-of-bondage') {
+        // LOB-to-LOB: snap back to auto-arranged position
+        const lobZone = zoneLayout['land-of-bondage'];
+        if (lobZone) {
+          const lobPositions = calculateAutoArrangePositions(
+            state.zones['land-of-bondage'].length, lobZone, cardWidth, cardHeight
+          );
+          const idx = state.zones['land-of-bondage'].findIndex(c => c.instanceId === card.instanceId);
+          if (idx !== -1 && lobPositions[idx]) {
+            node.x(lobPositions[idx].x);
+            node.y(lobPositions[idx].y);
+          }
+        }
+        node.getLayer()?.batchDraw();
+      } else if (targetZone === 'deck' && card.zone !== 'deck') {
         // Hide the card so it doesn't awkwardly sit at the deck position while the popup is open
         let cardGroup: Konva.Node | null = node;
         while (cardGroup && !cardGroup.draggable()) {
@@ -739,14 +729,36 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
           if (isGroupDrag) {
             setBatchDeckDropIds(cardIds);
           }
-          handleDeckDrop(card.instanceId, rect.left + centerX, rect.top + centerY);
+          const screenPos = virtualToScreen(centerX, centerY, scale, offsetX, offsetY);
+          handleDeckDrop(card.instanceId, rect.left + screenPos.x, rect.top + screenPos.y);
         }
-      } else if (targetZone && (targetZone !== card.zone || targetZone === 'territory' || targetZone === 'land-of-bondage')) {
+      } else if (targetZone === 'soul-deck' && card.zone !== 'soul-deck') {
+        // Paragon: dropping on the soul deck pile opens a top/bottom/shuffle popup.
+        let cardGroup: Konva.Node | null = node;
+        while (cardGroup && !cardGroup.draggable()) {
+          cardGroup = cardGroup.parent;
+        }
+        if (cardGroup) {
+          cardGroup.visible(false);
+          cardGroup.getLayer()?.batchDraw();
+        }
+        const stage = stageRef.current;
+        if (stage) {
+          const rect = stage.container().getBoundingClientRect();
+          const screenPos = virtualToScreen(centerX, centerY, scale, offsetX, offsetY);
+          setSoulDeckDropPopup({
+            cardInstanceId: card.instanceId,
+            batchIds: isGroupDrag ? cardIds : undefined,
+            x: rect.left + screenPos.x,
+            y: rect.top + screenPos.y,
+          });
+        }
+      } else if (targetZone && (targetZone !== card.zone || targetZone === 'territory')) {
         // Hide the dragged card group immediately so it doesn't linger at the drop position
         // while React processes the state update and re-renders the card in its new zone.
         // Walk up from e.target to find the draggable Group (the card-level container).
         // Skip hiding for free-form zones where repositioning within the same zone is allowed.
-        const freeFormZones: ZoneId[] = ['territory', 'land-of-bondage'];
+        const freeFormZones: ZoneId[] = ['territory'];
         if (!freeFormZones.includes(targetZone)) {
           let cardGroup: Konva.Node | null = node;
           while (cardGroup && !cardGroup.draggable()) {
@@ -773,7 +785,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
         } else if (freeFormZones.includes(targetZone)) {
           moveCard(card.instanceId, targetZone, undefined, dropX, dropY);
         } else {
-          moveCard(card.instanceId, targetZone, undefined, dropX, dropY);
+          moveCard(card.instanceId, targetZone);
         }
       }
 
@@ -793,7 +805,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
         }, 700);
       }
     },
-    [findZoneAtPosition, moveCard, moveCardsBatch, handleDeckDrop, cardWidth, cardHeight, selectedIds, clearSelection, state.turn]
+    [findZoneAtPosition, moveCard, moveCardsBatch, handleDeckDrop, cardWidth, cardHeight, selectedIds, clearSelection, state.turn, scale, offsetX, offsetY, state.zones.hand, state.zones['land-of-bondage'], state.zones.territory, state.isSpreadHand, virtualWidth, reorderHand, zoneLayout, attachCard]
   );
 
   const handleCardContextMenu = useCallback(
@@ -902,24 +914,30 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
 
   const handleCardMouseLeave = useCallback(() => {
     setHoveredInstanceId(null);
-    setPreviewCard(null);
+    // Don't clear previewCard on mouseLeave so the last card stays visible in the loupe panel
     stopHoverAnimation();
     if (hoverTimerRef.current) {
       clearTimeout(hoverTimerRef.current);
       hoverTimerRef.current = null;
     }
     setHoverCard(null);
-  }, [stopHoverAnimation, setPreviewCard]);
+  }, [stopHoverAnimation]);
 
   const handleCardDblClick = useCallback(
     (card: GameCard) => {
+      const willBeMeek = !card.isMeek;
       if (card.isMeek) {
         unmeekCard(card.instanceId);
       } else {
         meekCard(card.instanceId);
       }
+      setPreviewCard({
+        cardName: card.cardName,
+        cardImgFile: card.cardImgFile,
+        isMeek: willBeMeek,
+      });
     },
-    [meekCard, unmeekCard]
+    [meekCard, unmeekCard, setPreviewCard]
   );
 
   const handleDeckContextMenu = useCallback(
@@ -935,6 +953,104 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
     },
     []
   );
+
+  const handleSoulDeckContextMenu = useCallback(
+    (e: Konva.KonvaEventObject<PointerEvent>) => {
+      e.evt.preventDefault();
+      const stage = stageRef.current;
+      if (!stage) return;
+      const container = stage.container().getBoundingClientRect();
+      setSoulDeckMenu({
+        x: e.evt.clientX - container.left,
+        y: e.evt.clientY - container.top,
+      });
+    },
+    []
+  );
+
+  // Pop N card IDs from the soul-deck by position (top/bottom/random).
+  const pickSoulDeckIds = useCallback(
+    (mode: 'top' | 'bottom' | 'random', n: number): string[] => {
+      const pile = state.zones['soul-deck'];
+      if (pile.length === 0) return [];
+      const count = Math.min(n, pile.length);
+      if (mode === 'top') return pile.slice(0, count).map(c => c.instanceId);
+      if (mode === 'bottom') return pile.slice(-count).map(c => c.instanceId);
+      // random
+      const shuffled = [...pile];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      return shuffled.slice(0, count).map(c => c.instanceId);
+    },
+    [state.zones],
+  );
+
+  // Reveal: show the top/bottom/random N soul-deck cards in a peek modal.
+  // Cards stay in the soul deck until the user drags them out or closes.
+  const revealFromSoulDeck = useCallback(
+    (mode: 'top' | 'bottom' | 'random', n: number) => {
+      setSoulDeckMenu(null);
+      const pile = state.zones['soul-deck'];
+      if (pile.length === 0) { showGameToast('Soul Deck is empty'); return; }
+      const ids = pickSoulDeckIds(mode, n);
+      if (ids.length === 0) return;
+      const count = ids.length;
+      const title = mode === 'top'
+        ? `Top ${count} of Soul Deck`
+        : mode === 'bottom'
+          ? `Bottom ${count} of Soul Deck`
+          : `Random ${count} from Soul Deck`;
+      setPeekState({ cardIds: ids, title, sourceZone: 'soul-deck' });
+    },
+    [state.zones, pickSoulDeckIds],
+  );
+
+  // Draw: move the top/bottom/random N soul-deck cards face-up into the LoB.
+  const drawFromSoulDeck = useCallback(
+    (mode: 'top' | 'bottom' | 'random', n: number) => {
+      setSoulDeckMenu(null);
+      const pile = state.zones['soul-deck'];
+      if (pile.length === 0) { showGameToast('Soul Deck is empty'); return; }
+      const ids = pickSoulDeckIds(mode, n);
+      if (ids.length === 0) return;
+      if (ids.length === 1) {
+        moveCard(ids[0], 'land-of-bondage');
+      } else {
+        moveCardsBatch(ids, 'land-of-bondage');
+      }
+    },
+    [state.zones, pickSoulDeckIds, moveCard, moveCardsBatch],
+  );
+
+  const lookAtSoulDeck = useCallback(
+    (mode: 'top' | 'bottom' | 'random', n: number) => {
+      setSoulDeckMenu(null);
+      const pile = state.zones['soul-deck'];
+      if (pile.length === 0) { showGameToast('Soul Deck is empty'); return; }
+      const ids = pickSoulDeckIds(mode, n);
+      if (ids.length === 0) return;
+      const count = ids.length;
+      const title = mode === 'top'
+        ? `Looking at Top ${count} of Soul Deck`
+        : mode === 'bottom'
+          ? `Looking at Bottom ${count} of Soul Deck`
+          : `Looking at Random ${count} from Soul Deck`;
+      setLookState({ cardIds: ids, title, sourceZone: 'soul-deck' });
+    },
+    [state.zones, pickSoulDeckIds],
+  );
+
+  const searchSoulDeck = useCallback(() => {
+    setSoulDeckMenu(null);
+    setBrowseSoulDeck(true);
+  }, []);
+
+  const shuffleSoulDeck = useCallback(() => {
+    setSoulDeckMenu(null);
+    dispatch(gameActionCreators.shuffleSoulDeck());
+  }, [dispatch]);
 
   const handleZoneClick = useCallback(
     (zoneId: ZoneId) => {
@@ -994,45 +1110,93 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
 
   // Calculate card positions for each zone
   const handPositions = useMemo(
-    () => calculateHandPositions(state.zones.hand.length, width, height, state.isSpreadHand),
-    [state.zones.hand.length, width, height, state.isSpreadHand]
+    () => calculateHandPositions(state.zones.hand.length, virtualWidth, VIRTUAL_HEIGHT, state.isSpreadHand, cardWidth, cardHeight),
+    [state.zones.hand.length, state.isSpreadHand, cardWidth, cardHeight, virtualWidth]
   );
 
   // Render all zones except hand
   const nonHandZones: ZoneId[] = useMemo(() => [
     'territory', 'land-of-bondage',
     'land-of-redemption', 'deck', 'discard', 'reserve', 'banish',
-    ...(isParagon ? ['paragon' as ZoneId] : []),
-  ], [isParagon]);
+  ], []);
+
+  // Map weapon instanceId → { x, y, seamX, seamY } derived from the warrior it's
+  // attached to. Weapons fan diagonally: index 0 sits closest to the warrior;
+  // higher indices peek out further behind. `seam` is the top-left of whatever
+  // sits in front of this weapon (warrior for index 0, weapon N-1 otherwise) —
+  // used to anchor the unlink icon at the visible attach point.
+  // Only applies in Territory.
+  const derivedWeaponPositions = useMemo(() => {
+    const result = new Map<string, { x: number; y: number; seamX: number; seamY: number }>();
+    // Group weapons by their warrior id, preserving territory array order.
+    const byWarrior = new Map<string, typeof state.zones.territory>();
+    for (const card of state.zones.territory) {
+      if (!card.equippedTo) continue;
+      const list = byWarrior.get(card.equippedTo);
+      if (list) list.push(card);
+      else byWarrior.set(card.equippedTo, [card]);
+    }
+    for (const [warriorId, weapons] of byWarrior) {
+      const warrior = state.zones.territory.find(c => c.instanceId === warriorId);
+      if (!warrior || warrior.posX === undefined || warrior.posY === undefined) continue;
+      weapons.forEach((weapon, index) => {
+        const { dx, dy } = computeEquipOffset(cardWidth, cardHeight, index);
+        // This weapon's top-left in canvas coords.
+        const x = warrior.posX! + dx;
+        const y = warrior.posY! + dy;
+        // "Seam" for this weapon's detach icon: the top-left corner of whatever is
+        // in front of it. For index 0 that's the warrior; for index N that's weapon N-1.
+        const ahead = index === 0
+          ? { x: warrior.posX!, y: warrior.posY! }
+          : (() => {
+              const { dx: adx, dy: ady } = computeEquipOffset(cardWidth, cardHeight, index - 1);
+              return { x: warrior.posX! + adx, y: warrior.posY! + ady };
+            })();
+        result.set(weapon.instanceId, { x, y, seamX: ahead.x, seamY: ahead.y });
+      });
+    }
+    return result;
+  }, [state.zones.territory, cardWidth, cardHeight]);
 
   // Compute card bounds for all visible cards (used for selection rectangle intersection)
   const allCardBounds = useMemo((): CardBound[] => {
     const bounds: CardBound[] = [];
 
     // Hand cards
-    const handPos = calculateHandPositions(state.zones.hand.length, width, height, state.isSpreadHand);
+    const handPos = calculateHandPositions(state.zones.hand.length, virtualWidth, VIRTUAL_HEIGHT, state.isSpreadHand, cardWidth, cardHeight);
     state.zones.hand.forEach((card, i) => {
       const pos = handPos[i];
       if (pos) bounds.push({ instanceId: card.instanceId, x: pos.x, y: pos.y, width: cardWidth, height: cardHeight, rotation: pos.rotation });
     });
 
-    // Territory cards (free-form)
+    // Territory cards (free-form). Attached weapons don't carry their own posX/posY —
+    // look them up in derivedWeaponPositions so rect-select hits them where they're
+    // actually rendered, not at the autogrid fallback.
     const tZone = zoneLayout['territory'];
     if (tZone) {
       state.zones.territory.forEach((card, i) => {
-        const x = card.posX ?? (tZone.x + 8 + (i % 8) * (cardWidth + 4));
-        const y = card.posY ?? (tZone.y + 20 + Math.floor(i / 8) * (cardHeight * 0.35));
+        let x: number;
+        let y: number;
+        if (card.equippedTo) {
+          const derived = derivedWeaponPositions.get(card.instanceId);
+          if (!derived) return; // can't place without derived — skip from selection bounds
+          x = derived.x;
+          y = derived.y;
+        } else {
+          x = card.posX ?? (tZone.x + 8 + (i % 8) * (cardWidth + 4));
+          y = card.posY ?? (tZone.y + 20 + Math.floor(i / 8) * (cardHeight * 0.35));
+        }
         bounds.push({ instanceId: card.instanceId, x, y, width: cardWidth, height: cardHeight, rotation: 0 });
       });
     }
 
-    // Land of bondage (free-form)
+    // Land of bondage (auto-arrange)
     const lobZone = zoneLayout['land-of-bondage'];
-    if (lobZone) {
+    if (lobZone && state.zones['land-of-bondage'].length > 0) {
+      const lobPositions = calculateAutoArrangePositions(state.zones['land-of-bondage'].length, lobZone, cardWidth, cardHeight);
       state.zones['land-of-bondage'].forEach((card, i) => {
-        const x = card.posX ?? (lobZone.x + 8 + (i % 8) * (cardWidth + 4));
-        const y = card.posY ?? (lobZone.y + 20 + Math.floor(i / 8) * (cardHeight * 0.35));
-        bounds.push({ instanceId: card.instanceId, x, y, width: cardWidth, height: cardHeight, rotation: 0 });
+        const pos = lobPositions[i];
+        if (pos) bounds.push({ instanceId: card.instanceId, x: pos.x, y: pos.y, width: cardWidth, height: cardHeight, rotation: 0 });
       });
     }
 
@@ -1063,7 +1227,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
     }
 
     return bounds;
-  }, [state.zones, width, height, state.isSpreadHand, zoneLayout, cardWidth, cardHeight]);
+  }, [state.zones, state.isSpreadHand, zoneLayout, cardWidth, cardHeight, derivedWeaponPositions]);
 
   // Stage event handlers for rectangular selection drag
   const handleStageMouseDown = useCallback(
@@ -1086,9 +1250,9 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
       if (!e.evt.shiftKey && selectedIds.size > 0) {
         clearSelection();
       }
-      const stage = stageRef.current;
-      if (!stage) return;
-      const pos = stage.getPointerPosition();
+      const layer = gameLayerRef.current;
+      if (!layer) return;
+      const pos = layer.getRelativePointerPosition();
       if (!pos) return;
       startSelectionDrag(pos.x, pos.y, e.evt.shiftKey);
     },
@@ -1105,9 +1269,9 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
         onRectChangeRef.current?.(null);
         return;
       }
-      const stage = stageRef.current;
-      if (!stage) return;
-      const pos = stage.getPointerPosition();
+      const layer = gameLayerRef.current;
+      if (!layer) return;
+      const pos = layer.getRelativePointerPosition();
       if (pos) {
         updateSelectionDrag(pos.x, pos.y, allCardBounds, e.evt.shiftKey);
       }
@@ -1146,15 +1310,23 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
     <>
       <Stage
         ref={stageRef}
-        width={width}
-        height={height}
+        width={containerWidth}
+        height={containerHeight}
+        pixelRatio={typeof window !== 'undefined' ? window.devicePixelRatio : 1}
         onContextMenu={(e) => e.evt.preventDefault()}
         onMouseDown={handleStageMouseDown}
         onMouseMove={handleStageMouseMove}
         onMouseUp={handleStageMouseUp}
       >
-        {/* Zone backgrounds layer */}
-        <Layer listening={true}>
+        {/* Game layer — scaled to virtual canvas 1920x1080 */}
+        <Layer
+          ref={gameLayerRef as any}
+          scaleX={scale}
+          scaleY={scale}
+          x={offsetX}
+          y={offsetY}
+          listening={true}
+        >
           {nonHandZones.map(zoneId => {
             const rect = zoneLayout[zoneId];
             if (!rect) return null;
@@ -1166,12 +1338,6 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                 onClick={(e) => {
                   if (e.evt.button === 0 && zoneId !== 'deck') handleZoneClick(zoneId);
                 }}
-                onDblClick={(e) => {
-                  if (zoneId === 'deck' && e.evt.button === 0) drawCard();
-                }}
-                onDblTap={() => {
-                  if (zoneId === 'deck') drawCard();
-                }}
                 onContextMenu={(e) => {
                   if (zoneId === 'deck') handleDeckContextMenu(e);
                   if (zoneId === 'land-of-bondage') {
@@ -1179,7 +1345,8 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                     const stage = stageRef.current;
                     if (!stage) return;
                     const container = stage.container().getBoundingClientRect();
-                    const pointer = stage.getPointerPosition();
+                    const layer = gameLayerRef.current;
+                    const pointer = layer?.getRelativePointerPosition();
                     setZoneMenu({
                       x: e.evt.clientX - container.left,
                       y: e.evt.clientY - container.top,
@@ -1208,34 +1375,92 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                   stroke="#6b4e27"
                   strokeWidth={1}
                   cornerRadius={3}
-                  opacity={0.35}
+                  opacity={0.45}
                 />
-                <Text
-                  x={rect.x + 8}
-                  y={rect.y + 6}
-                  text={(useShortenedLabels && SHORT_ZONE_LABELS[zoneId] ? SHORT_ZONE_LABELS[zoneId] : rect.label).toUpperCase()}
-                  fontSize={SIDEBAR_ZONES_WITH_BADGE.includes(zoneId) && useShortenedLabels ? 11 : 14}
-                  fontFamily="Cinzel, Georgia, serif"
-                  fill="#e8d5a3"
-                  letterSpacing={SIDEBAR_ZONES_WITH_BADGE.includes(zoneId) && useShortenedLabels ? 1 : 2}
-                  width={rect.width - 8 - 38}
-                  ellipsis={true}
-                />
-                {/* Count badge for sidebar zones */}
-                {SIDEBAR_ZONES_WITH_BADGE.includes(zoneId) && (
-                  <Group x={rect.x + rect.width - 34} y={rect.y + 4}>
-                    <Rect width={28} height={20} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} />
+                {zoneId === 'territory' || zoneId === 'land-of-bondage' ? (
+                  // Top-right aligned label + count — matches multiplayer style
+                  (() => {
+                    const labelText = rect.label.toUpperCase();
+                    const labelTextWidth = labelText.length * 8.5;
+                    const badgeW = 24;
+                    const labelW = labelTextWidth + 8 + badgeW + 8;
+                    const bgW = Math.min(labelW + 6, rect.width);
+                    const bgX = rect.x + rect.width - bgW;
+                    const labelX = bgX + 6;
+                    const badgeX = labelX + labelTextWidth + 8;
+                    return (
+                      <>
+                        <Rect
+                          x={bgX}
+                          y={rect.y}
+                          width={bgW}
+                          height={20}
+                          fill="rgba(30, 22, 16, 0.85)"
+                          cornerRadius={[0, 3, 0, 4]}
+                        />
+                        <Text
+                          x={labelX}
+                          y={rect.y + 4}
+                          text={labelText}
+                          fontSize={11}
+                          fontFamily="Cinzel, Georgia, serif"
+                          fill="#e8d5a3"
+                          letterSpacing={1}
+                          width={rect.width - 44}
+                          ellipsis={true}
+                        />
+                        <Rect
+                          x={badgeX}
+                          y={rect.y + 3}
+                          width={badgeW}
+                          height={14}
+                          fill="rgba(196, 149, 90, 0.25)"
+                          cornerRadius={3}
+                          stroke="rgba(196, 149, 90, 0.5)"
+                          strokeWidth={0.5}
+                        />
+                        <Text
+                          x={badgeX}
+                          y={rect.y + 4}
+                          width={badgeW}
+                          text={String(cardCount)}
+                          fontSize={11}
+                          fill="#e8d5a3"
+                          align="center"
+                        />
+                      </>
+                    );
+                  })()
+                ) : (
+                  <>
                     <Text
-                      text={String(cardCount)}
-                      fontSize={14}
-                      fontStyle="bold"
+                      x={rect.x + 8}
+                      y={rect.y + 6}
+                      text={(useShortenedLabels && SHORT_ZONE_LABELS[zoneId] ? SHORT_ZONE_LABELS[zoneId] : rect.label).toUpperCase()}
+                      fontSize={SIDEBAR_ZONES_WITH_BADGE.includes(zoneId) && useShortenedLabels ? 11 : 14}
+                      fontFamily="Cinzel, Georgia, serif"
                       fill="#e8d5a3"
-                      width={28}
-                      height={20}
-                      align="center"
-                      verticalAlign="middle"
+                      letterSpacing={SIDEBAR_ZONES_WITH_BADGE.includes(zoneId) && useShortenedLabels ? 1 : 2}
+                      width={rect.width - 8 - 38}
+                      ellipsis={true}
                     />
-                  </Group>
+                    {/* Count badge for sidebar zones */}
+                    {SIDEBAR_ZONES_WITH_BADGE.includes(zoneId) && (
+                      <Group x={rect.x + rect.width - 34} y={rect.y + 4}>
+                        <Rect width={28} height={20} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} />
+                        <Text
+                          text={String(cardCount)}
+                          fontSize={14}
+                          fontStyle="bold"
+                          fill="#e8d5a3"
+                          width={28}
+                          height={20}
+                          align="center"
+                          verticalAlign="middle"
+                        />
+                      </Group>
+                    )}
+                  </>
                 )}
               </Group>
             );
@@ -1286,10 +1511,8 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
               align="center"
             />
           )}
-        </Layer>
 
-        {/* Card layer — non-hand zones */}
-        <Layer key={`cards-${cardRenderKey}`}>
+          {/* Card rendering — non-hand zones */}
           {nonHandZones.map(zoneId => {
             const cards = state.zones[zoneId];
             if (!cards || cards.length === 0) return null;
@@ -1300,16 +1523,16 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
               const cx = zone.x + zone.width / 2;
               const cy = zone.y + zone.height / 2;
               const rot = rotateSidebarPiles ? -90 : 0;
-              const oX = rotateSidebarPiles ? cardWidth / 2 : 0;
-              const oY = rotateSidebarPiles ? cardHeight / 2 : 0;
+              const oX = rotateSidebarPiles ? sidebarCardWidth / 2 : 0;
+              const oY = rotateSidebarPiles ? sidebarCardHeight / 2 : 0;
               // When not rotated, position top-left so card sits below the label
-              const px = rotateSidebarPiles ? cx : zone.x + zone.width / 2 - cardWidth / 2;
+              const px = rotateSidebarPiles ? cx : zone.x + zone.width / 2 - sidebarCardWidth / 2;
               const py = rotateSidebarPiles ? cy : zone.y + 24;
               return (
                 <Group key={zoneId}>
                   {cards.length > 1 && (
                     <Group x={px - 2} y={py - 2} rotation={rot} offsetX={oX} offsetY={oY}>
-                      <CardBackShape width={cardWidth} height={cardHeight} />
+                      <CardBackShape width={sidebarCardWidth} height={sidebarCardHeight} />
                     </Group>
                   )}
                   <Group
@@ -1319,10 +1542,8 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                     offsetX={oX}
                     offsetY={oY}
                     onContextMenu={handleDeckContextMenu}
-                    onDblClick={(e) => { if (e.evt.button === 0) drawCard(); }}
-                    onDblTap={() => drawCard()}
                   >
-                    <CardBackShape width={cardWidth} height={cardHeight} />
+                    <CardBackShape width={sidebarCardWidth} height={sidebarCardHeight} />
                   </Group>
                 </Group>
               );
@@ -1338,7 +1559,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
               );
               const overlap = sorted.length <= 1
                 ? 0
-                : Math.min(cardWidth * 0.3, (availW - cardWidth) / (sorted.length - 1));
+                : Math.min(sidebarCardWidth * 0.3, (availW - sidebarCardWidth) / (sorted.length - 1));
               return (
                 <Group key={zoneId}>
                   {sorted.map((card, i) => (
@@ -1348,8 +1569,8 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                       x={zone.x + pad + i * overlap}
                       y={zone.y + 24}
                       rotation={0}
-                      cardWidth={cardWidth}
-                      cardHeight={cardHeight}
+                      cardWidth={sidebarCardWidth}
+                      cardHeight={sidebarCardHeight}
                       image={getImage(card.cardImgFile)}
                       isSelected={selectedIds.has(card.instanceId)}
                       hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
@@ -1374,15 +1595,15 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
               const cx = zone.x + zone.width / 2;
               const cy = zone.y + zone.height / 2;
               const rot = rotateSidebarPiles ? -90 : 0;
-              const oX = rotateSidebarPiles ? cardWidth / 2 : 0;
-              const oY = rotateSidebarPiles ? cardHeight / 2 : 0;
-              const px = rotateSidebarPiles ? cx : zone.x + zone.width / 2 - cardWidth / 2;
+              const oX = rotateSidebarPiles ? sidebarCardWidth / 2 : 0;
+              const oY = rotateSidebarPiles ? sidebarCardHeight / 2 : 0;
+              const px = rotateSidebarPiles ? cx : zone.x + zone.width / 2 - sidebarCardWidth / 2;
               const py = rotateSidebarPiles ? cy : zone.y + 24;
               return (
                 <Group key={zoneId}>
                   {cards.length > 1 && (
                     <Group x={px - 2} y={py - 2} rotation={rot} offsetX={oX} offsetY={oY}>
-                      <CardBackShape width={cardWidth} height={cardHeight} />
+                      <CardBackShape width={sidebarCardWidth} height={sidebarCardHeight} />
                     </Group>
                   )}
                   <Group
@@ -1395,7 +1616,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                     onTap={() => setBrowseZone('banish')}
                     onContextMenu={(e) => { e.evt.preventDefault(); setBrowseZone('banish'); }}
                   >
-                    <CardBackShape width={cardWidth} height={cardHeight} />
+                    <CardBackShape width={sidebarCardWidth} height={sidebarCardHeight} />
                   </Group>
                 </Group>
               );
@@ -1408,8 +1629,8 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
               const cy = zone.y + zone.height / 2;
               // When rotated, GameCardNode rotates around top-left, so pre-offset
               // so the visual center lands at (cx, cy).
-              const baseX = rotateSidebarPiles ? cx - cardHeight / 2 : cx - cardWidth / 2;
-              const baseY = rotateSidebarPiles ? cy + cardWidth / 2 : zone.y + 24;
+              const baseX = rotateSidebarPiles ? cx - sidebarCardHeight / 2 : cx - sidebarCardWidth / 2;
+              const baseY = rotateSidebarPiles ? cy + sidebarCardWidth / 2 : zone.y + 24;
               const baseRot = rotateSidebarPiles ? -90 : 0;
               return (
                 <Group key={zoneId}>
@@ -1429,11 +1650,11 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                         x={baseX + jitterX}
                         y={baseY + jitterY}
                         rotation={baseRot + jitterRot}
-                        cardWidth={cardWidth}
-                        cardHeight={cardHeight}
+                        cardWidth={sidebarCardWidth}
+                        cardHeight={sidebarCardHeight}
                         image={getImage(card.cardImgFile)}
                         isSelected={selectedIds.has(card.instanceId)}
-                      hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
+                        hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
                         nodeRef={registerCardNode}
                         onDragStart={handleCardDragStart}
                         onDragMove={handleCardDragMove}
@@ -1457,7 +1678,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
               const availW = zone.width - pad * 2;
               const overlap = cards.length <= 1
                 ? 0
-                : Math.min(cardWidth * 0.3, (availW - cardWidth) / (cards.length - 1));
+                : Math.min(sidebarCardWidth * 0.3, (availW - sidebarCardWidth) / (cards.length - 1));
               return (
                 <Group key={zoneId}>
                   {cards.map((card, i) => (
@@ -1467,8 +1688,8 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                       x={zone.x + pad + i * overlap}
                       y={zone.y + 24}
                       rotation={0}
-                      cardWidth={cardWidth}
-                      cardHeight={cardHeight}
+                      cardWidth={sidebarCardWidth}
+                      cardHeight={sidebarCardHeight}
                       image={getImage(card.cardImgFile)}
                       isSelected={selectedIds.has(card.instanceId)}
                       hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
@@ -1487,15 +1708,57 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
               );
             }
 
-            // Territory: free-form placement using stored positions
+            // Territory: free-form placement using stored positions.
+            // Per-cluster render so each warrior's weapons draw directly behind
+            // THAT warrior (not globally behind all warriors). We walk the
+            // non-attached cards in territory order; for each warrior, its
+            // attached weapons are emitted first (higher-index first so fan
+            // z-order is correct), then the warrior itself.
             if (zoneId === 'territory') {
               const zone = zoneLayout[zoneId];
+              const clipProps = isDraggingAnyCard
+                ? {}
+                : { clipX: zone.x, clipY: zone.y, clipWidth: zone.width, clipHeight: zone.height };
               return (
-                <Group key={zoneId}>
-                  {cards.map((card, i) => {
+                <Group key={zoneId} {...clipProps}>
+                  {cards.filter(c => !c.equippedTo).flatMap((card, i) => {
+                    const attached = cards
+                      .filter(w => w.equippedTo === card.instanceId)
+                      .slice()
+                      .sort((a, b) => {
+                        const warriorWeapons = cards.filter(c => c.equippedTo === a.equippedTo);
+                        return warriorWeapons.indexOf(b) - warriorWeapons.indexOf(a);
+                      });
+                    const weaponNodes = attached.map(w => {
+                      const derived = derivedWeaponPositions.get(w.instanceId);
+                      if (!derived) return null;
+                      return (
+                        <GameCardNode
+                          key={w.instanceId}
+                          card={w}
+                          x={derived.x}
+                          y={derived.y}
+                          rotation={0}
+                          cardWidth={cardWidth}
+                          cardHeight={cardHeight}
+                          image={getImage(w.cardImgFile)}
+                          isSelected={selectedIds.has(w.instanceId)}
+                          hoverProgress={hoveredInstanceId === w.instanceId ? hoverProgress : 0}
+                          nodeRef={registerCardNode}
+                          onDragStart={handleCardDragStart}
+                          onDragMove={handleCardDragMove}
+                          onDragEnd={handleCardDragEnd}
+                          onContextMenu={handleCardContextMenu}
+                          onClick={handleCardClick}
+                          onDblClick={handleCardDblClick}
+                          onMouseEnter={handleCardMouseEnter}
+                          onMouseLeave={handleCardMouseLeave}
+                        />
+                      );
+                    });
                     const x = card.posX ?? (zone.x + 8 + (i % 8) * (cardWidth + 4));
                     const y = card.posY ?? (zone.y + 20 + Math.floor(i / 8) * (cardHeight * 0.35));
-                    return (
+                    const warriorNode = (
                       <GameCardNode
                         key={card.instanceId}
                         card={card}
@@ -1506,7 +1769,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                         cardHeight={cardHeight}
                         image={getImage(card.cardImgFile)}
                         isSelected={selectedIds.has(card.instanceId)}
-                      hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
+                        hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
                         nodeRef={registerCardNode}
                         onDragStart={handleCardDragStart}
                         onDragMove={handleCardDragMove}
@@ -1518,31 +1781,37 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
                         onMouseLeave={handleCardMouseLeave}
                       />
                     );
+                    return [...weaponNodes, warriorNode];
                   })}
                 </Group>
               );
             }
 
-            // Land of Bondage: free-form placement using stored positions
+            // Land of Bondage: auto-arrange horizontal strip with drag-to-reorder
             if (zoneId === 'land-of-bondage') {
               const zone = zoneLayout[zoneId];
+              const lobPositions = calculateAutoArrangePositions(cards.length, zone, cardWidth, cardHeight);
+              const lobClipProps = isDraggingAnyCard
+                ? {}
+                : { clipX: zone.x, clipY: zone.y, clipWidth: zone.width, clipHeight: zone.height };
               return (
-                <Group key={zoneId}>
+                <Group key={zoneId} {...lobClipProps}>
                   {cards.map((card, i) => {
-                    const x = card.posX ?? (zone.x + 8 + (i % 8) * (cardWidth + 4));
-                    const y = card.posY ?? (zone.y + 20 + Math.floor(i / 8) * (cardHeight * 0.35));
+                    const pos = lobPositions[i];
+                    if (!pos) return null;
                     return (
                       <GameCardNode
                         key={card.instanceId}
                         card={card}
-                        x={x}
-                        y={y}
+                        x={pos.x}
+                        y={pos.y}
                         rotation={0}
                         cardWidth={cardWidth}
                         cardHeight={cardHeight}
                         image={getImage(card.cardImgFile)}
                         isSelected={selectedIds.has(card.instanceId)}
-                      hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
+                        hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
+                        lobArrivalGlow={getLobGlow(card.instanceId) > 0}
                         nodeRef={registerCardNode}
                         onDragStart={handleCardDragStart}
                         onDragMove={handleCardDragMove}
@@ -1600,10 +1869,102 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
               </Group>
             );
           })}
-        </Layer>
 
-        {/* Hand layer — separate for z-ordering */}
-        <Layer key={`hand-${cardRenderKey}`}>
+          {/* Soul Deck pile — Paragon only. Face-down stack anchored in the
+              soul-deck rect (left side of Land of Bondage). Right-click opens
+              a deck-style context menu (Search / Shuffle / Look / Reveal). */}
+          {state.format === 'Paragon' && state.zones['soul-deck'].length > 0 && (() => {
+            const zone = zoneLayout['soul-deck'];
+            if (!zone || zone.width <= 0) return null;
+            const count = state.zones['soul-deck'].length;
+            // Fit the card inside the narrow soul-deck column.
+            const pileWidth = Math.min(cardWidth, zone.width - 4);
+            const pileHeight = Math.round(pileWidth * CARD_ASPECT_RATIO);
+            const px = zone.x + (zone.width - pileWidth) / 2;
+            const py = zone.y + (zone.height - pileHeight) / 2;
+            // TODO: drag-from-Soul-Deck — right-click reveal is the primary path for now.
+            return (
+              <Group
+                key="soul-deck-pile"
+                onContextMenu={handleSoulDeckContextMenu}
+              >
+                {/* Back-stack hint — a slight offset shows depth when there's more than one */}
+                {count > 1 && (
+                  soulDeckBackReady && soulDeckBackRef.current ? (
+                    <KonvaImage
+                      image={soulDeckBackRef.current}
+                      x={px - 2}
+                      y={py - 2}
+                      width={pileWidth}
+                      height={pileHeight}
+                      cornerRadius={4}
+                      opacity={0.85}
+                    />
+                  ) : (
+                    <Rect
+                      x={px - 2}
+                      y={py - 2}
+                      width={pileWidth}
+                      height={pileHeight}
+                      fill="#2a1410"
+                      stroke="#6b4e27"
+                      strokeWidth={1}
+                      cornerRadius={4}
+                    />
+                  )
+                )}
+                {soulDeckBackReady && soulDeckBackRef.current ? (
+                  <KonvaImage
+                    image={soulDeckBackRef.current}
+                    x={px}
+                    y={py}
+                    width={pileWidth}
+                    height={pileHeight}
+                    cornerRadius={4}
+                  />
+                ) : (
+                  <Rect
+                    x={px}
+                    y={py}
+                    width={pileWidth}
+                    height={pileHeight}
+                    fill="#3a1e18"
+                    stroke="#c4955a"
+                    strokeWidth={1}
+                    cornerRadius={4}
+                  />
+                )}
+                {/* Count badge anchored to the top-right of the pile */}
+                <Group x={px + pileWidth - 30} y={py + 4}>
+                  <Rect width={28} height={20} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} />
+                  <Text
+                    text={String(count)}
+                    fontSize={14}
+                    fontStyle="bold"
+                    fill="#e8d5a3"
+                    width={28}
+                    height={20}
+                    align="center"
+                    verticalAlign="middle"
+                  />
+                </Group>
+                {/* Small "SOUL" label at the bottom so the pile is identifiable */}
+                <Text
+                  x={px}
+                  y={py + pileHeight - 16}
+                  width={pileWidth}
+                  text="SOUL DECK"
+                  fontSize={9}
+                  fontFamily="Cinzel, Georgia, serif"
+                  fill="#e8d5a3"
+                  letterSpacing={1}
+                  align="center"
+                />
+              </Group>
+            );
+          })()}
+
+          {/* Hand cards */}
           {state.zones.hand.map((card, i) => {
             const pos = handPositions[i];
             if (!pos) return null;
@@ -1633,8 +1994,15 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
           })}
         </Layer>
 
-        {/* Selection rectangle layer — updated imperatively for performance */}
-        <Layer ref={selectionLayerRef as any} listening={false}>
+        {/* Selection rectangle layer — scaled to match game layer */}
+        <Layer
+          ref={selectionLayerRef as any}
+          listening={false}
+          scaleX={scale}
+          scaleY={scale}
+          x={offsetX}
+          y={offsetY}
+        >
           <Rect
             ref={selectionRectRef as any}
             visible={false}
@@ -1646,17 +2014,57 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
         </Layer>
       </Stage>
 
+      {/* Equip unlink icons — one per attached weapon, anchored at that weapon's seam
+          (top-left of whatever sits in front of it: warrior for index 0, weapon N-1 otherwise).
+          Hidden during drag because the overlay reads from state (which doesn't update until
+          drag-end), so leaving it visible would lag behind the dragging card. */}
+      <div
+        className="pointer-events-none absolute inset-0 z-10"
+        aria-hidden="false"
+      >
+        {!isCardDraggingUi && state.zones.territory
+          .filter(c => c.equippedTo)
+          .map(weapon => {
+            const derived = derivedWeaponPositions.get(weapon.instanceId);
+            if (!derived) return null;
+            // Convert the weapon's own seam from virtual canvas coords to screen coords
+            // so the HTML button aligns over the rendered Konva cards.
+            const seam = virtualToScreen(derived.seamX, derived.seamY, scale, offsetX, offsetY);
+            const warrior = state.zones.territory.find(c => c.instanceId === weapon.equippedTo);
+            return (
+              <button
+                key={weapon.instanceId}
+                type="button"
+                onClick={() => detachCard(weapon.instanceId, derived.x, derived.y)}
+                className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#1a1510] p-1.5 text-[#c4955a] shadow-md ring-1 ring-[#c4955a]/40 transition hover:bg-[#2a1f14] hover:ring-[#c4955a]"
+                style={{ left: `${seam.x}px`, top: `${seam.y}px` }}
+                title="Unequip"
+                aria-label={warrior ? `Unequip ${weapon.cardName} from ${warrior.cardName}` : 'Unequip'}
+              >
+                <Link2Off size={14} strokeWidth={2} />
+              </button>
+            );
+          })}
+      </div>
+
       {/* DOM overlays */}
 
       {/* Reserve lock indicator on turn 1 */}
-      {state.turn === 1 && zoneLayout.reserve && (
+      {state.turn === 1 && zoneLayout.reserve && (() => {
+        const reserveTopRight = virtualToScreen(
+          zoneLayout.reserve.x + zoneLayout.reserve.width,
+          zoneLayout.reserve.y,
+          scale, offsetX, offsetY
+        );
+        const lockPos = { x: reserveTopRight.x - 52, y: reserveTopRight.y + 5 };
+        return (
         <div
           className="reserve-lock-wrapper"
           onContextMenu={(e) => e.preventDefault()}
           style={{
             position: 'absolute',
-            left: zoneLayout.reserve.x + zoneLayout.reserve.width - 52,
-            top: zoneLayout.reserve.y + 5,
+            left: lockPos.x,
+            top: lockPos.y,
             pointerEvents: 'auto',
             cursor: 'help',
             display: 'flex',
@@ -1698,18 +2106,34 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
             }
           `}</style>
         </div>
-      )}
+        );
+      })()}
 
       <PhaseBar />
       <GameToolbar />
+      <CardScaleControl
+        cardScale={cardScale}
+        setCardScale={setCardScale}
+        resetScale={resetScale}
+        minScale={MIN_SCALE}
+        maxScale={MAX_SCALE}
+        step={STEP}
+        onLoadDeck={onLoadDeck}
+      />
 
       {contextMenu && (
         <CardContextMenu
           card={contextMenu.card}
           x={contextMenu.x}
           y={contextMenu.y}
+          actions={goldfishActions}
+          zones={state.zones}
           onClose={() => setContextMenu(null)}
           onExchange={(ids) => setExchangeCardIds(ids)}
+          onDetach={(id) => {
+            const derived = derivedWeaponPositions.get(id);
+            detachCard(id, derived?.x, derived?.y);
+          }}
         />
       )}
 
@@ -1718,6 +2142,8 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
           selectedIds={Array.from(selectedIds)}
           x={multiCardContextMenu.x}
           y={multiCardContextMenu.y}
+          actions={goldfishActions}
+          zones={state.zones}
           onClose={() => setMultiCardContextMenu(null)}
           onClearSelection={() => { clearSelection(); setMultiCardContextMenu(null); }}
           onExchange={(ids) => setExchangeCardIds(ids)}
@@ -1731,6 +2157,7 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
           spawnX={zoneMenu.spawnX}
           spawnY={zoneMenu.spawnY}
           onClose={() => setZoneMenu(null)}
+          onAddOpponentLostSoul={(testament, posX, posY) => addOpponentLostSoul(testament, posX, posY)}
         />
       )}
 
@@ -1750,6 +2177,35 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
           deckSize={state.zones.deck.length}
           onClose={() => setDeckMenu(null)}
           onSearchDeck={() => { setDeckMenu(null); setShowDeckSearch(true); }}
+          onLookAtTop={(count) => {
+            setDeckMenu(null);
+            const deck = state.zones.deck;
+            if (deck.length === 0) { showGameToast('Deck is empty'); return; }
+            const n = Math.min(count, deck.length);
+            const ids = deck.slice(0, n).map(c => c.instanceId);
+            setLookState({ cardIds: ids, title: `Looking at Top ${n}` });
+          }}
+          onLookAtBottom={(count) => {
+            setDeckMenu(null);
+            const deck = state.zones.deck;
+            if (deck.length === 0) { showGameToast('Deck is empty'); return; }
+            const n = Math.min(count, deck.length);
+            const ids = deck.slice(-n).map(c => c.instanceId);
+            setLookState({ cardIds: ids, title: `Looking at Bottom ${n}` });
+          }}
+          onLookAtRandom={(count) => {
+            setDeckMenu(null);
+            const deck = state.zones.deck;
+            if (deck.length === 0) { showGameToast('Deck is empty'); return; }
+            const n = Math.min(count, deck.length);
+            const shuffled = [...deck];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            const ids = shuffled.slice(0, n).map(c => c.instanceId);
+            setLookState({ cardIds: ids, title: `Looking at Random ${n}` });
+          }}
           onShuffleDeck={() => { setDeckMenu(null); shuffleDeck(); }}
           // Top card actions
           onDrawTop={(count) => {
@@ -1881,6 +2337,36 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
         />
       )}
 
+      {soulDeckMenu && (
+        <DeckContextMenu
+          x={soulDeckMenu.x}
+          y={soulDeckMenu.y}
+          deckSize={state.zones['soul-deck'].length}
+          hideDiscardActions
+          hideReserveActions
+          onClose={() => setSoulDeckMenu(null)}
+          onSearchDeck={searchSoulDeck}
+          onShuffleDeck={shuffleSoulDeck}
+          onLookAtTop={(n) => lookAtSoulDeck('top', n)}
+          onLookAtBottom={(n) => lookAtSoulDeck('bottom', n)}
+          onLookAtRandom={(n) => lookAtSoulDeck('random', n)}
+          onRevealTop={(n) => revealFromSoulDeck('top', n)}
+          onRevealBottom={(n) => revealFromSoulDeck('bottom', n)}
+          onRevealRandom={(n) => revealFromSoulDeck('random', n)}
+          // Draw moves the card face-up into LoB; Reveal shows a peek modal.
+          onDrawTop={(n) => drawFromSoulDeck('top', n)}
+          onDrawBottom={(n) => drawFromSoulDeck('bottom', n)}
+          onDrawRandom={(n) => drawFromSoulDeck('random', n)}
+          // Hidden actions — still required by the prop contract
+          onDiscardTop={() => {}}
+          onDiscardBottom={() => {}}
+          onDiscardRandom={() => {}}
+          onReserveTop={() => {}}
+          onReserveBottom={() => {}}
+          onReserveRandom={() => {}}
+        />
+      )}
+
       {hoverCard && (
         <CardHoverPreview
           card={hoverCard.card}
@@ -1889,38 +2375,65 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
         />
       )}
 
-      {browseZone && (
-        <ZoneBrowseModal
-          zoneId={browseZone}
-          onClose={() => setBrowseZone(null)}
-          onStartDrag={modalStartDrag}
-          onStartMultiDrag={modalStartMultiDrag}
-          didDragRef={modalDidDragRef}
-          isDragActive={modalDrag.isDragging}
-        />
-      )}
+      <ModalGameProvider value={modalGameValue}>
+        {browseZone && (
+          <ZoneBrowseModal
+            zoneId={browseZone}
+            onClose={() => setBrowseZone(null)}
+            onStartDrag={modalStartDrag}
+            onStartMultiDrag={modalStartMultiDrag}
+            didDragRef={modalDidDragRef}
+            isDragActive={modalDrag.isDragging}
+          />
+        )}
 
-      {showDeckSearch && (
-        <DeckSearchModal
-          onClose={() => setShowDeckSearch(false)}
-          onStartDrag={modalStartDrag}
-          onStartMultiDrag={modalStartMultiDrag}
-          didDragRef={modalDidDragRef}
-          isDragActive={modalDrag.isDragging}
-        />
-      )}
+        {showDeckSearch && (
+          <DeckSearchModal
+            onClose={() => setShowDeckSearch(false)}
+            onStartDrag={modalStartDrag}
+            onStartMultiDrag={modalStartMultiDrag}
+            didDragRef={modalDidDragRef}
+            isDragActive={modalDrag.isDragging}
+          />
+        )}
 
-      {peekState !== null && (
-        <DeckPeekModal
-          cardIds={peekState.cardIds}
-          title={peekState.title}
-          onClose={() => setPeekState(null)}
-          onStartDrag={modalStartDrag}
-          onStartMultiDrag={modalStartMultiDrag}
-          didDragRef={modalDidDragRef}
-          isDragActive={modalDrag.isDragging}
-        />
-      )}
+        {peekState !== null && (
+          <DeckPeekModal
+            cardIds={peekState.cardIds}
+            title={peekState.title}
+            onClose={() => setPeekState(null)}
+            onStartDrag={modalStartDrag}
+            onStartMultiDrag={modalStartMultiDrag}
+            didDragRef={modalDidDragRef}
+            isDragActive={modalDrag.isDragging}
+            sourceZone={peekState.sourceZone}
+          />
+        )}
+
+        {lookState !== null && (
+          <DeckPeekModal
+            cardIds={lookState.cardIds}
+            title={lookState.title}
+            onClose={() => setLookState(null)}
+            onStartDrag={modalStartDrag}
+            onStartMultiDrag={modalStartMultiDrag}
+            didDragRef={modalDidDragRef}
+            isDragActive={modalDrag.isDragging}
+            isPrivateLook
+            sourceZone={lookState.sourceZone}
+          />
+        )}
+
+        {browseSoulDeck && (
+          <ZoneBrowseModal
+            zoneId="soul-deck"
+            onClose={() => setBrowseSoulDeck(false)}
+            onStartDrag={modalStartDrag}
+            onStartMultiDrag={modalStartMultiDrag}
+            didDragRef={modalDidDragRef}
+            isDragActive={modalDrag.isDragging}
+          />
+        )}
 
       {/* Zone drop target highlights — visible during any drag */}
       {(modalDrag.isDragging || canvasDragZone !== null) && (
@@ -1930,15 +2443,17 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
             if (!modalDrag.isDragging && dragSourceZoneRef.current === zoneId) return null;
             const activeHoveredZone = modalDrag.isDragging ? modalHoveredZone : canvasDragZone;
             const isHovered = activeHoveredZone === zoneId;
+            const screenTopLeft = virtualToScreen(rect.x, rect.y, scale, offsetX, offsetY);
+            const screenBottomRight = virtualToScreen(rect.x + rect.width, rect.y + rect.height, scale, offsetX, offsetY);
             return (
               <div
                 key={zoneId}
                 style={{
                   position: 'absolute',
-                  left: rect.x,
-                  top: rect.y,
-                  width: rect.width,
-                  height: rect.height,
+                  left: screenTopLeft.x,
+                  top: screenTopLeft.y,
+                  width: screenBottomRight.x - screenTopLeft.x,
+                  height: screenBottomRight.y - screenTopLeft.y,
                   border: isHovered ? '1px solid rgba(196,149,90,0.6)' : '1px solid var(--gf-hover)',
                   background: isHovered ? 'rgba(196,149,90,0.12)' : 'transparent',
                   borderRadius: 4,
@@ -2093,22 +2608,50 @@ export default function GoldfishCanvas({ width, height }: GoldfishCanvasProps) {
         />
       )}
 
-      {exchangeCardIds && (
-        <DeckExchangeModal
-          exchangeCardIds={exchangeCardIds}
-          onComplete={() => {
-            setExchangeCardIds(null);
-            clearSelection();
-          }}
-          onCancel={() => {
-            setExchangeCardIds(null);
-            setCardRenderKey(k => k + 1);
-          }}
-          onStartDrag={modalStartDrag}
-          didDragRef={modalDidDragRef}
-          isDragActive={modalDrag.isDragging}
-        />
-      )}
+      {soulDeckDropPopup && (() => {
+        const ids = soulDeckDropPopup.batchIds ?? [soulDeckDropPopup.cardInstanceId];
+        return (
+          <DeckDropPopup
+            x={soulDeckDropPopup.x}
+            y={soulDeckDropPopup.y}
+            onShuffleIn={() => {
+              for (const id of ids) moveCard(id, 'soul-deck');
+              dispatch(gameActionCreators.shuffleSoulDeck());
+              setSoulDeckDropPopup(null);
+              if (soulDeckDropPopup.batchIds) clearSelection();
+            }}
+            onTopDeck={() => {
+              for (const id of ids) moveCard(id, 'soul-deck', 0);
+              setSoulDeckDropPopup(null);
+              if (soulDeckDropPopup.batchIds) clearSelection();
+            }}
+            onBottomDeck={() => {
+              for (const id of ids) moveCard(id, 'soul-deck');
+              setSoulDeckDropPopup(null);
+              if (soulDeckDropPopup.batchIds) clearSelection();
+            }}
+            onCancel={() => { setSoulDeckDropPopup(null); setCardRenderKey(k => k + 1); }}
+          />
+        );
+      })()}
+
+        {exchangeCardIds && (
+          <DeckExchangeModal
+            exchangeCardIds={exchangeCardIds}
+            onComplete={() => {
+              setExchangeCardIds(null);
+              clearSelection();
+            }}
+            onCancel={() => {
+              setExchangeCardIds(null);
+              setCardRenderKey(k => k + 1);
+            }}
+            onStartDrag={modalStartDrag}
+            didDragRef={modalDidDragRef}
+            isDragActive={modalDrag.isDragging}
+          />
+        )}
+      </ModalGameProvider>
 
       <GameToastContainer />
       <DiceRollOverlay />

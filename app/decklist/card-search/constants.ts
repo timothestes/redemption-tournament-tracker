@@ -1,5 +1,3 @@
-export const CARD_DATA_URL =
-  "https://raw.githubusercontent.com/jalstad/RedemptionLackeyCCG/master/RedemptionQuick/sets/carddata.txt";
 export const CARD_IMAGE_BASE_URL =
   "https://raw.githubusercontent.com/jalstad/RedemptionLackeyCCG/master/RedemptionQuick/sets/setimages/general/";
 // Use proxy for better caching and performance

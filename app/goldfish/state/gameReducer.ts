@@ -6,6 +6,12 @@ import {
   PHASE_ORDER,
 } from '../types';
 import { buildInitialGameState } from './gameInitializer';
+import { refillSoulDeck } from '@/app/shared/paragon/refill';
+import {
+  type CardAbility,
+  getAbilitiesForCard,
+  resolveTokenCard,
+} from '@/lib/cards/cardAbilities';
 
 const MAX_HISTORY = 20;
 const HAND_LIMIT = 16;
@@ -29,6 +35,148 @@ function cloneZones(zones: GameState['zones']): GameState['zones'] {
     cloned[key] = zones[key].map(c => ({ ...c }));
   }
   return cloned;
+}
+
+function spawnTokenInState(
+  state: GameState,
+  source: GameCard,
+  ability: Extract<CardAbility, { type: 'spawn_token' }>,
+  history: GameState[],
+): GameState {
+  // Phase 1 — validate. Any failure returns state unchanged.
+  // resolveTokenCard checks SPECIAL_TOKEN_CARDS first (handcrafted lost-soul
+  // tokens under public/gameplay/) then falls back to findCard() for tokens
+  // that exist in the generated CARDS dataset.
+  const tokenData = resolveTokenCard(ability.tokenName);
+  if (!tokenData) {
+    console.warn('[cardAbilities] unknown token', ability.tokenName);
+    return state;
+  }
+  const count = ability.count ?? 1;
+  if (count < 1) return state;
+
+  // Always spawn tokens in Territory by default — it's the visible main play
+  // area and cards in LoR/LoB strips can't lay out free-form. A registry
+  // entry can override via ability.defaultZone (e.g., for tokens that
+  // thematically belong in LoB).
+  const targetZone: ZoneId = ability.defaultZone ?? 'territory';
+
+  // Stagger each token relative to the source's position IF the source is
+  // already in territory. Otherwise use a reasonable default near the
+  // center-ish area so tokens appear together and visible.
+  const STAGGER_X = 55;
+  const STAGGER_Y = 15;
+  const sourceInTerritory = source.zone === 'territory';
+  const sourcePosX =
+    typeof source.posX === 'number'
+      ? source.posX
+      : typeof source.posX === 'string' && source.posX !== ''
+        ? Number(source.posX)
+        : NaN;
+  const sourcePosY =
+    typeof source.posY === 'number'
+      ? source.posY
+      : typeof source.posY === 'string' && source.posY !== ''
+        ? Number(source.posY)
+        : NaN;
+  const baseX = sourceInTerritory && Number.isFinite(sourcePosX) ? sourcePosX : 200;
+  const baseY = sourceInTerritory && Number.isFinite(sourcePosY) ? sourcePosY : 200;
+
+  // Phase 2 — build all new cards in memory. No state mutation yet.
+  const newCards: GameCard[] = Array.from({ length: count }, (_, i) => ({
+    instanceId: crypto.randomUUID(),
+    cardName: tokenData.name,
+    cardSet: tokenData.set,
+    cardImgFile: tokenData.imgFile,
+    type: tokenData.type,
+    brigade: tokenData.brigade ?? '',
+    strength: tokenData.strength ?? '',
+    toughness: tokenData.toughness ?? '',
+    specialAbility: tokenData.specialAbility ?? '',
+    identifier: tokenData.identifier ?? '',
+    reference: tokenData.reference ?? '',
+    alignment: tokenData.alignment ?? '',
+    isMeek: false,
+    counters: [],
+    isFlipped: false,
+    isToken: true,
+    zone: targetZone,
+    ownerId: source.ownerId,
+    notes: '',
+    posX: targetZone === 'territory' ? baseX + (i + 1) * STAGGER_X : undefined,
+    posY: targetZone === 'territory' ? baseY + (i + 1) * STAGGER_Y : undefined,
+  }));
+
+  // Phase 3 — commit in a single shallow clone.
+  const zones = cloneZones(state.zones);
+  zones[targetZone] = [...zones[targetZone], ...newCards];
+  return { ...state, zones, history };
+}
+
+function shuffleAndDrawInState(
+  state: GameState,
+  _ownerId: string,
+  shuffleCount: number,
+  drawCount: number,
+  history: GameState[],
+): GameState {
+  // Phase 1 — validate.
+  if (shuffleCount < 0 || drawCount < 0) return state;
+
+  // Phase 2 — build new zones in memory.
+  const zones = cloneZones(state.zones);
+
+  // Pick up to shuffleCount random hand cards. Hand shortage: shuffle all.
+  const actualShuffle = Math.min(shuffleCount, zones.hand.length);
+  const handIndices = zones.hand.map((_c, i) => i);
+  // Fisher-Yates partial shuffle — indices at the tail are the picks.
+  for (let i = handIndices.length - 1; i > handIndices.length - 1 - actualShuffle && i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [handIndices[i], handIndices[j]] = [handIndices[j], handIndices[i]];
+  }
+  const pickedSet = new Set(handIndices.slice(handIndices.length - actualShuffle));
+  const picked: GameCard[] = [];
+  const remainingHand: GameCard[] = [];
+  zones.hand.forEach((card, i) => {
+    if (pickedSet.has(i)) {
+      picked.push({ ...card, zone: 'deck', isFlipped: true });
+    } else {
+      remainingHand.push(card);
+    }
+  });
+  zones.hand = remainingHand;
+
+  // Merge picked cards into deck and reshuffle entire deck.
+  const mergedDeck = [...zones.deck, ...picked];
+  zones.deck = shuffleArray(mergedDeck);
+
+  // Phase 3 — draw up to drawCount, respecting auto-route Lost Souls and hand limit.
+  // Short-deck draws as many as possible.
+  for (let i = 0; i < drawCount; i++) {
+    if (zones.deck.length === 0) break;
+    if (zones.hand.length >= HAND_LIMIT && !state.options.autoRouteLostSouls) break;
+
+    let card = zones.deck.shift()!;
+    // Auto-route consecutive Lost Souls if the option is on.
+    while (state.options.autoRouteLostSouls && isLostSoul(card)) {
+      card.zone = 'land-of-bondage';
+      card.isFlipped = false;
+      zones['land-of-bondage'].push(card);
+      if (zones.deck.length === 0) { card = undefined as unknown as GameCard; break; }
+      card = zones.deck.shift()!;
+    }
+    if (!card) break;
+
+    if (zones.hand.length >= HAND_LIMIT) {
+      zones.deck.unshift(card); // put back — no room
+      break;
+    }
+    card.zone = 'hand';
+    card.isFlipped = false;
+    zones.hand.push(card);
+  }
+
+  return { ...state, zones, history };
 }
 
 function pushHistory(state: GameState): GameState[] {
@@ -88,7 +236,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
       // Tokens dropped into reserve/banish/discard/hand/deck are removed entirely
       const TOKEN_REMOVE_ZONES: ZoneId[] = ['reserve', 'banish', 'discard', 'hand', 'deck'];
-      if (result.card.ownerId === 'player2' && TOKEN_REMOVE_ZONES.includes(toZone)) {
+      if (result.card.isToken && TOKEN_REMOVE_ZONES.includes(toZone)) {
         return { ...state, zones, history };
       }
 
@@ -96,9 +244,22 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (result.fromZone === 'deck' && toZone !== 'deck') {
         result.card.isFlipped = false;
       }
+      // Paragon: revealing a card from the Soul Deck flips it face-up as it leaves.
+      if (result.fromZone === 'soul-deck' && toZone !== 'soul-deck') {
+        result.card.isFlipped = false;
+      }
       result.card.zone = toZone;
-      // Store free-form position for territory and land-of-bondage
-      const FREE_FORM_ZONES: ZoneId[] = ['territory', 'land-of-bondage'];
+      // Paragon: rescuing a Soul-Deck-origin card transfers ownership from
+      // the shared sentinel to the rescuing player. Marker stays set.
+      const movedFromSharedLob =
+        result.fromZone === 'land-of-bondage' &&
+        result.card.ownerId === 'shared' &&
+        result.card.isSoulDeckOrigin === true;
+      if (movedFromSharedLob) {
+        result.card.ownerId = 'player1'; // goldfish: only player1 is the seat
+      }
+      // Store free-form position for territory only (LOB is auto-arranged)
+      const FREE_FORM_ZONES: ZoneId[] = ['territory'];
       if (FREE_FORM_ZONES.includes(toZone) && posX !== undefined && posY !== undefined) {
         result.card.posX = posX;
         result.card.posY = posY;
@@ -106,13 +267,50 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         result.card.posX = undefined;
         result.card.posY = undefined;
       }
+      // Auto-detach on exit from territory. Clear this mover's equippedTo
+      // (if any). For cards that pointed at this mover: normally just unlink,
+      // but if the destination is Land of Bondage, auto-discard them (a warrior
+      // going to LOB takes its weapons down with it).
+      if (toZone !== 'territory') {
+        if (result.card.equippedTo) {
+          result.card.equippedTo = undefined;
+        }
+        for (const zoneId of Object.keys(zones) as ZoneId[]) {
+          for (let i = 0; i < zones[zoneId].length; i++) {
+            const other = zones[zoneId][i];
+            if (other.equippedTo !== cardInstanceId) continue;
+            if (toZone === 'land-of-bondage') {
+              zones[zoneId].splice(i, 1);
+              i--;
+              zones.discard.push({
+                ...other,
+                zone: 'discard',
+                equippedTo: undefined,
+                posX: undefined,
+                posY: undefined,
+              });
+            } else {
+              zones[zoneId][i] = { ...other, equippedTo: undefined };
+            }
+          }
+        }
+      }
       if (toIndex !== undefined && toIndex >= 0) {
         zones[toZone].splice(toIndex, 0, result.card);
       } else {
         zones[toZone].push(result.card);
       }
 
-      return { ...state, zones, history };
+      let finalZones = zones;
+      const needsRefill =
+        state.format === 'Paragon' &&
+        result.fromZone === 'land-of-bondage' &&
+        result.card.isSoulDeckOrigin === true &&
+        toZone === 'land-of-redemption';
+      if (needsRefill) {
+        finalZones = refillSoulDeck(zones);
+      }
+      return { ...state, zones: finalZones, history };
     }
 
     case 'DRAW_CARD': {
@@ -122,7 +320,6 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const card = zones.deck.shift()!;
 
       if (state.options.autoRouteLostSouls && isLostSoul(card)) {
-        // TODO: animate Lost Soul sliding to Land of Bondage with golden glow flash
         card.zone = 'land-of-bondage';
         card.isFlipped = false;
         zones['land-of-bondage'].push(card);
@@ -181,12 +378,17 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return { ...state, zones, history };
     }
 
+    case 'SHUFFLE_SOUL_DECK': {
+      zones['soul-deck'] = shuffleArray(zones['soul-deck']);
+      return { ...state, zones, history };
+    }
+
     case 'SHUFFLE_AND_MOVE_TO_TOP': {
       const { cardInstanceId } = action.payload;
       if (!cardInstanceId) return state;
       const result = findAndRemoveCard(zones, cardInstanceId);
       if (!result) return state;
-      if (result.card.ownerId === 'player2') return { ...state, zones, history };
+      if (result.card.isToken) return { ...state, zones, history };
       zones.deck = shuffleArray(zones.deck);
       result.card.zone = 'deck';
       zones.deck.unshift(result.card);
@@ -198,7 +400,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (!cardInstanceId) return state;
       const result = findAndRemoveCard(zones, cardInstanceId);
       if (!result) return state;
-      if (result.card.ownerId === 'player2') return { ...state, zones, history };
+      if (result.card.isToken) return { ...state, zones, history };
       zones.deck = shuffleArray(zones.deck);
       result.card.zone = 'deck';
       zones.deck.push(result.card);
@@ -334,6 +536,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         newState.history = history;
         newState.drawnThisTurn = true;
       }
+      if (newState.format === 'Paragon') {
+        newState = { ...newState, zones: refillSoulDeck(newState.zones) };
+      }
       return newState;
     }
 
@@ -341,19 +546,93 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const { cardInstanceIds, toZone, positions } = action.payload;
       if (!cardInstanceIds || !toZone) return state;
 
+      const movedIds = new Set(cardInstanceIds);
+      // Pre-compute per-card final destination. Weapons whose attached warrior
+      // is also in this batch and going to LOB get redirected to discard — a
+      // warrior heading to LOB takes its weapons down with it.
+      const finalZoneById = new Map<string, ZoneId>();
+      for (const id of cardInstanceIds) {
+        let cardObj: GameCard | undefined;
+        for (const zoneId of Object.keys(zones) as ZoneId[]) {
+          const found = zones[zoneId].find(c => c.instanceId === id);
+          if (found) { cardObj = found; break; }
+        }
+        if (!cardObj) continue;
+        const redirected =
+          toZone === 'land-of-bondage' &&
+          !!cardObj.equippedTo &&
+          movedIds.has(cardObj.equippedTo);
+        finalZoneById.set(id, redirected ? 'discard' : toZone);
+      }
+
+      let anyRescue = false;
       for (const instanceId of cardInstanceIds) {
         const result = findAndRemoveCard(zones, instanceId);
         if (!result) continue;
-        if (result.fromZone === 'deck' && toZone !== 'deck') {
+        const finalZone = finalZoneById.get(instanceId) ?? toZone;
+        if (result.fromZone === 'deck' && finalZone !== 'deck') {
           result.card.isFlipped = false;
         }
-        result.card.zone = toZone;
+        if (result.fromZone === 'soul-deck' && finalZone !== 'soul-deck') {
+          result.card.isFlipped = false;
+        }
+        result.card.zone = finalZone;
+        const wasSharedSoulFromLob =
+          result.fromZone === 'land-of-bondage' &&
+          result.card.ownerId === 'shared' &&
+          result.card.isSoulDeckOrigin === true;
+        if (wasSharedSoulFromLob) {
+          result.card.ownerId = 'player1';
+        }
+        if (
+          result.fromZone === 'land-of-bondage' &&
+          result.card.isSoulDeckOrigin === true &&
+          finalZone === 'land-of-redemption'
+        ) {
+          anyRescue = true;
+        }
         const pos = positions?.[instanceId];
-        result.card.posX = pos?.posX;
-        result.card.posY = pos?.posY;
-        zones[toZone].push(result.card);
+        result.card.posX = finalZone === 'territory' ? pos?.posX : undefined;
+        result.card.posY = finalZone === 'territory' ? pos?.posY : undefined;
+        // Leaving territory — always unlink (batch grouping doesn't preserve
+        // the attach the way it used to). If destination is LOB, any weapon
+        // pointing at this mover that's NOT already in the batch auto-discards.
+        if (finalZone !== 'territory') {
+          if (result.card.equippedTo) {
+            result.card.equippedTo = undefined;
+          }
+          for (const zoneId of Object.keys(zones) as ZoneId[]) {
+            for (let i = 0; i < zones[zoneId].length; i++) {
+              const other = zones[zoneId][i];
+              if (other.equippedTo !== instanceId) continue;
+              if (movedIds.has(other.instanceId)) {
+                // Batch-member weapon — finalZoneById already routes it.
+                zones[zoneId][i] = { ...other, equippedTo: undefined };
+                continue;
+              }
+              if (finalZone === 'land-of-bondage') {
+                zones[zoneId].splice(i, 1);
+                i--;
+                zones.discard.push({
+                  ...other,
+                  zone: 'discard',
+                  equippedTo: undefined,
+                  posX: undefined,
+                  posY: undefined,
+                });
+              } else {
+                zones[zoneId][i] = { ...other, equippedTo: undefined };
+              }
+            }
+          }
+        }
+        zones[finalZone].push(result.card);
       }
-      return { ...state, zones, history };
+      let finalZones = zones;
+      if (state.format === 'Paragon' && anyRescue) {
+        finalZones = refillSoulDeck(zones);
+      }
+      return { ...state, zones: finalZones, history };
     }
 
     case 'ADD_OPPONENT_LOST_SOUL': {
@@ -375,10 +654,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         toughness: '',
         specialAbility: '',
         identifier: testament,
+        reference: '',
         alignment: 'Neutral',
         isMeek: false,
         counters: [],
         isFlipped: false,
+        isToken: true,
         zone: 'land-of-bondage',
         ownerId: 'player2',
         notes: '',
@@ -401,10 +682,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         toughness: '',
         specialAbility: '',
         identifier: 'OT',
+        reference: '',
         alignment: 'Neutral',
         isMeek: false,
         counters: [],
         isFlipped: false,
+        isToken: true,
         zone: 'land-of-redemption',
         ownerId: 'player1',
         notes: '',
@@ -418,6 +701,171 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (!cardInstanceId) return state;
       findAndRemoveCard(zones, cardInstanceId);
       return { ...state, zones, history };
+    }
+
+    case 'REORDER_HAND': {
+      const { cardInstanceIds } = action.payload;
+      if (!cardInstanceIds || cardInstanceIds.length === 0) return state;
+
+      // Build a map of instanceId → card for quick lookup
+      const handMap = new Map<string, GameCard>();
+      for (const card of zones.hand) {
+        handMap.set(card.instanceId, card);
+      }
+
+      // Reorder hand to match the provided ID order
+      const reordered: GameCard[] = [];
+      for (const id of cardInstanceIds) {
+        const card = handMap.get(id);
+        if (card) {
+          reordered.push(card);
+          handMap.delete(id);
+        }
+      }
+      // Append any cards not in the provided list (safety net)
+      for (const card of handMap.values()) {
+        reordered.push(card);
+      }
+
+      zones.hand = reordered;
+      return { ...state, zones, history };
+    }
+
+    case 'REORDER_LOB': {
+      const { cardInstanceIds } = action.payload;
+      if (!cardInstanceIds || cardInstanceIds.length === 0) return state;
+
+      const lobMap = new Map<string, GameCard>();
+      for (const card of zones['land-of-bondage']) {
+        lobMap.set(card.instanceId, card);
+      }
+
+      const reordered: GameCard[] = [];
+      for (const id of cardInstanceIds) {
+        const card = lobMap.get(id);
+        if (card) {
+          reordered.push(card);
+          lobMap.delete(id);
+        }
+      }
+      for (const card of lobMap.values()) {
+        reordered.push(card);
+      }
+
+      zones['land-of-bondage'] = reordered;
+      return { ...state, zones, history };
+    }
+
+    case 'ATTACH_CARD': {
+      const { cardInstanceId, warriorInstanceId } = action.payload;
+      if (!cardInstanceId || !warriorInstanceId) return state;
+      const warrior = zones.territory.find(c => c.instanceId === warriorInstanceId);
+      if (!warrior) return state;
+      // Weapon may be in ANY zone (e.g. hand, territory). Pull it out, move
+      // it into territory, and set equippedTo. Insert it in the territory
+      // array immediately BEFORE the warrior so render order places it behind.
+      const found = findAndRemoveCard(zones, cardInstanceId);
+      if (!found) return state;
+      const attachedWeapon: GameCard = {
+        ...found.card,
+        zone: 'territory',
+        equippedTo: warriorInstanceId,
+        posX: warrior.posX,
+        posY: warrior.posY,
+        isFlipped: false,
+      };
+      const warriorIdx = zones.territory.findIndex(c => c.instanceId === warriorInstanceId);
+      if (warriorIdx >= 0) {
+        zones.territory.splice(warriorIdx, 0, attachedWeapon);
+      } else {
+        zones.territory.push(attachedWeapon);
+      }
+      return { ...state, zones, history };
+    }
+
+    case 'DETACH_CARD': {
+      const { cardInstanceId, posX, posY } = action.payload;
+      if (!cardInstanceId) return state;
+      // Remove the weapon wherever it is, then reinsert it into territory
+      // immediately BEFORE its (former) warrior — this keeps it rendered
+      // behind the warrior after the link is broken.
+      let foundIdx = -1;
+      let foundZone: ZoneId | null = null;
+      for (const zoneId of Object.keys(zones) as ZoneId[]) {
+        const idx = zones[zoneId].findIndex(c => c.instanceId === cardInstanceId);
+        if (idx >= 0) { foundIdx = idx; foundZone = zoneId; break; }
+      }
+      if (foundIdx === -1 || !foundZone) return state;
+      const weapon = zones[foundZone][foundIdx];
+      const warriorId = weapon.equippedTo;
+      const detached: GameCard = {
+        ...weapon,
+        equippedTo: undefined,
+        posX: posX ?? weapon.posX,
+        posY: posY ?? weapon.posY,
+      };
+      zones[foundZone].splice(foundIdx, 1);
+      if (foundZone === 'territory' && warriorId) {
+        const warriorIdxAfter = zones.territory.findIndex(c => c.instanceId === warriorId);
+        if (warriorIdxAfter >= 0) {
+          zones.territory.splice(warriorIdxAfter, 0, detached);
+        } else {
+          zones.territory.push(detached);
+        }
+      } else {
+        zones[foundZone].splice(foundIdx, 0, detached);
+      }
+      return { ...state, zones, history };
+    }
+
+    case 'EXECUTE_CARD_ABILITY': {
+      const { cardInstanceId, abilityIndex } = action.payload;
+      if (!cardInstanceId || abilityIndex === undefined) return state;
+
+      // Locate the source across all zones.
+      let source: GameCard | undefined;
+      for (const zone of Object.values(state.zones)) {
+        const found = zone.find(c => c.instanceId === cardInstanceId);
+        if (found) { source = found; break; }
+      }
+      if (!source) return state;
+
+      // Abilities only fire when the source card is in play. Matches the
+      // CardContextMenu gate — a malformed dispatch from elsewhere still
+      // no-ops here rather than leaving weird state. Includes Land of
+      // Redemption so resting Heroes can trigger abilities.
+      const ABILITY_SOURCE_ZONES: ZoneId[] = ['territory', 'land-of-bondage', 'land-of-redemption'];
+      if (!ABILITY_SOURCE_ZONES.includes(source.zone)) return state;
+
+      // Registry keys match GameCard.cardName (includes the set suffix for the
+      // v1 cards, e.g., "Two Possessed (GoC)"). The card's identifier field is
+      // a taxonomy descriptor ("Generic, Demon", etc.) and is NOT unique enough
+      // to key the registry.
+      const ability = getAbilitiesForCard(source.cardName)[abilityIndex];
+      if (!ability) return state;
+
+      switch (ability.type) {
+        case 'spawn_token':
+          return spawnTokenInState(state, source, ability, history);
+        case 'shuffle_and_draw':
+          // Reserved for future — v1 ships spawn_token only.
+          return state;
+        case 'all_players_shuffle_and_draw':
+          // Goldfish is single-player — apply to the card's owner only.
+          return shuffleAndDrawInState(state, source.ownerId, ability.shuffleCount, ability.drawCount, history);
+        case 'reveal_own_deck':
+          // Modal-driven effect — GoldfishCanvas intercepts the dispatch and
+          // calls setPeekState directly. Reaching the reducer is a bug, no-op.
+          return state;
+        case 'custom':
+          // Custom abilities are dispatched client-side in multiplayer and
+          // never reach the goldfish reducer in v1. No-op defensively.
+          return state;
+        default: {
+          const _exhaustive: never = ability;
+          return state;
+        }
+      }
     }
 
     default:

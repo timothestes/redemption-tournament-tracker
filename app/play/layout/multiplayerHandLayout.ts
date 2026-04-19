@@ -1,0 +1,84 @@
+import type { ZoneRect } from './multiplayerLayout';
+
+export interface HandCardPosition {
+  x: number;
+  y: number;
+  rotation: number;
+}
+
+/**
+ * Calculate card positions in a fan arc (or flat spread) for a hand zone.
+ *
+ * Works for both player hand (full-size cards) and opponent hand (compact
+ * cards) — the caller passes the appropriate card dimensions.
+ *
+ * @param isSpread  When true, cards are laid out in a flat horizontal row
+ *                  with no rotation or parabolic arc — useful when the player
+ *                  wants to see every card clearly without overlap.
+ */
+export function calculateHandPositions(
+  cardCount: number,
+  handRect: ZoneRect,
+  cardWidth: number,
+  cardHeight: number,
+  isSpread: boolean = false,
+): HandCardPosition[] {
+  if (cardCount === 0) return [];
+
+  const centerX = handRect.x + handRect.width / 2;
+  // Use more of the available width — 85% gives cards more room to spread
+  const handAreaWidth = handRect.width * 0.85;
+  // Reserve space at the bottom for the floating toolbar so cards don't render behind it
+  const toolbarReserve = 48;
+  const usableHeight = handRect.height - toolbarReserve;
+  const handY =
+    handRect.y + Math.max(0, (usableHeight - cardHeight) / 2);
+
+  if (isSpread) {
+    // Flat spread — evenly spaced, no rotation, no arc
+    const maxCardSpacing = cardWidth + 6;
+    const minCardSpacing = cardWidth * 0.35;
+    const idealSpacing = Math.min(
+      maxCardSpacing,
+      handAreaWidth / Math.max(cardCount, 1),
+    );
+    const spacing = Math.max(minCardSpacing, idealSpacing);
+    const totalWidth = (cardCount - 1) * spacing;
+    const startX = centerX - totalWidth / 2;
+
+    return Array.from({ length: cardCount }, (_, i) => ({
+      x: startX + i * spacing,
+      y: handY,
+      rotation: 0,
+    }));
+  }
+
+  // Fan arc layout
+  const maxArcAngle = 20; // degrees total arc spread
+  const minVisibleFraction = 0.3;
+
+  const maxCardSpacing = cardWidth + 4;
+  const minCardSpacing = cardWidth * minVisibleFraction;
+  const idealSpacing = Math.min(
+    maxCardSpacing,
+    handAreaWidth / Math.max(cardCount, 1),
+  );
+  const spacing = Math.max(minCardSpacing, idealSpacing);
+
+  const totalWidth = (cardCount - 1) * spacing;
+  const startX = centerX - totalWidth / 2;
+
+  // Arc angle per card
+  const arcAngle = cardCount > 1 ? maxArcAngle / (cardCount - 1) : 0;
+  const startAngle = -maxArcAngle / 2;
+
+  return Array.from({ length: cardCount }, (_, i) => {
+    const x = startX + i * spacing;
+    const rotation = cardCount > 1 ? startAngle + i * arcAngle : 0;
+    // Parabolic y-offset — cards at the edges dip down slightly
+    const normalizedPos =
+      cardCount > 1 ? (i / (cardCount - 1)) * 2 - 1 : 0;
+    const yOffset = normalizedPos * normalizedPos * 8;
+    return { x, y: handY + yOffset, rotation };
+  });
+}

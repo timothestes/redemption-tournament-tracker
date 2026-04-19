@@ -10,6 +10,7 @@ import GeneratePDFModal from "../card-search/components/GeneratePDFModal";
 import GenerateDeckImageModal from "../card-search/components/GenerateDeckImageModal";
 import { Deck } from "../card-search/types/deck";
 import { Card } from "../card-search/utils";
+import { getCardImageUrlOrNull as getCardImageUrl } from '../../shared/utils/cardImageUrl';
 
 interface DeckTag { id: string; name: string; color: string; }
 
@@ -526,14 +527,6 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
       )}
     </div>
   );
-}
-
-function getCardImageUrl(imgFile: string | null | undefined): string | null {
-  if (!imgFile) return null;
-  const blobBase = process.env.NEXT_PUBLIC_BLOB_BASE_URL;
-  if (!blobBase) return null;
-  const sanitized = imgFile.replace(/\.jpe?g$/i, "");
-  return `${blobBase}/card-images/${sanitized}.jpg`;
 }
 
 function getPreviewImages(deck: PublicDeck): [string | null, string | null] {

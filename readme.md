@@ -99,30 +99,57 @@ We will want to let the host print it out easily
 
 # Backlog
 
+# Podcast
+
+## Implemented features:
+Spotlight Mode
+YTG Add to Cart
+Min Price
+Cube Improvements
+Jayden Mode
+Official Deck Checks
+Spoiler
+Upcoming Tournaments
+Tournament Deck Publishing
+Card-specific rulings
+Card groupings
+AoD calculations
+
+## How can you help?
+- spoilers
+- ruling questions
+- publishing decks
+- reporting bugs
+- suggesting features
+
+## Bugs
+Ending tournament early bug
+CA State T1 bug
+jayden mode tournament
+redemptionccg app logo (Top nav) takes a while to load in 
+bright green in dark mode needs dimming
+
 ## short term
+add aod button
 
 ## long term
 Pre-bake duplicate card groups at build time (static JSON) instead of fetching from Supabase at runtime — eliminates cold-start connection pressure on deckcheck
 add maybeboard
-add animations to goldfish mode
+add animations to goldfish/play mode
 Collection Tracker
+Cube builder
 add wishlist
 Teaching new players how to play
-Comprehensive Deck Legality Validation (Type 1 complete with 14 rules and 206 tests; Type 2 in progress)
 misc tournament tracker improvements
 Joining a tournament via QR code
 metagame snapshot
 tournament tracker mobile ux support
 Deck upvoting
 Offline intallable app on phone (Progressive Web app with offline capabilities)
+Fallow audit: https://github.com/fallow-rs/fallow
 
 
 # play features
-add on hover feedback for who goes first menu
-let fan/unfan be a personal global setting
-right click card menu for opponent's revealed cards
-remove battle phase implementation, maybe just put it to part of the territory
-probably improve right click top/bottom/random menu
-when revealing cards, reveal them to ALL players
-audit banish, discard, reserve, deck zones all the same size
-think about positions of ^ zones.
+save game, load game, invite to game?
+Ghost cards... from exchange option
+battle phase/zone could be better
