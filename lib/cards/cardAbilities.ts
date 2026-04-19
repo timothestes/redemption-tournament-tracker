@@ -1,4 +1,13 @@
 // lib/cards/cardAbilities.ts
+// -----------------------------------------------------------------------------
+// Per-card ability registry.
+// NOTE: A duplicate of this file exists at spacetimedb/src/cardAbilities.ts —
+// keep the CARD_ABILITIES entries and CardAbility union in sync. The parity
+// is enforced by the test in lib/cards/__tests__/cardAbilities.test.ts.
+// The SpacetimeDB copy also carries TOKEN_CARD_DATA (server-side token
+// metadata) because the module tsconfig's rootDir prevents it from reading
+// the generated CARDS dataset.
+// -----------------------------------------------------------------------------
 import type { ZoneId } from '@/app/shared/types/gameCard';
 
 export type CardAbility =

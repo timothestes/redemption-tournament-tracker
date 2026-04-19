@@ -4,6 +4,7 @@ import { DisconnectTimeout, setDisconnectTimeoutReducer, ChooseFirstTimeout, set
 import { t, SenderError } from 'spacetimedb/server';
 import { ScheduleAt } from 'spacetimedb';
 import { makeSeed, seededShuffle, seededDiceRoll, xorshift64, generateGameCode } from './utils';
+import { getAbilitiesForCard, findTokenCard, type CardAbility } from './cardAbilities';
 
 // ---------------------------------------------------------------------------
 // Helper: logAction
@@ -2001,6 +2002,127 @@ export const move_cards_batch = spacetimedb.reducer(
       refillSoulDeck(ctx, game.id);
     }
   }
+);
+
+// ---------------------------------------------------------------------------
+// Helper: spawnTokenImpl
+// Called by execute_card_ability when ability.type === 'spawn_token'.
+// Validates, computes target zone + zoneIndex, then inserts token CardInstance
+// rows. SpacetimeDB rolls back the whole reducer if any insert throws.
+// ---------------------------------------------------------------------------
+function spawnTokenImpl(
+  ctx: any,
+  source: any, // CardInstance row
+  ability: Extract<CardAbility, { type: 'spawn_token' }>,
+  player: any, // Player row
+  gameId: bigint,
+) {
+  // Phase 1 — validate token exists in card data.
+  const tokenData = findTokenCard(ability.tokenName);
+  if (!tokenData) throw new SenderError(`Unknown token '${ability.tokenName}'`);
+
+  const count = ability.count ?? 1;
+  if (count < 1) throw new SenderError('Invalid count');
+
+  // Phase 2 — compute target zone.
+  const PLAY_ZONES = ['territory', 'land-of-bondage', 'land-of-redemption'];
+  const targetZone = PLAY_ZONES.includes(source.zone)
+    ? source.zone
+    : (ability.defaultZone ?? 'territory');
+
+  // Compute starting zoneIndex based on existing cards for (targetZone, ownerId).
+  let maxIdx = -1n;
+  for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+    if (c.ownerId === source.ownerId && c.zone === targetZone && c.zoneIndex > maxIdx) {
+      maxIdx = c.zoneIndex;
+    }
+  }
+
+  // Phase 3 — all-or-nothing inserts. SpacetimeDB rolls back the whole
+  // reducer if any insert throws.
+  for (let i = 0; i < count; i++) {
+    maxIdx += 1n;
+    ctx.db.CardInstance.insert({
+      id: 0n,
+      gameId,
+      ownerId: source.ownerId,
+      zone: targetZone,
+      zoneIndex: maxIdx,
+      posX: '',
+      posY: '',
+      isMeek: false,
+      isFlipped: false,
+      isToken: true,
+      isSoulDeckOrigin: false,
+      equippedToInstanceId: 0n,
+      notes: '',
+      cardName: tokenData.name,
+      cardSet: tokenData.set,
+      cardImgFile: tokenData.imgFile,
+      cardType: tokenData.cardType,
+      brigade: tokenData.brigade,
+      strength: tokenData.strength,
+      toughness: tokenData.toughness,
+      alignment: tokenData.alignment,
+      identifier: tokenData.identifier,
+      specialAbility: tokenData.specialAbility,
+      reference: tokenData.reference,
+    });
+  }
+
+  const game = ctx.db.Game.id.find(gameId);
+  if (game) {
+    logAction(
+      ctx, gameId, player.id, 'SPAWN_TOKEN',
+      JSON.stringify({
+        sourceInstanceId: source.id.toString(),
+        tokenName: tokenData.name,
+        count,
+        targetZone,
+      }),
+      game.turnNumber, game.currentPhase,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Reducer: execute_card_ability
+//
+// Server-authoritative dispatch for per-card custom abilities defined in the
+// shared CARD_ABILITIES registry. Client sends only (gameId, cardInstanceId,
+// abilityIndex); the server re-reads the registry by the source card's
+// identifier and dispatches. validate → compute → write ordering ensures no
+// row is inserted until every precondition has passed.
+// ---------------------------------------------------------------------------
+export const execute_card_ability = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardInstanceId: t.u64(),
+    abilityIndex: t.u64(),
+  },
+  (ctx, { gameId, cardInstanceId, abilityIndex }) => {
+    // Phase 1 — validate.
+    const player = findPlayerBySender(ctx, gameId);
+
+    const source = ctx.db.CardInstance.id.find(cardInstanceId);
+    if (!source) throw new SenderError('Card not found');
+    if (source.gameId !== gameId) throw new SenderError('Card not in this game');
+    if (source.ownerId !== player.id) throw new SenderError('Not your card');
+
+    const abilities = getAbilitiesForCard(source.identifier);
+    const ability = abilities[Number(abilityIndex)];
+    if (!ability) throw new SenderError('No such ability');
+
+    // Phase 2 — dispatch.
+    switch (ability.type) {
+      case 'spawn_token':
+        return spawnTokenImpl(ctx, source, ability, player, gameId);
+      case 'shuffle_and_draw':
+        throw new SenderError('shuffle_and_draw not yet implemented');
+      case 'custom':
+        throw new SenderError('Custom abilities are dispatched by the client, not this reducer');
+    }
+  },
 );
 
 // ---------------------------------------------------------------------------

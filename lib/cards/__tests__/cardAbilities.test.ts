@@ -27,6 +27,24 @@ describe('CARD_ABILITIES registry', () => {
   it('getAbilitiesForCard returns [] for unknown identifiers', () => {
     expect(getAbilitiesForCard('Nonexistent Card')).toEqual([]);
   });
+
+  it('SpacetimeDB duplicate of CARD_ABILITIES stays in sync', async () => {
+    const spacetimeCopy = await import('@/spacetimedb/src/cardAbilities');
+    expect(spacetimeCopy.CARD_ABILITIES).toEqual(CARD_ABILITIES);
+  });
+
+  it('every spawn_token in the registry has metadata in TOKEN_CARD_DATA (server-side)', async () => {
+    const { TOKEN_CARD_DATA } = await import('@/spacetimedb/src/cardAbilities');
+    const bad: string[] = [];
+    for (const abilities of Object.values(CARD_ABILITIES)) {
+      for (const a of abilities) {
+        if (a.type === 'spawn_token' && !TOKEN_CARD_DATA[a.tokenName]) {
+          bad.push(a.tokenName);
+        }
+      }
+    }
+    expect(bad).toEqual([]);
+  });
 });
 
 describe('abilityLabel', () => {
