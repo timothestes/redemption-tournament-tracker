@@ -61,6 +61,18 @@ function findPlayerBySender(ctx: any, gameId: bigint) {
 // zone (land-of-bondage or soul-deck). Prevents cross-seat interference with
 // player-owned cards while allowing both players to interact with the Soul
 // Deck and shared LoB.
+//
+// TODO: The current move-type reducers (move_card, move_cards_batch) already
+// permit any-player moves, so this helper is not yet called. It is retained
+// to satisfy the spec's broader requirement (design.md L111) that every
+// reducer authorizing on ownership gain a shared-card branch. Known future
+// consumers — wire up when shared-card interaction is needed for each:
+//   - attach_card            (enhancer/weapon attach to a shared soul)
+//   - detach_card            (weapon detach)
+//   - reorder_hand           (own-hand only; may not need shared branch)
+//   - reorder_lob            (BOTH players reorder shared LoB)
+//   - add_card_note          (annotate shared LoB souls, e.g. "Negated")
+//   - exchange_cards         (deck exchange affecting shared state)
 // ---------------------------------------------------------------------------
 function canSenderActOnCard(game: any, card: any, player: any): boolean {
   if (card.ownerId === player.id) return true;
@@ -1712,6 +1724,7 @@ export const move_card = spacetimedb.reducer(
 
     // Paragon: if a soul-origin card left the shared LoB, refill back to 3.
     const triggeredRefill =
+      normalizeFormat(game.format) === 'Paragon' &&
       card.isSoulDeckOrigin === true &&
       card.zone === 'land-of-bondage' &&
       toZone !== 'land-of-bondage';
