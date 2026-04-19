@@ -1589,6 +1589,30 @@ export const move_card = spacetimedb.reducer(
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
 
+    // Tokens dropped into non-play zones are deleted, not moved.
+    // Parallels the goldfish cleanup rule at gameReducer.ts:92. Runs BEFORE the
+    // lost-soul redirect so tokens always delete (never redirect to LOB) even if
+    // they happen to be lost-soul-typed.
+    const TOKEN_REMOVE_ZONES = ['reserve', 'banish', 'discard', 'hand', 'deck'];
+    if (card.isToken && TOKEN_REMOVE_ZONES.includes(toZone)) {
+      ctx.db.CardInstance.id.delete(cardInstanceId);
+      if (fromZone === 'hand') compactHandIndices(ctx, gameId, card.ownerId);
+      if (fromZone === 'land-of-bondage') compactLobIndices(ctx, gameId, card.ownerId);
+      logAction(
+        ctx, gameId, player.id, 'MOVE_CARD',
+        JSON.stringify({
+          cardInstanceId: cardInstanceId.toString(),
+          from: fromZone,
+          to: toZone,
+          cardName: card.cardName,
+          cardImgFile: card.cardImgFile,
+          tokenCleanup: true,
+        }),
+        game.turnNumber, game.currentPhase,
+      );
+      return;
+    }
+
     // Lost souls sent to discard or reserve go to land-of-bondage instead
     const isLostSoul = card.cardType === 'LS' || card.cardName.toLowerCase().includes('lost soul');
     if (isLostSoul && (toZone === 'discard' || toZone === 'reserve' || toZone === 'banish')) {
