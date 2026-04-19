@@ -41,6 +41,7 @@ export const CardInstance = __t.object("CardInstance", {
   reference: __t.string(),
   notes: __t.string(),
   equippedToInstanceId: __t.u64(),
+  isSoulDeckOrigin: __t.bool(),
 });
 export type CardInstance = __Infer<typeof CardInstance>;
 

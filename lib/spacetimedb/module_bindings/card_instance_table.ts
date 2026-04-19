@@ -33,4 +33,5 @@ export default __t.row({
   reference: __t.string(),
   notes: __t.string(),
   equippedToInstanceId: __t.u64().name("equipped_to_instance_id"),
+  isSoulDeckOrigin: __t.bool().name("is_soul_deck_origin"),
 });
