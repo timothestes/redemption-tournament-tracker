@@ -1267,6 +1267,45 @@ export const leave_game = spacetimedb.reducer(
 );
 
 // ---------------------------------------------------------------------------
+// Reducer: register_presence
+// Called by the client whenever the game page is mounted AND the WebSocket
+// is connected — initially and after every reconnect. Revives isConnected,
+// cancels any pending DisconnectTimeout, and clears disconnectTimeoutFired.
+// Silent no-op if the sender isn't in the game or the game is finished; this
+// is the explicit signal that replaces the old blanket revive in
+// clientConnected (which used to keep orphaned lobbies alive whenever the
+// creator hit any other page on the site).
+// ---------------------------------------------------------------------------
+export const register_presence = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+  },
+  (ctx, { gameId }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game || game.status === 'finished') return;
+
+    for (const player of ctx.db.Player.player_game_id.filter(gameId)) {
+      if (player.identity.toHexString() !== ctx.sender.toHexString()) continue;
+
+      if (!player.isConnected) {
+        ctx.db.Player.id.update({ ...player, isConnected: true });
+      }
+
+      for (const timeout of ctx.db.DisconnectTimeout.iter()) {
+        if (timeout.playerId === player.id) {
+          ctx.db.DisconnectTimeout.scheduledId.delete(timeout.scheduledId);
+        }
+      }
+
+      if (game.disconnectTimeoutFired) {
+        ctx.db.Game.id.update({ ...game, disconnectTimeoutFired: false });
+      }
+      return;
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
 // Reducer: resign_game
 // ---------------------------------------------------------------------------
 export const resign_game = spacetimedb.reducer(
@@ -2276,6 +2315,102 @@ function spawnTokenImpl(
 }
 
 // ---------------------------------------------------------------------------
+// Helper: shuffleAndDrawForPlayerImpl
+// Moves up to `shuffleCount` random cards from player's hand into their deck,
+// reshuffles the whole deck with a seeded PRNG, then draws `drawCount`.
+// Short-hand (< shuffleCount) shuffles all of hand. Short deck draws as many
+// as possible. Emits a single SHUFFLE_AND_DRAW log entry for the action.
+// ---------------------------------------------------------------------------
+function shuffleAndDrawForPlayerImpl(
+  ctx: any,
+  gameId: bigint,
+  targetPlayer: any, // Player row — whose hand/deck to shuffle + draw
+  shuffleCount: number,
+  drawCount: number,
+): { shuffled: number; drawn: number } {
+  if (shuffleCount < 0 || drawCount < 0) {
+    throw new SenderError('Invalid shuffle/draw counts');
+  }
+
+  const game = ctx.db.Game.id.find(gameId);
+  if (!game) throw new SenderError('Game not found');
+
+  // Collect target's hand
+  const handCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+    (c: any) => c.ownerId === targetPlayer.id && c.zone === 'hand'
+  );
+
+  // Hand shortage: shuffle whatever we have (could be 0).
+  const actualShuffle = Math.min(shuffleCount, handCards.length);
+
+  // Seeded PRNG for shuffle selection
+  const rngCounter1 = game.rngCounter + 1n;
+  ctx.db.Game.id.update({ ...game, rngCounter: rngCounter1 });
+  const pickSeed = makeSeed(ctx.timestamp.microsSinceUnixEpoch, gameId, targetPlayer.id, rngCounter1);
+  const pickRng = xorshift64(pickSeed);
+
+  // Fisher-Yates partial shuffle to pick random hand indices
+  const indices = handCards.map((_: any, i: number) => i);
+  for (let i = indices.length - 1; i > indices.length - 1 - actualShuffle && i > 0; i--) {
+    const j = Number(pickRng.next() % BigInt(i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+  const pickedCards = indices.slice(indices.length - actualShuffle).map((i: number) => handCards[i]);
+
+  // Move picked hand cards to deck (temporary zoneIndex — will be overwritten
+  // by the reshuffle pass below).
+  for (const card of pickedCards) {
+    ctx.db.CardInstance.id.update({
+      ...card,
+      zone: 'deck',
+      zoneIndex: 0n,
+      posX: '',
+      posY: '',
+      isFlipped: true,
+    });
+  }
+
+  // Reshuffle the entire deck
+  const latestGame = ctx.db.Game.id.find(gameId);
+  if (!latestGame) throw new SenderError('Game disappeared mid-reducer');
+  const rngCounter2 = latestGame.rngCounter + 1n;
+  ctx.db.Game.id.update({ ...latestGame, rngCounter: rngCounter2 });
+
+  const allDeckCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+    (c: any) => c.ownerId === targetPlayer.id && c.zone === 'deck'
+  );
+  const shuffleIndices = allDeckCards.map((_: any, idx: number) => idx);
+  const shuffleSeed = makeSeed(ctx.timestamp.microsSinceUnixEpoch, gameId, targetPlayer.id, rngCounter2);
+  seededShuffle(shuffleIndices, shuffleSeed);
+  for (let i = 0; i < allDeckCards.length; i++) {
+    ctx.db.CardInstance.id.update({ ...allDeckCards[i], zoneIndex: BigInt(shuffleIndices[i]) });
+  }
+
+  compactHandIndices(ctx, gameId, targetPlayer.id);
+
+  // Draw — short-deck draws as many as possible (drawCardsForPlayer handles it).
+  const drawGame = ctx.db.Game.id.find(gameId);
+  if (!drawGame) throw new SenderError('Game disappeared mid-reducer');
+  const drawResult = drawCardsForPlayer(ctx, drawGame, targetPlayer, drawCount);
+
+  const finalGame = ctx.db.Game.id.find(gameId);
+  if (finalGame) {
+    logAction(
+      ctx, gameId, targetPlayer.id, 'SHUFFLE_AND_DRAW',
+      JSON.stringify({
+        shuffled: actualShuffle,
+        requestedShuffle: shuffleCount,
+        drawn: drawResult.drawn,
+        requestedDraw: drawCount,
+      }),
+      finalGame.turnNumber, finalGame.currentPhase,
+    );
+  }
+
+  return { shuffled: actualShuffle, drawn: drawResult.drawn };
+}
+
+// ---------------------------------------------------------------------------
 // Reducer: execute_card_ability
 //
 // Server-authoritative dispatch for per-card custom abilities defined in the
@@ -2319,6 +2454,40 @@ export const execute_card_ability = spacetimedb.reducer(
         return spawnTokenImpl(ctx, source, ability, player, gameId);
       case 'shuffle_and_draw':
         throw new SenderError('shuffle_and_draw not yet implemented');
+      case 'all_players_shuffle_and_draw': {
+        // Caster effect applies immediately. Opponent effect requires consent
+        // (inserts a ZoneSearchRequest with action='shuffle_and_draw' — the
+        // caster's client fires opponent_shuffle_and_draw on approval).
+        shuffleAndDrawForPlayerImpl(ctx, gameId, player, ability.shuffleCount, ability.drawCount);
+
+        const allPlayers = [...ctx.db.Player.player_game_id.filter(gameId)];
+        const opponent = allPlayers.find((p: any) => p.id !== player.id);
+        if (opponent) {
+          // Don't stack requests if the caster already has one pending.
+          for (const req of ctx.db.ZoneSearchRequest.zone_search_request_game_id.filter(gameId)) {
+            if (req.requesterId === player.id && req.status === 'pending') {
+              throw new SenderError('You already have a pending request');
+            }
+          }
+          ctx.db.ZoneSearchRequest.insert({
+            id: 0n,
+            gameId,
+            requesterId: player.id,
+            targetPlayerId: opponent.id,
+            zone: 'deck',
+            status: 'pending',
+            createdAt: ctx.timestamp,
+            action: 'shuffle_and_draw',
+            actionParams: JSON.stringify({
+              shuffleCount: ability.shuffleCount,
+              drawCount: ability.drawCount,
+            }),
+          });
+        }
+        return;
+      }
+      case 'reveal_own_deck':
+        throw new SenderError('reveal_own_deck is dispatched by the client, not this reducer');
       case 'custom':
         throw new SenderError('Custom abilities are dispatched by the client, not this reducer');
     }
@@ -2921,6 +3090,40 @@ export const random_opponent_hand_to_zone = spacetimedb.reducer(
     logAction(ctx, gameId, player.id, 'RANDOM_OPPONENT_HAND_TO_ZONE',
       JSON.stringify({ destination: destLabel, count: actualCount, targetPlayerId: targetId.toString() }),
       game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: opponent_shuffle_and_draw
+// Authorised via an approved ZoneSearchRequest (action='shuffle_and_draw').
+// Applies a shuffle-N-and-draw-N effect to the target player (opponent of the
+// caster). Used by the Mayhem ability after opponent consent.
+// ---------------------------------------------------------------------------
+export const opponent_shuffle_and_draw = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    requestId: t.u64(),
+    shuffleCount: t.u64(),
+    drawCount: t.u64(),
+  },
+  (ctx, { gameId, requestId, shuffleCount, drawCount }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in progress');
+
+    const player = findPlayerBySender(ctx, gameId);
+
+    const req = ctx.db.ZoneSearchRequest.id.find(requestId);
+    if (!req) throw new SenderError('Search request not found');
+    if (req.gameId !== gameId) throw new SenderError('Request not in this game');
+    if (req.requesterId !== player.id) throw new SenderError('Not your search request');
+    if (req.status !== 'approved') throw new SenderError('Search request not approved');
+
+    const allPlayers = [...ctx.db.Player.player_game_id.filter(gameId)];
+    const target = allPlayers.find((p: any) => p.id === req.targetPlayerId);
+    if (!target) throw new SenderError('Target player not found');
+
+    shuffleAndDrawForPlayerImpl(ctx, gameId, target, Number(shuffleCount), Number(drawCount));
   }
 );
 
@@ -3847,16 +4050,30 @@ export const toggle_reveal_reserve = spacetimedb.reducer(
 );
 
 // ---------------------------------------------------------------------------
-// Reducer: reveal_cards — broadcast revealed card IDs to all players
+// Reducer: reveal_cards — broadcast revealed card IDs to all players.
+// `context` is an optional JSON string carrying metadata (e.g. source card
+// name + position + count for ability-triggered reveals). When present, the
+// log payload wraps cardIds + context; when empty, logs cardIds directly for
+// backward compatibility with the deck-menu "Reveal Top N" flow.
 // ---------------------------------------------------------------------------
 export const reveal_cards = spacetimedb.reducer(
   {
     gameId: t.u64(),
     cardIds: t.string(), // JSON array of card instance ID strings
+    context: t.string(), // optional JSON object string; '' when omitted
   },
-  (ctx, { gameId, cardIds }) => {
+  (ctx, { gameId, cardIds, context }) => {
     const player = findPlayerBySender(ctx, gameId);
     ctx.db.Player.id.update({ ...player, revealedCards: cardIds });
+
+    let logPayload = cardIds;
+    if (context) {
+      try {
+        logPayload = JSON.stringify({ cardIds: JSON.parse(cardIds), context: JSON.parse(context) });
+      } catch {
+        // Malformed context — fall back to raw cardIds so the log still renders.
+      }
+    }
 
     const game = ctx.db.Game.id.find(gameId);
     logAction(
@@ -3864,7 +4081,7 @@ export const reveal_cards = spacetimedb.reducer(
       gameId,
       player.id,
       'REVEAL_CARDS',
-      cardIds,
+      logPayload,
       game ? game.currentTurn : 0n,
       game ? game.currentPhase : 'draw',
     );
@@ -3889,24 +4106,15 @@ export const clear_revealed_cards = spacetimedb.reducer(
 // ---------------------------------------------------------------------------
 export const onConnect = spacetimedb.clientConnected((ctx) => {
   console.log('[stdb-debug] clientConnected:', ctx.sender.toHexString());
-  // Find all player rows for this identity and set connected
+  // Presence is revived explicitly by register_presence from the game page,
+  // so this hook only logs and seeds the cleanup schedule. Reviving
+  // isConnected here revived rows in every game the identity ever joined,
+  // which kept orphaned lobbies alive whenever the creator hit any other
+  // page on the site.
   for (const player of ctx.db.Player.iter()) {
     if (player.identity.toHexString() === ctx.sender.toHexString()) {
       const game = ctx.db.Game.id.find(player.gameId);
       console.log('[stdb-debug] clientConnected — player:', String(player.id), 'game:', String(player.gameId), 'gameStatus:', game?.status);
-      ctx.db.Player.id.update({ ...player, isConnected: true });
-
-      // Cancel any pending disconnect timeouts for this player
-      for (const timeout of ctx.db.DisconnectTimeout.iter()) {
-        if (timeout.playerId === player.id) {
-          ctx.db.DisconnectTimeout.scheduledId.delete(timeout.scheduledId);
-        }
-      }
-
-      // Reset disconnectTimeoutFired if it was set
-      if (game && game.disconnectTimeoutFired) {
-        ctx.db.Game.id.update({ ...game, disconnectTimeoutFired: false });
-      }
     }
   }
 

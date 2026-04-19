@@ -12,6 +12,4 @@ import {
 
 export default {
   gameId: __t.u64(),
-  cardIds: __t.string(),
-  context: __t.string(),
 };

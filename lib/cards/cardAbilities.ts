@@ -11,6 +11,8 @@ import { findCard, type CardData } from './lookup';
 export type CardAbility =
   | { type: 'spawn_token'; tokenName: string; count?: number; defaultZone?: ZoneId }
   | { type: 'shuffle_and_draw'; shuffleCount: number; drawCount: number }
+  | { type: 'all_players_shuffle_and_draw'; shuffleCount: number; drawCount: number }
+  | { type: 'reveal_own_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'custom'; reducerName: string; label: string };
 
 /**
@@ -32,6 +34,13 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'Lost Soul "Harvest" [John 4:35]':                     [{ type: 'spawn_token', tokenName: 'Harvest Soul Token' }],
   'Lost Soul "Harvest" [John 4:35] [2023 - 2nd Place]':  [{ type: 'spawn_token', tokenName: 'Harvest Soul Token' }],
   'Lost Soul "Lost Souls" [Proverbs 2:16-17]':           [{ type: 'spawn_token', tokenName: 'Lost Souls Token' }],
+  'Mayhem':                                              [{ type: 'all_players_shuffle_and_draw', shuffleCount: 6, drawCount: 6 }],
+  'Mayhem (2020 Promo)':                                 [{ type: 'all_players_shuffle_and_draw', shuffleCount: 6, drawCount: 6 }],
+  'Mayhem [Fundraiser]':                                 [{ type: 'all_players_shuffle_and_draw', shuffleCount: 6, drawCount: 6 }],
+  'Mayhem (FoM)':                                        [{ type: 'all_players_shuffle_and_draw', shuffleCount: 6, drawCount: 6 }],
+  'Lost Soul "Lawless" [Hebrews 12:8]':                  [{ type: 'reveal_own_deck', position: 'top', count: 6 }],
+  'Lost Soul "Lawless" [Hebrews 12:8] [2021 - 1st Place]': [{ type: 'reveal_own_deck', position: 'top', count: 6 }],
+  'Lost Soul "Lawless" [Hebrews 12:8] [AB - CoW]':       [{ type: 'reveal_own_deck', position: 'top', count: 6 }],
 };
 
 /**
@@ -117,6 +126,12 @@ export function abilityLabel(a: CardAbility): string {
     }
     case 'shuffle_and_draw':
       return `Shuffle ${a.shuffleCount} from hand, draw ${a.drawCount}`;
+    case 'all_players_shuffle_and_draw':
+      return `All players shuffle ${a.shuffleCount} from hand, draw ${a.drawCount}`;
+    case 'reveal_own_deck': {
+      const where = a.position === 'random' ? `${a.count} random` : `${a.position} ${a.count}`;
+      return `Reveal ${where} card${a.count === 1 ? '' : 's'} of deck`;
+    }
     case 'custom':
       return a.label;
   }

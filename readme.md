@@ -150,9 +150,6 @@ Fallow audit: https://github.com/fallow-rs/fallow
 
 
 # play features
-probably improve right click top/bottom/random menu?
-create system where cards can have custom abilities coded
-add ability to use card tokens
 save game, load game, invite to game?
 Ghost cards... from exchange option
 battle phase/zone could be better

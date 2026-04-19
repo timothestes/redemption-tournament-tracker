@@ -33,6 +33,7 @@ import MoveCardToBottomOfDeckReducer from "../move_card_to_bottom_of_deck_reduce
 import MoveCardToTopOfDeckReducer from "../move_card_to_top_of_deck_reducer";
 import MoveCardsBatchReducer from "../move_cards_batch_reducer";
 import MoveOpponentCardReducer from "../move_opponent_card_reducer";
+import OpponentShuffleAndDrawReducer from "../opponent_shuffle_and_draw_reducer";
 import PregameAcknowledgeFirstReducer from "../pregame_acknowledge_first_reducer";
 import PregameAcknowledgeRollReducer from "../pregame_acknowledge_roll_reducer";
 import PregameChangeDeckReducer from "../pregame_change_deck_reducer";
@@ -42,6 +43,7 @@ import PregameSkipToRevealReducer from "../pregame_skip_to_reveal_reducer";
 import RandomHandToZoneReducer from "../random_hand_to_zone_reducer";
 import RandomOpponentHandToZoneReducer from "../random_opponent_hand_to_zone_reducer";
 import RandomReserveToZoneReducer from "../random_reserve_to_zone_reducer";
+import RegisterPresenceReducer from "../register_presence_reducer";
 import ReloadDeckReducer from "../reload_deck_reducer";
 import RemoveCounterReducer from "../remove_counter_reducer";
 import RemoveTokenReducer from "../remove_token_reducer";
@@ -96,6 +98,7 @@ export type MoveCardToBottomOfDeckParams = __Infer<typeof MoveCardToBottomOfDeck
 export type MoveCardToTopOfDeckParams = __Infer<typeof MoveCardToTopOfDeckReducer>;
 export type MoveCardsBatchParams = __Infer<typeof MoveCardsBatchReducer>;
 export type MoveOpponentCardParams = __Infer<typeof MoveOpponentCardReducer>;
+export type OpponentShuffleAndDrawParams = __Infer<typeof OpponentShuffleAndDrawReducer>;
 export type PregameAcknowledgeFirstParams = __Infer<typeof PregameAcknowledgeFirstReducer>;
 export type PregameAcknowledgeRollParams = __Infer<typeof PregameAcknowledgeRollReducer>;
 export type PregameChangeDeckParams = __Infer<typeof PregameChangeDeckReducer>;
@@ -105,6 +108,7 @@ export type PregameSkipToRevealParams = __Infer<typeof PregameSkipToRevealReduce
 export type RandomHandToZoneParams = __Infer<typeof RandomHandToZoneReducer>;
 export type RandomOpponentHandToZoneParams = __Infer<typeof RandomOpponentHandToZoneReducer>;
 export type RandomReserveToZoneParams = __Infer<typeof RandomReserveToZoneReducer>;
+export type RegisterPresenceParams = __Infer<typeof RegisterPresenceReducer>;
 export type ReloadDeckParams = __Infer<typeof ReloadDeckReducer>;
 export type RemoveCounterParams = __Infer<typeof RemoveCounterReducer>;
 export type RemoveTokenParams = __Infer<typeof RemoveTokenReducer>;

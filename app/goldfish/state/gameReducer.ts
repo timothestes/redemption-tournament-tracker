@@ -113,6 +113,72 @@ function spawnTokenInState(
   return { ...state, zones, history };
 }
 
+function shuffleAndDrawInState(
+  state: GameState,
+  _ownerId: string,
+  shuffleCount: number,
+  drawCount: number,
+  history: GameState[],
+): GameState {
+  // Phase 1 — validate.
+  if (shuffleCount < 0 || drawCount < 0) return state;
+
+  // Phase 2 — build new zones in memory.
+  const zones = cloneZones(state.zones);
+
+  // Pick up to shuffleCount random hand cards. Hand shortage: shuffle all.
+  const actualShuffle = Math.min(shuffleCount, zones.hand.length);
+  const handIndices = zones.hand.map((_c, i) => i);
+  // Fisher-Yates partial shuffle — indices at the tail are the picks.
+  for (let i = handIndices.length - 1; i > handIndices.length - 1 - actualShuffle && i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [handIndices[i], handIndices[j]] = [handIndices[j], handIndices[i]];
+  }
+  const pickedSet = new Set(handIndices.slice(handIndices.length - actualShuffle));
+  const picked: GameCard[] = [];
+  const remainingHand: GameCard[] = [];
+  zones.hand.forEach((card, i) => {
+    if (pickedSet.has(i)) {
+      picked.push({ ...card, zone: 'deck', isFlipped: true });
+    } else {
+      remainingHand.push(card);
+    }
+  });
+  zones.hand = remainingHand;
+
+  // Merge picked cards into deck and reshuffle entire deck.
+  const mergedDeck = [...zones.deck, ...picked];
+  zones.deck = shuffleArray(mergedDeck);
+
+  // Phase 3 — draw up to drawCount, respecting auto-route Lost Souls and hand limit.
+  // Short-deck draws as many as possible.
+  for (let i = 0; i < drawCount; i++) {
+    if (zones.deck.length === 0) break;
+    if (zones.hand.length >= HAND_LIMIT && !state.options.autoRouteLostSouls) break;
+
+    let card = zones.deck.shift()!;
+    // Auto-route consecutive Lost Souls if the option is on.
+    while (state.options.autoRouteLostSouls && isLostSoul(card)) {
+      card.zone = 'land-of-bondage';
+      card.isFlipped = false;
+      zones['land-of-bondage'].push(card);
+      if (zones.deck.length === 0) { card = undefined as unknown as GameCard; break; }
+      card = zones.deck.shift()!;
+    }
+    if (!card) break;
+
+    if (zones.hand.length >= HAND_LIMIT) {
+      zones.deck.unshift(card); // put back — no room
+      break;
+    }
+    card.zone = 'hand';
+    card.isFlipped = false;
+    zones.hand.push(card);
+  }
+
+  return { ...state, zones, history };
+}
+
 function pushHistory(state: GameState): GameState[] {
   // Store a snapshot (without history to avoid nesting)
   const snapshot: GameState = {
@@ -783,6 +849,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           return spawnTokenInState(state, source, ability, history);
         case 'shuffle_and_draw':
           // Reserved for future — v1 ships spawn_token only.
+          return state;
+        case 'all_players_shuffle_and_draw':
+          // Goldfish is single-player — apply to the card's owner only.
+          return shuffleAndDrawInState(state, source.ownerId, ability.shuffleCount, ability.drawCount, history);
+        case 'reveal_own_deck':
+          // Modal-driven effect — GoldfishCanvas intercepts the dispatch and
+          // calls setPeekState directly. Reaching the reducer is a bug, no-op.
           return state;
         case 'custom':
           // Custom abilities are dispatched client-side in multiplayer and

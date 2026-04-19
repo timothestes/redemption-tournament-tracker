@@ -192,6 +192,36 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
   if (actionType === 'SPAWN_LOST_SOUL') {
     return 'spawned a lost soul token';
   }
+  if (actionType === 'REVEAL_CARDS' && payload) {
+    try {
+      const parsed = JSON.parse(payload);
+      // New-shape payload from ability-triggered reveals — renders rich detail.
+      if (parsed && !Array.isArray(parsed) && parsed.cardIds && parsed.context) {
+        const ctx = parsed.context;
+        const count = Number(ctx.count ?? (Array.isArray(parsed.cardIds) ? parsed.cardIds.length : 0));
+        const position = ctx.position ?? 'top';
+        const where = position === 'random' ? `${count} random` : `${position} ${count}`;
+        const source: string | undefined = ctx.sourceCardName;
+        if (source) {
+          return <>revealed {where} card{count === 1 ? '' : 's'} of deck via <HoverableCard name={source} /></>;
+        }
+        return `revealed ${where} card${count === 1 ? '' : 's'} of deck`;
+      }
+      // Legacy raw cardIds array (deck-menu Reveal Top/Bottom/Random).
+      if (Array.isArray(parsed)) {
+        const n = parsed.length;
+        return `revealed ${n} card${n === 1 ? '' : 's'}`;
+      }
+    } catch { /* fall through */ }
+  }
+  if (actionType === 'SHUFFLE_AND_DRAW' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const shuffled = Number(data.shuffled ?? 0);
+      const drawn = Number(data.drawn ?? 0);
+      return `shuffled ${shuffled} from hand into deck and drew ${drawn}`;
+    } catch { /* fall through */ }
+  }
   if (actionType === 'SPAWN_TOKEN' && payload) {
     try {
       const data = JSON.parse(payload);
@@ -432,6 +462,14 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
         case 'random_hand_to_deck_top': return `asked to send ${count} random card${plural} from ${targetName}'s hand to the top of their deck`;
         case 'random_hand_to_deck_bottom': return `asked to send ${count} random card${plural} from ${targetName}'s hand to the bottom of their deck`;
         case 'random_hand_to_deck_shuffle': return `asked to shuffle ${count} random card${plural} from ${targetName}'s hand into their deck`;
+        case 'shuffle_and_draw': {
+          let s = 0, d = 0;
+          try {
+            const p = data.actionParams ? JSON.parse(data.actionParams) : {};
+            s = p.shuffleCount ?? 0; d = p.drawCount ?? 0;
+          } catch {}
+          return `asked ${targetName} to shuffle ${s} from hand into deck and draw ${d}`;
+        }
         default: return `asked to perform an action on ${targetName}'s deck`;
       }
     } catch { /* fall through */ }

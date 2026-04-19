@@ -131,6 +131,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   }, []);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [errorFromPregame, setErrorFromPregame] = useState(false);
+  const [formatMismatch, setFormatMismatch] = useState<{ host: string; joiner: string } | null>(null);
   const [isPracticing, setIsPracticing] = useState(false);
   // Guards against a visual flash: once the user chooses to leave, we freeze the
   // render on a transition overlay so that subsequent SpacetimeDB state updates
@@ -193,6 +194,19 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       console.error('Failed to subscribe (phase 2):', e);
     }
   }, [conn, gameId]);
+
+  // Presence heartbeat — reassert isConnected and cancel any pending
+  // DisconnectTimeout whenever the WebSocket is live on this page. The server
+  // no longer blanket-revives on clientConnected, so orphan lobbies die 30s
+  // after the creator navigates away.
+  useEffect(() => {
+    if (!conn || gameId === null || !isConnected) return;
+    try {
+      conn.reducers.registerPresence({ gameId });
+    } catch (e) {
+      console.error('Failed to register presence:', e);
+    }
+  }, [conn, gameId, isConnected]);
 
   // Read session storage params set by the lobby page
   const [gameParams] = useState<GameParams | null>(() => {
@@ -392,6 +406,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           const joinerFormat = normalizeDeckFormat(gameParams.format ?? 'Type 1');
           const hostFormat = normalizeDeckFormat(hostGame.format);
           if (joinerFormat !== hostFormat) {
+            setFormatMismatch({ host: hostFormat, joiner: joinerFormat });
             setErrorMessage(
               `This game is ${hostFormat}. Your selected deck is ${joinerFormat} — pick a ${hostFormat} deck to join.`
             );
@@ -604,6 +619,21 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     router.replace('/play');
   }, [isGameNotFound, code, router]);
 
+  // Auto-redirect back to the invite-style lobby on format mismatch so the user
+  // can swap to a matching-format deck without clicking through the error screen.
+  // Preserves the code via ?join=CODE so they stay in the join-this-game flow.
+  const isFormatMismatch = lifecycle === 'error' && formatMismatch !== null;
+  useEffect(() => {
+    if (lifecycle !== 'error' || !formatMismatch) return;
+    sessionStorage.setItem(
+      'lobby_error',
+      `This game is ${formatMismatch.host}. Your deck is ${formatMismatch.joiner} — pick a ${formatMismatch.host} deck and try again.`
+    );
+    // Clear the stale join params so the page can't auto-rejoin with the same deck.
+    sessionStorage.removeItem(`${SESSION_KEY_PREFIX}${code}`);
+    router.replace(`/play?join=${code}`);
+  }, [lifecycle, formatMismatch, code, router]);
+
   if (isLeaving) {
     return (
       <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black">
@@ -623,7 +653,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   }
 
   if (lifecycle === 'error') {
-    if (isGameNotFound) {
+    if (isGameNotFound || isFormatMismatch) {
       // Show brief loading state while redirecting
       return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">

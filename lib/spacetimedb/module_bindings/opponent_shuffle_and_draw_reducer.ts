@@ -12,6 +12,7 @@ import {
 
 export default {
   gameId: __t.u64(),
-  cardIds: __t.string(),
-  context: __t.string(),
+  requestId: __t.u64(),
+  shuffleCount: __t.u64(),
+  drawCount: __t.u64(),
 };

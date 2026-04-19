@@ -38,6 +38,7 @@ import { useCardPreview } from '../state/CardPreviewContext';
 import { useLobArrivalEffect } from '@/app/shared/hooks/useLobArrivalEffect';
 import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '../utils/equipLayout';
 import { findCard, isWeapon, isWarrior } from '@/lib/cards/lookup';
+import { getAbilitiesForCard } from '@/lib/cards/cardAbilities';
 import { Link2Off } from 'lucide-react';
 
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
@@ -85,11 +86,41 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     moveCardToTopOfDeck: (cardId) => moveCardToTopOfDeck(cardId),
     moveCardToBottomOfDeck: (cardId) => moveCardToBottomOfDeck(cardId),
     removeOpponentToken: (cardId) => removeOpponentToken(cardId),
-    executeCardAbility: (cardId, abilityIndex) => executeCardAbility(cardId, abilityIndex),
+    executeCardAbility: (cardId, abilityIndex) => {
+      // Intercept modal-driven abilities (reveal_own_deck) — the goldfish
+      // reducer no-ops them; the modal lives in component state.
+      let source: GameCard | undefined;
+      for (const zone of Object.values(state.zones)) {
+        const found = zone.find(c => c.instanceId === cardId);
+        if (found) { source = found; break; }
+      }
+      const ability = source ? getAbilitiesForCard(source.cardName)[abilityIndex] : undefined;
+      if (ability?.type === 'reveal_own_deck') {
+        const deck = state.zones.deck;
+        if (deck.length === 0) { showGameToast('Deck is empty'); return; }
+        const n = Math.min(ability.count, deck.length);
+        let ids: string[];
+        let title: string;
+        if (ability.position === 'top') {
+          ids = deck.slice(0, n).map(c => c.instanceId);
+          title = `Top ${n} of Deck`;
+        } else if (ability.position === 'bottom') {
+          ids = deck.slice(-n).map(c => c.instanceId);
+          title = `Bottom ${n} of Deck`;
+        } else {
+          const shuffled = [...deck].sort(() => Math.random() - 0.5);
+          ids = shuffled.slice(0, n).map(c => c.instanceId);
+          title = `Random ${n} from Deck`;
+        }
+        setPeekState({ cardIds: ids, title });
+        return;
+      }
+      executeCardAbility(cardId, abilityIndex);
+    },
     randomHandToZone: () => {}, // not used in goldfish
     randomReserveToZone: () => {}, // not used in goldfish
     reloadDeck: () => {}, // not used in goldfish
-  }), [moveCard, moveCardsBatch, flipCard, meekCard, unmeekCard, addCounter, removeCounter, shuffleCardIntoDeck, shuffleDeck, addNote, drawCard, drawMultiple, moveCardToTopOfDeck, moveCardToBottomOfDeck, removeOpponentToken, executeCardAbility]);
+  }), [moveCard, moveCardsBatch, flipCard, meekCard, unmeekCard, addCounter, removeCounter, shuffleCardIntoDeck, shuffleDeck, addNote, drawCard, drawMultiple, moveCardToTopOfDeck, moveCardToBottomOfDeck, removeOpponentToken, executeCardAbility, state.zones]);
 
   // Bridge goldfish game state into the shared ModalGameContext for shared modal components
   const modalGameValue = useMemo<ModalGameContextValue>(() => ({

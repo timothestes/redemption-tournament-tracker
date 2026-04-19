@@ -358,10 +358,6 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
     };
   }, []);
 
-  // Compute max width based on card count for a tighter layout with few cards
-  const cardCount = peekedCards.length;
-  const maxWidth = cardCount <= 2 ? 380 : cardCount <= 4 ? 600 : '90vw';
-
   return (
     <div
       style={{
@@ -387,8 +383,8 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
           border: '1px solid var(--gf-border)',
           borderRadius: 8,
           padding: 20,
-          width: typeof maxWidth === 'string' ? maxWidth : undefined,
-          maxWidth: maxWidth,
+          width: '90vw',
+          maxWidth: '90vw',
           maxHeight: '85vh',
           overflowY: 'auto',
           position: 'relative',
@@ -457,7 +453,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
             ref={gridRef}
             style={{
               display: 'grid',
-              gridTemplateColumns: cardCount <= 2 ? `repeat(${cardCount}, 1fr)` : 'repeat(auto-fill, minmax(140px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
               gap: 12,
               position: 'relative',
               userSelect: 'none',

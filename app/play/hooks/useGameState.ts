@@ -79,6 +79,7 @@ export interface GameState {
   randomHandToZone: (count: number, toZone: string, deckPosition: string) => void;
   randomReserveToZone: (count: number, toZone: string, deckPosition: string) => void;
   randomOpponentHandToZone: (requestId: bigint, count: number, toZone: string, deckPosition: string) => void;
+  opponentShuffleAndDraw: (requestId: bigint, shuffleCount: number, drawCount: number) => void;
   meekCard: (cardInstanceId: bigint) => void;
   unmeekCard: (cardInstanceId: bigint) => void;
   flipCard: (cardInstanceId: bigint) => void;
@@ -113,7 +114,7 @@ export interface GameState {
   // Rematch actions
   requestRematch: (deckId: string, deckData: string, paragon: string, format: string) => void;
   respondRematch: (accepted: boolean, deckId: string, deckData: string, paragon: string, format: string) => void;
-  revealCards: (cardIds: string) => void;
+  revealCards: (cardIds: string, context?: string) => void;
   clearRevealedCards: () => void;
   logSearchDeck: () => void;
   logLookAtTop: (count: number) => void;
@@ -400,6 +401,18 @@ export function useGameState(gameId: bigint): GameState {
     [conn, gameId],
   );
 
+  const opponentShuffleAndDraw = useCallback(
+    (requestId: bigint, shuffleCount: number, drawCount: number) => {
+      conn?.reducers.opponentShuffleAndDraw({
+        gameId,
+        requestId,
+        shuffleCount: BigInt(shuffleCount),
+        drawCount: BigInt(drawCount),
+      });
+    },
+    [conn, gameId],
+  );
+
   const reloadDeck = useCallback(
     (deckId: string, deckData: string, paragon: string) => {
       conn?.reducers.reloadDeck({ gameId, deckId, deckData, paragon });
@@ -517,8 +530,8 @@ export function useGameState(gameId: bigint): GameState {
   );
 
   const revealCards = useCallback(
-    (cardIds: string) => {
-      conn?.reducers.revealCards({ gameId, cardIds });
+    (cardIds: string, context: string = '') => {
+      conn?.reducers.revealCards({ gameId, cardIds, context });
     },
     [conn, gameId],
   );
@@ -734,6 +747,7 @@ export function useGameState(gameId: bigint): GameState {
     randomHandToZone,
     randomReserveToZone,
     randomOpponentHandToZone,
+    opponentShuffleAndDraw,
     reloadDeck,
     meekCard,
     unmeekCard,

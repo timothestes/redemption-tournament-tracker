@@ -71,6 +71,26 @@ describe('abilityLabel', () => {
       .toBe('Shuffle 6 from hand, draw 6');
   });
 
+  it('formats all_players_shuffle_and_draw', () => {
+    expect(abilityLabel({ type: 'all_players_shuffle_and_draw', shuffleCount: 6, drawCount: 6 }))
+      .toBe('All players shuffle 6 from hand, draw 6');
+  });
+
+  it('formats reveal_own_deck for top position', () => {
+    expect(abilityLabel({ type: 'reveal_own_deck', position: 'top', count: 6 }))
+      .toBe('Reveal top 6 cards of deck');
+  });
+
+  it('formats reveal_own_deck for random position', () => {
+    expect(abilityLabel({ type: 'reveal_own_deck', position: 'random', count: 3 }))
+      .toBe('Reveal 3 random cards of deck');
+  });
+
+  it('formats reveal_own_deck singular', () => {
+    expect(abilityLabel({ type: 'reveal_own_deck', position: 'bottom', count: 1 }))
+      .toBe('Reveal bottom 1 card of deck');
+  });
+
   it('uses explicit label for custom abilities', () => {
     expect(abilityLabel({ type: 'custom', reducerName: 'foo', label: 'Do Thing' }))
       .toBe('Do Thing');
