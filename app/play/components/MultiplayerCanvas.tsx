@@ -988,10 +988,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         gameState.moveCard(BigInt(id), String(toZone), undefined, posX?.toString(), posY?.toString()),
       moveCardsBatch: (ids, toZone) =>
         gameState.moveCardsBatch(JSON.stringify(ids), String(toZone)),
-      moveCardToTopOfDeck: (id) => gameState.moveCardToTopOfDeck(BigInt(id)),
-      moveCardToBottomOfDeck: (id) => gameState.moveCardToBottomOfDeck(BigInt(id)),
+      // The shared Soul Deck has no "deck" semantics — redirect the generic
+      // "Top/Bottom of Deck" and "Shuffle into Deck" context-menu actions back
+      // to 'soul-deck' so they don't escape into the viewer's private deck and
+      // corrupt both piles.
+      moveCardToTopOfDeck: (id) => gameState.moveCard(BigInt(id), 'soul-deck', '0'),
+      moveCardToBottomOfDeck: (id) => gameState.moveCard(BigInt(id), 'soul-deck'),
       shuffleDeck: () => gameState.shuffleSoulDeck(),
-      shuffleCardIntoDeck: (id) => gameState.shuffleCardIntoDeck(BigInt(id)),
+      shuffleCardIntoDeck: (_id) => gameState.shuffleSoulDeck(),
     },
   }), [sharedCards, counters, gameState]);
 
@@ -1129,13 +1133,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       }
       const ids = pickSoulDeckIds(mode, n);
       if (ids.length === 0) return;
+      // Rescue-attempt reveals are intentionally non-undoable — skip the undo wrapper.
       if (ids.length === 1) {
-        moveCard(BigInt(ids[0]), 'land-of-bondage');
+        gameState.moveCard(BigInt(ids[0]), 'land-of-bondage');
       } else {
-        moveCardsBatch(JSON.stringify(ids), 'land-of-bondage');
+        gameState.moveCardsBatch(JSON.stringify(ids), 'land-of-bondage');
       }
     },
-    [sharedCards, pickSoulDeckIds, moveCard, moveCardsBatch],
+    [sharedCards, pickSoulDeckIds, gameState],
   );
 
   const lookAtSoulDeck = useCallback(
