@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useModalGame } from '@/app/shared/contexts/ModalGameContext';
-import { GameCard } from '@/app/shared/types/gameCard';
+import { GameCard, ZoneId } from '@/app/shared/types/gameCard';
 import { X, Search, ArrowLeftRight } from 'lucide-react';
 import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './ModalCardHoverPreview';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
@@ -20,6 +20,8 @@ interface DeckExchangeModalProps {
   isDragActive?: boolean;
   /** Set by useModalCardDrag — true only when the drag ended on a valid zone */
   validDropRef?: React.MutableRefObject<boolean>;
+  /** Which zone the exchange cards land in. Defaults to 'deck'; set to 'soul-deck' for Paragon shared-soul exchange. */
+  targetZone?: ZoneId;
 }
 
 export function DeckExchangeModal({
@@ -30,6 +32,7 @@ export function DeckExchangeModal({
   didDragRef,
   isDragActive,
   validDropRef,
+  targetZone = 'deck',
 }: DeckExchangeModalProps) {
   const { zones, actions } = useModalGame();
   const { moveCardToTopOfDeck, shuffleDeck, exchangeFromDeck } = actions;
@@ -89,7 +92,7 @@ export function DeckExchangeModal({
     return null;
   }).filter(Boolean) as GameCard[];
 
-  const deckCards = zones.deck;
+  const deckCards = zones[targetZone] ?? [];
   const filtered = search
     ? deckCards.filter(c => matchesSearch(c, search))
     : deckCards;
@@ -198,8 +201,8 @@ export function DeckExchangeModal({
 
     const pickedIds = Array.from(selectedIds);
 
-    if (exchangeFromDeck) {
-      // Atomic path: single reducer handles the entire exchange
+    if (exchangeFromDeck && targetZone === 'deck') {
+      // Atomic path: single reducer handles the entire exchange (private deck only)
       const replacementMoves = pickedIds.map((cardId, i) => {
         const source = exchangeCards[i];
         return {
@@ -211,7 +214,8 @@ export function DeckExchangeModal({
       });
       exchangeFromDeck(exchangeCardIds, replacementMoves);
     } else {
-      // Fallback for goldfish/non-multiplayer: use individual calls
+      // Fallback for goldfish/non-multiplayer or non-deck targets (e.g. shared soul deck):
+      // rely on the provider's moveCardToTopOfDeck / shuffleDeck to target the correct pile.
       for (let i = 0; i < needCount; i++) {
         const source = exchangeCards[i];
         actions.moveCard(pickedIds[i], source.zone, undefined, source.posX, source.posY);
@@ -223,7 +227,7 @@ export function DeckExchangeModal({
     }
 
     onComplete();
-  }, [selectedIds, needCount, exchangeCards, exchangeCardIds, exchangeFromDeck, actions, moveCardToTopOfDeck, shuffleDeck, onComplete]);
+  }, [selectedIds, needCount, exchangeCards, exchangeCardIds, exchangeFromDeck, actions, moveCardToTopOfDeck, shuffleDeck, onComplete, targetZone]);
 
   return (
     <>
@@ -274,7 +278,7 @@ export function DeckExchangeModal({
                   color: 'var(--gf-text-bright)',
                 }}
               >
-                Exchange — Pick {needCount} card{needCount > 1 ? 's' : ''} from Deck
+                Exchange — Pick {needCount} card{needCount > 1 ? 's' : ''} from {targetZone === 'soul-deck' ? 'Soul Deck' : 'Deck'}
               </h2>
             </div>
             <button
@@ -297,7 +301,7 @@ export function DeckExchangeModal({
             marginBottom: 12,
           }}>
             <span style={{ color: 'var(--gf-text)', fontSize: 12, fontFamily: 'var(--font-cinzel), Georgia, serif' }}>
-              Sending to deck:
+              Sending to {targetZone === 'soul-deck' ? 'soul deck' : 'deck'}:
             </span>
             {exchangeCards.map(c => (
               <span key={c.instanceId} style={{
@@ -414,7 +418,7 @@ export function DeckExchangeModal({
           <div style={{ overflow: 'auto', flex: 1 }}>
             {filtered.length === 0 ? (
               <p style={{ color: 'var(--gf-text-dim)', fontStyle: 'italic', textAlign: 'center', padding: 20 }}>
-                {search ? 'No cards match your search' : 'Deck is empty'}
+                {search ? 'No cards match your search' : (targetZone === 'soul-deck' ? 'Soul Deck is empty' : 'Deck is empty')}
               </p>
             ) : (
               <div

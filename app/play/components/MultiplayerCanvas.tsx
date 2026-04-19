@@ -601,7 +601,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const [showDeckSearch, setShowDeckSearch] = useState(false);
   const [peekState, setPeekState] = useState<{ position: 'top' | 'bottom' | 'random'; count: number; source?: { cardName: string } } | null>(null);
   const [lookState, setLookState] = useState<{ count: number; position: 'top' | 'bottom' | 'random' } | null>(null);
-  const [exchangeCardIds, setExchangeCardIds] = useState<string[] | null>(null);
+  const [exchangeState, setExchangeState] = useState<
+    { cardIds: string[]; targetZone: ZoneId } | null
+  >(null);
   const [opponentZoneMenu, setOpponentZoneMenu] = useState<{ x: number; y: number; zone: string; zoneName: string } | null>(null);
   const [opponentDeckMenu, setOpponentDeckMenu] = useState<{ x: number; y: number } | null>(null);
   const [opponentPeekState, setOpponentPeekState] = useState<{ position: 'top' | 'bottom' | 'random'; count: number } | null>(null);
@@ -622,7 +624,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       browseMyZone !== null ||
       browseOpponentZone !== null ||
       peekState !== null ||
-      exchangeCardIds !== null ||
+      exchangeState !== null ||
       opponentPeekState !== null ||
       opponentLookState !== null ||
       browseSoulDeck ||
@@ -638,7 +640,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     browseMyZone,
     browseOpponentZone,
     peekState,
-    exchangeCardIds,
+    exchangeState,
     opponentPeekState,
     opponentLookState,
     browseSoulDeck,
@@ -1048,7 +1050,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     setShowDeckSearch(false);
     setPeekState(null);
     setLookState(null);
-    setExchangeCardIds(null);
+    setExchangeState(null);
     setBrowseMyZone(null);
     setBrowseOpponentZone(null);
     setOpponentZoneMenu(null);
@@ -4846,7 +4848,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           y={contextMenu.y}
           actions={{ ...multiplayerActions, ...(sharedSoulActions ?? {}) }}
           onClose={() => setContextMenu(null)}
-          onExchange={(cardIds) => { setContextMenu(null); setExchangeCardIds(cardIds); }}
+          onExchange={(cardIds) => {
+            setContextMenu(null);
+            setExchangeState({ cardIds, targetZone: isSharedSoul ? 'soul-deck' : 'deck' });
+          }}
           onDetach={
             contextMenu.card.ownerId === 'player1'
               ? (weaponId) => {
@@ -5147,7 +5152,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               for (const id of ids) multiplayerActions.moveCardToBottomOfDeck(id);
               setDeckDrop(null);
             }}
-            onExchange={!isBatch ? () => { setDeckDrop(null); setExchangeCardIds([deckDrop.cardId]); } : undefined}
+            onExchange={!isBatch ? () => { setDeckDrop(null); setExchangeState({ cardIds: [deckDrop.cardId], targetZone: 'deck' }); } : undefined}
             onCancel={() => setDeckDrop(null)}
           />
         );
@@ -5436,11 +5441,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           />
         )}
 
-        {exchangeCardIds && (
+        {exchangeState && exchangeState.targetZone !== 'soul-deck' && (
           <DeckExchangeModal
-            exchangeCardIds={exchangeCardIds}
-            onComplete={() => { setExchangeCardIds(null); clearSelection(); }}
-            onCancel={() => setExchangeCardIds(null)}
+            exchangeCardIds={exchangeState.cardIds}
+            targetZone={exchangeState.targetZone}
+            onComplete={() => { setExchangeState(null); clearSelection(); }}
+            onCancel={() => setExchangeState(null)}
             onStartDrag={modalStartDrag}
             didDragRef={modalDidDragRef}
             isDragActive={modalDrag.isDragging}
@@ -5504,6 +5510,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             isDragActive={modalDrag.isDragging}
             isPrivateLook
             sourceZone="soul-deck"
+          />
+        )}
+        {exchangeState && exchangeState.targetZone === 'soul-deck' && (
+          <DeckExchangeModal
+            exchangeCardIds={exchangeState.cardIds}
+            targetZone={exchangeState.targetZone}
+            onComplete={() => { setExchangeState(null); clearSelection(); }}
+            onCancel={() => setExchangeState(null)}
+            onStartDrag={modalStartDrag}
+            didDragRef={modalDidDragRef}
+            isDragActive={modalDrag.isDragging}
+            validDropRef={modalValidDropRef}
           />
         )}
       </ModalGameProvider>
