@@ -1241,7 +1241,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
    * plus hand zone. Priority: my zones first, then opponent free-form zones.
    */
   const findZoneAtPosition = useCallback(
-    (x: number, y: number): { zone: DropZoneKey; owner: 'my' | 'opponent' } | null => {
+    (x: number, y: number): { zone: DropZoneKey; owner: 'my' | 'opponent' | 'shared' } | null => {
       if (!mpLayout || !myHandRect) return null;
 
       // Check my hand zone
@@ -1252,6 +1252,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // Check opponent hand zone
       if (opponentHandRect && pointInRect(x, y, opponentHandRect)) {
         return { zone: 'hand', owner: 'opponent' };
+      }
+
+      // Paragon: the shared LoB is a drop target that resets ownership to the shared sentinel.
+      if (normalizedFormat === 'Paragon' && mpLayout.zones.sharedLob && pointInRect(x, y, mpLayout.zones.sharedLob)) {
+        return { zone: 'land-of-bondage', owner: 'shared' };
       }
 
       // Check my zones (all: free-form + sidebar piles)
@@ -1278,7 +1283,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
       return null;
     },
-    [mpLayout, myZones, opponentZones, myHandRect, opponentHandRect],
+    [mpLayout, myZones, opponentZones, myHandRect, opponentHandRect, normalizedFormat],
   );
 
   // ---- Modal card drag hook (for dragging cards from modals to canvas) ----
@@ -2266,14 +2271,22 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // Resolve the zone rect for the drop target so we can store normalized positions
       // (0–1 ratios). This ensures cards render at the correct proportional position
       // regardless of each player's screen/window size.
-      const zoneRect = hit.owner === 'my' ? myZones[targetZone] : opponentZones[targetZone];
+      const zoneRect =
+        hit.owner === 'my'
+          ? myZones[targetZone]
+          : hit.owner === 'opponent'
+          ? opponentZones[targetZone]
+          : mpLayout?.zones.sharedLob;
       // Resolve target owner ID — always set to the target zone's owner so
       // cards transfer ownership when moving between players' zones.
-      const targetOwnerId = hit.owner === 'my' && gameState.myPlayer
-        ? String(gameState.myPlayer.id)
-        : hit.owner === 'opponent' && gameState.opponentPlayer
-        ? String(gameState.opponentPlayer.id)
-        : '';
+      const targetOwnerId =
+        hit.owner === 'shared'
+          ? '0'
+          : hit.owner === 'my' && gameState.myPlayer
+          ? String(gameState.myPlayer.id)
+          : hit.owner === 'opponent' && gameState.opponentPlayer
+          ? String(gameState.opponentPlayer.id)
+          : '';
 
       // Opponent zones render with mirrored positions (1-posX, 1-posY).
       // When dropping into an opponent zone, inverse-mirror so the card
@@ -2577,6 +2590,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       clearSelection,
       myZones,
       opponentZones,
+      mpLayout,
       gameState.myPlayer,
       gameState.opponentPlayer,
       scale,

@@ -1650,7 +1650,15 @@ export const move_card = spacetimedb.reducer(
     // Moving to deck = face-down; leaving deck or reserve = face-up; otherwise preserve
     const isFlipped = toZone === 'deck' ? true : (fromZone === 'deck' || fromZone === 'reserve') ? false : card.isFlipped;
     // Optionally transfer ownership (e.g. rescue lost soul, capture hero)
-    const newOwnerId = targetOwnerId ? BigInt(targetOwnerId) : card.ownerId;
+    let newOwnerId = targetOwnerId ? BigInt(targetOwnerId) : card.ownerId;
+    // Paragon: dropping a soul-origin card back into the shared LoB resets ownership to the shared sentinel.
+    if (
+      targetOwnerId === '0' &&
+      card.isSoulDeckOrigin === true &&
+      toZone === 'land-of-bondage'
+    ) {
+      newOwnerId = 0n;
+    }
 
     // Paragon: rescuing a shared soul transfers ownership to the acting seat.
     let resolvedOwnerId = newOwnerId;
@@ -1905,6 +1913,14 @@ export const move_cards_batch = spacetimedb.reducer(
         cardFinalZone !== 'soul-deck'
       ) {
         resolvedCardOwnerId = player.id;
+      }
+      // Paragon: dropping a soul-origin card back into the shared LoB resets ownership to the shared sentinel.
+      if (
+        targetOwnerId === '0' &&
+        card.isSoulDeckOrigin === true &&
+        cardFinalZone === 'land-of-bondage'
+      ) {
+        resolvedCardOwnerId = 0n;
       }
       // Clear the attach pointer only when the mover is actually leaving its
       // current zone. Same-zone reposition preserves the link (both Territory
