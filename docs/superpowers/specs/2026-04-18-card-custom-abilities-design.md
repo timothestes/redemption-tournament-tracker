@@ -10,16 +10,18 @@ Goldfish and multiplayer modes currently support a fixed menu of card actions (m
 
 The existing Land of Bondages flow hardcodes a single opponent-lost-soul spawn inside the goldfish reducer. The pattern doesn't scale: every new card ability would require a bespoke reducer branch, hardcoded UI, and its own SpacetimeDB reducer. This design introduces a single extensible system so any card can declare one or more custom right-click abilities in a shared registry, and both modes dispatch those abilities through a uniform code path.
 
-V1 ships the `spawn_token` ability type, enough to cover every card in the GoC token-spawning set the user called out:
+V1 ships the `spawn_token` ability type, enough to cover every card in the GoC token-spawning set the user called out. Each ability entry has an optional `count` — cards like *Two Possessed* spawn multiple tokens per invocation, so one right-click produces the full number atomically instead of requiring the player to click N times.
 
-| Source card | Token |
-|---|---|
-| Two Possessed (GoC) | Violent Possessor Token |
-| The Accumulator (GoC) | Wicked Spirit Token |
-| The Proselytizers (GoC) | Proselyte Token |
-| The Church of Christ (GoC) | Follower Token |
-| Angel of the Harvest (GoC) | Heavenly Host Token |
-| The Heavenly Host (GoC) | Heavenly Host Token |
+| Source card | Token | Count per click |
+|---|---|---|
+| Two Possessed (GoC) | Violent Possessor Token | 2 |
+| The Accumulator (GoC) | Wicked Spirit Token | 1 |
+| The Proselytizers (GoC) | Proselyte Token | 1 |
+| The Church of Christ (GoC) | Follower Token | 1 |
+| Angel of the Harvest (GoC) | Heavenly Host Token | 1 |
+| The Heavenly Host (GoC) | Heavenly Host Token | 1 |
+
+If another card in the set actually spawns multiple tokens per effect (or spawns different token *kinds* in one effect), the count can be bumped or a second ability entry can be added to that card's array. This table is the starting canonical mapping for v1 and easy to edit as the real card text is re-checked during implementation.
 
 All five token cards are confirmed present in `lib/cards/generated/cardData.ts` (verified via grep during spec prep — Follower, Heavenly Host, Proselyte, Violent Possessor, and Wicked Spirit Token entries all exist). No data import step is needed. If `make update-cards` ever pulls down a version of `carddata.txt` that drops one of these rows, the registry integrity unit test (see §Testing) will fail and the implementation will catch it.
 
@@ -54,13 +56,16 @@ export type CardAbility =
   | { type: 'custom'; reducerName: string; label: string };                 // reserved
 
 export const CARD_ABILITIES: Record<string, CardAbility[]> = {
-  'Two Possessed (GoC)':         [{ type: 'spawn_token', tokenName: 'Violent Possessor Token' }],
+  'Two Possessed (GoC)':         [{ type: 'spawn_token', tokenName: 'Violent Possessor Token', count: 2 }],
   'The Accumulator (GoC)':       [{ type: 'spawn_token', tokenName: 'Wicked Spirit Token' }],
   'The Proselytizers (GoC)':     [{ type: 'spawn_token', tokenName: 'Proselyte Token' }],
   'The Church of Christ (GoC)':  [{ type: 'spawn_token', tokenName: 'Follower Token' }],
   'Angel of the Harvest (GoC)':  [{ type: 'spawn_token', tokenName: 'Heavenly Host Token' }],
   'The Heavenly Host (GoC)':     [{ type: 'spawn_token', tokenName: 'Heavenly Host Token' }],
 };
+// `count` defaults to 1 when omitted. Cards that spawn multiple tokens per
+// effect (e.g., Two Possessed's two Violent Possessors) set count explicitly
+// so a single right-click spawns all of them atomically — never partial.
 
 export function getAbilitiesForCard(identifier: string): CardAbility[] {
   return CARD_ABILITIES[identifier] ?? [];
@@ -68,7 +73,12 @@ export function getAbilitiesForCard(identifier: string): CardAbility[] {
 
 export function abilityLabel(a: CardAbility): string {
   switch (a.type) {
-    case 'spawn_token':      return `Create ${a.tokenName}${a.count && a.count > 1 ? ` ×${a.count}` : ''}`;
+    case 'spawn_token': {
+      const n = a.count ?? 1;
+      // n=1 → "Create Violent Possessor Token"
+      // n>1 → "Create 2× Violent Possessor Token"
+      return n > 1 ? `Create ${n}× ${a.tokenName}` : `Create ${a.tokenName}`;
+    }
     case 'shuffle_and_draw': return `Shuffle ${a.shuffleCount} from hand, draw ${a.drawCount}`;
     case 'custom':           return a.label;
   }
@@ -345,6 +355,7 @@ Mutation only happens inside the Phase 3 clone step, and if Phase 2 (building `n
 
 - Import the user's GoC deck.
 - Right-click each of the six source cards in the Battle Area; verify the correct token appears with the correct art and metadata.
+- Right-click *Two Possessed* and verify the menu reads "Create 2× Violent Possessor Token" and a single click produces two tokens side by side in the Battle Area.
 - Drag a token to Discard; verify it disappears.
 - Spawn a token from a source card in Hand; verify it goes to Territory (fallback path).
 
