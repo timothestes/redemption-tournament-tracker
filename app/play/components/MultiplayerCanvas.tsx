@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Stage, Layer, Rect, Text, Group } from 'react-konva';
+import { Stage, Layer, Rect, Text, Group, Image as KonvaImage } from 'react-konva';
 import type Konva from 'konva';
 import KonvaLib from 'konva';
 
@@ -57,6 +57,7 @@ import { useVirtualCanvas, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen } from
 import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '@/app/goldfish/utils/equipLayout';
 import { findCard, isWarrior, isWeapon, isSite } from '@/lib/cards/lookup';
 import { normalizeDeckFormat } from '@/lib/deck-format';
+import { SOUL_DECK_BACK_IMG } from '@/app/shared/paragon/soulDeck';
 import { Link2Off } from 'lucide-react';
 import { useCardScale } from '@/app/shared/hooks/useCardScale';
 import { CardScaleControl } from '@/app/shared/components/CardScaleControl';
@@ -214,6 +215,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const {
     myCards,
     opponentCards,
+    sharedCards,
     counters,
     moveCard: rawMoveCard,
     moveCardsBatch: rawMoveCardsBatch,
@@ -564,6 +566,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const [browseOpponentZone, setBrowseOpponentZone] = useState<string | null>(null);
   const [zoneMenu, setZoneMenu] = useState<{ x: number; y: number; spawnX: number; spawnY: number; targetPlayerId?: string } | null>(null);
   const [deckMenu, setDeckMenu] = useState<{ x: number; y: number } | null>(null);
+  // Paragon-only: right-click context menu for the shared Soul Deck pile. Shared by
+  // both players, so there's no approval flow — handlers dispatch reducers directly.
+  const [soulDeckMenu, setSoulDeckMenu] = useState<{ x: number; y: number } | null>(null);
+  const [browseSoulDeck, setBrowseSoulDeck] = useState(false);
+  const [soulDeckLookState, setSoulDeckLookState] = useState<
+    { cardIds: string[]; title: string } | null
+  >(null);
   const [lorMenu, setLorMenu] = useState<{ x: number; y: number } | null>(null);
   const [deckDrop, setDeckDrop] = useState<{ x: number; y: number; cardId: string; batchIds?: string[] } | null>(null);
   const pendingBatchRef = useRef<string[] | null>(null);

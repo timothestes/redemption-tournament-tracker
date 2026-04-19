@@ -44,6 +44,8 @@ export interface GameState {
   disconnectTimeoutFired: boolean;
   myCards: Record<string, CardInstanceRow[]>;
   opponentCards: Record<string, CardInstanceRow[]>;
+  /** Cards with ownerId === 0n (Paragon shared cards — Soul Deck and shared LoB souls). */
+  sharedCards: Record<string, CardInstanceRow[]>;
   isMyTurn: boolean;
   counters: Map<bigint, CardCounterRow[]>;
   chatMessages: ChatMessageRow[];
@@ -71,6 +73,8 @@ export interface GameState {
   detachCard: (weaponInstanceId: bigint, posX?: string, posY?: string) => void;
   shuffleDeck: () => void;
   shuffleCardIntoDeck: (cardInstanceId: bigint) => void;
+  /** Paragon-only — shuffle all shared Soul Deck cards via server reducer. */
+  shuffleSoulDeck: () => void;
   reloadDeck: (deckId: string, deckData: string, paragon: string) => void;
   randomHandToZone: (count: number, toZone: string, deckPosition: string) => void;
   randomReserveToZone: (count: number, toZone: string, deckPosition: string) => void;
@@ -221,6 +225,14 @@ export function useGameState(gameId: bigint): GameState {
     return groupCardsByZone(gameCards.filter((c) => c.ownerId === opponentPlayer.id));
   }, [gameCards, opponentPlayer]);
 
+  // Shared cards — ownerId === 0n sentinel (Paragon Soul Deck + shared-origin souls
+  // still in the shared LoB). Once a shared soul is rescued, the move_card reducer
+  // transfers ownership to the rescuer, so the card leaves this bucket and lands
+  // in myCards / opponentCards under land-of-redemption.
+  const sharedCards = useMemo(() => {
+    return groupCardsByZone(gameCards.filter((c) => c.ownerId === 0n));
+  }, [gameCards]);
+
   // Counters indexed by cardInstanceId
   const counters = useMemo(() => {
     const map = new Map<bigint, CardCounterRow[]>();
@@ -361,6 +373,10 @@ export function useGameState(gameId: bigint): GameState {
     },
     [conn, gameId],
   );
+
+  const shuffleSoulDeck = useCallback(() => {
+    conn?.reducers.shuffleSoulDeck({ gameId });
+  }, [conn, gameId]);
 
   const randomHandToZone = useCallback(
     (count: number, toZone: string, deckPosition: string) => {
@@ -681,6 +697,7 @@ export function useGameState(gameId: bigint): GameState {
     disconnectTimeoutFired,
     myCards,
     opponentCards,
+    sharedCards,
     isMyTurn,
     counters,
     chatMessages,
@@ -698,6 +715,7 @@ export function useGameState(gameId: bigint): GameState {
     detachCard,
     shuffleDeck,
     shuffleCardIntoDeck,
+    shuffleSoulDeck,
     randomHandToZone,
     randomReserveToZone,
     randomOpponentHandToZone,

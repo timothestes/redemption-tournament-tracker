@@ -2295,6 +2295,49 @@ export const shuffle_deck = spacetimedb.reducer(
 );
 
 // ---------------------------------------------------------------------------
+// Reducer: shuffle_soul_deck
+// Paragon-only. Shuffles all shared soul-deck cards (ownerId=0n) in a single
+// seeded pass. Either seat may invoke it (the Soul Deck is shared). Mirrors
+// goldfish's client-side SHUFFLE_SOUL_DECK action but runs authoritatively.
+// ---------------------------------------------------------------------------
+export const shuffle_soul_deck = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+  },
+  (ctx, { gameId }) => {
+    // Still require the sender to be a player in the game (stops drive-bys), but
+    // either seat is authorized since the Soul Deck is shared.
+    const player = findPlayerBySender(ctx, gameId);
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (normalizeFormat(game.format) !== 'Paragon') {
+      throw new SenderError('Soul Deck only exists in Paragon format');
+    }
+
+    const soulCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+      (c: any) => c.ownerId === 0n && c.zone === 'soul-deck'
+    );
+    if (soulCards.length === 0) return;
+
+    const newRngCounter = game.rngCounter + 1n;
+    ctx.db.Game.id.update({ ...game, rngCounter: newRngCounter });
+
+    const seed = makeSeed(ctx.timestamp.microsSinceUnixEpoch, gameId, 0n, newRngCounter);
+    const indices = soulCards.map((_: any, idx: number) => idx);
+    seededShuffle(indices, seed);
+
+    for (let i = 0; i < soulCards.length; i++) {
+      ctx.db.CardInstance.id.update({
+        ...soulCards[i],
+        zoneIndex: BigInt(indices[i]),
+      });
+    }
+
+    logAction(ctx, gameId, player.id, 'SHUFFLE_SOUL_DECK', '', game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
 // Reducer: shuffle_card_into_deck
 // ---------------------------------------------------------------------------
 export const shuffle_card_into_deck = spacetimedb.reducer(
