@@ -56,6 +56,7 @@ import { getCardImageUrl as getSharedCardImageUrl } from '@/app/shared/utils/car
 import { useVirtualCanvas, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen } from '@/app/shared/layout/virtualCanvas';
 import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '@/app/goldfish/utils/equipLayout';
 import { findCard, isWarrior, isWeapon, isSite } from '@/lib/cards/lookup';
+import { normalizeDeckFormat } from '@/lib/deck-format';
 import { Link2Off } from 'lucide-react';
 import { useCardScale } from '@/app/shared/hooks/useCardScale';
 import { CardScaleControl } from '@/app/shared/components/CardScaleControl';
@@ -318,12 +319,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // ---- Layout ----
   // Normalize the raw game.format string (e.g. "Paragon Type 1", "Type 2") to
   // the canonical 'T1' | 'T2' | 'Paragon' expected by the layout function.
-  const rawFormat = gameState.game?.format ?? '';
-  const normalizedFormat: 'T1' | 'T2' | 'Paragon' = rawFormat.toLowerCase().includes('paragon')
-    ? 'Paragon'
-    : rawFormat.toLowerCase().includes('type 2') || rawFormat.toLowerCase() === 't2'
-      ? 'T2'
-      : 'T1';
+  const normalizedFormat = normalizeDeckFormat(gameState.game?.format ?? '');
   const mpLayout = useMemo(
     () => calculateMultiplayerLayout(virtualWidth, VIRTUAL_HEIGHT, normalizedFormat),
     [virtualWidth, normalizedFormat],

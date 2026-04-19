@@ -365,30 +365,6 @@ export function calculateMultiplayerLayout(
     label: 'Land of Bondage',
   };
 
-  // Paragon: collapse both per-seat LoBs into a single shared band sitting
-  // on top of the center divider. Soul Deck pile anchors the left end.
-  let sharedLob: ZoneRect | undefined;
-  let soulDeck: ZoneRect | undefined;
-  if (format === 'Paragon') {
-    const sharedBandY = oppTerritoryY + oppTerritoryHeight + gap;
-    const sharedBandHeight = oppLobHeight + dividerHeight + playerLobHeight - gap * 2;
-    const soulDeckWidth = Math.round(Math.min(100, (playAreaWidth - pad * 2) * 0.12));
-    sharedLob = {
-      x: pad + soulDeckWidth + 4,
-      y: sharedBandY,
-      width: playAreaWidth - pad * 2 - soulDeckWidth - 4,
-      height: sharedBandHeight,
-      label: 'Land of Bondage (Shared)',
-    };
-    soulDeck = {
-      x: pad,
-      y: sharedBandY,
-      width: soulDeckWidth,
-      height: sharedBandHeight,
-      label: 'Soul Deck',
-    };
-  }
-
   const playerHand: ZoneRect = {
     x: 0,
     y: playerHandY,
@@ -397,12 +373,80 @@ export function calculateMultiplayerLayout(
     label: 'Hand',
   };
 
+  // Paragon: replace the two per-seat LoBs + divider with a single shared
+  // LoB band positioned between the territories. The Soul Deck pile anchors
+  // the left end. Per-seat LoBs and divider rects collapse to zero-height
+  // placeholders at the shared band's Y so Task 15 can branch on
+  // `sharedLob` presence without worrying about stale rect positions.
+  //
+  // Vertical budget: existing oppLob + divider + playerLob occupy a fixed
+  // slice of stageHeight; reallocate that slice to the shared band and
+  // shift the player territory up so its bottom hits the reclaimed space.
+  let sharedLob: ZoneRect | undefined;
+  let soulDeck: ZoneRect | undefined;
+  let paragonOpponentLob: ZoneRect | undefined;
+  let paragonPlayerLob: ZoneRect | undefined;
+  let paragonDivider: ZoneRect | undefined;
+  let paragonPlayerTerritory: ZoneRect | undefined;
+  let paragonPlayerHand: ZoneRect | undefined;
+  if (format === 'Paragon') {
+    const SOUL_DECK_GUTTER = 4;
+    // Shared band = (old oppLob + old divider + old playerLob) vertical budget
+    const sharedBandHeight = oppLobHeight + dividerHeight + playerLobHeight;
+    const sharedBandY = oppTerritoryY + oppTerritoryHeight;
+    // Player territory shifts UP to sit directly under the shared band.
+    const paragonPlayerTerritoryY = sharedBandY + sharedBandHeight;
+    const paragonPlayerHandY = paragonPlayerTerritoryY + playerTerritoryHeight;
+    const paragonPlayerHandHeight = stageHeight - paragonPlayerHandY;
+
+    const soulDeckWidth = Math.round(Math.min(100, (playAreaWidth - pad * 2) * 0.12));
+
+    sharedLob = {
+      x: pad + soulDeckWidth + SOUL_DECK_GUTTER,
+      y: sharedBandY + gap,
+      width: playAreaWidth - pad * 2 - soulDeckWidth - SOUL_DECK_GUTTER,
+      height: sharedBandHeight - gap * 2,
+      label: 'Land of Bondage (Shared)',
+    };
+    soulDeck = {
+      x: pad,
+      y: sharedBandY + gap,
+      width: soulDeckWidth,
+      height: sharedBandHeight - gap * 2,
+      label: 'Soul Deck',
+    };
+
+    // Collapse the legacy LoB / divider rects to zero-height at the shared
+    // band's Y position so forgotten render sites are silent no-ops rather
+    // than out-of-place overlays.
+    paragonOpponentLob = { x: pad, y: sharedBandY, width: playAreaWidth - pad * 2, height: 0, label: '' };
+    paragonDivider = { x: 0, y: sharedBandY, width: stageWidth, height: 0, label: '' };
+    paragonPlayerLob = { x: pad, y: paragonPlayerTerritoryY + playerTerritoryHeight, width: playAreaWidth - pad * 2, height: 0, label: '' };
+
+    // Shift the player territory + player hand down.
+    paragonPlayerTerritory = {
+      ...playerTerritory,
+      y: paragonPlayerTerritoryY,
+    };
+    paragonPlayerHand = {
+      x: 0,
+      y: paragonPlayerHandY,
+      width: stageWidth,
+      height: paragonPlayerHandHeight,
+      label: 'Hand',
+    };
+  }
+
   // ── Sidebars ─────────────────────────────────────────────────────────
   // Split at the center divider so each sidebar mirrors its half of the board.
   const oppSidebarY = oppLobY;
-  const oppSidebarHeight = dividerY - oppLobY;
-  const playerSidebarY = dividerY + dividerHeight;
-  const playerSidebarHeight = playerHandY - playerSidebarY;
+  const oppSidebarHeight = (format === 'Paragon' ? oppTerritoryY + oppTerritoryHeight : dividerY) - oppLobY;
+  const playerSidebarY = format === 'Paragon'
+    ? (paragonPlayerTerritory?.y ?? (dividerY + dividerHeight))
+    : dividerY + dividerHeight;
+  const playerSidebarHeight = (format === 'Paragon'
+    ? (paragonPlayerHand?.y ?? playerHandY)
+    : playerHandY) - playerSidebarY;
 
   // Opponent piles: Deck (top) → Discard → Reserve → Banish → LOR (bottom)
   const oppPileLabels = ['Deck', 'Discard', 'Reserve', 'Banish', 'Land of Redemption'];
@@ -443,11 +487,11 @@ export function calculateMultiplayerLayout(
     zones: {
       opponentHand,
       opponentTerritory,
-      opponentLob,
-      divider,
-      playerLob,
-      playerTerritory,
-      playerHand,
+      opponentLob: paragonOpponentLob ?? opponentLob,
+      divider: paragonDivider ?? divider,
+      playerLob: paragonPlayerLob ?? playerLob,
+      playerTerritory: paragonPlayerTerritory ?? playerTerritory,
+      playerHand: paragonPlayerHand ?? playerHand,
       sharedLob,
       soulDeck,
     },
