@@ -8,6 +8,7 @@ import { X, Search, ArrowLeftRight } from 'lucide-react';
 import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './ModalCardHoverPreview';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
+import { useDraggableModal } from '@/app/shared/hooks/useDraggableModal';
 
 interface DeckExchangeModalProps {
   /** The card instance IDs being sent into the deck */
@@ -34,6 +35,7 @@ export function DeckExchangeModal({
   validDropRef,
   targetZone = 'deck',
 }: DeckExchangeModalProps) {
+  const { dragHandleProps, modalStyle } = useDraggableModal();
   const { zones, actions } = useModalGame();
   const { moveCardToTopOfDeck, shuffleDeck, exchangeFromDeck } = actions;
   const [search, setSearch] = useState('');
@@ -265,10 +267,21 @@ export function DeckExchangeModal({
             opacity: isDragActive ? 0.15 : 1,
             pointerEvents: isDragActive ? 'none' : 'auto',
             transition: 'opacity 0.2s ease',
+            ...modalStyle,
           }}
         >
           {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <div
+            {...dragHandleProps}
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 12,
+              userSelect: 'none',
+              ...dragHandleProps.style,
+            }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <ArrowLeftRight size={16} style={{ color: 'var(--gf-accent)' }} />
               <h2
