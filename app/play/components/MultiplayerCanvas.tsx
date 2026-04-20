@@ -650,6 +650,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const [exchangeState, setExchangeState] = useState<
     { cardIds: string[]; targetZone: ZoneId } | null
   >(null);
+  const exchangeStateRef = useRef<{ cardIds: string[]; targetZone: ZoneId } | null>(null);
+  useEffect(() => {
+    exchangeStateRef.current = exchangeState;
+  }, [exchangeState]);
   const [opponentZoneMenu, setOpponentZoneMenu] = useState<{ x: number; y: number; zone: string; zoneName: string } | null>(null);
   const [opponentDeckMenu, setOpponentDeckMenu] = useState<{ x: number; y: number } | null>(null);
   const [opponentPeekState, setOpponentPeekState] = useState<{ position: 'top' | 'bottom' | 'random'; count: number } | null>(null);
@@ -1515,13 +1519,20 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       execute();
     },
     onDeckDrop: (cardId, screenX, screenY) => {
+      // Suppress the deck-drop popup while an exchange is already in progress.
+      // Task 1 already ensures validDropRef stays false for deck targets, so
+      // the exchange modal will not complete either.
+      if (exchangeStateRef.current) return;
       // Defer so batch callback (called first) can store IDs
       pendingBatchRef.current = null;
       setTimeout(() => {
         setDeckDrop({ x: screenX, y: screenY, cardId, batchIds: pendingBatchRef.current ?? undefined });
       }, 0);
     },
-    onBatchDeckDrop: (cardIds) => { pendingBatchRef.current = cardIds; },
+    onBatchDeckDrop: (cardIds) => {
+      if (exchangeStateRef.current) return;
+      pendingBatchRef.current = cardIds;
+    },
     cardWidth,
     cardHeight,
   });

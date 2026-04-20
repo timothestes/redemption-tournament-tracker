@@ -235,6 +235,11 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   const [multiCardContextMenu, setMultiCardContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [batchDeckDropIds, setBatchDeckDropIds] = useState<string[] | null>(null);
   const [exchangeCardIds, setExchangeCardIds] = useState<string[] | null>(null);
+  const exchangeCardIdsRef = useRef<string[] | null>(null);
+  useEffect(() => {
+    exchangeCardIdsRef.current = exchangeCardIds;
+  }, [exchangeCardIds]);
+
   const [zoneMenu, setZoneMenu] = useState<{ x: number; y: number; spawnX: number; spawnY: number } | null>(null);
   const [lorMenu, setLorMenu] = useState<{ x: number; y: number } | null>(null);
   const [cardRenderKey, setCardRenderKey] = useState(0);
@@ -395,6 +400,11 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
 
   // Shared handler: when a card is dropped on the deck zone, show popup
   const handleDeckDrop = useCallback((cardInstanceId: string, screenX: number, screenY: number) => {
+    // Suppress the deck-drop popup while an exchange is already in progress.
+    // Dropping deck→deck during exchange is treated as "cancel this drag attempt";
+    // Task 1 already ensures validDropRef stays false for deck targets, so the
+    // exchange modal will not complete either.
+    if (exchangeCardIdsRef.current) return;
     // Tokens dragged onto deck are silently removed
     const allCards = Object.values(state.zones).flat();
     const card = allCards.find(c => c.instanceId === cardInstanceId);
@@ -407,6 +417,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
 
   // Batch deck drop handler for multi-card modal drags
   const handleBatchDeckDrop = useCallback((cardInstanceIds: string[]) => {
+    if (exchangeCardIdsRef.current) return;
     setBatchDeckDropIds(cardInstanceIds);
   }, []);
 
@@ -418,6 +429,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     hoveredZone: modalHoveredZone,
     ghostRef: modalGhostRef,
     didDragRef: modalDidDragRef,
+    validDropRef: modalValidDropRef,
   } = useModalCardDrag({
     stageRef,
     zoneLayout,
@@ -2649,6 +2661,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             onStartDrag={modalStartDrag}
             didDragRef={modalDidDragRef}
             isDragActive={modalDrag.isDragging}
+            validDropRef={modalValidDropRef}
           />
         )}
       </ModalGameProvider>
