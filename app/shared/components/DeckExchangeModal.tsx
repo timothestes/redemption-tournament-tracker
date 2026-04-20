@@ -9,6 +9,7 @@ import { useModalCardHover, ModalCardHoverPreview, getHoverGlowStyle } from './M
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import { useDraggableModal } from '@/app/shared/hooks/useDraggableModal';
+import { DraggableTitleBar } from './DraggableTitleBar';
 
 interface DeckExchangeModalProps {
   /** The card instance IDs being sent into the deck */
@@ -270,37 +271,14 @@ export function DeckExchangeModal({
             ...modalStyle,
           }}
         >
-          {/* Header */}
-          <div
-            {...dragHandleProps}
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: 12,
-              userSelect: 'none',
-              ...dragHandleProps.style,
-            }}
+          <DraggableTitleBar
+            dragHandleProps={dragHandleProps}
+            title={`Exchange — Pick ${needCount} card${needCount > 1 ? 's' : ''} from ${targetZone === 'soul-deck' ? 'Soul Deck' : 'Deck'}`}
+            bottomGap={12}
+            onClose={onCancel}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <ArrowLeftRight size={16} style={{ color: 'var(--gf-accent)' }} />
-              <h2
-                style={{
-                  fontFamily: 'var(--font-cinzel), Georgia, serif',
-                  fontSize: 16,
-                  color: 'var(--gf-text-bright)',
-                }}
-              >
-                Exchange — Pick {needCount} card{needCount > 1 ? 's' : ''} from {targetZone === 'soul-deck' ? 'Soul Deck' : 'Deck'}
-              </h2>
-            </div>
-            <button
-              onClick={onCancel}
-              style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--gf-text-dim)' }}
-            >
-              <X size={18} />
-            </button>
-          </div>
+            <ArrowLeftRight size={14} style={{ color: 'var(--gf-accent)', flexShrink: 0 }} />
+          </DraggableTitleBar>
 
           {/* Exchange info banner */}
           <div style={{
