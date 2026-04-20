@@ -76,7 +76,7 @@ export default function UsernameModal({ onSuccess, onClose }: UsernameModalProps
   const trimmed = username.trim();
   const isValidLength = trimmed.length >= 3 && trimmed.length <= 24;
   const isValidChars = /^[a-zA-Z0-9_-]*$/.test(trimmed);
-  const canSubmit = isValidLength && isValidChars && available === true && !submitting;
+  const canSubmit = isValidLength && isValidChars && available === true && !submitting && !checking;
 
   return (
     <Dialog open={true} onOpenChange={(open) => { if (!open) onClose(); }}>

@@ -373,6 +373,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
       onClick={() => { if (readyForClose && !didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) handleCloseAction('top'); }}
       onContextMenu={(e) => e.preventDefault()}
     >
+      <div style={modalStyle}>
       <motion.div
         initial={false}
         animate={{ opacity: 1, scale: 1 }}
@@ -391,7 +392,6 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
           opacity: isDragActive ? 0.15 : 1,
           pointerEvents: isDragActive ? 'none' : 'auto',
           transition: 'opacity 0.2s ease',
-          ...modalStyle,
         }}
       >
         <DraggableTitleBar
@@ -583,6 +583,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
           ) : null}
         </div>
       </motion.div>
+      </div>
 
       <ModalCardHoverPreview hover={hover} />
 

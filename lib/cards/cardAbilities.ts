@@ -41,6 +41,8 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'Lost Soul "Lawless" [Hebrews 12:8]':                  [{ type: 'reveal_own_deck', position: 'top', count: 6 }],
   'Lost Soul "Lawless" [Hebrews 12:8] [2021 - 1st Place]': [{ type: 'reveal_own_deck', position: 'top', count: 6 }],
   'Lost Soul "Lawless" [Hebrews 12:8] [AB - CoW]':       [{ type: 'reveal_own_deck', position: 'top', count: 6 }],
+  'The Ancient of Days':                                 [{ type: 'reveal_own_deck', position: 'top', count: 3 }],
+  'The Ancient of Days [T2C AB]':                        [{ type: 'reveal_own_deck', position: 'top', count: 3 }],
 };
 
 /**
