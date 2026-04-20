@@ -429,6 +429,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     hoveredZone: modalHoveredZone,
     ghostRef: modalGhostRef,
     didDragRef: modalDidDragRef,
+    validDropRef: modalValidDropRef,
   } = useModalCardDrag({
     stageRef,
     zoneLayout,
@@ -2660,6 +2661,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             onStartDrag={modalStartDrag}
             didDragRef={modalDidDragRef}
             isDragActive={modalDrag.isDragging}
+            validDropRef={modalValidDropRef}
           />
         )}
       </ModalGameProvider>
