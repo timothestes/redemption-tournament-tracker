@@ -41,7 +41,7 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
   const card = useMemo(() => {
     if (!zones) return initialCard;
     for (const zoneId of Object.keys(zones) as ZoneId[]) {
-      const found = zones[zoneId].find(c => c.instanceId === initialCard.instanceId);
+      const found = (zones[zoneId] ?? []).find(c => c.instanceId === initialCard.instanceId);
       if (found) return found;
     }
     return initialCard;

@@ -35,7 +35,7 @@ export function MultiCardContextMenu({ selectedIds, x, y, actions, onClose, onCl
   const selectedCards = zones
     ? selectedIds.flatMap(id => {
         for (const zoneId of Object.keys(zones) as ZoneId[]) {
-          const card = zones[zoneId].find(c => c.instanceId === id);
+          const card = (zones[zoneId] ?? []).find(c => c.instanceId === id);
           if (card) return [card];
         }
         return [];

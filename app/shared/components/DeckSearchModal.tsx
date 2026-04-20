@@ -215,7 +215,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
     }
   };
 
-  const deckCards = zones.deck;
+  const deckCards = zones.deck ?? [];
   const filtered = search
     ? deckCards.filter(c => matchesSearch(c, search))
     : deckCards;

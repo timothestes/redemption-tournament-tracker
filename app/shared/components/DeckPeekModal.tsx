@@ -201,7 +201,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
 
   // Derive live cards from current state (they may have been moved already)
   const peekedCards = peekedIds
-    .map(id => zones[sourceZone].find(c => c.instanceId === id))
+    .map(id => (zones[sourceZone] ?? []).find(c => c.instanceId === id))
     .filter((c): c is GameCard => !!c);
 
   const remainingIds = peekedCards.map(c => c.instanceId);
@@ -376,7 +376,8 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
       <div style={modalStyle}>
       <motion.div
         initial={false}
-        animate={{ opacity: 1, scale: 1 }}
+        animate={{ opacity: isDragActive ? 0.15 : 1, scale: 1 }}
+        transition={{ opacity: { duration: 0.2 } }}
         onClick={(e) => e.stopPropagation()}
         onPointerDown={handleContentPointerDown}
         style={{
@@ -384,14 +385,11 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
           border: '1px solid var(--gf-border)',
           borderRadius: 8,
           padding: 20,
-          width: '90vw',
-          maxWidth: '90vw',
+          width: `min(90vw, ${Math.min(peekedIds.length, 4) * 152 + 40}px)`,
           maxHeight: '85vh',
           overflowY: 'auto',
           position: 'relative',
-          opacity: isDragActive ? 0.15 : 1,
           pointerEvents: isDragActive ? 'none' : 'auto',
-          transition: 'opacity 0.2s ease',
         }}
       >
         <DraggableTitleBar
@@ -453,7 +451,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
             ref={gridRef}
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
               gap: 12,
               position: 'relative',
               userSelect: 'none',

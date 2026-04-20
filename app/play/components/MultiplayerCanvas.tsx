@@ -189,6 +189,44 @@ function describeOpponentAction(action: string, paramsJson: string): string {
   }
 }
 
+/** Same as describeOpponentAction but phrased from the requester's POV for
+ *  denial toasts (e.g. "look at top 6 of opponent's deck"). */
+function describeRequesterAction(action: string, paramsJson: string): string {
+  let parsed: any = {};
+  try { parsed = paramsJson ? JSON.parse(paramsJson) : {}; } catch {}
+  const count = parsed.count ?? 0;
+  const plural = count === 1 ? '' : 's';
+  if (action === 'shuffle_and_draw') {
+    const s = parsed.shuffleCount ?? 0;
+    const d = parsed.drawCount ?? 0;
+    return `shuffle ${s} from opponent's hand, draw ${d}`;
+  }
+  switch (action) {
+    case 'shuffle_deck': return "shuffle opponent's deck";
+    case 'look_deck_top': return `look at top ${count} of opponent's deck`;
+    case 'look_deck_bottom': return `look at bottom ${count} of opponent's deck`;
+    case 'look_deck_random': return `look at ${count} random card${plural} from opponent's deck`;
+    case 'reveal_deck_top': return `reveal top ${count} of opponent's deck`;
+    case 'reveal_deck_bottom': return `reveal bottom ${count} of opponent's deck`;
+    case 'reveal_deck_random': return `reveal ${count} random card${plural} from opponent's deck`;
+    case 'draw_deck_top': return `draw ${count} from top of opponent's deck`;
+    case 'draw_deck_bottom': return `draw ${count} from bottom of opponent's deck`;
+    case 'draw_deck_random': return `draw ${count} random from opponent's deck`;
+    case 'discard_deck_top': return `discard top ${count} of opponent's deck`;
+    case 'discard_deck_bottom': return `discard bottom ${count} of opponent's deck`;
+    case 'discard_deck_random': return `discard ${count} random from opponent's deck`;
+    case 'reserve_deck_top': return `reserve top ${count} of opponent's deck`;
+    case 'reserve_deck_bottom': return `reserve bottom ${count} of opponent's deck`;
+    case 'reserve_deck_random': return `reserve ${count} random from opponent's deck`;
+    case 'random_hand_to_discard': return `discard ${count} random from opponent's hand`;
+    case 'random_hand_to_reserve': return `send ${count} random from opponent's hand to reserve`;
+    case 'random_hand_to_deck_top': return `send ${count} random from opponent's hand to top of deck`;
+    case 'random_hand_to_deck_bottom': return `send ${count} random from opponent's hand to bottom of deck`;
+    case 'random_hand_to_deck_shuffle': return `shuffle ${count} random from opponent's hand into deck`;
+    default: return 'action';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
@@ -941,6 +979,26 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         });
         return;
       }
+      if (ability?.type === 'look_at_own_deck') {
+        // Private — no broadcast to opponent. Reuses the existing lookState
+        // modal (same DeckPeekModal with isPrivateLook).
+        setLookState({
+          position: ability.position,
+          count: ability.count,
+        });
+        return;
+      }
+      if (ability?.type === 'look_at_opponent_deck') {
+        // Requires opponent consent — routes through the existing
+        // request_opponent_action flow. On approve, the approvedSearchRequest
+        // effect dispatches `look_deck_*` which opens opponentLookState.
+        const action =
+          ability.position === 'top' ? 'look_deck_top'
+          : ability.position === 'bottom' ? 'look_deck_bottom'
+          : 'look_deck_random';
+        requestOpponentAction(action, JSON.stringify({ count: ability.count }));
+        return;
+      }
       gameState.executeCardAbility(sourceInstanceId, abilityIndex);
     },
     randomHandToZone: (count, toZone, deckPosition) =>
@@ -1572,10 +1630,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     if (pendingSearchRef.current && !myPending && !approvedSearchRequest) {
       const prev = pendingSearchRef.current;
       const zone = prev.zone;
-      const msg = prev.action ? 'Action denied'
-        : zone === 'hand-reveal' ? 'Reveal request denied'
-        : zone === 'action-priority' ? 'Priority request denied'
-        : 'Search request denied';
+      const msg = prev.action ? `Opponent denied: ${describeRequesterAction(prev.action, prev.actionParams)}`
+        : zone === 'hand-reveal' ? 'Opponent declined to reveal their hand'
+        : zone === 'action-priority' ? 'Opponent declined priority'
+        : `Opponent declined to share their ${zone}`;
       showGameToast(msg);
     }
     pendingSearchRef.current = myPending ?? null;

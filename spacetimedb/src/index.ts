@@ -2488,6 +2488,10 @@ export const execute_card_ability = spacetimedb.reducer(
       }
       case 'reveal_own_deck':
         throw new SenderError('reveal_own_deck is dispatched by the client, not this reducer');
+      case 'look_at_own_deck':
+        throw new SenderError('look_at_own_deck is dispatched by the client, not this reducer');
+      case 'look_at_opponent_deck':
+        throw new SenderError('look_at_opponent_deck is dispatched by the client, not this reducer');
       case 'custom':
         throw new SenderError('Custom abilities are dispatched by the client, not this reducer');
     }

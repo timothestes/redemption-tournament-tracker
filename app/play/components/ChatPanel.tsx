@@ -593,9 +593,18 @@ export default function ChatPanel({
     return () => timers.forEach(clearTimeout);
   }, [gameActions]);
 
-  const visibleGameActions = hiddenActionIds.size === 0
+  const visibleGameActions = (hiddenActionIds.size === 0
     ? gameActions
-    : gameActions.filter((a) => !hiddenActionIds.has(a.id.toString()));
+    : gameActions.filter((a) => !hiddenActionIds.has(a.id.toString()))
+  ).filter((a) => {
+    // Suppress "finished action priority" — the grant/request pair is enough.
+    if (a.actionType === 'COMPLETE_ZONE_SEARCH' && a.payload) {
+      try {
+        if (JSON.parse(a.payload).zone === 'action-priority') return false;
+      } catch { /* fall through */ }
+    }
+    return true;
+  });
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const logEndRef = useRef<HTMLDivElement>(null);

@@ -148,7 +148,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
   const { dragHandleProps, modalStyle } = useDraggableModal();
   const { zones, actions } = useModalGame();
   const { moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck, shuffleDeck } = actions;
-  const rawCards = zones[zoneId];
+  const rawCards = zones[zoneId] ?? [];
   // Sort reserve by type then name (matches goldfish canvas convention)
   const cards = zoneId === 'reserve'
     ? [...rawCards].sort((a, b) => a.type.localeCompare(b.type) || a.cardName.localeCompare(b.cardName))

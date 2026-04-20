@@ -95,7 +95,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
         if (found) { source = found; break; }
       }
       const ability = source ? getAbilitiesForCard(source.cardName)[abilityIndex] : undefined;
-      if (ability?.type === 'reveal_own_deck') {
+      if (ability?.type === 'reveal_own_deck' || ability?.type === 'look_at_own_deck') {
         const deck = state.zones.deck;
         if (deck.length === 0) { showGameToast('Deck is empty'); return; }
         const n = Math.min(ability.count, deck.length);

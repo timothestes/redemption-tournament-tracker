@@ -22,6 +22,8 @@ export type CardAbility =
   | { type: 'shuffle_and_draw'; shuffleCount: number; drawCount: number }
   | { type: 'all_players_shuffle_and_draw'; shuffleCount: number; drawCount: number }
   | { type: 'reveal_own_deck'; position: 'top' | 'bottom' | 'random'; count: number }
+  | { type: 'look_at_own_deck'; position: 'top' | 'bottom' | 'random'; count: number }
+  | { type: 'look_at_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'custom'; reducerName: string; label: string };
 
 export const CARD_ABILITIES: Record<string, CardAbility[]> = {
@@ -45,6 +47,44 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'Lost Soul "Lawless" [Hebrews 12:8] [AB - CoW]':       [{ type: 'reveal_own_deck', position: 'top', count: 6 }],
   'The Ancient of Days':                                 [{ type: 'reveal_own_deck', position: 'top', count: 3 }],
   'The Ancient of Days [T2C AB]':                        [{ type: 'reveal_own_deck', position: 'top', count: 3 }],
+  'Given from God':                                      [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
+  'Given from God [T2C AB]':                             [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
+  'Anna, the Widow (GoC)':                               [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
+  'Vain Vision (PoC)':                                   [{ type: 'look_at_own_deck', position: 'top', count: 6 }],
+  'Shimei (CoW AB)':                                     [{ type: 'look_at_own_deck', position: 'top', count: 4 }],
+  'Shimei (CoW)':                                        [{ type: 'look_at_own_deck', position: 'top', count: 4 }],
+  'Zeresh, Wife of Haman (Roots)':                       [{ type: 'look_at_own_deck', position: 'top', count: 6 }],
+  'Chaldeans [T2C AB]':                                  [{ type: 'look_at_own_deck', position: 'top', count: 6 }],
+  'Chaldeans [T2C]':                                     [{ type: 'look_at_own_deck', position: 'top', count: 6 }],
+  'Laban, the Deal Breaker (Roots)':                     [{ type: 'look_at_own_deck', position: 'top', count: 6 }],
+  'Divination [K]':                                      [{ type: 'look_at_own_deck', position: 'top', count: 6 }],
+  'House of Samuel':                                     [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
+  'Mount Sinai':                                         [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
+  'Faith of Isaac':                                      [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
+  'False Prophecy (PoC)':                                [{ type: 'look_at_opponent_deck', position: 'top', count: 6 }],
+  'Omen Interpreter':                                    [{ type: 'reveal_own_deck', position: 'top', count: 6 }],
+  "Balaam's Prophecy":                                   [{ type: 'reveal_own_deck', position: 'top', count: 6 }],
+  'Fruit of the Land':                                   [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
+  'Intervening of Prophecy':                             [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
+  'The Coming Prince':                                   [{ type: 'look_at_own_deck', position: 'top', count: 1 }],
+  'Sign of Jonah':                                       [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
+  'Virgin Birth':                                        [{ type: 'look_at_own_deck', position: 'top', count: 6 }],
+  'Eve, Mother of All (Roots)':                          [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
+  'The Thankful Leper (GoC)':                            [{ type: 'look_at_own_deck', position: 'top', count: 10 }],
+  'David (Roots)':                                       [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
+  'Malachi, the Loved':                                  [{ type: 'look_at_own_deck', position: 'top', count: 4 }],
+  'Malachi, the Loved [T2C AB]':                         [{ type: 'look_at_own_deck', position: 'top', count: 4 }],
+  'Samuel, Born of Prayer':                              [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
+  'David the Psalmist':                                  [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
+  'David, the Psalmist (CoW AB)':                        [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
+  'Prophets of Gibeath (Promo)':                         [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
+  "David's Spies [K]":                                   [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
+  'Servants by the River [T2C AB]':                      [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
+  'Servants by the River [T2C]':                         [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
+  'The Angel of His Presence [T2C AB]':                  [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
+  'The Angel of His Presence [T2C]':                     [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
+  'The Three Visitors':                                  [{ type: 'look_at_own_deck', position: 'top', count: 9 }],
+  'Women of Israel [L]':                                 [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
 };
 
 export function getAbilitiesForCard(identifier: string): CardAbility[] {

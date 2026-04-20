@@ -854,6 +854,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           // Goldfish is single-player — apply to the card's owner only.
           return shuffleAndDrawInState(state, source.ownerId, ability.shuffleCount, ability.drawCount, history);
         case 'reveal_own_deck':
+        case 'look_at_own_deck':
+        case 'look_at_opponent_deck':
           // Modal-driven effect — GoldfishCanvas intercepts the dispatch and
           // calls setPeekState directly. Reaching the reducer is a bug, no-op.
           return state;
