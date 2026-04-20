@@ -171,7 +171,6 @@ export function useModalCardDrag({
           const targetZone = findZoneAtPosition(virt.x, virt.y);
 
           if (targetZone) {
-            validDropRef.current = true;
             const primary = dragRef.current.card;
             const additional = dragRef.current.additionalCards;
             const isMulti = additional.length > 0;
@@ -180,6 +179,11 @@ export function useModalCardDrag({
               : [primary.instanceId];
 
             if (targetZone === 'deck') {
+              // Intentionally do NOT set validDropRef.current = true here.
+              // `validDropRef` is consumed by DeckExchangeModal, which cannot
+              // accept "deck" as a valid exchange destination for a card that
+              // was just dragged out of the deck. Letting deck drops pass as
+              // valid would cause the exchange to complete with no net move.
               if (isMulti && onBatchDeckDrop) {
                 onBatchDeckDrop(allIds);
               }
@@ -188,6 +192,7 @@ export function useModalCardDrag({
                 onDeckDrop(primary.instanceId, e.clientX, e.clientY);
               }
             } else if (targetZone === 'territory' || targetZone === 'land-of-bondage') {
+              validDropRef.current = true;
               if (isMulti) {
                 const baseX = virt.x - cardWidth / 2;
                 const baseY = virt.y - cardHeight / 2;
@@ -201,6 +206,7 @@ export function useModalCardDrag({
                 moveCard(primary.instanceId, targetZone, undefined, virt.x - cardWidth / 2, virt.y - cardHeight / 2);
               }
             } else {
+              validDropRef.current = true;
               if (isMulti) {
                 moveCardsBatch(allIds, targetZone);
               } else {
