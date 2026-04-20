@@ -146,18 +146,20 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
   // (includes the set suffix, e.g., "Two Possessed (GoC)") — the identifier
   // field is a taxonomy descriptor, not a stable lookup key.
   const abilities = getAbilitiesForCard(card.cardName);
-  const isOwnedByLocalPlayer = true; // multiplayer server enforces ownership; UX predicate is a separate concern
+  // Only the local player (player1) can fire abilities on their own cards. The
+  // server enforces this too, but hiding the menu items avoids a confusing
+  // click-then-fail flow when right-clicking opponent cards in multiplayer.
+  // Goldfish is single-player so every card is owned by player1 — no change there.
+  const isOwnedByLocalPlayer = card.ownerId === 'player1';
   // Only allow abilities to fire when the source card is actually in play.
   // Cards in hand/deck/reserve/discard/banish can't trigger in-play effects.
   // "In play" means Territory, Land of Bondage, or Land of Redemption — heroes
   // rest in LoR between battles, so omitting it blocks most Hero-source cards.
   const ABILITY_SOURCE_ZONES: ReadonlyArray<ZoneId> = ['territory', 'land-of-bondage', 'land-of-redemption'];
   const isInAbilityZone = ABILITY_SOURCE_ZONES.includes(card.zone);
-  const canExecuteAbilities =
-    abilities.length > 0 &&
-    typeof actions.executeCardAbility === 'function' &&
-    isOwnedByLocalPlayer &&
-    isInAbilityZone;
+  const hasAbilities =
+    abilities.length > 0 && typeof actions.executeCardAbility === 'function';
+  const canExecuteAbilities = hasAbilities && isOwnedByLocalPlayer && isInAbilityZone;
 
   // Opponent tokens get a simplified menu
   if (card.isToken) {
@@ -192,23 +194,35 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
   return (
     <div ref={menuRef} style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
 
-      {/* Card abilities from CARD_ABILITIES registry */}
-      {canExecuteAbilities && (
+      {/* Card abilities from CARD_ABILITIES registry. Rendered disabled when
+          the local player doesn't own the card, or when the card isn't in a
+          valid source zone — the server would reject these anyway. */}
+      {hasAbilities && (
         <>
-          {abilities.map((ability, index) => (
-            <button
-              key={index}
-              style={itemStyle}
-              onClick={() => {
-                actions.executeCardAbility?.(card.instanceId, index);
-                onClose();
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-            >
-              {abilityLabel(ability)}
-            </button>
-          ))}
+          {abilities.map((ability, index) => {
+            const disabled = !canExecuteAbilities;
+            return (
+              <button
+                key={index}
+                disabled={disabled}
+                title={disabled && !isOwnedByLocalPlayer ? "You don't control this card" : undefined}
+                style={{
+                  ...itemStyle,
+                  opacity: disabled ? 0.4 : 1,
+                  cursor: disabled ? 'not-allowed' : 'pointer',
+                }}
+                onClick={() => {
+                  if (disabled) return;
+                  actions.executeCardAbility?.(card.instanceId, index);
+                  onClose();
+                }}
+                onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.background = 'var(--gf-hover)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                {abilityLabel(ability)}
+              </button>
+            );
+          })}
           <div style={separatorStyle} />
         </>
       )}
