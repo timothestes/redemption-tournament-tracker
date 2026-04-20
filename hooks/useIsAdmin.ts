@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "../utils/supabase/client";
+import { getUserSafe } from "../utils/supabase/getUserSafe";
 
 interface AdminState {
   isAdmin: boolean;
@@ -18,9 +19,9 @@ export function useIsAdmin() {
   useEffect(() => {
     const checkAdminStatus = async () => {
       try {
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        const user = await getUserSafe(supabase);
 
-        if (authError || !user) {
+        if (!user) {
           setState({ isAdmin: false, permissions: [], loading: false });
           return;
         }

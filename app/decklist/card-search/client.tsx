@@ -19,6 +19,7 @@ import { useDeckState } from "./hooks/useDeckState";
 import { useDeckCheck } from "./hooks/useDeckCheck";
 import { parseDeckText, generateDeckText, downloadDeckAsFile, copyDeckToClipboard } from "./utils/deckImportExport";
 import { createClient } from "../../../utils/supabase/client";
+import { getUserSafe } from "../../../utils/supabase/getUserSafe";
 import type { User } from "@supabase/supabase-js";
 import { deleteDeckAction } from "../actions";
 import { MobileBottomNav } from "./components/MobileBottomNav";
@@ -492,7 +493,7 @@ export default function CardSearchClient() {
   // Check user authentication on mount
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const currentUser = await getUserSafe(supabase);
       setUser(currentUser);
     };
 

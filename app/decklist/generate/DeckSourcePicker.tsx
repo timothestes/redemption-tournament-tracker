@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { loadUserDecksAction, loadDeckByIdAction, DeckData, DeckCardData } from "../actions";
 import { createClient } from "@/utils/supabase/client";
+import { getUserSafe } from "@/utils/supabase/getUserSafe";
 
 /**
  * Convert DeckCardData[] from the database into Lackey-format text.
@@ -91,7 +92,7 @@ export default function DeckSourcePicker({
   // Check auth + preload deck count on mount
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    getUserSafe(supabase).then((user) => {
       setIsLoggedIn(!!user);
       if (user) {
         // Preload deck count so we can show it on the button

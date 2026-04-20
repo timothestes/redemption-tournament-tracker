@@ -14,6 +14,7 @@ import { usePathname } from "next/navigation";
 import { Button } from "./ui/button";
 import { ThemeSwitcher } from "./theme-switcher";
 import { createClient } from "../utils/supabase/client";
+import { getUserSafe } from "../utils/supabase/getUserSafe";
 import { signOutAction } from "../app/actions";
 import { useIsAdmin } from "../hooks/useIsAdmin";
 import { NATIONALS_CONFIG } from "../app/config/nationals";
@@ -85,7 +86,7 @@ const TopNav: React.FC = () => {
   // Auth effect — runs once on mount, listens for session changes
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const currentUser = await getUserSafe(supabase);
       setUser(currentUser);
       setAuthLoading(false);
     };

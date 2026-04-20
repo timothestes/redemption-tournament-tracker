@@ -54,6 +54,24 @@ export const updateSession = async (request: NextRequest) => {
 
     const pathname = request.nextUrl.pathname;
 
+    // Zombie-session cleanup: auth cookies are present but the server
+    // rejected them (refresh token rotation race, network-interrupted
+    // refresh, reuse detection). Without this, the browser keeps the stale
+    // access-token cookie and the UI shows "logged in" while every server
+    // call silently 401s.
+    if (error && !user) {
+      const staleAuthCookies = request.cookies
+        .getAll()
+        .filter(
+          (c) => c.name.startsWith("sb-") && c.name.includes("-auth-token"),
+        );
+      if (staleAuthCookies.length > 0) {
+        staleAuthCookies.forEach((cookie) => {
+          response.cookies.set(cookie.name, "", { maxAge: 0, path: "/" });
+        });
+      }
+    }
+
     // Protected routes: redirect to sign-in if no session
     if (needsAuth(pathname) && !user && error) {
       const fullPath = request.nextUrl.pathname + request.nextUrl.search;

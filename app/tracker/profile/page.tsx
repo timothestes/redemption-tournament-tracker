@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "../../../utils/supabase/client";
+import { getUserSafe } from "../../../utils/supabase/getUserSafe";
 
 export default function ProfilePage() {
   const [user, setUser] = useState(null);
@@ -9,12 +10,8 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const fetchUser = async () => {
-      const { data, error } = await supabase.auth.getUser();
-      if (error) {
-        console.error("Error fetching user:", error);
-      } else {
-        setUser(data.user);
-      }
+      const currentUser = await getUserSafe(supabase);
+      setUser(currentUser);
     };
 
     fetchUser();

@@ -6,6 +6,7 @@ import { Input } from "../../../components/ui/input";
 import { Label } from "../../../components/ui/label";
 import TopNav from "../../../components/top-nav";
 import { createClient } from "../../../utils/supabase/client";
+import { getUserSafe } from "../../../utils/supabase/getUserSafe";
 import { getRegistrations, deleteRegistration, sendBulkEmail, updateRegistration, createTournamentFromRegistrations } from "./actions";
 import { useRouter } from "next/navigation";
 import { useIsAdmin } from "../../../hooks/useIsAdmin";
@@ -77,7 +78,7 @@ export default function AdminRegistrationsPage() {
 
   useEffect(() => {
     const checkAccess = async () => {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const currentUser = await getUserSafe(supabase);
       setUser(currentUser);
 
       // Check if user has manage_registrations permission
