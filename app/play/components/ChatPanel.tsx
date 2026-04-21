@@ -183,6 +183,13 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       return data.isFlipped ? 'turned a card face down' : 'flipped a card face up';
     } catch { /* fall through */ }
   }
+  if (actionType === 'REVEAL_CARD' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      if (data.cardName) return <>revealed <HoverableCard name={data.cardName} img={data.cardImgFile} /> from hand</>;
+      return 'revealed a card from hand';
+    } catch { /* fall through */ }
+  }
   if (actionType === 'SET_PHASE' && payload) {
     try {
       const data = JSON.parse(payload);

@@ -3395,6 +3395,8 @@ export const reveal_card_in_hand = spacetimedb.reducer(
     if (!game) throw new SenderError('Game not found');
     const payload = {
       cardInstanceId: cardInstanceId.toString(),
+      cardName: card.cardName,
+      cardImgFile: card.cardImgFile,
       expiresAtMicros: expiresAtMicros.toString(),
     };
     logAction(ctx, gameId, player.id, 'REVEAL_CARD', JSON.stringify(payload), game.turnNumber, game.currentPhase);

@@ -4898,7 +4898,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               >
                 {oppHandPositions.map((pos, i) => {
                   const card = opponentHandCards[i];
-                  if (oppHandRevealed && card) {
+                  // Per-card reveal: an individual hand card can be revealed
+                  // temporarily via revealExpiresAt. When active (or when the
+                  // whole hand is revealed), route through GameCardNode so
+                  // the face + countdown badge render correctly.
+                  const nowMicros = BigInt(Date.now()) * 1000n;
+                  const cardRevealed =
+                    !!card &&
+                    card.revealExpiresAt !== undefined &&
+                    card.revealExpiresAt.microsSinceUnixEpoch > nowMicros;
+                  if ((oppHandRevealed || cardRevealed) && card) {
                     const gameCard = adaptCard(card, 'player2');
                     return (
                       <GameCardNode
