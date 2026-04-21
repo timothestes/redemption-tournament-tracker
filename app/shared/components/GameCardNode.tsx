@@ -329,19 +329,22 @@ export const GameCardNode = memo(function GameCardNode({
           const REVEAL_DURATION_MS = 30_000;
           const remainingMs = Math.max(0, card.revealUntil! - Date.now());
           const remainingFrac = Math.min(1, remainingMs / REVEAL_DURATION_MS);
-          const outerRadius = 8;
-          const innerRadius = 5;
+          const outerRadius = 10;
+          const innerRadius = 6;
           const cx = cardWidth - outerRadius - 4;
           const cy = outerRadius + 4;
           return (
             <Group x={cx} y={cy} listening={false}>
-              {/* Background ring — subtle base so empty state still reads */}
+              {/* Solid dark backdrop — ensures the ring reads against any
+                  card art, not just dark areas. */}
+              <Circle radius={outerRadius + 1} fill="rgba(0,0,0,0.85)" />
+              {/* Empty-track ring — shows remaining shape after the arc sweeps past */}
               <Arc
                 innerRadius={innerRadius}
                 outerRadius={outerRadius}
                 angle={360}
                 rotation={-90}
-                fill="rgba(20,20,20,0.55)"
+                fill="rgba(40,40,40,0.95)"
               />
               {/* Remaining time arc — amber, sweeps clockwise */}
               <Arc
