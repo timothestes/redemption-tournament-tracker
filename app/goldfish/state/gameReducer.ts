@@ -249,6 +249,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         result.card.isFlipped = false;
       }
       result.card.zone = toZone;
+      // Per-card hand reveals are ephemeral — clear when the card changes zone.
+      if (result.fromZone !== toZone) {
+        result.card.revealUntil = undefined;
+      }
       // Paragon: rescuing a Soul-Deck-origin card transfers ownership from
       // the shared sentinel to the rescuing player. Marker stays set.
       const movedFromSharedLob =
@@ -391,6 +395,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (result.card.isToken) return { ...state, zones, history };
       zones.deck = shuffleArray(zones.deck);
       result.card.zone = 'deck';
+      result.card.revealUntil = undefined;
       zones.deck.unshift(result.card);
       return { ...state, zones, history };
     }
@@ -403,6 +408,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (result.card.isToken) return { ...state, zones, history };
       zones.deck = shuffleArray(zones.deck);
       result.card.zone = 'deck';
+      result.card.revealUntil = undefined;
       zones.deck.push(result.card);
       return { ...state, zones, history };
     }
@@ -577,6 +583,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           result.card.isFlipped = false;
         }
         result.card.zone = finalZone;
+        if (result.fromZone !== finalZone) {
+          result.card.revealUntil = undefined;
+        }
         const wasSharedSoulFromLob =
           result.fromZone === 'land-of-bondage' &&
           result.card.ownerId === 'shared' &&
@@ -868,6 +877,17 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           return state;
         }
       }
+    }
+
+    case 'REVEAL_CARD_IN_HAND': {
+      const { cardInstanceId, value } = action.payload;
+      if (!cardInstanceId || typeof value !== 'number') return state;
+      // Only reveal cards that are actually in hand — silently no-op otherwise.
+      const idx = zones.hand.findIndex(c => c.instanceId === cardInstanceId);
+      if (idx === -1) return state;
+      zones.hand = [...zones.hand];
+      zones.hand[idx] = { ...zones.hand[idx], revealUntil: value };
+      return { ...state, zones, history };
     }
 
     default:
