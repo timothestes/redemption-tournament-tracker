@@ -41,4 +41,9 @@ export interface GameActions {
   // Custom per-card abilities (optional — registry-driven right-click actions).
   // Implemented by both goldfish and multiplayer. See lib/cards/cardAbilities.ts.
   executeCardAbility?(sourceInstanceId: string, abilityIndex: number): void;
+
+  // Per-card hand reveal (optional — implemented by both goldfish and multiplayer).
+  // Temporarily reveals a single hand card to opponents/spectators for 30 seconds.
+  // Duration is fixed at the callee — callers don't pass it.
+  revealCardInHand?(cardId: string): void;
 }
