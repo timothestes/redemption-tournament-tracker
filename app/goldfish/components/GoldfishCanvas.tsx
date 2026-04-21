@@ -56,7 +56,7 @@ interface GoldfishCanvasProps {
 }
 
 export default function GoldfishCanvas({ containerWidth, containerHeight, scale, offsetX, offsetY, virtualWidth, onLoadDeck }: GoldfishCanvasProps) {
-  const { state, dispatch, drawCard, drawMultiple, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck, shuffleDeck, meekCard, unmeekCard, flipCard, addCounter, removeCounter, addNote, addOpponentLostSoul, removeOpponentToken, executeCardAbility, addPlayerLostSoul, reorderHand, attachCard, detachCard } = useGame();
+  const { state, dispatch, drawCard, drawMultiple, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck, shuffleDeck, meekCard, unmeekCard, flipCard, revealCardInHand, addCounter, removeCounter, addNote, addOpponentLostSoul, removeOpponentToken, executeCardAbility, addPlayerLostSoul, reorderHand, attachCard, detachCard } = useGame();
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const stageRef = useRef<Konva.Stage>(null);
   const gameLayerRef = useRef<Konva.Layer>(null);
@@ -73,6 +73,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     moveCard: (cardId, toZone, posX, posY) => moveCard(cardId, toZone as ZoneId, undefined, posX !== undefined ? Number(posX) : undefined, posY !== undefined ? Number(posY) : undefined),
     moveCardsBatch: (cardIds, toZone) => moveCardsBatch(cardIds, toZone as ZoneId),
     flipCard: (cardId) => flipCard(cardId),
+    revealCardInHand: (cardId) => revealCardInHand(cardId),
     meekCard: (cardId) => meekCard(cardId),
     unmeekCard: (cardId) => unmeekCard(cardId),
     addCounter: (cardId, color) => addCounter(cardId, color as any),
@@ -120,7 +121,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     randomHandToZone: () => {}, // not used in goldfish
     randomReserveToZone: () => {}, // not used in goldfish
     reloadDeck: () => {}, // not used in goldfish
-  }), [moveCard, moveCardsBatch, flipCard, meekCard, unmeekCard, addCounter, removeCounter, shuffleCardIntoDeck, shuffleDeck, addNote, drawCard, drawMultiple, moveCardToTopOfDeck, moveCardToBottomOfDeck, removeOpponentToken, executeCardAbility, state.zones]);
+  }), [moveCard, moveCardsBatch, flipCard, revealCardInHand, meekCard, unmeekCard, addCounter, removeCounter, shuffleCardIntoDeck, shuffleDeck, addNote, drawCard, drawMultiple, moveCardToTopOfDeck, moveCardToBottomOfDeck, removeOpponentToken, executeCardAbility, state.zones]);
 
   // Bridge goldfish game state into the shared ModalGameContext for shared modal components
   const modalGameValue = useMemo<ModalGameContextValue>(() => ({
@@ -2140,6 +2141,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
           y={contextMenu.y}
           actions={goldfishActions}
           zones={state.zones}
+          isHandRevealed={false}
           onClose={() => setContextMenu(null)}
           onExchange={(ids) => setExchangeCardIds(ids)}
           onDetach={(id) => {

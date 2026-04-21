@@ -27,6 +27,7 @@ interface GameContextValue {
   meekCard: (cardInstanceId: string) => void;
   unmeekCard: (cardInstanceId: string) => void;
   flipCard: (cardInstanceId: string) => void;
+  revealCardInHand: (cardInstanceId: string) => void;
   addNote: (cardInstanceId: string, note: string) => void;
   addOpponentLostSoul: (testament?: 'NT' | 'OT', posX?: number, posY?: number) => void;
   removeOpponentToken: (cardInstanceId: string) => void;
@@ -118,6 +119,7 @@ export function GameProvider({ children, deck, optionsOverrides }: GameProviderP
   const meekCard = useCallback((id: string) => dispatch(actions.meekCard(id)), [dispatch]);
   const unmeekCard = useCallback((id: string) => dispatch(actions.unmeekCard(id)), [dispatch]);
   const flipCard = useCallback((id: string) => dispatch(actions.flipCard(id)), [dispatch]);
+  const revealCardInHand = useCallback((id: string) => dispatch(actions.revealCardInHand(id)), [dispatch]);
   const addNote = useCallback(
     (id: string, note: string) => dispatch(actions.addNote(id, note)),
     [dispatch]
@@ -193,6 +195,7 @@ export function GameProvider({ children, deck, optionsOverrides }: GameProviderP
       meekCard,
       unmeekCard,
       flipCard,
+      revealCardInHand,
       addNote,
       addOpponentLostSoul,
       removeOpponentToken,
@@ -209,7 +212,7 @@ export function GameProvider({ children, deck, optionsOverrides }: GameProviderP
       state, dispatch, drawCard, drawMultiple, moveCard,
       moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck,
       shuffleDeck, undo, newGame, advancePhase, regressPhase, endTurn,
-      addCounter, removeCounter, meekCard, unmeekCard, flipCard,
+      addCounter, removeCounter, meekCard, unmeekCard, flipCard, revealCardInHand,
       addNote, addOpponentLostSoul, removeOpponentToken, executeCardAbility, moveCardsBatch, addPlayerLostSoul, reorderHand, reorderLob, attachCard, detachCard, toggleSpreadHand,
     ]
   );
