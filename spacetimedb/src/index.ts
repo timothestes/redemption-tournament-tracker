@@ -444,10 +444,8 @@ export const create_game = spacetimedb.reducer(
     lobbyMessage: t.string(),
   },
   (ctx, { code, deckId, displayName, paragon, format, supabaseUserId, deckData, isPublic, lobbyMessage }) => {
-    console.log('[stdb-debug] create_game called — code:', code, 'sender:', ctx.sender.toHexString());
     // Validate code is not already in use by an active game
     for (const g of ctx.db.Game.game_code.filter(code)) {
-      console.log('[stdb-debug] create_game — existing game with code:', String(g.id), 'status:', g.status);
       if (g.status !== 'finished') {
         throw new SenderError('Game code already in use');
       }
@@ -506,8 +504,6 @@ export const create_game = spacetimedb.reducer(
       revealedCards: '',
     });
 
-    // Log action
-    console.log('[stdb-debug] create_game — SUCCESS — gameId:', String(game.id), 'status:', game.status);
     logAction(ctx, game.id, player.id, 'GAME_CREATED', JSON.stringify({ code }), 0n, 'draw');
   }
 );
@@ -824,10 +820,8 @@ export const pregame_choose_first = spacetimedb.reducer(
     }
 
     // Cancel the server-side choose timeout
-    for (const timeout of ctx.db.ChooseFirstTimeout.iter()) {
-      if (timeout.gameId === gameId) {
-        ctx.db.ChooseFirstTimeout.scheduledId.delete(timeout.scheduledId);
-      }
+    for (const timeout of ctx.db.ChooseFirstTimeout.choose_first_timeout_game_id.filter(gameId)) {
+      ctx.db.ChooseFirstTimeout.scheduledId.delete(timeout.scheduledId);
     }
 
     // Transition to revealing phase — show who goes first before starting
@@ -1291,10 +1285,8 @@ export const register_presence = spacetimedb.reducer(
         ctx.db.Player.id.update({ ...player, isConnected: true });
       }
 
-      for (const timeout of ctx.db.DisconnectTimeout.iter()) {
-        if (timeout.playerId === player.id) {
-          ctx.db.DisconnectTimeout.scheduledId.delete(timeout.scheduledId);
-        }
+      for (const timeout of ctx.db.DisconnectTimeout.disconnect_timeout_player_id.filter(player.id)) {
+        ctx.db.DisconnectTimeout.scheduledId.delete(timeout.scheduledId);
       }
 
       if (game.disconnectTimeoutFired) {
@@ -1463,43 +1455,47 @@ export const cleanup_stale_games = spacetimedb.reducer(
       scheduledAt: ScheduleAt.time(now + ONE_HOUR_MICROS),
     });
 
-    // 1. Abandon waiting games older than 1 hour
+    // Single scan — branch on status. Previously we scanned Game four times;
+    // merging keeps one sequential pass and the same semantics (a waiting
+    // game >24h old becomes 'finished' here and is eligible for deletion in
+    // the same pass because we re-check status per row).
     for (const game of [...ctx.db.Game.iter()]) {
-      if (game.status === 'waiting' && (now - game.createdAt.microsSinceUnixEpoch) > ONE_HOUR_MICROS) {
+      const age = now - game.createdAt.microsSinceUnixEpoch;
+
+      // 1. Abandon waiting games older than 1 hour
+      if (game.status === 'waiting' && age > ONE_HOUR_MICROS) {
         ctx.db.Game.id.update({ ...game, status: 'finished' });
+        continue;
       }
-    }
 
-    // 2. Abandon pregame games older than 30 minutes
-    for (const game of [...ctx.db.Game.iter()]) {
-      if (game.status === 'pregame' && (now - game.createdAt.microsSinceUnixEpoch) > THIRTY_MIN_MICROS) {
+      // 2. Abandon pregame games older than 30 minutes
+      if (game.status === 'pregame' && age > THIRTY_MIN_MICROS) {
         ctx.db.Game.id.update({ ...game, status: 'finished' });
+        continue;
       }
-    }
 
-    // 3. Abandon playing games where both players disconnected, no recent activity
-    for (const game of [...ctx.db.Game.iter()]) {
-      if (game.status !== 'playing') continue;
-      const players = [...ctx.db.Player.player_game_id.filter(game.id)];
-      const allDisconnected = players.length > 0 && players.every((p: any) => !p.isConnected);
-      if (!allDisconnected) continue;
+      // 3. Abandon playing games where both players disconnected, no recent activity
+      if (game.status === 'playing') {
+        const players = [...ctx.db.Player.player_game_id.filter(game.id)];
+        const allDisconnected = players.length > 0 && players.every((p: any) => !p.isConnected);
+        if (!allDisconnected) continue;
 
-      let latestActionTime = 0n;
-      for (const action of ctx.db.GameAction.game_action_game_id.filter(game.id)) {
-        const actionTime = action.timestamp.microsSinceUnixEpoch;
-        if (actionTime > latestActionTime) latestActionTime = actionTime;
+        let latestActionTime = 0n;
+        for (const action of ctx.db.GameAction.game_action_game_id.filter(game.id)) {
+          const actionTime = action.timestamp.microsSinceUnixEpoch;
+          if (actionTime > latestActionTime) latestActionTime = actionTime;
+        }
+        if (latestActionTime === 0n) latestActionTime = game.createdAt.microsSinceUnixEpoch;
+
+        if ((now - latestActionTime) > THIRTY_MIN_MICROS) {
+          ctx.db.Game.id.update({ ...game, status: 'finished' });
+        }
+        continue;
       }
-      if (latestActionTime === 0n) latestActionTime = game.createdAt.microsSinceUnixEpoch;
 
-      if ((now - latestActionTime) > THIRTY_MIN_MICROS) {
-        ctx.db.Game.id.update({ ...game, status: 'finished' });
-      }
-    }
-
-    // 4. Delete data for finished games older than 24 hours
-    for (const game of [...ctx.db.Game.iter()]) {
+      // 4. Delete data for finished games older than 24 hours
       if (game.status !== 'finished') continue;
-      if ((now - game.createdAt.microsSinceUnixEpoch) <= TWENTY_FOUR_HOURS_MICROS) continue;
+      if (age <= TWENTY_FOUR_HOURS_MICROS) continue;
 
       const gameId = game.id;
 
@@ -3480,7 +3476,6 @@ export const set_note = spacetimedb.reducer(
     const card = ctx.db.CardInstance.id.find(cardInstanceId);
     if (!card) throw new SenderError('Card not found');
     if (card.gameId !== gameId) throw new SenderError('Card not in this game');
-    if (card.ownerId !== player.id) throw new SenderError('Not your card');
 
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
@@ -4109,18 +4104,10 @@ export const clear_revealed_cards = spacetimedb.reducer(
 // Lifecycle: clientConnected
 // ---------------------------------------------------------------------------
 export const onConnect = spacetimedb.clientConnected((ctx) => {
-  console.log('[stdb-debug] clientConnected:', ctx.sender.toHexString());
-  // Presence is revived explicitly by register_presence from the game page,
-  // so this hook only logs and seeds the cleanup schedule. Reviving
-  // isConnected here revived rows in every game the identity ever joined,
-  // which kept orphaned lobbies alive whenever the creator hit any other
-  // page on the site.
-  for (const player of ctx.db.Player.iter()) {
-    if (player.identity.toHexString() === ctx.sender.toHexString()) {
-      const game = ctx.db.Game.id.find(player.gameId);
-      console.log('[stdb-debug] clientConnected — player:', String(player.id), 'game:', String(player.gameId), 'gameStatus:', game?.status);
-    }
-  }
+  // Presence is revived explicitly by register_presence from the game page.
+  // Reviving isConnected here would revive rows in every game the identity
+  // ever joined, keeping orphaned lobbies alive whenever the creator hit any
+  // other page on the site.
 
   // Seed cleanup schedule if none exists
   const existingCleanup = [...ctx.db.CleanupSchedule.iter()];
@@ -4380,8 +4367,9 @@ export const move_opponent_card = spacetimedb.reducer(
     toZone: t.string(),
     posX: t.string(),
     posY: t.string(),
+    newOwnerId: t.string(),
   },
-  (ctx, { gameId, requestId, cardInstanceId, toZone, posX, posY }) => {
+  (ctx, { gameId, requestId, cardInstanceId, toZone, posX, posY, newOwnerId }) => {
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
 
@@ -4401,12 +4389,25 @@ export const move_opponent_card = spacetimedb.reducer(
     // Moving to deck/soul-deck = face-down; leaving deck, reserve, or soul-deck = face-up; otherwise preserve
     const isFlipped = (toZone === 'deck' || toZone === 'soul-deck') ? true : (fromZone === 'deck' || fromZone === 'reserve' || fromZone === 'soul-deck') ? false : card.isFlipped;
 
+    // Determine final owner: if newOwnerId is provided (non-empty) and differs
+    // from current owner, reassign. This handles the "take from opponent's deck
+    // to my territory" case — the card should end up owned by the player whose
+    // zone it was dropped into.
+    let finalOwnerId = card.ownerId;
+    if (newOwnerId && newOwnerId.length > 0) {
+      const parsedOwnerId = BigInt(newOwnerId);
+      const targetOwner = ctx.db.Player.id.find(parsedOwnerId);
+      if (!targetOwner) throw new SenderError('Target owner not found');
+      if (targetOwner.gameId !== gameId) throw new SenderError('Target owner not in this game');
+      finalOwnerId = parsedOwnerId;
+    }
+
     // For free-form zones, auto-assign highest zoneIndex so new cards render on top
     let finalZoneIndex = 0n;
     if (toZone !== 'deck' && toZone !== 'hand') {
       let maxIdx = -1n;
       for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
-        if (c.ownerId === card.ownerId && c.zone === toZone && c.zoneIndex > maxIdx) {
+        if (c.ownerId === finalOwnerId && c.zone === toZone && c.zoneIndex > maxIdx) {
           maxIdx = c.zoneIndex;
         }
       }
@@ -4415,6 +4416,7 @@ export const move_opponent_card = spacetimedb.reducer(
 
     ctx.db.CardInstance.id.update({
       ...card,
+      ownerId: finalOwnerId,
       zone: toZone,
       zoneIndex: finalZoneIndex,
       posX,
@@ -4504,29 +4506,25 @@ export const shuffle_opponent_deck = spacetimedb.reducer(
 // Lifecycle: clientDisconnected
 // ---------------------------------------------------------------------------
 export const onDisconnect = spacetimedb.clientDisconnected((ctx) => {
-  console.log('[stdb-debug] clientDisconnected:', ctx.sender.toHexString());
   // Find all player rows for this identity and set disconnected
-  for (const player of ctx.db.Player.iter()) {
-    if (player.identity.toHexString() === ctx.sender.toHexString()) {
-      const gameForPlayer = ctx.db.Game.id.find(player.gameId);
-      console.log('[stdb-debug] clientDisconnected — player:', String(player.id), 'game:', String(player.gameId), 'gameStatus:', gameForPlayer?.status);
-      ctx.db.Player.id.update({ ...player, isConnected: false });
+  for (const player of ctx.db.Player.player_identity.filter(ctx.sender)) {
+    const gameForPlayer = ctx.db.Game.id.find(player.gameId);
+    ctx.db.Player.id.update({ ...player, isConnected: false });
 
-      // For waiting and pregame, use a 30-second grace window — long enough to survive
-      // WebSocket reconnections and page refreshes. The client proactively
-      // calls leave_game on navigation, so this is only a fallback for
-      // crashes/network drops.
-      // For playing games, use the normal 5-minute timeout.
-      const timeoutMicros = gameForPlayer && gameForPlayer.status === 'playing'
-        ? 300_000_000n  // 5 minutes for active games
-        : 30_000_000n;  // 30 seconds for waiting and pregame
-      const futureTime = ctx.timestamp.microsSinceUnixEpoch + timeoutMicros;
-      ctx.db.DisconnectTimeout.insert({
-        scheduledId: 0n,
-        scheduledAt: ScheduleAt.time(futureTime),
-        gameId: player.gameId,
-        playerId: player.id,
-      });
-    }
+    // For waiting and pregame, use a 30-second grace window — long enough to survive
+    // WebSocket reconnections and page refreshes. The client proactively
+    // calls leave_game on navigation, so this is only a fallback for
+    // crashes/network drops.
+    // For playing games, use the normal 5-minute timeout.
+    const timeoutMicros = gameForPlayer && gameForPlayer.status === 'playing'
+      ? 300_000_000n  // 5 minutes for active games
+      : 30_000_000n;  // 30 seconds for waiting and pregame
+    const futureTime = ctx.timestamp.microsSinceUnixEpoch + timeoutMicros;
+    ctx.db.DisconnectTimeout.insert({
+      scheduledId: 0n,
+      scheduledAt: ScheduleAt.time(futureTime),
+      gameId: player.gameId,
+      playerId: player.id,
+    });
   }
 });

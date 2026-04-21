@@ -17,4 +17,5 @@ export default {
   toZone: __t.string(),
   posX: __t.string(),
   posY: __t.string(),
+  newOwnerId: __t.string(),
 };

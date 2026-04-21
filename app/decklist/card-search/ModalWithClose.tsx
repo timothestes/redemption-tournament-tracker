@@ -493,6 +493,7 @@ export default function ModalWithClose({
   modalCard,
   setModalCard,
   visibleCards,
+  onNavigateToIndex,
   onAddCard,
   onRemoveCard,
   getCardQuantity,
@@ -503,6 +504,8 @@ export default function ModalWithClose({
   modalCard: Card | null;
   setModalCard: (card: Card | null) => void;
   visibleCards: Card[];
+  /** Called when modal navigation lands on a new index — lets parent extend its rendered window. */
+  onNavigateToIndex?: (index: number) => void;
   onAddCard: ((card: Card, isReserve: boolean) => void) | null;
   onRemoveCard: ((name: string, set: string, isReserve: boolean) => void) | null;
   getCardQuantity: ((name: string, set: string, isReserve: boolean) => number) | null;
@@ -615,6 +618,7 @@ export default function ModalWithClose({
           nextIndex = currentIndex === visibleCards.length - 1 ? 0 : currentIndex + 1;
         }
 
+        onNavigateToIndex?.(nextIndex);
         setModalCard(visibleCards[nextIndex]);
       } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
         if (!onAddCard || !onRemoveCard) return;
@@ -631,7 +635,7 @@ export default function ModalWithClose({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [setModalCard, closeModal, modalCard, visibleCards, showMenu, onAddCard, onRemoveCard, activeDeckTab]);
+  }, [setModalCard, closeModal, modalCard, visibleCards, showMenu, onAddCard, onRemoveCard, onNavigateToIndex, activeDeckTab]);
 
   // Get adjacent card for preview during swipe
   const getAdjacentCard = React.useCallback((direction: 'left' | 'right') => {
@@ -679,11 +683,12 @@ export default function ModalWithClose({
     }
     // Store the card to switch to after animation
     pendingCardRef.current = visibleCards[nextIndex];
+    onNavigateToIndex?.(nextIndex);
     isAnimatingRef.current = true;
     // Animate track: show prev (0%) or next (-200%)
     setSwipeOffset(0);
     setAnimatingTo(direction === 'left' ? '0%' : '-200%');
-  }, [visibleCards, modalCard]);
+  }, [visibleCards, modalCard, onNavigateToIndex]);
 
   // Swipe navigation (no animation, used by desktop)
   const navigateToCard = React.useCallback((direction: 'left' | 'right') => {
@@ -696,8 +701,9 @@ export default function ModalWithClose({
     } else {
       nextIndex = currentIndex === visibleCards.length - 1 ? 0 : currentIndex + 1;
     }
+    onNavigateToIndex?.(nextIndex);
     setModalCard(visibleCards[nextIndex]);
-  }, [visibleCards, modalCard, setModalCard]);
+  }, [visibleCards, modalCard, setModalCard, onNavigateToIndex]);
 
   // Touch handlers
   const handleTouchStart = React.useCallback((e: React.TouchEvent) => {
@@ -1417,12 +1423,12 @@ export default function ModalWithClose({
             {isFundraiser ? (
               <button
                 onClick={() => window.open('https://cactus-game-design-inc.square.site/s/shop', '_blank')}
-                className="px-4 h-10 border border-border text-muted-foreground hover:text-foreground hover:bg-card rounded-lg flex items-center gap-1.5 font-medium transition-colors text-sm whitespace-nowrap"
+                className="px-4 h-10 border border-emerald-600/30 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 rounded-lg flex items-center gap-1.5 font-medium transition-colors text-sm whitespace-nowrap active:translate-y-[1px] [.jayden_&]:border-blue-500/30 [.jayden_&]:bg-blue-950/30 [.jayden_&]:text-blue-300 [.jayden_&]:hover:bg-blue-900/40"
               >
                 {(() => {
                   const cardKey = `${modalCard.name}|${modalCard.set}|${modalCard.imgFile}`;
                   const priceInfo = getPrice(cardKey);
-                  return priceInfo ? <span>${priceInfo.price.toFixed(0)}</span> : null;
+                  return priceInfo ? <span className="font-semibold">${priceInfo.price.toFixed(0)}</span> : null;
                 })()}
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                   <path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/>

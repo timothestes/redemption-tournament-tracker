@@ -183,7 +183,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       conn.subscriptionBuilder().subscribe([
         `SELECT * FROM player WHERE game_id = ${gameId}`,
         `SELECT * FROM card_instance WHERE game_id = ${gameId}`,
-        `SELECT * FROM card_counter`,
+        `SELECT cc.* FROM card_counter cc JOIN card_instance ci ON cc.card_instance_id = ci.id WHERE ci.game_id = ${gameId}`,
         `SELECT * FROM game_action WHERE game_id = ${gameId}`,
         `SELECT * FROM chat_message WHERE game_id = ${gameId}`,
         `SELECT * FROM spectator WHERE game_id = ${gameId}`,

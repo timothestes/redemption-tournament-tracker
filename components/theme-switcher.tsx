@@ -80,7 +80,7 @@ const ThemeSwitcher = () => {
             <span>Dark</span>
           </DropdownMenuRadioItem>
           <DropdownMenuRadioItem className="flex gap-2" value="jayden">
-            <Image src="/jayden-icon.png" alt="" width={20} height={20} className="rounded-full" />{" "}
+            <Image src="/jayden-icon.png" alt="" width={20} height={20} className="rounded-full grayscale opacity-70 [.jayden_&]:grayscale-0 [.jayden_&]:opacity-100" />{" "}
             <span>Jayden</span>
           </DropdownMenuRadioItem>
           <DropdownMenuRadioItem className="flex gap-2" value="system">

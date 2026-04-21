@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ParagonEntry } from '../types/paragonEntry';
 
 interface ParagonDrawerProps {
@@ -15,6 +15,7 @@ const HANDLE_HEIGHT = 36;
 export function ParagonDrawer({ paragons }: ParagonDrawerProps) {
   const [open, setOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const drawerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (paragons.length === 0) {
@@ -65,6 +66,18 @@ export function ParagonDrawer({ paragons }: ParagonDrawerProps) {
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, [open, paragons]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      const node = drawerRef.current;
+      if (node && !node.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
 
   const cycleParagon = (step: 1 | -1) => {
     setActiveId((curr) => {
@@ -137,6 +150,7 @@ export function ParagonDrawer({ paragons }: ParagonDrawerProps) {
       </button>
 
       <div
+        ref={drawerRef}
         role="dialog"
         aria-label={`Paragon: ${activeEntry.paragonName}`}
         aria-hidden={!open}

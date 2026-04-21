@@ -278,13 +278,14 @@ export default function CardSearchClient() {
   const resizeStartXRef = useRef(0);
   const resizeStartWidthRef = useRef(0);
   const currentDeckPanelWidthRef = useRef(38.2);
-  const [deckPanelWidth, setDeckPanelWidth] = useState<number>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('deck-panel-width');
-      return saved ? parseFloat(saved) : 38.2;
+  const [deckPanelWidth, setDeckPanelWidth] = useState<number>(38.2);
+  useEffect(() => {
+    const saved = localStorage.getItem('deck-panel-width');
+    if (saved) {
+      const parsed = parseFloat(saved);
+      if (!Number.isNaN(parsed)) setDeckPanelWidth(parsed);
     }
-    return 38.2;
-  });
+  }, []);
   // Keep ref in sync so mouseup handler can read latest value
   currentDeckPanelWidthRef.current = deckPanelWidth;
 
@@ -1039,33 +1040,36 @@ export default function CardSearchClient() {
     }
   }, [filtered.length, queries, legalityMode, selectedIconFilters, selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, strengthFilter, toughnessFilter, noAltArt, noFirstPrint, nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly, postexilicOnly, testamentNots, gospelNot]);
 
-  const visibleCards = useMemo(() => {
-    return [...filtered]
-      .sort((a, b) => {
-        switch (sortBy) {
-          case 'set':
-            return a.officialSet.localeCompare(b.officialSet) || a.name.localeCompare(b.name);
-          case 'strength': {
-            const aStr = parseInt(a.strength) || 0;
-            const bStr = parseInt(b.strength) || 0;
-            return bStr - aStr || a.name.localeCompare(b.name);
-          }
-          case 'toughness': {
-            const aTgh = parseInt(a.toughness) || 0;
-            const bTgh = parseInt(b.toughness) || 0;
-            return bTgh - aTgh || a.name.localeCompare(b.name);
-          }
-          case 'type':
-            return a.type.localeCompare(b.type) || a.name.localeCompare(b.name);
-          case 'brigade':
-            return a.brigade.localeCompare(b.brigade) || a.name.localeCompare(b.name);
-          case 'name':
-          default:
-            return a.name.localeCompare(b.name);
+  const sortedFiltered = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case 'set':
+          return a.officialSet.localeCompare(b.officialSet) || a.name.localeCompare(b.name);
+        case 'strength': {
+          const aStr = parseInt(a.strength) || 0;
+          const bStr = parseInt(b.strength) || 0;
+          return bStr - aStr || a.name.localeCompare(b.name);
         }
-      })
-      .slice(0, visibleCount);
-  }, [filtered, visibleCount, sortBy]);
+        case 'toughness': {
+          const aTgh = parseInt(a.toughness) || 0;
+          const bTgh = parseInt(b.toughness) || 0;
+          return bTgh - aTgh || a.name.localeCompare(b.name);
+        }
+        case 'type':
+          return a.type.localeCompare(b.type) || a.name.localeCompare(b.name);
+        case 'brigade':
+          return a.brigade.localeCompare(b.brigade) || a.name.localeCompare(b.name);
+        case 'name':
+        default:
+          return a.name.localeCompare(b.name);
+      }
+    });
+  }, [filtered, sortBy]);
+
+  const visibleCards = useMemo(
+    () => sortedFiltered.slice(0, visibleCount),
+    [sortedFiltered, visibleCount]
+  );
 
   // Whether any filter pills should be shown in the summary bar
   const hasActiveFilters = queries.some(q => q.text.trim()) ||
@@ -1338,7 +1342,7 @@ export default function CardSearchClient() {
         <ModalWithClose
           modalCard={modalCard}
           setModalCard={setModalCard}
-          visibleCards={!showSearch 
+          visibleCards={!showSearch
             ? deck.cards
                 .filter(dc => dc.isReserve === (fullDeckViewSection === 'reserve'))
                 .map(dc => dc.card)
@@ -1352,8 +1356,11 @@ export default function CardSearchClient() {
                   // Then by name
                   return a.name.localeCompare(b.name);
                 })
-            : visibleCards
+            : sortedFiltered
           }
+          onNavigateToIndex={showSearch ? (index) => {
+            setVisibleCount((prev) => Math.max(prev, index + 1));
+          } : undefined}
           onAddCard={addCard}
           onRemoveCard={removeCard}
           getCardQuantity={getCardQuantity}

@@ -166,6 +166,9 @@ const tablesSchema = __schema({
   ChooseFirstTimeout: __table({
     name: 'choose_first_timeout',
     indexes: [
+      { accessor: 'choose_first_timeout_game_id', name: 'choose_first_timeout_game_id_idx_btree', algorithm: 'btree', columns: [
+        'gameId',
+      ] },
       { accessor: 'scheduledId', name: 'choose_first_timeout_scheduled_id_idx_btree', algorithm: 'btree', columns: [
         'scheduledId',
       ] },
@@ -188,6 +191,9 @@ const tablesSchema = __schema({
   DisconnectTimeout: __table({
     name: 'disconnect_timeout',
     indexes: [
+      { accessor: 'disconnect_timeout_player_id', name: 'disconnect_timeout_player_id_idx_btree', algorithm: 'btree', columns: [
+        'playerId',
+      ] },
       { accessor: 'scheduledId', name: 'disconnect_timeout_scheduled_id_idx_btree', algorithm: 'btree', columns: [
         'scheduledId',
       ] },
@@ -204,6 +210,9 @@ const tablesSchema = __schema({
       ] },
       { accessor: 'id', name: 'game_id_idx_btree', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { accessor: 'game_status', name: 'game_status_idx_btree', algorithm: 'btree', columns: [
+        'status',
       ] },
     ],
     constraints: [
@@ -232,6 +241,9 @@ const tablesSchema = __schema({
       ] },
       { accessor: 'id', name: 'player_id_idx_btree', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { accessor: 'player_identity', name: 'player_identity_idx_btree', algorithm: 'btree', columns: [
+        'identity',
       ] },
     ],
     constraints: [

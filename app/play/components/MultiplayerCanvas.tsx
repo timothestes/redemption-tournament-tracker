@@ -1447,6 +1447,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     if (!hit) return null;
     // Allow dropping on own zones, plus opponent territory/LOB for battles
     if (hit.owner === 'opponent' && !isFreeFormZone(hit.zone) && !isAutoArrangeZone(hit.zone)) return null;
+    // Shared zones (Paragon shared LoB / Soul Deck) are not valid modal drop
+    // targets — the modal moveCard callback only handles 'my'/'opponent'
+    // ownership, so shared drops would misroute the card to the player's own
+    // zone with the wrong owner and coords (effectively losing the card).
+    if (hit.owner === 'shared') return null;
     return hit.zone as ZoneId;
   }, [findZoneAtPosition]);
 
@@ -1541,6 +1546,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const findZoneForOpponentDrag = useCallback((x: number, y: number): ZoneId | null => {
     const hit = findZoneAtPosition(x, y);
     if (!hit) return null;
+    // Shared zones are not valid modal drop targets — moveCard only handles
+    // 'my'/'opponent' ownership. See findZoneForModalDrag for details.
+    if (hit.owner === 'shared') return null;
     return hit.zone as ZoneId;
   }, [findZoneAtPosition]);
 
@@ -1576,12 +1584,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             normX = db.x.toString();
             normY = db.y.toString();
           }
+          // Reassign ownership to match the destination zone's owner. Without
+          // this, pulling a card from the opponent's deck into my territory
+          // leaves the card still owned by the opponent (bug).
+          const newOwnerId = hit
+            ? (isOppZone
+              ? (gameState.opponentPlayer ? String(gameState.opponentPlayer.id) : '')
+              : (gameState.myPlayer ? String(gameState.myPlayer.id) : ''))
+            : '';
           moveOpponentCard(
             BigInt(approvedSearchRequest.id),
             BigInt(id),
             String(toZone),
             normX,
-            normY
+            normY,
+            newOwnerId
           );
         };
         // T1 reserve protection for opponent's reserve
@@ -1603,14 +1620,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             if (zone) {
               const owner: 'my' | 'opponent' = isOppZone ? 'opponent' : 'my';
               const clamp = isFreeFormZone(String(toZone)) ? { cardWidth, cardHeight } : undefined;
+              const newOwnerId = isOppZone
+                ? (gameState.opponentPlayer ? String(gameState.opponentPlayer.id) : '')
+                : (gameState.myPlayer ? String(gameState.myPlayer.id) : '');
               for (const id of ids) {
                 const p = positions[id];
                 if (!p) {
-                  moveOpponentCard(BigInt(approvedSearchRequest.id), BigInt(id), String(toZone));
+                  moveOpponentCard(BigInt(approvedSearchRequest.id), BigInt(id), String(toZone), undefined, undefined, newOwnerId);
                   continue;
                 }
                 const db = toDbPos(p.posX, p.posY, zone, owner, clamp);
-                moveOpponentCard(BigInt(approvedSearchRequest.id), BigInt(id), String(toZone), db.x.toString(), db.y.toString());
+                moveOpponentCard(BigInt(approvedSearchRequest.id), BigInt(id), String(toZone), db.x.toString(), db.y.toString(), newOwnerId);
               }
               return;
             }
@@ -2309,8 +2329,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       }
 
       const targetZone = hit.zone;
-      // Same zone = same zone name AND same owner (my hand ≠ opponent hand)
-      const sourceOwner = card.ownerId === 'player1' ? 'my' : 'opponent';
+      // Same zone = same zone name AND same owner (my hand ≠ opponent hand).
+      // Paragon shared-zone cards (shared LoB / Soul Deck) are adapted with
+      // ownerId='player1' for rendering, so fall back to the underlying
+      // CardInstance.ownerId to detect the true 'shared' source — otherwise a
+      // shared→shared drop would compute sourceOwner='my' vs hit.owner='shared'
+      // and wrongly treat it as a cross-zone move.
+      const sourceInstance = findAnyCardById(card.instanceId);
+      const sourceOwner: 'my' | 'opponent' | 'shared' =
+        sourceInstance?.ownerId === 0n
+          ? 'shared'
+          : card.ownerId === 'player1'
+          ? 'my'
+          : 'opponent';
       const isSameZone = targetZone === sourceZone && hit.owner === sourceOwner;
 
       // Equip: if a weapon is dropped on a warrior in the local player's
@@ -4832,7 +4863,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                         onDragStart={handleCardDragStart}
                         onDragMove={handleCardDragMove}
                         onDragEnd={handleCardDragEnd}
-                        onContextMenu={handleCardContextMenu}
+                        onContextMenu={noopContextMenu}
                         onDblClick={noopDblClick}
                         onMouseEnter={handleMouseEnter}
                         onMouseLeave={handleMouseLeave}
@@ -5103,19 +5134,15 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 }
               : undefined
           }
-          onEditNote={
-            contextMenu.card.ownerId === 'player1'
-              ? (card) => {
-                  setNotePopover({
-                    cardId: card.instanceId,
-                    x: contextMenu.x,
-                    y: contextMenu.y,
-                    initialValue: card.notes ?? '',
-                  });
-                  setContextMenu(null);
-                }
-              : undefined
-          }
+          onEditNote={(card) => {
+            setNotePopover({
+              cardId: card.instanceId,
+              x: contextMenu.x,
+              y: contextMenu.y,
+              initialValue: card.notes ?? '',
+            });
+            setContextMenu(null);
+          }}
           zones={allZonesForContextMenu as any}
         />
         );
@@ -5261,7 +5288,20 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           onRandomToDeckBottom={(count) => { setHandMenu(null); multiplayerActions.randomHandToZone(count, 'deck', 'bottom'); }}
           onShuffleRandomIntoDeck={(count) => { setHandMenu(null); multiplayerActions.randomHandToZone(count, 'deck', 'shuffle'); }}
           isHandRevealed={gameState.myPlayer?.handRevealed ?? false}
-          onRevealHand={(revealed) => { setHandMenu(null); gameState.revealHand(revealed); }}
+          onRevealHand={(revealed) => {
+            setHandMenu(null);
+            gameState.revealHand(revealed);
+            if (revealAutoHideRef.current) {
+              clearTimeout(revealAutoHideRef.current);
+              revealAutoHideRef.current = null;
+            }
+            if (revealed) {
+              revealAutoHideRef.current = setTimeout(() => {
+                gameState.revealHand(false);
+                revealAutoHideRef.current = null;
+              }, 30_000);
+            }
+          }}
         />
       )}
 

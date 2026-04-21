@@ -9,6 +9,7 @@ export const Game = table(
     public: true,
     indexes: [
       { accessor: 'game_code', algorithm: 'btree' as const, columns: ['code'] },
+      { accessor: 'game_status', algorithm: 'btree' as const, columns: ['status'] },
     ],
   },
   {
@@ -55,6 +56,7 @@ export const Player = table(
     public: true,
     indexes: [
       { accessor: 'player_game_id', algorithm: 'btree' as const, columns: ['gameId'] },
+      { accessor: 'player_identity', algorithm: 'btree' as const, columns: ['identity'] },
     ],
   },
   {
@@ -218,6 +220,9 @@ export const DisconnectTimeout = table(
     name: 'disconnect_timeout',
     public: true,
     scheduled: () => _handleDisconnectTimeout,
+    indexes: [
+      { accessor: 'disconnect_timeout_player_id', algorithm: 'btree' as const, columns: ['playerId'] },
+    ],
   },
   {
     scheduledId: t.u64().primaryKey().autoInc(),
@@ -270,6 +275,9 @@ export const ChooseFirstTimeout = table(
     name: 'choose_first_timeout',
     public: true,
     scheduled: () => _handleChooseFirstTimeout,
+    indexes: [
+      { accessor: 'choose_first_timeout_game_id', algorithm: 'btree' as const, columns: ['gameId'] },
+    ],
   },
   {
     scheduledId: t.u64().primaryKey().autoInc(),
