@@ -5,35 +5,29 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 const LOCALSTORAGE_KEY = 'game-timer-visible';
 
 /**
- * Client-side game timer that tracks elapsed play time.
+ * Game timer anchored to a server timestamp so the elapsed value survives
+ * navigation away and back.
  *
- * - Ticks once per second via setInterval (interval stored in a ref to avoid
- *   re-renders on start/stop).
- * - Only the displayed `elapsed` state triggers a re-render, once per second.
- * - Supports pause (deck search open), resume, and reset.
- * - The visibility preference is persisted to localStorage.
+ * Pass `anchorMicros` = the server-recorded `playingStartedAtMicros` (u64
+ * microseconds since the unix epoch). Pass `0n` / `null` when the game is not
+ * yet in the 'playing' state; the display stays at 0.
+ *
+ * Local pause/resume (e.g. deck search open) only affects the current session;
+ * it resets on navigation. The underlying anchor is authoritative.
  */
-export function useGameTimer() {
-  // Elapsed seconds displayed to the user
+export function useGameTimer(anchorMicros: bigint | null) {
   const [elapsed, setElapsed] = useState(0);
 
-  // Whether the timer is currently ticking
-  const isRunningRef = useRef(false);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Local pause bookkeeping (session-only)
+  const pauseStartRef = useRef<number | null>(null);
+  const totalPausedMsRef = useRef(0);
 
-  // Track when the timer was last "started" so we can compute drift-corrected
-  // elapsed time, but a simple 1s tick is fine for a casual game timer.
-  const startTimeRef = useRef<number | null>(null);
-  const accumulatedRef = useRef(0); // seconds accumulated before the latest pause
-
-  // Visibility preference
   const [isTimerVisible, setIsTimerVisible] = useState(() => {
     if (typeof window === 'undefined') return true;
     const stored = localStorage.getItem(LOCALSTORAGE_KEY);
     return stored === null ? true : stored === 'true';
   });
 
-  // Persist visibility to localStorage
   useEffect(() => {
     localStorage.setItem(LOCALSTORAGE_KEY, String(isTimerVisible));
   }, [isTimerVisible]);
@@ -42,85 +36,47 @@ export function useGameTimer() {
     setIsTimerVisible((v) => !v);
   }, []);
 
-  // --- Core timer controls ---
+  const computeElapsed = useCallback(() => {
+    if (anchorMicros === null || anchorMicros === 0n) return 0;
+    const anchorMs = Number(anchorMicros / 1000n);
+    const now = Date.now();
+    const activePauseMs = pauseStartRef.current !== null ? now - pauseStartRef.current : 0;
+    const elapsedMs = now - anchorMs - totalPausedMsRef.current - activePauseMs;
+    return Math.max(0, Math.floor(elapsedMs / 1000));
+  }, [anchorMicros]);
 
-  const clearTick = useCallback(() => {
-    if (intervalRef.current !== null) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+  useEffect(() => {
+    // Reset session pause state when anchor changes (new game / rematch)
+    pauseStartRef.current = null;
+    totalPausedMsRef.current = 0;
+
+    if (anchorMicros === null || anchorMicros === 0n) {
+      setElapsed(0);
+      return;
     }
+
+    setElapsed(computeElapsed());
+    const interval = setInterval(() => setElapsed(computeElapsed()), 1000);
+    return () => clearInterval(interval);
+  }, [anchorMicros, computeElapsed]);
+
+  const pause = useCallback(() => {
+    if (pauseStartRef.current !== null) return;
+    pauseStartRef.current = Date.now();
   }, []);
 
-  const startTicking = useCallback(() => {
-    clearTick();
-    startTimeRef.current = Date.now();
-    intervalRef.current = setInterval(() => {
-      if (startTimeRef.current === null) return;
-      const secondsSinceResume = Math.floor((Date.now() - startTimeRef.current) / 1000);
-      setElapsed(accumulatedRef.current + secondsSinceResume);
-    }, 1000);
-  }, [clearTick]);
-
-  /** Start or resume the timer. */
-  const start = useCallback(() => {
-    if (isRunningRef.current) return;
-    isRunningRef.current = true;
-    startTicking();
-  }, [startTicking]);
-
-  /** Pause the timer (e.g. deck search open). */
-  const pause = useCallback(() => {
-    if (!isRunningRef.current) return;
-    isRunningRef.current = false;
-    // Accumulate the time from this run segment
-    if (startTimeRef.current !== null) {
-      accumulatedRef.current += Math.floor((Date.now() - startTimeRef.current) / 1000);
-      startTimeRef.current = null;
-    }
-    clearTick();
-  }, [clearTick]);
-
-  /** Resume after a pause. */
   const resume = useCallback(() => {
-    start();
-  }, [start]);
-
-  /** Reset elapsed to zero and stop the timer. */
-  const reset = useCallback(() => {
-    isRunningRef.current = false;
-    accumulatedRef.current = 0;
-    startTimeRef.current = null;
-    clearTick();
-    setElapsed(0);
-  }, [clearTick]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => clearTick();
-  }, [clearTick]);
-
-  // --- Formatted display ---
-
-  const formatted = formatElapsed(elapsed);
+    if (pauseStartRef.current === null) return;
+    totalPausedMsRef.current += Date.now() - pauseStartRef.current;
+    pauseStartRef.current = null;
+  }, []);
 
   return {
-    /** Elapsed seconds. */
     elapsed,
-    /** Human-readable MM:SS or H:MM:SS string. */
-    formatted,
-    /** Whether the timer is currently ticking. */
-    isRunning: isRunningRef.current,
-    /** Start / resume the timer. */
-    start,
-    /** Pause the timer. */
+    formatted: formatElapsed(elapsed),
     pause,
-    /** Resume the timer (alias for start). */
     resume,
-    /** Reset the timer to 0 and stop. */
-    reset,
-    /** Whether the timer display is visible. */
     isTimerVisible,
-    /** Toggle timer visibility (persisted to localStorage). */
     toggleTimerVisibility,
   };
 }

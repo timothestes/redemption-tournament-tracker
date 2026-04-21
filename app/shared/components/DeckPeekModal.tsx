@@ -199,10 +199,15 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
   // Snapshot the card IDs on mount so the list is stable
   const [peekedIds] = useState(() => cardIds);
 
+  // Track cards that have been committed to a new deck position (top/bottom/shuffle)
+  // via the context menu — they should leave the peek view even though they remain
+  // in the deck zone.
+  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
+
   // Derive live cards from current state (they may have been moved already)
   const peekedCards = peekedIds
     .map(id => (zones[sourceZone] ?? []).find(c => c.instanceId === id))
-    .filter((c): c is GameCard => !!c);
+    .filter((c): c is GameCard => !!c && !removedIds.has(c.instanceId));
 
   const remainingIds = peekedCards.map(c => c.instanceId);
   const hasRemaining = remainingIds.length > 0;
@@ -541,43 +546,45 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
           marginTop: 16,
           paddingTop: 12,
           borderTop: '1px solid #3d2e1a',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          flexWrap: 'wrap',
         }}>
           {hasRemaining && onClose && sourceZone === 'deck' ? (
             <>
-              <span style={{
+              <div style={{
                 fontFamily: 'var(--font-cinzel), Georgia, serif',
-                color: 'var(--gf-border)',
-                fontSize: 11,
-                marginRight: 4,
+                color: 'var(--gf-text-bright)',
+                fontSize: 12,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                marginBottom: 8,
               }}>
-                Put back:
-              </span>
-              <PeekActionButton
-                icon={<ArrowUp size={13} />}
-                label="Top of Deck"
-                onClick={() => handleCloseAction('top')}
-              />
-              <PeekActionButton
-                icon={<ArrowDown size={13} />}
-                label="Bottom of Deck"
-                onClick={() => handleCloseAction('bottom')}
-              />
-              <PeekActionButton
-                icon={<Shuffle size={13} />}
-                label="Shuffle In"
-                onClick={() => handleCloseAction('shuffle')}
-              />
+                Put remaining {remainingIds.length} {remainingIds.length === 1 ? 'card' : 'cards'} back to:
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <PeekActionButton
+                  icon={<ArrowUp size={13} />}
+                  label="Top of Deck"
+                  onClick={() => handleCloseAction('top')}
+                />
+                <PeekActionButton
+                  icon={<ArrowDown size={13} />}
+                  label="Bottom of Deck"
+                  onClick={() => handleCloseAction('bottom')}
+                />
+                <PeekActionButton
+                  icon={<Shuffle size={13} />}
+                  label="Shuffle In"
+                  onClick={() => handleCloseAction('shuffle')}
+                />
+              </div>
             </>
           ) : onClose ? (
-            <PeekActionButton
-              label="Close"
-              onClick={onClose}
-              style={{ marginLeft: 'auto' }}
-            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <PeekActionButton
+                label="Close"
+                onClick={onClose}
+                style={{ marginLeft: 'auto' }}
+              />
+            </div>
           ) : null}
         </div>
       </motion.div>
@@ -598,9 +605,21 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
             x={contextCard.x}
             y={contextCard.y}
             onClose={() => setContextCard(null)}
-            onMove={(zone) => { for (const id of targetIds) moveCard(id, zone); }}
-            onMoveToTop={() => { for (const id of targetIds) moveCardToTopOfDeck(id); }}
-            onMoveToBottom={() => { for (const id of targetIds) moveCardToBottomOfDeck(id); }}
+            onMove={(zone) => {
+              for (const id of targetIds) moveCard(id, zone);
+              setRemovedIds(prev => { const next = new Set(prev); for (const id of targetIds) next.add(id); return next; });
+              setSelectedIds(new Set());
+            }}
+            onMoveToTop={() => {
+              for (const id of targetIds) moveCardToTopOfDeck(id);
+              setRemovedIds(prev => { const next = new Set(prev); for (const id of targetIds) next.add(id); return next; });
+              setSelectedIds(new Set());
+            }}
+            onMoveToBottom={() => {
+              for (const id of targetIds) moveCardToBottomOfDeck(id);
+              setRemovedIds(prev => { const next = new Set(prev); for (const id of targetIds) next.add(id); return next; });
+              setSelectedIds(new Set());
+            }}
             onShuffleIn={() => {
               if (targetIds.length === 1) {
                 shuffleCardIntoDeck(targetIds[0]);
@@ -608,6 +627,8 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
                 moveCardsBatch(targetIds, 'deck');
                 shuffleDeck();
               }
+              setRemovedIds(prev => { const next = new Set(prev); for (const id of targetIds) next.add(id); return next; });
+              setSelectedIds(new Set());
             }}
             sourceZone={sourceZone}
           />

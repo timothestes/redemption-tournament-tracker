@@ -160,6 +160,19 @@ export const GameCardNode = memo(function GameCardNode({
       y={y}
       rotation={rotation}
       draggable={isDraggable}
+      onMouseDown={(e) => {
+        // macOS Ctrl+click fires mousedown with button=0 + ctrlKey=true, which
+        // Konva's draggable shapes consume as a left-press and call
+        // preventDefault on — suppressing the subsequent `contextmenu` event
+        // that macOS would otherwise emit. Route the click through onContextMenu
+        // manually and cancel the pending drag so no ghost drag state lingers.
+        if (e.evt.ctrlKey && e.evt.button === 0) {
+          const node: any = e.target;
+          if (node && typeof node.stopDrag === 'function') node.stopDrag();
+          onContextMenu(card, e as unknown as Konva.KonvaEventObject<PointerEvent>);
+          e.cancelBubble = true;
+        }
+      }}
       onDragStart={() => { setIsDragging(true); onDragStart(card); }}
       onDragMove={onDragMove}
       onDragEnd={(e) => { setIsDragging(false); onDragEnd(card, e); }}

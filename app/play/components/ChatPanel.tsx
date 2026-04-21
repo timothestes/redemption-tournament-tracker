@@ -515,6 +515,38 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       if (data.cardName) return <>removed {data.color} counter from <HoverableCard name={data.cardName} img={data.cardImgFile} /></>;
     } catch { /* fall through */ }
   }
+  if (actionType === 'RANDOM_HAND_TO_ZONE' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const count = Number(data.count ?? 0);
+      const plural = count === 1 ? '' : 's';
+      const destination: string = data.destination ?? '';
+      const isViewer = actorPlayerId && viewerPlayerId && actorPlayerId === viewerPlayerId;
+      const rawCards: { name: string; img: string }[] = Array.isArray(data.cards) ? data.cards : [];
+
+      let verb: string;
+      if (destination === 'discard') verb = `discarded ${count} random card${plural} from their hand`;
+      else if (destination === 'reserve') verb = `sent ${count} random card${plural} from their hand to reserve`;
+      else if (destination === 'banish') verb = `banished ${count} random card${plural} from their hand`;
+      else if (destination === 'land-of-bondage') verb = `sent ${count} random card${plural} from their hand to land of bondage`;
+      else if (destination === 'deck (top)') verb = `put ${count} random card${plural} from their hand on top of their deck`;
+      else if (destination === 'deck (bottom)') verb = `put ${count} random card${plural} from their hand on the bottom of their deck`;
+      else if (destination === 'deck (shuffle)') verb = `shuffled ${count} random card${plural} from their hand into their deck`;
+      else verb = `moved ${count} random card${plural} from their hand to ${destination}`;
+
+      if (isViewer && rawCards.length > 0) {
+        return (
+          <>
+            {verb}: <CardNameList cards={rawCards} />
+            <span style={{ fontSize: 9, fontStyle: 'italic', color: 'rgba(232, 213, 163, 0.35)', marginLeft: 4 }}>
+              (only visible to you)
+            </span>
+          </>
+        );
+      }
+      return verb;
+    } catch { /* fall through */ }
+  }
   if (actionType === 'SET_NOTE' && payload) {
     try {
       const data = JSON.parse(payload);

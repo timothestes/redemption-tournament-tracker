@@ -154,8 +154,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // Client-side undo stack for multiplayer reverse actions
   const undoStack = useUndoStack();
 
-  // Game timer — client-side only, tracks elapsed play time
-  const gameTimer = useGameTimer();
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
 
   // Phase 1: Subscribe to game table filtered by code so we can discover the
@@ -248,6 +246,10 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // Must be declared before the reducer effect so isGamesReady is available
   // in the dependency array (which is evaluated during render).
   const gameState = useGameState(gameId ?? BigInt(0));
+
+  // Game timer — anchored to server-recorded playingStartedAtMicros so elapsed
+  // time survives navigating away and back to the game.
+  const gameTimer = useGameTimer(gameState.game?.playingStartedAtMicros ?? null);
 
   // Persist chat/log/all tab across loupe toggles so it doesn't reset to chat
   const [chatTab, setChatTab] = useState<'chat' | 'log' | 'all'>('all');
@@ -514,18 +516,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       setLifecycle('finished');
     }
   }, [gameState.game, lifecycle]);
-
-  // --- Game timer control ---
-  // Start when lifecycle transitions to 'playing'; reset on pregame (rematch)
-  useEffect(() => {
-    if (lifecycle === 'playing') {
-      gameTimer.start();
-    } else if (lifecycle === 'pregame') {
-      // Reset timer for rematch (pregame re-entered from finished)
-      gameTimer.reset();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lifecycle]);
 
   // Pause/resume based on search modal state
   useEffect(() => {
@@ -1229,7 +1219,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                   <button
                     onClick={() => {
                       gameState.reloadDeck(reloadDeckConfirm.deckId, reloadDeckConfirm.deckData, reloadDeckConfirm.paragon);
-                      gameTimer.reset();
                       setReloadDeckConfirm(null);
                     }}
                     style={{
@@ -1432,7 +1421,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               <button
                 onClick={() => {
                   gameState.reloadDeck(reloadDeckConfirm.deckId, reloadDeckConfirm.deckData, reloadDeckConfirm.paragon);
-                  gameTimer.reset();
                   setReloadDeckConfirm(null);
                 }}
                 style={{
