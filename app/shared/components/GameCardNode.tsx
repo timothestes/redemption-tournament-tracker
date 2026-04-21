@@ -321,32 +321,41 @@ export const GameCardNode = memo(function GameCardNode({
           );
         })}
 
-        {/* Per-card reveal countdown badge — top-right corner. Only appears
-            while the card's 30s reveal window is active (hand zone only). */}
-        {isActivelyRevealed && (
-          <Group x={cardWidth - 44} y={4} listening={false}>
-            <Rect
-              width={40}
-              height={18}
-              fill="rgba(20,20,20,0.85)"
-              stroke="#f2c94c"
-              strokeWidth={1}
-              cornerRadius={4}
-            />
-            <Text
-              x={0}
-              y={0}
-              width={40}
-              height={18}
-              align="center"
-              verticalAlign="middle"
-              text={`${Math.max(0, Math.ceil((card.revealUntil! - Date.now()) / 1000))}s`}
-              fontSize={11}
-              fontStyle="bold"
-              fill="#f2c94c"
-            />
-          </Group>
-        )}
+        {/* Per-card reveal countdown badge — horizontally centered, lower
+            third of the card (above the note pill). Only appears while the
+            card's 30s reveal window is active (hand zone only). */}
+        {isActivelyRevealed && (() => {
+          const badgeWidth = 40;
+          const badgeHeight = 18;
+          return (
+            <Group
+              x={(cardWidth - badgeWidth) / 2}
+              y={cardHeight * 0.75}
+              listening={false}
+            >
+              <Rect
+                width={badgeWidth}
+                height={badgeHeight}
+                fill="rgba(20,20,20,0.85)"
+                stroke="#f2c94c"
+                strokeWidth={1}
+                cornerRadius={4}
+              />
+              <Text
+                x={0}
+                y={0}
+                width={badgeWidth}
+                height={badgeHeight}
+                align="center"
+                verticalAlign="middle"
+                text={`${Math.max(0, Math.ceil((card.revealUntil! - Date.now()) / 1000))}s`}
+                fontSize={11}
+                fontStyle="bold"
+                fill="#f2c94c"
+              />
+            </Group>
+          );
+        })()}
 
         {/* Note text pill — bottom of card, hidden during drag */}
         {card.notes && !isDragging && (() => {
