@@ -2,7 +2,7 @@ import spacetimedb from './schema';
 export default spacetimedb;
 import { DisconnectTimeout, setDisconnectTimeoutReducer, ChooseFirstTimeout, setChooseFirstTimeoutReducer, CleanupSchedule, setCleanupStaleGamesReducer } from './schema';
 import { t, SenderError } from 'spacetimedb/server';
-import { ScheduleAt } from 'spacetimedb';
+import { ScheduleAt, Timestamp } from 'spacetimedb';
 import { makeSeed, seededShuffle, seededDiceRoll, xorshift64, generateGameCode } from './utils';
 import { getAbilitiesForCard, findTokenCard, type CardAbility } from './cardAbilities';
 
@@ -235,6 +235,7 @@ function insertCardsShuffleDraw(
       equippedToInstanceId: 0n,
       isSoulDeckOrigin: false,
       isToken: false,
+      revealExpiresAt: undefined,
     });
   }
 
@@ -332,6 +333,7 @@ function initializeSoulDeck(ctx: any, game: any) {
       equippedToInstanceId: 0n,
       isSoulDeckOrigin: true,
       isToken: false,
+      revealExpiresAt: undefined,
     });
   }
 
@@ -484,6 +486,7 @@ export const create_game = spacetimedb.reducer(
       rematchCode: '',
       disconnectTimeoutFired: false,
       choosingDeadlineMicros: 0n,
+      playingStartedAtMicros: 0n,
     });
 
     // Insert player row with pending deck data (cards loaded later during pregame)
@@ -895,6 +898,7 @@ export const pregame_acknowledge_first = spacetimedb.reducer(
         pregamePhase: '',
         currentPhase: 'draw',
         turnNumber: 1n,
+        playingStartedAtMicros: ctx.timestamp.microsSinceUnixEpoch,
       });
 
       logAction(ctx, gameId, player.id, 'GAME_STARTED',
@@ -1171,6 +1175,7 @@ export const respond_rematch = spacetimedb.reducer(
         rematchResponse: '',
         rematchCode: '',
         choosingDeadlineMicros: ctx.timestamp.microsSinceUnixEpoch + CHOOSE_DEADLINE_MICROS,
+        playingStartedAtMicros: 0n,
       });
 
       logAction(ctx, gameId, player.id, 'REMATCH_STARTED',
@@ -1835,6 +1840,7 @@ export const move_card = spacetimedb.reducer(
       isFlipped,
       ownerId: resolvedOwnerId,
       equippedToInstanceId: clearEquippedOnMover ? 0n : card.equippedToInstanceId,
+      revealExpiresAt: undefined,
     });
 
     if (leavingZone) {
@@ -1859,6 +1865,7 @@ export const move_card = spacetimedb.reducer(
             posX: '',
             posY: '',
             equippedToInstanceId: 0n,
+            revealExpiresAt: undefined,
           });
         } else {
           ctx.db.CardInstance.id.update({ ...accessory, equippedToInstanceId: 0n });
@@ -2150,6 +2157,7 @@ export const move_cards_batch = spacetimedb.reducer(
         isFlipped,
         ownerId: resolvedCardOwnerId,
         equippedToInstanceId: leavingZone ? 0n : card.equippedToInstanceId,
+        revealExpiresAt: undefined,
       });
     }
 
@@ -2183,6 +2191,7 @@ export const move_cards_batch = spacetimedb.reducer(
             posX: '',
             posY: '',
             equippedToInstanceId: 0n,
+            revealExpiresAt: undefined,
           });
         } else {
           ctx.db.CardInstance.id.update({ ...accessory, equippedToInstanceId: 0n });
@@ -2289,6 +2298,7 @@ function spawnTokenImpl(
       identifier: tokenData.identifier,
       specialAbility: tokenData.specialAbility,
       reference: tokenData.reference,
+      revealExpiresAt: undefined,
     });
   }
 
@@ -2851,6 +2861,7 @@ export const shuffle_card_into_deck = spacetimedb.reducer(
       ...card,
       zone: 'deck',
       isFlipped: true,
+      revealExpiresAt: undefined,
     });
 
     // Now shuffle the deck owner's entire deck (same logic as shuffle_deck)
@@ -2937,10 +2948,10 @@ export const random_hand_to_zone = spacetimedb.reducer(
       }
     }
 
-    const movedNames: string[] = [];
+    const movedCards: { name: string; img: string }[] = [];
     for (let i = 0; i < pickedCards.length; i++) {
       const card = pickedCards[i];
-      movedNames.push(card.cardName);
+      movedCards.push({ name: card.cardName, img: card.cardImgFile });
 
       let newZoneIndex = 0n;
       if (toZone === 'deck') {
@@ -2957,6 +2968,7 @@ export const random_hand_to_zone = spacetimedb.reducer(
         zoneIndex: newZoneIndex,
         posX: '',
         posY: '',
+        revealExpiresAt: undefined,
       });
     }
 
@@ -2983,7 +2995,7 @@ export const random_hand_to_zone = spacetimedb.reducer(
 
     const destLabel = toZone === 'deck' ? `deck (${deckPosition})` : toZone;
     logAction(ctx, gameId, player.id, 'RANDOM_HAND_TO_ZONE',
-      JSON.stringify({ cards: movedNames, destination: destLabel, count: actualCount }),
+      JSON.stringify({ cards: movedCards, destination: destLabel, count: actualCount }),
       game.turnNumber, game.currentPhase);
   }
 );
@@ -3064,6 +3076,7 @@ export const random_opponent_hand_to_zone = spacetimedb.reducer(
         posX: '',
         posY: '',
         isFlipped: toZone === 'deck' || toZone === 'reserve' ? true : card.isFlipped,
+        revealExpiresAt: undefined,
       });
     }
 
@@ -3344,6 +3357,47 @@ export const flip_card = spacetimedb.reducer(
       flipPayload.cardImgFile = card.cardImgFile;
     }
     logAction(ctx, gameId, player.id, 'FLIP', JSON.stringify(flipPayload), game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: reveal_card_in_hand
+// ---------------------------------------------------------------------------
+// Temporarily reveals a single hand card to opponents/spectators for a fixed
+// duration. Server-authoritative via reveal_expires_at; clients compare the
+// timestamp against their local clock. Clears automatically whenever a
+// move-out-of-hand reducer runs.
+export const reveal_card_in_hand = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardInstanceId: t.u64(),
+  },
+  (ctx, { gameId, cardInstanceId }) => {
+    const player = findPlayerBySender(ctx, gameId);
+
+    const card = ctx.db.CardInstance.id.find(cardInstanceId);
+    if (!card) throw new SenderError('Card not found');
+    if (card.gameId !== gameId) throw new SenderError('Card not in this game');
+    if (card.ownerId !== player.id) throw new SenderError('Not your card');
+    if (card.zone !== 'hand') throw new SenderError('Card must be in hand');
+
+    // Fixed 30 second duration. Timestamps use microseconds since Unix epoch.
+    const THIRTY_SECONDS_MICROS = 30_000_000n;
+    const expiresAtMicros =
+      ctx.timestamp.microsSinceUnixEpoch + THIRTY_SECONDS_MICROS;
+
+    ctx.db.CardInstance.id.update({
+      ...card,
+      revealExpiresAt: new Timestamp(expiresAtMicros),
+    });
+
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    const payload = {
+      cardInstanceId: cardInstanceId.toString(),
+      expiresAtMicros: expiresAtMicros.toString(),
+    };
+    logAction(ctx, gameId, player.id, 'REVEAL_CARD', JSON.stringify(payload), game.turnNumber, game.currentPhase);
   }
 );
 
@@ -3732,6 +3786,7 @@ export const move_card_to_top_of_deck = spacetimedb.reducer(
       zone: 'deck',
       zoneIndex: 0n,
       isFlipped: true,
+      revealExpiresAt: undefined,
     });
 
     // Compact hand indices if card left hand
@@ -3789,6 +3844,7 @@ export const move_card_to_bottom_of_deck = spacetimedb.reducer(
       zone: 'deck',
       zoneIndex: maxIndex + 1n,
       isFlipped: true,
+      revealExpiresAt: undefined,
     });
 
     // Compact hand indices if card left hand
@@ -3877,6 +3933,7 @@ export const spawn_lost_soul = spacetimedb.reducer(
       equippedToInstanceId: 0n,
       isSoulDeckOrigin: false,
       isToken: true,
+      revealExpiresAt: undefined,
     });
 
     logAction(ctx, gameId, player.id, 'SPAWN_LOST_SOUL', JSON.stringify({ testament }), game.turnNumber, game.currentPhase);
