@@ -130,13 +130,22 @@ async function loadShopifyProducts(): Promise<{
  */
 async function loadProtectedKeys(): Promise<Set<string>> {
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from('card_price_mappings')
-    .select('card_key, status, confidence')
-    .or('status.eq.manual,and(status.eq.auto_matched,confidence.gte.0.95)');
-  if (error) throw new Error(`Failed to load protected mappings: ${error.message}`);
+  const filter = 'status.eq.manual,status.eq.no_price_exists,and(status.eq.auto_matched,confidence.gte.0.95)';
+  const pageSize = 1000;
+  const keys = new Set<string>();
 
-  return new Set((data ?? []).map((r: { card_key: string }) => r.card_key));
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase
+      .from('card_price_mappings')
+      .select('card_key')
+      .or(filter)
+      .range(offset, offset + pageSize - 1);
+    if (error) throw new Error(`Failed to load protected mappings: ${error.message}`);
+    for (const row of data ?? []) keys.add((row as { card_key: string }).card_key);
+    if (!data || data.length < pageSize) break;
+  }
+
+  return keys;
 }
 
 /**
@@ -861,12 +870,20 @@ export async function runMatchingPipeline(options?: {
 async function writeResults(results: MatchResult[]): Promise<void> {
   const supabase = getSupabaseAdmin();
 
-  // Load manually-protected keys to exclude from writes
-  const { data: manualRows } = await supabase
-    .from('card_price_mappings')
-    .select('card_key')
-    .eq('status', 'manual');
-  const manualKeys = new Set((manualRows ?? []).map((r: any) => r.card_key));
+  // Load manually-protected keys to exclude from writes.
+  // `no_price_exists` is a deliberate user decision ("this card has no Shopify
+  // price") and must also be protected from auto-matcher overwrites.
+  const manualKeys = new Set<string>();
+  const pageSize = 1000;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data: manualRows } = await supabase
+      .from('card_price_mappings')
+      .select('card_key')
+      .in('status', ['manual', 'no_price_exists'])
+      .range(offset, offset + pageSize - 1);
+    for (const row of manualRows ?? []) manualKeys.add((row as any).card_key);
+    if (!manualRows || manualRows.length < pageSize) break;
+  }
 
   // Filter out any results that would overwrite manual entries
   const filtered = results.filter(r => !manualKeys.has(r.card_key));
