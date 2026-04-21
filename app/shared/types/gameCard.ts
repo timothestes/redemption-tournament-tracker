@@ -83,6 +83,10 @@ export interface GameCard {
    *  Undefined when unattached. Cleared automatically by the reducer when
    *  either card leaves Territory. */
   equippedTo?: string;
+  /** Unix ms epoch when this card's temporary per-card reveal expires.
+   *  A card is "currently revealed" iff revealUntil !== undefined &&
+   *  revealUntil > Date.now(). Cleared whenever the card changes zone. */
+  revealUntil?: number;
 }
 
 export type ActionType =
@@ -112,7 +116,8 @@ export type ActionType =
   | 'REORDER_LOB'
   | 'ATTACH_CARD'
   | 'DETACH_CARD'
-  | 'EXECUTE_CARD_ABILITY';
+  | 'EXECUTE_CARD_ABILITY'
+  | 'REVEAL_CARD_IN_HAND';
 
 export interface GameAction {
   id: string;
