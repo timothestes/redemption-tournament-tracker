@@ -42,4 +42,5 @@ export default __t.row({
   rematchCode: __t.string().name("rematch_code"),
   disconnectTimeoutFired: __t.bool().name("disconnect_timeout_fired"),
   choosingDeadlineMicros: __t.u64().name("choosing_deadline_micros"),
+  playingStartedAtMicros: __t.u64().name("playing_started_at_micros"),
 });

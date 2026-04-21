@@ -82,6 +82,7 @@ import RequestRematchReducer from "./request_rematch_reducer";
 import RequestZoneSearchReducer from "./request_zone_search_reducer";
 import ResignGameReducer from "./resign_game_reducer";
 import RespondRematchReducer from "./respond_rematch_reducer";
+import RevealCardInHandReducer from "./reveal_card_in_hand_reducer";
 import RevealCardsReducer from "./reveal_cards_reducer";
 import RollDiceReducer from "./roll_dice_reducer";
 import SendChatReducer from "./send_chat_reducer";
@@ -330,6 +331,7 @@ const reducersSchema = __reducers(
   __reducerSchema("request_zone_search", RequestZoneSearchReducer),
   __reducerSchema("resign_game", ResignGameReducer),
   __reducerSchema("respond_rematch", RespondRematchReducer),
+  __reducerSchema("reveal_card_in_hand", RevealCardInHandReducer),
   __reducerSchema("reveal_cards", RevealCardsReducer),
   __reducerSchema("roll_dice", RollDiceReducer),
   __reducerSchema("send_chat", SendChatReducer),

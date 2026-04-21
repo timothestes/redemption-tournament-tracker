@@ -43,6 +43,7 @@ export const CardInstance = __t.object("CardInstance", {
   equippedToInstanceId: __t.u64(),
   isSoulDeckOrigin: __t.bool(),
   isToken: __t.bool(),
+  revealExpiresAt: __t.option(__t.timestamp()),
 });
 export type CardInstance = __Infer<typeof CardInstance>;
 
@@ -108,6 +109,7 @@ export const Game = __t.object("Game", {
   rematchCode: __t.string(),
   disconnectTimeoutFired: __t.bool(),
   choosingDeadlineMicros: __t.u64(),
+  playingStartedAtMicros: __t.u64(),
 });
 export type Game = __Infer<typeof Game>;
 
