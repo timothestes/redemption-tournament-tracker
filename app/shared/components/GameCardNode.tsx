@@ -95,7 +95,11 @@ export const GameCardNode = memo(function GameCardNode({
   onMouseLeave,
 }: GameCardNodeProps) {
   const isToken = card.isToken;
-  const showFace = !card.isFlipped && image;
+  const isActivelyRevealed =
+    typeof card.revealUntil === 'number' && card.revealUntil > Date.now();
+  // A per-card reveal temporarily shows the face even when the card would
+  // otherwise render face-down (opponent hand view).
+  const showFace = (!card.isFlipped || isActivelyRevealed) && image;
   const [isDragging, setIsDragging] = useState(false);
 
   // Ref for the LOB arrival glow rect — used to run an imperative Konva Tween
@@ -303,6 +307,33 @@ export const GameCardNode = memo(function GameCardNode({
             </Group>
           );
         })}
+
+        {/* Per-card reveal countdown badge — top-right corner. Only appears
+            while the card's 30s reveal window is active (hand zone only). */}
+        {isActivelyRevealed && (
+          <Group x={cardWidth - 44} y={4} listening={false}>
+            <Rect
+              width={40}
+              height={18}
+              fill="rgba(20,20,20,0.85)"
+              stroke="#f2c94c"
+              strokeWidth={1}
+              cornerRadius={4}
+            />
+            <Text
+              x={0}
+              y={0}
+              width={40}
+              height={18}
+              align="center"
+              verticalAlign="middle"
+              text={`${Math.max(0, Math.ceil((card.revealUntil! - Date.now()) / 1000))}s`}
+              fontSize={11}
+              fontStyle="bold"
+              fill="#f2c94c"
+            />
+          </Group>
+        )}
 
         {/* Note text pill — bottom of card, hidden during drag */}
         {card.notes && !isDragging && (() => {
