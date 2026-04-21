@@ -36,6 +36,7 @@ import { GameToastContainer, showGameToast } from './GameToast';
 import { DiceRollOverlay } from './DiceRollOverlay';
 import { useCardPreview } from '../state/CardPreviewContext';
 import { useLobArrivalEffect } from '@/app/shared/hooks/useLobArrivalEffect';
+import { useRevealTick } from '@/app/shared/hooks/useRevealTick';
 import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '../utils/equipLayout';
 import { findCard, isWeapon, isWarrior } from '@/lib/cards/lookup';
 import { getAbilitiesForCard } from '@/lib/cards/cardAbilities';
@@ -67,6 +68,16 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     [state.zones],
   );
   const { getGlowIntensity: getLobGlow } = useLobArrivalEffect(lobCardIds);
+
+  // Drive 1s re-renders while any hand card has an active per-card reveal —
+  // needed for the countdown badge to tick and the auto-expiry to render.
+  const handHasActiveReveal = useMemo(
+    () => (state.zones.hand ?? []).some(
+      c => typeof c.revealUntil === 'number' && c.revealUntil > Date.now(),
+    ),
+    [state.zones.hand],
+  );
+  useRevealTick(handHasActiveReveal);
 
   // Adapter: bridge goldfish game context to shared GameActions interface
   const goldfishActions: GameActions = useMemo(() => ({
