@@ -133,6 +133,13 @@ function cardInstanceToGameCard(
       color: c.color as Counter['color'],
       count: Number(c.count),
     })),
+    // Map server timestamp (microseconds) → client ms epoch. Undefined =
+    // no active reveal. Clients read this to drive the countdown badge and
+    // to override opponent face-down rendering for the reveal window.
+    revealUntil:
+      card.revealExpiresAt === undefined
+        ? undefined
+        : Number(card.revealExpiresAt.microsSinceUnixEpoch / 1000n),
   };
 }
 
@@ -956,10 +963,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       if (undoStack) {
         const card = findMyCardById(cardId);
         const fromZone = card?.zone;
-        if (fromZone && fromZone !== 'deck') {
+        if (fromZone) {
+          // When the card is already in the deck (e.g. dragged out of a peek/look
+          // modal), the reverse action sends it back to the top — the position
+          // that matches where the user was peeking.
+          const reverseAction = fromZone === 'deck'
+            ? () => gameState.moveCardToTopOfDeck(BigInt(cardId))
+            : () => gameState.moveCard(BigInt(cardId), fromZone, undefined, card?.posX, card?.posY);
           undoStack.push({
             description: `Moved ${card?.cardName || 'card'} to bottom of deck`,
-            reverseAction: () => gameState.moveCard(BigInt(cardId), fromZone!, undefined, card?.posX, card?.posY),
+            reverseAction,
           });
         }
       }
@@ -1044,7 +1057,22 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         execute();
       },
       moveCardToTopOfDeck: (id) => gameState.moveCardToTopOfDeck(BigInt(id)),
-      moveCardToBottomOfDeck: (id) => gameState.moveCardToBottomOfDeck(BigInt(id)),
+      moveCardToBottomOfDeck: (id) => {
+        if (undoStack) {
+          const card = findMyCardById(id);
+          const fromZone = card?.zone;
+          if (fromZone) {
+            const reverseAction = fromZone === 'deck'
+              ? () => gameState.moveCardToTopOfDeck(BigInt(id))
+              : () => gameState.moveCard(BigInt(id), fromZone, undefined, card?.posX, card?.posY);
+            undoStack.push({
+              description: `Moved ${card?.cardName || 'card'} to bottom of deck`,
+              reverseAction,
+            });
+          }
+        }
+        gameState.moveCardToBottomOfDeck(BigInt(id));
+      },
       shuffleDeck: () => gameState.shuffleDeck(),
       shuffleCardIntoDeck: (id) => gameState.shuffleCardIntoDeck(BigInt(id)),
       exchangeFromDeck: (exchangeCardIds, replacementMoves) => {
@@ -1054,7 +1082,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         );
       },
     },
-  }), [myCards, counters, gameState, findMyCardById, checkReserveProtection, checkReserveBatchProtection]);
+  }), [myCards, counters, gameState, findMyCardById, checkReserveProtection, checkReserveBatchProtection, undoStack]);
 
   // ---- ModalGameProvider value for opponent deck modals (peek/search operate on opponent cards) ----
   const opponentModalGameValue = useMemo<ModalGameContextValue>(() => ({
@@ -3430,7 +3458,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // ---- Stage mouse handlers for marquee selection ----
   const handleStageMouseDown = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
-      if (e.evt.button !== 0) return;
+      // Skip Ctrl/⌘+Click: macOS fires a native contextmenu right after. Starting
+      // a marquee here would flip layer.listening(false) before Konva can hit-test
+      // the contextmenu, so the hand Rect's onContextMenu never fires.
+      if (e.evt.button !== 0 || e.evt.ctrlKey || e.evt.metaKey) return;
 
       // Only start selection on empty canvas (not on cards or clickable zones).
       // Walks target + ancestors; treats anything draggable, named "zone-click",

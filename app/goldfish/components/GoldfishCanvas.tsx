@@ -1256,8 +1256,9 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   // Stage event handlers for rectangular selection drag
   const handleStageMouseDown = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
-      // Only left-click
-      if (e.evt.button !== 0) return;
+      // Only left-click; skip Ctrl/⌘+Click so macOS contextmenu routing wins
+      // over marquee selection (mirrors MultiplayerCanvas).
+      if (e.evt.button !== 0 || e.evt.ctrlKey || e.evt.metaKey) return;
       // Only start selection drag on empty canvas space (not cards).
       // Walk up the node tree to detect any draggable ancestor (card Group),
       // since the click target may be a nested child (e.g. KonvaImage inside
