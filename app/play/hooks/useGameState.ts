@@ -83,6 +83,7 @@ export interface GameState {
   meekCard: (cardInstanceId: bigint) => void;
   unmeekCard: (cardInstanceId: bigint) => void;
   flipCard: (cardInstanceId: bigint) => void;
+  revealCardInHand: (cardInstanceId: bigint) => void;
   updateCardPosition: (cardInstanceId: bigint, posX: string, posY: string) => void;
   addCounter: (cardInstanceId: bigint, color: string) => void;
   removeCounter: (cardInstanceId: bigint, color: string) => void;
@@ -441,6 +442,13 @@ export function useGameState(gameId: bigint): GameState {
     [conn, gameId],
   );
 
+  const revealCardInHand = useCallback(
+    (cardInstanceId: bigint) => {
+      conn?.reducers.revealCardInHand({ gameId, cardInstanceId });
+    },
+    [conn, gameId],
+  );
+
   const updateCardPosition = useCallback(
     (cardInstanceId: bigint, posX: string, posY: string) => {
       conn?.reducers.updateCardPosition({ gameId, cardInstanceId, posX, posY });
@@ -753,6 +761,7 @@ export function useGameState(gameId: bigint): GameState {
     meekCard,
     unmeekCard,
     flipCard,
+    revealCardInHand,
     updateCardPosition,
     addCounter,
     removeCounter,
