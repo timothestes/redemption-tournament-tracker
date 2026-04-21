@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
-import { Group, Rect, Image as KonvaImage, Circle, Text } from 'react-konva';
+import { Group, Rect, Image as KonvaImage, Circle, Text, Arc } from 'react-konva';
 import type Konva from 'konva';
 import KonvaLib from 'konva';
 import { GameCard, COUNTER_COLORS } from '../../goldfish/types';
@@ -321,36 +321,34 @@ export const GameCardNode = memo(function GameCardNode({
           );
         })}
 
-        {/* Per-card reveal countdown badge — horizontally centered, lower
-            third of the card (above the note pill). Only appears while the
-            card's 30s reveal window is active (hand zone only). */}
+        {/* Per-card reveal progress ring — quiet circular countdown in the
+            top-right corner. Sweeps from full circle down to empty over the
+            30s window. Background ring keeps the shape visible while the
+            arc shrinks. */}
         {isActivelyRevealed && (() => {
-          const badgeWidth = 40;
-          const badgeHeight = 18;
+          const REVEAL_DURATION_MS = 30_000;
+          const remainingMs = Math.max(0, card.revealUntil! - Date.now());
+          const remainingFrac = Math.min(1, remainingMs / REVEAL_DURATION_MS);
+          const outerRadius = 8;
+          const innerRadius = 5;
+          const cx = cardWidth - outerRadius - 4;
+          const cy = outerRadius + 4;
           return (
-            <Group
-              x={(cardWidth - badgeWidth) / 2}
-              y={cardHeight * 0.7}
-              listening={false}
-            >
-              <Rect
-                width={badgeWidth}
-                height={badgeHeight}
-                fill="rgba(20,20,20,0.85)"
-                stroke="#f2c94c"
-                strokeWidth={1}
-                cornerRadius={4}
+            <Group x={cx} y={cy} listening={false}>
+              {/* Background ring — subtle base so empty state still reads */}
+              <Arc
+                innerRadius={innerRadius}
+                outerRadius={outerRadius}
+                angle={360}
+                rotation={-90}
+                fill="rgba(20,20,20,0.55)"
               />
-              <Text
-                x={0}
-                y={0}
-                width={badgeWidth}
-                height={badgeHeight}
-                align="center"
-                verticalAlign="middle"
-                text={`${Math.max(0, Math.ceil((card.revealUntil! - Date.now()) / 1000))}s`}
-                fontSize={11}
-                fontStyle="bold"
+              {/* Remaining time arc — amber, sweeps clockwise */}
+              <Arc
+                innerRadius={innerRadius}
+                outerRadius={outerRadius}
+                angle={360 * remainingFrac}
+                rotation={-90}
                 fill="#f2c94c"
               />
             </Group>
