@@ -67,6 +67,11 @@ export const actions = {
     return createAction('FLIP_CARD', { cardInstanceId });
   },
 
+  revealCardInHand(cardInstanceId: string): GameAction {
+    const revealUntil = Date.now() + 30_000;
+    return createAction('REVEAL_CARD_IN_HAND', { cardInstanceId, value: revealUntil });
+  },
+
   advancePhase(): GameAction {
     return createAction('ADVANCE_PHASE');
   },
