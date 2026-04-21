@@ -49,6 +49,7 @@ import { getAbilitiesForCard } from '@/lib/cards/cardAbilities';
 import { DeckExchangeModal } from '@/app/shared/components/DeckExchangeModal';
 import { ZoneBrowseModal } from '@/app/shared/components/ZoneBrowseModal';
 import { useModalCardDrag } from '@/app/shared/hooks/useModalCardDrag';
+import { useRevealTick } from '@/app/shared/hooks/useRevealTick';
 import type { ZoneId } from '@/app/shared/types/gameCard';
 import type { ZoneRect as GoldfishZoneRect } from '@/app/goldfish/layout/zoneLayout';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
@@ -433,6 +434,19 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   );
   const { getGlowIntensity: getMyLobGlow } = useLobArrivalEffect(myLobIds);
   const { getGlowIntensity: getOppLobGlow } = useLobArrivalEffect(oppLobIds);
+
+  // Drive 1s re-renders while any visible hand card has an active per-card
+  // reveal. Both own and opponent hands can carry reveals — opponent cards
+  // need to flip back at T+30s on the viewer's side without a state change.
+  const anyHandActiveReveal = useMemo(() => {
+    const nowMicros = BigInt(Date.now()) * 1000n;
+    const hasActive = (cards: readonly { zone: string; revealExpiresAt?: { microsSinceUnixEpoch: bigint } }[]) =>
+      cards.some(c => c.zone === 'hand' && c.revealExpiresAt !== undefined && c.revealExpiresAt.microsSinceUnixEpoch > nowMicros);
+    return hasActive(myCards['hand'] ?? []) || hasActive(opponentCards['hand'] ?? []);
+    // myCards/opponentCards identities update on each server tick, so this
+    // re-computes when reveals arrive or expire.
+  }, [myCards, opponentCards]);
+  useRevealTick(anyHandActiveReveal);
 
   // ---- Stage ref ----
   const stageRef = useRef<Konva.Stage>(null);
@@ -887,6 +901,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         });
       }
       gameState.flipCard(BigInt(cardId));
+    },
+    revealCardInHand: (cardId) => {
+      // Re-clicking already resets the timer — undo entry would add more
+      // confusion than value, so skip it.
+      gameState.revealCardInHand(BigInt(cardId));
     },
     meekCard: (cardId) => {
       if (undoStack) {
@@ -2970,8 +2989,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       setHoveredInstanceId(card.instanceId);
       startHoverAnimation();
 
-      // Don't show card preview for face-down opponent cards (hidden info)
-      if (card.isFlipped && card.ownerId === 'player2') {
+      // Don't show card preview for face-down opponent cards (hidden info) —
+      // but actively revealed cards ARE public, so allow preview on those.
+      const revealedNow =
+        typeof card.revealUntil === 'number' && card.revealUntil > Date.now();
+      if (card.isFlipped && card.ownerId === 'player2' && !revealedNow) {
         setHoveredCard(null);
         return;
       }
@@ -5146,6 +5168,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           x={contextMenu.x}
           y={contextMenu.y}
           actions={{ ...multiplayerActions, ...(sharedSoulActions ?? {}) }}
+          isHandRevealed={gameState.myPlayer?.handRevealed ?? false}
           onClose={() => setContextMenu(null)}
           onExchange={(cardIds) => {
             setContextMenu(null);
