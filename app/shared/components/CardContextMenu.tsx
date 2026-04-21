@@ -31,9 +31,12 @@ interface CardContextMenuProps {
   onEditNote?: (card: GameCard) => void;
   /** Live zone state for reading updated card data (counters, etc.) */
   zones?: Record<ZoneId, GameCard[]>;
+  /** When true, the whole-hand reveal is active — suppress the per-card
+   *  "Reveal for 30s" entry as redundant. Optional; defaults to false. */
+  isHandRevealed?: boolean;
 }
 
-export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onExchange, onDetach, onEditNote, zones }: CardContextMenuProps) {
+export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onExchange, onDetach, onEditNote, zones, isHandRevealed }: CardContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number; ready: boolean }>({ left: x, top: y, ready: false });
 
@@ -161,6 +164,21 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
     abilities.length > 0 && typeof actions.executeCardAbility === 'function';
   const canExecuteAbilities = hasAbilities && isOwnedByLocalPlayer && isInAbilityZone;
 
+  // Per-card hand reveal — gated to local player's own hand cards and
+  // suppressed when the whole hand is already publicly revealed.
+  const canRevealInHand =
+    card.zone === 'hand' &&
+    isOwnedByLocalPlayer &&
+    !isHandRevealed &&
+    typeof actions.revealCardInHand === 'function';
+
+  const nowForReveal = Date.now();
+  const isActivelyRevealed =
+    typeof card.revealUntil === 'number' && card.revealUntil > nowForReveal;
+  const secondsRemaining = isActivelyRevealed
+    ? Math.max(0, Math.ceil((card.revealUntil! - nowForReveal) / 1000))
+    : 0;
+
   // Opponent tokens get a simplified menu
   if (card.isToken) {
     return (
@@ -223,6 +241,22 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
               </button>
             );
           })}
+          <div style={separatorStyle} />
+        </>
+      )}
+
+      {canRevealInHand && (
+        <>
+          <button
+            style={itemStyle}
+            onClick={() => doAction(() => actions.revealCardInHand!(card.instanceId))}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          >
+            {isActivelyRevealed
+              ? `Reveal for 30s (${secondsRemaining}s left — reset)`
+              : 'Reveal for 30s'}
+          </button>
           <div style={separatorStyle} />
         </>
       )}
