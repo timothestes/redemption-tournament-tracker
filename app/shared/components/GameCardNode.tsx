@@ -330,7 +330,7 @@ export const GameCardNode = memo(function GameCardNode({
           return (
             <Group
               x={(cardWidth - badgeWidth) / 2}
-              y={cardHeight * 0.75}
+              y={cardHeight * 0.7}
               listening={false}
             >
               <Rect
