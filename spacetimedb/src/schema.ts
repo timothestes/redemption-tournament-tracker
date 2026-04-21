@@ -44,6 +44,7 @@ export const Game = table(
     rematchCode: t.string(),        // new game code for rematch
     disconnectTimeoutFired: t.bool().default(false), // true when timeout fired during active game
     choosingDeadlineMicros: t.u64().default(0n),  // server timestamp (microseconds since epoch) when choosing timer expires
+    playingStartedAtMicros: t.u64().default(0n),  // server timestamp (microseconds since epoch) when status transitioned to 'playing'; 0 when not yet started
   }
 );
 
@@ -116,6 +117,10 @@ export const CardInstance = table(
     equippedToInstanceId: t.u64().default(0n),
     isSoulDeckOrigin: t.bool().default(false),
     isToken: t.bool().default(false),
+    // Per-card hand reveal expiry. Absent = never revealed. When set, the
+    // card's face is shown to all clients until this timestamp passes. Move
+    // reducers clear this field when the card leaves the hand zone.
+    revealExpiresAt: t.timestamp().optional(),
   }
 );
 
