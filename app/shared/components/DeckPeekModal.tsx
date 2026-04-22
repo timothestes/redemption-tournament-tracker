@@ -456,7 +456,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
             ref={gridRef}
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+              gridTemplateColumns: `repeat(${Math.min(peekedIds.length, 4)}, minmax(140px, 1fr))`,
               gap: 12,
               position: 'relative',
               userSelect: 'none',
