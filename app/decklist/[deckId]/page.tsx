@@ -66,11 +66,11 @@ export default async function PublicDeckPage({ params }: PageProps) {
       return (
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
-            <svg className="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="mx-auto h-16 w-16 text-muted-foreground mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
             <h1 className="text-2xl font-bold mb-2">This deck is private</h1>
-            <p className="text-gray-600 dark:text-gray-400">The owner has made this deck private.</p>
+            <p className="text-muted-foreground">The owner has made this deck private.</p>
           </div>
         </div>
       );

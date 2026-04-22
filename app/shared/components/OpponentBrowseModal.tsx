@@ -681,6 +681,7 @@ export function OpponentBrowseModal({
                             borderRadius: 4,
                             border: isSelected ? '2px solid var(--gf-accent)' : '1px solid var(--gf-border)',
                             boxShadow: glowStyle?.boxShadow ?? selectedShadow,
+                            filter: card.zone === 'banish' ? 'grayscale(0.55) brightness(0.78)' : undefined,
                             transition: 'border 0.1s ease',
                           }}
                         />

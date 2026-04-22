@@ -49,7 +49,7 @@ export function MobileDrawer({ isOpen, onClose, children, title }: MobileDrawerP
           >
             {/* Drag handle */}
             <div className="flex justify-center pt-3 pb-2 cursor-grab active:cursor-grabbing">
-              <div className="w-10 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600" />
+              <div className="w-10 h-1.5 rounded-full bg-muted-foreground/40" />
             </div>
             {title && (
               <div className="px-4 pb-2 text-lg font-semibold text-foreground">

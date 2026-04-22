@@ -92,16 +92,16 @@ export default function GenerateDeckImageModal({ deck, onClose, isLegal }: Gener
         <DialogHeader>
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <h3 className="text-lg font-semibold text-foreground">
                 Generate Deck Image
               </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-sm text-muted-foreground">
                 {deck.name}
               </p>
             </div>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1"
+              className="text-muted-foreground hover:text-foreground p-1"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -132,11 +132,11 @@ export default function GenerateDeckImageModal({ deck, onClose, isLegal }: Gener
                 <label className="block text-sm font-medium mb-2">Options</label>
                 <div className="flex flex-wrap gap-x-5 gap-y-2">
                   <label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none" title="Average number of unique brigades when randomly drawing 8 non-lost soul cards">
-                    <input type="checkbox" checked={mCount} onChange={(e) => setMCount(e.target.checked)} className="rounded border-gray-300 dark:border-gray-600 text-blue-600 bg-transparent" />
+                    <input type="checkbox" checked={mCount} onChange={(e) => setMCount(e.target.checked)} className="rounded border-border text-blue-600 bg-transparent" />
                     Matthew count
                   </label>
                   <label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none" title="Average number of Daniel cards in the top 9 cards of a randomly shuffled deck">
-                    <input type="checkbox" checked={aodCount} onChange={(e) => setAodCount(e.target.checked)} className="rounded border-gray-300 dark:border-gray-600 text-blue-600 bg-transparent" />
+                    <input type="checkbox" checked={aodCount} onChange={(e) => setAodCount(e.target.checked)} className="rounded border-border text-blue-600 bg-transparent" />
                     AoD count
                   </label>
                 </div>
@@ -150,14 +150,14 @@ export default function GenerateDeckImageModal({ deck, onClose, isLegal }: Gener
                 <button
                   onClick={onClose}
                   disabled={loading}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+                  className="px-4 py-2 border border-border rounded-lg text-sm font-medium text-foreground hover:bg-muted transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleGenerate}
                   disabled={loading}
-                  className="px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg text-sm font-medium hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors disabled:opacity-50 inline-flex items-center gap-2"
+                  className="px-4 py-2 bg-foreground text-background rounded-lg text-sm font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 inline-flex items-center gap-2"
                 >
                   {loading ? (
                     <>
@@ -182,15 +182,15 @@ export default function GenerateDeckImageModal({ deck, onClose, isLegal }: Gener
                   </svg>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">Image ready</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Your deck image has been generated</p>
+                  <p className="text-sm font-semibold text-foreground">Image ready</p>
+                  <p className="text-xs text-muted-foreground">Your deck image has been generated</p>
                 </div>
               </div>
 
               <DialogFooter className="justify-end gap-2">
                 <button
                   onClick={onClose}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  className="px-4 py-2 border border-border rounded-lg text-sm font-medium text-foreground hover:bg-muted transition-colors"
                 >
                   Close
                 </button>
@@ -198,7 +198,7 @@ export default function GenerateDeckImageModal({ deck, onClose, isLegal }: Gener
                   href={success.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg text-sm font-medium hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors inline-flex items-center gap-2"
+                  className="px-4 py-2 bg-foreground text-background rounded-lg text-sm font-medium hover:bg-foreground/90 transition-colors inline-flex items-center gap-2"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />

@@ -428,7 +428,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
         onMouseLeave={() => setHoveredCard(null)}
       >
         {/* Card image - compact */}
-        <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-gray-800 hover:ring-2 hover:ring-primary transition-all cursor-pointer shadow-md">
+        <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-muted hover:ring-2 hover:ring-primary transition-all cursor-pointer shadow-md">
           {imageUrl ? (
             <img
               src={imageUrl}
@@ -437,7 +437,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
               loading="eager"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gray-700">
+            <div className="w-full h-full flex items-center justify-center bg-muted/60">
               <span className="text-xs text-muted-foreground text-center px-1">{card.name}</span>
             </div>
           )}
@@ -454,7 +454,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
             <div className="w-full p-1.5 text-white">
               <p className="text-xs font-semibold leading-tight truncate">{card.name}</p>
               {card.set && (
-                <p className="text-[10px] text-gray-300 truncate">{card.set}</p>
+                <p className="text-[10px] text-white/70 truncate">{card.set}</p>
               )}
             </div>
           </div>
@@ -804,7 +804,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
             <div className="sticky top-12">
               {hoveredCard ? (
                 <div className="transition-opacity duration-150">
-                  <div className="aspect-[2.5/3.5] rounded-lg overflow-hidden shadow-lg bg-gray-800">
+                  <div className="aspect-[2.5/3.5] rounded-lg overflow-hidden shadow-lg bg-muted">
                     <img
                       src={getImageUrl(hoveredCard.imgFile)}
                       alt={hoveredCard.name}

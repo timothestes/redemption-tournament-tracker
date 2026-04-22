@@ -126,7 +126,7 @@ export default function DeckCardList({
 
   if (filteredCards.length === 0) {
     return (
-      <div className="flex items-center justify-center py-8 text-gray-400 dark:text-gray-500 text-sm">
+      <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">
         No cards yet
       </div>
     );
@@ -166,7 +166,7 @@ export default function DeckCardList({
 
               {/* Card Image */}
               <div
-                className="aspect-[2.5/3.5] bg-gray-200 dark:bg-gray-700 animate-pulse cursor-pointer relative"
+                className="aspect-[2.5/3.5] bg-muted animate-pulse cursor-pointer relative"
                 onClick={() => onViewCard?.(card)}
               >
                 <img
@@ -195,7 +195,7 @@ export default function DeckCardList({
                         setOpenMenuCard(null);
                         onMoveCard(card.name, card.set, isReserve, !isReserve);
                       }}
-                      className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-gray-700 dark:text-gray-200 transition-all"
+                      className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-foreground transition-all"
                       title={isReserve ? "Move to main deck" : "Move to reserve"}
                     >
                       {isReserve ? (
@@ -218,7 +218,7 @@ export default function DeckCardList({
                         onViewCard(card);
                         setOpenMenuCard(null);
                       }}
-                      className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-gray-700 dark:text-gray-200 transition-all"
+                      className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-foreground transition-all"
                       title="View card details"
                     >
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -329,7 +329,7 @@ export default function DeckCardList({
             <img
               src={getImageUrl(previewCard.card.imgFile)}
               alt={previewCard.card.name}
-              className="rounded-lg shadow-2xl border-2 border-gray-300 dark:border-gray-600"
+              className="rounded-lg shadow-2xl border-2 border-border"
               style={{ maxHeight: '400px', width: 'auto' }}
             />
           </div>
@@ -658,7 +658,7 @@ export default function DeckCardList({
               {/* Decrement Button (always visible) */}
               <button
                 onClick={() => onDecrement(card.name, card.set, isReserve)}
-                className="w-7 h-7 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 transition-colors font-semibold text-base"
+                className="w-7 h-7 flex items-center justify-center rounded bg-muted hover:bg-muted/70 text-foreground transition-colors font-semibold text-base"
                 aria-label="Decrease quantity"
                 title="Decrease quantity"
               >
@@ -666,14 +666,14 @@ export default function DeckCardList({
               </button>
 
               {/* Quantity Badge (always visible, not a button) */}
-              <div key={quantity} className="animate-qty-pop flex-shrink-0 w-9 h-7 flex items-center justify-center text-gray-900 dark:text-white font-bold text-sm">
+              <div key={quantity} className="animate-qty-pop flex-shrink-0 w-9 h-7 flex items-center justify-center text-foreground font-bold text-sm">
                 {quantity}
               </div>
 
               {/* Increment Button (always visible) */}
               <button
                 onClick={() => onIncrement(card.name, card.set, isReserve)}
-                className="w-7 h-7 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 transition-colors font-semibold text-base"
+                className="w-7 h-7 flex items-center justify-center rounded bg-muted hover:bg-muted/70 text-foreground transition-colors font-semibold text-base"
                 aria-label="Increase quantity"
                 title="Increase quantity"
               >
@@ -684,7 +684,7 @@ export default function DeckCardList({
             {/* Card Info */}
             <div className="flex-1 min-w-0">
               <div
-                className="text-sm font-medium text-gray-900 dark:text-white truncate cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                className="text-sm font-medium text-foreground truncate cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                 onMouseEnter={(e) => {
                   const pos = calculatePreviewPosition(e.currentTarget);
                   setPreviewCard({
@@ -715,7 +715,7 @@ export default function DeckCardList({
               {onViewCard && (
                 <button
                   onClick={() => onViewCard(card)}
-                  className="w-6 h-6 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-600 hover:bg-primary text-gray-700 dark:text-gray-200 hover:text-primary-foreground transition-colors"
+                  className="w-6 h-6 flex items-center justify-center rounded bg-muted hover:bg-primary text-foreground hover:text-primary-foreground transition-colors"
                   aria-label="View card details"
                   title="View card details"
                 >
@@ -729,7 +729,7 @@ export default function DeckCardList({
               {onMoveCard && filterReserve !== undefined && (
                 <button
                   onClick={() => onMoveCard(card.name, card.set, isReserve, !isReserve)}
-                  className="w-8 h-6 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 transition-colors text-xs font-bold"
+                  className="w-8 h-6 flex items-center justify-center rounded bg-muted hover:bg-muted/70 text-foreground transition-colors text-xs font-bold"
                   aria-label={isReserve ? "Move to main deck" : "Move to reserve"}
                   title={isReserve ? "Move to main deck" : "Move to reserve"}
                 >
@@ -764,7 +764,7 @@ export default function DeckCardList({
           <img
             src={getImageUrl(previewCard.card.imgFile)}
             alt={previewCard.card.name}
-            className="rounded-lg shadow-2xl border-2 border-gray-300 dark:border-gray-600"
+            className="rounded-lg shadow-2xl border-2 border-border"
             style={{ maxHeight: '400px', width: 'auto' }}
           />
         </div>

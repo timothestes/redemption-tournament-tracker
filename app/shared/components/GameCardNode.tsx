@@ -260,6 +260,18 @@ export const GameCardNode = memo(function GameCardNode({
           <CardBackShape width={cardWidth} height={cardHeight} />
         )}
 
+        {/* Banish-zone dim — subtle grey wash to signal out-of-play state.
+            Rendered under counters/notes so those stay fully legible. */}
+        {card.zone === 'banish' && showFace && (
+          <Rect
+            width={cardWidth}
+            height={cardHeight}
+            fill="rgba(30,30,35,0.4)"
+            cornerRadius={4}
+            listening={false}
+          />
+        )}
+
         {/* Token overlay — dashed border + badge to distinguish from player's cards */}
         {isToken && (
           <>

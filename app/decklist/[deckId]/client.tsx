@@ -198,18 +198,43 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   // Tags
   const [deckTags, setDeckTags] = useState<GlobalTag[]>(deck.tags || []);
   const [allGlobalTags, setAllGlobalTags] = useState<GlobalTag[]>([]);
+  const [tagsLoading, setTagsLoading] = useState(false);
+  const [tagsLoadError, setTagsLoadError] = useState<string | null>(null);
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
   const [tagFilter, setTagFilter] = useState("");
   const [savingTags, setSavingTags] = useState(false);
   const tagPickerRef = useRef<HTMLDivElement>(null);
 
-  // Load global tag list for the picker (owner only)
+  // Load global tag list when the picker opens (retry on each open if load hasn't succeeded)
   useEffect(() => {
-    if (!isOwner) return;
-    loadGlobalTagsAction().then((res) => {
-      if (res.success) setAllGlobalTags(res.tags);
-    });
-  }, [isOwner]);
+    if (!isOwner || !tagPickerOpen) return;
+    if (allGlobalTags.length > 0) return;
+    let cancelled = false;
+    setTagsLoading(true);
+    setTagsLoadError(null);
+    (async () => {
+      try {
+        const { createClient } = await import("../../../utils/supabase/client");
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from("global_tags")
+          .select("id, name, color")
+          .order("name");
+        if (cancelled) return;
+        if (error) {
+          setTagsLoadError(error.message || "Failed to load tags");
+        } else if (data) {
+          setAllGlobalTags(data as GlobalTag[]);
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setTagsLoadError(err instanceof Error ? err.message : "Network error");
+      } finally {
+        if (!cancelled) setTagsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isOwner, tagPickerOpen, allGlobalTags.length]);
 
   // Close picker on outside click
   useEffect(() => {
@@ -694,13 +719,28 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                                 placeholder="Filter tags…"
                                 value={tagFilter}
                                 onChange={(e) => setTagFilter(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" && filteredGlobalTags[0]) {
+                                    e.preventDefault();
+                                    toggleTag(filteredGlobalTags[0]);
+                                  }
+                                }}
                                 className="w-full px-2.5 py-1.5 text-sm rounded-lg border border-border bg-card focus:outline-none focus:ring-2 focus:ring-blue-500"
                               />
                             </div>
 
                             {/* Tag list */}
                             <div className="max-h-56 overflow-y-auto">
-                              {filteredGlobalTags.length === 0 ? (
+                              {tagsLoading ? (
+                                <div className="flex items-center justify-center gap-2 py-4">
+                                  <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-muted-foreground border-t-transparent" />
+                                  <span className="text-xs text-muted-foreground">Loading tags…</span>
+                                </div>
+                              ) : tagsLoadError ? (
+                                <p className="text-xs text-red-500 dark:text-red-400 text-center py-4 px-3">
+                                  {tagsLoadError}
+                                </p>
+                              ) : filteredGlobalTags.length === 0 ? (
                                 <p className="text-xs text-muted-foreground text-center py-4">
                                   {allGlobalTags.length === 0 ? "No tags available yet" : "No matches"}
                                 </p>
@@ -1342,7 +1382,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                           onMouseEnter={() => setHoveredCard({ name: card.card_name, imgFile: card.card_img_file || "", set: card.card_set, type: card.type })}
                           onMouseLeave={() => setHoveredCard(null)}
                         >
-                          <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-gray-800 hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer shadow-md">
+                          <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-muted hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer shadow-md">
                             <img
                               src={getImageUrl(card.card_img_file || "")}
                               alt={card.card_name}
@@ -1382,7 +1422,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                         onMouseEnter={() => setHoveredCard({ name: card.card_name, imgFile: card.card_img_file || "", set: card.card_set, type: card.type })}
                         onMouseLeave={() => setHoveredCard(null)}
                       >
-                        <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-gray-800 hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer shadow-md">
+                        <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-muted hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer shadow-md">
                           <img
                             src={getImageUrl(card.card_img_file || "")}
                             alt={card.card_name}
@@ -1518,7 +1558,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
           <div className="sticky top-24">
             {hoveredCard ? (
               <div className="transition-opacity duration-150">
-                <div className="aspect-[2.5/3.5] rounded-lg overflow-hidden shadow-lg bg-gray-800">
+                <div className="aspect-[2.5/3.5] rounded-lg overflow-hidden shadow-lg bg-muted">
                   <img
                     src={getImageUrl(hoveredCard.imgFile)}
                     alt={hoveredCard.name}

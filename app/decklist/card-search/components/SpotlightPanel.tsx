@@ -50,7 +50,7 @@ function PlayerScore({
               setIsEditing(false);
             }
           }}
-          className="w-full text-center text-sm font-medium bg-transparent border-b border-gray-400 dark:border-gray-500 outline-none text-gray-800 dark:text-gray-200 px-1 h-7 leading-7"
+          className="w-full text-center text-sm font-medium bg-transparent border-b border-border outline-none text-foreground px-1 h-7 leading-7"
           autoFocus
         />
       ) : (
@@ -59,7 +59,7 @@ function PlayerScore({
             setEditValue(name);
             setIsEditing(true);
           }}
-          className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors truncate max-w-full cursor-text h-7 leading-7 border-b border-transparent"
+          className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors truncate max-w-full cursor-text h-7 leading-7 border-b border-transparent"
           title="Click to edit name"
         >
           {name}
@@ -67,7 +67,7 @@ function PlayerScore({
       )}
 
       {/* Score */}
-      <span className="text-3xl font-bold text-gray-800 dark:text-gray-100 tabular-nums mt-1">
+      <span className="text-3xl font-bold text-foreground tabular-nums mt-1">
         {score}
       </span>
 
@@ -76,7 +76,7 @@ function PlayerScore({
         <button
           onClick={() => onScoreChange(Math.max(0, score - 1))}
           disabled={score <= 0}
-          className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          className="w-8 h-8 flex items-center justify-center rounded-full bg-muted hover:bg-muted/70 text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
           aria-label={`Decrease ${name} score`}
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -86,7 +86,7 @@ function PlayerScore({
         <button
           onClick={() => onScoreChange(Math.min(7, score + 1))}
           disabled={score >= 7}
-          className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          className="w-8 h-8 flex items-center justify-center rounded-full bg-muted hover:bg-muted/70 text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
           aria-label={`Increase ${name} score`}
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -138,7 +138,7 @@ function Scoreboard({
       <div className="flex justify-center mt-3">
         <button
           onClick={onReset}
-          className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           Reset
         </button>
@@ -188,7 +188,7 @@ export default function SpotlightPanel({
       {/* Clear button */}
       <button
         onClick={onClear}
-        className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 transition-colors"
+        className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-muted hover:bg-muted/70 text-muted-foreground hover:text-foreground transition-colors"
         title="Clear spotlight"
       >
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -208,7 +208,7 @@ export default function SpotlightPanel({
 
       {/* Price */}
       {price !== null && (
-        <p className="mt-3 text-lg font-semibold text-gray-600 dark:text-gray-300">
+        <p className="mt-3 text-lg font-semibold text-muted-foreground">
           ${price.toFixed(2)}
         </p>
       )}

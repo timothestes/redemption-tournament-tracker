@@ -94,7 +94,7 @@ export default function ParagonRequirements({ paragonName, stats }: ParagonRequi
                     : 'bg-red-100 dark:bg-red-900/30 border-red-500 dark:border-red-600'
                 }`}
               >
-                <div className="text-[10px] md:text-xs font-medium text-gray-700 dark:text-gray-300 truncate">
+                <div className="text-[10px] md:text-xs font-medium text-foreground truncate">
                   {req.label}
                 </div>
                 <div className={`text-sm md:text-lg font-bold ${
@@ -109,9 +109,9 @@ export default function ParagonRequirements({ paragonName, stats }: ParagonRequi
               </div>
 
               {/* Tooltip on hover */}
-              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-10 whitespace-nowrap">
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-foreground text-background text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-10 whitespace-nowrap">
                 {req.description}
-                <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
+                <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-foreground"></div>
               </div>
             </div>
           );

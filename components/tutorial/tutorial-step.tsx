@@ -10,10 +10,10 @@ export function TutorialStep({
   return (
     <li className="relative py-3">
       <div className="flex flex-col">
-        <h3 className="text-lg font-medium text-gray-800 dark:text-gray-100 mb-2 text-center">
+        <h3 className="text-lg font-medium text-foreground mb-2 text-center">
           {title}
         </h3>
-        <div className="text-sm text-gray-600 dark:text-gray-300">
+        <div className="text-sm text-muted-foreground">
           {children}
         </div>
       </div>

@@ -249,7 +249,7 @@ export default function RegistrationPage() {
                 <h2 className="text-3xl md:text-4xl font-bold text-foreground">
                   Registration Complete!
                 </h2>
-                <p className="text-xl text-gray-700 dark:text-gray-300">
+                <p className="text-xl text-foreground">
                   Thank you for registering{formData.firstName ? `, ${formData.firstName}` : ''}! 🎉
                 </p>
                 <p className="text-sm text-muted-foreground">
@@ -263,7 +263,7 @@ export default function RegistrationPage() {
                   📋 What's next?
                 </p>
                 <ul className="text-left space-y-3 max-w-md mx-auto">
-                  <li className="flex items-start gap-3 text-gray-700 dark:text-gray-300">
+                  <li className="flex items-start gap-3 text-foreground">
                     <span className="flex-shrink-0 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center mt-0.5">
                       <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -271,7 +271,7 @@ export default function RegistrationPage() {
                     </span>
                     <span>Check your email for a confirmation message</span>
                   </li>
-                  <li className="flex items-start gap-3 text-gray-700 dark:text-gray-300">
+                  <li className="flex items-start gap-3 text-foreground">
                     <span className="flex-shrink-0 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center mt-0.5">
                       <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -279,7 +279,7 @@ export default function RegistrationPage() {
                     </span>
                     <span>We'll send updates about the venue and schedule</span>
                   </li>
-                  <li className="flex items-start gap-3 text-gray-700 dark:text-gray-300">
+                  <li className="flex items-start gap-3 text-foreground">
                     <span className="flex-shrink-0 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center mt-0.5">
                       <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -427,7 +427,7 @@ export default function RegistrationPage() {
                   type="file"
                   accept="image/*"
                   onChange={handlePhotoChange}
-                  className="block w-full text-sm text-gray-900 dark:text-gray-300 file:ml-2 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 dark:file:bg-green-900/20 dark:file:text-green-400 dark:hover:file:bg-green-900/30 cursor-pointer"
+                  className="block w-full text-sm text-foreground file:ml-2 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-primary/15 file:text-primary hover:file:bg-primary/25 cursor-pointer"
                 />
                 {photoPreview && (
                   <div className="mt-4 pt-3 border-t border-border">
@@ -594,7 +594,7 @@ export default function RegistrationPage() {
                     role="checkbox"
                     aria-checked={formData.firstNationals}
                     onClick={() => setFormData({...formData, firstNationals: !formData.firstNationals})}
-                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${formData.firstNationals ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
+                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${formData.firstNationals ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-border'}`}
                   >
                     {formData.firstNationals && (
                       <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -613,7 +613,7 @@ export default function RegistrationPage() {
                     role="checkbox"
                     aria-checked={formData.ironManInterest}
                     onClick={() => setFormData({...formData, ironManInterest: !formData.ironManInterest})}
-                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${formData.ironManInterest ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
+                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${formData.ironManInterest ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-border'}`}
                   >
                     {formData.ironManInterest && (
                       <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -632,7 +632,7 @@ export default function RegistrationPage() {
                     role="checkbox"
                     aria-checked={formData.fantasyDraftOptIn}
                     onClick={() => setFormData({...formData, fantasyDraftOptIn: !formData.fantasyDraftOptIn})}
-                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${formData.fantasyDraftOptIn ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
+                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${formData.fantasyDraftOptIn ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-border'}`}
                   >
                     {formData.fantasyDraftOptIn && (
                       <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -658,7 +658,7 @@ export default function RegistrationPage() {
                     role="checkbox"
                     aria-checked={formData.needsAirportTransportation}
                     onClick={() => setFormData({...formData, needsAirportTransportation: !formData.needsAirportTransportation})}
-                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${formData.needsAirportTransportation ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
+                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${formData.needsAirportTransportation ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-border'}`}
                   >
                     {formData.needsAirportTransportation && (
                       <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -692,7 +692,7 @@ export default function RegistrationPage() {
                     role="checkbox"
                     aria-checked={formData.needsHotelTransportation}
                     onClick={() => setFormData({...formData, needsHotelTransportation: !formData.needsHotelTransportation})}
-                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${formData.needsHotelTransportation ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
+                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${formData.needsHotelTransportation ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-border'}`}
                   >
                     {formData.needsHotelTransportation && (
                       <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -725,7 +725,7 @@ export default function RegistrationPage() {
                         overnightStayNights: newStayingOvernight ? formData.overnightStayNights : []
                       });
                     }}
-                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${formData.stayingOvernight ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-gray-300 dark:border-gray-600'}`}
+                    className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${formData.stayingOvernight ? 'bg-slate-600 border-slate-700 dark:bg-slate-500 dark:border-slate-600' : 'border-border'}`}
                   >
                     {formData.stayingOvernight && (
                       <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">

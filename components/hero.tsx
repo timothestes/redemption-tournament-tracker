@@ -27,9 +27,9 @@ export default function Header() {
         />
       </div>
       <h1 className="sr-only">Welcome message</h1>
-      <p className="text-3xl lg:text-4xl !leading-tight mx-auto max-w-xl text-center text-gray-800 dark:text-white">
+      <p className="text-3xl lg:text-4xl !leading-tight mx-auto max-w-xl text-center text-foreground">
         The best way to experience{" "}
-        <span className="font-bold text-4xl lg:text-5xl text-gray-900 dark:text-white">
+        <span className="font-bold text-4xl lg:text-5xl text-foreground">
           Redemption online
         </span>
       </p>

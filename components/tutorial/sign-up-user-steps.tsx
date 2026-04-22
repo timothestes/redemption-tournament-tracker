@@ -5,7 +5,7 @@ export default function SignUpUserSteps() {
   return (
     <ol className="flex flex-col gap-8">
       <TutorialStep title="Sign up to host a tournament">
-        <p className="text-center text-gray-700 dark:text-gray-300">
+        <p className="text-center text-muted-foreground">
           Only users that are{" "}
           <Link
             href="/sign-up"

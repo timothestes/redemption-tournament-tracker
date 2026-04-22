@@ -59,13 +59,14 @@ function formatDeckType(format?: string): string {
 
 function getDeckTypeBadgeClasses(format?: string): string {
   const deckType = formatDeckType(format);
+  const base = "px-2 py-0.5 rounded text-xs font-semibold [.jayden_&]:border [.jayden_&]:tracking-wide";
   if (deckType === "T2") {
-    return "px-2 py-0.5 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 rounded text-xs font-semibold";
+    return `${base} bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 [.jayden_&]:bg-[hsl(270,70%,50%)]/20 [.jayden_&]:text-[hsl(280,70%,88%)] [.jayden_&]:border-[hsl(270,70%,55%)]/45`;
   }
   if (deckType === "Paragon") {
-    return "px-2 py-0.5 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 rounded text-xs font-semibold";
+    return `${base} bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 [.jayden_&]:bg-[hsl(330,90%,55%)]/20 [.jayden_&]:text-[hsl(330,90%,88%)] [.jayden_&]:border-[hsl(330,90%,55%)]/45`;
   }
-  return "px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded text-xs font-semibold";
+  return `${base} bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 [.jayden_&]:bg-[hsl(230,90%,55%)]/20 [.jayden_&]:text-[hsl(220,90%,88%)] [.jayden_&]:border-[hsl(230,90%,55%)]/45`;
 }
 
 function timeAgo(dateString: string): string {
@@ -258,7 +259,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
       {/* Controls */}
       <div className="flex flex-col gap-3 mb-6">
         {/* Row 1: Search */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 max-w-2xl">
           <input
             type="text"
             value={searchInput}
@@ -647,7 +648,7 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
               deck.tournament.placement === 1
                 ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-700/60"
                 : deck.tournament.placement === 2
-                ? "bg-gray-50 dark:bg-gray-700/30 border-border"
+                ? "bg-muted/40 border-border"
                 : deck.tournament.placement === 3
                 ? "bg-orange-50 dark:bg-orange-900/15 border-orange-300 dark:border-orange-800/50"
                 : "bg-muted border-border"
@@ -659,7 +660,7 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
                 deck.tournament.placement === 1
                   ? "text-yellow-700 dark:text-yellow-300"
                   : deck.tournament.placement === 2
-                  ? "text-gray-600 dark:text-gray-300"
+                  ? "text-foreground"
                   : deck.tournament.placement === 3
                   ? "text-orange-700 dark:text-orange-300"
                   : "text-muted-foreground"

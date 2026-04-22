@@ -131,11 +131,11 @@ export default function LoadDeckModal({ onLoadDeck, onClose }: LoadDeckModalProp
         {/* Deck List */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {loading ? (
-            <div className="text-center py-8 text-gray-500">Loading decks...</div>
+            <div className="text-center py-8 text-muted-foreground">Loading decks...</div>
           ) : error ? (
             <div className="text-center py-8 text-red-500">{error}</div>
           ) : filteredDecks.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-muted-foreground">
               {searchQuery ? "No decks match your search" : "No saved decks found"}
             </div>
           ) : (

@@ -156,8 +156,8 @@ export default function DeckLegalityChecklist({
 
   if (totalCards === 0) {
     return (
-      <div className="rounded-lg bg-gray-800/30 px-4 py-3">
-        <p className="text-xs text-gray-500">Empty Deck</p>
+      <div className="rounded-lg bg-muted/50 px-4 py-3">
+        <p className="text-xs text-muted-foreground">Empty Deck</p>
       </div>
     );
   }
@@ -183,7 +183,7 @@ export default function DeckLegalityChecklist({
       <div
         className={`rounded-lg px-4 py-3 ${
           isChecking && !useServer
-            ? "bg-gray-800/30"
+            ? "bg-muted/50"
             : isValid
               ? "bg-green-950/40"
               : "bg-red-950/40"
@@ -193,8 +193,8 @@ export default function DeckLegalityChecklist({
           <div className="flex items-center gap-2">
             {isChecking && !useServer ? (
               <>
-                <Spinner className="text-gray-400" />
-                <span className="text-sm font-semibold text-gray-400">Checking...</span>
+                <Spinner className="text-muted-foreground" />
+                <span className="text-sm font-semibold text-muted-foreground">Checking...</span>
               </>
             ) : isValid ? (
               <>
@@ -216,7 +216,7 @@ export default function DeckLegalityChecklist({
             href="https://landofredemption.com/wp-content/uploads/2026/03/Deck_Building_Rules_1.3.pdf"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors"
+            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
           >
             Rules v1.3
           </a>
@@ -231,11 +231,11 @@ export default function DeckLegalityChecklist({
                 {hasFailed ? (
                   <XIcon className="shrink-0 text-red-400 w-3 h-3" />
                 ) : (
-                  <CheckIcon className="shrink-0 text-gray-600 w-3 h-3" />
+                  <CheckIcon className="shrink-0 text-muted-foreground w-3 h-3" />
                 )}
                 <span
                   className={`text-[11px] leading-none ${
-                    hasFailed ? "text-red-400 font-medium" : "text-gray-600"
+                    hasFailed ? "text-red-400 font-medium" : "text-muted-foreground"
                   }`}
                 >
                   {category.label}

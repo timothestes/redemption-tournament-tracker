@@ -23,6 +23,7 @@ import WaitingRoomGoldfish from '../components/WaitingRoomGoldfish';
 import { SpreadHandProvider, useSpreadHand } from '../contexts/SpreadHandContext';
 import { convertToGoldfishDeck, type GameCardData } from '../utils/convertToGoldfishDeck';
 import PregameScreen, { PregameCeremonyOverlay } from '../components/PregameScreen';
+import { ImageLoadingGate } from '../components/ImageLoadingGate';
 import { DeckPickerModal } from '../components/DeckPickerModal';
 import { getRandomLoadingMessage } from '@/app/shared/constants/loadingMessages';
 import { ArrowLeft } from 'lucide-react';
@@ -146,6 +147,32 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // Deck reload state
   const [showReloadDeckPicker, setShowReloadDeckPicker] = useState(false);
   const [reloadDeckConfirm, setReloadDeckConfirm] = useState<{ deckId: string; deckName: string; deckData: string; paragon: string } | null>(null);
+
+  // Image preload gate — keeps the board obscured until the tier-1 (visible)
+  // card images have loaded, so slow-wifi users aren't dropped into a board
+  // full of generic card backs. Capped at IMAGE_GATE_TIMEOUT_MS so a truly
+  // offline user is never held hostage.
+  const IMAGE_GATE_TIMEOUT_MS = 8_000;
+  const [imagesGateOpen, setImagesGateOpen] = useState(false);
+  const [imageLoadProgress, setImageLoadProgress] = useState(0);
+  const gateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleCriticalImagesReady = useCallback(() => setImagesGateOpen(true), []);
+  const handleImageLoadProgress = useCallback((p: number) => setImageLoadProgress(p), []);
+  // Start the safety timer once the canvas first has cards to render.
+  useEffect(() => {
+    if (imagesGateOpen) return;
+    if (gateTimerRef.current !== null) return;
+    if (gameId === null) return;
+    gateTimerRef.current = setTimeout(() => {
+      setImagesGateOpen(true);
+    }, IMAGE_GATE_TIMEOUT_MS);
+    return () => {
+      if (gateTimerRef.current) {
+        clearTimeout(gateTimerRef.current);
+        gateTimerRef.current = null;
+      }
+    };
+  }, [imagesGateOpen, gameId]);
 
   // Card preview hook — must be called before any early returns (Rules of Hooks)
   const { isLoupeVisible, toggleLoupe, previewCard } = useCardPreview();
@@ -1026,9 +1053,10 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           </div>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
             {gameId !== null && (
-              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} />
+              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} onCriticalImagesReady={handleCriticalImagesReady} onImageLoadProgress={handleImageLoadProgress} />
             )}
             <PregameCeremonyOverlay gameState={gameState} />
+            <ImageLoadingGate open={!imagesGateOpen} progress={imageLoadProgress} />
             <GameToastContainer />
           </div>
         </div>
@@ -1064,8 +1092,9 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           </div>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
             {gameId !== null && (
-              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} />
+              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} onCriticalImagesReady={handleCriticalImagesReady} onImageLoadProgress={handleImageLoadProgress} />
             )}
+            <ImageLoadingGate open={!imagesGateOpen} progress={imageLoadProgress} />
             <GameToastContainer />
           </div>
         </div>
@@ -1109,7 +1138,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               />
             </div>
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} />
+              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} onCriticalImagesReady={handleCriticalImagesReady} onImageLoadProgress={handleImageLoadProgress} />
               {/* Bottom toolbar — stays active for draw/shuffle, end turn disabled */}
               <GameToolbar
                 actions={{
@@ -1315,8 +1344,9 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         </div>
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           {gameId !== null && (
-            <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} />
+            <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} onCriticalImagesReady={handleCriticalImagesReady} onImageLoadProgress={handleImageLoadProgress} />
           )}
+          <ImageLoadingGate open={!imagesGateOpen} progress={imageLoadProgress} />
           {/* Quick action toolbar — floating above hand area */}
           <GameToolbar
             actions={{

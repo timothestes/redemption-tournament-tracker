@@ -243,7 +243,7 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
                 onClick={() => handleModeChange(m)}
                 className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                   mode === m
-                    ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900"
+                    ? "bg-foreground text-background"
                     : "bg-muted text-muted-foreground"
                 }`}
               >

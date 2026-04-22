@@ -16,7 +16,7 @@ export default async function MyDecksPage() {
     return (
       <div className="w-full max-w-2xl mx-auto px-4 py-16 text-center">
         <svg
-          className="mx-auto h-20 w-20 text-gray-400 mb-6"
+          className="mx-auto h-20 w-20 text-muted-foreground mb-6"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -46,7 +46,7 @@ export default async function MyDecksPage() {
             Create an account
           </Link>
         </div>
-        <p className="mt-8 text-sm text-gray-500 dark:text-gray-500">
+        <p className="mt-8 text-sm text-muted-foreground">
           You can still <Link href="/decklist/card-search?new=true" className="text-blue-600 dark:text-blue-400 underline">build a deck</Link> without an account — signing in lets you save it to the cloud.
         </p>
       </div>

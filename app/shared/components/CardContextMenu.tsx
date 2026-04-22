@@ -261,8 +261,8 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
         </>
       )}
 
-      {/* Counter swatches — only for territory and land-of-bondage */}
-      {(card.zone === 'territory' || card.zone === 'land-of-bondage') && (
+      {/* Counter swatches — territory and land-of-bondage always; land-of-redemption only when counters already exist */}
+      {(card.zone === 'territory' || card.zone === 'land-of-bondage' || (card.zone === 'land-of-redemption' && card.counters.some(c => c.count > 0))) && (
         <>
           <div style={labelStyle}>Counters</div>
           <div style={{ display: 'flex', gap: 6, padding: '4px 16px 2px', alignItems: 'center' }}>

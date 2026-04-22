@@ -22,12 +22,12 @@ export default function CardImage({ imgFile, alt, className = "", sizes, priorit
     <div className="relative w-full aspect-[2.5/3.5] bg-transparent rounded overflow-hidden">
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-muted animate-pulse">
-          <div className="text-gray-400 text-xs">Loading...</div>
+          <div className="text-muted-foreground text-xs">Loading...</div>
         </div>
       )}
       
       {hasError ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted text-gray-400 text-xs p-2">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted text-muted-foreground text-xs p-2">
           <div>🃏</div>
           <div className="text-center mt-1">Image not found</div>
         </div>
