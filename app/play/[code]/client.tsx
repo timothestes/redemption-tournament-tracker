@@ -24,6 +24,8 @@ import { SpreadHandProvider, useSpreadHand } from '../contexts/SpreadHandContext
 import { convertToGoldfishDeck, type GameCardData } from '../utils/convertToGoldfishDeck';
 import PregameScreen, { PregameCeremonyOverlay } from '../components/PregameScreen';
 import { ImageLoadingGate } from '../components/ImageLoadingGate';
+import { useMultiplayerImagePreloader } from '@/app/play/hooks/useMultiplayerImagePreloader';
+import { buildPrioritizedImageUrls, buildCriticalImageUrls } from '@/app/play/lib/multiplayerImageUrls';
 import { DeckPickerModal } from '../components/DeckPickerModal';
 import { getRandomLoadingMessage } from '@/app/shared/constants/loadingMessages';
 import { ArrowLeft } from 'lucide-react';
@@ -152,27 +154,15 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // card images have loaded, so slow-wifi users aren't dropped into a board
   // full of generic card backs. Capped at IMAGE_GATE_TIMEOUT_MS so a truly
   // offline user is never held hostage.
+  //
+  // The preloader is deliberately hoisted to this component (rather than
+  // MultiplayerCanvas) because MultiplayerCanvas is remounted across
+  // lifecycle transitions (ceremony → awaiting-start → playing). Hoisting
+  // keeps the image cache alive across those transitions — otherwise each
+  // remount fires duplicate requests and the browser aborts the originals.
   const IMAGE_GATE_TIMEOUT_MS = 8_000;
   const [imagesGateOpen, setImagesGateOpen] = useState(false);
-  const [imageLoadProgress, setImageLoadProgress] = useState(0);
   const gateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const handleCriticalImagesReady = useCallback(() => setImagesGateOpen(true), []);
-  const handleImageLoadProgress = useCallback((p: number) => setImageLoadProgress(p), []);
-  // Start the safety timer once the canvas first has cards to render.
-  useEffect(() => {
-    if (imagesGateOpen) return;
-    if (gateTimerRef.current !== null) return;
-    if (gameId === null) return;
-    gateTimerRef.current = setTimeout(() => {
-      setImagesGateOpen(true);
-    }, IMAGE_GATE_TIMEOUT_MS);
-    return () => {
-      if (gateTimerRef.current) {
-        clearTimeout(gateTimerRef.current);
-        gateTimerRef.current = null;
-      }
-    };
-  }, [imagesGateOpen, gameId]);
 
   // Card preview hook — must be called before any early returns (Rules of Hooks)
   const { isLoupeVisible, toggleLoupe, previewCard } = useCardPreview();
@@ -273,6 +263,69 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // Must be declared before the reducer effect so isGamesReady is available
   // in the dependency array (which is evaluated during render).
   const gameState = useGameState(gameId ?? BigInt(0));
+
+  // ---- Image preload — hoisted from MultiplayerCanvas so the cache survives
+  // the canvas remounts that happen at every lifecycle transition.
+  //
+  // Warm-up URLs come from the host's loaded deckData (available while
+  // waiting for an opponent). They're appended as the lowest-priority tier
+  // so real visible-card URLs from gameState will load ahead of them once
+  // the game starts dealing cards.
+  const myDeckImageUrls = useMemo(() => {
+    if (!deckData) return [];
+    try {
+      const cards = JSON.parse(deckData) as GameCardData[];
+      const out: string[] = [];
+      const seen = new Set<string>();
+      for (const card of cards) {
+        if (!card.cardImgFile) continue;
+        const url = getCardImageUrl(card.cardImgFile);
+        if (!url || seen.has(url)) continue;
+        seen.add(url);
+        out.push(url);
+      }
+      return out;
+    } catch {
+      return [];
+    }
+  }, [deckData]);
+
+  const allImageUrls = useMemo(() => {
+    const visible = buildPrioritizedImageUrls(gameState.myCards, gameState.opponentCards, gameState.sharedCards);
+    if (myDeckImageUrls.length === 0) return visible;
+    // Dedup — visible (higher priority) wins.
+    const seen = new Set(visible);
+    const out = visible.slice();
+    for (const url of myDeckImageUrls) {
+      if (seen.has(url)) continue;
+      seen.add(url);
+      out.push(url);
+    }
+    return out;
+  }, [gameState.myCards, gameState.opponentCards, gameState.sharedCards, myDeckImageUrls]);
+
+  const criticalImageUrls = useMemo(
+    () => buildCriticalImageUrls(gameState.myCards, gameState.opponentCards, gameState.sharedCards),
+    [gameState.myCards, gameState.opponentCards, gameState.sharedCards],
+  );
+  const { getImage, areUrlsLoaded, progress: imageLoadProgress } = useMultiplayerImagePreloader(allImageUrls);
+  const criticalReady = criticalImageUrls.length > 0 && areUrlsLoaded(criticalImageUrls);
+  useEffect(() => {
+    if (criticalReady) setImagesGateOpen(true);
+  }, [criticalReady]);
+  // Safety timer — never hold a truly-offline user hostage.
+  useEffect(() => {
+    if (imagesGateOpen) return;
+    if (gateTimerRef.current !== null) return;
+    if (gameId === null) return;
+    gateTimerRef.current = setTimeout(() => setImagesGateOpen(true), IMAGE_GATE_TIMEOUT_MS);
+    return () => {
+      if (gateTimerRef.current) {
+        clearTimeout(gateTimerRef.current);
+        gateTimerRef.current = null;
+      }
+    };
+  }, [imagesGateOpen, gameId]);
 
   // Game timer — anchored to server-recorded playingStartedAtMicros so elapsed
   // time survives navigating away and back to the game.
@@ -1053,7 +1106,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           </div>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
             {gameId !== null && (
-              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} onCriticalImagesReady={handleCriticalImagesReady} onImageLoadProgress={handleImageLoadProgress} />
+              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} />
             )}
             <PregameCeremonyOverlay gameState={gameState} />
             <ImageLoadingGate open={!imagesGateOpen} progress={imageLoadProgress} />
@@ -1092,7 +1145,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           </div>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
             {gameId !== null && (
-              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} onCriticalImagesReady={handleCriticalImagesReady} onImageLoadProgress={handleImageLoadProgress} />
+              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} />
             )}
             <ImageLoadingGate open={!imagesGateOpen} progress={imageLoadProgress} />
             <GameToastContainer />
@@ -1138,7 +1191,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               />
             </div>
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} onCriticalImagesReady={handleCriticalImagesReady} onImageLoadProgress={handleImageLoadProgress} />
+              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} />
               {/* Bottom toolbar — stays active for draw/shuffle, end turn disabled */}
               <GameToolbar
                 actions={{
@@ -1344,7 +1397,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         </div>
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           {gameId !== null && (
-            <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} onCriticalImagesReady={handleCriticalImagesReady} onImageLoadProgress={handleImageLoadProgress} />
+            <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} />
           )}
           <ImageLoadingGate open={!imagesGateOpen} progress={imageLoadProgress} />
           {/* Quick action toolbar — floating above hand area */}

@@ -164,7 +164,10 @@ function SpectatorInner({ code, isConnected }: SpectatorInnerProps) {
       <div className="pt-10 h-full w-full relative">
         {gameId !== null && (
           <>
-            <MultiplayerCanvas gameId={gameId} />
+            {/* Spectator mode is currently disabled at the route level
+                (see page.tsx). If re-enabled, wire a real preloader here
+                instead of this no-op. */}
+            <MultiplayerCanvas gameId={gameId} getImage={() => null} />
 
             {/* Read-only overlay — intercepts all pointer events on the canvas */}
             <div

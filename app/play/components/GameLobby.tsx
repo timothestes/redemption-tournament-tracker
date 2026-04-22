@@ -1,17 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Loader2 } from 'lucide-react';
 import { getCardImageUrl } from '@/lib/card-images';
+import { getCardImageUrl as getBlobCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import { useSpacetimeConnection } from '../hooks/useSpacetimeConnection';
 import { SpacetimeProvider } from '../lib/spacetimedb-provider';
 import { DeckPickerModal } from './DeckPickerModal';
 import { LobbyList } from './LobbyList';
 import UsernameModal from '@/app/decklist/my-decks/UsernameModal';
+import { loadDeckForGame } from '../actions';
 import type { DeckOption } from './DeckPickerCard';
 
 interface GameLobbyProps {
@@ -34,6 +36,44 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
     decks.length > 0 ? decks[0] : null
   );
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  // Warm the browser HTTP cache with the selected deck's card images as soon
+  // as the user commits to a deck. By the time they click Host/Join and
+  // navigate into /play/[code], the images are already on disk — cold-deck
+  // startup goes from "several seconds" to "instant." Especially matters for
+  // the joiner, who otherwise has no idle window before the game begins.
+  const prefetchedDeckIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const deckId = selectedDeck?.id;
+    if (!deckId) return;
+    if (prefetchedDeckIdsRef.current.has(deckId)) return;
+    prefetchedDeckIdsRef.current.add(deckId);
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await loadDeckForGame(deckId);
+        if (cancelled) return;
+        const seen = new Set<string>();
+        for (const card of result.deckData) {
+          if (!card.cardImgFile) continue;
+          const url = getBlobCardImageUrl(card.cardImgFile);
+          if (!url || seen.has(url)) continue;
+          seen.add(url);
+          // Fire-and-forget: the browser HTTP cache holds the response; we
+          // don't need the decoded image here. No retry — this is best-effort
+          // warmup; the real preloader in /play/[code] is what drives the game.
+          const img = new Image();
+          img.src = url;
+        }
+      } catch {
+        // Silent. A failed warmup just means the real preloader will fetch
+        // normally once the game starts. Nothing to surface to the user.
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [selectedDeck?.id]);
 
   // Game state
   const [gameCode, setGameCode] = useState(joinCode);

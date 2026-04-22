@@ -7,7 +7,6 @@ import KonvaLib from 'konva';
 
 import { useGameState } from '../hooks/useGameState';
 import { useSpreadHand } from '../contexts/SpreadHandContext';
-import { useMultiplayerImagePreloader } from '../hooks/useMultiplayerImagePreloader';
 import {
   calculateMultiplayerLayout,
   type ZoneRect,
@@ -250,17 +249,19 @@ interface MultiplayerCanvasProps {
   isTimerVisible?: boolean;
   /** Toggle timer visibility (passed through to CardScaleControl). */
   onToggleTimer?: () => void;
-  /** Called once the first-tier (visible) card images have all settled. Lets the parent dismiss a loading-gate overlay. */
-  onCriticalImagesReady?: () => void;
-  /** Continuous progress signal (0–1) for the image preloader. Parent uses this to show a loading progress UI. */
-  onImageLoadProgress?: (progress: number) => void;
+  /**
+   * Preloaded-image lookup. Hoisted to the parent so the cache survives the
+   * canvas remounts that happen at lifecycle transitions (ceremony →
+   * awaiting-start → playing).
+   */
+  getImage: (url: string) => HTMLImageElement | null;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSearchModalChange, isTimerVisible, onToggleTimer, onCriticalImagesReady, onImageLoadProgress }: MultiplayerCanvasProps) {
+export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSearchModalChange, isTimerVisible, onToggleTimer, getImage }: MultiplayerCanvasProps) {
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
 
   // ---- Container sizing (respects flex layout) ----
@@ -473,104 +474,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     };
   }, []);
 
-  // ---- Image preloading ----
-  // Priority-ordered URL list. Earlier entries load first; the preloader
-  // throttles to a small number of concurrent requests so a long tail
-  // (opponent's deck, bulk discard piles) can't starve cards the player is
-  // actually looking at on slow connections.
-  const allImageUrls = useMemo(() => {
-    const ordered: string[] = [];
-    const seen = new Set<string>();
-    const push = (card: CardInstance | undefined) => {
-      if (!card?.cardImgFile) return;
-      const url = getCardImageUrl(card.cardImgFile);
-      if (!url || seen.has(url)) return;
-      seen.add(url);
-      ordered.push(url);
-    };
-    const pushZone = (zoneCards: CardInstance[] | undefined) => {
-      if (!zoneCards) return;
-      for (const card of zoneCards) push(card);
-    };
-
-    // Tier 1 — visible face-up cards the player interacts with most.
-    pushZone(myCards['hand']);
-    pushZone(myCards['territory']);
-    pushZone(myCards['land-of-bondage']);
-    pushZone(opponentCards['territory']);
-    pushZone(opponentCards['land-of-bondage']);
-    for (const zoneCards of Object.values(sharedCards)) pushZone(zoneCards);
-
-    // Tier 2 — opponent's hand (may be face-down but can be revealed).
-    pushZone(opponentCards['hand']);
-
-    // Tier 3 — sidebar piles where only the top card is typically inspected.
-    for (const zone of SIDEBAR_PILE_ZONES) {
-      if (zone === 'deck') continue; // deck last — usually face-down
-      pushZone(myCards[zone]);
-      pushZone(opponentCards[zone]);
-    }
-
-    // Tier 4 — decks (face-down; only matters once a card is drawn).
-    pushZone(myCards['deck']);
-    pushZone(opponentCards['deck']);
-
-    // Catch-all — any zone we didn't enumerate above.
-    for (const [zone, zoneCards] of Object.entries(myCards)) {
-      if (zone === 'hand' || zone === 'territory' || zone === 'land-of-bondage' || zone === 'deck') continue;
-      if ((SIDEBAR_PILE_ZONES as readonly string[]).includes(zone)) continue;
-      pushZone(zoneCards);
-    }
-    for (const [zone, zoneCards] of Object.entries(opponentCards)) {
-      if (zone === 'hand' || zone === 'territory' || zone === 'land-of-bondage' || zone === 'deck') continue;
-      if ((SIDEBAR_PILE_ZONES as readonly string[]).includes(zone)) continue;
-      pushZone(zoneCards);
-    }
-
-    return ordered;
-  }, [myCards, opponentCards, sharedCards]);
-
-  // Tier-1 subset: the cards visible on-screen the moment the board reveals.
-  // The parent uses this to decide when it's safe to dismiss the loading gate —
-  // once these are cached (or given up on), the rest can finish in the
-  // background without the user staring at card backs.
-  const criticalImageUrls = useMemo(() => {
-    const urls: string[] = [];
-    const seen = new Set<string>();
-    const push = (card: CardInstance | undefined) => {
-      if (!card?.cardImgFile) return;
-      const url = getCardImageUrl(card.cardImgFile);
-      if (!url || seen.has(url)) return;
-      seen.add(url);
-      urls.push(url);
-    };
-    const pushZone = (zoneCards: CardInstance[] | undefined) => {
-      if (!zoneCards) return;
-      for (const card of zoneCards) push(card);
-    };
-    pushZone(myCards['hand']);
-    pushZone(myCards['territory']);
-    pushZone(myCards['land-of-bondage']);
-    pushZone(opponentCards['territory']);
-    pushZone(opponentCards['land-of-bondage']);
-    for (const zoneCards of Object.values(sharedCards)) pushZone(zoneCards);
-    return urls;
-  }, [myCards, opponentCards, sharedCards]);
-
-  const { getImage, areUrlsLoaded, progress: imageLoadProgress } = useMultiplayerImagePreloader(allImageUrls);
-
-  // Fire critical-ready callback once tier-1 URLs have settled. Guard on
-  // non-empty set so we don't prematurely signal "ready" before gameState
-  // has populated (empty array vacuously passes areUrlsLoaded).
-  const criticalReady = criticalImageUrls.length > 0 && areUrlsLoaded(criticalImageUrls);
-  useEffect(() => {
-    if (criticalReady) onCriticalImagesReady?.();
-  }, [criticalReady, onCriticalImagesReady]);
-
-  // Forward progress to the parent so it can render a progress bar in the gate.
-  useEffect(() => {
-    onImageLoadProgress?.(imageLoadProgress);
-  }, [imageLoadProgress, onImageLoadProgress]);
+  // Image preloading lives on the parent (GameInner in client.tsx) so the
+  // cache survives canvas remounts at lifecycle transitions. This component
+  // reads the cache via the `getImage` prop.
 
   // Re-render once card back image loads
   const [, setCardBackVersion] = useState(0);
@@ -3065,6 +2971,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   }, [multiplayerActions, setPreviewCard]);
   const noopDblClick = useCallback((_card: GameCard) => {}, []);
   const noopContextMenu = useCallback((_card: GameCard, _e: Konva.KonvaEventObject<PointerEvent>) => {}, []);
+  const noopMouseEnter = useCallback((_card: GameCard, _e: Konva.KonvaEventObject<MouseEvent>) => {}, []);
+  const noopMouseLeave = useCallback(() => {}, []);
 
   const handleMouseEnter = useCallback(
     (card: GameCard, e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -4758,6 +4666,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                         );
                       })
                     ) : zoneKey === 'deck' && topCard ? (
+                      // Deck top card is draggable (to draw) but its identity is
+                      // hidden information — suppress hover preview.
                       <GameCardNode
                         card={adaptCard(topCard, 'player1')}
                         x={0}
@@ -4775,8 +4685,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                         onDragEnd={handleCardDragEnd}
                         onContextMenu={noopContextMenu}
                         onDblClick={noopDblClick}
-                        onMouseEnter={handleMouseEnter}
-                        onMouseLeave={handleMouseLeave}
+                        onMouseEnter={noopMouseEnter}
+                        onMouseLeave={noopMouseLeave}
                       />
                     ) : (
                       <CardBackShape width={pileCardWidth} height={pileCardHeight} />

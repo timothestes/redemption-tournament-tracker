@@ -2,6 +2,7 @@ import { GeistSans } from "geist/font/sans";
 import { Cinzel } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import Background from "../components/ui/background"; // Using the improved background
+import { AdminProvider } from "../components/providers/AdminProvider";
 import "./globals.css";
 
 const cinzel = Cinzel({ subsets: ["latin"], variable: "--font-cinzel" });
@@ -37,9 +38,11 @@ export default function RootLayout({
           disableTransitionOnChange
           themes={["light", "dark", "jayden", "system"]}
         >
-          <Background>
-            <main className="min-h-screen flex flex-col">{children}</main>
-          </Background>
+          <AdminProvider>
+            <Background>
+              <main className="min-h-screen flex flex-col">{children}</main>
+            </Background>
+          </AdminProvider>
         </ThemeProvider>
       </body>
     </html>

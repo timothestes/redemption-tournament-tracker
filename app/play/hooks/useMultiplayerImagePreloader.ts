@@ -69,6 +69,19 @@ export function useMultiplayerImagePreloader(
   const [version, setVersion] = useState(0);
   const [isReady, setIsReady] = useState(false);
 
+  // Coalesces rapid version bumps into at most one re-render per animation
+  // frame. Without this, a burst of cached images all firing onload in the
+  // same microtask window cascades through to the parent (via the progress
+  // callback) and can trip React's "Maximum update depth exceeded" guard.
+  const pendingBumpRef = useRef<number | null>(null);
+  const scheduleBump = useCallback(() => {
+    if (pendingBumpRef.current !== null) return;
+    pendingBumpRef.current = requestAnimationFrame(() => {
+      pendingBumpRef.current = null;
+      scheduleBump();
+    });
+  }, []);
+
   // pump() is defined below but called from startLoad's callbacks. Using a ref
   // lets startLoad's closures call whichever version of pump is current.
   const pumpRef = useRef<() => void>(() => {});
@@ -89,7 +102,7 @@ export function useMultiplayerImagePreloader(
       runningRef.current.delete(url);
       failureCountRef.current.delete(url);
       loadedCountRef.current++;
-      setVersion((v) => v + 1);
+      scheduleBump();
       pumpRef.current();
     };
 
@@ -115,7 +128,7 @@ export function useMultiplayerImagePreloader(
       } else {
         // Gave up. Count toward total so progress/isReady can still settle.
         loadedCountRef.current++;
-        setVersion((v) => v + 1);
+        scheduleBump();
       }
       pumpRef.current();
     };
@@ -161,7 +174,7 @@ export function useMultiplayerImagePreloader(
       totalCountRef.current += addedToTotal;
       pump();
       // Bump version so consumers relying on progress re-read.
-      setVersion((v) => v + 1);
+      scheduleBump();
     }
   }, [urls, pump]);
 
@@ -176,12 +189,16 @@ export function useMultiplayerImagePreloader(
     }
   }, [isReady, version]);
 
-  // Cancel pending retry timers on unmount.
+  // Cancel pending retry timers + coalesced-bump frame on unmount.
   useEffect(() => {
     const timers = retryTimersRef.current;
     return () => {
       for (const timer of timers.values()) clearTimeout(timer);
       timers.clear();
+      if (pendingBumpRef.current !== null) {
+        cancelAnimationFrame(pendingBumpRef.current);
+        pendingBumpRef.current = null;
+      }
     };
   }, []);
 
