@@ -44,6 +44,7 @@ export const CardInstance = __t.object("CardInstance", {
   isSoulDeckOrigin: __t.bool(),
   isToken: __t.bool(),
   revealExpiresAt: __t.option(__t.timestamp()),
+  originalOwnerId: __t.u64(),
 });
 export type CardInstance = __Infer<typeof CardInstance>;
 

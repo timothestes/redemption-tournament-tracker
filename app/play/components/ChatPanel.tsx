@@ -283,7 +283,7 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       const data = JSON.parse(payload);
       const count = data.count ? Number(data.count) : 0;
       const isViewer = actorPlayerId && viewerPlayerId && actorPlayerId === viewerPlayerId;
-      const rawExchanged: { name: string; img: string; fromZone?: string }[] = Array.isArray(data.cards) ? data.cards : [];
+      const rawExchanged: { name: string; img: string; fromZone?: string; deckOwnerId?: string }[] = Array.isArray(data.cards) ? data.cards : [];
       // Hand cards are private — only reveal names/images to the actor themselves.
       const exchangedForDisplay = rawExchanged.map((c) => {
         if (!isViewer && c.fromZone === 'hand') {
@@ -294,10 +294,33 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       const received: { name: string; img: string }[] = Array.isArray(data.received) ? data.received : [];
       const hasExchanged = exchangedForDisplay.length > 0;
       const hasReceived = received.length > 0;
+
+      // Cross-player routing: cards going back to an opponent's deck get a
+      // trailing clause so the log accurately reflects where they landed.
+      const crossOwnerGroups = new Map<string, { name: string; img: string }[]>();
+      for (let i = 0; i < rawExchanged.length; i++) {
+        const raw = rawExchanged[i];
+        const owner = raw.deckOwnerId;
+        if (!owner || !actorPlayerId || owner === actorPlayerId) continue;
+        const display = exchangedForDisplay[i];
+        if (!display) continue;
+        if (!crossOwnerGroups.has(owner)) crossOwnerGroups.set(owner, []);
+        crossOwnerGroups.get(owner)!.push(display);
+      }
+      const crossClauses: ReactNode[] = [];
+      for (const [ownerId, cards] of crossOwnerGroups) {
+        const name = playerNames?.[ownerId];
+        if (!name) continue;
+        crossClauses.push(
+          <span key={ownerId}>; sent <CardNameList cards={cards} /> to {name}&apos;s deck</span>
+        );
+      }
+
       if (hasExchanged && hasReceived) {
         return (
           <>
             exchanged <CardNameList cards={exchangedForDisplay} /> for <CardNameList cards={received} />
+            {crossClauses}
           </>
         );
       }
@@ -305,6 +328,7 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
         return (
           <>
             exchanged <CardNameList cards={exchangedForDisplay} /> with their deck
+            {crossClauses}
           </>
         );
       }
@@ -445,7 +469,12 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       const data = JSON.parse(payload);
       const isCrossPlayer = data.deckOwnerId && data.deckOwnerId !== actorPlayerId;
       const targetName = isCrossPlayer && playerNames?.[data.deckOwnerId];
-      return targetName ? <>shuffled a card into {targetName}&apos;s deck</> : 'shuffled a card into their deck';
+      const cardEl = data.cardName && data.cardName !== 'a face-down card'
+        ? <HoverableCard name={data.cardName} img={data.cardImgFile} />
+        : 'a card';
+      return targetName
+        ? <>shuffled {cardEl} into {targetName}&apos;s deck</>
+        : <>shuffled {cardEl} into their deck</>;
     } catch { /* fall through */ }
   }
   if (actionType === 'LOOK_AT_TOP' && payload) {

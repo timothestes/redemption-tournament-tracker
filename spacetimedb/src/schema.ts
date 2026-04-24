@@ -122,6 +122,11 @@ export const CardInstance = table(
     // card's face is shown to all clients until this timestamp passes. Move
     // reducers clear this field when the card leaves the hand zone.
     revealExpiresAt: t.timestamp().optional(),
+    // Immutable original owner. Set at insert time, never mutated by moves.
+    // When a card returns to a "home" zone (deck/discard/reserve/banish/hand/LoB),
+    // routing uses this so taken opponent cards go back to their real owner.
+    // `0n` on pre-migration rows means "unset" — fall back to ownerId.
+    originalOwnerId: t.u64().default(0n),
   }
 );
 

@@ -36,4 +36,5 @@ export default __t.row({
   isSoulDeckOrigin: __t.bool().name("is_soul_deck_origin"),
   isToken: __t.bool().name("is_token"),
   revealExpiresAt: __t.option(__t.timestamp()).name("reveal_expires_at"),
+  originalOwnerId: __t.u64().name("original_owner_id"),
 });

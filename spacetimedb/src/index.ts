@@ -214,6 +214,7 @@ function insertCardsShuffleDraw(
       id: 0n,
       gameId: game.id,
       ownerId: player.id,
+      originalOwnerId: player.id,
       zone: card.isReserve ? 'reserve' : 'deck',
       zoneIndex: BigInt(i),
       posX: '',
@@ -312,6 +313,7 @@ function initializeSoulDeck(ctx: any, game: any) {
       id: 0n,
       gameId: game.id,
       ownerId: 0n,
+      originalOwnerId: 0n,
       zone: 'soul-deck',
       zoneIndex: BigInt(i),
       posX: '',
@@ -1706,12 +1708,19 @@ export const move_card = spacetimedb.reducer(
       return;
     }
 
+    // Home zones = private per-player piles. When a card heads home without an
+    // explicit targetOwnerId, route to its original owner so taken opponent
+    // cards return to the opponent's piles, not the controller's.
+    const HOME_ZONES = ['deck', 'discard', 'reserve', 'banish', 'hand', 'land-of-bondage'];
+    const homeOwnerId = card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId;
+
     // Lost souls sent to discard or reserve go to land-of-bondage instead
     const isLostSoul = card.cardType === 'LS' || card.cardName.toLowerCase().includes('lost soul');
     if (isLostSoul && (toZone === 'discard' || toZone === 'reserve' || toZone === 'banish')) {
+      const lobOwnerId = targetOwnerId ? BigInt(targetOwnerId) : homeOwnerId;
       const lobIndex = BigInt(
         [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
-          (c: any) => c.ownerId === card.ownerId && c.zone === 'land-of-bondage'
+          (c: any) => c.ownerId === lobOwnerId && c.zone === 'land-of-bondage'
         ).length
       );
       ctx.db.CardInstance.id.update({
@@ -1721,7 +1730,7 @@ export const move_card = spacetimedb.reducer(
         posX: '',
         posY: '',
         isFlipped: false,
-        ownerId: card.ownerId,
+        ownerId: lobOwnerId,
       });
       const actionWord = toZone === 'discard' ? 'discarded' : toZone === 'reserve' ? 'reserved' : 'banished';
       const redirectLogName = card.cardName;
@@ -1740,8 +1749,14 @@ export const move_card = spacetimedb.reducer(
 
     // Moving to deck/soul-deck = face-down; leaving deck, reserve, or soul-deck = face-up; otherwise preserve
     const isFlipped = (toZone === 'deck' || toZone === 'soul-deck') ? true : (fromZone === 'deck' || fromZone === 'reserve' || fromZone === 'soul-deck') ? false : card.isFlipped;
-    // Optionally transfer ownership (e.g. rescue lost soul, capture hero)
-    let newOwnerId = targetOwnerId ? BigInt(targetOwnerId) : card.ownerId;
+    // Optionally transfer ownership (e.g. rescue lost soul, capture hero).
+    // For private home zones with no explicit target, default to the original
+    // owner so opponent-controlled cards return to their real owner's piles.
+    let newOwnerId = targetOwnerId
+      ? BigInt(targetOwnerId)
+      : HOME_ZONES.includes(toZone)
+        ? homeOwnerId
+        : card.ownerId;
     // Paragon: dropping a soul-origin card back into the shared LoB resets ownership to the shared sentinel.
     if (
       targetOwnerId === '0' &&
@@ -2026,12 +2041,18 @@ export const move_cards_batch = spacetimedb.reducer(
         }
       }
 
+      // Home zones = private per-player piles. Route to original owner when
+      // no explicit target is set so taken opponent cards return home.
+      const HOME_ZONES = ['deck', 'discard', 'reserve', 'banish', 'hand', 'land-of-bondage'];
+      const homeOwnerId = card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId;
+
       // Lost souls sent to discard or reserve go to land-of-bondage instead
       const isLostSoul = card.cardType === 'LS' || card.cardName.toLowerCase().includes('lost soul');
       if (isLostSoul && (toZone === 'discard' || toZone === 'reserve' || toZone === 'banish')) {
+        const lobOwnerId = newOwnerId ?? homeOwnerId;
         const lobIndex = BigInt(
           [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
-            (c: any) => c.ownerId === card.ownerId && c.zone === 'land-of-bondage'
+            (c: any) => c.ownerId === lobOwnerId && c.zone === 'land-of-bondage'
           ).length
         );
         ctx.db.CardInstance.id.update({
@@ -2041,7 +2062,7 @@ export const move_cards_batch = spacetimedb.reducer(
           posX: '',
           posY: '',
           isFlipped: false,
-          ownerId: card.ownerId,
+          ownerId: lobOwnerId,
         });
         redirectedLostSouls.push({ name: logName, img: logImg });
         continue;
@@ -2050,7 +2071,7 @@ export const move_cards_batch = spacetimedb.reducer(
       const rawPos = posMap[idStr] || { posX: '', posY: '' };
       // Ensure posX/posY are strings — client may send numbers via JSON positions map
       const pos = { posX: String(rawPos.posX ?? ''), posY: String(rawPos.posY ?? '') };
-      const cardOwnerId = newOwnerId ?? card.ownerId;
+      const cardOwnerId = newOwnerId ?? (HOME_ZONES.includes(toZone) ? homeOwnerId : card.ownerId);
       const cardFinalZone = finalZoneById.get(idStr) ?? toZone;
       // Paragon: rescuing a shared soul transfers ownership. Default to the
       // acting seat, but honor an explicit targetOwnerId when the caller
@@ -2301,6 +2322,7 @@ function spawnTokenImpl(
       id: 0n,
       gameId,
       ownerId: source.ownerId,
+      originalOwnerId: source.ownerId,
       zone: targetZone,
       zoneIndex: maxIdx,
       posX,
@@ -2945,11 +2967,13 @@ export const shuffle_card_into_deck = spacetimedb.reducer(
 
     const fromZone = card.zone;
 
-    // Move card to deck (card keeps its ownerId — it goes into that player's deck)
-    const deckOwnerId = card.ownerId;
+    // Route into the original owner's deck so a taken opponent card
+    // shuffles back into the opponent's deck, not the controller's.
+    const deckOwnerId = card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId;
     ctx.db.CardInstance.id.update({
       ...card,
       zone: 'deck',
+      ownerId: deckOwnerId,
       isFlipped: true,
       revealExpiresAt: undefined,
     });
@@ -3670,46 +3694,52 @@ export const exchange_cards = spacetimedb.reducer(
       if (card.gameId !== gameId) throw new SenderError('Card not in this game: ' + idStr);
     }
 
-    // Collect card details for the log BEFORE mutating
-    const exchangedCards: { name: string; img: string; fromZone: string }[] = [];
+    // Collect card details for the log BEFORE mutating. Each card's home
+    // owner is captured so taken opponent cards log as going to the opponent's
+    // deck, not the actor's.
+    const exchangedCards: { name: string; img: string; fromZone: string; deckOwnerId: string }[] = [];
+    const affectedDeckOwners = new Set<bigint>();
     for (const idStr of ids) {
       const card = ctx.db.CardInstance.id.find(BigInt(idStr));
-      if (card) exchangedCards.push({ name: card.cardName, img: card.cardImgFile, fromZone: card.zone });
+      if (!card) continue;
+      const deckOwnerId = card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId;
+      exchangedCards.push({ name: card.cardName, img: card.cardImgFile, fromZone: card.zone, deckOwnerId: deckOwnerId.toString() });
+      affectedDeckOwners.add(deckOwnerId);
     }
 
-    // Move all cards to deck, flipped
+    // Move all cards to their home-owner's deck, flipped
     for (const idStr of ids) {
       const cardId = BigInt(idStr);
       const card = ctx.db.CardInstance.id.find(cardId);
-      if (card) {
-        ctx.db.CardInstance.id.update({ ...card, zone: 'deck', isFlipped: true });
+      if (!card) continue;
+      const deckOwnerId = card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId;
+      ctx.db.CardInstance.id.update({ ...card, zone: 'deck', ownerId: deckOwnerId, isFlipped: true });
+    }
+
+    // Shuffle every deck that received a card (acting player's deck always,
+    // plus any opponent decks when taken cards are exchanged back).
+    let rngCounter = game.rngCounter;
+    for (const deckOwnerId of affectedDeckOwners) {
+      rngCounter += 1n;
+      const deckCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+        (c: any) => c.ownerId === deckOwnerId && c.zone === 'deck'
+      );
+      const seed = makeSeed(ctx.timestamp.microsSinceUnixEpoch, gameId, deckOwnerId, rngCounter);
+      const indices = deckCards.map((_: any, idx: number) => idx);
+      seededShuffle(indices, seed);
+      for (let i = 0; i < deckCards.length; i++) {
+        ctx.db.CardInstance.id.update({
+          ...deckCards[i],
+          zoneIndex: BigInt(indices[i]),
+        });
       }
     }
-
-    // Shuffle deck
-    const deckCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
-      (c: any) => c.ownerId === player.id && c.zone === 'deck'
-    );
-
-    const newRngCounter = game.rngCounter + 1n;
-    ctx.db.Game.id.update({ ...game, rngCounter: newRngCounter });
-
-    const seed = makeSeed(ctx.timestamp.microsSinceUnixEpoch, gameId, player.id, newRngCounter);
-
-    const indices = deckCards.map((_: any, idx: number) => idx);
-    seededShuffle(indices, seed);
-
-    for (let i = 0; i < deckCards.length; i++) {
-      ctx.db.CardInstance.id.update({
-        ...deckCards[i],
-        zoneIndex: BigInt(indices[i]),
-      });
-    }
+    ctx.db.Game.id.update({ ...game, rngCounter });
 
     // Compact hand indices before drawing replacements so new cards get correct indices
     compactHandIndices(ctx, gameId, player.id);
 
-    // Draw same number of replacement cards
+    // Draw same number of replacement cards from the ACTING player's deck
     const latestGame = ctx.db.Game.id.find(gameId);
     if (latestGame) {
       drawCardsForPlayer(ctx, latestGame, player, ids.length);
@@ -3742,15 +3772,17 @@ export const exchange_from_deck = spacetimedb.reducer(
     if (exchangeIds.length === 0) throw new SenderError('No cards to exchange');
     if (moves.length !== exchangeIds.length) throw new SenderError('Must pick same number of replacements as cards being exchanged');
 
-    // Validate exchange cards exist, belong to this game, and are owned by the player
+    // Validate exchange cards exist and belong to this game. Ownership check
+    // is relaxed — captured opponent cards (card.ownerId === player) pass,
+    // and so do cards still under original ownership (which home-routes below).
     for (const idStr of exchangeIds) {
       const card = ctx.db.CardInstance.id.find(BigInt(idStr));
       if (!card) throw new SenderError('Exchange card not found: ' + idStr);
       if (card.gameId !== gameId) throw new SenderError('Card not in this game: ' + idStr);
-      if (card.ownerId !== player.id) throw new SenderError('Card not owned by player: ' + idStr);
     }
 
-    // Validate replacement cards exist, are in deck, and belong to the player
+    // Validate replacement cards exist, are in deck, and belong to the player.
+    // Replacements always come from the ACTING player's own deck.
     for (const move of moves) {
       const card = ctx.db.CardInstance.id.find(BigInt(move.cardId));
       if (!card) throw new SenderError('Replacement card not found: ' + move.cardId);
@@ -3759,11 +3791,17 @@ export const exchange_from_deck = spacetimedb.reducer(
       if (card.zone !== 'deck') throw new SenderError('Replacement card not in deck: ' + move.cardId);
     }
 
-    // Collect card details for the log BEFORE mutating
-    const exchangedCards: { name: string; img: string; fromZone: string }[] = [];
+    // Collect card details for the log BEFORE mutating. Each exchanged card
+    // records its home-owner so taken opponent cards log as going to the
+    // opponent's deck.
+    const exchangedCards: { name: string; img: string; fromZone: string; deckOwnerId: string }[] = [];
+    const affectedDeckOwners = new Set<bigint>();
     for (const idStr of exchangeIds) {
       const card = ctx.db.CardInstance.id.find(BigInt(idStr));
-      if (card) exchangedCards.push({ name: card.cardName, img: card.cardImgFile, fromZone: card.zone });
+      if (!card) continue;
+      const deckOwnerId = card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId;
+      exchangedCards.push({ name: card.cardName, img: card.cardImgFile, fromZone: card.zone, deckOwnerId: deckOwnerId.toString() });
+      affectedDeckOwners.add(deckOwnerId);
     }
     const receivedCards: { name: string; img: string }[] = [];
     for (const move of moves) {
@@ -3805,36 +3843,43 @@ export const exchange_from_deck = spacetimedb.reducer(
       });
     }
 
-    // Step 2: Move exchange cards to deck (face down)
+    // Step 2: Move exchange cards to their home-owner's deck (face down)
     for (const idStr of exchangeIds) {
       const card = ctx.db.CardInstance.id.find(BigInt(idStr));
       if (!card) continue;
       const fromZone = card.zone;
-      ctx.db.CardInstance.id.update({ ...card, zone: 'deck', isFlipped: true, posX: '', posY: '' });
-      // Compact hand/LOB if needed
+      const fromOwner = card.ownerId;
+      const deckOwnerId = card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId;
+      ctx.db.CardInstance.id.update({ ...card, zone: 'deck', ownerId: deckOwnerId, isFlipped: true, posX: '', posY: '' });
+      // Compact hand/LOB against the card's PRE-move owner (that's the pile the card left)
       if (fromZone === 'hand') {
-        compactHandIndices(ctx, gameId, player.id);
+        compactHandIndices(ctx, gameId, fromOwner);
       }
       if (fromZone === 'land-of-bondage') {
-        compactLobIndices(ctx, gameId, player.id);
+        compactLobIndices(ctx, gameId, fromOwner);
       }
     }
 
-    // Step 3: Shuffle deck
-    const deckCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
-      (c: any) => c.ownerId === player.id && c.zone === 'deck'
-    );
-    const newRngCounter = game.rngCounter + 1n;
-    ctx.db.Game.id.update({ ...game, rngCounter: newRngCounter });
-    const seed = makeSeed(ctx.timestamp.microsSinceUnixEpoch, gameId, player.id, newRngCounter);
-    const indices = deckCards.map((_: any, idx: number) => idx);
-    seededShuffle(indices, seed);
-    for (let i = 0; i < deckCards.length; i++) {
-      ctx.db.CardInstance.id.update({
-        ...deckCards[i],
-        zoneIndex: BigInt(indices[i]),
-      });
+    // Step 3: Shuffle every deck that received a card — player's deck (it lost
+    // replacements) plus any opponent decks (they received taken cards back).
+    affectedDeckOwners.add(player.id);
+    let rngCounter = game.rngCounter;
+    for (const deckOwnerId of affectedDeckOwners) {
+      rngCounter += 1n;
+      const deckCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+        (c: any) => c.ownerId === deckOwnerId && c.zone === 'deck'
+      );
+      const seed = makeSeed(ctx.timestamp.microsSinceUnixEpoch, gameId, deckOwnerId, rngCounter);
+      const indices = deckCards.map((_: any, idx: number) => idx);
+      seededShuffle(indices, seed);
+      for (let i = 0; i < deckCards.length; i++) {
+        ctx.db.CardInstance.id.update({
+          ...deckCards[i],
+          zoneIndex: BigInt(indices[i]),
+        });
+      }
     }
+    ctx.db.Game.id.update({ ...game, rngCounter });
 
     logAction(ctx, gameId, player.id, 'EXCHANGE', JSON.stringify({ count: exchangeIds.length, cards: exchangedCards, received: receivedCards }), game.turnNumber, game.currentPhase);
   }
@@ -3861,22 +3906,27 @@ export const move_card_to_top_of_deck = spacetimedb.reducer(
 
     const fromZone = card.zone;
 
-    // Shift all existing deck cards' zoneIndex += 1
+    // Route to the card's original owner's deck so a taken opponent card
+    // topdecks to the opponent's deck, not the acting player's.
+    const homeOwnerId = card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId;
+
+    // Shift all existing deck cards' zoneIndex += 1 (in the target deck)
     const deckCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
-      (c: any) => c.ownerId === player.id && c.zone === 'deck'
+      (c: any) => c.ownerId === homeOwnerId && c.zone === 'deck'
     );
 
     for (const dc of deckCards) {
       ctx.db.CardInstance.id.update({ ...dc, zoneIndex: dc.zoneIndex + 1n });
     }
 
-    // Update the target card: zone = 'deck', zoneIndex = 0n
+    // Update the target card: zone = 'deck', zoneIndex = 0n, owner = home
     const updatedCard = ctx.db.CardInstance.id.find(cardInstanceId);
     if (!updatedCard) throw new SenderError('Card not found');
     ctx.db.CardInstance.id.update({
       ...updatedCard,
       zone: 'deck',
       zoneIndex: 0n,
+      ownerId: homeOwnerId,
       isFlipped: true,
       revealExpiresAt: undefined,
     });
@@ -3895,7 +3945,7 @@ export const move_card_to_top_of_deck = spacetimedb.reducer(
     const hideIdentity = card.isFlipped || (fromZone === 'hand' && player.id === card.ownerId);
     const topLogName = hideIdentity ? 'a face-down card' : card.cardName;
     const topLogImg = hideIdentity ? '' : card.cardImgFile;
-    logAction(ctx, gameId, player.id, 'MOVE_TO_TOP_OF_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: topLogName, cardImgFile: topLogImg, targetOwnerId: card.ownerId.toString() }), game.turnNumber, game.currentPhase);
+    logAction(ctx, gameId, player.id, 'MOVE_TO_TOP_OF_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: topLogName, cardImgFile: topLogImg, targetOwnerId: homeOwnerId.toString() }), game.turnNumber, game.currentPhase);
   }
 );
 
@@ -3920,9 +3970,13 @@ export const move_card_to_bottom_of_deck = spacetimedb.reducer(
 
     const fromZone = card.zone;
 
-    // Find max zoneIndex among player's deck cards
+    // Route to the card's original owner's deck so a taken opponent card
+    // bottom-decks to the opponent's deck, not the acting player's.
+    const homeOwnerId = card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId;
+
+    // Find max zoneIndex among target deck's cards
     const deckCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
-      (c: any) => c.ownerId === player.id && c.zone === 'deck'
+      (c: any) => c.ownerId === homeOwnerId && c.zone === 'deck'
     );
 
     let maxIndex = -1n;
@@ -3936,6 +3990,7 @@ export const move_card_to_bottom_of_deck = spacetimedb.reducer(
       ...card,
       zone: 'deck',
       zoneIndex: maxIndex + 1n,
+      ownerId: homeOwnerId,
       isFlipped: true,
       revealExpiresAt: undefined,
     });
@@ -3954,7 +4009,7 @@ export const move_card_to_bottom_of_deck = spacetimedb.reducer(
     const hideIdentity = card.isFlipped || (fromZone === 'hand' && player.id === card.ownerId);
     const bottomLogName = hideIdentity ? 'a face-down card' : card.cardName;
     const bottomLogImg = hideIdentity ? '' : card.cardImgFile;
-    logAction(ctx, gameId, player.id, 'MOVE_TO_BOTTOM_OF_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: bottomLogName, cardImgFile: bottomLogImg, targetOwnerId: card.ownerId.toString() }), game.turnNumber, game.currentPhase);
+    logAction(ctx, gameId, player.id, 'MOVE_TO_BOTTOM_OF_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: bottomLogName, cardImgFile: bottomLogImg, targetOwnerId: homeOwnerId.toString() }), game.turnNumber, game.currentPhase);
   }
 );
 
@@ -4006,6 +4061,7 @@ export const spawn_lost_soul = spacetimedb.reducer(
       id: 0n,
       gameId,
       ownerId,
+      originalOwnerId: ownerId,
       zone: 'land-of-bondage',
       zoneIndex: lobIndex,
       posX,
