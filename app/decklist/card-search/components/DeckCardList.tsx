@@ -179,7 +179,8 @@ export default function DeckCardList({
                     e.currentTarget.parentElement?.classList.remove('animate-pulse');
                   }}
                   onError={(e) => {
-                    e.currentTarget.src = '/placeholder-card.png';
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.style.display = 'none';
                   }}
                 />
               </div>
