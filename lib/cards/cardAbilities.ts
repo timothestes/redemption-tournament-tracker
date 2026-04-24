@@ -15,6 +15,7 @@ export type CardAbility =
   | { type: 'reveal_own_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'look_at_own_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'look_at_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
+  | { type: 'reserve_top_of_deck'; count: number }
   | { type: 'custom'; reducerName: string; label: string };
 
 /**
@@ -83,6 +84,8 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'The Angel of His Presence [T2C]':                     [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
   'The Three Visitors':                                  [{ type: 'look_at_own_deck', position: 'top', count: 9 }],
   'Women of Israel [L]':                                 [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
+  "Herod's Temple (GoC)":                                [{ type: 'reserve_top_of_deck', count: 1 }],
+  "Herod's Temple [2022 - GoC P]":                       [{ type: 'reserve_top_of_deck', count: 1 }],
 };
 
 /**
@@ -182,6 +185,8 @@ export function abilityLabel(a: CardAbility): string {
       const where = a.position === 'random' ? `${a.count} random` : `${a.position} ${a.count}`;
       return `Look at ${where} card${a.count === 1 ? '' : 's'} of opponent's deck`;
     }
+    case 'reserve_top_of_deck':
+      return `Reserve top ${a.count} card${a.count === 1 ? '' : 's'} of deck`;
     case 'custom':
       return a.label;
   }

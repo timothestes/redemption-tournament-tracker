@@ -25,4 +25,5 @@ export default __t.row({
   pendingDeckData: __t.string().name("pending_deck_data"),
   revealedCards: __t.string().name("revealed_cards"),
   reserveRevealed: __t.bool().name("reserve_revealed"),
+  handRevealSnapshot: __t.string().name("hand_reveal_snapshot"),
 });

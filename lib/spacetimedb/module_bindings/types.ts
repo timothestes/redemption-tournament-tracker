@@ -140,6 +140,7 @@ export const Player = __t.object("Player", {
   pendingDeckData: __t.string(),
   revealedCards: __t.string(),
   reserveRevealed: __t.bool(),
+  handRevealSnapshot: __t.string(),
 });
 export type Player = __Infer<typeof Player>;
 

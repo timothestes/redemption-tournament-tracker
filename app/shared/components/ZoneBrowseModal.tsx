@@ -69,6 +69,7 @@ function CardContextPopup({
   return (
     <div
       ref={ref}
+      data-modal-keep-open="true"
       onContextMenu={(e) => e.preventDefault()}
       style={{
         position: 'fixed',
@@ -81,6 +82,7 @@ function CardContextPopup({
         zIndex: 900,
         minWidth: 140,
         boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+        pointerEvents: 'auto',
       }}
     >
       <div style={{ ...itemStyle, color: 'var(--gf-text-dim)', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', cursor: 'default', padding: '3px 12px' }}>
@@ -168,6 +170,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
 
   // Lasso selection state
   const gridRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const [lassoRect, setLassoRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const lassoStart = useRef<{ x: number; y: number } | null>(null);
   const isLassoing = useRef(false);
@@ -211,6 +214,37 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
   }, [onClose, selectedIds.size]);
+
+  // Outside-click / outside-right-click behavior. The backdrop is
+  // pointer-events: none so cards underneath can fire hover previews, so we
+  // detect "click outside the modal box" here instead of on the backdrop.
+  useEffect(() => {
+    const isInside = (target: EventTarget | null) => {
+      if (!(target instanceof Element)) return false;
+      if (contentRef.current?.contains(target)) return true;
+      return !!target.closest('[data-modal-keep-open]');
+    };
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (isInside(e.target)) return;
+      if (e.button === 0 && !didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) {
+        setContextCard(null);
+        onClose();
+      }
+    };
+    const handleContextMenu = (e: MouseEvent) => {
+      if (isInside(e.target)) return;
+      e.preventDefault();
+      setContextCard(null);
+    };
+
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('contextmenu', handleContextMenu);
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('contextmenu', handleContextMenu);
+    };
+  }, [onClose, didDragRef]);
 
   const handleCardContextMenu = (card: GameCard, e: React.MouseEvent) => {
     e.preventDefault();
@@ -267,7 +301,6 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
   };
 
   // Lasso selection: pointer down on empty space in the content area starts lasso
-  const contentRef = useRef<HTMLDivElement>(null);
   const handleContentPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
     // Block lasso on interactive elements (buttons, card images, inputs)
@@ -382,8 +415,6 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      onClick={() => { if (!didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) { setContextCard(null); onClose(); } }}
-      onContextMenu={(e) => e.preventDefault()}
       style={{
         position: 'fixed',
         inset: 0,
@@ -393,11 +424,12 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 500,
+        pointerEvents: 'none',
       }}
     >
       <div
         ref={contentRef}
-        onClick={(e) => { e.stopPropagation(); setContextCard(null); }}
+        onClick={() => setContextCard(null)}
         onPointerDown={handleContentPointerDown}
         style={{
           background: 'var(--gf-bg)',
@@ -407,7 +439,9 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
           maxWidth: gridColumns === 4 ? 680 : 850,
           maxHeight: '85vh',
           width: '90vw',
-          overflow: 'auto',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
           position: 'relative',
           opacity: isDragActive ? 0.15 : 1,
           pointerEvents: isDragActive ? 'none' : 'auto',
@@ -498,6 +532,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
         {cards.length === 0 ? (
           <p style={{ color: 'var(--gf-text-dim)', fontStyle: 'italic' }}>Empty</p>
         ) : (
+          <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
           <div
             ref={gridRef}
             style={{
@@ -585,6 +620,7 @@ export function ZoneBrowseModal({ zoneId, onClose, onStartDrag, onStartMultiDrag
                 }}
               />
             )}
+          </div>
           </div>
         )}
       </div>

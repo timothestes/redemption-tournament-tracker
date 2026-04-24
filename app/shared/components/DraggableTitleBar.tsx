@@ -38,10 +38,14 @@ export function DraggableTitleBar({
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
+        // Pull edge-to-edge past the parent's padding. Explicit width is
+        // required in flex-column parents, where negative horizontal margins
+        // alone don't widen the item.
+        width: `calc(100% + ${parentPadding * 2}px)`,
+        boxSizing: 'border-box',
         margin: `-${parentPadding}px -${parentPadding}px ${bottomGap}px -${parentPadding}px`,
         padding: '8px 10px 8px 8px',
-        background:
-          'linear-gradient(to bottom, rgba(196,149,90,0.18) 0%, rgba(196,149,90,0.08) 60%, rgba(196,149,90,0.04) 100%)',
+        background: 'rgba(15,10,5,0.55)',
         borderBottom: '1px solid var(--gf-border)',
         borderTopLeftRadius: 7,
         borderTopRightRadius: 7,

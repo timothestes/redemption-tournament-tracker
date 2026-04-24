@@ -32,6 +32,7 @@ import { ArrowLeft } from 'lucide-react';
 import { loadDeckForGame } from '../actions';
 import { useUndoStack } from '../hooks/useUndoStack';
 import { useGameTimer } from '../hooks/useGameTimer';
+import { useChatScale } from '@/app/shared/hooks/useChatScale';
 import { normalizeDeckFormat } from '@/lib/deck-format';
 
 // Konva requires browser APIs — lazy-load to avoid SSR issues
@@ -170,6 +171,16 @@ function GameInner({ code, isConnected }: GameInnerProps) {
 
   // Client-side undo stack for multiplayer reverse actions
   const undoStack = useUndoStack();
+
+  // Chat/log font scale — shared between ChatPanel and the gear-menu slider
+  const {
+    chatScale,
+    setChatScale,
+    resetChatScale,
+    MIN_SCALE: CHAT_MIN_SCALE,
+    MAX_SCALE: CHAT_MAX_SCALE,
+    STEP: CHAT_STEP,
+  } = useChatScale();
 
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
 
@@ -1074,6 +1085,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               playerNames={playerNameMap}
               activeTab={chatTab}
               onActiveTabChange={setChatTab}
+              chatScale={chatScale}
             />
           </div>
         </>
@@ -1106,7 +1118,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           </div>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
             {gameId !== null && (
-              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} />
+              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} />
             )}
             <PregameCeremonyOverlay gameState={gameState} />
             <ImageLoadingGate open={!imagesGateOpen} progress={imageLoadProgress} />
@@ -1145,7 +1157,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           </div>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
             {gameId !== null && (
-              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} />
+              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} />
             )}
             <ImageLoadingGate open={!imagesGateOpen} progress={imageLoadProgress} />
             <GameToastContainer />
@@ -1191,7 +1203,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               />
             </div>
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} />
+              <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} />
               {/* Bottom toolbar — stays active for draw/shuffle, end turn disabled */}
               <GameToolbar
                 actions={{
@@ -1397,7 +1409,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         </div>
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           {gameId !== null && (
-            <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} />
+            <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} />
           )}
           <ImageLoadingGate open={!imagesGateOpen} progress={imageLoadProgress} />
           {/* Quick action toolbar — floating above hand area */}

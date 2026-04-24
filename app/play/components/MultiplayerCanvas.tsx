@@ -249,6 +249,13 @@ interface MultiplayerCanvasProps {
   isTimerVisible?: boolean;
   /** Toggle timer visibility (passed through to CardScaleControl). */
   onToggleTimer?: () => void;
+  /** Chat/log font scale — passed through to CardScaleControl for the slider. */
+  chatScale?: number;
+  setChatScale?: (scale: number) => void;
+  resetChatScale?: () => void;
+  minChatScale?: number;
+  maxChatScale?: number;
+  chatStep?: number;
   /**
    * Preloaded-image lookup. Hoisted to the parent so the cache survives the
    * canvas remounts that happen at lifecycle transitions (ceremony →
@@ -261,7 +268,7 @@ interface MultiplayerCanvasProps {
 // Component
 // ---------------------------------------------------------------------------
 
-export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSearchModalChange, isTimerVisible, onToggleTimer, getImage }: MultiplayerCanvasProps) {
+export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSearchModalChange, isTimerVisible, onToggleTimer, getImage, chatScale, setChatScale, resetChatScale, minChatScale, maxChatScale, chatStep }: MultiplayerCanvasProps) {
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
 
   // ---- Container sizing (respects flex layout) ----
@@ -366,6 +373,25 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     },
     [rawMoveCardsBatch, rawMoveCard, undoStack, findCardForUndo],
   );
+
+  // Push an undo entry for an opponent-card move. Captures the card's current
+  // zone/position/owner BEFORE the forward action runs, so undo can restore it
+  // even after the search request is closed.
+  const recordOpponentCardUndo = useCallback((cardId: string | bigint) => {
+    if (!undoStack) return;
+    const idStr = String(cardId);
+    const card = findCardForUndo(idStr);
+    if (!card) return;
+    const fromZone = card.zone;
+    const posX = card.posX ?? '';
+    const posY = card.posY ?? '';
+    const ownerId = String(card.ownerId ?? '');
+    const name = card.cardName || 'card';
+    undoStack.push({
+      description: `Moved ${name} back to ${fromZone}`,
+      reverseAction: () => rawMoveCard(BigInt(idStr), fromZone, undefined, posX, posY, ownerId),
+    });
+  }, [undoStack, findCardForUndo, rawMoveCard]);
 
   const [claimBannerDismissed, setClaimBannerDismissed] = useState(false);
 
@@ -1630,6 +1656,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               ? (gameState.opponentPlayer ? String(gameState.opponentPlayer.id) : '')
               : (gameState.myPlayer ? String(gameState.myPlayer.id) : ''))
             : '';
+          recordOpponentCardUndo(id);
           moveOpponentCard(
             BigInt(approvedSearchRequest.id),
             BigInt(id),
@@ -1663,6 +1690,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 : (gameState.myPlayer ? String(gameState.myPlayer.id) : '');
               for (const id of ids) {
                 const p = positions[id];
+                recordOpponentCardUndo(id);
                 if (!p) {
                   moveOpponentCard(BigInt(approvedSearchRequest.id), BigInt(id), String(toZone), undefined, undefined, newOwnerId);
                   continue;
@@ -1674,6 +1702,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             }
           }
           for (const id of ids) {
+            recordOpponentCardUndo(id);
             moveOpponentCard(BigInt(approvedSearchRequest.id), BigInt(id), String(toZone));
           }
         };
@@ -4875,6 +4904,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             );
 
             const oppHandRevealed = gameState.opponentPlayer?.handRevealed ?? false;
+            // Snapshot of card IDs visible at reveal time. Cards drawn into the
+            // hand after reveal are not in this set and stay face-down.
+            const oppHandRevealSnapshot = new Set<string>();
+            if (oppHandRevealed) {
+              try {
+                const raw = gameState.opponentPlayer?.handRevealSnapshot;
+                if (raw) {
+                  const ids = JSON.parse(raw);
+                  if (Array.isArray(ids)) for (const id of ids) oppHandRevealSnapshot.add(String(id));
+                }
+              } catch { /* ignore malformed snapshot */ }
+            }
 
             return (
               <Group
@@ -4902,7 +4943,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     !!card &&
                     card.revealExpiresAt !== undefined &&
                     card.revealExpiresAt.microsSinceUnixEpoch > nowMicros;
-                  if ((oppHandRevealed || cardRevealed) && card) {
+                  const inSnapshot = !!card && oppHandRevealSnapshot.has(String(card.id));
+                  if (((oppHandRevealed && inSnapshot) || cardRevealed) && card) {
                     const gameCard = adaptCard(card, 'player2');
                     return (
                       <GameCardNode
@@ -4920,7 +4962,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                         onDragStart={handleCardDragStart}
                         onDragMove={handleCardDragMove}
                         onDragEnd={handleCardDragEnd}
-                        onContextMenu={noopContextMenu}
+                        onContextMenu={handleCardContextMenu}
                         onDblClick={noopDblClick}
                         onMouseEnter={handleMouseEnter}
                         onMouseLeave={handleMouseLeave}
@@ -5064,6 +5106,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         minScale={MIN_SCALE}
         maxScale={MAX_SCALE}
         step={STEP}
+        chatScale={chatScale}
+        setChatScale={setChatScale}
+        resetChatScale={resetChatScale}
+        minChatScale={minChatScale}
+        maxChatScale={maxChatScale}
+        chatStep={chatStep}
         onLoadDeck={onLoadDeck}
         isTimerVisible={isTimerVisible}
         onToggleTimer={onToggleTimer}
@@ -5731,6 +5779,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             cards={zoneCards}
             onMoveCard={(cardId, action) => {
               const reqId = BigInt(approvedSearchRequest.id);
+              recordOpponentCardUndo(cardId);
               if (action === 'discard') {
                 moveOpponentCard(reqId, BigInt(cardId), 'discard');
               } else if (action === 'banish') {
@@ -5747,6 +5796,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             onMoveCardsBatch={(cardIds, action) => {
               const reqId = BigInt(approvedSearchRequest.id);
               for (const cardId of cardIds) {
+                recordOpponentCardUndo(cardId);
                 if (action === 'discard') {
                   moveOpponentCard(reqId, BigInt(cardId), 'discard');
                 } else if (action === 'banish') {

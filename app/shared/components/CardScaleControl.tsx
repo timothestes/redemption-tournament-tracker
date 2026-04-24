@@ -10,6 +10,13 @@ interface CardScaleControlProps {
   minScale: number;
   maxScale: number;
   step: number;
+  /** Chat/log font scale — if provided, a second slider renders. */
+  chatScale?: number;
+  setChatScale?: (scale: number) => void;
+  resetChatScale?: () => void;
+  minChatScale?: number;
+  maxChatScale?: number;
+  chatStep?: number;
   /** Called to trigger mid-game deck reload (multiplayer only). */
   onLoadDeck?: () => void;
   /** Whether the game timer is currently visible. */
@@ -25,6 +32,12 @@ export function CardScaleControl({
   minScale,
   maxScale,
   step,
+  chatScale,
+  setChatScale,
+  resetChatScale,
+  minChatScale,
+  maxChatScale,
+  chatStep,
   onLoadDeck,
   isTimerVisible,
   onToggleTimer,
@@ -45,6 +58,14 @@ export function CardScaleControl({
   }, [open]);
 
   const pct = Math.round(cardScale * 100);
+  const chatPct = chatScale !== undefined ? Math.round(chatScale * 100) : null;
+  const hasChatControl =
+    chatScale !== undefined &&
+    setChatScale !== undefined &&
+    resetChatScale !== undefined &&
+    minChatScale !== undefined &&
+    maxChatScale !== undefined &&
+    chatStep !== undefined;
 
   return (
     <div
@@ -181,6 +202,95 @@ export function CardScaleControl({
               {Math.round(maxScale * 100)}%
             </span>
           </div>
+
+          {/* Chat/log font size — multiplayer only */}
+          {hasChatControl && (
+            <>
+              <div style={{
+                height: 1,
+                background: 'var(--gf-border, #3d2e1f)',
+                margin: '4px 0',
+              }} />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-cinzel), Georgia, serif',
+                    fontSize: 11,
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    color: 'var(--gf-text, #e8d5a3)',
+                  }}
+                >
+                  Chat/Log Size
+                </span>
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: 'var(--gf-text-bright, #fff)',
+                    fontVariantNumeric: 'tabular-nums',
+                    minWidth: 36,
+                    textAlign: 'right',
+                  }}
+                >
+                  {chatPct}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min={minChatScale! * 100}
+                max={maxChatScale! * 100}
+                step={chatStep! * 100}
+                value={chatPct!}
+                onChange={(e) => {
+                  const newScale = Math.round(parseFloat(e.target.value)) / 100;
+                  setChatScale!(newScale);
+                }}
+                style={{
+                  width: '100%',
+                  accentColor: '#c4955a',
+                  cursor: 'pointer',
+                }}
+              />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 10, color: 'var(--gf-text-dim, #8a7a66)' }}>
+                  {Math.round(minChatScale! * 100)}%
+                </span>
+                <button
+                  onClick={resetChatScale}
+                  title="Reset to 100%"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: '2px 8px',
+                    background: 'transparent',
+                    border: '1px solid var(--gf-border, #3d2e1f)',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                    color: 'var(--gf-text, #e8d5a3)',
+                    fontSize: 10,
+                    fontFamily: 'var(--font-cinzel), Georgia, serif',
+                    letterSpacing: '0.04em',
+                    textTransform: 'uppercase',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'var(--gf-hover, #2a1f12)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                  }}
+                >
+                  <RotateCcw size={10} />
+                  Reset
+                </button>
+                <span style={{ fontSize: 10, color: 'var(--gf-text-dim, #8a7a66)' }}>
+                  {Math.round(maxChatScale! * 100)}%
+                </span>
+              </div>
+            </>
+          )}
 
           {/* Load Deck — multiplayer only */}
           {onLoadDeck && (

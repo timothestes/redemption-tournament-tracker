@@ -73,6 +73,7 @@ function CardContextPopup({
   return (
     <div
       ref={ref}
+      data-modal-keep-open="true"
       onClick={(e) => e.stopPropagation()}
       style={{
         position: 'fixed',
@@ -85,6 +86,7 @@ function CardContextPopup({
         zIndex: 900,
         minWidth: 140,
         boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+        pointerEvents: 'auto',
       }}
     >
       <div style={{ ...itemStyle, color: 'var(--gf-text-dim)', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', cursor: 'default', padding: '3px 12px' }}>
@@ -141,6 +143,11 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave } = useModalCardHover(350, { setPreviewCard, isLoupeVisible });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Ref for the inner modal box — used for outside-click detection so the
+  // backdrop can stay pointer-events: none (letting hover previews reach the
+  // game board cards underneath).
+  const modalBoxRef = useRef<HTMLDivElement>(null);
 
   // Refs for card DOM elements (for lasso hit-testing)
   const cardElRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -271,6 +278,37 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
   }, [handleClose, selectedIds.size]);
+
+  // Outside-click / outside-right-click behavior. The backdrop is
+  // pointer-events: none so cards underneath can fire hover previews, so we
+  // detect "click outside the modal box" here instead of on the backdrop.
+  useEffect(() => {
+    const isInside = (target: EventTarget | null) => {
+      if (!(target instanceof Element)) return false;
+      if (modalBoxRef.current?.contains(target)) return true;
+      return !!target.closest('[data-modal-keep-open]');
+    };
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (isInside(e.target)) return;
+      if (e.button === 0 && !didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) {
+        setContextCard(null);
+        handleClose();
+      }
+    };
+    const handleContextMenu = (e: MouseEvent) => {
+      if (isInside(e.target)) return;
+      e.preventDefault();
+      setContextCard(null);
+    };
+
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('contextmenu', handleContextMenu);
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('contextmenu', handleContextMenu);
+    };
+  }, [handleClose, didDragRef]);
 
   const handleCardContextMenu = (card: GameCard, e: React.MouseEvent) => {
     e.preventDefault();
@@ -415,8 +453,6 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      onClick={() => { if (!didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) handleClose(); }}
-      onContextMenu={(e) => e.preventDefault()}
       style={{
         position: 'fixed',
         inset: 0,
@@ -427,10 +463,12 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
         paddingTop: '5vh',
         justifyContent: 'center',
         zIndex: 500,
+        pointerEvents: 'none',
       }}
     >
       <div
-        onClick={(e) => { e.stopPropagation(); setContextCard(null); }}
+        ref={modalBoxRef}
+        onClick={() => setContextCard(null)}
         onPointerDown={handleContentPointerDown}
         style={{
           background: 'var(--gf-bg)',

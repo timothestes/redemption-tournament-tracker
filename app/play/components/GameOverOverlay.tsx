@@ -230,33 +230,42 @@ export default function GameOverOverlay({
       )}
 
       {/* Temporary toast — auto-dismisses (for self-resign / generic end) */}
-      {!isOpponentLeft && toastVisible && (
-        <div style={{
-          position: 'absolute',
-          bottom: 70,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 800,
-          background: 'rgba(14, 10, 6, 0.95)',
-          border: '1px solid rgba(107, 78, 39, 0.5)',
-          borderRadius: 8,
-          padding: '12px 24px',
-          textAlign: 'center',
-          boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
-          pointerEvents: 'none',
-          animation: 'fadeInUp 0.3s ease',
-        }}>
-          <p style={{
-            fontFamily: 'var(--font-cinzel), Georgia, serif',
-            fontSize: 14,
-            fontWeight: 700,
-            color: '#e8d5a3',
-            letterSpacing: '0.06em',
+      {!isOpponentLeft && toastVisible && (() => {
+        const isWin = label === 'Opponent resigned' || label === 'Opponent disconnected';
+        const isLoss = label === 'You resigned';
+        const accent = isWin
+          ? { border: 'rgba(80, 180, 100, 0.55)', color: 'rgba(160, 230, 170, 0.95)' }
+          : isLoss
+            ? { border: 'rgba(200, 80, 80, 0.55)', color: 'rgba(240, 160, 160, 0.95)' }
+            : { border: 'rgba(107, 78, 39, 0.5)', color: '#e8d5a3' };
+        return (
+          <div style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 800,
+            background: 'rgba(14, 10, 6, 0.95)',
+            border: `1px solid ${accent.border}`,
+            borderRadius: 8,
+            padding: '14px 28px',
+            textAlign: 'center',
+            boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
+            pointerEvents: 'none',
+            animation: 'fadeInCenter 0.3s ease',
           }}>
-            {label}
-          </p>
-        </div>
-      )}
+            <p style={{
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: 14,
+              fontWeight: 700,
+              color: accent.color,
+              letterSpacing: '0.06em',
+            }}>
+              {label}
+            </p>
+          </div>
+        );
+      })()}
 
       {/* Rematch request banner from opponent */}
       {showRematchBanner && (
@@ -377,6 +386,10 @@ export default function GameOverOverlay({
         @keyframes fadeInUp {
           from { opacity: 0; transform: translateX(-50%) translateY(12px); }
           to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+        @keyframes fadeInCenter {
+          from { opacity: 0; transform: translate(-50%, -50%) scale(0.92); }
+          to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
         }
       `}</style>
     </>

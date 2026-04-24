@@ -43,11 +43,11 @@ function PeekCardContextPopup({
   const label = count && count > 1 ? `Move ${count} cards to...` : 'Move to...';
 
   return (
-    <div ref={ref} onClick={(e) => e.stopPropagation()} style={{
+    <div ref={ref} data-modal-keep-open="true" onClick={(e) => e.stopPropagation()} style={{
       position: 'fixed', left: Math.min(x, window.innerWidth - 160),
       top: Math.min(y, window.innerHeight - 300), background: 'var(--gf-bg)',
       border: '1px solid var(--gf-border)', borderRadius: 6, padding: '4px 0',
-      zIndex: 1000, minWidth: 140, boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+      zIndex: 1000, minWidth: 140, boxShadow: '0 8px 24px rgba(0,0,0,0.6)', pointerEvents: 'auto',
     }}>
       <div style={{ ...itemStyle, color: 'var(--gf-text-dim)', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', cursor: 'default', padding: '3px 12px' }}>
         {label}
@@ -183,6 +183,11 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
     setContextCard({ card, x: e.clientX, y: e.clientY });
   };
 
+  // Ref for the inner modal box — used for outside-click detection so the
+  // backdrop can stay pointer-events: none (letting hover previews reach the
+  // game board cards underneath).
+  const modalBoxRef = useRef<HTMLDivElement>(null);
+
   // Refs for card DOM elements (for lasso hit-testing)
   const cardElRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const registerCardEl = useCallback((instanceId: string, el: HTMLDivElement | null) => {
@@ -248,6 +253,36 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
   }, [hasRemaining, remainingIds, selectedIds.size]);
+
+  // Outside-click / outside-right-click behavior. The backdrop is
+  // pointer-events: none so cards underneath can fire hover previews, so we
+  // detect "click outside the modal box" here instead of on the backdrop.
+  useEffect(() => {
+    if (!onClose) return;
+    const isInside = (target: EventTarget | null) => {
+      if (!(target instanceof Element)) return false;
+      if (modalBoxRef.current?.contains(target)) return true;
+      return !!target.closest('[data-modal-keep-open]');
+    };
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (isInside(e.target)) return;
+      if (e.button === 0 && readyForClose && !didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) {
+        handleCloseAction('top');
+      }
+    };
+    const handleContextMenu = (e: MouseEvent) => {
+      if (isInside(e.target)) return;
+      e.preventDefault();
+    };
+
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('contextmenu', handleContextMenu);
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('contextmenu', handleContextMenu);
+    };
+  }, [onClose, readyForClose, didDragRef, hasRemaining, remainingIds]);
 
   // Track pointer down card to distinguish click from drag on pointer up
   const pointerDownCardRef = useRef<string | null>(null);
@@ -374,16 +409,14 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        pointerEvents: 'none',
       }}
-      onClick={() => { if (readyForClose && !didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) handleCloseAction('top'); }}
-      onContextMenu={(e) => e.preventDefault()}
     >
-      <div style={modalStyle}>
+      <div ref={modalBoxRef} style={modalStyle}>
       <motion.div
         initial={false}
         animate={{ opacity: isDragActive ? 0.15 : 1, scale: 1 }}
         transition={{ opacity: { duration: 0.2 } }}
-        onClick={(e) => e.stopPropagation()}
         onPointerDown={handleContentPointerDown}
         style={{
           background: '#1e1610',
@@ -392,7 +425,9 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
           padding: 20,
           width: `min(90vw, ${Math.min(peekedIds.length, 4) * 152 + 40}px)`,
           maxHeight: '85vh',
-          overflowY: 'auto',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
           position: 'relative',
           pointerEvents: isDragActive ? 'none' : 'auto',
         }}
@@ -430,6 +465,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
           )}
         </DraggableTitleBar>
 
+        <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
         <p style={{
           fontFamily: 'var(--font-cinzel), Georgia, serif',
           color: isPrivateLook ? 'var(--gf-accent)' : 'var(--gf-text-dim)',
@@ -540,6 +576,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
             )}
           </div>
         )}
+        </div>
 
         {/* Action footer — choose where remaining revealed cards go */}
         <div style={{

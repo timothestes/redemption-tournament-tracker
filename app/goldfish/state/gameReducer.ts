@@ -179,6 +179,35 @@ function shuffleAndDrawInState(
   return { ...state, zones, history };
 }
 
+function reserveTopOfDeckInState(
+  state: GameState,
+  _source: GameCard,
+  ability: Extract<CardAbility, { type: 'reserve_top_of_deck' }>,
+  history: GameState[],
+): GameState {
+  // Phase 1 — validate.
+  if (ability.count < 1) return state;
+  if (state.zones.deck.length === 0) return state;
+
+  // Phase 2 — build new zones. Top of deck is zones.deck[0] (matches shift()
+  // usage in shuffleAndDrawInState and drawCard).
+  const zones = cloneZones(state.zones);
+  const n = Math.min(ability.count, zones.deck.length);
+  const taken = zones.deck.slice(0, n).map(c => ({
+    ...c,
+    zone: 'reserve' as ZoneId,
+    // Face-down: player didn't look at the card. Matches the initial reserve
+    // state (see buildInitialGameState / insertCardsShuffleDraw in the server).
+    isFlipped: true,
+    posX: undefined,
+    posY: undefined,
+  }));
+  zones.deck = zones.deck.slice(n);
+  zones.reserve = [...taken, ...zones.reserve];
+
+  return { ...state, zones, history };
+}
+
 function pushHistory(state: GameState): GameState[] {
   // Store a snapshot (without history to avoid nesting)
   const snapshot: GameState = {
@@ -868,6 +897,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           // Modal-driven effect — GoldfishCanvas intercepts the dispatch and
           // calls setPeekState directly. Reaching the reducer is a bug, no-op.
           return state;
+        case 'reserve_top_of_deck':
+          return reserveTopOfDeckInState(state, source, ability, history);
         case 'custom':
           // Custom abilities are dispatched client-side in multiplayer and
           // never reach the goldfish reducer in v1. No-op defensively.

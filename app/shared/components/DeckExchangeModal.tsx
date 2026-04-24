@@ -45,6 +45,16 @@ export function DeckExchangeModal({
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const { hover, hoverProgress, hoveredCardId, onCardMouseEnter, onCardMouseLeave } = useModalCardHover(350, { setPreviewCard, isLoupeVisible });
 
+  // Ref for the inner modal box — used for outside-click detection so the
+  // backdrop can stay pointer-events: none (letting hover previews reach the
+  // game board cards underneath).
+  const modalBoxRef = useRef<HTMLDivElement>(null);
+
+  // Timestamp of last drag end — guards the outside-click handler against the
+  // spurious click that fires when mousedown-on-card + mouseup-on-backdrop
+  // occur during a drag gesture.
+  const dragEndTimeRef = useRef(0);
+
   // Track pointer down card to distinguish click from drag
   const pointerDownCardRef = useRef<string | null>(null);
 
@@ -109,6 +119,27 @@ export function DeckExchangeModal({
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
   }, [onCancel]);
+
+  // Outside-click behavior. The backdrop is pointer-events: none so cards
+  // underneath can fire hover previews, so we detect "click outside the modal
+  // box" here instead of on the backdrop.
+  useEffect(() => {
+    const isInside = (target: EventTarget | null) => {
+      if (!(target instanceof Element)) return false;
+      if (modalBoxRef.current?.contains(target)) return true;
+      return !!target.closest('[data-modal-keep-open]');
+    };
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (isInside(e.target)) return;
+      if (e.button === 0 && !didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) {
+        onCancel();
+      }
+    };
+
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, [onCancel, didDragRef]);
 
   const selectCard = useCallback((cardId: string) => {
     setSelectedIds(prev => {
@@ -188,7 +219,6 @@ export function DeckExchangeModal({
     }
   };
 
-  const dragEndTimeRef = useRef(0);
   const prevDragActive = useRef(false);
   useEffect(() => {
     if (prevDragActive.current && !isDragActive) {
@@ -240,7 +270,6 @@ export function DeckExchangeModal({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.15 }}
-        onClick={() => { if (!didDragRef?.current && Date.now() - dragEndTimeRef.current > 300) onCancel(); }}
         style={{
           position: 'fixed',
           inset: 0,
@@ -250,10 +279,11 @@ export function DeckExchangeModal({
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 500,
+          pointerEvents: 'none',
         }}
       >
         <div
-          onClick={(e) => e.stopPropagation()}
+          ref={modalBoxRef}
           style={{
             background: 'var(--gf-bg)',
             border: '1px solid var(--gf-border)',

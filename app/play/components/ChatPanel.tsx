@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type CSSProperties } from 'react';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 
 // ---------------------------------------------------------------------------
@@ -36,6 +36,8 @@ interface ChatPanelProps {
   playerNames: Record<string, string>; // playerId.toString() → display name
   activeTab?: TabKey;
   onActiveTabChange?: (tab: TabKey) => void;
+  /** Font scale for chat/log content. Defaults to 1.0. */
+  chatScale?: number;
 }
 
 // Discriminated union for interleaved timeline entries
@@ -153,7 +155,7 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
           return (
             <>
               {countText}: <CardNameList cards={data.cards} />
-              <span style={{ fontSize: 9, fontStyle: 'italic', color: 'rgba(232, 213, 163, 0.35)', marginLeft: 4 }}>
+              <span style={{ fontSize: 'calc(9px * var(--chat-fs, 1))', fontStyle: 'italic', color: 'rgba(232, 213, 163, 0.35)', marginLeft: 4 }}>
                 (only visible to you)
               </span>
             </>
@@ -227,6 +229,32 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       const shuffled = Number(data.shuffled ?? 0);
       const drawn = Number(data.drawn ?? 0);
       return `shuffled ${shuffled} from hand into deck and drew ${drawn}`;
+    } catch { /* fall through */ }
+  }
+  if (actionType === 'RESERVE_TOP_OF_DECK' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const count = Number(data.count ?? 1);
+      const sourceName: string = data.sourceCardName ?? '';
+      const sourceImg: string = data.sourceCardImgFile ?? '';
+      const cards: { name: string; img: string }[] = Array.isArray(data.cards) ? data.cards : [];
+      const hasCards = cards.length > 0;
+      const prefix = count === 1 ? 'reserved top card of deck' : `reserved top ${count} cards of deck`;
+      return (
+        <>
+          {prefix}
+          {hasCards ? (
+            <>
+              : <CardNameList cards={cards} />
+            </>
+          ) : null}
+          {sourceName ? (
+            <>
+              {' '}via <HoverableCard name={sourceName} img={sourceImg} />
+            </>
+          ) : null}
+        </>
+      );
     } catch { /* fall through */ }
   }
   if (actionType === 'SPAWN_TOKEN' && payload) {
@@ -545,7 +573,7 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
         return (
           <>
             {verb}: <CardNameList cards={rawCards} />
-            <span style={{ fontSize: 9, fontStyle: 'italic', color: 'rgba(232, 213, 163, 0.35)', marginLeft: 4 }}>
+            <span style={{ fontSize: 'calc(9px * var(--chat-fs, 1))', fontStyle: 'italic', color: 'rgba(232, 213, 163, 0.35)', marginLeft: 4 }}>
               (only visible to you)
             </span>
           </>
@@ -587,6 +615,7 @@ export default function ChatPanel({
   playerNames,
   activeTab: controlledTab,
   onActiveTabChange,
+  chatScale = 1,
 }: ChatPanelProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [internalTab, setInternalTab] = useState<TabKey>('all');
@@ -719,7 +748,8 @@ export default function ChatPanel({
       flex: 1,
       overflow: 'hidden',
       fontFamily: 'var(--font-geist-sans, system-ui, sans-serif)',
-    }}>
+      ['--chat-fs' as string]: chatScale,
+    } as CSSProperties}>
       {/* ================================================================
           Toggle button — horizontal row in the sidebar
           ================================================================ */}
@@ -737,7 +767,7 @@ export default function ChatPanel({
           borderBottom: '1px solid rgba(107, 78, 39, 0.2)',
           color: '#e8d5a3',
           cursor: 'pointer',
-          fontSize: 11,
+          fontSize: 'calc(11px * var(--chat-fs, 1))',
           letterSpacing: '0.08em',
           textTransform: 'uppercase',
           fontFamily: 'inherit',
@@ -769,7 +799,7 @@ export default function ChatPanel({
               background: '#c4955a',
               color: '#0a0805',
               borderRadius: '50%',
-              fontSize: 9,
+              fontSize: 'calc(9px * var(--chat-fs, 1))',
               fontWeight: 700,
               minWidth: 16,
               height: 16,
@@ -847,7 +877,7 @@ export default function ChatPanel({
                       border: `1px solid ${isActive ? 'rgba(196, 149, 90, 0.45)' : 'transparent'}`,
                       borderRadius: 20,
                       cursor: 'pointer',
-                      fontSize: 10,
+                      fontSize: 'calc(10px * var(--chat-fs, 1))',
                       letterSpacing: '0.07em',
                       textTransform: 'uppercase',
                       color: isActive ? '#e8d5a3' : 'rgba(232, 213, 163, 0.4)',
@@ -898,7 +928,7 @@ export default function ChatPanel({
                   <p
                     style={{
                       color: 'rgba(232, 213, 163, 0.3)',
-                      fontSize: 11,
+                      fontSize: 'calc(11px * var(--chat-fs, 1))',
                       textAlign: 'center',
                       marginTop: 16,
                       fontStyle: 'italic',
@@ -936,7 +966,7 @@ export default function ChatPanel({
                         <span
                           style={{
                             fontWeight: 700,
-                            fontSize: 10,
+                            fontSize: 'calc(10px * var(--chat-fs, 1))',
                             color: isMe ? '#c4955a' : '#4a7ab5',
                             letterSpacing: '0.02em',
                           }}
@@ -945,7 +975,7 @@ export default function ChatPanel({
                         </span>
                         <span
                           style={{
-                            fontSize: 9,
+                            fontSize: 'calc(9px * var(--chat-fs, 1))',
                             color: 'rgba(232, 213, 163, 0.3)',
                             fontVariantNumeric: 'tabular-nums',
                           }}
@@ -966,7 +996,7 @@ export default function ChatPanel({
                           border: isMe
                             ? '1px solid rgba(196, 149, 90, 0.3)'
                             : '1px solid rgba(255, 255, 255, 0.08)',
-                          fontSize: 12,
+                          fontSize: 'calc(12px * var(--chat-fs, 1))',
                           color: '#e8d5a3',
                           lineHeight: 1.4,
                           wordBreak: 'break-word',
@@ -1005,7 +1035,7 @@ export default function ChatPanel({
                     borderRadius: 4,
                     padding: '5px 8px',
                     color: '#e8d5a3',
-                    fontSize: 12,
+                    fontSize: 'calc(12px * var(--chat-fs, 1))',
                     fontFamily: 'inherit',
                     outline: 'none',
                   }}
@@ -1025,7 +1055,7 @@ export default function ChatPanel({
                     borderRadius: 4,
                     color: inputText.trim() ? '#e8d5a3' : 'rgba(232, 213, 163, 0.3)',
                     cursor: inputText.trim() ? 'pointer' : 'default',
-                    fontSize: 10,
+                    fontSize: 'calc(10px * var(--chat-fs, 1))',
                     letterSpacing: '0.06em',
                     textTransform: 'uppercase',
                     fontFamily: 'inherit',
@@ -1055,7 +1085,7 @@ export default function ChatPanel({
                 <p
                   style={{
                     color: 'rgba(232, 213, 163, 0.3)',
-                    fontSize: 11,
+                    fontSize: 'calc(11px * var(--chat-fs, 1))',
                     textAlign: 'center',
                     marginTop: 16,
                     fontStyle: 'italic',
@@ -1085,13 +1115,13 @@ export default function ChatPanel({
                       borderLeft: '2px solid rgba(107, 78, 39, 0.3)',
                     }}
                   >
-                    <span style={{ fontSize: 11, color: '#c8b882', lineHeight: 1.35 }}>
+                    <span style={{ fontSize: 'calc(11px * var(--chat-fs, 1))', color: '#c8b882', lineHeight: 1.35 }}>
                       <strong style={{ color: '#e8d5a3' }}>{playerName}</strong>{' '}
                       {verb}
                     </span>
                     <span
                       style={{
-                        fontSize: 9,
+                        fontSize: 'calc(9px * var(--chat-fs, 1))',
                         color: 'rgba(232, 213, 163, 0.3)',
                         fontVariantNumeric: 'tabular-nums',
                       }}
@@ -1123,7 +1153,7 @@ export default function ChatPanel({
                   <p
                     style={{
                       color: 'rgba(232, 213, 163, 0.3)',
-                      fontSize: 11,
+                      fontSize: 'calc(11px * var(--chat-fs, 1))',
                       textAlign: 'center',
                       marginTop: 16,
                       fontStyle: 'italic',
@@ -1182,7 +1212,7 @@ export default function ChatPanel({
                               <span
                                 style={{
                                   fontWeight: 700,
-                                  fontSize: 10,
+                                  fontSize: 'calc(10px * var(--chat-fs, 1))',
                                   color: isMe ? '#c4955a' : '#4a7ab5',
                                   letterSpacing: '0.02em',
                                 }}
@@ -1191,7 +1221,7 @@ export default function ChatPanel({
                               </span>
                               <span
                                 style={{
-                                  fontSize: 9,
+                                  fontSize: 'calc(9px * var(--chat-fs, 1))',
                                   color: 'rgba(232, 213, 163, 0.3)',
                                   fontVariantNumeric: 'tabular-nums',
                                 }}
@@ -1210,7 +1240,7 @@ export default function ChatPanel({
                                 border: isMe
                                   ? '1px solid rgba(196, 149, 90, 0.22)'
                                   : '1px solid rgba(255, 255, 255, 0.07)',
-                                fontSize: 12,
+                                fontSize: 'calc(12px * var(--chat-fs, 1))',
                                 color: '#e8d5a3',
                                 lineHeight: 1.4,
                                 wordBreak: 'break-word',
@@ -1243,13 +1273,13 @@ export default function ChatPanel({
                             opacity: 0.8,
                           }}
                         >
-                          <span style={{ fontSize: 10, color: '#c8b882', lineHeight: 1.35 }}>
+                          <span style={{ fontSize: 'calc(10px * var(--chat-fs, 1))', color: '#c8b882', lineHeight: 1.35 }}>
                             <strong style={{ color: '#e8d5a3' }}>{playerName}</strong>{' '}
                             {verb}
                           </span>
                           <span
                             style={{
-                              fontSize: 9,
+                              fontSize: 'calc(9px * var(--chat-fs, 1))',
                               color: 'rgba(232, 213, 163, 0.25)',
                               fontVariantNumeric: 'tabular-nums',
                             }}
@@ -1289,7 +1319,7 @@ export default function ChatPanel({
                     borderRadius: 4,
                     padding: '5px 8px',
                     color: '#e8d5a3',
-                    fontSize: 12,
+                    fontSize: 'calc(12px * var(--chat-fs, 1))',
                     fontFamily: 'inherit',
                     outline: 'none',
                   }}
@@ -1309,7 +1339,7 @@ export default function ChatPanel({
                     borderRadius: 4,
                     color: inputText.trim() ? '#e8d5a3' : 'rgba(232, 213, 163, 0.3)',
                     cursor: inputText.trim() ? 'pointer' : 'default',
-                    fontSize: 10,
+                    fontSize: 'calc(10px * var(--chat-fs, 1))',
                     letterSpacing: '0.06em',
                     textTransform: 'uppercase',
                     fontFamily: 'inherit',

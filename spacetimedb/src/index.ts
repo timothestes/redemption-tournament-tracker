@@ -502,6 +502,7 @@ export const create_game = spacetimedb.reducer(
       isConnected: true,
       autoRouteLostSouls: true,
       handRevealed: false,
+      handRevealSnapshot: '',
       reserveRevealed: false,
       pendingDeckData: deckData,
       revealedCards: '',
@@ -572,6 +573,7 @@ export const join_game = spacetimedb.reducer(
       isConnected: true,
       autoRouteLostSouls: true,
       handRevealed: false,
+      handRevealSnapshot: '',
       reserveRevealed: false,
       pendingDeckData: deckData,
       revealedCards: '',
@@ -1829,7 +1831,7 @@ export const move_card = spacetimedb.reducer(
     // Redemption rule: a warrior going from Territory to LOB drags its weapons
     // to Discard. All other host-leaves-zone cases (soul rescued from LOB,
     // same-zone reposition, etc.) just unlink accessories in place.
-    const leavingZone = toZone !== fromZone;
+    const leavingZone = toZone !== fromZone || resolvedOwnerId !== card.ownerId;
     const clearEquippedOnMover = leavingZone && card.equippedToInstanceId !== 0n;
     ctx.db.CardInstance.id.update({
       ...card,
@@ -1876,8 +1878,11 @@ export const move_card = spacetimedb.reducer(
     // Log when the card changes zones OR changes ownership (e.g. territory → opponent's territory)
     const ownerChanged = newOwnerId !== card.ownerId;
     if (fromZone !== toZone || ownerChanged) {
-      // Hide card identity when moving from hand to hidden zones (deck/reserve) — hand contents are private
-      const hideIdentity = isFlipped || (fromZone === 'hand' && (toZone === 'deck' || toZone === 'reserve'));
+      // Hide card identity when the OWNER moves their own hand card to a hidden
+      // zone — their hand is private. When a different player moves the card
+      // (cross-player take), both players already know its identity, so reveal it.
+      const hideIdentity = isFlipped ||
+        (fromZone === 'hand' && (toZone === 'deck' || toZone === 'reserve') && player.id === card.ownerId);
       const logName = hideIdentity ? 'a face-down card' : card.cardName;
       const logImg = hideIdentity ? '' : card.cardImgFile;
       logAction(ctx, gameId, player.id, 'MOVE_CARD', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), from: fromZone, to: toZone, cardName: logName, cardImgFile: logImg, targetOwnerId: targetOwnerId || '' }), game.turnNumber, game.currentPhase);
@@ -1951,10 +1956,12 @@ export const move_cards_batch = spacetimedb.reducer(
     // can distinguish "actually left zone" from "same-zone reposition".
     const finalZoneById = new Map<string, string>();
     const originalZoneById = new Map<string, string>();
+    const originalOwnerById = new Map<string, bigint>();
     for (const idStr of ids) {
       const c = ctx.db.CardInstance.id.find(BigInt(idStr));
       if (!c) continue;
       originalZoneById.set(idStr, c.zone);
+      originalOwnerById.set(idStr, c.ownerId);
       const redirected =
         c.zone === 'territory' &&
         toZone === 'land-of-bondage' &&
@@ -1998,8 +2005,10 @@ export const move_cards_batch = spacetimedb.reducer(
       // Moving to deck/soul-deck = face-down; leaving deck, reserve, or soul-deck = face-up; otherwise preserve
       const isFlipped = (toZone === 'deck' || toZone === 'soul-deck') ? true : (card.zone === 'deck' || card.zone === 'reserve' || card.zone === 'soul-deck') ? false : card.isFlipped;
 
-      // Hide card identity when moving from hand to hidden zones (deck/reserve) — hand contents are private
-      const hideIdentity = isFlipped || (card.zone === 'hand' && (toZone === 'deck' || toZone === 'reserve'));
+      // Hide card identity only when the owner moves their own hand card to a
+      // hidden zone. Cross-player takes reveal the card (both players know it).
+      const hideIdentity = isFlipped ||
+        (card.zone === 'hand' && (toZone === 'deck' || toZone === 'reserve') && player.id === card.ownerId);
       const logName = hideIdentity ? 'a face-down card' : card.cardName;
       const logImg = hideIdentity ? '' : card.cardImgFile;
       cards.push({ name: logName, img: logImg });
@@ -2079,7 +2088,13 @@ export const move_cards_batch = spacetimedb.reducer(
       // current zone. Same-zone reposition preserves the link (both Territory
       // warriors and LOB souls can shuffle within their zone without losing
       // attached accessories).
-      const leavingZone = cardFinalZone !== card.zone;
+      const leavingZone =
+        cardFinalZone !== card.zone || resolvedCardOwnerId !== card.ownerId;
+      // An accessory travelling with its host in the same batch keeps its link —
+      // otherwise a warrior-with-weapon group move across ownership boundaries
+      // would strip the weapon off mid-flight.
+      const hostInBatch =
+        card.equippedToInstanceId !== 0n && batchIdSet.has(card.equippedToInstanceId);
 
       // Auto-fan: if dropping into territory without an explicit position,
       // stagger the card in a small grid so multi-card modal moves don't stack
@@ -2156,7 +2171,7 @@ export const move_cards_batch = spacetimedb.reducer(
         posY: finalPosY,
         isFlipped,
         ownerId: resolvedCardOwnerId,
-        equippedToInstanceId: leavingZone ? 0n : card.equippedToInstanceId,
+        equippedToInstanceId: leavingZone && !hostInBatch ? 0n : card.equippedToInstanceId,
         revealExpiresAt: undefined,
       });
     }
@@ -2170,7 +2185,16 @@ export const move_cards_batch = spacetimedb.reducer(
       const moverFinalZone = finalZoneById.get(idStr) ?? toZone;
       const originalZone = originalZoneById.get(idStr);
       if (originalZone === undefined) continue;
-      if (moverFinalZone === originalZone) continue;
+      // Refetch the mover to learn its post-update owner — cascade must fire
+      // when ownership changed between territories (same zone name) so stranded
+      // accessories don't keep pointing at a host in another player's zone.
+      const postMover = ctx.db.CardInstance.id.find(moverId);
+      const originalOwner = originalOwnerById.get(idStr);
+      const ownerChanged =
+        postMover != null &&
+        originalOwner !== undefined &&
+        postMover.ownerId !== originalOwner;
+      if (moverFinalZone === originalZone && !ownerChanged) continue;
       const sendToDiscard =
         originalZone === 'territory' && moverFinalZone === 'land-of-bondage';
       const nonBatchAccessories = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
@@ -2417,6 +2441,70 @@ function shuffleAndDrawForPlayerImpl(
 }
 
 // ---------------------------------------------------------------------------
+// Helper: reserveTopOfDeckImpl
+// Moves the top `count` cards of the acting player's deck into their reserve.
+// "Top" is defined by ascending zoneIndex (same convention as drawCardsForPlayer).
+// Cards enter reserve face-down — the player didn't look at them.
+// ---------------------------------------------------------------------------
+function reserveTopOfDeckImpl(
+  ctx: any,
+  source: any,
+  ability: Extract<CardAbility, { type: 'reserve_top_of_deck' }>,
+  player: any,
+  gameId: bigint,
+) {
+  if (ability.count < 1) throw new SenderError('Invalid count');
+
+  const game = ctx.db.Game.id.find(gameId);
+  if (!game) throw new SenderError('Game not found');
+
+  const playerCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+    (c: any) => c.ownerId === player.id
+  );
+  const deckCards = playerCards
+    .filter((c: any) => c.zone === 'deck')
+    .sort((a: any, b: any) => (a.zoneIndex < b.zoneIndex ? -1 : a.zoneIndex > b.zoneIndex ? 1 : 0));
+
+  if (deckCards.length === 0) return;
+
+  const reserveCards = playerCards.filter((c: any) => c.zone === 'reserve');
+  const n = Math.min(ability.count, deckCards.length);
+
+  // Shift existing reserve cards' zoneIndex up by n so the new arrivals
+  // occupy slots [0..n-1] — matches "top of deck" semantics in
+  // move_card_to_top_of_deck.
+  for (const rc of reserveCards) {
+    ctx.db.CardInstance.id.update({ ...rc, zoneIndex: rc.zoneIndex + BigInt(n) });
+  }
+
+  const movedCards: { name: string; img: string }[] = [];
+  for (let i = 0; i < n; i++) {
+    const top = deckCards[i];
+    ctx.db.CardInstance.id.update({
+      ...top,
+      zone: 'reserve',
+      zoneIndex: BigInt(i),
+      posX: '',
+      posY: '',
+      isFlipped: true,
+    });
+    movedCards.push({ name: top.cardName, img: top.cardImgFile });
+  }
+
+  logAction(
+    ctx, gameId, player.id, 'RESERVE_TOP_OF_DECK',
+    JSON.stringify({
+      count: n,
+      requested: ability.count,
+      sourceCardName: source.cardName,
+      sourceCardImgFile: source.cardImgFile,
+      cards: movedCards,
+    }),
+    game.turnNumber, game.currentPhase,
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Reducer: execute_card_ability
 //
 // Server-authoritative dispatch for per-card custom abilities defined in the
@@ -2498,6 +2586,8 @@ export const execute_card_ability = spacetimedb.reducer(
         throw new SenderError('look_at_own_deck is dispatched by the client, not this reducer');
       case 'look_at_opponent_deck':
         throw new SenderError('look_at_opponent_deck is dispatched by the client, not this reducer');
+      case 'reserve_top_of_deck':
+        return reserveTopOfDeckImpl(ctx, source, ability, player, gameId);
       case 'custom':
         throw new SenderError('Custom abilities are dispatched by the client, not this reducer');
     }
@@ -3800,8 +3890,9 @@ export const move_card_to_top_of_deck = spacetimedb.reducer(
       compactLobIndices(ctx, gameId, card.ownerId);
     }
 
-    // Hide card identity when moving from hand — hand contents are private
-    const hideIdentity = card.isFlipped || fromZone === 'hand';
+    // Hide card identity only when the owner moves their own hand card.
+    // Cross-player moves reveal the card (both players already know it).
+    const hideIdentity = card.isFlipped || (fromZone === 'hand' && player.id === card.ownerId);
     const topLogName = hideIdentity ? 'a face-down card' : card.cardName;
     const topLogImg = hideIdentity ? '' : card.cardImgFile;
     logAction(ctx, gameId, player.id, 'MOVE_TO_TOP_OF_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: topLogName, cardImgFile: topLogImg, targetOwnerId: card.ownerId.toString() }), game.turnNumber, game.currentPhase);
@@ -3858,8 +3949,9 @@ export const move_card_to_bottom_of_deck = spacetimedb.reducer(
       compactLobIndices(ctx, gameId, card.ownerId);
     }
 
-    // Hide card identity when moving from hand — hand contents are private
-    const hideIdentity = card.isFlipped || fromZone === 'hand';
+    // Hide card identity only when the owner moves their own hand card.
+    // Cross-player moves reveal the card (both players already know it).
+    const hideIdentity = card.isFlipped || (fromZone === 'hand' && player.id === card.ownerId);
     const bottomLogName = hideIdentity ? 'a face-down card' : card.cardName;
     const bottomLogImg = hideIdentity ? '' : card.cardImgFile;
     logAction(ctx, gameId, player.id, 'MOVE_TO_BOTTOM_OF_DECK', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), cardName: bottomLogName, cardImgFile: bottomLogImg, targetOwnerId: card.ownerId.toString() }), game.turnNumber, game.currentPhase);
@@ -4067,7 +4159,21 @@ export const toggle_reveal_hand = spacetimedb.reducer(
   },
   (ctx, { gameId, revealed }) => {
     const player = findPlayerBySender(ctx, gameId);
-    ctx.db.Player.id.update({ ...player, handRevealed: revealed });
+
+    // Snapshot the current hand when revealing; clear when hiding. Cards drawn
+    // after the reveal are not in the snapshot, so they render face-down.
+    let snapshot = '[]';
+    if (revealed) {
+      const handIds: string[] = [];
+      for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+        if (c.ownerId === player.id && c.zone === 'hand') {
+          handIds.push(c.id.toString());
+        }
+      }
+      snapshot = JSON.stringify(handIds);
+    }
+
+    ctx.db.Player.id.update({ ...player, handRevealed: revealed, handRevealSnapshot: snapshot });
 
     const game = ctx.db.Game.id.find(gameId);
     logAction(
