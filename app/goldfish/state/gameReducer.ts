@@ -179,6 +179,30 @@ function shuffleAndDrawInState(
   return { ...state, zones, history };
 }
 
+function drawBottomOfDeckInState(
+  state: GameState,
+  _source: GameCard,
+  ability: Extract<CardAbility, { type: 'draw_bottom_of_deck' }>,
+  history: GameState[],
+): GameState {
+  if (ability.count < 1) return state;
+  if (state.zones.deck.length === 0) return state;
+
+  const zones = cloneZones(state.zones);
+  const n = Math.min(ability.count, zones.deck.length);
+  const taken = zones.deck.slice(zones.deck.length - n).map(c => ({
+    ...c,
+    zone: 'hand' as ZoneId,
+    isFlipped: false,
+    posX: undefined,
+    posY: undefined,
+  }));
+  zones.deck = zones.deck.slice(0, zones.deck.length - n);
+  zones.hand = [...zones.hand, ...taken];
+
+  return { ...state, zones, history };
+}
+
 function reserveTopOfDeckInState(
   state: GameState,
   _source: GameCard,
@@ -899,6 +923,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           return state;
         case 'reserve_top_of_deck':
           return reserveTopOfDeckInState(state, source, ability, history);
+        case 'draw_bottom_of_deck':
+          return drawBottomOfDeckInState(state, source, ability, history);
         case 'custom':
           // Custom abilities are dispatched client-side in multiplayer and
           // never reach the goldfish reducer in v1. No-op defensively.

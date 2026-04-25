@@ -25,6 +25,7 @@ export type CardAbility =
   | { type: 'look_at_own_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'look_at_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'reserve_top_of_deck'; count: number }
+  | { type: 'draw_bottom_of_deck'; count: number }
   | { type: 'custom'; reducerName: string; label: string };
 
 export const CARD_ABILITIES: Record<string, CardAbility[]> = {
@@ -88,6 +89,8 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'Women of Israel [L]':                                 [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
   "Herod's Temple (GoC)":                                [{ type: 'reserve_top_of_deck', count: 1 }],
   "Herod's Temple [2022 - GoC P]":                       [{ type: 'reserve_top_of_deck', count: 1 }],
+  'Treacherous Land':                                    [{ type: 'draw_bottom_of_deck', count: 1 }],
+  'Treacherous Land (2022 - 2nd Place)':                 [{ type: 'draw_bottom_of_deck', count: 1 }],
 };
 
 export function getAbilitiesForCard(identifier: string): CardAbility[] {

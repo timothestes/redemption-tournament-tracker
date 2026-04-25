@@ -1962,6 +1962,46 @@ export const move_cards_batch = spacetimedb.reducer(
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
 
+    // When drawing from the acting player's own deck into hand, we need to
+    // replicate the top-of-deck auto-route behavior: a drawn Lost Soul (with
+    // autoRouteLostSouls on) is redirected to Land of Bondage and a replacement
+    // is pulled from the same end of the deck. `needsReplacementSupport` gates
+    // the extra bookkeeping below.
+    const needsReplacementSupport =
+      toZone === 'hand' &&
+      (fromSource === 'top-of-deck' || fromSource === 'bottom-of-deck' || fromSource === 'random-from-deck');
+    let replacementDeckPool: any[] = [];
+    const usedReplacementIds = new Set<bigint>(ids.map((s) => BigInt(s)));
+    if (needsReplacementSupport) {
+      replacementDeckPool = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)]
+        .filter((c: any) => c.ownerId === player.id && c.zone === 'deck')
+        .sort((a: any, b: any) => (a.zoneIndex < b.zoneIndex ? -1 : a.zoneIndex > b.zoneIndex ? 1 : 0));
+    }
+    const pickReplacementId = (): string | null => {
+      if (!needsReplacementSupport) return null;
+      // Bottom-of-deck walks from the highest zoneIndex down; top-of-deck and
+      // random (best-effort) walk from the lowest. All three skip cards already
+      // consumed by the batch or by earlier replacements.
+      if (fromSource === 'bottom-of-deck') {
+        for (let i = replacementDeckPool.length - 1; i >= 0; i--) {
+          const candidate = replacementDeckPool[i];
+          if (!usedReplacementIds.has(candidate.id)) {
+            usedReplacementIds.add(candidate.id);
+            return candidate.id.toString();
+          }
+        }
+      } else {
+        for (let i = 0; i < replacementDeckPool.length; i++) {
+          const candidate = replacementDeckPool[i];
+          if (!usedReplacementIds.has(candidate.id)) {
+            usedReplacementIds.add(candidate.id);
+            return candidate.id.toString();
+          }
+        }
+      }
+      return null;
+    };
+
     // Accessory cascade pre-pass: redirect accessories-whose-host-is-in-the-batch
     // to Discard only for the warrior→LOB case (host in Territory, batch going
     // to LOB). All other cross-zone scenarios let the accessory travel with
@@ -2065,6 +2105,49 @@ export const move_cards_batch = spacetimedb.reducer(
           ownerId: lobOwnerId,
         });
         redirectedLostSouls.push({ name: logName, img: logImg });
+        continue;
+      }
+
+      // Drawing a Lost Soul from your own deck routes it to Land of Bondage
+      // and pulls a replacement from the same end of the deck — same rule as
+      // top-of-deck auto-route in drawCardsForPlayer.
+      if (
+        isLostSoul &&
+        needsReplacementSupport &&
+        card.zone === 'deck' &&
+        card.ownerId === player.id &&
+        player.autoRouteLostSouls
+      ) {
+        const lobIndex = BigInt(
+          [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+            (c: any) => c.ownerId === homeOwnerId && c.zone === 'land-of-bondage'
+          ).length
+        );
+        ctx.db.CardInstance.id.update({
+          ...card,
+          zone: 'land-of-bondage',
+          zoneIndex: lobIndex,
+          posX: '',
+          posY: '',
+          isFlipped: false,
+          ownerId: homeOwnerId,
+        });
+        redirectedLostSouls.push({ name: logName, img: logImg });
+        // Queue a replacement from the same end of the deck. Append to `ids`
+        // so the main loop processes it with the rest of the batch; seed the
+        // pre-pass maps since the replacement wasn't in the original ids.
+        const replacementId = pickReplacementId();
+        if (replacementId) {
+          const replacementBig = BigInt(replacementId);
+          const replacementCard = ctx.db.CardInstance.id.find(replacementBig);
+          if (replacementCard) {
+            batchIdSet.add(replacementBig);
+            originalZoneById.set(replacementId, replacementCard.zone);
+            originalOwnerById.set(replacementId, replacementCard.ownerId);
+            finalZoneById.set(replacementId, toZone);
+            ids.push(replacementId);
+          }
+        }
         continue;
       }
 
@@ -2527,6 +2610,65 @@ function reserveTopOfDeckImpl(
 }
 
 // ---------------------------------------------------------------------------
+// Helper: drawBottomOfDeckImpl
+// Moves the bottom `count` cards of the acting player's deck into their hand.
+// "Bottom" is defined by descending zoneIndex (inverse of drawCardsForPlayer).
+// Does not apply auto-route Lost Souls — the card text is a literal draw from
+// bottom.
+// ---------------------------------------------------------------------------
+function drawBottomOfDeckImpl(
+  ctx: any,
+  source: any,
+  ability: Extract<CardAbility, { type: 'draw_bottom_of_deck' }>,
+  player: any,
+  gameId: bigint,
+) {
+  if (ability.count < 1) throw new SenderError('Invalid count');
+
+  const game = ctx.db.Game.id.find(gameId);
+  if (!game) throw new SenderError('Game not found');
+
+  const playerCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+    (c: any) => c.ownerId === player.id
+  );
+  const deckCards = playerCards
+    .filter((c: any) => c.zone === 'deck')
+    .sort((a: any, b: any) => (a.zoneIndex < b.zoneIndex ? -1 : a.zoneIndex > b.zoneIndex ? 1 : 0));
+
+  if (deckCards.length === 0) return;
+
+  let handCount = playerCards.filter((c: any) => c.zone === 'hand').length;
+  const n = Math.min(ability.count, deckCards.length);
+
+  const bottom = deckCards.slice(deckCards.length - n);
+  const movedCards: { name: string; img: string }[] = [];
+  for (const card of bottom) {
+    ctx.db.CardInstance.id.update({
+      ...card,
+      zone: 'hand',
+      zoneIndex: BigInt(handCount),
+      posX: '',
+      posY: '',
+      isFlipped: false,
+    });
+    handCount++;
+    movedCards.push({ name: card.cardName, img: card.cardImgFile });
+  }
+
+  logAction(
+    ctx, gameId, player.id, 'DRAW_BOTTOM_OF_DECK',
+    JSON.stringify({
+      count: n,
+      requested: ability.count,
+      sourceCardName: source.cardName,
+      sourceCardImgFile: source.cardImgFile,
+      cards: movedCards,
+    }),
+    game.turnNumber, game.currentPhase,
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Reducer: execute_card_ability
 //
 // Server-authoritative dispatch for per-card custom abilities defined in the
@@ -2610,6 +2752,8 @@ export const execute_card_ability = spacetimedb.reducer(
         throw new SenderError('look_at_opponent_deck is dispatched by the client, not this reducer');
       case 'reserve_top_of_deck':
         return reserveTopOfDeckImpl(ctx, source, ability, player, gameId);
+      case 'draw_bottom_of_deck':
+        return drawBottomOfDeckImpl(ctx, source, ability, player, gameId);
       case 'custom':
         throw new SenderError('Custom abilities are dispatched by the client, not this reducer');
     }

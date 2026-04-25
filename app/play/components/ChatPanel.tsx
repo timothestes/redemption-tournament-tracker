@@ -231,6 +231,35 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       return `shuffled ${shuffled} from hand into deck and drew ${drawn}`;
     } catch { /* fall through */ }
   }
+  if (actionType === 'DRAW_BOTTOM_OF_DECK' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const count = Number(data.count ?? 1);
+      const sourceName: string = data.sourceCardName ?? '';
+      const sourceImg: string = data.sourceCardImgFile ?? '';
+      const cards: { name: string; img: string }[] = Array.isArray(data.cards) ? data.cards : [];
+      const isViewer = actorPlayerId && viewerPlayerId && actorPlayerId === viewerPlayerId;
+      const prefix = count === 1 ? 'drew bottom card of deck' : `drew bottom ${count} cards of deck`;
+      return (
+        <>
+          {prefix}
+          {isViewer && cards.length > 0 ? (
+            <>
+              : <CardNameList cards={cards} />
+              <span style={{ fontSize: 'calc(9px * var(--chat-fs, 1))', fontStyle: 'italic', color: 'rgba(232, 213, 163, 0.35)', marginLeft: 4 }}>
+                (only visible to you)
+              </span>
+            </>
+          ) : null}
+          {sourceName ? (
+            <>
+              {' '}via <HoverableCard name={sourceName} img={sourceImg} />
+            </>
+          ) : null}
+        </>
+      );
+    } catch { /* fall through */ }
+  }
   if (actionType === 'RESERVE_TOP_OF_DECK' && payload) {
     try {
       const data = JSON.parse(payload);
@@ -439,7 +468,16 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
         if (data.toZone === 'hand') {
           const isCrossPlayer = data.targetOwnerId && playerNames?.[data.targetOwnerId] && data.targetOwnerId !== actorPlayerId;
           const targetName = isCrossPlayer && playerNames?.[data.targetOwnerId];
-          parts.push(<span key="hand">{targetName ? <>moved <CardNameList cards={data.cards} /> to {targetName}&apos;s hand{fromSuffix}</> : <>drew <CardNameList cards={data.cards} />{fromSuffix}</>}</span>);
+          const isViewer = actorPlayerId && viewerPlayerId && actorPlayerId === viewerPlayerId;
+          const fromHiddenDeck = data.fromSource === 'top-of-deck' || data.fromSource === 'bottom-of-deck' || data.fromSource === 'random-from-deck';
+          // Drawing from own deck into own hand is private — don't reveal card names to the opponent.
+          const hideFromOpponent = !targetName && fromHiddenDeck && !isViewer;
+          if (hideFromOpponent) {
+            const n = data.cards.length;
+            parts.push(<span key="hand">drew {n === 1 ? 'a card' : `${n} cards`}{fromSuffix}</span>);
+          } else {
+            parts.push(<span key="hand">{targetName ? <>moved <CardNameList cards={data.cards} /> to {targetName}&apos;s hand{fromSuffix}</> : <>drew <CardNameList cards={data.cards} />{fromSuffix}{isViewer && fromHiddenDeck ? <span style={{ fontSize: 'calc(9px * var(--chat-fs, 1))', fontStyle: 'italic', color: 'rgba(232, 213, 163, 0.35)', marginLeft: 4 }}>(only visible to you)</span> : null}</>}</span>);
+          }
         }
         if (data.toZone === 'territory') {
           const isCrossPlayer = data.targetOwnerId && data.targetOwnerId !== actorPlayerId;
