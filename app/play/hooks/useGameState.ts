@@ -118,7 +118,7 @@ export interface GameState {
   revealCards: (cardIds: string, context?: string) => void;
   clearRevealedCards: () => void;
   logSearchDeck: () => void;
-  logLookAtTop: (count: number) => void;
+  logLookAtTop: (count: number, sourceCardName?: string, position?: 'top' | 'bottom' | 'random') => void;
   requestZoneSearch: (zone: string) => void;
   requestOpponentAction: (action: string, actionParams?: string) => void;
   approveZoneSearch: (requestId: bigint) => void;
@@ -643,8 +643,13 @@ export function useGameState(gameId: bigint): GameState {
   }, [conn, gameId]);
 
   const logLookAtTop = useCallback(
-    (count: number) => {
-      conn?.reducers.logLookAtTop({ gameId, count: BigInt(count) });
+    (count: number, sourceCardName?: string, position?: 'top' | 'bottom' | 'random') => {
+      conn?.reducers.logLookAtTop({
+        gameId,
+        count: BigInt(count),
+        sourceCardName: sourceCardName ?? '',
+        position: position ?? '',
+      });
     },
     [conn, gameId],
   );

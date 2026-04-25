@@ -6,6 +6,12 @@ import { ScheduleAt, Timestamp } from 'spacetimedb';
 import { makeSeed, seededShuffle, seededDiceRoll, xorshift64, generateGameCode } from './utils';
 import { getAbilitiesForCard, findTokenCard, type CardAbility } from './cardAbilities';
 
+// Auto-reveal duration for cards that land in a hand via a move whose log
+// payload reveals the card identity (cross-player moves, face-up moves, etc.).
+// Briefly flashes the card face-up in the recipient's hand so the receiver
+// sees what they got without scanning the chat log.
+const AUTO_REVEAL_HAND_MICROS = 10_000_000n; // 10 seconds
+
 // ---------------------------------------------------------------------------
 // Helper: logAction
 // ---------------------------------------------------------------------------
@@ -237,6 +243,7 @@ function insertCardsShuffleDraw(
       isSoulDeckOrigin: false,
       isToken: false,
       revealExpiresAt: undefined,
+      revealStartedAt: undefined,
     });
   }
 
@@ -336,6 +343,7 @@ function initializeSoulDeck(ctx: any, game: any) {
       isSoulDeckOrigin: true,
       isToken: false,
       revealExpiresAt: undefined,
+      revealStartedAt: undefined,
     });
   }
 
@@ -1717,7 +1725,10 @@ export const move_card = spacetimedb.reducer(
     // Lost souls sent to discard or reserve go to land-of-bondage instead
     const isLostSoul = card.cardType === 'LS' || card.cardName.toLowerCase().includes('lost soul');
     if (isLostSoul && (toZone === 'discard' || toZone === 'reserve' || toZone === 'banish')) {
-      const lobOwnerId = targetOwnerId ? BigInt(targetOwnerId) : homeOwnerId;
+      // A drop on the actor's own pile routes home; an explicit drop on
+      // someone else's pile honors the caller's choice.
+      const droppedOnOwnZone = !targetOwnerId || BigInt(targetOwnerId) === player.id;
+      const lobOwnerId = droppedOnOwnZone ? homeOwnerId : BigInt(targetOwnerId);
       const lobIndex = BigInt(
         [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
           (c: any) => c.ownerId === lobOwnerId && c.zone === 'land-of-bondage'
@@ -1750,13 +1761,21 @@ export const move_card = spacetimedb.reducer(
     // Moving to deck/soul-deck = face-down; leaving deck, reserve, or soul-deck = face-up; otherwise preserve
     const isFlipped = (toZone === 'deck' || toZone === 'soul-deck') ? true : (fromZone === 'deck' || fromZone === 'reserve' || fromZone === 'soul-deck') ? false : card.isFlipped;
     // Optionally transfer ownership (e.g. rescue lost soul, capture hero).
-    // For private home zones with no explicit target, default to the original
-    // owner so opponent-controlled cards return to their real owner's piles.
-    let newOwnerId = targetOwnerId
-      ? BigInt(targetOwnerId)
-      : HOME_ZONES.includes(toZone)
-        ? homeOwnerId
-        : card.ownerId;
+    // For private home zones, route to the original owner so opponent-owned
+    // cards return to their real owner's piles even when the actor dropped
+    // them on their own zone (e.g. banishing a captured opponent card on my
+    // banish pile sends it to the opponent's banish). An explicit drop on
+    // someone else's zone (targetOwnerId ≠ actor) still wins, so "give to
+    // opponent's hand" works as intended.
+    let newOwnerId: bigint;
+    if (HOME_ZONES.includes(toZone)) {
+      const droppedOnOwnZone = !targetOwnerId || BigInt(targetOwnerId) === player.id;
+      newOwnerId = droppedOnOwnZone ? homeOwnerId : BigInt(targetOwnerId);
+    } else if (targetOwnerId) {
+      newOwnerId = BigInt(targetOwnerId);
+    } else {
+      newOwnerId = card.ownerId;
+    }
     // Paragon: dropping a soul-origin card back into the shared LoB resets ownership to the shared sentinel.
     if (
       targetOwnerId === '0' &&
@@ -1848,6 +1867,20 @@ export const move_card = spacetimedb.reducer(
     // same-zone reposition, etc.) just unlink accessories in place.
     const leavingZone = toZone !== fromZone || resolvedOwnerId !== card.ownerId;
     const clearEquippedOnMover = leavingZone && card.equippedToInstanceId !== 0n;
+
+    // Cards landing in a hand via an identity-revealing move (cross-player
+    // takes, face-up tutors, etc.) flash face-up briefly. Mirrors the same
+    // hideIdentity rule used for the log below so the visual reveal matches
+    // the log entry.
+    const isCrossPlayerMove = player.id !== card.ownerId || player.id !== newOwnerId;
+    const hideIdentity = !isCrossPlayerMove && (isFlipped ||
+      (fromZone === 'hand' && (toZone === 'deck' || toZone === 'reserve') && player.id === card.ownerId));
+    const autoReveal = toZone === 'hand' && fromZone !== 'hand' && !hideIdentity;
+    const newRevealExpiresAt = autoReveal
+      ? new Timestamp(ctx.timestamp.microsSinceUnixEpoch + AUTO_REVEAL_HAND_MICROS)
+      : undefined;
+    const newRevealStartedAt = autoReveal ? ctx.timestamp : undefined;
+
     ctx.db.CardInstance.id.update({
       ...card,
       zone: toZone,
@@ -1857,7 +1890,8 @@ export const move_card = spacetimedb.reducer(
       isFlipped,
       ownerId: resolvedOwnerId,
       equippedToInstanceId: clearEquippedOnMover ? 0n : card.equippedToInstanceId,
-      revealExpiresAt: undefined,
+      revealExpiresAt: newRevealExpiresAt,
+      revealStartedAt: newRevealStartedAt,
     });
 
     if (leavingZone) {
@@ -1883,6 +1917,7 @@ export const move_card = spacetimedb.reducer(
             posY: '',
             equippedToInstanceId: 0n,
             revealExpiresAt: undefined,
+      revealStartedAt: undefined,
           });
         } else {
           ctx.db.CardInstance.id.update({ ...accessory, equippedToInstanceId: 0n });
@@ -1893,14 +1928,11 @@ export const move_card = spacetimedb.reducer(
     // Log when the card changes zones OR changes ownership (e.g. territory → opponent's territory)
     const ownerChanged = newOwnerId !== card.ownerId;
     if (fromZone !== toZone || ownerChanged) {
-      // Hide card identity when the OWNER moves their own hand card to a hidden
-      // zone — their hand is private. When a different player moves the card
-      // (cross-player take), both players already know its identity, so reveal it.
-      const hideIdentity = isFlipped ||
-        (fromZone === 'hand' && (toZone === 'deck' || toZone === 'reserve') && player.id === card.ownerId);
+      // hideIdentity (computed above) decides whether the log reveals the
+      // card name. Same flag drives the auto-reveal in hand.
       const logName = hideIdentity ? 'a face-down card' : card.cardName;
       const logImg = hideIdentity ? '' : card.cardImgFile;
-      logAction(ctx, gameId, player.id, 'MOVE_CARD', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), from: fromZone, to: toZone, cardName: logName, cardImgFile: logImg, targetOwnerId: targetOwnerId || '' }), game.turnNumber, game.currentPhase);
+      logAction(ctx, gameId, player.id, 'MOVE_CARD', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), from: fromZone, to: toZone, cardName: logName, cardImgFile: logImg, targetOwnerId: resolvedOwnerId.toString() }), game.turnNumber, game.currentPhase);
       // Compact hand indices if card left hand
       if (fromZone === 'hand') {
         compactHandIndices(ctx, gameId, card.ownerId);
@@ -1945,7 +1977,7 @@ export const move_cards_batch = spacetimedb.reducer(
     const newOwnerId = targetOwnerId ? BigInt(targetOwnerId) : null;
     const batchIdSet = new Set(ids.map((s) => BigInt(s)));
     const cards: { name: string; img: string }[] = [];
-    const movedCards: { name: string; img: string }[] = [];
+    const movedCards: { name: string; img: string; from: string }[] = [];
     const redirectedLostSouls: { name: string; img: string }[] = [];
     // If cards being moved belong to someone other than the actor (e.g. the
     // requester is acting on the opponent's deck through an approved request),
@@ -2061,9 +2093,13 @@ export const move_cards_batch = spacetimedb.reducer(
       const isFlipped = (toZone === 'deck' || toZone === 'soul-deck') ? true : (card.zone === 'deck' || card.zone === 'reserve' || card.zone === 'soul-deck') ? false : card.isFlipped;
 
       // Hide card identity only when the owner moves their own hand card to a
-      // hidden zone. Cross-player takes reveal the card (both players know it).
-      const hideIdentity = isFlipped ||
-        (card.zone === 'hand' && (toZone === 'deck' || toZone === 'reserve') && player.id === card.ownerId);
+      // hidden zone. Cross-player moves (sender ≠ source owner or sender ≠
+      // destination owner) reveal the card — both players witness the move
+      // on-screen, so the log should match.
+      const cardNewOwnerId = newOwnerId ?? card.ownerId;
+      const isCrossPlayerMove = player.id !== card.ownerId || player.id !== cardNewOwnerId;
+      const hideIdentity = !isCrossPlayerMove && (isFlipped ||
+        (card.zone === 'hand' && (toZone === 'deck' || toZone === 'reserve') && player.id === card.ownerId));
       const logName = hideIdentity ? 'a face-down card' : card.cardName;
       const logImg = hideIdentity ? '' : card.cardImgFile;
       cards.push({ name: logName, img: logImg });
@@ -2072,7 +2108,7 @@ export const move_cards_batch = spacetimedb.reducer(
       }
       const cardOwnerChanged = newOwnerId !== null && newOwnerId !== card.ownerId;
       if (card.zone !== toZone || cardOwnerChanged) {
-        movedCards.push({ name: logName, img: logImg });
+        movedCards.push({ name: logName, img: logImg, from: card.zone });
         if (card.zone === 'hand') {
           handCompactOwners.add(card.ownerId);
         }
@@ -2089,7 +2125,8 @@ export const move_cards_batch = spacetimedb.reducer(
       // Lost souls sent to discard or reserve go to land-of-bondage instead
       const isLostSoul = card.cardType === 'LS' || card.cardName.toLowerCase().includes('lost soul');
       if (isLostSoul && (toZone === 'discard' || toZone === 'reserve' || toZone === 'banish')) {
-        const lobOwnerId = newOwnerId ?? homeOwnerId;
+        const droppedOnOwnZone = newOwnerId === null || newOwnerId === player.id;
+        const lobOwnerId = droppedOnOwnZone ? homeOwnerId : newOwnerId;
         const lobIndex = BigInt(
           [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
             (c: any) => c.ownerId === lobOwnerId && c.zone === 'land-of-bondage'
@@ -2154,7 +2191,17 @@ export const move_cards_batch = spacetimedb.reducer(
       const rawPos = posMap[idStr] || { posX: '', posY: '' };
       // Ensure posX/posY are strings — client may send numbers via JSON positions map
       const pos = { posX: String(rawPos.posX ?? ''), posY: String(rawPos.posY ?? '') };
-      const cardOwnerId = newOwnerId ?? (HOME_ZONES.includes(toZone) ? homeOwnerId : card.ownerId);
+      // Same home-zone routing rule as the single move_card reducer: a drop on
+      // the actor's own home pile sends captured cards to their original
+      // owner's pile. Explicit drops on someone else's zone (newOwnerId set
+      // and not the actor) still win.
+      let cardOwnerId: bigint;
+      if (HOME_ZONES.includes(toZone)) {
+        const droppedOnOwnZone = newOwnerId === null || newOwnerId === player.id;
+        cardOwnerId = droppedOnOwnZone ? homeOwnerId : newOwnerId;
+      } else {
+        cardOwnerId = newOwnerId ?? card.ownerId;
+      }
       const cardFinalZone = finalZoneById.get(idStr) ?? toZone;
       // Paragon: rescuing a shared soul transfers ownership. Default to the
       // acting seat, but honor an explicit targetOwnerId when the caller
@@ -2267,6 +2314,15 @@ export const move_cards_batch = spacetimedb.reducer(
       const finalPosX = cardFinalZone === toZone ? pos.posX : '';
       const finalPosY = cardFinalZone === toZone ? pos.posY : '';
 
+      // Mirror move_card's auto-reveal: cards landing in a hand via an
+      // identity-revealing move flash face-up briefly. Uses cardFinalZone (not
+      // toZone) so a redirect to LOB never triggers the reveal.
+      const autoReveal = cardFinalZone === 'hand' && card.zone !== 'hand' && !hideIdentity;
+      const newRevealExpiresAt = autoReveal
+        ? new Timestamp(ctx.timestamp.microsSinceUnixEpoch + AUTO_REVEAL_HAND_MICROS)
+        : undefined;
+      const newRevealStartedAt = autoReveal ? ctx.timestamp : undefined;
+
       ctx.db.CardInstance.id.update({
         ...card,
         zone: cardFinalZone,
@@ -2276,7 +2332,8 @@ export const move_cards_batch = spacetimedb.reducer(
         isFlipped,
         ownerId: resolvedCardOwnerId,
         equippedToInstanceId: leavingZone && !hostInBatch ? 0n : card.equippedToInstanceId,
-        revealExpiresAt: undefined,
+        revealExpiresAt: newRevealExpiresAt,
+        revealStartedAt: newRevealStartedAt,
       });
     }
 
@@ -2320,6 +2377,7 @@ export const move_cards_batch = spacetimedb.reducer(
             posY: '',
             equippedToInstanceId: 0n,
             revealExpiresAt: undefined,
+      revealStartedAt: undefined,
           });
         } else {
           ctx.db.CardInstance.id.update({ ...accessory, equippedToInstanceId: 0n });
@@ -2428,6 +2486,7 @@ function spawnTokenImpl(
       specialAbility: tokenData.specialAbility,
       reference: tokenData.reference,
       revealExpiresAt: undefined,
+      revealStartedAt: undefined,
     });
   }
 
@@ -3120,6 +3179,7 @@ export const shuffle_card_into_deck = spacetimedb.reducer(
       ownerId: deckOwnerId,
       isFlipped: true,
       revealExpiresAt: undefined,
+      revealStartedAt: undefined,
     });
 
     // Now shuffle the deck owner's entire deck (same logic as shuffle_deck)
@@ -3227,6 +3287,7 @@ export const random_hand_to_zone = spacetimedb.reducer(
         posX: '',
         posY: '',
         revealExpiresAt: undefined,
+      revealStartedAt: undefined,
       });
     }
 
@@ -3335,6 +3396,7 @@ export const random_opponent_hand_to_zone = spacetimedb.reducer(
         posY: '',
         isFlipped: toZone === 'deck' || toZone === 'reserve' ? true : card.isFlipped,
         revealExpiresAt: undefined,
+      revealStartedAt: undefined,
       });
     }
 
@@ -3647,6 +3709,7 @@ export const reveal_card_in_hand = spacetimedb.reducer(
     ctx.db.CardInstance.id.update({
       ...card,
       revealExpiresAt: new Timestamp(expiresAtMicros),
+      revealStartedAt: ctx.timestamp,
     });
 
     const game = ctx.db.Game.id.find(gameId);
@@ -4073,6 +4136,7 @@ export const move_card_to_top_of_deck = spacetimedb.reducer(
       ownerId: homeOwnerId,
       isFlipped: true,
       revealExpiresAt: undefined,
+      revealStartedAt: undefined,
     });
 
     // Compact hand indices if card left hand
@@ -4137,6 +4201,7 @@ export const move_card_to_bottom_of_deck = spacetimedb.reducer(
       ownerId: homeOwnerId,
       isFlipped: true,
       revealExpiresAt: undefined,
+      revealStartedAt: undefined,
     });
 
     // Compact hand indices if card left hand
@@ -4228,6 +4293,7 @@ export const spawn_lost_soul = spacetimedb.reducer(
       isSoulDeckOrigin: false,
       isToken: true,
       revealExpiresAt: undefined,
+      revealStartedAt: undefined,
     });
 
     logAction(ctx, gameId, player.id, 'SPAWN_LOST_SOUL', JSON.stringify({ testament }), game.turnNumber, game.currentPhase);
@@ -4508,14 +4574,23 @@ export const log_look_at_top = spacetimedb.reducer(
   {
     gameId: t.u64(),
     count: t.u64(),
+    sourceCardName: t.string(),
+    position: t.string(),
   },
-  (ctx, { gameId, count }) => {
+  (ctx, { gameId, count, sourceCardName, position }) => {
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
     if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
 
     const player = findPlayerBySender(ctx, gameId);
-    logAction(ctx, gameId, player.id, 'LOOK_AT_TOP', String(count), game.turnNumber, game.currentPhase);
+    const payload = (sourceCardName || position)
+      ? JSON.stringify({
+          count: Number(count),
+          ...(sourceCardName ? { sourceCardName } : {}),
+          position: position || 'top',
+        })
+      : String(count);
+    logAction(ctx, gameId, player.id, 'LOOK_AT_TOP', payload, game.turnNumber, game.currentPhase);
   }
 );
 

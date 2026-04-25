@@ -60,6 +60,10 @@ export interface GameCardNodeProps {
   /** When true, plays a one-shot amber pulse glow: a brief fade-in + bloom,
    *  followed by a longer fade-out. Total duration ~1.8s. */
   lobArrivalGlow?: boolean;
+  /** When true, suppress the per-card reveal countdown ring. Used when
+   *  rendering the local viewer's own hand — the ring is meant for the
+   *  receiving party (opponent), not the holder. */
+  suppressRevealRing?: boolean;
   nodeRef?: (instanceId: string, node: Konva.Group | null) => void;
   onDragStart: (card: GameCard) => void;
   onDragMove: (e: Konva.KonvaEventObject<DragEvent>) => void;
@@ -84,6 +88,7 @@ export const GameCardNode = memo(function GameCardNode({
   isDraggable = true,
   hoverProgress,
   lobArrivalGlow,
+  suppressRevealRing,
   nodeRef,
   onDragStart,
   onDragMove,
@@ -335,21 +340,28 @@ export const GameCardNode = memo(function GameCardNode({
 
         {/* Per-card reveal progress ring — quiet circular countdown in the
             top-right corner. Sweeps from full circle down to empty over the
-            30s window. Background ring keeps the shape visible while the
-            arc shrinks. */}
+            reveal window. Auto-reveals (short, ≤15s) render smaller and more
+            muted, and are suppressed entirely on the holder's own view. The
+            manual 30s reveal stays visible everywhere — the holder triggered
+            it deliberately and benefits from seeing it count down. */}
         {isActivelyRevealed && (() => {
-          const REVEAL_DURATION_MS = 30_000;
+          const DEFAULT_DURATION_MS = 30_000;
+          const durationMs = card.revealDurationMs ?? DEFAULT_DURATION_MS;
+          const isShortReveal = durationMs <= 15_000;
+          if (isShortReveal && suppressRevealRing) return null;
           const remainingMs = Math.max(0, card.revealUntil! - Date.now());
-          const remainingFrac = Math.min(1, remainingMs / REVEAL_DURATION_MS);
-          const outerRadius = 10;
-          const innerRadius = 6;
+          const remainingFrac = Math.min(1, remainingMs / Math.max(durationMs, 1));
+          const outerRadius = isShortReveal ? 7 : 10;
+          const innerRadius = isShortReveal ? 4 : 6;
           const cx = cardWidth - outerRadius - 4;
           const cy = outerRadius + 4;
+          const arcColor = isShortReveal ? 'rgba(242,201,76,0.7)' : '#f2c94c';
+          const backdropAlpha = isShortReveal ? 0.65 : 0.85;
           return (
             <Group x={cx} y={cy} listening={false}>
               {/* Solid dark backdrop — ensures the ring reads against any
                   card art, not just dark areas. */}
-              <Circle radius={outerRadius + 1} fill="rgba(0,0,0,0.85)" />
+              <Circle radius={outerRadius + 1} fill={`rgba(0,0,0,${backdropAlpha})`} />
               {/* Empty-track ring — shows remaining shape after the arc sweeps past */}
               <Arc
                 innerRadius={innerRadius}
@@ -364,7 +376,7 @@ export const GameCardNode = memo(function GameCardNode({
                 outerRadius={outerRadius}
                 angle={360 * remainingFrac}
                 rotation={-90}
-                fill="#f2c94c"
+                fill={arcColor}
               />
             </Group>
           );

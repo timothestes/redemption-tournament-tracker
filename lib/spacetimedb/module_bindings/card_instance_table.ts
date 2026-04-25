@@ -37,4 +37,5 @@ export default __t.row({
   isToken: __t.bool().name("is_token"),
   revealExpiresAt: __t.option(__t.timestamp()).name("reveal_expires_at"),
   originalOwnerId: __t.u64().name("original_owner_id"),
+  revealStartedAt: __t.option(__t.timestamp()).name("reveal_started_at"),
 });

@@ -13,4 +13,6 @@ import {
 export default {
   gameId: __t.u64(),
   count: __t.u64(),
+  sourceCardName: __t.string(),
+  position: __t.string(),
 };

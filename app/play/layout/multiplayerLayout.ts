@@ -476,14 +476,20 @@ export function calculateMultiplayerLayout(
       ? (paragonPlayerHand?.y ?? playerHandY)
       : playerHandY) - playerSidebarY;
 
-  // Opponent piles: Deck (top) → Discard → Reserve → Banish → LOR (bottom)
-  const oppPileLabels = ['Deck', 'Discard', 'Reserve', 'Banish', 'Land of Redemption'];
-  const oppPileKeys: PileZone[] = ['deck', 'discard', 'reserve', 'banish', 'lor'];
-
-  // Player piles: LOR (top) then 2×2 grid clockwise from TL: Deck → Reserve → Banish → Discard
-  // Grid fills row-by-row, so array order is [TL, TR, BL, BR] = [Deck, Reserve, Discard, Banish]
+  // Player piles: LOR (top, closest to divider) then 2×2 grid:
+  //   [TL=Deck,    TR=Reserve]
+  //   [BL=Discard, BR=Banish]
   const playerPileLabels = ['Land of Redemption', 'Deck', 'Reserve', 'Discard', 'Banish'];
   const playerPileKeys: PileZone[] = ['lor', 'deck', 'reserve', 'discard', 'banish'];
+
+  // Opponent piles: vertical mirror of the player layout across the divider.
+  // Grid sits above LOR (LOR is closest to divider, matching player side), and
+  // the rows flip so columns line up with player A's columns:
+  //   [TL=Discard, TR=Banish]
+  //   [BL=Deck,    BR=Reserve]
+  //   LOR (full-width, bottom — closest to divider)
+  const oppPileLabels = ['Discard', 'Banish', 'Deck', 'Reserve', 'Land of Redemption'];
+  const oppPileKeys: PileZone[] = ['discard', 'banish', 'deck', 'reserve', 'lor'];
 
   const opponentSidebar = buildSidebar(
     sidebarX, oppSidebarY, oppSidebarHeight,

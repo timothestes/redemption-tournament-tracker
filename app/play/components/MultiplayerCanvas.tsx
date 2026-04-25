@@ -140,6 +140,10 @@ function cardInstanceToGameCard(
       card.revealExpiresAt === undefined
         ? undefined
         : Number(card.revealExpiresAt.microsSinceUnixEpoch / 1000n),
+    revealDurationMs:
+      card.revealExpiresAt === undefined || card.revealStartedAt === undefined
+        ? undefined
+        : Number((card.revealExpiresAt.microsSinceUnixEpoch - card.revealStartedAt.microsSinceUnixEpoch) / 1000n),
   };
 }
 
@@ -683,7 +687,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const [soulDeckDrop, setSoulDeckDrop] = useState<{ x: number; y: number; cardId: string; batchIds?: string[] } | null>(null);
   const pendingBatchRef = useRef<string[] | null>(null);
   const [showDeckSearch, setShowDeckSearch] = useState(false);
-  const [peekState, setPeekState] = useState<{ position: 'top' | 'bottom' | 'random'; count: number; source?: { cardName: string } } | null>(null);
+  const [peekState, setPeekState] = useState<{ position: 'top' | 'bottom' | 'random'; count: number; cardIds: string[]; source?: { cardName: string } } | null>(null);
   const [lookState, setLookState] = useState<{ count: number; position: 'top' | 'bottom' | 'random' } | null>(null);
   const [exchangeState, setExchangeState] = useState<
     { cardIds: string[]; targetZone: ZoneId } | null
@@ -1037,6 +1041,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         setPeekState({
           position: ability.position,
           count: ability.count,
+          cardIds: sampleDeckCardIds(ability.position, ability.count),
           source: { cardName: source!.cardName },
         });
         return;
@@ -1048,6 +1053,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           position: ability.position,
           count: ability.count,
         });
+        if (source) {
+          gameState.logLookAtTop(ability.count, source.cardName, ability.position);
+        }
         return;
       }
       if (ability?.type === 'look_at_opponent_deck') {
@@ -1573,13 +1581,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const findZoneForModalDrag = useCallback((x: number, y: number): ZoneId | null => {
     const hit = findZoneAtPosition(x, y);
     if (!hit) return null;
-    // Allow dropping on own zones, plus opponent territory/LOB for battles
-    if (hit.owner === 'opponent' && !isFreeFormZone(hit.zone) && !isAutoArrangeZone(hit.zone)) return null;
     // Shared zones (Paragon shared LoB / Soul Deck) are not valid modal drop
     // targets — the modal moveCard callback only handles 'my'/'opponent'
     // ownership, so shared drops would misroute the card to the player's own
     // zone with the wrong owner and coords (effectively losing the card).
     if (hit.owner === 'shared') return null;
+    // Allow dropping on any non-shared zone — own zones and opponent zones
+    // (territory/LOB for battles, sidebar piles for pile manipulation, hand
+    // for transferring cards into the opponent's hand). Opponent hand is
+    // hidden to the local player but the move itself is a legal sandbox
+    // action; the server's existing visibility rules keep card identity
+    // private.
     return hit.zone as ZoneId;
   }, [findZoneAtPosition]);
 
@@ -1947,24 +1959,31 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   }, []);
 
   // ---- Peek card IDs for DeckPeekModal ----
-  const peekCardIds = useMemo(() => {
-    if (!peekState) return [];
-    const sorted = [...(myCards['deck'] ?? [])].sort(
-      (a, b) => Number(a.zoneIndex) - Number(b.zoneIndex)
-    );
-    let selected: typeof sorted;
-    if (peekState.position === 'top') selected = sorted.slice(0, peekState.count);
-    else if (peekState.position === 'bottom') selected = sorted.slice(-peekState.count);
-    else {
-      const shuffled = [...sorted];
-      for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  // Snapshot taken at reveal time (stored in peekState.cardIds). Reading from
+  // the live deck here would cause the "top N" to refill as cards are dragged
+  // out, re-firing the broadcast effect and racing past clearRevealedCards.
+  const peekCardIds = peekState?.cardIds ?? [];
+
+  const sampleDeckCardIds = useCallback(
+    (position: 'top' | 'bottom' | 'random', count: number): string[] => {
+      const sorted = [...(myCards['deck'] ?? [])].sort(
+        (a, b) => Number(a.zoneIndex) - Number(b.zoneIndex)
+      );
+      let selected: typeof sorted;
+      if (position === 'top') selected = sorted.slice(0, count);
+      else if (position === 'bottom') selected = sorted.slice(-count);
+      else {
+        const shuffled = [...sorted];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        selected = shuffled.slice(0, count);
       }
-      selected = shuffled.slice(0, peekState.count);
-    }
-    return selected.map(c => String(c.id));
-  }, [peekState, myCards]);
+      return selected.map(c => String(c.id));
+    },
+    [myCards],
+  );
 
   // ---- Look card IDs (private peek — no broadcast to opponent) ----
   const lookCardIds = useMemo(() => {
@@ -4804,7 +4823,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
             const topCard = cards[cards.length - 1];
             const oppReserveRevealed = gameState.opponentPlayer?.reserveRevealed ?? false;
-            const showFace = ((zoneKey === 'discard' || zoneKey === 'land-of-redemption') && topCard && !topCard.isFlipped)
+            const showFace = ((zoneKey === 'discard' || zoneKey === 'land-of-redemption' || zoneKey === 'banish') && topCard && !topCard.isFlipped)
               || (zoneKey === 'reserve' && oppReserveRevealed && topCard);
 
             return (
@@ -4912,6 +4931,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                         const img = getCardImage(effectiveTop);
                         return img ? (
                           <GameCardNode
+                            key={String(effectiveTop.id)}
                             card={adaptCard(effectiveTop, 'player2')}
                             x={pileCardWidth}
                             y={pileCardHeight}
@@ -5077,6 +5097,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       isSelected={isSelected(String(card.id))}
                       isDraggable={true}
                       hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
+                      suppressRevealRing
                       nodeRef={registerCardNode}
                       onClick={handleCardClick}
                       onDragStart={handleCardDragStart}
@@ -5397,20 +5418,20 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           deckSize={(myCards['deck'] ?? []).length}
           onClose={() => setDeckMenu(null)}
           onSearchDeck={() => { logSearchDeck(); setDeckMenu(null); setShowDeckSearch(true); }}
-          onLookAtTop={(n) => { logLookAtTop(n); setDeckMenu(null); setLookState({ count: n, position: 'top' }); }}
-          onLookAtBottom={(n) => { logLookAtTop(n); setDeckMenu(null); setLookState({ count: n, position: 'bottom' }); }}
-          onLookAtRandom={(n) => { logLookAtTop(n); setDeckMenu(null); setLookState({ count: n, position: 'random' }); }}
+          onLookAtTop={(n) => { logLookAtTop(n, undefined, 'top'); setDeckMenu(null); setLookState({ count: n, position: 'top' }); }}
+          onLookAtBottom={(n) => { logLookAtTop(n, undefined, 'bottom'); setDeckMenu(null); setLookState({ count: n, position: 'bottom' }); }}
+          onLookAtRandom={(n) => { logLookAtTop(n, undefined, 'random'); setDeckMenu(null); setLookState({ count: n, position: 'random' }); }}
           onShuffleDeck={() => { multiplayerActions.shuffleDeck(); setDeckMenu(null); }}
           onDrawTop={(n) => { multiplayerActions.drawMultiple(n); setDeckMenu(null); }}
-          onRevealTop={(n) => { setDeckMenu(null); setPeekState({ position: 'top', count: n }); }}
+          onRevealTop={(n) => { setDeckMenu(null); setPeekState({ position: 'top', count: n, cardIds: sampleDeckCardIds('top', n) }); }}
           onDiscardTop={(n) => { moveDeckCardsToZone('top', n, 'discard'); setDeckMenu(null); }}
           onReserveTop={(n) => { moveDeckCardsToZone('top', n, 'reserve'); setDeckMenu(null); }}
           onDrawBottom={(n) => { moveDeckCardsToZone('bottom', n, 'hand'); setDeckMenu(null); }}
-          onRevealBottom={(n) => { setDeckMenu(null); setPeekState({ position: 'bottom', count: n }); }}
+          onRevealBottom={(n) => { setDeckMenu(null); setPeekState({ position: 'bottom', count: n, cardIds: sampleDeckCardIds('bottom', n) }); }}
           onDiscardBottom={(n) => { moveDeckCardsToZone('bottom', n, 'discard'); setDeckMenu(null); }}
           onReserveBottom={(n) => { moveDeckCardsToZone('bottom', n, 'reserve'); setDeckMenu(null); }}
           onDrawRandom={(n) => { moveDeckCardsToZone('random', n, 'hand'); setDeckMenu(null); }}
-          onRevealRandom={(n) => { setDeckMenu(null); setPeekState({ position: 'random', count: n }); }}
+          onRevealRandom={(n) => { setDeckMenu(null); setPeekState({ position: 'random', count: n, cardIds: sampleDeckCardIds('random', n) }); }}
           onDiscardRandom={(n) => { moveDeckCardsToZone('random', n, 'discard'); setDeckMenu(null); }}
           onReserveRandom={(n) => { moveDeckCardsToZone('random', n, 'reserve'); setDeckMenu(null); }}
         />
@@ -6375,23 +6396,40 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           Card hover preview — floating tooltip near cursor
           ================================================================ */}
       {hoveredCard && hoverReady && !isLoupeVisible && !isDraggingRef.current && !contextMenu && !multiCardContextMenu && !deckMenu && !zoneMenu && !lorMenu && !opponentZoneMenu && !handMenu && !opponentHandMenu && !reserveMenu && !opponentReserveMenu && (() => {
-        const previewWidth = 280;
-        const previewHeight = Math.round(previewWidth * 1.4);
+        const MARGIN = 8;
+        const CURSOR_OFFSET = 16;
+        const viewportW = typeof window !== 'undefined' ? window.innerWidth : 1280;
+        const viewportH = typeof window !== 'undefined' ? window.innerHeight : 720;
+
+        // Scale the preview down if the viewport is too short to fit the
+        // default size. Keeps the 1:1.4 aspect ratio.
+        const maxHeight = Math.max(120, viewportH - MARGIN * 2);
+        let previewHeight = Math.min(Math.round(280 * 1.4), maxHeight);
+        let previewWidth = Math.round(previewHeight / 1.4);
+        const maxWidth = Math.max(80, viewportW - MARGIN * 2);
+        if (previewWidth > maxWidth) {
+          previewWidth = maxWidth;
+          previewHeight = Math.round(previewWidth * 1.4);
+        }
+
         const imageUrl = getSharedCardImageUrl(hoveredCard.cardImgFile);
         if (!imageUrl) return null;
 
-        // Position above-right of cursor by default, flip if overflowing
-        let left = mousePos.x + 16;
-        let top = mousePos.y - previewHeight - 16;
+        // Prefer above-right of cursor; flip horizontally / vertically if it
+        // would overflow, then clamp to the viewport as a final guarantee so
+        // the preview is never partially off-screen on small viewports.
+        let left = mousePos.x + CURSOR_OFFSET;
+        let top = mousePos.y - previewHeight - CURSOR_OFFSET;
 
-        if (typeof window !== 'undefined') {
-          if (left + previewWidth > window.innerWidth - 8) {
-            left = mousePos.x - previewWidth - 16;
-          }
-          if (top < 8) {
-            top = mousePos.y + 16;
-          }
+        if (left + previewWidth > viewportW - MARGIN) {
+          left = mousePos.x - previewWidth - CURSOR_OFFSET;
         }
+        if (top < MARGIN) {
+          top = mousePos.y + CURSOR_OFFSET;
+        }
+
+        left = Math.max(MARGIN, Math.min(left, viewportW - previewWidth - MARGIN));
+        top = Math.max(MARGIN, Math.min(top, viewportH - previewHeight - MARGIN));
 
         return (
           <div

@@ -127,6 +127,11 @@ export const CardInstance = table(
     // routing uses this so taken opponent cards go back to their real owner.
     // `0n` on pre-migration rows means "unset" — fall back to ownerId.
     originalOwnerId: t.u64().default(0n),
+    // When the current reveal began. Used together with revealExpiresAt to
+    // compute the full duration so the client countdown ring renders the
+    // correct fraction regardless of whether the reveal was a 10s auto or a
+    // 30s manual flash. Cleared alongside revealExpiresAt.
+    revealStartedAt: t.timestamp().optional(),
   }
 );
 

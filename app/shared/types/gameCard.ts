@@ -87,6 +87,10 @@ export interface GameCard {
    *  A card is "currently revealed" iff revealUntil !== undefined &&
    *  revealUntil > Date.now(). Cleared whenever the card changes zone. */
   revealUntil?: number;
+  /** Total duration of the active reveal in ms. Used to render the
+   *  countdown ring with the correct fraction (10s auto vs 30s manual).
+   *  Undefined when no reveal is active. */
+  revealDurationMs?: number;
 }
 
 export type ActionType =

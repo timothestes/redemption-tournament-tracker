@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type CSSProperties } from 'react';
+import { isValidElement, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type CSSProperties } from 'react';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 
 // ---------------------------------------------------------------------------
@@ -53,6 +53,21 @@ type TimelineEntry =
 // PregameScreen.tsx — this is how long the rolling animation runs before the
 // die lands, so we hide PREGAME_ROLL log entries until then.
 const PREGAME_ROLL_REVEAL_DELAY_MS = 1800;
+
+/** Flatten a ReactNode (string, number, array, fragment, element) to plain text.
+ *  Used to build searchable strings from the rich JSX returned by formatActionType. */
+function nodeToText(node: ReactNode): string {
+  if (node == null || typeof node === 'boolean') return '';
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(nodeToText).join(' ');
+  if (isValidElement(node)) {
+    const props = node.props as { children?: ReactNode; name?: unknown };
+    // HoverableCard / similar pass the card name as a `name` prop, not children.
+    if (typeof props.name === 'string' && !props.children) return props.name;
+    return nodeToText(props.children);
+  }
+  return '';
+}
 
 function formatTimestamp(micros: bigint): string {
   const ms = Number(micros / BigInt(1000));
@@ -373,10 +388,14 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
         return <>{data.redirected} <HoverableCard name={data.cardName} img={data.cardImgFile} /> but went to land of bondage instead</>;
       }
       if (data.cardName) {
-        if (data.to === 'discard') return <>discarded <HoverableCard name={data.cardName} img={data.cardImgFile} /></>;
-        if (data.to === 'reserve') return <>placed <HoverableCard name={data.cardName} img={data.cardImgFile} /> in reserve</>;
-        if (data.to === 'banish') return <>banished <HoverableCard name={data.cardName} img={data.cardImgFile} /></>;
-        if (data.to === 'deck') return 'put a card into their deck';
+        const isCrossPlayer = data.targetOwnerId && data.targetOwnerId !== actorPlayerId;
+        const targetName = isCrossPlayer && playerNames?.[data.targetOwnerId];
+        const cardEl = <HoverableCard name={data.cardName} img={data.cardImgFile} />;
+        const fromCtx = targetName && data.from ? <> from {targetName}&apos;s {data.from}</> : null;
+        if (data.to === 'discard') return targetName ? <>discarded {cardEl}{fromCtx} into {targetName}&apos;s discard</> : <>discarded {cardEl}</>;
+        if (data.to === 'reserve') return targetName ? <>placed {cardEl}{fromCtx} into {targetName}&apos;s reserve</> : <>placed {cardEl} in reserve</>;
+        if (data.to === 'banish') return targetName ? <>banished {cardEl}{fromCtx} into {targetName}&apos;s banish</> : <>banished {cardEl}</>;
+        if (data.to === 'deck') return targetName ? <>put {cardEl}{fromCtx} into {targetName}&apos;s deck</> : 'put a card into their deck';
         if (data.to === 'hand') {
           const isCrossPlayer = data.targetOwnerId && data.targetOwnerId !== actorPlayerId;
           const targetName = isCrossPlayer && playerNames?.[data.targetOwnerId];
@@ -456,15 +475,38 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       const parts: ReactNode[] = [];
       const sourceName = data.sourceOwnerId && playerNames?.[data.sourceOwnerId] ? playerNames[data.sourceOwnerId] : null;
       const deckLabel = sourceName ? `${sourceName}'s deck` : 'deck';
-      const fromSuffix = data.fromSource === 'top-of-deck' ? ` from top of ${deckLabel}`
+      // Build a "from" suffix. Prefer the explicit fromSource (deck-derived
+      // batch ops like "top of deck"); otherwise, if every card shares the
+      // same originating zone, surface that — e.g. "from territory".
+      const explicitFromSuffix = data.fromSource === 'top-of-deck' ? ` from top of ${deckLabel}`
         : data.fromSource === 'bottom-of-deck' ? ` from bottom of ${deckLabel}`
         : data.fromSource === 'random-from-deck' ? ` randomly from ${deckLabel}`
         : '';
+      const cardFromZones: string[] = Array.isArray(data.cards)
+        ? data.cards.map((c: { from?: string }) => c?.from).filter((z: string | undefined): z is string => !!z)
+        : [];
+      const allSameFrom = cardFromZones.length > 0 && cardFromZones.length === data.cards?.length
+        && cardFromZones.every((z) => z === cardFromZones[0]);
+      const commonFromZone = allSameFrom ? cardFromZones[0] : null;
+      const ZONE_LABEL: Record<string, string> = {
+        territory: 'territory',
+        'land-of-bondage': 'land of bondage',
+        'land-of-redemption': 'land of redemption',
+        'soul-deck': 'soul deck',
+        hand: 'hand', deck: 'deck', discard: 'discard', reserve: 'reserve', banish: 'banish',
+      };
+      const sharedFromSuffix = explicitFromSuffix
+        || (commonFromZone && commonFromZone !== data.toZone
+              ? ` from ${sourceName ? `${sourceName}'s ` : 'their '}${ZONE_LABEL[commonFromZone] ?? commonFromZone}`
+              : '');
+      const isCrossPlayerBatch = data.targetOwnerId && data.targetOwnerId !== actorPlayerId;
+      const targetNameBatch = isCrossPlayerBatch && playerNames?.[data.targetOwnerId];
+      const intoSuffix = (zone: string) => targetNameBatch ? <> into {targetNameBatch}&apos;s {zone}</> : null;
       if (data.cards?.length) {
-        if (data.toZone === 'discard') parts.push(<span key="discard">discarded <CardNameList cards={data.cards} />{fromSuffix}</span>);
-        if (data.toZone === 'reserve') parts.push(<span key="reserve">reserved <CardNameList cards={data.cards} />{fromSuffix}</span>);
-        if (data.toZone === 'banish') parts.push(<span key="banish">banished <CardNameList cards={data.cards} />{fromSuffix}</span>);
-        if (data.toZone === 'deck') parts.push(<span key="deck">put {data.cards?.length === 1 ? 'a card' : `${data.cards.length} cards`} into their deck</span>);
+        if (data.toZone === 'discard') parts.push(<span key="discard">discarded <CardNameList cards={data.cards} />{sharedFromSuffix}{intoSuffix('discard')}</span>);
+        if (data.toZone === 'reserve') parts.push(<span key="reserve">reserved <CardNameList cards={data.cards} />{sharedFromSuffix}{intoSuffix('reserve')}</span>);
+        if (data.toZone === 'banish') parts.push(<span key="banish">banished <CardNameList cards={data.cards} />{sharedFromSuffix}{intoSuffix('banish')}</span>);
+        if (data.toZone === 'deck') parts.push(<span key="deck">put {data.cards?.length === 1 ? 'a card' : `${data.cards.length} cards`} into {targetNameBatch ? <>{targetNameBatch}&apos;s deck</> : <>their deck</>}</span>);
         if (data.toZone === 'hand') {
           const isCrossPlayer = data.targetOwnerId && playerNames?.[data.targetOwnerId] && data.targetOwnerId !== actorPlayerId;
           const targetName = isCrossPlayer && playerNames?.[data.targetOwnerId];
@@ -474,9 +516,9 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
           const hideFromOpponent = !targetName && fromHiddenDeck && !isViewer;
           if (hideFromOpponent) {
             const n = data.cards.length;
-            parts.push(<span key="hand">drew {n === 1 ? 'a card' : `${n} cards`}{fromSuffix}</span>);
+            parts.push(<span key="hand">drew {n === 1 ? 'a card' : `${n} cards`}{explicitFromSuffix}</span>);
           } else {
-            parts.push(<span key="hand">{targetName ? <>moved <CardNameList cards={data.cards} /> to {targetName}&apos;s hand{fromSuffix}</> : <>drew <CardNameList cards={data.cards} />{fromSuffix}{isViewer && fromHiddenDeck ? <span style={{ fontSize: 'calc(9px * var(--chat-fs, 1))', fontStyle: 'italic', color: 'rgba(232, 213, 163, 0.35)', marginLeft: 4 }}>(only visible to you)</span> : null}</>}</span>);
+            parts.push(<span key="hand">{targetName ? <>moved <CardNameList cards={data.cards} /> to {targetName}&apos;s hand{explicitFromSuffix}</> : <>drew <CardNameList cards={data.cards} />{explicitFromSuffix}{isViewer && fromHiddenDeck ? <span style={{ fontSize: 'calc(9px * var(--chat-fs, 1))', fontStyle: 'italic', color: 'rgba(232, 213, 163, 0.35)', marginLeft: 4 }}>(only visible to you)</span> : null}</>}</span>);
           }
         }
         if (data.toZone === 'territory') {
@@ -516,6 +558,23 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
     } catch { /* fall through */ }
   }
   if (actionType === 'LOOK_AT_TOP' && payload) {
+    // New format: JSON {count, sourceCardName, position}. Old format: bare count string.
+    if (payload.startsWith('{')) {
+      try {
+        const data = JSON.parse(payload) as { count: number; sourceCardName?: string; position?: 'top' | 'bottom' | 'random' };
+        const count = Number(data.count) || 0;
+        const positionWord = data.position === 'bottom' ? 'bottom' : data.position === 'random' ? 'random' : 'top';
+        const cardsWord = count === 1 ? 'card' : 'cards';
+        const pickPhrase =
+          positionWord === 'random'
+            ? `at ${count} random ${cardsWord} from their deck`
+            : `at the ${positionWord} ${count} ${cardsWord} of their deck`;
+        if (data.sourceCardName) {
+          return <>used <HoverableCard name={data.sourceCardName} /> to look {pickPhrase}</>;
+        }
+        return `looked ${pickPhrase}`;
+      } catch { /* fall through */ }
+    }
     const count = parseInt(payload, 10);
     if (count === 1) return 'looked at the top card of their deck';
     if (count > 1) return `looked at the top ${count} cards of their deck`;
@@ -690,6 +749,11 @@ export default function ChatPanel({
   const setActiveTab = onActiveTabChange ?? setInternalTab;
   const [inputText, setInputText] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const isSearching = normalizedQuery.length > 0;
 
   // Delay PREGAME_ROLL log entries so they appear when the dice land, not
   // when the server broadcasts the roll. Actions present on first mount are
@@ -741,6 +805,35 @@ export default function ChatPanel({
     return true;
   });
 
+  // ---- Search filter ----
+  // Build a lowercased searchable string for each visible action by flattening
+  // the rich JSX returned by formatActionType to plain text. Memoized by id +
+  // payload so re-renders don't redo the work.
+  const actionSearchText = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const a of visibleGameActions) {
+      const playerName = playerNames[a.playerId.toString()] ?? `Player ${a.playerId}`;
+      const verb = formatActionType(a.actionType, a.payload, playerNames, a.playerId.toString(), myPlayerId.toString());
+      map.set(a.id.toString(), `${playerName} ${nodeToText(verb)} ${a.actionType}`.toLowerCase());
+    }
+    return map;
+  }, [visibleGameActions, playerNames, myPlayerId]);
+
+  const matchesQuery = (text: string) => !isSearching || text.includes(normalizedQuery);
+
+  const filteredChat = isSearching
+    ? chatMessages.filter((msg) => {
+        const senderName = playerNames[msg.senderId.toString()] ?? '';
+        return `${senderName} ${msg.text}`.toLowerCase().includes(normalizedQuery);
+      })
+    : chatMessages;
+
+  const filteredActions = isSearching
+    ? visibleGameActions.filter((a) => matchesQuery(actionSearchText.get(a.id.toString()) ?? ''))
+    : visibleGameActions;
+
+  const totalMatches = isSearching ? filteredChat.length + filteredActions.length : 0;
+
   const chatEndRef = useRef<HTMLDivElement>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
   const allEndRef = useRef<HTMLDivElement>(null);
@@ -762,33 +855,42 @@ export default function ChatPanel({
     }
   }, [isOpen, activeTab]);
 
-  // Auto-scroll chat to bottom when new messages arrive
+  // Auto-scroll chat to bottom when new messages arrive (paused while searching
+  // so the user can read filtered results without being yanked to the bottom).
   useEffect(() => {
+    if (isSearching) return;
     if (isOpen && activeTab === 'chat') {
       chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [chatMessages, isOpen, activeTab]);
+  }, [chatMessages, isOpen, activeTab, isSearching]);
 
   // Auto-scroll log to bottom when new actions arrive or tab switches
   const prevLogTab = useRef(activeTab);
   useEffect(() => {
+    if (isSearching) { prevLogTab.current = activeTab; return; }
     if (isOpen && activeTab === 'log') {
       // Instant scroll when first switching to log tab, smooth for new entries
       const justSwitched = prevLogTab.current !== 'log';
       logEndRef.current?.scrollIntoView({ behavior: justSwitched ? 'instant' : 'smooth' });
     }
     prevLogTab.current = activeTab;
-  }, [gameActions, isOpen, activeTab, hiddenActionIds]);
+  }, [gameActions, isOpen, activeTab, hiddenActionIds, isSearching]);
 
   // Auto-scroll combined "all" tab to bottom
   const prevAllTab = useRef(activeTab);
   useEffect(() => {
+    if (isSearching) { prevAllTab.current = activeTab; return; }
     if (isOpen && activeTab === 'all') {
       const justSwitched = prevAllTab.current !== 'all';
       allEndRef.current?.scrollIntoView({ behavior: justSwitched ? 'instant' : 'smooth' });
     }
     prevAllTab.current = activeTab;
-  }, [chatMessages, gameActions, isOpen, activeTab, hiddenActionIds]);
+  }, [chatMessages, gameActions, isOpen, activeTab, hiddenActionIds, isSearching]);
+
+  // Focus the search input when the search bar opens.
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
 
   const handleSend = () => {
     const trimmed = inputText.trim();
@@ -921,14 +1023,15 @@ export default function ChatPanel({
           {/* ---- Header with tabs ---- */}
           <div
             style={{
-              display: 'flex',
+              display: 'grid',
+              gridTemplateColumns: '1fr auto 1fr',
               alignItems: 'center',
-              justifyContent: 'center',
               padding: '6px 8px',
               borderBottom: '1px solid rgba(107, 78, 39, 0.3)',
               flexShrink: 0,
             }}
           >
+            <span aria-hidden />
             {/* Tabs */}
             <div style={{ display: 'flex', gap: 4 }}>
               {(['all', 'chat', 'log'] as const).map((tab) => {
@@ -975,7 +1078,107 @@ export default function ChatPanel({
                 );
               })}
             </div>
+            {/* Search toggle (right-aligned in the grid) */}
+            <div style={{ justifySelf: 'end' }}>
+              <button
+                onClick={() => {
+                  setSearchOpen((prev) => {
+                    const next = !prev;
+                    if (!next) setSearchQuery('');
+                    return next;
+                  });
+                }}
+                aria-label={searchOpen ? 'Close search' : 'Search messages and log'}
+                aria-pressed={searchOpen}
+                title={searchOpen ? 'Close search' : 'Search'}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 24,
+                  height: 24,
+                  padding: 0,
+                  background: searchOpen ? 'rgba(196, 149, 90, 0.18)' : 'transparent',
+                  border: `1px solid ${searchOpen ? 'rgba(196, 149, 90, 0.45)' : 'transparent'}`,
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  color: searchOpen ? '#e8d5a3' : 'rgba(232, 213, 163, 0.55)',
+                  transition: 'color 0.15s, background 0.15s, border-color 0.15s',
+                }}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="11" cy="11" r="7" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </button>
+            </div>
           </div>
+
+          {/* ---- Search bar (collapsible) ---- */}
+          {searchOpen && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 8px',
+                borderBottom: '1px solid rgba(107, 78, 39, 0.3)',
+                background: 'rgba(196, 149, 90, 0.04)',
+                flexShrink: 0,
+              }}
+            >
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    e.preventDefault();
+                    setSearchQuery('');
+                    setSearchOpen(false);
+                  }
+                }}
+                placeholder="Search messages, actions, cards..."
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(107, 78, 39, 0.35)',
+                  borderRadius: 4,
+                  padding: '4px 8px',
+                  color: '#e8d5a3',
+                  fontSize: 'calc(11px * var(--chat-fs, 1))',
+                  fontFamily: 'inherit',
+                  outline: 'none',
+                }}
+                aria-label="Search messages and log"
+              />
+              <span
+                style={{
+                  fontSize: 'calc(10px * var(--chat-fs, 1))',
+                  color: 'rgba(232, 213, 163, 0.45)',
+                  fontVariantNumeric: 'tabular-nums',
+                  whiteSpace: 'nowrap',
+                  minWidth: 56,
+                  textAlign: 'right',
+                }}
+              >
+                {isSearching ? `${totalMatches} ${totalMatches === 1 ? 'match' : 'matches'}` : 'Esc to close'}
+              </span>
+            </div>
+          )}
 
           {/* ---- Tab: Chat ---- */}
           {activeTab === 'chat' && (
@@ -991,7 +1194,7 @@ export default function ChatPanel({
                   gap: 8,
                 }}
               >
-                {chatMessages.length === 0 && (
+                {filteredChat.length === 0 && (
                   <p
                     style={{
                       color: 'rgba(232, 213, 163, 0.3)',
@@ -1001,10 +1204,10 @@ export default function ChatPanel({
                       fontStyle: 'italic',
                     }}
                   >
-                    No messages yet.
+                    {isSearching ? 'No matches.' : 'No messages yet.'}
                   </p>
                 )}
-                {chatMessages.map((msg) => {
+                {filteredChat.map((msg) => {
                   const isMe = msg.senderId === myPlayerId;
                   const senderName =
                     playerNames[msg.senderId.toString()] ??
@@ -1148,7 +1351,7 @@ export default function ChatPanel({
                 gap: 4,
               }}
             >
-              {visibleGameActions.length === 0 && (
+              {filteredActions.length === 0 && (
                 <p
                   style={{
                     color: 'rgba(232, 213, 163, 0.3)',
@@ -1158,10 +1361,10 @@ export default function ChatPanel({
                     fontStyle: 'italic',
                   }}
                 >
-                  No actions yet.
+                  {isSearching ? 'No matches.' : 'No actions yet.'}
                 </p>
               )}
-              {visibleGameActions.map((action) => {
+              {filteredActions.map((action) => {
                 const playerName =
                   playerNames[action.playerId.toString()] ??
                   `Player ${action.playerId}`;
@@ -1216,7 +1419,7 @@ export default function ChatPanel({
                   gap: 6,
                 }}
               >
-                {chatMessages.length === 0 && visibleGameActions.length === 0 && (
+                {filteredChat.length === 0 && filteredActions.length === 0 && (
                   <p
                     style={{
                       color: 'rgba(232, 213, 163, 0.3)',
@@ -1226,16 +1429,16 @@ export default function ChatPanel({
                       fontStyle: 'italic',
                     }}
                   >
-                    No activity yet.
+                    {isSearching ? 'No matches.' : 'No activity yet.'}
                   </p>
                 )}
                 {(() => {
                   // Build a merged timeline sorted chronologically
                   const timeline: TimelineEntry[] = [];
-                  for (const msg of chatMessages) {
+                  for (const msg of filteredChat) {
                     timeline.push({ kind: 'chat', msg, micros: msg.sentAt.microsSinceUnixEpoch });
                   }
-                  for (const action of visibleGameActions) {
+                  for (const action of filteredActions) {
                     timeline.push({ kind: 'action', action, micros: action.timestamp.microsSinceUnixEpoch });
                   }
                   timeline.sort((a, b) => (a.micros < b.micros ? -1 : a.micros > b.micros ? 1 : 0));
