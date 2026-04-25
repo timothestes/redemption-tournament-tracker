@@ -237,10 +237,11 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   const [soulDeckDropPopup, setSoulDeckDropPopup] = useState<{ cardInstanceId: string; batchIds?: string[]; x: number; y: number } | null>(null);
   const [canvasDragZone, setCanvasDragZone] = useState<ZoneId | null>(null);
   const isCanvasDragging = useRef(false);
-  // React-visible drag flag used to hide the HTML unlink overlay during drag
-  // (HTML overlay reads warrior.posX from state, which doesn't update until
-  // drag-end, so without this the icon lags visibly behind the card).
-  const [isCardDraggingUi, setIsCardDraggingUi] = useState(false);
+  // Set of card instanceIds currently being dragged (drag card + followers).
+  // Used to hide a specific unlink icon only when its warrior or weapon is
+  // part of the active drag — the HTML overlay reads from state, which lags
+  // behind the dragged Konva node, so the icon would visibly drift otherwise.
+  const [draggingCardIds, setDraggingCardIds] = useState<ReadonlySet<string>>(() => new Set());
   // When true, disable zone-level clipping so a card dragged out of a clipped
   // zone (territory, land-of-bondage) isn't visually cut off by the zone rect.
   const [isDraggingAnyCard, setIsDraggingAnyCard] = useState(false);
@@ -461,7 +462,6 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   const handleCardDragStart = useCallback((card: GameCard) => {
     isDraggingRef.current = true;
     isCanvasDragging.current = true;
-    setIsCardDraggingUi(true);
     setIsDraggingAnyCard(true);
     dragSourceZoneRef.current = card.zone;
     if (hoverTimerRef.current) {
@@ -483,6 +483,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     const followerIds = multiSelectFollowerIds.length > 0
       ? multiSelectFollowerIds
       : equipFollowerIds;
+    setDraggingCardIds(new Set([card.instanceId, ...followerIds]));
 
     if (followerIds.length > 0) {
       const dragNode = cardNodeRefs.current.get(card.instanceId);
@@ -626,7 +627,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       const followerOffsets = dragFollowerOffsets.current;
       isDraggingRef.current = false;
       isCanvasDragging.current = false;
-      setIsCardDraggingUi(false);
+      setDraggingCardIds(new Set());
       canvasDragZoneRef.current = null;
       dragSourceZoneRef.current = null;
       dragFollowerOffsets.current = null;
@@ -2041,14 +2042,19 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
 
       {/* Equip unlink icons — one per attached weapon, anchored at that weapon's seam
           (top-left of whatever sits in front of it: warrior for index 0, weapon N-1 otherwise).
-          Hidden during drag because the overlay reads from state (which doesn't update until
-          drag-end), so leaving it visible would lag behind the dragging card. */}
+          Hidden only when this specific link's warrior or weapon is part of the active drag —
+          the overlay reads from state (which lags behind the Konva node mid-drag), so leaving
+          it visible for the moving card would make the icon drift. Other links stay put. */}
       <div
         className="pointer-events-none absolute inset-0 z-10"
         aria-hidden="false"
       >
-        {!isCardDraggingUi && state.zones.territory
+        {state.zones.territory
           .filter(c => c.equippedTo)
+          .filter(weapon =>
+            !draggingCardIds.has(weapon.instanceId) &&
+            !(weapon.equippedTo && draggingCardIds.has(weapon.equippedTo))
+          )
           .map(weapon => {
             const derived = derivedWeaponPositions.get(weapon.instanceId);
             if (!derived) return null;

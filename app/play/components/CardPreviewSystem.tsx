@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { X } from 'lucide-react';
 
 const BLOB_BASE_URL = process.env.NEXT_PUBLIC_BLOB_BASE_URL || '';
@@ -50,6 +50,77 @@ interface CardPreviewSystemProps {
 
 const PREVIEW_WIDTH = 220;
 const PREVIEW_HEIGHT = PREVIEW_WIDTH * 1.4;
+
+interface FallbackImageProps {
+  src: string;
+  alt: string;
+  imgStyle: CSSProperties;
+  width?: number;
+  height?: number;
+}
+
+// Renders an <img> with a spinner overlay while the browser is fetching it.
+// Used when the preloader's cache miss forces a direct fetch — without this
+// the user sees a blank pane and can't tell if the image is loading or broken.
+function FallbackImage({ src, alt, imgStyle, width, height }: FallbackImageProps) {
+  const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
+
+  useEffect(() => {
+    setStatus('loading');
+  }, [src]);
+
+  return (
+    <div style={{ position: 'relative', lineHeight: 0 }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt}
+        width={width}
+        height={height}
+        style={{ ...imgStyle, opacity: status === 'loaded' ? 1 : 0 }}
+        onLoad={() => setStatus('loaded')}
+        onError={() => setStatus('error')}
+      />
+      {status !== 'loaded' && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(13, 9, 5, 0.6)',
+            pointerEvents: 'none',
+          }}
+        >
+          {status === 'loading' ? (
+            <div
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: '50%',
+                border: '2px solid rgba(212,168,103,0.25)',
+                borderTopColor: 'rgba(212,168,103,0.85)',
+                animation: 'cardPreviewSpin 0.7s linear infinite',
+              }}
+            />
+          ) : (
+            <span
+              style={{
+                fontFamily: 'var(--font-geist-sans), system-ui, sans-serif',
+                fontSize: 10,
+                color: 'rgba(232,213,163,0.55)',
+                letterSpacing: '0.05em',
+              }}
+            >
+              Image unavailable
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface HoverPreviewProps {
   card: HoveredCardInfo;
@@ -107,12 +178,12 @@ function HoverPreview({ card, getImage }: HoverPreviewProps) {
         />
       ) : imageUrl ? (
         // Fallback: browser fetch if preloader doesn't have it yet
-        <img
+        <FallbackImage
           src={imageUrl}
           alt={card.cardName}
           width={PREVIEW_WIDTH}
           height={PREVIEW_HEIGHT}
-          style={{ display: 'block', width: '100%', height: 'auto' }}
+          imgStyle={{ display: 'block', width: '100%', height: 'auto' }}
         />
       ) : (
         <div
@@ -254,10 +325,10 @@ function ZoomModal({ card, onClose, getImage }: ZoomModalProps) {
               }}
             />
           ) : imageUrl ? (
-            <img
+            <FallbackImage
               src={imageUrl}
               alt={card.cardName}
-              style={{
+              imgStyle={{
                 display: 'block',
                 maxHeight: '75vh',
                 maxWidth: 'min(400px, 85vw)',
@@ -357,6 +428,9 @@ const KEYFRAMES = `
 @keyframes cardZoomScaleIn {
   from { transform: scale(0.92); opacity: 0; }
   to   { transform: scale(1);    opacity: 1; }
+}
+@keyframes cardPreviewSpin {
+  to { transform: rotate(360deg); }
 }
 `;
 
