@@ -95,4 +95,24 @@ describe('abilityLabel', () => {
     expect(abilityLabel({ type: 'custom', reducerName: 'foo', label: 'Do Thing' }))
       .toBe('Do Thing');
   });
+
+  it('formats discard_opponent_deck for top position singular', () => {
+    expect(abilityLabel({ type: 'discard_opponent_deck', position: 'top', count: 1 }))
+      .toBe("Discard top 1 card of opponent's deck");
+  });
+
+  it('formats discard_opponent_deck for top position plural', () => {
+    expect(abilityLabel({ type: 'discard_opponent_deck', position: 'top', count: 3 }))
+      .toBe("Discard top 3 cards of opponent's deck");
+  });
+
+  it('formats discard_opponent_deck for bottom position', () => {
+    expect(abilityLabel({ type: 'discard_opponent_deck', position: 'bottom', count: 2 }))
+      .toBe("Discard bottom 2 cards of opponent's deck");
+  });
+
+  it('formats discard_opponent_deck for random position', () => {
+    expect(abilityLabel({ type: 'discard_opponent_deck', position: 'random', count: 4 }))
+      .toBe("Discard 4 random cards of opponent's deck");
+  });
 });

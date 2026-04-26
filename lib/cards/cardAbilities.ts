@@ -15,6 +15,7 @@ export type CardAbility =
   | { type: 'reveal_own_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'look_at_own_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'look_at_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
+  | { type: 'discard_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'reserve_top_of_deck'; count: number }
   | { type: 'draw_bottom_of_deck'; count: number }
   | { type: 'custom'; reducerName: string; label: string };
@@ -187,6 +188,10 @@ export function abilityLabel(a: CardAbility): string {
     case 'look_at_opponent_deck': {
       const where = a.position === 'random' ? `${a.count} random` : `${a.position} ${a.count}`;
       return `Look at ${where} card${a.count === 1 ? '' : 's'} of opponent's deck`;
+    }
+    case 'discard_opponent_deck': {
+      const where = a.position === 'random' ? `${a.count} random` : `${a.position} ${a.count}`;
+      return `Discard ${where} card${a.count === 1 ? '' : 's'} of opponent's deck`;
     }
     case 'reserve_top_of_deck':
       return `Reserve top ${a.count} card${a.count === 1 ? '' : 's'} of deck`;
