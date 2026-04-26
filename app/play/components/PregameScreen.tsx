@@ -60,6 +60,11 @@ interface PregameScreenProps {
   onPractice: () => void;
   onBackToLobby: () => void;
   onUpdateMessage?: (message: string) => void;
+  // True once this client's own deck images are preloaded (or the safety
+  // timer has expired). When false, the Ready button is disabled so the
+  // server-anchored choose-first countdown can't start while a slow-wifi
+  // player is still downloading card images.
+  canReady: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -77,6 +82,7 @@ export default function PregameScreen({
   onPractice,
   onBackToLobby,
   onUpdateMessage,
+  canReady,
 }: PregameScreenProps) {
   const { game, myPlayer, opponentPlayer } = gameState;
 
@@ -153,6 +159,7 @@ export default function PregameScreen({
             myPlayer={myPlayer}
             gameState={gameState}
             showDice={phase === 'rolling' || phase === 'choosing' || phase === 'revealing'}
+            canReady={canReady}
           />
 
           {/* Action area — contextual */}
@@ -273,6 +280,7 @@ function PlayerCards({
   myPlayer,
   gameState,
   showDice,
+  canReady,
 }: {
   isWaiting: boolean;
   phase: string;
@@ -288,6 +296,7 @@ function PlayerCards({
   myPlayer: any;
   gameState: GameState;
   showDice: boolean;
+  canReady: boolean;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [isChangingDeck, setIsChangingDeck] = useState(false);
@@ -365,12 +374,14 @@ function PlayerCards({
                 variant={myReady ? 'outline' : 'default'}
                 size="sm"
                 onClick={handleToggleReady}
+                disabled={!canReady && !myReady}
+                title={!canReady && !myReady ? 'Loading card images...' : undefined}
                 className={myReady
                   ? 'h-7 text-xs border-[#c4955a]/30 text-[#c4955a]/70 bg-[#c4955a]/10 hover:bg-[#c4955a]/20'
-                  : 'h-7 text-xs bg-[#c4955a]/80 text-black hover:bg-[#c4955a]'
+                  : 'h-7 text-xs bg-[#c4955a]/80 text-black hover:bg-[#c4955a] disabled:opacity-60 disabled:cursor-wait'
                 }
               >
-                {myReady ? 'Ready' : 'Ready up'}
+                {myReady ? 'Ready' : canReady ? 'Ready up' : 'Loading cards...'}
               </Button>
             </div>
           )}
@@ -612,6 +623,7 @@ export function PregameCeremonyOverlay({ gameState }: { gameState: GameState }) 
           myPlayer={myPlayer}
           gameState={gameState}
           showDice={true}
+          canReady={true}
         />
 
         {/* Action area */}

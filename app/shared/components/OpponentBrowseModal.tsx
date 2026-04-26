@@ -450,7 +450,7 @@ export function OpponentBrowseModal({
           padding: 20,
           width: '80vw',
           maxWidth: 700,
-          height: '80vh',
+          maxHeight: '80vh',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',

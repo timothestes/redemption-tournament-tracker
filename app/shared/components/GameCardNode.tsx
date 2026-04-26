@@ -117,8 +117,9 @@ export const GameCardNode = memo(function GameCardNode({
     if (lobArrivalGlow) {
       // Phase 1: bloom in — quick fade-up with stroke expansion.
       // Phase 2: settle + fade out — longer, stroke softens back.
+      // Stroke width range matches the hover highlight (1.5 → 3).
       node.opacity(0);
-      node.strokeWidth(2.5);
+      node.strokeWidth(1.5);
       node.visible(true);
 
       let fade: Konva.Tween | null = null;
@@ -126,14 +127,14 @@ export const GameCardNode = memo(function GameCardNode({
         node,
         duration: 0.22,
         opacity: 1,
-        strokeWidth: 4,
+        strokeWidth: 3,
         easing: KonvaLib.Easings.EaseOut,
         onFinish: () => {
           fade = new KonvaLib.Tween({
             node,
             duration: 1.55,
             opacity: 0,
-            strokeWidth: 2.5,
+            strokeWidth: 1.5,
             easing: KonvaLib.Easings.EaseOut,
             onFinish: () => {
               node.visible(false);
@@ -196,14 +197,14 @@ export const GameCardNode = memo(function GameCardNode({
           Gaussian blur every frame and was the dominant cost during arrivals. */}
       <Rect
         ref={arrivalGlowRef as any}
-        x={-6}
-        y={-6}
-        width={cardWidth + 12}
-        height={cardHeight + 12}
+        x={-1}
+        y={-1}
+        width={cardWidth + 2}
+        height={cardHeight + 2}
         fill="transparent"
         stroke="#e8b86a"
-        strokeWidth={2.5}
-        cornerRadius={7}
+        strokeWidth={1.5}
+        cornerRadius={6}
         visible={false}
         opacity={0}
         listening={false}

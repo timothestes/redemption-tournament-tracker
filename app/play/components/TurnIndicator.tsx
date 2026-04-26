@@ -396,6 +396,40 @@ export default function TurnIndicator({
         >
           &#x276F;
         </button>
+
+        {/* End Turn button */}
+        <button
+          onClick={onEndTurn}
+          disabled={!isMyTurn}
+          title={isMyTurn ? 'End your turn' : "Wait for opponent's turn to end"}
+          style={{
+            marginLeft: 10,
+            padding: '5px 12px',
+            background: isMyTurn ? 'rgba(196, 149, 90, 0.15)' : 'transparent',
+            border: `1px solid ${isMyTurn ? 'rgba(196, 149, 90, 0.45)' : 'rgba(107, 78, 39, 0.25)'}`,
+            borderRadius: 4,
+            cursor: isMyTurn ? 'pointer' : 'default',
+            fontFamily: 'var(--font-cinzel), Georgia, serif',
+            fontSize: 10,
+            letterSpacing: '0.07em',
+            textTransform: 'uppercase',
+            color: isMyTurn ? '#e8d5a3' : 'rgba(196, 149, 90, 0.3)',
+            transition: 'background 0.15s, border-color 0.15s, color 0.15s',
+            whiteSpace: 'nowrap',
+          }}
+          onMouseEnter={(e) => {
+            if (!isMyTurn) return;
+            e.currentTarget.style.background = 'rgba(196, 149, 90, 0.28)';
+            e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.75)';
+          }}
+          onMouseLeave={(e) => {
+            if (!isMyTurn) return;
+            e.currentTarget.style.background = 'rgba(196, 149, 90, 0.15)';
+            e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.45)';
+          }}
+        >
+          End Turn
+        </button>
       </div>
 
       {/* ================================================================

@@ -338,6 +338,22 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     };
   }, [imagesGateOpen, gameId]);
 
+  // Gate the pregame "Ready up" button on this client's own deck images
+  // being preloaded. Otherwise a slow-wifi player can mark themselves ready
+  // while still downloading cards, and the server-anchored choose-first
+  // countdown burns against them. Same 8s safety fallback as the board gate
+  // so a truly-offline user is never blocked forever.
+  const myDeckImagesPreloaded =
+    myDeckImageUrls.length > 0 && areUrlsLoaded(myDeckImageUrls);
+  const [deckPreloadFallback, setDeckPreloadFallback] = useState(false);
+  useEffect(() => {
+    if (myDeckImageUrls.length === 0) return;
+    if (myDeckImagesPreloaded) return;
+    const timer = setTimeout(() => setDeckPreloadFallback(true), IMAGE_GATE_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [myDeckImageUrls.length, myDeckImagesPreloaded]);
+  const canReady = myDeckImagesPreloaded || deckPreloadFallback;
+
   // Game timer — anchored to server-recorded playingStartedAtMicros so elapsed
   // time survives navigating away and back to the game.
   const gameTimer = useGameTimer(gameState.game?.playingStartedAtMicros ?? null);
@@ -906,6 +922,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         onUpdateMessage={gameId && conn ? (message: string) => {
           conn.reducers.updateLobbyMessage({ gameId, message });
         } : undefined}
+        canReady={canReady}
       />
     );
   }

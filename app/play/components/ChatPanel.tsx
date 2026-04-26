@@ -506,7 +506,17 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
         if (data.toZone === 'discard') parts.push(<span key="discard">discarded <CardNameList cards={data.cards} />{sharedFromSuffix}{intoSuffix('discard')}</span>);
         if (data.toZone === 'reserve') parts.push(<span key="reserve">reserved <CardNameList cards={data.cards} />{sharedFromSuffix}{intoSuffix('reserve')}</span>);
         if (data.toZone === 'banish') parts.push(<span key="banish">banished <CardNameList cards={data.cards} />{sharedFromSuffix}{intoSuffix('banish')}</span>);
-        if (data.toZone === 'deck') parts.push(<span key="deck">put {data.cards?.length === 1 ? 'a card' : `${data.cards.length} cards`} into {targetNameBatch ? <>{targetNameBatch}&apos;s deck</> : <>their deck</>}</span>);
+        if (data.toZone === 'deck') {
+          const allFaceDown = data.cards.every((c: { name?: string }) => c?.name === 'a face-down card');
+          const deckTarget = targetNameBatch ? <>{targetNameBatch}&apos;s deck</> : <>their deck</>;
+          parts.push(
+            <span key="deck">
+              {allFaceDown
+                ? <>put {data.cards.length === 1 ? 'a card' : `${data.cards.length} cards`} into {deckTarget}</>
+                : <>put <CardNameList cards={data.cards} />{sharedFromSuffix} into {deckTarget}</>}
+            </span>
+          );
+        }
         if (data.toZone === 'hand') {
           const isCrossPlayer = data.targetOwnerId && playerNames?.[data.targetOwnerId] && data.targetOwnerId !== actorPlayerId;
           const targetName = isCrossPlayer && playerNames?.[data.targetOwnerId];
