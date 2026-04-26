@@ -151,3 +151,23 @@ describe('EXECUTE_CARD_ABILITY — spawn_token', () => {
     expect(next.history.length).toBe(state.history.length + 1);
   });
 });
+
+describe("EXECUTE_CARD_ABILITY — discard_opponent_deck (goldfish no-op)", () => {
+  it('returns the same state reference when Delivered is activated', () => {
+    const source = makeCard({
+      cardName: 'Delivered',
+      cardSet: 'PoC',
+      type: 'GE/EE',
+      identifier: '',
+      alignment: 'Neutral',
+      zone: 'territory',
+    });
+    const state = makeState([source]);
+
+    const next = gameReducer(state, act('source-1', 0));
+
+    // Single-player goldfish: no opponent → ability is a no-op.
+    // Reducer must return the same state reference (no clone, no history push).
+    expect(next).toBe(state);
+  });
+});

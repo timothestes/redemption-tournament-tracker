@@ -918,8 +918,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         case 'reveal_own_deck':
         case 'look_at_own_deck':
         case 'look_at_opponent_deck':
-          // Modal-driven effect — GoldfishCanvas intercepts the dispatch and
-          // calls setPeekState directly. Reaching the reducer is a bug, no-op.
+        case 'discard_opponent_deck':
+          // Modal-driven or opponent-required — GoldfishCanvas intercepts, or
+          // the effect is multiplayer-only. No-op here.
           return state;
         case 'reserve_top_of_deck':
           return reserveTopOfDeckInState(state, source, ability, history);
