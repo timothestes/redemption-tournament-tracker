@@ -1069,6 +1069,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         requestOpponentAction(action, JSON.stringify({ count: ability.count }));
         return;
       }
+      if (ability?.type === 'discard_opponent_deck') {
+        // Requires opponent consent — routes through the existing
+        // request_opponent_action flow. On approve, the approvedSearchRequest
+        // effect dispatches `discard_deck_*` which calls
+        // moveOpponentDeckCardsToZone(..., 'discard').
+        const action =
+          ability.position === 'top' ? 'discard_deck_top'
+          : ability.position === 'bottom' ? 'discard_deck_bottom'
+          : 'discard_deck_random';
+        requestOpponentAction(action, JSON.stringify({ count: ability.count }));
+        return;
+      }
       gameState.executeCardAbility(sourceInstanceId, abilityIndex);
     },
     randomHandToZone: (count, toZone, deckPosition) =>
