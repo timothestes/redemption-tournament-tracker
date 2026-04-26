@@ -1767,8 +1767,19 @@ export const move_card = spacetimedb.reducer(
     // banish pile sends it to the opponent's banish). An explicit drop on
     // someone else's zone (targetOwnerId ≠ actor) still wins, so "give to
     // opponent's hand" works as intended.
+    // Cross-player LoB→LoB drag is unambiguous user intent: the source pile is
+    // already a "home", so home-routing has nothing to redirect. Honor the
+    // explicit targetOwnerId and skip the fallback below.
+    const isCrossPlayerLobDrag =
+      fromZone === 'land-of-bondage' &&
+      toZone === 'land-of-bondage' &&
+      !!targetOwnerId &&
+      BigInt(targetOwnerId) !== card.ownerId;
+
     let newOwnerId: bigint;
-    if (HOME_ZONES.includes(toZone)) {
+    if (isCrossPlayerLobDrag) {
+      newOwnerId = BigInt(targetOwnerId);
+    } else if (HOME_ZONES.includes(toZone)) {
       const droppedOnOwnZone = !targetOwnerId || BigInt(targetOwnerId) === player.id;
       newOwnerId = droppedOnOwnZone ? homeOwnerId : BigInt(targetOwnerId);
     } else if (targetOwnerId) {
@@ -2195,8 +2206,18 @@ export const move_cards_batch = spacetimedb.reducer(
       // the actor's own home pile sends captured cards to their original
       // owner's pile. Explicit drops on someone else's zone (newOwnerId set
       // and not the actor) still win.
+      // Cross-player LoB→LoB drag: honor the explicit target instead of
+      // home-routing (mirror of move_card). Source LoB is already a home pile,
+      // so there's nothing for home-routing to redirect.
+      const isCrossPlayerLobDrag =
+        card.zone === 'land-of-bondage' &&
+        toZone === 'land-of-bondage' &&
+        newOwnerId !== null &&
+        newOwnerId !== card.ownerId;
       let cardOwnerId: bigint;
-      if (HOME_ZONES.includes(toZone)) {
+      if (isCrossPlayerLobDrag) {
+        cardOwnerId = newOwnerId!;
+      } else if (HOME_ZONES.includes(toZone)) {
         const droppedOnOwnZone = newOwnerId === null || newOwnerId === player.id;
         cardOwnerId = droppedOnOwnZone ? homeOwnerId : newOwnerId;
       } else {

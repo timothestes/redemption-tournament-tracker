@@ -179,8 +179,10 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
     ? Math.max(0, Math.ceil((card.revealUntil! - nowForReveal) / 1000))
     : 0;
 
-  // Opponent tokens get a simplified menu
-  if (card.isToken) {
+  // Lost Soul tokens get a simplified menu (rescue is the actual game mechanic).
+  // Other tokens fall through to the normal menu — server-side cleanup deletes
+  // them when they leave territory.
+  if (card.isToken && isLostSoul(card)) {
     return (
       <div ref={menuRef} style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
         <div style={labelStyle}>{card.cardName}</div>

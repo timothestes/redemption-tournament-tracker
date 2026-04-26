@@ -38,10 +38,13 @@ export function generateYTGProductURL(cardName: string, cardSet: string): string
 }
 
 /**
- * Generates a Your Turn Games search URL for a card name
+ * Generates a Your Turn Games search URL for a card name.
+ * Strips the [T2C AB] tag — YTG doesn't carry that variant under that name,
+ * so the base card name yields better search results.
  */
 export function generateYTGSearchURL(cardName: string): string {
-  const searchQuery = encodeURIComponent(cardName);
+  const cleaned = cardName.replace(/\s*\[T2C AB\]\s*/g, '').trim();
+  const searchQuery = encodeURIComponent(cleaned);
   return `https://www.yourturngames.biz/a/search?q=${searchQuery}`;
 }
 
