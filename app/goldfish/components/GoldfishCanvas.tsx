@@ -464,6 +464,15 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     isCanvasDragging.current = true;
     setIsDraggingAnyCard(true);
     dragSourceZoneRef.current = card.zone;
+
+    // Bring the dragged card to the front of its parent group so it draws
+    // above sibling cards mid-drag. Without this, cards rendered later in
+    // the same parent (right-side hand fan, overlapping territory cards)
+    // visually obscure the dragged node until drop triggers a re-render.
+    const dragLeaderNode = cardNodeRefs.current.get(card.instanceId);
+    dragLeaderNode?.moveToTop();
+    dragLeaderNode?.getLayer()?.batchDraw();
+
     if (hoverTimerRef.current) {
       clearTimeout(hoverTimerRef.current);
       hoverTimerRef.current = null;

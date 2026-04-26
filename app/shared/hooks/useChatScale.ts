@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
 const STORAGE_KEY = 'redemption-chat-scale';
-const DEFAULT_SCALE = 1.0;
+const DEFAULT_SCALE = 1.3;
 const MIN_SCALE = 0.8;
 const MAX_SCALE = 1.6;
 const STEP = 0.1;
