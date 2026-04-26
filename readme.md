@@ -97,30 +97,23 @@ Do you think anything else should be included on a givne match slip
 
 We will want to let the host print it out easily
 
-# Backlog
-
-# Podcast
 
 ## Implemented features:
+Tournament Tracker
+Deck building (with Paragon Support)
 Spotlight Mode
 YTG Add to Cart
 Min Price
 Cube Improvements
 Jayden Mode
 Official Deck Checks
-Spoiler
-Upcoming Tournaments
+Goldfish Feature
+Spoiler Page
+Official Upcoming Tournaments
 Tournament Deck Publishing
 Card-specific rulings
 Card groupings
 AoD calculations
-
-## How can you help?
-- spoilers
-- ruling questions
-- publishing decks
-- reporting bugs
-- suggesting features
 
 ## Bugs
 Ending tournament early bug
@@ -131,22 +124,23 @@ bright green in dark mode needs dimming
 
 ## short term
 add aod button
+Fallow audit: https://github.com/fallow-rs/fallow
+Pre-bake duplicate card groups at build time (static JSON) instead of fetching from Supabase at runtime — eliminates cold-start connection pressure on deckcheck
 
 ## long term
-Pre-bake duplicate card groups at build time (static JSON) instead of fetching from Supabase at runtime — eliminates cold-start connection pressure on deckcheck
 add maybeboard
-add animations to goldfish/play mode
 Collection Tracker
-Cube builder
 add wishlist
-Teaching new players how to play
 misc tournament tracker improvements
-Joining a tournament via QR code
+- Joining a tournament via QR code
+- Linking your deck
 metagame snapshot
+Teaching new players how to play
+add animations to goldfish/play mode
+Cube builder
 tournament tracker mobile ux support
 Deck upvoting
 Offline intallable app on phone (Progressive Web app with offline capabilities)
-Fallow audit: https://github.com/fallow-rs/fallow
 
 
 # play features

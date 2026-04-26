@@ -19,6 +19,12 @@ import { signOutAction } from "../app/actions";
 import { useIsAdmin } from "../hooks/useIsAdmin";
 import { NATIONALS_CONFIG } from "../app/config/nationals";
 
+// @supabase/ssr's createBrowserClient is already a singleton in the browser,
+// but binding the result to a module-level const keeps the JS reference stable
+// across renders. Otherwise [supabase]-keyed effects re-fire every render and
+// cause repeated getUser() round-trips, which feeds the refresh-token storm.
+const supabase = createClient();
+
 const TopNav: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isResourcesOpen, setIsResourcesOpen] = useState(false);
@@ -28,7 +34,6 @@ const TopNav: React.FC = () => {
   const [authLoading, setAuthLoading] = useState(true);
   const { isAdmin, permissions, loading: adminLoading } = useIsAdmin();
   const pathname = usePathname();
-  const supabase = createClient();
 
   // Nav is "ready" when both auth and admin checks have resolved
   const navReady = !authLoading && !adminLoading;
@@ -98,7 +103,7 @@ const TopNav: React.FC = () => {
     });
 
     return () => subscription.unsubscribe();
-  }, [supabase]);
+  }, []);
 
   // Close dropdowns on outside click
   useEffect(() => {

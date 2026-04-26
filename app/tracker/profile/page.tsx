@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { createClient } from "../../../utils/supabase/client";
 import { getUserSafe } from "../../../utils/supabase/getUserSafe";
 
+const supabase = createClient();
+
 export default function ProfilePage() {
   const [user, setUser] = useState(null);
-  const supabase = createClient();
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -21,7 +22,7 @@ export default function ProfilePage() {
     });
 
     return () => subscription.unsubscribe();
-  }, [supabase]);
+  }, []);
 
   return (
     <div className="px-6 mx-auto">

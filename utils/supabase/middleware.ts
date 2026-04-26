@@ -54,21 +54,63 @@ export const updateSession = async (request: NextRequest) => {
 
     const pathname = request.nextUrl.pathname;
 
-    // Zombie-session cleanup: auth cookies are present but the server
-    // rejected them (refresh token rotation race, network-interrupted
-    // refresh, reuse detection). Without this, the browser keeps the stale
-    // access-token cookie and the UI shows "logged in" while every server
-    // call silently 401s.
+    // Zombie-session cleanup: only delete cookies when the server has
+    // unambiguously rejected the session (AuthApiError with a known
+    // refresh/JWT failure code). NEVER delete on AuthRetryableFetchError —
+    // that's a network blip, CORS issue, or temporary 5xx, and the cookies
+    // would still be valid on retry. Mobile Chrome users on flaky networks
+    // were getting their auth cookies wiped by transient fetch failures.
     if (error && !user) {
-      const staleAuthCookies = request.cookies
-        .getAll()
-        .filter(
-          (c) => c.name.startsWith("sb-") && c.name.includes("-auth-token"),
+      const errName = (error as { name?: string })?.name;
+      const errCode = (error as { code?: string })?.code;
+      const isSessionRejected =
+        errName === "AuthApiError" &&
+        (errCode === "refresh_token_already_used" ||
+          errCode === "refresh_token_not_found" ||
+          errCode === "session_not_found" ||
+          errCode === "bad_jwt");
+
+      if (isSessionRejected) {
+        const staleAuthCookies = request.cookies
+          .getAll()
+          .filter(
+            (c) => c.name.startsWith("sb-") && c.name.includes("-auth-token"),
+          );
+        if (staleAuthCookies.length > 0) {
+          console.warn(
+            "[auth-anomaly]",
+            JSON.stringify({
+              kind: "middleware.zombie-cookie-cleanup",
+              errorName: errName ?? null,
+              errorStatus: (error as { status?: number })?.status ?? null,
+              errorCode: errCode ?? null,
+              errorMessage: error?.message ?? null,
+              path: pathname,
+              staleCookieCount: staleAuthCookies.length,
+              ts: new Date().toISOString(),
+            }),
+          );
+          staleAuthCookies.forEach((cookie) => {
+            response.cookies.set(cookie.name, "", { maxAge: 0, path: "/" });
+          });
+        }
+      } else {
+        // Diagnostic-only: log when we WOULD have deleted cookies under the
+        // old over-aggressive logic but didn't. Compare volume vs the
+        // zombie-cookie-cleanup events to confirm we're catching the right
+        // bucket of errors. Remove this branch once the bug is confirmed fixed.
+        console.warn(
+          "[auth-anomaly]",
+          JSON.stringify({
+            kind: "middleware.zombie-cleanup-skipped",
+            errorName: errName ?? null,
+            errorStatus: (error as { status?: number })?.status ?? null,
+            errorCode: errCode ?? null,
+            errorMessage: error?.message ?? null,
+            path: pathname,
+            ts: new Date().toISOString(),
+          }),
         );
-      if (staleAuthCookies.length > 0) {
-        staleAuthCookies.forEach((cookie) => {
-          response.cookies.set(cookie.name, "", { maxAge: 0, path: "/" });
-        });
       }
     }
 

@@ -25,6 +25,8 @@ import { deleteDeckAction } from "../actions";
 import { MobileBottomNav } from "./components/MobileBottomNav";
 import { useCardPrices } from "./hooks/useCardPrices";
 
+const supabase = createClient();
+
 // Helper component for rename form in new deck modal
 function NewDeckRenameForm({ 
   onSubmit, 
@@ -350,7 +352,6 @@ export default function CardSearchClient() {
 
   // User authentication state
   const [user, setUser] = useState<User | null>(null);
-  const supabase = createClient();
 
   // Deck builder state
   const {
