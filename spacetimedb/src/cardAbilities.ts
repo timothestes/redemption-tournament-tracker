@@ -24,6 +24,7 @@ export type CardAbility =
   | { type: 'reveal_own_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'look_at_own_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'look_at_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
+  | { type: 'discard_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'reserve_top_of_deck'; count: number }
   | { type: 'draw_bottom_of_deck'; count: number }
   | { type: 'custom'; reducerName: string; label: string };
@@ -64,6 +65,7 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'Mount Sinai':                                         [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
   'Faith of Isaac':                                      [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
   'False Prophecy (PoC)':                                [{ type: 'look_at_opponent_deck', position: 'top', count: 6 }],
+  'Delivered':                                           [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
   'Omen Interpreter':                                    [{ type: 'reveal_own_deck', position: 'top', count: 6 }],
   "Balaam's Prophecy":                                   [{ type: 'reveal_own_deck', position: 'top', count: 6 }],
   'Fruit of the Land':                                   [{ type: 'look_at_own_deck', position: 'top', count: 7 }],

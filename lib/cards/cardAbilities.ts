@@ -63,6 +63,7 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'Mount Sinai':                                         [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
   'Faith of Isaac':                                      [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
   'False Prophecy (PoC)':                                [{ type: 'look_at_opponent_deck', position: 'top', count: 6 }],
+  'Delivered':                                           [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
   'Omen Interpreter':                                    [{ type: 'reveal_own_deck', position: 'top', count: 6 }],
   "Balaam's Prophecy":                                   [{ type: 'reveal_own_deck', position: 'top', count: 6 }],
   'Fruit of the Land':                                   [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
