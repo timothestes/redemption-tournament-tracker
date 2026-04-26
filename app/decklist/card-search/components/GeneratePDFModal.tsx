@@ -51,7 +51,9 @@ export default function GeneratePDFModal({ deck, onClose, isLegal }: GeneratePDF
 
     setLoading(true);
     try {
-      // If we don't have legality yet, check it now
+      // If we don't have legality yet, check it now. The PDF generator omits
+      // the legal/illegal seal entirely (renders `?`) when is_legal is missing,
+      // so log every reason this fallback might fail to make it diagnosable.
       let legalityResult = isLegal;
       if (legalityResult == null) {
         try {
@@ -66,9 +68,15 @@ export default function GeneratePDFModal({ deck, onClose, isLegal }: GeneratePDF
           if (checkRes.ok) {
             const checkData = await checkRes.json();
             legalityResult = checkData.valid ?? null;
+            if (legalityResult == null) {
+              console.warn("[pdf-legality] /api/deckcheck returned ok but `valid` is missing", { deckId: deck.id, checkData });
+            }
+          } else {
+            const text = await checkRes.text().catch(() => "");
+            console.warn("[pdf-legality] /api/deckcheck returned non-ok — PDF will render without legality seal", { deckId: deck.id, status: checkRes.status, body: text.slice(0, 500) });
           }
-        } catch {
-          // Deckcheck failed — proceed without legality
+        } catch (err) {
+          console.warn("[pdf-legality] /api/deckcheck threw — PDF will render without legality seal", { deckId: deck.id, err });
         }
       }
 

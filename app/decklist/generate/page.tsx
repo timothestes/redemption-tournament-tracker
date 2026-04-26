@@ -6,6 +6,8 @@ import ToastNotification from "../../../components/ui/toast-notification";
 import DeckSourcePicker from "./DeckSourcePicker";
 
 async function checkLegality(decklist: string, deckType: string, deckId?: string | null): Promise<boolean | null> {
+  // The PDF/image generator omits the legal/illegal seal entirely (renders `?`)
+  // when is_legal is missing, so log every reason this fallback returns null.
   try {
     const body: Record<string, unknown> = deckId
       ? { deckId }
@@ -21,10 +23,18 @@ async function checkLegality(decklist: string, deckType: string, deckId?: string
       signal: controller.signal,
     });
     clearTimeout(timeout);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      console.warn("[generate-legality] /api/deckcheck returned non-ok — output will render without legality seal", { deckId, status: res.status, body: text.slice(0, 500) });
+      return null;
+    }
     const result = await res.json();
+    if (result?.valid == null) {
+      console.warn("[generate-legality] /api/deckcheck returned ok but `valid` is missing", { deckId, result });
+    }
     return result.valid ?? null;
-  } catch {
+  } catch (err) {
+    console.warn("[generate-legality] /api/deckcheck threw — output will render without legality seal", { deckId, err });
     return null;
   }
 }

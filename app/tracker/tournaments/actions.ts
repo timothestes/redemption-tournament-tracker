@@ -320,10 +320,12 @@ export async function publishTournamentDecklistsAction(
   for (const dl of decklists as any[]) {
     const participantName = dl.participants?.name || "Unknown";
 
-    // Fetch original deck metadata
+    // Fetch original deck metadata. Carry is_legal/deckcheck_issues forward so
+    // PDF generation on the published copy renders the legal/illegal seal —
+    // the cards are copied 1:1, so legality is identical to the original.
     const { data: origDeck } = await admin
       .from("decks")
-      .select("name, description, format, paragon, preview_card_1, preview_card_2, card_count")
+      .select("name, description, format, paragon, preview_card_1, preview_card_2, card_count, is_legal, deckcheck_issues")
       .eq("id", dl.deck_id)
       .single();
 
@@ -351,6 +353,8 @@ export async function publishTournamentDecklistsAction(
         preview_card_2: origDeck.preview_card_2 || null,
         card_count: origDeck.card_count || 0,
         is_public: true,
+        is_legal: origDeck.is_legal ?? null,
+        deckcheck_issues: origDeck.deckcheck_issues ?? null,
       })
       .select("id")
       .single();

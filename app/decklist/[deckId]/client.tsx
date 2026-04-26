@@ -27,6 +27,7 @@ interface PublicDeckData {
   format?: string;
   paragon?: string;
   is_public?: boolean;
+  is_legal?: boolean | null;
   card_count?: number;
   view_count?: number;
   preview_card_1?: string | null;
@@ -1606,7 +1607,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
         <GeneratePDFModal
           deck={deckForModal}
           onClose={() => setShowPDFModal(false)}
-          isLegal={null}
+          isLegal={deck.is_legal ?? null}
         />
       )}
 
@@ -1615,7 +1616,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
         <GenerateDeckImageModal
           deck={deckForModal}
           onClose={() => setShowImageModal(false)}
-          isLegal={null}
+          isLegal={deck.is_legal ?? null}
         />
       )}
     </div>
