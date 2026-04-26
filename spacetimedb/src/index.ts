@@ -2809,6 +2809,8 @@ export const execute_card_ability = spacetimedb.reducer(
         throw new SenderError('look_at_own_deck is dispatched by the client, not this reducer');
       case 'look_at_opponent_deck':
         throw new SenderError('look_at_opponent_deck is dispatched by the client, not this reducer');
+      case 'discard_opponent_deck':
+        throw new SenderError('discard_opponent_deck is dispatched by the client, not this reducer');
       case 'reserve_top_of_deck':
         return reserveTopOfDeckImpl(ctx, source, ability, player, gameId);
       case 'draw_bottom_of_deck':
