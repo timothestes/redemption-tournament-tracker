@@ -333,6 +333,14 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (toZone !== 'territory') {
         result.card.outlineColor = undefined;
       }
+      // Counters reflect in-play state — drop them whenever the card leaves
+      // Territory or Land of Bondage for any other zone.
+      if (
+        result.fromZone !== toZone &&
+        (result.fromZone === 'territory' || result.fromZone === 'land-of-bondage')
+      ) {
+        result.card.counters = [];
+      }
       // Paragon: rescuing a Soul-Deck-origin card transfers ownership from
       // the shared sentinel to the rescuing player. Marker stays set.
       const movedFromSharedLob =
@@ -364,6 +372,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             const other = zones[zoneId][i];
             if (other.equippedTo !== cardInstanceId) continue;
             if (toZone === 'land-of-bondage') {
+              const dropCounters =
+                zoneId === 'territory' || zoneId === 'land-of-bondage';
               zones[zoneId].splice(i, 1);
               i--;
               zones.discard.push({
@@ -372,6 +382,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                 equippedTo: undefined,
                 posX: undefined,
                 posY: undefined,
+                counters: dropCounters ? [] : other.counters,
               });
             } else {
               zones[zoneId][i] = { ...other, equippedTo: undefined };
@@ -476,6 +487,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       zones.deck = shuffleArray(zones.deck);
       result.card.zone = 'deck';
       result.card.revealUntil = undefined;
+      if (result.fromZone === 'territory' || result.fromZone === 'land-of-bondage') {
+        result.card.counters = [];
+      }
       zones.deck.unshift(result.card);
       return { ...state, zones, history };
     }
@@ -489,6 +503,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       zones.deck = shuffleArray(zones.deck);
       result.card.zone = 'deck';
       result.card.revealUntil = undefined;
+      if (result.fromZone === 'territory' || result.fromZone === 'land-of-bondage') {
+        result.card.counters = [];
+      }
       zones.deck.push(result.card);
       return { ...state, zones, history };
     }
@@ -669,6 +686,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         if (finalZone !== 'territory') {
           result.card.outlineColor = undefined;
         }
+        if (
+          result.fromZone !== finalZone &&
+          (result.fromZone === 'territory' || result.fromZone === 'land-of-bondage')
+        ) {
+          result.card.counters = [];
+        }
         const wasSharedSoulFromLob =
           result.fromZone === 'land-of-bondage' &&
           result.card.ownerId === 'shared' &&
@@ -703,6 +726,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                 continue;
               }
               if (finalZone === 'land-of-bondage') {
+                const dropCounters =
+                  zoneId === 'territory' || zoneId === 'land-of-bondage';
                 zones[zoneId].splice(i, 1);
                 i--;
                 zones.discard.push({
@@ -711,6 +736,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                   equippedTo: undefined,
                   posX: undefined,
                   posY: undefined,
+                  counters: dropCounters ? [] : other.counters,
                 });
               } else {
                 zones[zoneId][i] = { ...other, equippedTo: undefined };

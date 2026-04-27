@@ -130,6 +130,21 @@ function compactLobIndices(ctx: any, gameId: bigint, playerId: bigint) {
 }
 
 // ---------------------------------------------------------------------------
+// Helper: clearCountersIfLeavingPlay
+// Counters reflect in-play state (damage, charges, generic markers). When a
+// card leaves Territory or Land of Bondage for any other zone, drop all
+// CardCounter rows for it so they don't follow the card into deck/hand/discard
+// or persist when it later returns to play.
+// ---------------------------------------------------------------------------
+function clearCountersIfLeavingPlay(ctx: any, cardId: bigint, fromZone: string, toZone: string) {
+  if (fromZone === toZone) return;
+  if (fromZone !== 'territory' && fromZone !== 'land-of-bondage') return;
+  for (const counter of [...ctx.db.CardCounter.card_counter_card_instance_id.filter(cardId)]) {
+    ctx.db.CardCounter.id.delete(counter.id);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Helper: drawCardsForPlayer
 // ---------------------------------------------------------------------------
 interface DrawnCardInfo {
@@ -1700,6 +1715,9 @@ export const move_card = spacetimedb.reducer(
     // they happen to be lost-soul-typed.
     const TOKEN_REMOVE_ZONES = ['reserve', 'banish', 'discard', 'hand', 'deck'];
     if (card.isToken && TOKEN_REMOVE_ZONES.includes(toZone)) {
+      for (const counter of [...ctx.db.CardCounter.card_counter_card_instance_id.filter(cardInstanceId)]) {
+        ctx.db.CardCounter.id.delete(counter.id);
+      }
       ctx.db.CardInstance.id.delete(cardInstanceId);
       if (fromZone === 'hand') compactHandIndices(ctx, gameId, card.ownerId);
       if (fromZone === 'land-of-bondage') compactLobIndices(ctx, gameId, card.ownerId);
@@ -1736,6 +1754,7 @@ export const move_card = spacetimedb.reducer(
           (c: any) => c.ownerId === lobOwnerId && c.zone === 'land-of-bondage'
         ).length
       );
+      clearCountersIfLeavingPlay(ctx, card.id, fromZone, 'land-of-bondage');
       ctx.db.CardInstance.id.update({
         ...card,
         zone: 'land-of-bondage',
@@ -1769,17 +1788,15 @@ export const move_card = spacetimedb.reducer(
     // banish pile sends it to the opponent's banish). An explicit drop on
     // someone else's zone (targetOwnerId ≠ actor) still wins, so "give to
     // opponent's hand" works as intended.
-    // Cross-player LoB→LoB drag is unambiguous user intent: the source pile is
-    // already a "home", so home-routing has nothing to redirect. Honor the
-    // explicit targetOwnerId and skip the fallback below.
-    const isCrossPlayerLobDrag =
-      fromZone === 'land-of-bondage' &&
-      toZone === 'land-of-bondage' &&
-      !!targetOwnerId &&
-      BigInt(targetOwnerId) !== card.ownerId;
+    // Explicit LoB drops are unambiguous user intent — the player dragged the
+    // card onto a specific seat's LoB. Honor targetOwnerId without applying
+    // home-routing, which would otherwise redirect opponent-owned cards back
+    // to the opponent's LoB even when the user dropped on their own.
+    const isExplicitLobDrop =
+      toZone === 'land-of-bondage' && !!targetOwnerId;
 
     let newOwnerId: bigint;
-    if (isCrossPlayerLobDrag) {
+    if (isExplicitLobDrop) {
       newOwnerId = BigInt(targetOwnerId);
     } else if (HOME_ZONES.includes(toZone)) {
       const droppedOnOwnZone = !targetOwnerId || BigInt(targetOwnerId) === player.id;
@@ -1894,6 +1911,7 @@ export const move_card = spacetimedb.reducer(
       : undefined;
     const newRevealStartedAt = autoReveal ? ctx.timestamp : undefined;
 
+    clearCountersIfLeavingPlay(ctx, card.id, fromZone, toZone);
     ctx.db.CardInstance.id.update({
       ...card,
       zone: toZone,
@@ -1923,6 +1941,7 @@ export const move_card = spacetimedb.reducer(
               maxDiscardIdx = c.zoneIndex;
             }
           }
+          clearCountersIfLeavingPlay(ctx, accessory.id, accessory.zone, 'discard');
           ctx.db.CardInstance.id.update({
             ...accessory,
             zone: 'discard',
@@ -2146,6 +2165,7 @@ export const move_cards_batch = spacetimedb.reducer(
             (c: any) => c.ownerId === lobOwnerId && c.zone === 'land-of-bondage'
           ).length
         );
+        clearCountersIfLeavingPlay(ctx, card.id, card.zone, 'land-of-bondage');
         ctx.db.CardInstance.id.update({
           ...card,
           zone: 'land-of-bondage',
@@ -2209,16 +2229,13 @@ export const move_cards_batch = spacetimedb.reducer(
       // the actor's own home pile sends captured cards to their original
       // owner's pile. Explicit drops on someone else's zone (newOwnerId set
       // and not the actor) still win.
-      // Cross-player LoB→LoB drag: honor the explicit target instead of
-      // home-routing (mirror of move_card). Source LoB is already a home pile,
-      // so there's nothing for home-routing to redirect.
-      const isCrossPlayerLobDrag =
-        card.zone === 'land-of-bondage' &&
-        toZone === 'land-of-bondage' &&
-        newOwnerId !== null &&
-        newOwnerId !== card.ownerId;
+      // Explicit LoB drop: honor the target seat (mirror of move_card). The
+      // user dragged the card onto a specific player's LoB, so home-routing
+      // shouldn't override that choice.
+      const isExplicitLobDrop =
+        toZone === 'land-of-bondage' && newOwnerId !== null;
       let cardOwnerId: bigint;
-      if (isCrossPlayerLobDrag) {
+      if (isExplicitLobDrop) {
         cardOwnerId = newOwnerId!;
       } else if (HOME_ZONES.includes(toZone)) {
         const droppedOnOwnZone = newOwnerId === null || newOwnerId === player.id;
@@ -2347,6 +2364,7 @@ export const move_cards_batch = spacetimedb.reducer(
         : undefined;
       const newRevealStartedAt = autoReveal ? ctx.timestamp : undefined;
 
+      clearCountersIfLeavingPlay(ctx, card.id, card.zone, cardFinalZone);
       ctx.db.CardInstance.id.update({
         ...card,
         zone: cardFinalZone,
@@ -2394,6 +2412,7 @@ export const move_cards_batch = spacetimedb.reducer(
               maxDiscardIdx = c.zoneIndex;
             }
           }
+          clearCountersIfLeavingPlay(ctx, accessory.id, accessory.zone, 'discard');
           ctx.db.CardInstance.id.update({
             ...accessory,
             zone: 'discard',
