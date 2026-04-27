@@ -144,6 +144,10 @@ function cardInstanceToGameCard(
       card.revealExpiresAt === undefined || card.revealStartedAt === undefined
         ? undefined
         : Number((card.revealExpiresAt.microsSinceUnixEpoch - card.revealStartedAt.microsSinceUnixEpoch) / 1000n),
+    outlineColor:
+      card.outlineColor === 'good' || card.outlineColor === 'evil'
+        ? card.outlineColor
+        : undefined,
   };
 }
 
@@ -278,6 +282,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // ---- Container sizing (respects flex layout) ----
   const containerRef = useRef<HTMLDivElement>(null);
   const { scale, offsetX, offsetY, containerWidth, containerHeight, virtualWidth } = useVirtualCanvas(containerRef);
+
+  // ---- Canvas text legibility floor ----
+  // Konva text is sized in virtual units and rendered through `scale`. On
+  // small viewports (e.g. 14" Retina laptops where scale ~0.79) the same
+  // virtual fontSize collapses below ~9 CSS px. `fs()` floors the rendered
+  // size at MIN_TEXT_PX so labels stay readable; at scale ≥ ~1 the original
+  // virtual size wins. `fsGrowth()` lets containers (label widths, badge
+  // offsets) scale alongside the floored text.
+  const MIN_TEXT_PX = 11;
+  const safeScale = Math.max(scale, 0.01);
+  const fs = (virtualSize: number) => Math.max(virtualSize, MIN_TEXT_PX / safeScale);
+  const fsGrowth = (virtualSize: number) => fs(virtualSize) / virtualSize;
 
   // ---- Game state ----
   const gameState = useGameState(gameId);
@@ -745,24 +761,65 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   // ---- Turn 1 reserve protection ----
   // On each player's first turn, cards should not leave the reserve zone.
   // We show a gentle confirmation dialog instead of hard-blocking.
+  // afterDismiss runs once the dialog closes (either confirm or cancel) and is
+  // used by the opponent-reserve flow to defer completing the ZoneSearchRequest
+  // until the user has decided — otherwise the request is deleted by the modal's
+  // auto-close-on-drag-end before `execute` runs and the server rejects the move.
   type PendingReserveMove =
-    | { kind: 'single'; execute: () => void }
-    | { kind: 'batch'; execute: () => void };
+    | { kind: 'single'; execute: () => void; afterDismiss?: () => void }
+    | { kind: 'batch'; execute: () => void; afterDismiss?: () => void };
   const [pendingReserveMove, setPendingReserveMove] = useState<PendingReserveMove | null>(null);
 
-  // turnNumber only increments when play cycles back to seat 0 (see END_TURN reducer),
-  // so both players' first turns share turnNumber === 1n — distinguish by currentTurn.
+  // When set, the opponent browse modal's onClose should NOT immediately call
+  // completeZoneSearch — it should hand the close opts off to afterDismiss so
+  // the search request stays valid until the user resolves the dialog.
+  const deferOpponentSearchCompleteRef = useRef<{
+    reqId: bigint;
+    storeOpts: (opts?: { shuffled?: boolean }) => void;
+  } | null>(null);
+
+  const dismissPendingReserveMove = useCallback(
+    (move: PendingReserveMove, execute: boolean) => {
+      if (execute) move.execute();
+      move.afterDismiss?.();
+      setPendingReserveMove(null);
+    },
+    [],
+  );
+
+  // A player is "still on their first turn" until they log an END_TURN action.
+  // Don't gate on whose turn it currently is — players can drag reserve cards
+  // while it's the opponent's turn (e.g. when seat 1 acts during seat 0's
+  // first turn before seat 1 has had any turn at all). The reserve restriction
+  // should fire any time the dragger hasn't yet completed their first turn.
   const isMyFirstTurn = useMemo(() => {
-    const { game, myPlayer } = gameState;
+    const { game, myPlayer, gameActions } = gameState;
     if (!game || !myPlayer) return false;
-    return game.turnNumber === BigInt(1) && game.currentTurn === myPlayer.seat;
+    return !gameActions.some(
+      (a) => a.playerId === myPlayer.id && a.actionType === 'END_TURN',
+    );
   }, [gameState]);
 
   const isOpponentFirstTurn = useMemo(() => {
-    const { game, opponentPlayer } = gameState;
+    const { game, opponentPlayer, gameActions } = gameState;
     if (!game || !opponentPlayer) return false;
-    return game.turnNumber === BigInt(1) && game.currentTurn === opponentPlayer.seat;
+    return !gameActions.some(
+      (a) => a.playerId === opponentPlayer.id && a.actionType === 'END_TURN',
+    );
   }, [gameState]);
+
+  // Allow ESC to dismiss the reserve protection dialog.
+  useEffect(() => {
+    if (!pendingReserveMove) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        dismissPendingReserveMove(pendingReserveMove, false);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [pendingReserveMove, dismissPendingReserveMove]);
 
   // Skip reserve protection in goldfish/practice mode (no opponent)
   const hasOpponent = !!gameState.opponentPlayer;
@@ -1454,6 +1511,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const isDraggingRef = useRef(false);
   const dragEndTimeRef = useRef<number>(0);
   const dragSourceZoneRef = useRef<string | null>(null);
+  const dragSourceOwnerRef = useRef<'my' | 'opponent' | 'shared' | null>(null);
   const dragOriginalPosRef = useRef<{ x: number; y: number } | null>(null);
   // Local coords in the original parent (before reparenting to the layer).
   // Used by snapBack to restore the card inside its source Group accurately.
@@ -1754,9 +1812,22 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             newOwnerId
           );
         };
-        // T1 reserve protection for opponent's reserve
+        // T1 reserve protection for opponent's reserve. Defer completing the
+        // search request until after the user resolves the dialog — otherwise
+        // the modal's drag-end auto-close deletes the request and `execute`
+        // fails with "Search request not found".
         if (isOpponentFirstTurn && approvedSearchRequest.zone === 'reserve' && toZone !== 'reserve') {
-          setPendingReserveMove({ kind: 'single', execute });
+          const reqId = BigInt(approvedSearchRequest.id);
+          let storedOpts: { shuffled?: boolean } = {};
+          deferOpponentSearchCompleteRef.current = {
+            reqId,
+            storeOpts: (opts) => { storedOpts = opts ?? {}; },
+          };
+          const afterDismiss = () => {
+            deferOpponentSearchCompleteRef.current = null;
+            completeZoneSearch(reqId, storedOpts.shuffled ?? false);
+          };
+          setPendingReserveMove({ kind: 'single', execute, afterDismiss });
         } else {
           execute();
         }
@@ -1794,9 +1865,20 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             moveOpponentCard(BigInt(approvedSearchRequest.id), BigInt(id), String(toZone));
           }
         };
-        // T1 reserve protection for opponent's reserve
+        // T1 reserve protection for opponent's reserve. See single-card branch
+        // above for why we defer completing the search request.
         if (isOpponentFirstTurn && approvedSearchRequest.zone === 'reserve' && toZone !== 'reserve') {
-          setPendingReserveMove({ kind: 'batch', execute });
+          const reqId = BigInt(approvedSearchRequest.id);
+          let storedOpts: { shuffled?: boolean } = {};
+          deferOpponentSearchCompleteRef.current = {
+            reqId,
+            storeOpts: (opts) => { storedOpts = opts ?? {}; },
+          };
+          const afterDismiss = () => {
+            deferOpponentSearchCompleteRef.current = null;
+            completeZoneSearch(reqId, storedOpts.shuffled ?? false);
+          };
+          setPendingReserveMove({ kind: 'batch', execute, afterDismiss });
         } else {
           execute();
         }
@@ -2123,6 +2205,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       }
       setIsCardDraggingUi(true);
       dragSourceZoneRef.current = card.zone;
+      const startSourceInstance = findAnyCardById(card.instanceId);
+      dragSourceOwnerRef.current =
+        startSourceInstance?.ownerId === 0n
+          ? 'shared'
+          : card.ownerId === 'player1'
+          ? 'my'
+          : 'opponent';
 
       // Turn off Konva's pixel-based hit detection for the duration of the drag.
       // Hit graph = an offscreen canvas where every listening shape is painted in a
@@ -2388,6 +2477,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       }, 220);
       dragEndTimeRef.current = performance.now();
       dragSourceZoneRef.current = null;
+      dragSourceOwnerRef.current = null;
       dragOriginalPosRef.current = null;
       dragOriginalLocalPosRef.current = null;
       dragCardSizeRef.current = null;
@@ -3816,7 +3906,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       x={zone.x + 6}
                       y={zone.y + 4}
                       text={zone.label.toUpperCase()}
-                      fontSize={11}
+                      fontSize={fs(11)}
                       fontFamily="Cinzel, Georgia, serif"
                       fill="#e8d5a3"
                       letterSpacing={1}
@@ -3884,7 +3974,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       x={zone.x + 6}
                       y={zone.y + 4}
                       text={zone.label.toUpperCase()}
-                      fontSize={11}
+                      fontSize={fs(11)}
                       fontFamily="Cinzel, Georgia, serif"
                       fill="#a3c5e8"
                       letterSpacing={1}
@@ -3925,14 +4015,15 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           {(() => {
             const areaRight = myHandRect.x + myHandRect.width;
             const bw = 26;
-            const lw = 52; // "HAND" at fontSize 12 + letterSpacing 2
+            // "HAND" at fontSize 12 + letterSpacing 2 — grows with floored text.
+            const lw = 52 * fsGrowth(12);
             const sx = areaRight - lw - 8 - bw - 6;
             return (
               <>
-                <Text x={sx} y={myHandRect.y + 4} text="HAND" fontSize={12} fontFamily="Cinzel, Georgia, serif" fill="#e8d5a3" letterSpacing={2} listening={false} />
+                <Text x={sx} y={myHandRect.y + 4} text="HAND" fontSize={fs(12)} fontFamily="Cinzel, Georgia, serif" fill="#e8d5a3" letterSpacing={2} listening={false} />
                 <Group x={sx + lw + 8} y={myHandRect.y + 2} listening={false}>
                   <Rect width={bw} height={18} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} />
-                  <Text text={String(myCards['hand']?.length ?? 0)} fontSize={12} fontStyle="bold" fill="#e8d5a3" width={bw} height={18} align="center" verticalAlign="middle" />
+                  <Text text={String(myCards['hand']?.length ?? 0)} fontSize={fs(12)} fontStyle="bold" fill="#e8d5a3" width={bw} height={18} align="center" verticalAlign="middle" />
                 </Group>
               </>
             );
@@ -3958,15 +4049,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           {(() => {
             const areaRight = opponentHandRect.x + opponentHandRect.width;
             const bw = 26;
-            const lw = 178; // "OPPONENT'S HAND" at fontSize 12 + letterSpacing 2
+            // "OPPONENT'S HAND" at fontSize 12 + letterSpacing 2 — grows with floored text.
+            const lw = 178 * fsGrowth(12);
             const totalW = lw + 8 + bw;
             const sx = areaRight - totalW - 6;
             return (
               <>
-                <Text x={sx} y={opponentHandRect.y + 4} text="OPPONENT'S HAND" fontSize={12} fontFamily="Cinzel, Georgia, serif" fill="#a3c5e8" letterSpacing={2} listening={false} />
+                <Text x={sx} y={opponentHandRect.y + 4} text="OPPONENT'S HAND" fontSize={fs(12)} fontFamily="Cinzel, Georgia, serif" fill="#a3c5e8" letterSpacing={2} listening={false} />
                 <Group x={sx + lw + 8} y={opponentHandRect.y + 2} listening={false}>
                   <Rect width={bw} height={18} fill="#101828" cornerRadius={4} stroke="#4a7ab5" strokeWidth={1} />
-                  <Text text={String(opponentCards['hand']?.length ?? 0)} fontSize={12} fontStyle="bold" fill="#a3c5e8" width={bw} height={18} align="center" verticalAlign="middle" />
+                  <Text text={String(opponentCards['hand']?.length ?? 0)} fontSize={fs(12)} fontStyle="bold" fill="#a3c5e8" width={bw} height={18} align="center" verticalAlign="middle" />
                 </Group>
               </>
             );
@@ -4401,7 +4493,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   <Rect width={28} height={20} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} />
                   <Text
                     text={String(count)}
-                    fontSize={14}
+                    fontSize={fs(14)}
                     fontStyle="bold"
                     fill="#e8d5a3"
                     width={28}
@@ -4415,7 +4507,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   y={py + pileHeight - 16}
                   width={pileWidth}
                   text="SOUL DECK"
-                  fontSize={9}
+                  fontSize={fs(9)}
                   fontFamily="Cinzel, Georgia, serif"
                   fill="#e8d5a3"
                   letterSpacing={1}
@@ -4436,7 +4528,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             if (oppLob) lobEntries.push({ zone: oppLob, isOpponent: true });
             return lobEntries.map(({ zone, isOpponent }) => {
               const cards = isOpponent ? (opponentCards['land-of-bondage'] ?? []) : (myCards['land-of-bondage'] ?? []);
-              const labelTextWidth = zone.label.toUpperCase().length * 8.5;
+              const labelTextWidth = zone.label.toUpperCase().length * 8.5 * fsGrowth(11);
               const fillColor = isOpponent ? '#a3c5e8' : '#e8d5a3';
               const badgeFill = isOpponent ? 'rgba(100, 149, 237, 0.25)' : 'rgba(196, 149, 90, 0.25)';
               const badgeStroke = isOpponent ? 'rgba(100, 149, 237, 0.5)' : 'rgba(196, 149, 90, 0.5)';
@@ -4461,7 +4553,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     x={labelX}
                     y={zone.y + 4}
                     text={zone.label.toUpperCase()}
-                    fontSize={11}
+                    fontSize={fs(11)}
                     fontFamily="Cinzel, Georgia, serif"
                     fill={fillColor}
                     letterSpacing={1}
@@ -4483,7 +4575,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     y={zone.y + 4}
                     width={badgeW}
                     text={String(cards.length)}
-                    fontSize={11}
+                    fontSize={fs(11)}
                     fill={fillColor}
                     align="center"
                   />
@@ -4498,7 +4590,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           {normalizedFormat === 'Paragon' && mpLayout?.zones.sharedLob && (() => {
             const zone = mpLayout.zones.sharedLob!;
             const cards = sharedCards['land-of-bondage'] ?? [];
-            const labelTextWidth = zone.label.toUpperCase().length * 8.5;
+            const labelTextWidth = zone.label.toUpperCase().length * 8.5 * fsGrowth(11);
             const fillColor = '#e8d5a3';
             const badgeFill = 'rgba(196, 149, 90, 0.25)';
             const badgeStroke = 'rgba(196, 149, 90, 0.5)';
@@ -4523,7 +4615,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   x={labelX}
                   y={zone.y + 4}
                   text={zone.label.toUpperCase()}
-                  fontSize={11}
+                  fontSize={fs(11)}
                   fontFamily="Cinzel, Georgia, serif"
                   fill={fillColor}
                   letterSpacing={1}
@@ -4545,7 +4637,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   y={zone.y + 4}
                   width={badgeW}
                   text={String(cards.length)}
-                  fontSize={11}
+                  fontSize={fs(11)}
                   fill={fillColor}
                   align="center"
                 />
@@ -4563,7 +4655,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             if (myTerr) territoryEntries.push({ zone: myTerr, isOpponent: false, cards: myCards['territory'] ?? [] });
             if (oppTerr) territoryEntries.push({ zone: oppTerr, isOpponent: true, cards: opponentCards['territory'] ?? [] });
             return territoryEntries.map(({ zone, isOpponent, cards }) => {
-              const labelTextWidth = zone.label.toUpperCase().length * 8.5;
+              const labelTextWidth = zone.label.toUpperCase().length * 8.5 * fsGrowth(11);
               const fillColor = isOpponent ? '#a3c5e8' : '#e8d5a3';
               const badgeFill = isOpponent ? 'rgba(100, 149, 237, 0.25)' : 'rgba(196, 149, 90, 0.25)';
               const badgeStroke = isOpponent ? 'rgba(100, 149, 237, 0.5)' : 'rgba(196, 149, 90, 0.5)';
@@ -4588,7 +4680,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     x={labelX}
                     y={zone.y + 4}
                     text={zone.label.toUpperCase()}
-                    fontSize={11}
+                    fontSize={fs(11)}
                     fontFamily="Cinzel, Georgia, serif"
                     fill={fillColor}
                     letterSpacing={1}
@@ -4610,7 +4702,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     y={zone.y + 4}
                     width={badgeW}
                     text={String(cards.length)}
-                    fontSize={11}
+                    fontSize={fs(11)}
                     fill={fillColor}
                     align="center"
                   />
@@ -4663,7 +4755,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   <Rect width={26} height={18} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} />
                   <Text
                     text={String(count)}
-                    fontSize={12}
+                    fontSize={fs(12)}
                     fontStyle="bold"
                     fill="#e8d5a3"
                     width={26}
@@ -4691,7 +4783,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     <Rect width={20} height={18} fill="#1a2e1a" cornerRadius={4} stroke="#5a9a5a" strokeWidth={1} />
                     <Text
                       text="👁"
-                      fontSize={11}
+                      fontSize={fs(11)}
                       width={20}
                       height={18}
                       align="center"
@@ -4860,7 +4952,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   <Rect width={26} height={18} fill="#101828" cornerRadius={4} stroke="#4a7ab5" strokeWidth={1} />
                   <Text
                     text={String(count)}
-                    fontSize={12}
+                    fontSize={fs(12)}
                     fontStyle="bold"
                     fill="#a3c5e8"
                     width={26}
@@ -4876,7 +4968,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     <Rect width={20} height={18} fill="#1a2e1a" cornerRadius={4} stroke="#5a9a5a" strokeWidth={1} />
                     <Text
                       text="👁"
-                      fontSize={11}
+                      fontSize={fs(11)}
                       width={20}
                       height={18}
                       align="center"
@@ -5148,6 +5240,64 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       </Stage>
 
       {/* ================================================================
+          Turn / whose-turn label — top-left, above the opponent's hand.
+          Lives as an HTML overlay (not Konva) so its size is governed by
+          the FZ clamp() scale, not the canvas scale, and stays legible on
+          small viewports. Replaces the equivalent block that used to live
+          in the TurnIndicator bar — moving it here freed enough room in
+          the bar to keep the centered phase row from overlapping the
+          score on narrow viewports.
+          ================================================================ */}
+      {gameState.game && gameState.myPlayer && (
+        <div
+          className="pointer-events-none absolute z-20"
+          style={{
+            top: 8,
+            left: 12,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-start',
+            gap: 3,
+            padding: '6px 12px',
+            background: 'rgba(10, 8, 5, 0.85)',
+            border: '1px solid rgba(107, 78, 39, 0.4)',
+            borderRadius: 6,
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
+          }}
+        >
+          <span
+            style={{
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: 'clamp(11px, 0.45vw + 7px, 13px)',
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: 'rgba(232, 213, 163, 0.55)',
+              lineHeight: 1,
+            }}
+          >
+            Turn{' '}
+            <span style={{ color: '#e8d5a3', fontSize: 'clamp(13px, 0.5vw + 9px, 15px)', fontWeight: 700 }}>
+              {Number(gameState.game.turnNumber ?? 1)}
+            </span>
+          </span>
+          <span
+            style={{
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: 'clamp(10px, 0.4vw + 7px, 12px)',
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: gameState.isMyTurn ? '#c4955a' : '#4a7ab5',
+              lineHeight: 1,
+            }}
+          >
+            {gameState.isMyTurn
+              ? `${gameState.myPlayer.displayName ?? 'You'}'s turn (you)`
+              : `${gameState.opponentPlayer?.displayName ?? 'Opponent'}'s turn`}
+          </span>
+        </div>
+      )}
+
+      {/* ================================================================
           Detach ("unlink") icons at each weapon/warrior seam.
           HTML overlay — only local-player weapons get the icon, since
           you can't unequip the opponent's cards.
@@ -5232,8 +5382,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 450 }}>
           {allZoneRects.map(({ key, rect, owner }) => {
             // Don't highlight the source zone
-            const sourceKey = dragSourceZoneRef.current
-              ? `my:${dragSourceZoneRef.current}`
+            const sourceKey = dragSourceZoneRef.current && dragSourceOwnerRef.current
+              ? `${dragSourceOwnerRef.current}:${dragSourceZoneRef.current}`
               : null;
             if (key === sourceKey) return null;
 
@@ -5910,7 +6060,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 shuffleOpponentDeck(reqId);
               }
             }}
-            onClose={(opts) => completeZoneSearch(BigInt(approvedSearchRequest.id), opts?.shuffled ?? false)}
+            onClose={(opts) => {
+              // If a Turn 1 reserve protection dialog is about to take over,
+              // hand the close opts to it and let it complete the search after
+              // the user resolves. Otherwise complete immediately as normal.
+              const deferred = deferOpponentSearchCompleteRef.current;
+              if (deferred) {
+                deferred.storeOpts(opts);
+                return;
+              }
+              completeZoneSearch(BigInt(approvedSearchRequest.id), opts?.shuffled ?? false);
+            }}
             onStartDrag={opponentModalStartDrag}
             onStartMultiDrag={opponentModalStartMultiDrag}
             didDragRef={opponentModalDidDragRef}
@@ -6289,7 +6449,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             justifyContent: 'center',
             background: 'rgba(0,0,0,0.4)',
           }}
-          onClick={() => setPendingReserveMove(null)}
+          onClick={() => dismissPendingReserveMove(pendingReserveMove, false)}
         >
           <div
             style={{
@@ -6313,10 +6473,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
               <button
-                onClick={() => {
-                  pendingReserveMove.execute();
-                  setPendingReserveMove(null);
-                }}
+                onClick={() => dismissPendingReserveMove(pendingReserveMove, true)}
                 style={{
                   padding: '7px 20px',
                   background: '#2d5a27',
@@ -6334,7 +6491,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 Move Anyway
               </button>
               <button
-                onClick={() => setPendingReserveMove(null)}
+                onClick={() => dismissPendingReserveMove(pendingReserveMove, false)}
                 style={{
                   padding: '7px 20px',
                   background: '#5a2727',

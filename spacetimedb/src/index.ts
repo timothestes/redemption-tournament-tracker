@@ -244,6 +244,7 @@ function insertCardsShuffleDraw(
       isToken: false,
       revealExpiresAt: undefined,
       revealStartedAt: undefined,
+      outlineColor: '',
     });
   }
 
@@ -344,6 +345,7 @@ function initializeSoulDeck(ctx: any, game: any) {
       isToken: false,
       revealExpiresAt: undefined,
       revealStartedAt: undefined,
+      outlineColor: '',
     });
   }
 
@@ -1903,6 +1905,7 @@ export const move_card = spacetimedb.reducer(
       equippedToInstanceId: clearEquippedOnMover ? 0n : card.equippedToInstanceId,
       revealExpiresAt: newRevealExpiresAt,
       revealStartedAt: newRevealStartedAt,
+      outlineColor: toZone === 'territory' ? card.outlineColor : '',
     });
 
     if (leavingZone) {
@@ -2355,6 +2358,7 @@ export const move_cards_batch = spacetimedb.reducer(
         equippedToInstanceId: leavingZone && !hostInBatch ? 0n : card.equippedToInstanceId,
         revealExpiresAt: newRevealExpiresAt,
         revealStartedAt: newRevealStartedAt,
+        outlineColor: cardFinalZone === 'territory' ? card.outlineColor : '',
       });
     }
 
@@ -2427,6 +2431,40 @@ export const move_cards_batch = spacetimedb.reducer(
     }
   }
 );
+
+// ---------------------------------------------------------------------------
+// Helper: setCardOutlineImpl
+// Called by execute_card_ability when ability.type === 'set_card_outline'.
+// Re-picking the same color clears it (mutually-exclusive cycle); picking the
+// other color switches.
+// ---------------------------------------------------------------------------
+function setCardOutlineImpl(
+  ctx: any,
+  source: any,
+  ability: Extract<CardAbility, { type: 'set_card_outline' }>,
+  player: any,
+  gameId: bigint,
+) {
+  const next = source.outlineColor === ability.color ? '' : ability.color;
+  ctx.db.CardInstance.id.update({ ...source, outlineColor: next });
+
+  const game = ctx.db.Game.id.find(gameId);
+  if (game) {
+    logAction(
+      ctx,
+      gameId,
+      player.id,
+      'SET_CARD_OUTLINE',
+      JSON.stringify({
+        cardName: source.cardName,
+        cardInstanceId: source.id.toString(),
+        color: next,
+      }),
+      game.turnNumber,
+      game.currentPhase,
+    );
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Helper: spawnTokenImpl
@@ -2508,6 +2546,7 @@ function spawnTokenImpl(
       reference: tokenData.reference,
       revealExpiresAt: undefined,
       revealStartedAt: undefined,
+      outlineColor: '',
     });
   }
 
@@ -2836,6 +2875,8 @@ export const execute_card_ability = spacetimedb.reducer(
         return reserveTopOfDeckImpl(ctx, source, ability, player, gameId);
       case 'draw_bottom_of_deck':
         return drawBottomOfDeckImpl(ctx, source, ability, player, gameId);
+      case 'set_card_outline':
+        return setCardOutlineImpl(ctx, source, ability, player, gameId);
       case 'custom':
         throw new SenderError('Custom abilities are dispatched by the client, not this reducer');
     }
@@ -4317,6 +4358,7 @@ export const spawn_lost_soul = spacetimedb.reducer(
       isToken: true,
       revealExpiresAt: undefined,
       revealStartedAt: undefined,
+      outlineColor: '',
     });
 
     logAction(ctx, gameId, player.id, 'SPAWN_LOST_SOUL', JSON.stringify({ testament }), game.turnNumber, game.currentPhase);

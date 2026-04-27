@@ -210,6 +210,26 @@ export const GameCardNode = memo(function GameCardNode({
         listening={false}
       />
 
+      {/* Card outline marker — Three Woes "Choose Good"/"Choose Evil".
+          Visible to all players; gated to Territory at render time as a
+          defense-in-depth (the reducers also clear it on territory exit). */}
+      {card.outlineColor && card.zone === 'territory' && (
+        <Rect
+          x={-2}
+          y={-2}
+          width={cardWidth + 4}
+          height={cardHeight + 4}
+          fill="transparent"
+          stroke={card.outlineColor === 'good' ? '#22c55e' : '#dc2626'}
+          strokeWidth={3}
+          cornerRadius={6}
+          shadowColor={card.outlineColor === 'good' ? '#22c55e' : '#dc2626'}
+          shadowBlur={10}
+          shadowOpacity={0.55}
+          listening={false}
+        />
+      )}
+
       {/* Selection highlight — golden glow border */}
       {isSelected && (
         <Rect

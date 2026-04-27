@@ -27,6 +27,7 @@ export type CardAbility =
   | { type: 'discard_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'reserve_top_of_deck'; count: number }
   | { type: 'draw_bottom_of_deck'; count: number }
+  | { type: 'set_card_outline'; color: 'good' | 'evil'; label: string }
   | { type: 'custom'; reducerName: string; label: string };
 
 export const CARD_ABILITIES: Record<string, CardAbility[]> = {
@@ -93,6 +94,10 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   "Herod's Temple [2022 - GoC P]":                       [{ type: 'reserve_top_of_deck', count: 1 }],
   'Treacherous Land':                                    [{ type: 'draw_bottom_of_deck', count: 1 }],
   'Treacherous Land (2022 - 2nd Place)':                 [{ type: 'draw_bottom_of_deck', count: 1 }],
+  'Three Woes (RoJ AB)':                                 [{ type: 'set_card_outline', color: 'good', label: 'Choose Good' }, { type: 'set_card_outline', color: 'evil', label: 'Choose Evil' }],
+  'Three Woes (RoJ)':                                    [{ type: 'set_card_outline', color: 'good', label: 'Choose Good' }, { type: 'set_card_outline', color: 'evil', label: 'Choose Evil' }],
+  'Three Woes [Fundraiser]':                             [{ type: 'set_card_outline', color: 'good', label: 'Choose Good' }, { type: 'set_card_outline', color: 'evil', label: 'Choose Evil' }],
+  'Three Woes [Fundraiser - Serialized]':                [{ type: 'set_card_outline', color: 'good', label: 'Choose Good' }, { type: 'set_card_outline', color: 'evil', label: 'Choose Evil' }],
 };
 
 export function getAbilitiesForCard(identifier: string): CardAbility[] {

@@ -113,6 +113,28 @@ function spawnTokenInState(
   return { ...state, zones, history };
 }
 
+function setCardOutlineInState(
+  state: GameState,
+  source: GameCard,
+  ability: Extract<CardAbility, { type: 'set_card_outline' }>,
+  history: GameState[],
+): GameState {
+  // Re-picking the same color clears it (mutually-exclusive toggle); picking
+  // the other color switches.
+  const next: GameCard['outlineColor'] =
+    source.outlineColor === ability.color ? undefined : ability.color;
+
+  const zones = cloneZones(state.zones);
+  for (const key of Object.keys(zones) as ZoneId[]) {
+    const idx = zones[key].findIndex(c => c.instanceId === source.instanceId);
+    if (idx !== -1) {
+      zones[key][idx] = { ...zones[key][idx], outlineColor: next };
+      break;
+    }
+  }
+  return { ...state, zones, history };
+}
+
 function shuffleAndDrawInState(
   state: GameState,
   _ownerId: string,
@@ -305,6 +327,11 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       // Per-card hand reveals are ephemeral — clear when the card changes zone.
       if (result.fromZone !== toZone) {
         result.card.revealUntil = undefined;
+      }
+      // Outline marker (Three Woes "Choose Good"/"Choose Evil") clears when
+      // the card leaves Territory.
+      if (toZone !== 'territory') {
+        result.card.outlineColor = undefined;
       }
       // Paragon: rescuing a Soul-Deck-origin card transfers ownership from
       // the shared sentinel to the rescuing player. Marker stays set.
@@ -639,6 +666,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         if (result.fromZone !== finalZone) {
           result.card.revealUntil = undefined;
         }
+        if (finalZone !== 'territory') {
+          result.card.outlineColor = undefined;
+        }
         const wasSharedSoulFromLob =
           result.fromZone === 'land-of-bondage' &&
           result.card.ownerId === 'shared' &&
@@ -926,6 +956,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           return reserveTopOfDeckInState(state, source, ability, history);
         case 'draw_bottom_of_deck':
           return drawBottomOfDeckInState(state, source, ability, history);
+        case 'set_card_outline':
+          return setCardOutlineInState(state, source, ability, history);
         case 'custom':
           // Custom abilities are dispatched client-side in multiplayer and
           // never reach the goldfish reducer in v1. No-op defensively.

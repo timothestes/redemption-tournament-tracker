@@ -46,6 +46,7 @@ export const CardInstance = __t.object("CardInstance", {
   revealExpiresAt: __t.option(__t.timestamp()),
   originalOwnerId: __t.u64(),
   revealStartedAt: __t.option(__t.timestamp()),
+  outlineColor: __t.string(),
 });
 export type CardInstance = __Infer<typeof CardInstance>;
 

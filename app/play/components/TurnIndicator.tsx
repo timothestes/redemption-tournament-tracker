@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { PHASE_ORDER } from '@/app/goldfish/types';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import type { GamePhase } from '@/app/shared/types/gameCard';
@@ -16,6 +16,19 @@ const PHASE_LABELS: Record<string, string> = {
   battle: 'Battle',
   discard: 'Discard',
 };
+
+// Fluid type scale — keeps the bar legible on Retina laptops (small logical
+// viewport, high DPI) without growing chunky on large monitors. Each clamp()
+// floors near the original design size and grows ~1.2-1.3x at typical widths.
+const FZ = {
+  caption: 'clamp(9px, 0.4vw + 6px, 11px)',     // formerly 8 ("you", "opp")
+  label: 'clamp(10px, 0.4vw + 7px, 12px)',      // formerly 9 ("X's turn")
+  ui: 'clamp(11px, 0.45vw + 7px, 13px)',        // formerly 10 (Cinzel UI labels, phase buttons, End Turn, Concede)
+  body: 'clamp(12px, 0.5vw + 8px, 14px)',       // formerly 12 (winner label, timer, modal buttons)
+  bodyLg: 'clamp(13px, 0.5vw + 9px, 15px)',     // formerly 13 (turn number, modal body)
+  headline: 'clamp(18px, 0.6vw + 12px, 22px)',  // formerly 18 (arrows, modal headlines)
+  score: 'clamp(20px, 0.8vw + 14px, 26px)',     // formerly 20 (score numbers)
+} as const;
 
 // ---------------------------------------------------------------------------
 // Props
@@ -85,6 +98,58 @@ export default function TurnIndicator({
   const isFirstPhase = currentIdx <= 0;
   const isLastPhase = currentIdx >= PHASE_ORDER.length - 1;
 
+  // Each client animates independently from its own currentPhase observation —
+  // the SpacetimeDB subscription drives the re-render, CSS transitions do the slide.
+  const phaseRowRef = useRef<HTMLDivElement | null>(null);
+  const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [activeBounds, setActiveBounds] = useState<{ left: number; width: number }>({ left: 0, width: 0 });
+  const hasMeasuredRef = useRef(false);
+
+  // Measure the bar's own width so we can hide non-essential bits (the timer)
+  // when the playfield container is narrow — e.g. on a 14" laptop or when the
+  // loupe sidebar is open. Width-based, not viewport-based, since the bar
+  // shrinks when the right-side panel opens.
+  const barRef = useRef<HTMLDivElement | null>(null);
+  const [isBarNarrow, setIsBarNarrow] = useState(false);
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const update = () => setIsBarNarrow(el.clientWidth < 1100);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  useLayoutEffect(() => {
+    const btn = buttonRefs.current[currentPhase];
+    if (!btn) return;
+    setActiveBounds({ left: btn.offsetLeft, width: btn.offsetWidth });
+    hasMeasuredRef.current = true;
+  }, [currentPhase]);
+
+  // Remeasure on viewport changes and font load (Cinzel can shift widths).
+  useEffect(() => {
+    const remeasure = () => {
+      const btn = buttonRefs.current[currentPhase];
+      if (!btn) return;
+      setActiveBounds({ left: btn.offsetLeft, width: btn.offsetWidth });
+    };
+    window.addEventListener('resize', remeasure);
+    let observer: ResizeObserver | undefined;
+    if (phaseRowRef.current && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(remeasure);
+      observer.observe(phaseRowRef.current);
+    }
+    if (typeof document !== 'undefined' && (document as any).fonts?.ready) {
+      (document as any).fonts.ready.then(remeasure).catch(() => {});
+    }
+    return () => {
+      window.removeEventListener('resize', remeasure);
+      observer?.disconnect();
+    };
+  }, [currentPhase]);
+
   const myName: string = myPlayer?.displayName ?? 'You';
   const opponentName: string = opponentPlayer?.displayName ?? 'Opponent';
 
@@ -106,19 +171,39 @@ export default function TurnIndicator({
 
   return (
     <div
+      ref={barRef}
       style={{
         position: 'relative',
         width: '100%',
         height: '100%',
         background: 'rgba(10, 8, 5, 0.96)',
         borderBottom: '1px solid rgba(107, 78, 39, 0.5)',
-        display: 'flex',
+        // Three columns: left cluster | center cluster | right cluster.
+        // `1fr auto 1fr` keeps the center anchored to the bar's geometric
+        // midpoint while the side `1fr` tracks share the remaining space.
+        // This works here because the left cluster (exit + score + timer)
+        // and right cluster (Concede) are now both small enough to fit in
+        // their 1fr share — TURN N / NAME's-turn moved to a canvas overlay
+        // over the opponent's hand zone, freeing ~140px from the left.
+        display: 'grid',
+        gridTemplateColumns: '1fr auto 1fr',
         alignItems: 'center',
+        gap: 8,
         paddingLeft: 12,
         paddingRight: 12,
-        gap: 0,
       }}
     >
+      {/* ================================================================
+          LEFT — Exit + turn counter + whose turn + score + timer
+          ================================================================ */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          minWidth: 0,
+        }}
+      >
       {/* Exit to lobby */}
       <button
         onClick={() => isFinished ? window.location.href = '/play' : setShowLeaveConfirm(true)}
@@ -130,7 +215,6 @@ export default function TurnIndicator({
           width: 28,
           height: 28,
           borderRadius: 4,
-          marginRight: 8,
           flexShrink: 0,
           border: 'none',
           background: 'transparent',
@@ -154,9 +238,9 @@ export default function TurnIndicator({
         </svg>
       </button>
 
-      {/* ================================================================
-          LEFT — Turn counter + whose turn + score
-          ================================================================ */}
+      {/* Score + timer wrapper. The TURN N / NAME's turn block lives over
+          the opponent's hand zone in the canvas instead — keeps the bar
+          narrow enough that the centered phase row never collides. */}
       <div
         style={{
           display: 'flex',
@@ -165,62 +249,6 @@ export default function TurnIndicator({
           flexShrink: 0,
         }}
       >
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'flex-start',
-          minWidth: 100,
-        }}
-      >
-        {isFinished ? (
-          <span
-            style={{
-              fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 12,
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-              color: '#e8d5a3',
-              fontWeight: 700,
-              lineHeight: 1.3,
-            }}
-          >
-            {winnerName ? `${winnerName} wins` : 'Game over'}
-          </span>
-        ) : (
-          <>
-            <span
-              style={{
-                fontFamily: 'var(--font-cinzel), Georgia, serif',
-                fontSize: 10,
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                color: 'rgba(232, 213, 163, 0.55)',
-                lineHeight: 1,
-              }}
-            >
-              Turn{' '}
-              <span style={{ color: '#e8d5a3', fontSize: 13, fontWeight: 700 }}>
-                {turnNumber}
-              </span>
-            </span>
-            <span
-              style={{
-                fontFamily: 'var(--font-cinzel), Georgia, serif',
-                fontSize: 9,
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase',
-                color: isMyTurn ? '#c4955a' : '#4a7ab5',
-                lineHeight: 1,
-                marginTop: 3,
-              }}
-            >
-              {isMyTurn ? `${myName}'s turn (you)` : `${opponentName}'s turn`}
-            </span>
-          </>
-        )}
-      </div>
-
       {/* Score */}
       <div
         style={{
@@ -231,13 +259,13 @@ export default function TurnIndicator({
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <span style={{ color: '#c4955a', fontSize: 20, fontWeight: 700, lineHeight: 1 }}>{myScore}</span>
-          <span style={{ color: 'rgba(196, 149, 90, 0.45)', fontSize: 8, letterSpacing: '0.08em', textTransform: 'uppercase', lineHeight: 1, marginTop: 2 }}>you</span>
+          <span style={{ color: '#c4955a', fontSize: FZ.score, fontWeight: 700, lineHeight: 1 }}>{myScore}</span>
+          <span style={{ color: 'rgba(196, 149, 90, 0.45)', fontSize: FZ.caption, letterSpacing: '0.08em', textTransform: 'uppercase', lineHeight: 1, marginTop: 2 }}>you</span>
         </div>
-        <span style={{ color: 'rgba(232, 213, 163, 0.2)', fontSize: 10, fontWeight: 400 }}>vs</span>
+        <span style={{ color: 'rgba(232, 213, 163, 0.2)', fontSize: FZ.ui, fontWeight: 400 }}>vs</span>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <span style={{ color: '#4a7ab5', fontSize: 20, fontWeight: 700, lineHeight: 1 }}>{opponentScore}</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: 'rgba(74, 122, 181, 0.45)', fontSize: 8, letterSpacing: '0.08em', textTransform: 'uppercase', lineHeight: 1, marginTop: 2 }}>
+          <span style={{ color: '#4a7ab5', fontSize: FZ.score, fontWeight: 700, lineHeight: 1 }}>{opponentScore}</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: 'rgba(74, 122, 181, 0.45)', fontSize: FZ.caption, letterSpacing: '0.08em', textTransform: 'uppercase', lineHeight: 1, marginTop: 2 }}>
             opp
             <span
               title={opponentConnectionStatus === 'connected' ? 'Connected' : opponentConnectionStatus === 'reconnecting' ? 'Reconnecting...' : 'Disconnected'}
@@ -255,13 +283,14 @@ export default function TurnIndicator({
         </div>
       </div>
 
-      {/* Game timer */}
-      {timerVisible && timerDisplay && (
+      {/* Game timer — hidden on narrow bars to avoid colliding with the
+          centered phase indicator. */}
+      {timerVisible && timerDisplay && !isBarNarrow && (
         <span
           title={timerPaused ? 'Timer paused (searching)' : 'Elapsed game time'}
           style={{
             fontFamily: 'var(--font-cinzel), Georgia, serif',
-            fontSize: 12,
+            fontSize: FZ.body,
             fontVariantNumeric: 'tabular-nums',
             letterSpacing: '0.04em',
             color: timerPaused ? 'rgba(232, 213, 163, 0.25)' : 'rgba(232, 213, 163, 0.45)',
@@ -273,22 +302,22 @@ export default function TurnIndicator({
         </span>
       )}
       </div>
+      </div>
 
       {/* ================================================================
-          CENTER — ‹ Arrow | Phase buttons | › Arrow (matches goldfish)
-          Absolute-positioned so it's true-centered on the bar regardless
-          of left/right cluster widths.
+          CENTER — ‹ Arrow | Phase buttons | › Arrow | End Turn
+          Sits in the middle grid column. With `1fr auto 1fr` columns the
+          center is anchored to the bar's geometric midpoint while the
+          left/right `1fr` tracks absorb spare space — and shifts gracefully
+          rather than overlapping when one side outgrows its track.
           ================================================================ */}
       <div
         style={{
-          position: 'absolute',
-          left: '50%',
-          top: '50%',
-          transform: 'translate(-50%, -50%)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           gap: 2,
+          minWidth: 0,
         }}
       >
         {/* Previous phase arrow */}
@@ -301,7 +330,7 @@ export default function TurnIndicator({
             border: 'none',
             cursor: !isMyTurn || isFirstPhase ? 'default' : 'pointer',
             color: !isMyTurn || isFirstPhase ? 'rgba(107, 78, 39, 0.3)' : 'rgba(232, 213, 163, 0.45)',
-            fontSize: 18,
+            fontSize: FZ.headline,
             fontFamily: 'serif',
             padding: '2px 6px',
             transition: 'color 0.2s',
@@ -313,67 +342,100 @@ export default function TurnIndicator({
           &#x276E;
         </button>
 
-        {PHASE_ORDER.map((phase) => {
-          const isActive = phase === currentPhase;
-          const canClick = isMyTurn && !isActive;
+        <div
+          ref={phaseRowRef}
+          style={{
+            position: 'relative',
+            display: 'flex',
+            alignItems: 'stretch',
+            gap: 2,
+          }}
+        >
+          {/* Sliding pill (behind the buttons). */}
+          <span
+            aria-hidden
+            style={{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              left: 0,
+              width: activeBounds.width,
+              transform: `translateX(${activeBounds.left}px)`,
+              background: 'rgba(196, 149, 90, 0.15)',
+              border: '1px solid rgba(196, 149, 90, 0.45)',
+              borderRadius: 20,
+              boxSizing: 'border-box',
+              opacity: hasMeasuredRef.current && activeBounds.width > 0 ? 1 : 0,
+              transition: 'transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), width 0.32s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s',
+              pointerEvents: 'none',
+              willChange: 'transform, width',
+            }}
+          />
 
-          return (
-            <button
-              key={phase}
-              onClick={() => canClick && onSetPhase(phase)}
-              disabled={!isMyTurn}
-              title={isMyTurn ? `Go to ${PHASE_LABELS[phase]}` : PHASE_LABELS[phase]}
-              style={{
-                position: 'relative',
-                padding: '4px 10px',
-                background: isActive ? 'rgba(196, 149, 90, 0.15)' : 'transparent',
-                border: isActive ? '1px solid rgba(196, 149, 90, 0.45)' : '1px solid transparent',
-                borderRadius: 20,
-                cursor: canClick ? 'pointer' : 'default',
-                fontFamily: 'var(--font-cinzel), Georgia, serif',
-                fontSize: 10,
-                letterSpacing: '0.07em',
-                textTransform: 'uppercase',
-                color: isActive
-                  ? '#e8d5a3'
-                  : isMyTurn
-                  ? 'rgba(232, 213, 163, 0.45)'
-                  : 'rgba(150, 150, 160, 0.35)',
-                transition: 'color 0.15s, background 0.15s, border-color 0.15s',
-                whiteSpace: 'nowrap',
-              }}
-              onMouseEnter={(e) => {
-                if (canClick) {
-                  e.currentTarget.style.color = '#e8d5a3';
-                  e.currentTarget.style.background = 'rgba(196, 149, 90, 0.08)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (canClick) {
-                  e.currentTarget.style.color = 'rgba(232, 213, 163, 0.45)';
-                  e.currentTarget.style.background = 'transparent';
-                }
-              }}
-            >
-              {PHASE_LABELS[phase]}
-              {isActive && (
-                <span
-                  style={{
-                    position: 'absolute',
-                    bottom: 2,
-                    left: '15%',
-                    right: '15%',
-                    height: 2,
-                    background: '#c4955a',
-                    borderRadius: 1,
-                    boxShadow: '0 0 6px rgba(196, 149, 90, 0.5)',
-                    display: 'block',
-                  }}
-                />
-              )}
-            </button>
-          );
-        })}
+          {/* Sliding underline (rides along under the pill). */}
+          <span
+            aria-hidden
+            style={{
+              position: 'absolute',
+              bottom: 2,
+              left: 0,
+              height: 2,
+              width: activeBounds.width * 0.7,
+              transform: `translateX(${activeBounds.left + activeBounds.width * 0.15}px)`,
+              background: '#c4955a',
+              borderRadius: 1,
+              boxShadow: '0 0 6px rgba(196, 149, 90, 0.5)',
+              opacity: hasMeasuredRef.current && activeBounds.width > 0 ? 1 : 0,
+              transition: 'transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), width 0.32s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s',
+              pointerEvents: 'none',
+              willChange: 'transform, width',
+              zIndex: 1,
+            }}
+          />
+
+          {PHASE_ORDER.map((phase) => {
+            const isActive = phase === currentPhase;
+            const canClick = isMyTurn && !isActive;
+
+            return (
+              <button
+                key={phase}
+                ref={(el) => { buttonRefs.current[phase] = el; }}
+                onClick={() => canClick && onSetPhase(phase)}
+                disabled={!isMyTurn}
+                title={isMyTurn ? `Go to ${PHASE_LABELS[phase]}` : PHASE_LABELS[phase]}
+                style={{
+                  position: 'relative',
+                  padding: '4px 10px',
+                  background: 'transparent',
+                  border: '1px solid transparent',
+                  borderRadius: 20,
+                  cursor: canClick ? 'pointer' : 'default',
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  fontSize: FZ.ui,
+                  letterSpacing: '0.07em',
+                  textTransform: 'uppercase',
+                  color: isActive
+                    ? '#e8d5a3'
+                    : isMyTurn
+                    ? 'rgba(232, 213, 163, 0.45)'
+                    : 'rgba(150, 150, 160, 0.35)',
+                  transition: 'color 0.24s ease-out',
+                  whiteSpace: 'nowrap',
+                  zIndex: 1,
+                }}
+                onMouseEnter={(e) => {
+                  if (canClick) e.currentTarget.style.color = '#e8d5a3';
+                }}
+                onMouseLeave={(e) => {
+                  if (canClick) e.currentTarget.style.color = 'rgba(232, 213, 163, 0.45)';
+                }}
+              >
+                {PHASE_LABELS[phase]}
+              </button>
+            );
+          })}
+        </div>
 
         {/* Next phase / End Turn arrow */}
         <button
@@ -385,7 +447,7 @@ export default function TurnIndicator({
             border: 'none',
             cursor: !isMyTurn ? 'default' : 'pointer',
             color: !isMyTurn ? 'rgba(107, 78, 39, 0.3)' : 'rgba(232, 213, 163, 0.45)',
-            fontSize: 18,
+            fontSize: FZ.headline,
             fontFamily: 'serif',
             padding: '2px 6px',
             transition: 'color 0.2s',
@@ -410,7 +472,7 @@ export default function TurnIndicator({
             borderRadius: 4,
             cursor: isMyTurn ? 'pointer' : 'default',
             fontFamily: 'var(--font-cinzel), Georgia, serif',
-            fontSize: 10,
+            fontSize: FZ.ui,
             letterSpacing: '0.07em',
             textTransform: 'uppercase',
             color: isMyTurn ? '#e8d5a3' : 'rgba(196, 149, 90, 0.3)',
@@ -437,12 +499,12 @@ export default function TurnIndicator({
           ================================================================ */}
       <div
         style={{
-          marginLeft: 'auto',
+          justifySelf: 'end',
           display: 'flex',
           alignItems: 'center',
           gap: 6,
           flexShrink: 0,
-          justifyContent: 'flex-end',
+          minWidth: 0,
         }}
       >
         {isFinished && onPlayAgain && (
@@ -456,7 +518,7 @@ export default function TurnIndicator({
               borderRadius: 4,
               cursor: rematchPending ? 'default' : 'pointer',
               fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 10,
+              fontSize: FZ.ui,
               letterSpacing: '0.07em',
               textTransform: 'uppercase',
               color: rematchPending ? 'rgba(196, 149, 90, 0.35)' : '#e8d5a3',
@@ -487,7 +549,7 @@ export default function TurnIndicator({
               borderRadius: 4,
               cursor: 'pointer',
               fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 10,
+              fontSize: FZ.ui,
               letterSpacing: '0.07em',
               textTransform: 'uppercase',
               color: '#d4b86a',
@@ -516,7 +578,7 @@ export default function TurnIndicator({
               borderRadius: 4,
               cursor: 'pointer',
               fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 10,
+              fontSize: FZ.ui,
               letterSpacing: '0.07em',
               textTransform: 'uppercase',
               color: 'rgba(220, 120, 120, 0.75)',
@@ -571,14 +633,14 @@ export default function TurnIndicator({
           >
             <p style={{
               fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 10,
+              fontSize: FZ.ui,
               letterSpacing: '0.18em',
               textTransform: 'uppercase',
               color: 'rgba(220, 120, 120, 0.5)',
             }}>Concede</p>
             <h2 style={{
               fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 18,
+              fontSize: FZ.headline,
               fontWeight: 700,
               color: '#e8d5a3',
               marginTop: 8,
@@ -587,7 +649,7 @@ export default function TurnIndicator({
             <p style={{
               marginTop: 8,
               fontFamily: 'Georgia, serif',
-              fontSize: 13,
+              fontSize: FZ.bodyLg,
               color: 'rgba(196, 149, 90, 0.5)',
             }}>This will end the game and count as a loss.</p>
 
@@ -602,7 +664,7 @@ export default function TurnIndicator({
                   background: 'transparent',
                   color: 'rgba(196, 149, 90, 0.6)',
                   fontFamily: 'var(--font-cinzel), Georgia, serif',
-                  fontSize: 12,
+                  fontSize: FZ.body,
                   fontWeight: 700,
                   letterSpacing: '0.08em',
                   textTransform: 'uppercase',
@@ -624,7 +686,7 @@ export default function TurnIndicator({
                   background: 'rgba(180, 60, 60, 0.15)',
                   color: '#dc7878',
                   fontFamily: 'var(--font-cinzel), Georgia, serif',
-                  fontSize: 12,
+                  fontSize: FZ.body,
                   fontWeight: 700,
                   letterSpacing: '0.08em',
                   textTransform: 'uppercase',
@@ -671,14 +733,14 @@ export default function TurnIndicator({
           >
             <p style={{
               fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 10,
+              fontSize: FZ.ui,
               letterSpacing: '0.18em',
               textTransform: 'uppercase',
               color: 'rgba(196, 149, 90, 0.5)',
             }}>Leave Game</p>
             <h2 style={{
               fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 18,
+              fontSize: FZ.headline,
               fontWeight: 700,
               color: '#e8d5a3',
               marginTop: 8,
@@ -687,7 +749,7 @@ export default function TurnIndicator({
             <p style={{
               marginTop: 8,
               fontFamily: 'Georgia, serif',
-              fontSize: 13,
+              fontSize: FZ.bodyLg,
               color: 'rgba(196, 149, 90, 0.5)',
             }}>This will end the game and count as a resignation.</p>
 
@@ -702,7 +764,7 @@ export default function TurnIndicator({
                   background: 'transparent',
                   color: 'rgba(196, 149, 90, 0.6)',
                   fontFamily: 'var(--font-cinzel), Georgia, serif',
-                  fontSize: 12,
+                  fontSize: FZ.body,
                   fontWeight: 700,
                   letterSpacing: '0.08em',
                   textTransform: 'uppercase',
@@ -725,7 +787,7 @@ export default function TurnIndicator({
                   background: 'rgba(180, 60, 60, 0.15)',
                   color: '#dc7878',
                   fontFamily: 'var(--font-cinzel), Georgia, serif',
-                  fontSize: 12,
+                  fontSize: FZ.body,
                   fontWeight: 700,
                   letterSpacing: '0.08em',
                   textTransform: 'uppercase',

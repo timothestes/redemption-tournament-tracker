@@ -132,6 +132,10 @@ export const CardInstance = table(
     // correct fraction regardless of whether the reveal was a 10s auto or a
     // 30s manual flash. Cleared alongside revealExpiresAt.
     revealStartedAt: t.timestamp().optional(),
+    // Visual outline marker set by `set_card_outline` abilities (e.g. Three
+    // Woes "Choose Good"/"Choose Evil"). '' = no outline; 'good' renders
+    // green, 'evil' renders red. Cleared when the card leaves Territory.
+    outlineColor: t.string().default(''),
   }
 );
 

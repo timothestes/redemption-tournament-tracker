@@ -91,6 +91,10 @@ export interface GameCard {
    *  countdown ring with the correct fraction (10s auto vs 30s manual).
    *  Undefined when no reveal is active. */
   revealDurationMs?: number;
+  /** Visual outline marker driven by `set_card_outline` abilities
+   *  (Three Woes "Choose Good"/"Choose Evil"). 'good' = green border,
+   *  'evil' = red border. Cleared when the card leaves Territory. */
+  outlineColor?: 'good' | 'evil';
 }
 
 export type ActionType =
@@ -121,7 +125,8 @@ export type ActionType =
   | 'ATTACH_CARD'
   | 'DETACH_CARD'
   | 'EXECUTE_CARD_ABILITY'
-  | 'REVEAL_CARD_IN_HAND';
+  | 'REVEAL_CARD_IN_HAND'
+  | 'SET_CARD_OUTLINE';
 
 export interface GameAction {
   id: string;

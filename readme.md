@@ -129,6 +129,7 @@ Pre-bake duplicate card groups at build time (static JSON) instead of fetching f
 
 ## long term
 add maybeboard
+add deck versioning
 Collection Tracker
 add wishlist
 misc tournament tracker improvements

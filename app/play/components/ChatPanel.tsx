@@ -301,6 +301,21 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       );
     } catch { /* fall through */ }
   }
+  if (actionType === 'SET_CARD_OUTLINE' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const cardName: string = data.cardName ?? 'a card';
+      const color = data.color === 'good' ? 'Good' : data.color === 'evil' ? 'Evil' : '';
+      if (!color) {
+        return <>cleared the outline on <HoverableCard name={cardName} img="" /></>;
+      }
+      return (
+        <>
+          chose <strong>{color}</strong> on <HoverableCard name={cardName} img="" />
+        </>
+      );
+    } catch { /* fall through */ }
+  }
   if (actionType === 'SPAWN_TOKEN' && payload) {
     try {
       const data = JSON.parse(payload);
