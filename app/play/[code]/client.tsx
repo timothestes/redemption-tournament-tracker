@@ -1178,7 +1178,6 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   if (lifecycle === 'finished') {
     const { label: endLabel, winnerName } = deriveEndReason(gameState.gameActions, gameState.myPlayer);
     const opponentDisconnected = endLabel === 'Opponent disconnected';
-    const opponentResigned = endLabel === 'Opponent resigned';
 
     // Show the overlay over the frozen canvas — always render canvas if gameId is known
     if (gameId !== null) {
@@ -1196,7 +1195,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                 onEndTurn={() => {}}
                 isFinished
                 winnerName={winnerName}
-                onPlayAgain={opponentDisconnected || opponentResigned ? undefined : () => setPlayAgainTriggered(true)}
+                onPlayAgain={opponentDisconnected ? undefined : () => setPlayAgainTriggered(true)}
                 rematchPending={rematchPending}
                 myScore={gameState.myCards['land-of-redemption']?.length ?? 0}
                 opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}
