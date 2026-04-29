@@ -16,6 +16,7 @@ import TopNav from '@/components/top-nav';
 import { GameToolbar } from '@/app/shared/components/GameToolbar';
 import { useGameHotkeys } from '@/app/shared/hooks/useGameHotkeys';
 import { GameToastContainer, showGameToast } from '@/app/shared/components/GameToast';
+import { CardChoicePromptContainer } from '@/app/shared/components/CardChoicePrompt';
 import { ParagonDrawer } from '@/app/shared/components/ParagonDrawer';
 import { buildParagonEntries } from '@/app/shared/utils/paragonEntries';
 import type { GameActions } from '@/app/shared/types/gameActions';
@@ -198,28 +199,11 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     }
   }, [isConnected, isActive, conn, code]);
 
-  // Phase 2: Once gameId is known, subscribe to remaining tables scoped to
-  // this game. This uses the btree indexes on game_id columns, eliminating
-  // the "subscription queries with sequential scan" warnings.
-  const didSubscribePhase2 = useRef(false);
-  useEffect(() => {
-    if (!conn || gameId === null || didSubscribePhase2.current) return;
-    didSubscribePhase2.current = true;
-    try {
-      conn.subscriptionBuilder().subscribe([
-        `SELECT * FROM player WHERE game_id = ${gameId}`,
-        `SELECT * FROM card_instance WHERE game_id = ${gameId}`,
-        `SELECT cc.* FROM card_counter cc JOIN card_instance ci ON cc.card_instance_id = ci.id WHERE ci.game_id = ${gameId}`,
-        `SELECT * FROM game_action WHERE game_id = ${gameId}`,
-        `SELECT * FROM chat_message WHERE game_id = ${gameId}`,
-        `SELECT * FROM spectator WHERE game_id = ${gameId}`,
-        `SELECT * FROM disconnect_timeout WHERE game_id = ${gameId}`,
-        `SELECT * FROM zone_search_request WHERE game_id = ${gameId}`,
-      ]);
-    } catch (e) {
-      console.error('Failed to subscribe (phase 2):', e);
-    }
-  }, [conn, gameId]);
+  // Phase 2 subscription block was removed: each `useTable(...)` call in
+  // `useGameState` now scopes its own server subscription via the typed query
+  // builder (`tables.X.where(r => r.gameId.eq(gameId))`), which both pushes
+  // the WHERE clause to the server AND filters callbacks at the React layer.
+  // The phase-2 raw-SQL subscriptions had become strict duplicates.
 
   // Presence heartbeat — reassert isConnected and cancel any pending
   // DisconnectTimeout whenever the WebSocket is live on this page. The server
@@ -1140,6 +1124,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             <PregameCeremonyOverlay gameState={gameState} />
             <ImageLoadingGate open={!imagesGateOpen} progress={imageLoadProgress} />
             <GameToastContainer />
+            <CardChoicePromptContainer />
           </div>
         </div>
         {rightPanel}
@@ -1178,6 +1163,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             )}
             <ImageLoadingGate open={!imagesGateOpen} progress={imageLoadProgress} />
             <GameToastContainer />
+            <CardChoicePromptContainer />
           </div>
         </div>
         {rightPanel}
@@ -1257,6 +1243,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                 onEndTurn={() => {}}
               />
               <GameToastContainer />
+              <CardChoicePromptContainer />
               <GameOverOverlay
                 game={gameState.game}
                 myPlayer={gameState.myPlayer}
@@ -1468,6 +1455,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             )}
           />
           <GameToastContainer />
+          <CardChoicePromptContainer />
         </div>
       </div>
 

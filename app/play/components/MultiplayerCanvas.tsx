@@ -63,6 +63,8 @@ import { Link2Off } from 'lucide-react';
 import { useCardScale } from '@/app/shared/hooks/useCardScale';
 import { CardScaleControl } from '@/app/shared/components/CardScaleControl';
 import { useLobArrivalEffect } from '@/app/shared/hooks/useLobArrivalEffect';
+import { useCardEnterPlayPrompt } from '@/app/shared/hooks/useCardEnterPlayPrompt';
+import { cardInstanceToGameCard } from '../utils/cardAdapter';
 import type { UndoStack } from '../hooks/useUndoStack';
 
 // ---------------------------------------------------------------------------
@@ -98,58 +100,8 @@ function getCardImageUrl(imgFile: string): string {
   return `${BLOB_BASE_URL}/card-images/${sanitizeImgFile(imgFile)}.jpg`;
 }
 
-/**
- * Adapt a SpacetimeDB CardInstance row + counters into the GameCard shape
- * expected by GameCardNode.
- */
-function cardInstanceToGameCard(
-  card: CardInstance,
-  counters: CardCounter[],
-  owner: 'player1' | 'player2',
-): GameCard {
-  return {
-    instanceId: String(card.id),
-    cardName: card.cardName,
-    cardSet: card.cardSet,
-    cardImgFile: card.cardImgFile,
-    type: card.cardType,
-    brigade: card.brigade,
-    strength: card.strength,
-    toughness: card.toughness,
-    specialAbility: card.specialAbility,
-    identifier: card.identifier,
-    reference: card.reference,
-    alignment: card.alignment,
-    isMeek: card.isMeek,
-    isFlipped: card.isFlipped,
-    isToken: card.isToken,
-    zone: card.zone as GameCard['zone'],
-    ownerId: owner,
-    notes: card.notes,
-    posX: card.posX ? parseFloat(card.posX) : undefined,
-    posY: card.posY ? parseFloat(card.posY) : undefined,
-    equippedTo: card.equippedToInstanceId !== 0n ? String(card.equippedToInstanceId) : undefined,
-    counters: counters.map((c) => ({
-      color: c.color as Counter['color'],
-      count: Number(c.count),
-    })),
-    // Map server timestamp (microseconds) → client ms epoch. Undefined =
-    // no active reveal. Clients read this to drive the countdown badge and
-    // to override opponent face-down rendering for the reveal window.
-    revealUntil:
-      card.revealExpiresAt === undefined
-        ? undefined
-        : Number(card.revealExpiresAt.microsSinceUnixEpoch / 1000n),
-    revealDurationMs:
-      card.revealExpiresAt === undefined || card.revealStartedAt === undefined
-        ? undefined
-        : Number((card.revealExpiresAt.microsSinceUnixEpoch - card.revealStartedAt.microsSinceUnixEpoch) / 1000n),
-    outlineColor:
-      card.outlineColor === 'good' || card.outlineColor === 'evil'
-        ? card.outlineColor
-        : undefined,
-  };
-}
+// `cardInstanceToGameCard` is imported from `../utils/cardAdapter` — keep the
+// adapter colocated with the reference-stable cache hook used by useGameState.
 
 /** Check if a point (px, py) is inside a ZoneRect. */
 function pointInRect(px: number, py: number, rect: ZoneRect): boolean {
@@ -302,6 +254,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     opponentCards,
     sharedCards,
     counters,
+    adaptedCardsById,
     moveCard: rawMoveCard,
     moveCardsBatch: rawMoveCardsBatch,
     updateCardPosition,
@@ -318,6 +271,23 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     shuffleOpponentDeck,
     zoneSearchRequests,
   } = gameState;
+
+  // ---- Adapter: get GameCard for a CardInstance ----
+  // Looks up the reference-stable adapted card from `useStableAdaptedCards` first
+  // so every render-path consumer hits the same GameCard reference for unchanged
+  // rows — the prerequisite that makes `memo(GameCardNode)` actually short-circuit.
+  // Falls back to direct adaptation for synthetic cards or owner mismatches
+  // (e.g. shared `ownerId === 0n` cards rendered as 'player2' in an opponent
+  // shared-soul-deck modal — rare; correctness over speed).
+  const adaptCard = useCallback(
+    (card: CardInstance, owner: 'player1' | 'player2'): GameCard => {
+      const cached = adaptedCardsById.get(card.id);
+      if (cached && cached.ownerId === owner) return cached;
+      const cardCounters = counters.get(card.id) ?? [];
+      return cardInstanceToGameCard(card, cardCounters, owner);
+    },
+    [adaptedCardsById, counters],
+  );
 
   // Undo-aware wrappers for moveCard / moveCardsBatch used in drag handlers.
   const findCardForUndo = useCallback((id: string) => {
@@ -485,6 +455,25 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   );
   const { getGlowIntensity: getMyLobGlow } = useLobArrivalEffect(myLobIds);
   const { getGlowIntensity: getOppLobGlow } = useLobArrivalEffect(oppLobIds);
+
+  // ---- Hand → play prompt for cards with `set_card_outline` abilities ----
+  // Three Woes is the v1 target. The choice routes through the same
+  // executeCardAbility flow that powers the right-click menu.
+  const cardsForChoicePrompt = useMemo(() => {
+    const list: { instanceId: string; cardName: string; zone: string }[] = [];
+    for (const cards of Object.values(myCards)) {
+      for (const c of cards) {
+        if (c.isToken) continue;
+        list.push({ instanceId: String(c.id), cardName: c.cardName, zone: c.zone });
+      }
+    }
+    return list;
+  }, [myCards]);
+  useCardEnterPlayPrompt({
+    cards: cardsForChoicePrompt,
+    onChoose: (instanceId, abilityIndex) =>
+      gameState.executeCardAbility(instanceId, abilityIndex),
+  });
 
   // Drive 1s re-renders while any visible hand card has an active per-card
   // reveal. Both own and opponent hands can carry reveals — opponent cards
@@ -1162,7 +1151,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     zones: Object.fromEntries(
       Object.entries(myCards).map(([zone, cards]) => [
         zone,
-        cards.map(c => cardInstanceToGameCard(c, counters.get(c.id) ?? [], 'player1'))
+        cards.map(c => adaptCard(c, 'player1'))
       ])
     ),
     actions: {
@@ -1266,7 +1255,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     zones: Object.fromEntries(
       Object.entries(opponentCards).map(([zone, cards]) => [
         zone,
-        cards.map(c => cardInstanceToGameCard(c, counters.get(c.id) ?? [], 'player2'))
+        cards.map(c => adaptCard(c, 'player2'))
       ])
     ),
     actions: {
@@ -1287,7 +1276,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     zones: Object.fromEntries(
       Object.entries(sharedCards).map(([zone, cards]) => [
         zone,
-        cards.map(c => cardInstanceToGameCard(c, counters.get(c.id) ?? [], 'player1'))
+        cards.map(c => adaptCard(c, 'player1'))
       ])
     ),
     actions: {
@@ -3226,15 +3215,6 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     if (hoverTimerRef.current) { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = null; }
     setHoverReady(false);
   }, [stopHoverAnimation]);
-
-  // ---- Adapter: get GameCard for a CardInstance ----
-  const adaptCard = useCallback(
-    (card: CardInstance, owner: 'player1' | 'player2'): GameCard => {
-      const cardCounters = counters.get(card.id) ?? [];
-      return cardInstanceToGameCard(card, cardCounters, owner);
-    },
-    [counters],
-  );
 
   // ---- LOB layout: host + attached-accessory positions ----
   // LOB packs cards in a horizontal strip. Attached sites render BEHIND the
@@ -6019,7 +5999,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
       {approvedSearchRequest && !approvedSearchRequest.action && approvedSearchRequest.zone !== 'hand-reveal' && approvedSearchRequest.zone !== 'action-priority' && (() => {
         const zoneCards = (opponentCards[approvedSearchRequest.zone] ?? [])
-          .map((c: any) => cardInstanceToGameCard(c, counters.get(c.id) ?? [], 'player2'));
+          .map((c: CardInstance) => adaptCard(c, 'player2'));
         return (
           <OpponentBrowseModal
             zoneName={approvedSearchRequest.zone}

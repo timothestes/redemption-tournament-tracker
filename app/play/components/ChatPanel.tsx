@@ -155,7 +155,9 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
   if (actionType === 'PREGAME_ROLL' && payload) {
     try {
       const data = JSON.parse(payload);
-      return `rolled ${data.result0} vs ${data.result1}`;
+      const winnerRoll = data.winner === '0' ? data.result0 : data.result1;
+      const loserRoll = data.winner === '0' ? data.result1 : data.result0;
+      return `won the roll: ${winnerRoll} vs ${loserRoll}`;
     } catch { /* fall through */ }
   }
   if (actionType === 'DRAW_MULTIPLE') {

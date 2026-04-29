@@ -145,6 +145,22 @@ function clearCountersIfLeavingPlay(ctx: any, cardId: bigint, fromZone: string, 
 }
 
 // ---------------------------------------------------------------------------
+// Helper: leavePlayFieldOverrides
+// Player-attached annotations (notes, Three Woes Choose Good/Evil outline) are
+// in-play state and shouldn't ride along when the card leaves Territory or
+// Land of Bondage. Returns the override map to spread into a CardInstance
+// update; preserves the existing values for moves that aren't leave-play.
+// ---------------------------------------------------------------------------
+function leavePlayFieldOverrides(card: any, fromZone: string, toZone: string): { notes: string; outlineColor: string } {
+  const leaving =
+    fromZone !== toZone && (fromZone === 'territory' || fromZone === 'land-of-bondage');
+  return {
+    notes: leaving ? '' : card.notes,
+    outlineColor: leaving ? '' : card.outlineColor,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Helper: drawCardsForPlayer
 // ---------------------------------------------------------------------------
 interface DrawnCardInfo {
@@ -668,7 +684,12 @@ export const join_game = spacetimedb.reducer(
       choosingDeadlineMicros: ctx.timestamp.microsSinceUnixEpoch + CHOOSE_DEADLINE_MICROS,
     });
 
-    logAction(ctx, game.id, player.id, 'PREGAME_ROLL',
+    const winnerSeat = winner === '0' ? 0n : 1n;
+    let winnerPlayerId = player.id;
+    for (const p of [...ctx.db.Player.player_game_id.filter(game.id)]) {
+      if (p.seat === winnerSeat) { winnerPlayerId = p.id; break; }
+    }
+    logAction(ctx, game.id, winnerPlayerId, 'PREGAME_ROLL',
       JSON.stringify({ result0: r0, result1: r1, winner }),
       0n, 'pregame');
   }
@@ -775,7 +796,12 @@ export const pregame_ready = spacetimedb.reducer(
       choosingDeadlineMicros: ctx.timestamp.microsSinceUnixEpoch + CHOOSE_DEADLINE_MICROS,
     });
 
-    logAction(ctx, gameId, player.id, 'PREGAME_ROLL',
+    const winnerSeat = winner === '0' ? 0n : 1n;
+    let winnerPlayerId = player.id;
+    for (const p of [...ctx.db.Player.player_game_id.filter(gameId)]) {
+      if (p.seat === winnerSeat) { winnerPlayerId = p.id; break; }
+    }
+    logAction(ctx, gameId, winnerPlayerId, 'PREGAME_ROLL',
       JSON.stringify({ result0: r0, result1: r1, winner }),
       0n, 'pregame');
   }
@@ -906,12 +932,12 @@ export const pregame_acknowledge_first = spacetimedb.reducer(
     if (bothReady) {
       // Both players acknowledged — start the game
       const chosenSeat = game.currentTurn;
+      const winnerSeat = game.rollWinner === '0' ? 0n : 1n;
       let chosenName = 'Player ' + (Number(chosenSeat) + 1);
+      let winnerPlayerId = player.id;
       for (const p of [...ctx.db.Player.player_game_id.filter(gameId)]) {
-        if (p.seat === chosenSeat) {
-          chosenName = p.displayName;
-          break;
-        }
+        if (p.seat === chosenSeat) chosenName = p.displayName;
+        if (p.seat === winnerSeat) winnerPlayerId = p.id;
       }
 
       // Paragon: soul deck is normally initialized earlier in the pregame
@@ -930,7 +956,7 @@ export const pregame_acknowledge_first = spacetimedb.reducer(
         playingStartedAtMicros: ctx.timestamp.microsSinceUnixEpoch,
       });
 
-      logAction(ctx, gameId, player.id, 'GAME_STARTED',
+      logAction(ctx, gameId, winnerPlayerId, 'GAME_STARTED',
         JSON.stringify({ chosenSeat: chosenSeat.toString(), chosenName }),
         1n, 'draw');
     } else {
@@ -1763,6 +1789,7 @@ export const move_card = spacetimedb.reducer(
         posY: '',
         isFlipped: false,
         ownerId: lobOwnerId,
+        ...leavePlayFieldOverrides(card, fromZone, 'land-of-bondage'),
       });
       const actionWord = toZone === 'discard' ? 'discarded' : toZone === 'reserve' ? 'reserved' : 'banished';
       const redirectLogName = card.cardName;
@@ -1923,7 +1950,7 @@ export const move_card = spacetimedb.reducer(
       equippedToInstanceId: clearEquippedOnMover ? 0n : card.equippedToInstanceId,
       revealExpiresAt: newRevealExpiresAt,
       revealStartedAt: newRevealStartedAt,
-      outlineColor: toZone === 'territory' ? card.outlineColor : '',
+      ...leavePlayFieldOverrides(card, fromZone, toZone),
     });
 
     if (leavingZone) {
@@ -1951,6 +1978,7 @@ export const move_card = spacetimedb.reducer(
             equippedToInstanceId: 0n,
             revealExpiresAt: undefined,
       revealStartedAt: undefined,
+            ...leavePlayFieldOverrides(accessory, accessory.zone, 'discard'),
           });
         } else {
           ctx.db.CardInstance.id.update({ ...accessory, equippedToInstanceId: 0n });
@@ -2174,6 +2202,7 @@ export const move_cards_batch = spacetimedb.reducer(
           posY: '',
           isFlipped: false,
           ownerId: lobOwnerId,
+          ...leavePlayFieldOverrides(card, card.zone, 'land-of-bondage'),
         });
         redirectedLostSouls.push({ name: logName, img: logImg });
         continue;
@@ -2376,7 +2405,7 @@ export const move_cards_batch = spacetimedb.reducer(
         equippedToInstanceId: leavingZone && !hostInBatch ? 0n : card.equippedToInstanceId,
         revealExpiresAt: newRevealExpiresAt,
         revealStartedAt: newRevealStartedAt,
-        outlineColor: cardFinalZone === 'territory' ? card.outlineColor : '',
+        ...leavePlayFieldOverrides(card, card.zone, cardFinalZone),
       });
     }
 
@@ -2422,6 +2451,7 @@ export const move_cards_batch = spacetimedb.reducer(
             equippedToInstanceId: 0n,
             revealExpiresAt: undefined,
       revealStartedAt: undefined,
+            ...leavePlayFieldOverrides(accessory, accessory.zone, 'discard'),
           });
         } else {
           ctx.db.CardInstance.id.update({ ...accessory, equippedToInstanceId: 0n });

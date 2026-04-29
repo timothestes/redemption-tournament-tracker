@@ -36,6 +36,8 @@ import { GameToastContainer, showGameToast } from './GameToast';
 import { DiceRollOverlay } from './DiceRollOverlay';
 import { useCardPreview } from '../state/CardPreviewContext';
 import { useLobArrivalEffect } from '@/app/shared/hooks/useLobArrivalEffect';
+import { useCardEnterPlayPrompt } from '@/app/shared/hooks/useCardEnterPlayPrompt';
+import { CardChoicePromptContainer } from '@/app/shared/components/CardChoicePrompt';
 import { useRevealTick } from '@/app/shared/hooks/useRevealTick';
 import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '../utils/equipLayout';
 import { findCard, isWeapon, isWarrior } from '@/lib/cards/lookup';
@@ -78,6 +80,26 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     [state.zones.hand],
   );
   useRevealTick(handHasActiveReveal);
+
+  // ---- Three Woes "Choose Good / Choose Evil" prompt on hand → play ----
+  // Generic over any card with `set_card_outline` abilities; the prompt
+  // routes the click through executeCardAbility so the same registry-driven
+  // flow that powers the right-click menu fires the outline tint.
+  const cardsForChoicePrompt = useMemo(() => {
+    const list: { instanceId: string; cardName: string; zone: string }[] = [];
+    for (const zoneId of Object.keys(state.zones) as ZoneId[]) {
+      for (const card of state.zones[zoneId]) {
+        if (card.ownerId !== 'player1') continue;
+        if (card.isToken) continue;
+        list.push({ instanceId: card.instanceId, cardName: card.cardName, zone: card.zone });
+      }
+    }
+    return list;
+  }, [state.zones]);
+  useCardEnterPlayPrompt({
+    cards: cardsForChoicePrompt,
+    onChoose: executeCardAbility,
+  });
 
   // Adapter: bridge goldfish game context to shared GameActions interface
   const goldfishActions: GameActions = useMemo(() => ({
@@ -2696,6 +2718,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       </ModalGameProvider>
 
       <GameToastContainer />
+      <CardChoicePromptContainer />
       <DiceRollOverlay />
     </>
   );

@@ -328,18 +328,16 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (result.fromZone !== toZone) {
         result.card.revealUntil = undefined;
       }
-      // Outline marker (Three Woes "Choose Good"/"Choose Evil") clears when
-      // the card leaves Territory.
-      if (toZone !== 'territory') {
-        result.card.outlineColor = undefined;
-      }
-      // Counters reflect in-play state — drop them whenever the card leaves
-      // Territory or Land of Bondage for any other zone.
+      // Counters, text notes, and the Three Woes Choose Good/Evil outline are
+      // in-play state — drop them whenever the card leaves Territory or Land
+      // of Bondage for any other zone.
       if (
         result.fromZone !== toZone &&
         (result.fromZone === 'territory' || result.fromZone === 'land-of-bondage')
       ) {
         result.card.counters = [];
+        result.card.notes = '';
+        result.card.outlineColor = undefined;
       }
       // Paragon: rescuing a Soul-Deck-origin card transfers ownership from
       // the shared sentinel to the rescuing player. Marker stays set.
@@ -372,7 +370,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             const other = zones[zoneId][i];
             if (other.equippedTo !== cardInstanceId) continue;
             if (toZone === 'land-of-bondage') {
-              const dropCounters =
+              const leavingPlay =
                 zoneId === 'territory' || zoneId === 'land-of-bondage';
               zones[zoneId].splice(i, 1);
               i--;
@@ -382,7 +380,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                 equippedTo: undefined,
                 posX: undefined,
                 posY: undefined,
-                counters: dropCounters ? [] : other.counters,
+                counters: leavingPlay ? [] : other.counters,
+                notes: leavingPlay ? '' : other.notes,
+                outlineColor: leavingPlay ? undefined : other.outlineColor,
               });
             } else {
               zones[zoneId][i] = { ...other, equippedTo: undefined };
@@ -489,6 +489,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       result.card.revealUntil = undefined;
       if (result.fromZone === 'territory' || result.fromZone === 'land-of-bondage') {
         result.card.counters = [];
+        result.card.notes = '';
+        result.card.outlineColor = undefined;
       }
       zones.deck.unshift(result.card);
       return { ...state, zones, history };
@@ -505,6 +507,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       result.card.revealUntil = undefined;
       if (result.fromZone === 'territory' || result.fromZone === 'land-of-bondage') {
         result.card.counters = [];
+        result.card.notes = '';
+        result.card.outlineColor = undefined;
       }
       zones.deck.push(result.card);
       return { ...state, zones, history };
@@ -683,14 +687,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         if (result.fromZone !== finalZone) {
           result.card.revealUntil = undefined;
         }
-        if (finalZone !== 'territory') {
-          result.card.outlineColor = undefined;
-        }
         if (
           result.fromZone !== finalZone &&
           (result.fromZone === 'territory' || result.fromZone === 'land-of-bondage')
         ) {
           result.card.counters = [];
+          result.card.notes = '';
+          result.card.outlineColor = undefined;
         }
         const wasSharedSoulFromLob =
           result.fromZone === 'land-of-bondage' &&
@@ -726,7 +729,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                 continue;
               }
               if (finalZone === 'land-of-bondage') {
-                const dropCounters =
+                const leavingPlay =
                   zoneId === 'territory' || zoneId === 'land-of-bondage';
                 zones[zoneId].splice(i, 1);
                 i--;
@@ -736,7 +739,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                   equippedTo: undefined,
                   posX: undefined,
                   posY: undefined,
-                  counters: dropCounters ? [] : other.counters,
+                  counters: leavingPlay ? [] : other.counters,
+                  notes: leavingPlay ? '' : other.notes,
+                  outlineColor: leavingPlay ? undefined : other.outlineColor,
                 });
               } else {
                 zones[zoneId][i] = { ...other, equippedTo: undefined };

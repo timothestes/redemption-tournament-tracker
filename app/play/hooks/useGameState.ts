@@ -13,6 +13,8 @@ import type {
   Spectator,
   DisconnectTimeout,
 } from '@/lib/spacetimedb/module_bindings/types';
+import type { GameCard } from '@/app/goldfish/types';
+import { useStableAdaptedCards } from '../utils/cardAdapter';
 
 // ---------------------------------------------------------------------------
 // Row types inferred from the generated type objects
@@ -48,6 +50,13 @@ export interface GameState {
   sharedCards: Record<string, CardInstanceRow[]>;
   isMyTurn: boolean;
   counters: Map<bigint, CardCounterRow[]>;
+  /**
+   * Reference-stable adapted GameCard objects keyed by CardInstance id.
+   * Unchanged cards return the same GameCard reference across renders, so
+   * `memo(GameCardNode)`'s shallow prop compare short-circuits and only
+   * cards whose content actually changed re-render.
+   */
+  adaptedCardsById: Map<bigint, GameCard>;
   chatMessages: ChatMessageRow[];
   gameActions: GameActionRow[];
   spectators: SpectatorRow[];
@@ -143,18 +152,40 @@ export function useGameState(gameId: bigint): GameState {
   const identityHex: string | undefined = identity?.toHexString?.();
 
   // ---------------------------------------------------------------------------
-  // Subscribe to all relevant tables.
-  // useTable returns ALL rows for the subscribed table — we filter client-side.
+  // Subscribe to relevant tables, scoping each subscription to the active game
+  // when we have a gameId column to filter on. The typed query builder pushes
+  // the WHERE clause to the server (so the connection only receives matching
+  // rows) AND filters callbacks at the React layer (so unrelated row changes
+  // don't trigger re-renders). When gameId is 0n (initial value before
+  // discovery), the eq filter matches no rows — strictly safer than
+  // subscribing globally.
+  //
+  // Game and Player stay unfiltered: `client.tsx` reconnect logic walks
+  // `allGames` / `allPlayers` to find existing rows by `code` BEFORE the
+  // numeric gameId is known. CardCounter has no gameId column — it stays
+  // unfiltered until the schema split adds one.
   // ---------------------------------------------------------------------------
   const [allGames, gamesLoading] = useTable(tables.Game) as [GameRow[], boolean];
   const [allPlayers, playersLoading] = useTable(tables.Player) as [PlayerRow[], boolean];
-  const [allCards, cardsLoading] = useTable(tables.CardInstance) as [CardInstanceRow[], boolean];
+  const [allCards, cardsLoading] = useTable(
+    tables.CardInstance.where(c => c.gameId.eq(gameId)),
+  ) as [CardInstanceRow[], boolean];
   const [allCounters, countersLoading] = useTable(tables.CardCounter) as [CardCounterRow[], boolean];
-  const [allChat, chatLoading] = useTable(tables.ChatMessage) as [ChatMessageRow[], boolean];
-  const [allActions, actionsLoading] = useTable(tables.GameAction) as [GameActionRow[], boolean];
-  const [allSpectators, spectatorsLoading] = useTable(tables.Spectator) as [SpectatorRow[], boolean];
-  const [allZoneSearchRequests, zsrLoading] = useTable(tables.ZoneSearchRequest) as [any[], boolean];
-  const [allDisconnectTimeouts] = useTable(tables.DisconnectTimeout) as [DisconnectTimeoutRow[], boolean];
+  const [allChat, chatLoading] = useTable(
+    tables.ChatMessage.where(m => m.gameId.eq(gameId)),
+  ) as [ChatMessageRow[], boolean];
+  const [allActions, actionsLoading] = useTable(
+    tables.GameAction.where(a => a.gameId.eq(gameId)),
+  ) as [GameActionRow[], boolean];
+  const [allSpectators, spectatorsLoading] = useTable(
+    tables.Spectator.where(s => s.gameId.eq(gameId)),
+  ) as [SpectatorRow[], boolean];
+  const [allZoneSearchRequests, zsrLoading] = useTable(
+    tables.ZoneSearchRequest.where(z => z.gameId.eq(gameId)),
+  ) as [any[], boolean];
+  const [allDisconnectTimeouts] = useTable(
+    tables.DisconnectTimeout.where(t => t.gameId.eq(gameId)),
+  ) as [DisconnectTimeoutRow[], boolean];
 
   // useTable returns [rows, subscribeApplied] where subscribeApplied=true means data is ready
   // Only require core tables (game, player, cards) — chat/actions/spectators can load async
@@ -252,6 +283,15 @@ export function useGameState(gameId: bigint): GameState {
     }
     return map;
   }, [allCounters, gameCards]);
+
+  // Reference-stable adapted GameCard objects. Critical perf path: by holding
+  // the same GameCard reference across renders for unchanged rows, memo(GameCardNode)
+  // can actually short-circuit and skip re-rendering cards that didn't change.
+  const adaptedCardsById = useStableAdaptedCards(
+    gameCards,
+    counters,
+    opponentPlayer?.id,
+  );
 
   // Chat messages for this game, sorted by sentAt
   const chatMessages = useMemo(
@@ -742,6 +782,7 @@ export function useGameState(gameId: bigint): GameState {
     sharedCards,
     isMyTurn,
     counters,
+    adaptedCardsById,
     chatMessages,
     gameActions,
     spectators,
