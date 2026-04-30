@@ -5476,6 +5476,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             });
             setContextMenu(null);
           }}
+          onSurrender={(cardInstanceId) => {
+            gameState.surrenderLostSoul(BigInt(cardInstanceId));
+          }}
+          onRescue={(cardInstanceId) => {
+            gameState.rescueLostSoul(BigInt(cardInstanceId));
+          }}
           zones={allZonesForContextMenu as any}
         />
         );

@@ -12,6 +12,10 @@ import { getAbilitiesForCard, findTokenCard, type CardAbility } from './cardAbil
 // sees what they got without scanning the chat log.
 const AUTO_REVEAL_HAND_MICROS = 10_000_000n; // 10 seconds
 
+// Maximum cards a player may hold in hand. Mirrors the client-side cap used
+// in goldfish/multiplayer UIs (HAND_LIMIT). Auto-draws stop short of this.
+const HAND_LIMIT = 16;
+
 // ---------------------------------------------------------------------------
 // Helper: logAction
 // ---------------------------------------------------------------------------
@@ -196,12 +200,18 @@ function drawCardsForPlayer(ctx: any, game: any, player: any, count: number): Dr
     if (deckPos >= deckCards.length) break; // No more cards in deck
 
     const topCard = deckCards[deckPos];
-    deckPos++;
 
     // Check if auto-route lost souls
     const isLostSoul =
       player.autoRouteLostSouls &&
       (topCard.cardType === 'LS' || topCard.cardName.toLowerCase().includes('lost soul'));
+
+    // Hand-size cap: stop drawing when the next card would land in hand and
+    // hand is already full. Lost Souls auto-route to LOB, so they don't take
+    // a hand slot and keep flowing.
+    if (!isLostSoul && handCount >= HAND_LIMIT) break;
+
+    deckPos++;
 
     if (isLostSoul) {
       // Move to land-of-bondage
@@ -2929,6 +2939,173 @@ export const execute_card_ability = spacetimedb.reducer(
       case 'custom':
         throw new SenderError('Custom abilities are dispatched by the client, not this reducer');
     }
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Helper: moveLostSoulToLor
+// Shared implementation for surrender_lost_soul and rescue_lost_soul. Moves a
+// Lost Soul from a Land of Bondage into a target player's Land of Redemption,
+// transferring ownership, clearing in-play state, unlinking any accessories,
+// compacting source LoB indices, and refilling the shared Soul Deck when a
+// Paragon shared soul is rescued. Mirrors move_card's land-of-redemption path.
+// ---------------------------------------------------------------------------
+function moveLostSoulToLor(
+  ctx: any,
+  gameId: bigint,
+  card: any,
+  targetOwnerId: bigint,
+  game: any,
+) {
+  const fromZone = card.zone;
+  const sourceOwnerId = card.ownerId;
+
+  // Highest zoneIndex + 1 in the target's LoR so the rescued soul stacks on top.
+  let maxIdx = -1n;
+  for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+    if (c.ownerId === targetOwnerId && c.zone === 'land-of-redemption' && c.zoneIndex > maxIdx) {
+      maxIdx = c.zoneIndex;
+    }
+  }
+  const finalZoneIndex = maxIdx + 1n;
+
+  clearCountersIfLeavingPlay(ctx, card.id, fromZone, 'land-of-redemption');
+  ctx.db.CardInstance.id.update({
+    ...card,
+    zone: 'land-of-redemption',
+    zoneIndex: finalZoneIndex,
+    posX: '',
+    posY: '',
+    isFlipped: false,
+    ownerId: targetOwnerId,
+    equippedToInstanceId: card.equippedToInstanceId !== 0n ? 0n : card.equippedToInstanceId,
+    revealExpiresAt: undefined,
+    revealStartedAt: undefined,
+    ...leavePlayFieldOverrides(card, fromZone, 'land-of-redemption'),
+  });
+
+  // Defensive cascade: any accessories still pointing at this soul lose their link.
+  for (const accessory of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+    if (accessory.equippedToInstanceId === card.id) {
+      ctx.db.CardInstance.id.update({ ...accessory, equippedToInstanceId: 0n });
+    }
+  }
+
+  if (fromZone === 'land-of-bondage') {
+    compactLobIndices(ctx, gameId, sourceOwnerId);
+  }
+
+  const triggeredRefill =
+    normalizeFormat(game.format) === 'Paragon' &&
+    card.isSoulDeckOrigin === true &&
+    fromZone === 'land-of-bondage' &&
+    sourceOwnerId === 0n;
+  if (triggeredRefill) {
+    refillSoulDeck(ctx, gameId);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Reducer: surrender_lost_soul
+// Sends a Lost Soul from the actor's (or shared Paragon) Land of Bondage to
+// the opponent's Land of Redemption, transferring ownership. Logs a distinct
+// SURRENDER_LOST_SOUL action so the chat reads "surrendered X" rather than
+// the generic move text.
+// ---------------------------------------------------------------------------
+export const surrender_lost_soul = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardInstanceId: t.u64(),
+  },
+  (ctx, { gameId, cardInstanceId }) => {
+    const player = findPlayerBySender(ctx, gameId);
+
+    const card = ctx.db.CardInstance.id.find(cardInstanceId);
+    if (!card) throw new SenderError('Card not found');
+    if (card.gameId !== gameId) throw new SenderError('Card not in this game');
+
+    const isLostSoul = card.cardType === 'LS' || card.cardName.toLowerCase().includes('lost soul');
+    if (!isLostSoul) throw new SenderError('Card is not a Lost Soul');
+    if (card.isToken) throw new SenderError('Cannot surrender a token');
+    if (card.zone !== 'land-of-bondage') throw new SenderError('Card must be in Land of Bondage');
+
+    // Surrender is allowed when the soul is yours OR it's a shared Paragon soul.
+    const isShared = card.ownerId === 0n;
+    if (!isShared && card.ownerId !== player.id) {
+      throw new SenderError('You can only surrender your own Lost Souls');
+    }
+
+    const opponent = [...ctx.db.Player.player_game_id.filter(gameId)].find(
+      (p: any) => p.id !== player.id,
+    );
+    if (!opponent) throw new SenderError('Opponent not found');
+
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+
+    const fromOwnerId = card.ownerId;
+    moveLostSoulToLor(ctx, gameId, card, opponent.id, game);
+
+    logAction(
+      ctx, gameId, player.id, 'SURRENDER_LOST_SOUL',
+      JSON.stringify({
+        cardInstanceId: cardInstanceId.toString(),
+        cardName: card.cardName,
+        cardImgFile: card.cardImgFile,
+        fromOwnerId: fromOwnerId.toString(),
+        targetOwnerId: opponent.id.toString(),
+      }),
+      game.turnNumber, game.currentPhase,
+    );
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: rescue_lost_soul
+// Sends a Lost Soul from the opponent's (or shared Paragon) Land of Bondage
+// to the actor's Land of Redemption, transferring ownership. Logs a distinct
+// RESCUE_LOST_SOUL action so the chat reads "rescued X".
+// ---------------------------------------------------------------------------
+export const rescue_lost_soul = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardInstanceId: t.u64(),
+  },
+  (ctx, { gameId, cardInstanceId }) => {
+    const player = findPlayerBySender(ctx, gameId);
+
+    const card = ctx.db.CardInstance.id.find(cardInstanceId);
+    if (!card) throw new SenderError('Card not found');
+    if (card.gameId !== gameId) throw new SenderError('Card not in this game');
+
+    const isLostSoul = card.cardType === 'LS' || card.cardName.toLowerCase().includes('lost soul');
+    if (!isLostSoul) throw new SenderError('Card is not a Lost Soul');
+    if (card.isToken) throw new SenderError('Cannot rescue a token via this reducer');
+    if (card.zone !== 'land-of-bondage') throw new SenderError('Card must be in Land of Bondage');
+
+    // Rescue applies to opponent souls or shared Paragon souls — never your own.
+    const isShared = card.ownerId === 0n;
+    if (!isShared && card.ownerId === player.id) {
+      throw new SenderError('You cannot rescue your own Lost Souls');
+    }
+
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+
+    const fromOwnerId = card.ownerId;
+    moveLostSoulToLor(ctx, gameId, card, player.id, game);
+
+    logAction(
+      ctx, gameId, player.id, 'RESCUE_LOST_SOUL',
+      JSON.stringify({
+        cardInstanceId: cardInstanceId.toString(),
+        cardName: card.cardName,
+        cardImgFile: card.cardImgFile,
+        fromOwnerId: fromOwnerId.toString(),
+        targetOwnerId: player.id.toString(),
+      }),
+      game.turnNumber, game.currentPhase,
+    );
   },
 );
 

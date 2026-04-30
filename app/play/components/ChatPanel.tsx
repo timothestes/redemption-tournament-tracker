@@ -398,6 +398,30 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       }
     } catch { /* fall through */ }
   }
+  if (actionType === 'SURRENDER_LOST_SOUL' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      if (data.cardName) {
+        const targetName = data.targetOwnerId && playerNames?.[data.targetOwnerId];
+        return targetName
+          ? <>surrendered <HoverableCard name={data.cardName} img={data.cardImgFile} /> to {targetName}&apos;s land of redemption</>
+          : <>surrendered <HoverableCard name={data.cardName} img={data.cardImgFile} /></>;
+      }
+    } catch { /* fall through */ }
+  }
+  if (actionType === 'RESCUE_LOST_SOUL' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      if (data.cardName) {
+        const fromOwnerName = data.fromOwnerId && data.fromOwnerId !== '0' && data.fromOwnerId !== actorPlayerId
+          ? playerNames?.[data.fromOwnerId]
+          : null;
+        return fromOwnerName
+          ? <>rescued <HoverableCard name={data.cardName} img={data.cardImgFile} /> from {fromOwnerName}&apos;s land of bondage</>
+          : <>rescued <HoverableCard name={data.cardName} img={data.cardImgFile} /></>;
+      }
+    } catch { /* fall through */ }
+  }
   if (actionType === 'MOVE_CARD' && payload) {
     try {
       const data = JSON.parse(payload);

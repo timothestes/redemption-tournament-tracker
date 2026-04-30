@@ -29,6 +29,15 @@ interface CardContextMenuProps {
   /** Invoked when the user clicks "Add text note" / "Edit note". When omitted, the
    *  menu entry is not rendered (used to gate the action to card owners). */
   onEditNote?: (card: GameCard) => void;
+  /** Invoked when the user clicks "Surrender" on a Lost Soul in their own (or
+   *  the shared Paragon) Land of Bondage. Sends the soul to the opponent's
+   *  Land of Redemption. Multiplayer-only — goldfish leaves this undefined and
+   *  the menu entry is suppressed. */
+  onSurrender?: (cardInstanceId: string) => void;
+  /** Invoked when the user clicks "Rescue" on a Lost Soul in the opponent's
+   *  (or the shared Paragon) Land of Bondage. Sends the soul to the local
+   *  player's Land of Redemption. Multiplayer-only. */
+  onRescue?: (cardInstanceId: string) => void;
   /** Live zone state for reading updated card data (counters, etc.) */
   zones?: Record<ZoneId, GameCard[]>;
   /** When true, the whole-hand reveal is active — suppress the per-card
@@ -36,7 +45,7 @@ interface CardContextMenuProps {
   isHandRevealed?: boolean;
 }
 
-export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onExchange, onDetach, onEditNote, zones, isHandRevealed }: CardContextMenuProps) {
+export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onExchange, onDetach, onEditNote, onSurrender, onRescue, zones, isHandRevealed }: CardContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number; ready: boolean }>({ left: x, top: y, ready: false });
 
@@ -211,8 +220,49 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
     );
   }
 
+  // Lost Soul rescue/surrender buttons — non-token Lost Souls in a Land of
+  // Bondage. Surrender applies to your own LoB or the shared Paragon LoB.
+  // Rescue applies to the opponent's LoB or the shared Paragon LoB. Handlers
+  // are multiplayer-only; goldfish leaves them undefined so the buttons hide.
+  const isNonTokenLostSoulInLob =
+    !card.isToken && isLostSoul(card) && card.zone === 'land-of-bondage';
+  const canSurrender =
+    isNonTokenLostSoulInLob &&
+    !!onSurrender &&
+    (card.ownerId === 'player1' || card.ownerId === 'shared');
+  const canRescue =
+    isNonTokenLostSoulInLob &&
+    !!onRescue &&
+    (card.ownerId === 'player2' || card.ownerId === 'shared');
+
   return (
     <div ref={menuRef} style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
+
+      {(canSurrender || canRescue) && (
+        <>
+          {canRescue && (
+            <button
+              style={itemStyle}
+              onClick={() => doAction(() => onRescue!(card.instanceId))}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              Rescue
+            </button>
+          )}
+          {canSurrender && (
+            <button
+              style={itemStyle}
+              onClick={() => doAction(() => onSurrender!(card.instanceId))}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              Surrender
+            </button>
+          )}
+          <div style={separatorStyle} />
+        </>
+      )}
 
       {/* Card abilities from CARD_ABILITIES registry. Rendered disabled when
           the local player doesn't own the card, or when the card isn't in a

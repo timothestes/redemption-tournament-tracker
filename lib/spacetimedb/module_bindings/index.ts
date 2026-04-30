@@ -80,6 +80,7 @@ import ReorderLobReducer from "./reorder_lob_reducer";
 import RequestOpponentActionReducer from "./request_opponent_action_reducer";
 import RequestRematchReducer from "./request_rematch_reducer";
 import RequestZoneSearchReducer from "./request_zone_search_reducer";
+import RescueLostSoulReducer from "./rescue_lost_soul_reducer";
 import ResignGameReducer from "./resign_game_reducer";
 import RespondRematchReducer from "./respond_rematch_reducer";
 import RevealCardInHandReducer from "./reveal_card_in_hand_reducer";
@@ -94,6 +95,7 @@ import ShuffleDeckReducer from "./shuffle_deck_reducer";
 import ShuffleOpponentDeckReducer from "./shuffle_opponent_deck_reducer";
 import ShuffleSoulDeckReducer from "./shuffle_soul_deck_reducer";
 import SpawnLostSoulReducer from "./spawn_lost_soul_reducer";
+import SurrenderLostSoulReducer from "./surrender_lost_soul_reducer";
 import ToggleRevealHandReducer from "./toggle_reveal_hand_reducer";
 import ToggleRevealReserveReducer from "./toggle_reveal_reserve_reducer";
 import UnmeekCardReducer from "./unmeek_card_reducer";
@@ -329,6 +331,7 @@ const reducersSchema = __reducers(
   __reducerSchema("request_opponent_action", RequestOpponentActionReducer),
   __reducerSchema("request_rematch", RequestRematchReducer),
   __reducerSchema("request_zone_search", RequestZoneSearchReducer),
+  __reducerSchema("rescue_lost_soul", RescueLostSoulReducer),
   __reducerSchema("resign_game", ResignGameReducer),
   __reducerSchema("respond_rematch", RespondRematchReducer),
   __reducerSchema("reveal_card_in_hand", RevealCardInHandReducer),
@@ -343,6 +346,7 @@ const reducersSchema = __reducers(
   __reducerSchema("shuffle_opponent_deck", ShuffleOpponentDeckReducer),
   __reducerSchema("shuffle_soul_deck", ShuffleSoulDeckReducer),
   __reducerSchema("spawn_lost_soul", SpawnLostSoulReducer),
+  __reducerSchema("surrender_lost_soul", SurrenderLostSoulReducer),
   __reducerSchema("toggle_reveal_hand", ToggleRevealHandReducer),
   __reducerSchema("toggle_reveal_reserve", ToggleRevealReserveReducer),
   __reducerSchema("unmeek_card", UnmeekCardReducer),

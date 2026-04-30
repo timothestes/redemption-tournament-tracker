@@ -433,7 +433,8 @@ export function OpponentBrowseModal({
         right: isLoupeVisible ? 'clamp(280px, 20vw, 380px)' : '36px',
         background: 'transparent',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
+        paddingTop: '5vh',
         justifyContent: 'center',
         zIndex: 900,
         pointerEvents: 'none',
@@ -450,7 +451,7 @@ export function OpponentBrowseModal({
           padding: 20,
           width: '80vw',
           maxWidth: 700,
-          maxHeight: '80vh',
+          height: '80vh',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
@@ -670,7 +671,7 @@ export function OpponentBrowseModal({
         </div>
 
         {/* Card grid — scrollable */}
-        <div ref={scrollContainerRef} style={{ overflow: 'auto', flex: 1 }}>
+        <div ref={scrollContainerRef} style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
           {filtered.length === 0 ? (
             <p style={{ color: 'var(--gf-text-dim)', fontStyle: 'italic', textAlign: 'center', padding: 20 }}>
               {search ? 'No cards match your search' : 'No cards in this zone'}

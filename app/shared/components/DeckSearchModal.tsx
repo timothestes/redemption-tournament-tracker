@@ -695,7 +695,7 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
         </div>
 
         {/* Card grid */}
-        <div ref={scrollContainerRef} style={{ overflow: 'auto', flex: 1 }}>
+        <div ref={scrollContainerRef} style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
           {filtered.length === 0 ? (
             <p style={{ color: 'var(--gf-text-dim)', fontStyle: 'italic', textAlign: 'center', padding: 20 }}>
               {search ? 'No cards match your search' : 'Deck is empty'}
