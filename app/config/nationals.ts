@@ -62,7 +62,6 @@ export const NATIONALS_CONFIG: NationalsConfig = {
     { value: "wednesday", label: "Wednesday Night (July 22)" },
     { value: "thursday", label: "Thursday Night (July 23)" },
     { value: "friday", label: "Friday Night (July 24)" },
-    { value: "saturday", label: "Saturday Night (July 25)" },
   ],
   
   // Event configurations by day
