@@ -200,7 +200,7 @@ export function CardChoicePromptContainer() {
                   fontFamily: 'var(--font-geist-sans), system-ui, sans-serif',
                 }}
               >
-                Resolve
+                Choose
               </div>
               <div
                 style={{
