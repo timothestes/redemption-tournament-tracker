@@ -13,7 +13,15 @@ const MOVE_TARGETS: ZoneId[] = [
 const LOST_SOUL_EXCLUDED_TARGETS: ZoneId[] = ['territory', 'discard', 'reserve'];
 
 function isLostSoul(card: GameCard): boolean {
-  return card.type === 'LS' || card.type === 'Lost Soul' || card.type.toLowerCase().includes('lost soul');
+  return (
+    card.type === 'LS' ||
+    card.type === 'Lost Soul' ||
+    card.type.toLowerCase().includes('lost soul') ||
+    // Multiplayer Lost Soul tokens get cardType 'TOKEN_LS' but their cardName
+    // always starts with "Lost Soul Token" — match on either to cover both
+    // goldfish (type='LS') and multiplayer (type='TOKEN_LS') tokens.
+    card.cardName.toLowerCase().startsWith('lost soul')
+  );
 }
 
 interface CardContextMenuProps {
@@ -188,10 +196,14 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
     ? Math.max(0, Math.ceil((card.revealUntil! - nowForReveal) / 1000))
     : 0;
 
-  // Lost Soul tokens get a simplified menu (rescue is the actual game mechanic).
+  // Lost Soul tokens get a simplified menu in goldfish (single-player rescue
+  // is just a moveCard). In multiplayer, onSurrender/onRescue handlers are
+  // wired so we fall through to the normal menu and surface the proper
+  // surrender/rescue buttons (which transfer ownership server-side).
   // Other tokens fall through to the normal menu — server-side cleanup deletes
   // them when they leave territory.
-  if (card.isToken && isLostSoul(card)) {
+  const isGoldfishMode = !onSurrender && !onRescue;
+  if (card.isToken && isLostSoul(card) && isGoldfishMode) {
     return (
       <div ref={menuRef} style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
         <div style={labelStyle}>{card.cardName}</div>
@@ -220,18 +232,18 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
     );
   }
 
-  // Lost Soul rescue/surrender buttons — non-token Lost Souls in a Land of
-  // Bondage. Surrender applies to your own LoB or the shared Paragon LoB.
-  // Rescue applies to the opponent's LoB or the shared Paragon LoB. Handlers
-  // are multiplayer-only; goldfish leaves them undefined so the buttons hide.
-  const isNonTokenLostSoulInLob =
-    !card.isToken && isLostSoul(card) && card.zone === 'land-of-bondage';
+  // Lost Soul rescue/surrender buttons — Lost Souls (token or non-token) in a
+  // Land of Bondage. Surrender applies to your own LoB or the shared Paragon
+  // LoB. Rescue applies to the opponent's LoB or the shared Paragon LoB.
+  // Handlers are multiplayer-only; goldfish leaves them undefined so the
+  // buttons hide.
+  const isLostSoulInLob = isLostSoul(card) && card.zone === 'land-of-bondage';
   const canSurrender =
-    isNonTokenLostSoulInLob &&
+    isLostSoulInLob &&
     !!onSurrender &&
     (card.ownerId === 'player1' || card.ownerId === 'shared');
   const canRescue =
-    isNonTokenLostSoulInLob &&
+    isLostSoulInLob &&
     !!onRescue &&
     (card.ownerId === 'player2' || card.ownerId === 'shared');
 

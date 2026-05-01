@@ -5885,7 +5885,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             }}
           >
             <div style={{
-              fontSize: 12,
+              fontSize: 15,
               color: '#e8d5a3',
               fontFamily: 'var(--font-cinzel), Georgia, serif',
               letterSpacing: '0.06em',
@@ -5903,12 +5903,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   showGameToast('Action priority granted');
                 }}
                 style={{
-                  padding: '6px 18px',
+                  padding: '9px 20px',
                   background: '#2d5a27',
                   border: '1px solid #4a8a42',
                   borderRadius: 6,
                   color: '#c4e8bf',
-                  fontSize: 11,
+                  fontSize: 14,
                   fontFamily: 'var(--font-cinzel), Georgia, serif',
                   letterSpacing: '0.06em',
                   cursor: 'pointer',
@@ -5921,12 +5921,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               <button
                 onClick={() => denyZoneSearch(BigInt(incomingSearchRequest.id))}
                 style={{
-                  padding: '6px 18px',
+                  padding: '9px 20px',
                   background: '#5a2727',
                   border: '1px solid #8a4242',
                   borderRadius: 6,
                   color: '#e8bfbf',
-                  fontSize: 11,
+                  fontSize: 14,
                   fontFamily: 'var(--font-cinzel), Georgia, serif',
                   letterSpacing: '0.06em',
                   cursor: 'pointer',

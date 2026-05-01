@@ -27,14 +27,14 @@ export function ConsentDialog({ requesterName, zoneName, requestType = 'search',
           background: 'var(--gf-bg)',
           border: '1px solid var(--gf-border)',
           borderRadius: 8,
-          padding: '12px 20px',
+          padding: '16px 22px',
           display: 'flex',
           alignItems: 'center',
-          gap: 16,
+          gap: 18,
           boxShadow: '0 8px 32px rgba(0,0,0,0.7)',
         }}
       >
-        <div style={{ fontSize: 13, color: 'var(--gf-text)', lineHeight: 1.4 }}>
+        <div style={{ fontSize: 15, color: 'var(--gf-text)', lineHeight: 1.4, maxWidth: 480 }}>
           {requestType === 'priority' ? (
             <><strong style={{ color: 'var(--gf-accent)' }}>{requesterName}</strong> is requesting <strong style={{ color: 'var(--gf-text-bright)' }}>action priority</strong></>
           ) : requestType === 'reveal' ? (
@@ -49,12 +49,12 @@ export function ConsentDialog({ requesterName, zoneName, requestType = 'search',
           <button
             onClick={onAllow}
             style={{
-              padding: '6px 16px',
+              padding: '9px 18px',
               background: '#2d5a27',
               border: '1px solid #4a8a42',
               borderRadius: 6,
               color: '#c4e8bf',
-              fontSize: 12,
+              fontSize: 14,
               fontFamily: 'var(--font-cinzel), Georgia, serif',
               cursor: 'pointer',
             }}
@@ -66,12 +66,12 @@ export function ConsentDialog({ requesterName, zoneName, requestType = 'search',
           <button
             onClick={onDeny}
             style={{
-              padding: '6px 16px',
+              padding: '9px 18px',
               background: '#5a2727',
               border: '1px solid #8a4242',
               borderRadius: 6,
               color: '#e8bfbf',
-              fontSize: 12,
+              fontSize: 14,
               fontFamily: 'var(--font-cinzel), Georgia, serif',
               cursor: 'pointer',
             }}

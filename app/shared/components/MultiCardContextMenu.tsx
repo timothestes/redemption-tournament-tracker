@@ -12,7 +12,12 @@ const MOVE_TARGETS: ZoneId[] = [
 const LOST_SOUL_EXCLUDED_TARGETS: ZoneId[] = ['territory', 'discard', 'reserve'];
 
 function isLostSoul(card: GameCard): boolean {
-  return card.type === 'LS' || card.type === 'Lost Soul' || card.type.toLowerCase().includes('lost soul');
+  return (
+    card.type === 'LS' ||
+    card.type === 'Lost Soul' ||
+    card.type.toLowerCase().includes('lost soul') ||
+    card.cardName.toLowerCase().startsWith('lost soul')
+  );
 }
 
 interface MultiCardContextMenuProps {

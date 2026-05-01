@@ -3024,9 +3024,8 @@ export const surrender_lost_soul = spacetimedb.reducer(
     if (!card) throw new SenderError('Card not found');
     if (card.gameId !== gameId) throw new SenderError('Card not in this game');
 
-    const isLostSoul = card.cardType === 'LS' || card.cardName.toLowerCase().includes('lost soul');
+    const isLostSoul = card.cardType === 'LS' || card.cardType === 'TOKEN_LS' || card.cardName.toLowerCase().includes('lost soul');
     if (!isLostSoul) throw new SenderError('Card is not a Lost Soul');
-    if (card.isToken) throw new SenderError('Cannot surrender a token');
     if (card.zone !== 'land-of-bondage') throw new SenderError('Card must be in Land of Bondage');
 
     // Surrender is allowed when the soul is yours OR it's a shared Paragon soul.
@@ -3078,9 +3077,8 @@ export const rescue_lost_soul = spacetimedb.reducer(
     if (!card) throw new SenderError('Card not found');
     if (card.gameId !== gameId) throw new SenderError('Card not in this game');
 
-    const isLostSoul = card.cardType === 'LS' || card.cardName.toLowerCase().includes('lost soul');
+    const isLostSoul = card.cardType === 'LS' || card.cardType === 'TOKEN_LS' || card.cardName.toLowerCase().includes('lost soul');
     if (!isLostSoul) throw new SenderError('Card is not a Lost Soul');
-    if (card.isToken) throw new SenderError('Cannot rescue a token via this reducer');
     if (card.zone !== 'land-of-bondage') throw new SenderError('Card must be in Land of Bondage');
 
     // Rescue applies to opponent souls or shared Paragon souls — never your own.
