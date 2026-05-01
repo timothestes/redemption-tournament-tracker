@@ -137,6 +137,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [errorFromPregame, setErrorFromPregame] = useState(false);
   const [formatMismatch, setFormatMismatch] = useState<{ host: string; joiner: string } | null>(null);
+  const [isSelfJoin, setIsSelfJoin] = useState(false);
   const [isPracticing, setIsPracticing] = useState(false);
   // Guards against a visual flash: once the user chooses to leave, we freeze the
   // render on a transition overlay so that subsequent SpacetimeDB state updates
@@ -508,25 +509,28 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           }
         }
 
-        try {
-          conn.reducers.joinGame({
-            code,
-            deckId: gameParams.deckId,
-            displayName: gameParams.displayName,
-            paragon: gameParams.paragon || '',
-            format: gameParams.format ?? 'Type 1',
-            supabaseUserId: gameParams.supabaseUserId,
-            deckData,
-          });
-        } catch (joinErr: unknown) {
-          // SpacetimeDB SenderError may throw synchronously
+        // joinGame returns a Promise that rejects with SenderError on server-side
+        // validation failures. Without an explicit .catch(), the rejection becomes
+        // an unhandled error and trips Next.js's runtime error overlay.
+        conn.reducers.joinGame({
+          code,
+          deckId: gameParams.deckId,
+          displayName: gameParams.displayName,
+          paragon: gameParams.paragon || '',
+          format: gameParams.format ?? 'Type 1',
+          supabaseUserId: gameParams.supabaseUserId,
+          deckData,
+        }).catch((joinErr: unknown) => {
           const msg = joinErr instanceof Error ? joinErr.message : 'Failed to join game';
-          setErrorMessage(msg.includes('No waiting game')
-            ? `No game found with code "${code}". The game may have ended or the code may be incorrect.`
-            : msg);
+          if (msg.includes('cannot join your own game')) {
+            setIsSelfJoin(true);
+          } else if (msg.includes('No waiting game')) {
+            setErrorMessage(`No game found with code "${code}". The game may have ended or the code may be incorrect.`);
+          } else {
+            setErrorMessage(msg);
+          }
           setLifecycle('error');
-          return;
-        }
+        });
       }
     } catch (e: unknown) {
       setErrorMessage(e instanceof Error ? e.message : 'Failed to initialize game');
@@ -775,6 +779,10 @@ function GameInner({ code, isConnected }: GameInnerProps) {
         </div>
       );
     }
+    const title = isSelfJoin ? "You're hosting this game" : 'Connection Error';
+    const body = isSelfJoin
+      ? 'Share the code with an opponent so they can join.'
+      : (errorMessage ?? 'An unexpected error occurred.');
     return (
       <>
       <TopNav />
@@ -787,10 +795,8 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               </svg>
             </div>
           </div>
-          <p className="text-lg font-semibold font-cinzel mb-2">Connection Error</p>
-          <p className="text-sm text-muted-foreground">
-            {errorMessage ?? 'An unexpected error occurred.'}
-          </p>
+          <p className="text-lg font-semibold font-cinzel mb-2">{title}</p>
+          <p className="text-sm text-muted-foreground">{body}</p>
           <a
             href="/play"
             className="mt-6 inline-block rounded-md border border-border px-5 py-2.5 text-sm font-medium hover:bg-muted transition-colors"

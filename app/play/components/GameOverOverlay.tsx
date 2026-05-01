@@ -286,7 +286,7 @@ export default function GameOverOverlay({
         }}>
           <p style={{
             fontFamily: 'Georgia, serif',
-            fontSize: 13,
+            fontSize: 14,
             color: '#e8d5a3',
             whiteSpace: 'nowrap',
           }}>
@@ -299,13 +299,13 @@ export default function GameOverOverlay({
             }}
             disabled={isLoading}
             style={{
-              padding: '6px 16px',
+              padding: '8px 16px',
               borderRadius: 4,
               border: '1px solid rgba(196, 149, 90, 0.45)',
               background: 'rgba(196, 149, 90, 0.15)',
               color: '#e8d5a3',
               fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 10,
+              fontSize: 12,
               fontWeight: 700,
               letterSpacing: '0.08em',
               textTransform: 'uppercase',
@@ -318,13 +318,13 @@ export default function GameOverOverlay({
           <button
             onClick={() => gameState.respondRematch(false, '', '', '', '')}
             style={{
-              padding: '6px 16px',
+              padding: '8px 16px',
               borderRadius: 4,
               border: '1px solid rgba(107, 78, 39, 0.3)',
               background: 'transparent',
               color: 'rgba(196, 149, 90, 0.5)',
               fontFamily: 'var(--font-cinzel), Georgia, serif',
-              fontSize: 10,
+              fontSize: 12,
               fontWeight: 700,
               letterSpacing: '0.08em',
               textTransform: 'uppercase',
