@@ -69,6 +69,11 @@ export interface GameState {
   isLoading: boolean;
   // True once the game table subscription has applied (data is in client cache)
   isGamesReady: boolean;
+  // True once the player table subscription has applied. Required by reconnect
+  // logic that checks `allPlayers` to detect "already joined" — gating only on
+  // isGamesReady races the Player subscription and falsely fires joinGame on a
+  // playing-status game, which the server rejects.
+  isPlayersReady: boolean;
 
   // Connection identity (as hex string for comparisons)
   identityHex: string | undefined;
@@ -805,6 +810,7 @@ export function useGameState(gameId: bigint): GameState {
     soulsRescued,
     isLoading,
     isGamesReady: gamesLoading,
+    isPlayersReady: playersLoading,
     identityHex,
     drawCard,
     drawMultiple,

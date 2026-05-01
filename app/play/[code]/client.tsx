@@ -430,11 +430,15 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   });
 
   // Once subscription data is ready, call the appropriate reducer once.
-  // Gate on isGamesReady (subscription applied) instead of isConnected (WebSocket open)
-  // to eliminate the race where allGames is empty and createGame re-fires.
+  // Gate on BOTH Game and Player subscriptions being applied. Game alone isn't
+  // enough — the reconnect branch below reads `allPlayers` to decide whether
+  // we're already joined, and a Player subscription that hasn't applied yet
+  // makes that check return false. The joiner then falls through to joinGame,
+  // which the server rejects on a 'playing'-status game with "No waiting game",
+  // surfacing as the "Game is no longer available" lobby toast.
   useEffect(() => {
-    console.log('[game-debug] reducer effect:', { isGamesReady: gameState.isGamesReady, hasConn: !!conn, didCall: didCallReducer.current, role: gameParams?.role, deckReady: deckData !== null });
-    if (!gameState.isGamesReady || !conn || didCallReducer.current) return;
+    console.log('[game-debug] reducer effect:', { isGamesReady: gameState.isGamesReady, isPlayersReady: gameState.isPlayersReady, hasConn: !!conn, didCall: didCallReducer.current, role: gameParams?.role, deckReady: deckData !== null });
+    if (!gameState.isGamesReady || !gameState.isPlayersReady || !conn || didCallReducer.current) return;
 
     if (!gameParams) {
       console.log('[game-debug] no gameParams — showing error');
@@ -536,7 +540,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       setErrorMessage(e instanceof Error ? e.message : 'Failed to initialize game');
       setLifecycle('error');
     }
-  }, [gameState.isGamesReady, conn, code, gameParams, deckData]);
+  }, [gameState.isGamesReady, gameState.isPlayersReady, conn, code, gameParams, deckData]);
 
   // Also get raw game list to find our game by code before we know the ID
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

@@ -97,10 +97,22 @@ function canSenderActOnCard(game: any, card: any, player: any): boolean {
 // Helper: compactHandIndices
 // After a card leaves the hand, re-index remaining hand cards to close gaps
 // so zoneIndex values are always sequential: 0, 1, 2, ...
+//
+// `gameCardsHint` lets callers reuse a single CardInstance materialization
+// across multiple operations in the same reducer (saves a full filter scan).
+// `excludeId` skips the just-moved card whose row in the hint still shows
+// `zone === 'hand'` because the hint was captured before the move.
 // ---------------------------------------------------------------------------
-function compactHandIndices(ctx: any, gameId: bigint, playerId: bigint) {
-  const handCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
-    (c: any) => c.ownerId === playerId && c.zone === 'hand'
+function compactHandIndices(
+  ctx: any,
+  gameId: bigint,
+  playerId: bigint,
+  gameCardsHint?: any[],
+  excludeId?: bigint,
+) {
+  const allCards = gameCardsHint ?? [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)];
+  const handCards = allCards.filter(
+    (c: any) => c.ownerId === playerId && c.zone === 'hand' && (excludeId === undefined || c.id !== excludeId)
   );
   // Sort by current zoneIndex to preserve order
   handCards.sort((a: any, b: any) => (a.zoneIndex < b.zoneIndex ? -1 : a.zoneIndex > b.zoneIndex ? 1 : 0));
@@ -117,13 +129,20 @@ function compactHandIndices(ctx: any, gameId: bigint, playerId: bigint) {
 // After a card leaves the LOB, re-index remaining LOB cards to close gaps
 // so zoneIndex values are always sequential: 0, 1, 2, ...
 // ---------------------------------------------------------------------------
-function compactLobIndices(ctx: any, gameId: bigint, playerId: bigint) {
+function compactLobIndices(
+  ctx: any,
+  gameId: bigint,
+  playerId: bigint,
+  gameCardsHint?: any[],
+  excludeId?: bigint,
+) {
   // Paragon shared LoB (ownerId=0n) intentionally keeps sparse zoneIndices so
   // that when a soul is rescued, its slot stays empty until refill places a
   // new soul there — preventing the other souls from visually shifting.
   if (playerId === 0n) return;
-  const lobCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
-    (c: any) => c.ownerId === playerId && c.zone === 'land-of-bondage'
+  const allCards = gameCardsHint ?? [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)];
+  const lobCards = allCards.filter(
+    (c: any) => c.ownerId === playerId && c.zone === 'land-of-bondage' && (excludeId === undefined || c.id !== excludeId)
   );
   lobCards.sort((a: any, b: any) => (a.zoneIndex < b.zoneIndex ? -1 : a.zoneIndex > b.zoneIndex ? 1 : 0));
   for (let i = 0; i < lobCards.length; i++) {
@@ -1745,6 +1764,14 @@ export const move_card = spacetimedb.reducer(
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
 
+    // Materialize the game's CardInstance rows once. Reused for the various
+    // zoneIndex / accessory / hand-count lookups below instead of issuing a
+    // fresh `[...filter(gameId)]` per branch. The compact helpers also accept
+    // this snapshot via `gameCardsHint`. Snapshot is taken pre-mutation, so
+    // any helper that runs after the main update must pass `excludeId` so the
+    // moved card's stale (pre-move) zone is ignored.
+    const gameCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)];
+
     // Tokens dropped into non-play zones are deleted, not moved.
     // Parallels the goldfish cleanup rule at gameReducer.ts:92. Runs BEFORE the
     // lost-soul redirect so tokens always delete (never redirect to LOB) even if
@@ -1755,8 +1782,8 @@ export const move_card = spacetimedb.reducer(
         ctx.db.CardCounter.id.delete(counter.id);
       }
       ctx.db.CardInstance.id.delete(cardInstanceId);
-      if (fromZone === 'hand') compactHandIndices(ctx, gameId, card.ownerId);
-      if (fromZone === 'land-of-bondage') compactLobIndices(ctx, gameId, card.ownerId);
+      if (fromZone === 'hand') compactHandIndices(ctx, gameId, card.ownerId, gameCards, cardInstanceId);
+      if (fromZone === 'land-of-bondage') compactLobIndices(ctx, gameId, card.ownerId, gameCards, cardInstanceId);
       logAction(
         ctx, gameId, player.id, 'MOVE_CARD',
         JSON.stringify({
@@ -1786,7 +1813,7 @@ export const move_card = spacetimedb.reducer(
       const droppedOnOwnZone = !targetOwnerId || BigInt(targetOwnerId) === player.id;
       const lobOwnerId = droppedOnOwnZone ? homeOwnerId : BigInt(targetOwnerId);
       const lobIndex = BigInt(
-        [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+        gameCards.filter(
           (c: any) => c.ownerId === lobOwnerId && c.zone === 'land-of-bondage'
         ).length
       );
@@ -1807,11 +1834,11 @@ export const move_card = spacetimedb.reducer(
       logAction(ctx, gameId, player.id, 'MOVE_CARD', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), from: fromZone, to: 'land-of-bondage', cardName: redirectLogName, cardImgFile: redirectLogImg, redirected: actionWord }), game.turnNumber, game.currentPhase);
       // Compact hand indices if card left hand
       if (fromZone === 'hand') {
-        compactHandIndices(ctx, gameId, card.ownerId);
+        compactHandIndices(ctx, gameId, card.ownerId, gameCards, cardInstanceId);
       }
       // Compact LOB indices if card left LOB
       if (fromZone === 'land-of-bondage') {
-        compactLobIndices(ctx, gameId, card.ownerId);
+        compactLobIndices(ctx, gameId, card.ownerId, gameCards, cardInstanceId);
       }
       return;
     }
@@ -1872,7 +1899,7 @@ export const move_card = spacetimedb.reducer(
     let finalZoneIndex = zoneIndex ? BigInt(zoneIndex) : 0n;
     if (!zoneIndex && toZone !== 'deck' && toZone !== 'hand') {
       let maxIdx = -1n;
-      for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
+      for (const c of gameCards) {
         if (c.ownerId === (newOwnerId) && c.zone === toZone && c.zoneIndex > maxIdx) {
           maxIdx = c.zoneIndex;
         }
@@ -1885,7 +1912,7 @@ export const move_card = spacetimedb.reducer(
     // maxIdx+1 assignment above to find the first empty slot in [0..2] first,
     // only falling back to maxIdx+1 when the canonical slots are all occupied.
     if (!zoneIndex && toZone === 'land-of-bondage' && newOwnerId === 0n) {
-      const sharedLob = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+      const sharedLob = gameCards.filter(
         (c: any) => c.ownerId === 0n && c.zone === 'land-of-bondage' && c.id !== cardInstanceId
       );
       const occupied = new Set<bigint>(sharedLob.map((c: any) => c.zoneIndex));
@@ -1904,7 +1931,7 @@ export const move_card = spacetimedb.reducer(
     }
     if (!zoneIndex && toZone === 'hand') {
       finalZoneIndex = BigInt(
-        [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+        gameCards.filter(
           (c: any) => c.ownerId === newOwnerId && c.zone === 'hand'
         ).length
       );
@@ -1916,7 +1943,7 @@ export const move_card = spacetimedb.reducer(
     // duplicate index 0 and a later "draw top" would pull an arbitrary card.
     if (toZone === 'soul-deck' && zoneIndex) {
       const insertIdx = BigInt(zoneIndex);
-      const soulDeckCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+      const soulDeckCards = gameCards.filter(
         (c: any) => c.ownerId === 0n && c.zone === 'soul-deck' && c.id !== cardInstanceId
       );
       for (const sc of soulDeckCards) {
@@ -1966,7 +1993,7 @@ export const move_card = spacetimedb.reducer(
     if (leavingZone) {
       const sendAccessoriesToDiscard =
         fromZone === 'territory' && toZone === 'land-of-bondage';
-      const attachedAccessories = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+      const attachedAccessories = gameCards.filter(
         (c: any) => c.equippedToInstanceId === cardInstanceId
       );
       for (const accessory of attachedAccessories) {
@@ -2006,11 +2033,11 @@ export const move_card = spacetimedb.reducer(
       logAction(ctx, gameId, player.id, 'MOVE_CARD', JSON.stringify({ cardInstanceId: cardInstanceId.toString(), from: fromZone, to: toZone, cardName: logName, cardImgFile: logImg, targetOwnerId: resolvedOwnerId.toString() }), game.turnNumber, game.currentPhase);
       // Compact hand indices if card left hand
       if (fromZone === 'hand') {
-        compactHandIndices(ctx, gameId, card.ownerId);
+        compactHandIndices(ctx, gameId, card.ownerId, gameCards, cardInstanceId);
       }
       // Compact LOB indices if card left LOB
       if (fromZone === 'land-of-bondage') {
-        compactLobIndices(ctx, gameId, card.ownerId);
+        compactLobIndices(ctx, gameId, card.ownerId, gameCards, cardInstanceId);
       }
     }
 

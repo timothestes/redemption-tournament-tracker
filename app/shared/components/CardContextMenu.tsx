@@ -233,19 +233,25 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
   }
 
   // Lost Soul rescue/surrender buttons — Lost Souls (token or non-token) in a
-  // Land of Bondage. Surrender applies to your own LoB or the shared Paragon
-  // LoB. Rescue applies to the opponent's LoB or the shared Paragon LoB.
+  // Land of Bondage. Surrender applies to your own LoB. Rescue applies to the
+  // opponent's LoB or the shared Paragon LoB. Paragon shared souls can only be
+  // rescued — never surrendered — since neither player owns them. The shared
+  // souls are identified by cardSet 'ParagonSoul' because the multiplayer
+  // adapter renders them with ownerId='player1' for the local view (the true
+  // shared marker lives on the underlying CardInstance, not the GameCard).
   // Handlers are multiplayer-only; goldfish leaves them undefined so the
   // buttons hide.
   const isLostSoulInLob = isLostSoul(card) && card.zone === 'land-of-bondage';
+  const isParagonSharedSoul = card.cardSet === 'ParagonSoul';
   const canSurrender =
     isLostSoulInLob &&
     !!onSurrender &&
-    (card.ownerId === 'player1' || card.ownerId === 'shared');
+    !isParagonSharedSoul &&
+    card.ownerId === 'player1';
   const canRescue =
     isLostSoulInLob &&
     !!onRescue &&
-    (card.ownerId === 'player2' || card.ownerId === 'shared');
+    (card.ownerId === 'player2' || isParagonSharedSoul);
 
   return (
     <div ref={menuRef} style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
