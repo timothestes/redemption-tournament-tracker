@@ -156,6 +156,7 @@ export interface LoadUserDecksPagedParams {
   pageSize?: number;
   search?: string;
   sort?: 'latest' | 'last_played' | 'name';
+  format?: string;
 }
 
 export interface LoadUserDecksPagedResult {
@@ -174,7 +175,7 @@ export async function loadUserDecksPaged(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { decks: [], totalCount: 0 };
 
-  const { page = 1, pageSize = 12, search, sort = 'last_played' } = params;
+  const { page = 1, pageSize = 12, search, sort = 'last_played', format } = params;
   const offset = (page - 1) * pageSize;
 
   let query = supabase
@@ -187,6 +188,15 @@ export async function loadUserDecksPaged(
 
   if (search && search.trim()) {
     query = query.ilike('name', `%${search.trim()}%`);
+  }
+
+  if (format) {
+    if (format === 'Type 1') {
+      // Decks with null format default to T1 in the UI, so include them here
+      query = query.or('format.is.null,format.eq.Type 1');
+    } else {
+      query = query.eq('format', format);
+    }
   }
 
   switch (sort) {

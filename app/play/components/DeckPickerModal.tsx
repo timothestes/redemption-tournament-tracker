@@ -54,6 +54,7 @@ function DeckPickerContent({
   // ── My Decks state (server-paginated) ──
   const [mySearch, setMySearch] = useState("");
   const [mySort, setMySort] = useState<"latest" | "last_played" | "name">("last_played");
+  const [myFormat, setMyFormat] = useState("");
   const [myPage, setMyPage] = useState(1);
   const [myResults, setMyResults] = useState<DeckOption[]>([]);
   const [myTotal, setMyTotal] = useState(0);
@@ -79,7 +80,7 @@ function DeckPickerContent({
   }, []);
 
   // Reset pagination when filters change
-  useEffect(() => { setMyPage(1); }, [mySearch, mySort]);
+  useEffect(() => { setMyPage(1); }, [mySearch, mySort, myFormat]);
   useEffect(() => { setCommunityPage(1); }, [communitySearch, communityFormat, communitySort]);
 
   // ── My Decks fetch ──
@@ -92,6 +93,7 @@ function DeckPickerContent({
         sort: mySort,
       };
       if (mySearch.trim().length > 0) params.search = mySearch.trim();
+      if (myFormat) params.format = myFormat;
 
       const result = await loadUserDecksPaged(params);
       setMyResults(result.decks);
@@ -103,7 +105,7 @@ function DeckPickerContent({
       setMyLoading(false);
       setMyHasLoaded(true);
     }
-  }, [myPage, mySort, mySearch]);
+  }, [myPage, mySort, mySearch, myFormat]);
 
   // Debounce my-decks search; immediate on sort/page changes
   useEffect(() => {
@@ -177,6 +179,31 @@ function DeckPickerContent({
   const myTotalPages = Math.max(1, Math.ceil(myTotal / MY_DECKS_PAGE_SIZE));
   const communityTotalPages = Math.max(1, Math.ceil(communityTotal / COMMUNITY_PAGE_SIZE));
 
+  // Left/right arrow keys paginate. Skip when the user is mid-edit
+  // (textarea, select, contenteditable, or an input that already has text —
+  // there the arrows are moving the caret).
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "TEXTAREA" || tag === "SELECT" || target?.isContentEditable) return;
+      if (tag === "INPUT" && (target as HTMLInputElement).value !== "") return;
+      if (activeTab === "my") {
+        if (myTotalPages <= 1) return;
+        if (e.key === "ArrowLeft") setMyPage((p) => Math.max(1, p - 1));
+        else setMyPage((p) => Math.min(myTotalPages, p + 1));
+      } else {
+        if (communityTotalPages <= 1) return;
+        if (e.key === "ArrowLeft") setCommunityPage((p) => Math.max(1, p - 1));
+        else setCommunityPage((p) => Math.min(communityTotalPages, p + 1));
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [activeTab, myTotalPages, communityTotalPages]);
+
   // ── Render ──
 
   const searchValue = activeTab === "my" ? mySearch : communitySearch;
@@ -223,17 +250,29 @@ function DeckPickerContent({
           />
         </div>
 
-        {/* My Decks sort */}
+        {/* My Decks filters */}
         {activeTab === "my" && (
-          <select
-            value={mySort}
-            onChange={(e) => setMySort(e.target.value as any)}
-            className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground"
-          >
-            <option value="latest">Latest</option>
-            <option value="last_played">Last Played</option>
-            <option value="name">Name</option>
-          </select>
+          <>
+            <select
+              value={myFormat}
+              onChange={(e) => setMyFormat(e.target.value)}
+              className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground"
+            >
+              <option value="">All Formats</option>
+              <option value="Type 1">Type 1</option>
+              <option value="Type 2">Type 2</option>
+              <option value="Paragon">Paragon</option>
+            </select>
+            <select
+              value={mySort}
+              onChange={(e) => setMySort(e.target.value as any)}
+              className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground"
+            >
+              <option value="latest">Latest</option>
+              <option value="last_played">Last Played</option>
+              <option value="name">Name</option>
+            </select>
+          </>
         )}
 
         {/* Community-only filters */}
@@ -323,9 +362,9 @@ function DeckPickerContent({
             size="sm"
             onClick={() => setMyPage((p) => Math.max(1, p - 1))}
             disabled={myPage === 1}
-            className="h-7 w-7 p-0"
+            className="h-10 w-10 p-0"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-6 w-6" />
           </Button>
           <span className="text-xs text-muted-foreground">
             {myPage} / {myTotalPages}
@@ -336,9 +375,9 @@ function DeckPickerContent({
             size="sm"
             onClick={() => setMyPage((p) => Math.min(myTotalPages, p + 1))}
             disabled={myPage === myTotalPages}
-            className="h-7 w-7 p-0"
+            className="h-10 w-10 p-0"
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-6 w-6" />
           </Button>
         </div>
       )}
@@ -349,9 +388,9 @@ function DeckPickerContent({
             size="sm"
             onClick={() => setCommunityPage((p) => Math.max(1, p - 1))}
             disabled={communityPage === 1}
-            className="h-7 w-7 p-0"
+            className="h-10 w-10 p-0"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-6 w-6" />
           </Button>
           <span className="text-xs text-muted-foreground">
             {communityPage} / {communityTotalPages}
@@ -362,9 +401,9 @@ function DeckPickerContent({
             size="sm"
             onClick={() => setCommunityPage((p) => Math.min(communityTotalPages, p + 1))}
             disabled={communityPage === communityTotalPages}
-            className="h-7 w-7 p-0"
+            className="h-10 w-10 p-0"
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-6 w-6" />
           </Button>
         </div>
       )}
@@ -400,7 +439,7 @@ export function DeckPickerModal({
   if (isDesktop) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl h-[85vh] flex flex-col">
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Select a Deck</DialogTitle>
           </DialogHeader>
