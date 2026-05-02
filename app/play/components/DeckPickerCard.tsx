@@ -52,8 +52,9 @@ export function DeckPickerCard({ deck, onClick, selected }: DeckPickerCardProps)
         "w-full text-left rounded-lg border",
         selected
           ? "border-primary"
-          : "border-border",
-        "bg-card",
+          : "border-border [.jayden_&]:border-primary/30",
+        "bg-gradient-to-br from-card to-muted/40",
+        "[.jayden_&]:from-[hsla(0,80%,25%,0.15)] [.jayden_&]:via-[hsla(270,60%,20%,0.1)] [.jayden_&]:to-[hsla(230,80%,30%,0.15)]",
         "hover:border-primary/70",
         "transition-colors cursor-pointer",
         "flex flex-col overflow-hidden",
@@ -72,12 +73,12 @@ export function DeckPickerCard({ deck, onClick, selected }: DeckPickerCardProps)
           />
         </div>
       ) : hasPreviewImages ? (
-        <div className="relative h-24 overflow-hidden bg-muted flex items-center justify-center gap-1 px-2 py-2">
+        <div className="h-24 overflow-hidden flex items-center justify-center gap-1 px-2 py-2">
           {img1Url && !img1Error && (
             <img
               src={img1Url}
               alt=""
-              className="h-full object-contain rounded"
+              className="h-full object-contain rounded shadow-md"
               onError={() => setImg1Error(true)}
             />
           )}
@@ -85,7 +86,7 @@ export function DeckPickerCard({ deck, onClick, selected }: DeckPickerCardProps)
             <img
               src={img2Url}
               alt=""
-              className="h-full object-contain rounded"
+              className="h-full object-contain rounded shadow-md"
               onError={() => setImg2Error(true)}
             />
           )}

@@ -1046,7 +1046,7 @@ function DeckCard({
   const updatedDate = formatDateTime(deck.updated_at!);
 
   return (
-    <div className="bg-card rounded-lg border border-border hover:shadow-lg transition-shadow flex flex-col jayden-gradient-bg">
+    <div className="bg-gradient-to-br from-card to-muted/40 rounded-lg border border-border hover:shadow-lg transition-shadow flex flex-col jayden-gradient-bg">
       {/* Image Header */}
       {formatDeckType(deck.format) === "Paragon" && deck.paragon ? (
         <div className="h-32 overflow-hidden rounded-t-lg cursor-pointer" onClick={() => onEdit(deck.id!)}>
@@ -1059,9 +1059,9 @@ function DeckCard({
           />
         </div>
       ) : (getCardImageUrl(deck.preview_card_1) || getCardImageUrl(deck.preview_card_2)) ? (
-        <div className="relative h-32 overflow-hidden rounded-t-lg bg-muted flex items-center justify-center gap-1 px-2 py-2 cursor-pointer" onClick={() => onEdit(deck.id!)}>
-          {getCardImageUrl(deck.preview_card_1) && <img src={getCardImageUrl(deck.preview_card_1)!} alt="" className="h-full object-contain rounded" />}
-          {getCardImageUrl(deck.preview_card_2) && <img src={getCardImageUrl(deck.preview_card_2)!} alt="" className="h-full object-contain rounded" />}
+        <div className="relative h-32 overflow-hidden rounded-t-lg flex items-center justify-center gap-1 px-2 py-2 cursor-pointer" onClick={() => onEdit(deck.id!)}>
+          {getCardImageUrl(deck.preview_card_1) && <img src={getCardImageUrl(deck.preview_card_1)!} alt="" className="h-full object-contain rounded shadow-md" />}
+          {getCardImageUrl(deck.preview_card_2) && <img src={getCardImageUrl(deck.preview_card_2)!} alt="" className="h-full object-contain rounded shadow-md" />}
           <button
             onClick={(e) => { e.stopPropagation(); onEditCover(deck.id!); }}
             className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/30 hover:bg-black/50 text-white/60 hover:text-white transition-colors"

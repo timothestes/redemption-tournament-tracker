@@ -18,6 +18,19 @@ const MOVE_ZONES: { id: ZoneId; label: string }[] = [
   { id: 'reserve', label: 'Reserve' },
 ];
 
+const LOST_SOUL_MOVE_ZONES: { id: ZoneId; label: string }[] = [
+  { id: 'land-of-bondage', label: 'Land of Bondage' },
+];
+
+function isLostSoul(card: GameCard): boolean {
+  return (
+    card.type === 'LS' ||
+    card.type === 'Lost Soul' ||
+    card.type.toLowerCase().includes('lost soul') ||
+    card.cardName.toLowerCase().startsWith('lost soul')
+  );
+}
+
 function PeekCardContextPopup({
   card, count, x, y, onClose, onMove, onMoveToTop, onMoveToBottom, onShuffleIn, sourceZone = 'deck',
 }: {
@@ -52,7 +65,7 @@ function PeekCardContextPopup({
       <div style={{ ...itemStyle, color: 'var(--gf-text-dim)', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', cursor: 'default', padding: '3px 12px' }}>
         {label}
       </div>
-      {MOVE_ZONES.map(({ id, label: zoneLabel }) => (
+      {(isLostSoul(card) ? LOST_SOUL_MOVE_ZONES : MOVE_ZONES).map(({ id, label: zoneLabel }) => (
         <button key={id} style={itemStyle}
           onClick={() => { onMove(id); onClose(); }}
           onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}

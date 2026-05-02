@@ -235,7 +235,8 @@ function drawCardsForPlayer(ctx: any, game: any, player: any, count: number): Dr
     deckPos++;
 
     if (isLostSoul) {
-      // Move to land-of-bondage
+      // Move to land-of-bondage. Auto-routed Lost Souls don't count toward
+      // `drawn` — by the rules, a card that never enters hand wasn't drawn.
       ctx.db.CardInstance.id.update({
         ...topCard,
         zone: 'land-of-bondage',
@@ -243,7 +244,6 @@ function drawCardsForPlayer(ctx: any, game: any, player: any, count: number): Dr
         zoneIndex: BigInt(lobCount),
       });
       lobCount++;
-      drawn++;
       logAction(ctx, game.id, player.id, 'MOVE_CARD', JSON.stringify({ cardInstanceId: topCard.id.toString(), from: 'deck', to: 'land-of-bondage', cardName: topCard.cardName, cardImgFile: topCard.cardImgFile, redirected: 'drew' }), game.turnNumber, game.currentPhase);
       // Draw a replacement — extend the loop
       count++;
@@ -1744,7 +1744,11 @@ export const draw_multiple = spacetimedb.reducer(
 
     const result = drawCardsForPlayer(ctx, game, player, Number(count));
 
-    logAction(ctx, gameId, player.id, 'DRAW_MULTIPLE', JSON.stringify({ count: result.drawn.toString(), cards: result.cards }), game.turnNumber, game.currentPhase);
+    // If every card was an auto-routed Lost Soul, the per-card MOVE_CARD logs
+    // already tell the story — skip the redundant "drew 0 cards" entry.
+    if (result.drawn > 0) {
+      logAction(ctx, gameId, player.id, 'DRAW_MULTIPLE', JSON.stringify({ count: result.drawn.toString(), cards: result.cards }), game.turnNumber, game.currentPhase);
+    }
   }
 );
 
@@ -3944,6 +3948,8 @@ export const meek_card = spacetimedb.reducer(
 
     ctx.db.CardInstance.id.update({ ...card, isMeek: true });
 
+    if (card.zone === 'hand') return;
+
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
 
@@ -3967,6 +3973,8 @@ export const unmeek_card = spacetimedb.reducer(
     if (card.gameId !== gameId) throw new SenderError('Card not in this game');
 
     ctx.db.CardInstance.id.update({ ...card, isMeek: false });
+
+    if (card.zone === 'hand') return;
 
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
