@@ -599,50 +599,43 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const [hoverReady, setHoverReady] = useState(false);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ---- rAF-throttled hover state updates ----
-  // Pointermove events fire 60-120/sec on high-poll mice. Each direct setState
-  // triggers a React render across ~30 cards. Coalesce updates so React only
-  // sees one hover-state change per animation frame.
-  const pendingHoverFrameRef = useRef<number | null>(null);
-  const pendingHoverPayloadRef = useRef<{
-    card: GameCard | null;
-    mousePos: { x: number; y: number };
-    instanceId: string | null;
-  } | null>(null);
+  // ---- rAF-throttled mouse-position updates ----
+  // Stage pointermove fires 60-120/sec on high-poll mice. Each direct
+  // setMousePos triggers a React render across the canvas. Coalesce to one
+  // update per animation frame. Hover identity (hoveredInstanceId/hoveredCard)
+  // is NOT throttled — it changes once per card crossing, and routing it
+  // through a queue creates a stale-closure race with stage mousemove that
+  // shows the wrong card highlighted.
+  const pendingMousePosRef = useRef<{ x: number; y: number } | null>(null);
+  const pendingMousePosFrameRef = useRef<number | null>(null);
 
-  const flushHoverState = useCallback(() => {
-    pendingHoverFrameRef.current = null;
-    const p = pendingHoverPayloadRef.current;
+  const flushMousePos = useCallback(() => {
+    pendingMousePosFrameRef.current = null;
+    const p = pendingMousePosRef.current;
     if (!p) return;
-    pendingHoverPayloadRef.current = null;
-    setHoveredInstanceId(p.instanceId);
-    setHoveredCard(p.card);
-    setMousePos(p.mousePos);
+    pendingMousePosRef.current = null;
+    setMousePos(p);
   }, []);
 
-  const queueHoverUpdate = useCallback((next: {
-    card: GameCard | null;
-    mousePos: { x: number; y: number };
-    instanceId: string | null;
-  }) => {
-    pendingHoverPayloadRef.current = next;
-    if (pendingHoverFrameRef.current == null) {
-      pendingHoverFrameRef.current = requestAnimationFrame(flushHoverState);
+  const queueMousePos = useCallback((pos: { x: number; y: number }) => {
+    pendingMousePosRef.current = pos;
+    if (pendingMousePosFrameRef.current == null) {
+      pendingMousePosFrameRef.current = requestAnimationFrame(flushMousePos);
     }
-  }, [flushHoverState]);
+  }, [flushMousePos]);
 
-  const cancelPendingHoverUpdate = useCallback(() => {
-    if (pendingHoverFrameRef.current != null) {
-      cancelAnimationFrame(pendingHoverFrameRef.current);
-      pendingHoverFrameRef.current = null;
+  const cancelPendingMousePos = useCallback(() => {
+    if (pendingMousePosFrameRef.current != null) {
+      cancelAnimationFrame(pendingMousePosFrameRef.current);
+      pendingMousePosFrameRef.current = null;
     }
-    pendingHoverPayloadRef.current = null;
+    pendingMousePosRef.current = null;
   }, []);
 
   useEffect(() => {
     return () => {
-      if (pendingHoverFrameRef.current != null) {
-        cancelAnimationFrame(pendingHoverFrameRef.current);
+      if (pendingMousePosFrameRef.current != null) {
+        cancelAnimationFrame(pendingMousePosFrameRef.current);
       }
     };
   }, []);
@@ -1131,6 +1124,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // useEffect broadcasts via revealCards so the opponent sees the reveal.
       const source = findMyCardById(sourceInstanceId);
       const ability = source ? getAbilitiesForCard(source.cardName)[abilityIndex] : undefined;
+      // (Star) abilities fired from hand also reveal the source card to
+      // opponents/spectators so the implicit "reveal from hand" cost is
+      // visible. Reveal duration matches the standard 30s — see
+      // reveal_card_in_hand reducer in spacetimedb/src/index.ts.
+      const firedFromHand = !!source && source.zone === 'hand' && !!ability;
+      if (firedFromHand) {
+        gameState.revealCardInHand(BigInt(sourceInstanceId));
+      }
       if (ability?.type === 'reveal_own_deck') {
         setPeekState({
           position: ability.position,
@@ -1172,6 +1173,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           ability.position === 'top' ? 'discard_deck_top'
           : ability.position === 'bottom' ? 'discard_deck_bottom'
           : 'discard_deck_random';
+        requestOpponentAction(action, JSON.stringify({ count: ability.count }));
+        return;
+      }
+      if (ability?.type === 'reserve_opponent_deck') {
+        // Same opponent-consent flow as discard_opponent_deck. On approve
+        // dispatches `reserve_deck_*` → moveOpponentDeckCardsToZone(..., 'reserve').
+        const action =
+          ability.position === 'top' ? 'reserve_deck_top'
+          : ability.position === 'bottom' ? 'reserve_deck_bottom'
+          : 'reserve_deck_random';
         requestOpponentAction(action, JSON.stringify({ count: ability.count }));
         return;
       }
@@ -3230,38 +3241,40 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       if (isDraggingRef.current) return;
       // Ignore Konva re-firing mouseEnter immediately after a drag ends
       if (performance.now() - dragEndTimeRef.current < 100) return;
+      setHoveredInstanceId(card.instanceId);
       startHoverAnimation();
-
-      // Capture mouse position for the hover preview tooltip
-      const pos = { x: e.evt.clientX, y: e.evt.clientY };
-      mousePosRef.current = pos;
 
       // Don't show card preview for face-down opponent cards (hidden info) —
       // but actively revealed cards ARE public, so allow preview on those.
       const revealedNow =
         typeof card.revealUntil === 'number' && card.revealUntil > Date.now();
-      const previewCard =
-        card.isFlipped && card.ownerId === 'player2' && !revealedNow ? null : card;
+      if (card.isFlipped && card.ownerId === 'player2' && !revealedNow) {
+        setHoveredCard(null);
+        return;
+      }
 
-      queueHoverUpdate({ instanceId: card.instanceId, card: previewCard, mousePos: pos });
-
+      setHoveredCard(card);
+      // Capture mouse position for the hover preview tooltip
+      const pos = { x: e.evt.clientX, y: e.evt.clientY };
+      mousePosRef.current = pos;
+      setMousePos(pos);
       // Start 250ms delay before showing hover preview
       if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
       setHoverReady(false);
       hoverTimerRef.current = setTimeout(() => setHoverReady(true), 250);
     },
-    [startHoverAnimation, queueHoverUpdate],
+    [startHoverAnimation],
   );
 
   const handleMouseLeave = useCallback(() => {
-    cancelPendingHoverUpdate();
+    cancelPendingMousePos();
     setHoveredInstanceId(null);
     setHoveredCard(null);
     stopHoverAnimation();
     // Clear hover preview delay
     if (hoverTimerRef.current) { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = null; }
     setHoverReady(false);
-  }, [stopHoverAnimation, cancelPendingHoverUpdate]);
+  }, [stopHoverAnimation, cancelPendingMousePos]);
 
   // ---- LOB layout: host + attached-accessory positions ----
   // LOB packs cards in a horizontal strip. Attached sites render BEHIND the
@@ -3763,7 +3776,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       const clientPos = { x: e.evt.clientX, y: e.evt.clientY };
       mousePosRef.current = clientPos;
       if (hoveredCard) {
-        queueHoverUpdate({ instanceId: hoveredInstanceId, card: hoveredCard, mousePos: clientPos });
+        queueMousePos(clientPos);
       }
 
       if (!isSelectingRef.current) return;
@@ -3780,7 +3793,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         updateSelectionDrag(pos.x, pos.y, allCardBounds, e.evt.shiftKey);
       }
     },
-    [updateSelectionDrag, allCardBounds, isSelectingRef, onRectChangeRef, hoveredCard, hoveredInstanceId, queueHoverUpdate],
+    [updateSelectionDrag, allCardBounds, isSelectingRef, onRectChangeRef, hoveredCard, queueMousePos],
   );
 
   const handleStageMouseUp = useCallback(
@@ -6083,12 +6096,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         const barVirtualWidth = mpLayout.playAreaWidth;
         const barTopLeft = virtualToScreen(
           opponentHandRect.x,
-          opponentHandRect.y + opponentHandRect.height - 8,
+          opponentHandRect.y + opponentHandRect.height,
           scale, offsetX, offsetY,
         );
         const barBottomRight = virtualToScreen(
           opponentHandRect.x + barVirtualWidth,
-          opponentHandRect.y + opponentHandRect.height - 4,
+          opponentHandRect.y + opponentHandRect.height + 4,
           scale, offsetX, offsetY,
         );
         const screenWidth = barBottomRight.x - barTopLeft.x;

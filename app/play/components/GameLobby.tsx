@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Pencil, ArrowLeftRight } from 'lucide-react';
 import { getCardImageUrl } from '@/lib/card-images';
 import { getCardImageUrl as getBlobCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import { useSpacetimeConnection } from '../hooks/useSpacetimeConnection';
@@ -296,7 +296,8 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
               <div className="flex items-center gap-2 shrink-0">
                 {!selectedDeck.username && (
                   <Button asChild variant="outline" size="sm">
-                    <Link href={`/decklist/card-search?deckId=${selectedDeck.id}`}>
+                    <Link href={`/decklist/card-search?deckId=${selectedDeck.id}`} className="inline-flex items-center gap-1.5">
+                      <Pencil className="h-4 w-4" />
                       Edit
                     </Link>
                   </Button>
@@ -304,8 +305,10 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
                 <Button
                   variant="outline"
                   size="sm"
+                  className="gap-1.5"
                   onClick={() => setPickerOpen(true)}
                 >
+                  <ArrowLeftRight className="h-4 w-4" />
                   Swap
                 </Button>
               </div>

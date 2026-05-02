@@ -47,6 +47,7 @@ interface TurnIndicatorProps {
   isFinished?: boolean;
   winnerName?: string;
   onPlayAgain?: () => void;
+  onBackToLobby?: () => void;
   myScore?: number;
   opponentScore?: number;
   opponentConnectionStatus?: 'connected' | 'reconnecting' | 'disconnected';
@@ -79,6 +80,7 @@ export default function TurnIndicator({
   isFinished,
   winnerName,
   onPlayAgain,
+  onBackToLobby,
   myScore = 0,
   opponentScore = 0,
   opponentConnectionStatus = 'connected',
@@ -537,6 +539,34 @@ export default function TurnIndicator({
             }}
           >
             {rematchPending ? 'Waiting...' : 'Play Again'}
+          </button>
+        )}
+        {isFinished && !onPlayAgain && onBackToLobby && (
+          <button
+            onClick={onBackToLobby}
+            style={{
+              padding: '5px 12px',
+              background: 'rgba(196, 149, 90, 0.15)',
+              border: '1px solid rgba(196, 149, 90, 0.45)',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: FZ.ui,
+              letterSpacing: '0.07em',
+              textTransform: 'uppercase',
+              color: '#e8d5a3',
+              transition: 'background 0.15s, border-color 0.15s, color 0.15s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(196, 149, 90, 0.28)';
+              e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.75)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(196, 149, 90, 0.15)';
+              e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.45)';
+            }}
+          >
+            Back to Lobby
           </button>
         )}
         {!isFinished && disconnectTimeoutFired && onClaimVictory && (

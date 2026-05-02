@@ -1051,8 +1051,15 @@ export const pregame_change_deck = spacetimedb.reducer(
   (ctx, { gameId, deckId, deckData }) => {
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
-    if (game.status !== 'pregame') throw new SenderError('Game is not in pregame');
-    if (game.pregamePhase !== 'deck_select') throw new SenderError('Not in deck select phase');
+    // Allow swap while waiting for opponent (status='waiting') OR during the
+    // pregame deck-select phase. Both states are pre-shuffle, so swapping
+    // pendingDeckData is safe.
+    if (game.status !== 'pregame' && game.status !== 'waiting') {
+      throw new SenderError('Game is not in pregame');
+    }
+    if (game.status === 'pregame' && game.pregamePhase !== 'deck_select') {
+      throw new SenderError('Not in deck select phase');
+    }
 
     const player = findPlayerBySender(ctx, gameId);
 
@@ -2959,6 +2966,8 @@ export const execute_card_ability = spacetimedb.reducer(
         throw new SenderError('look_at_opponent_deck is dispatched by the client, not this reducer');
       case 'discard_opponent_deck':
         throw new SenderError('discard_opponent_deck is dispatched by the client, not this reducer');
+      case 'reserve_opponent_deck':
+        throw new SenderError('reserve_opponent_deck is dispatched by the client, not this reducer');
       case 'reserve_top_of_deck':
         return reserveTopOfDeckImpl(ctx, source, ability, player, gameId);
       case 'draw_bottom_of_deck':

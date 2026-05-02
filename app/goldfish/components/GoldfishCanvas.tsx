@@ -146,9 +146,16 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
           ids = shuffled.slice(0, n).map(c => c.instanceId);
           title = `Random ${n} from Deck`;
         }
+        // (Star) abilities fired from hand — flash the source card so the
+        // implicit "reveal from hand" cost is visible. Goldfish is single
+        // player; matters mostly for parity with multiplayer behavior.
+        if (source && source.zone === 'hand') revealCardInHand(cardId);
         setPeekState({ cardIds: ids, title });
         return;
       }
+      // Non-modal abilities fired from hand still flash the source so the
+      // user can verify what they activated (e.g. Delivered's STAR).
+      if (source && source.zone === 'hand' && ability) revealCardInHand(cardId);
       executeCardAbility(cardId, abilityIndex);
     },
     randomHandToZone: () => {}, // not used in goldfish
@@ -264,9 +271,12 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   // part of the active drag — the HTML overlay reads from state, which lags
   // behind the dragged Konva node, so the icon would visibly drift otherwise.
   const [draggingCardIds, setDraggingCardIds] = useState<ReadonlySet<string>>(() => new Set());
-  // When true, disable zone-level clipping so a card dragged out of a clipped
-  // zone (territory, land-of-bondage) isn't visually cut off by the zone rect.
-  const [isDraggingAnyCard, setIsDraggingAnyCard] = useState(false);
+  // Tracks the source zone of an active drag. Used to disable clipping ONLY
+  // for that zone so a card dragged out of a clipped zone (territory,
+  // land-of-bondage) isn't visually cut off — without exposing previously
+  // clipped siblings (e.g. tall Lost Soul cards in the short LoB rect) in
+  // unrelated zones.
+  const [dragSourceZone, setDragSourceZone] = useState<ZoneId | null>(null);
   const [multiCardContextMenu, setMultiCardContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [batchDeckDropIds, setBatchDeckDropIds] = useState<string[] | null>(null);
   const [exchangeCardIds, setExchangeCardIds] = useState<string[] | null>(null);
@@ -484,7 +494,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   const handleCardDragStart = useCallback((card: GameCard) => {
     isDraggingRef.current = true;
     isCanvasDragging.current = true;
-    setIsDraggingAnyCard(true);
+    setDragSourceZone(card.zone);
     dragSourceZoneRef.current = card.zone;
 
     // Bring the dragged card to the front of its parent group so it draws
@@ -664,7 +674,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       dragFollowerOffsets.current = null;
       dragGhostOffsetRef.current = null;
       setCanvasDragZone(null);
-      setIsDraggingAnyCard(false);
+      setDragSourceZone(null);
 
       // Clean up ghost image
       if (dragGhostRef.current) {
@@ -1773,7 +1783,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             // z-order is correct), then the warrior itself.
             if (zoneId === 'territory') {
               const zone = zoneLayout[zoneId];
-              const clipProps = isDraggingAnyCard
+              const clipProps = dragSourceZone === 'territory'
                 ? {}
                 : { clipX: zone.x, clipY: zone.y, clipWidth: zone.width, clipHeight: zone.height };
               return (
@@ -1848,7 +1858,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             if (zoneId === 'land-of-bondage') {
               const zone = zoneLayout[zoneId];
               const lobPositions = calculateAutoArrangePositions(cards.length, zone, cardWidth, cardHeight);
-              const lobClipProps = isDraggingAnyCard
+              const lobClipProps = dragSourceZone === 'land-of-bondage'
                 ? {}
                 : { clipX: zone.x, clipY: zone.y, clipWidth: zone.width, clipHeight: zone.height };
               return (
