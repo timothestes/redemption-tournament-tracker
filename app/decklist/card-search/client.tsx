@@ -183,6 +183,7 @@ export default function CardSearchClient() {
   const [importText, setImportText] = useState("");
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [importFilename, setImportFilename] = useState<string | null>(null);
   const [exportNotification, setExportNotification] = useState(false);
 
   // Unsaved changes modal state
@@ -376,7 +377,7 @@ export default function CardSearchClient() {
     getCardQuantity,
     getDeckStats,
     clearUnsavedChanges,
-  } = useDeckState(deckIdFromUrl, folderIdFromUrl, isNewDeck);
+  } = useDeckState(deckIdFromUrl, folderIdFromUrl, isNewDeck, { autosaveEnabled: !!user });
 
   const [ignoreLegalityChecks, setIgnoreLegalityChecksRaw] = useState(() => {
     if (typeof window === 'undefined' || !deck.id) return false;
@@ -1238,24 +1239,45 @@ export default function CardSearchClient() {
   }
 
   // Import deck from text
-  function handleImportDeck(text: string) {
+  async function handleImportDeck(text: string) {
     const result = parseDeckText(text, cards);
-    
+
     if (result.errors.length > 0) {
       setImportErrors(result.errors);
     } else {
       setImportErrors([]);
     }
-    
-    if (result.deck) {
-      // Preserve the existing deck name when importing
-      const importedDeck = {
-        ...result.deck,
-        name: deck.name || result.deck.name,
-      };
-      loadDeck(importedDeck);
-      setShowImportModal(false);
-      setImportText("");
+
+    if (!result.deck) return;
+
+    // Filename (from .txt upload) wins over the existing deck name; fall back to parser default
+    const importedName = importFilename || deck.name || result.deck.name;
+    const importedDeck = {
+      ...result.deck,
+      name: importedName,
+    };
+
+    loadDeck(importedDeck);
+    setShowImportModal(false);
+    setImportText("");
+    setImportFilename(null);
+
+    // Auto-save the imported deck so it persists without an extra click
+    if (user) {
+      try {
+        const saveResult = await saveDeckToCloud(undefined, importedDeck);
+        if (saveResult?.success) {
+          if (saveResult.deckCheckResult) {
+            setDeckCheckResult(saveResult.deckCheckResult);
+          }
+          setNotification({ message: 'Deck imported and saved!', type: 'success' });
+        } else {
+          setNotification({ message: 'Imported, but failed to save', type: 'error' });
+        }
+      } catch {
+        setNotification({ message: 'Imported, but failed to save', type: 'error' });
+      }
+      setTimeout(() => setNotification(null), 3000);
     }
   }
 
@@ -2341,9 +2363,10 @@ export default function CardSearchClient() {
             setShowImportModal(false);
             setImportText("");
             setImportErrors([]);
+            setImportFilename(null);
           }}
         >
-          <div 
+          <div
             className="bg-card rounded-lg shadow-xl max-w-2xl w-full p-6"
             onClick={(e) => e.stopPropagation()}
           >
@@ -2403,6 +2426,7 @@ export default function CardSearchClient() {
                     reader.onload = (event) => {
                       const text = event.target?.result as string;
                       setImportText(text);
+                      setImportFilename(file.name.replace(/\.txt$/i, ""));
                     };
                     reader.readAsText(file);
                   }
@@ -2416,6 +2440,7 @@ export default function CardSearchClient() {
                   setShowImportModal(false);
                   setImportText("");
                   setImportErrors([]);
+                  setImportFilename(null);
                 }}
               >
                 Cancel

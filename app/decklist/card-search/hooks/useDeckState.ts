@@ -5,6 +5,28 @@ import { saveDeckAction, loadDeckByIdAction, DeckCardData } from "../../actions"
 import { CARD_BY_FULL_KEY } from "../data/cardIndex";
 
 const STORAGE_KEY = "redemption-deck-builder-current-deck";
+const AUTOSAVE_DEBOUNCE_MS = 1500;
+
+// Stable serialization of the persisted parts of a deck for change detection.
+// Used to skip redundant autosaves and to drive the "in-flight changes" indicator.
+function snapshotDeck(d: Deck): string {
+  const sortedCards = d.cards
+    .map((c) => `${c.card.name}|${c.card.set}|${c.quantity}|${c.isReserve ? 1 : 0}`)
+    .sort()
+    .join("§");
+  return JSON.stringify({
+    id: d.id ?? null,
+    name: d.name,
+    description: d.description ?? "",
+    format: d.format ?? null,
+    paragon: d.paragon ?? null,
+    folderId: d.folderId ?? null,
+    isPublic: d.isPublic ?? false,
+    previewCard1: d.previewCard1 ?? null,
+    previewCard2: d.previewCard2 ?? null,
+    cards: sortedCards,
+  });
+}
 
 /**
  * Sync status for cloud operations
@@ -15,10 +37,21 @@ export interface SyncStatus {
   error: string | null;
 }
 
+export interface UseDeckStateOptions {
+  /** Whether to auto-save deck changes to the cloud (debounced). Requires the user to be authenticated. */
+  autosaveEnabled?: boolean;
+}
+
 /**
  * Custom hook for managing deck state with localStorage persistence and cloud sync
  */
-export function useDeckState(initialDeckId?: string, initialFolderId?: string | null, isNewDeck?: boolean) {
+export function useDeckState(
+  initialDeckId?: string,
+  initialFolderId?: string | null,
+  isNewDeck?: boolean,
+  options?: UseDeckStateOptions
+) {
+  const autosaveEnabled = options?.autosaveEnabled ?? false;
   // Initialize with default deck to avoid hydration mismatch
   const [deck, setDeck] = useState<Deck>(getDefaultDeck);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
@@ -30,7 +63,20 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
   const [isInitializing, setIsInitializing] = useState(true);
   const isInitialMount = useRef(true);
   const hasLoadedFromStorage = useRef(false);
-  
+
+  // Mirror of `deck` for use inside async callbacks (autosave reads the latest deck via ref)
+  const deckRef = useRef(deck);
+  // Snapshot of the most recently saved (or just-loaded) deck — used to dedup autosaves
+  const lastSavedSnapshotRef = useRef<string | null>(null);
+  // Serializes saves so a manual + debounced autosave can't race
+  const savePromiseRef = useRef<Promise<unknown> | null>(null);
+  // Pending autosave debounce timer
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    deckRef.current = deck;
+  }, [deck]);
+
   // Track the initial params to avoid re-running on hydration changes
   const initialParamsRef = useRef<{ deckId?: string; isNew?: boolean; initialized: boolean }>({ initialized: false });
 
@@ -67,10 +113,11 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
   // Persist deck to localStorage whenever it changes
   useEffect(() => {
     saveDeckToStorage(deck);
-    
-    // Track unsaved changes (except on initial mount)
+
+    // Derive the dirty flag from the saved-snapshot ref so it reflects reality
+    // after both edits and successful saves (rather than always flipping to true).
     if (!isInitialMount.current) {
-      setHasUnsavedChanges(true);
+      setHasUnsavedChanges(snapshotDeck(deck) !== lastSavedSnapshotRef.current);
     }
   }, [deck]);
 
@@ -166,7 +213,9 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
           createdAt: new Date(cloudDeck.created_at),
           updatedAt: new Date(cloudDeck.updated_at),
         };
-        
+
+        // Mark the loaded deck as the baseline so autosave doesn't immediately re-save it
+        lastSavedSnapshotRef.current = snapshotDeck(loadedDeck);
         setDeck(loadedDeck);
         setHasUnsavedChanges(false);
         setIsInitializing(false);
@@ -197,84 +246,140 @@ export function useDeckState(initialDeckId?: string, initialFolderId?: string | 
   /**
    * Save current deck to cloud
    */
-  const saveDeckToCloud = useCallback(async (overrideName?: string) => {
-    try {
-      setSyncStatus({ isSaving: true, lastSavedAt: null, error: null });
+  const saveDeckToCloud = useCallback(async (overrideName?: string, overrideDeck?: Deck) => {
+    const isExplicitCall = overrideName !== undefined || overrideDeck !== undefined;
 
-      // Convert Deck format to database format
-      // Filter out cards with quantity <= 0 to avoid database constraint violations
-      const cardsData: DeckCardData[] = deck.cards
-        .filter((deckCard) => deckCard.quantity > 0)
-        .map((deckCard) => ({
-          card_name: deckCard.card.name,
-          card_set: deckCard.card.set,
-          card_img_file: deckCard.card.imgFile,
-          quantity: deckCard.quantity,
-          is_reserve: deckCard.isReserve,
-        }));
-
-      console.log('[useDeckState] Saving deck with folderId:', deck.folderId);
-
-      // Use user-selected preview cards if set, otherwise auto-compute
-      let previewCard1 = deck.previewCard1 ?? null;
-      let previewCard2 = deck.previewCard2 ?? null;
-      if (!previewCard1 || !previewCard2) {
-        const mainCards = deck.cards.filter(dc => !dc.isReserve && dc.quantity > 0);
-        const heroTypes = ['Hero', 'HC', 'Hero Character'];
-        const evilTypes = ['Evil Character', 'EC'];
-        const firstHero = mainCards.find(dc => heroTypes.includes(dc.card.type));
-        const firstEvil = mainCards.find(dc => evilTypes.includes(dc.card.type));
-        previewCard1 = previewCard1 ?? firstHero?.card.imgFile ?? mainCards[0]?.card.imgFile ?? null;
-        previewCard2 = previewCard2 ?? firstEvil?.card.imgFile ?? (mainCards.length > 1 ? mainCards[1]?.card.imgFile : null) ?? null;
+    // Serialize: chain this save behind any in-flight one so autosave + manual save can't race
+    const previous = savePromiseRef.current;
+    const next = (async () => {
+      if (previous) {
+        try { await previous; } catch { /* prior caller already saw the error */ }
       }
 
-      const result = await saveDeckAction({
-        deckId: deck.id,
-        name: overrideName || deck.name,
-        description: deck.description,
-        format: deck.format,
-        paragon: deck.paragon,
-        folderId: deck.folderId,
-        cards: cardsData,
-        previewCard1,
-        previewCard2,
-      });
+      try {
+        const targetDeck = overrideDeck ?? deckRef.current;
 
-      if (result.success) {
-        // Update deck with the ID if it was newly created
-        if (!deck.id && result.deckId) {
-          setDeck((prevDeck) => ({ ...prevDeck, id: result.deckId }));
+        // Autosave path: skip if nothing has changed since the last successful save
+        if (!isExplicitCall && snapshotDeck(targetDeck) === lastSavedSnapshotRef.current) {
+          return { success: true, deckCheckResult: null, skipped: true } as const;
         }
-        
-        setHasUnsavedChanges(false);
-        setSyncStatus({
-          isSaving: false,
-          lastSavedAt: new Date(),
-          error: null,
+
+        setSyncStatus({ isSaving: true, lastSavedAt: null, error: null });
+
+        // Convert Deck format to database format
+        // Filter out cards with quantity <= 0 to avoid database constraint violations
+        const cardsData: DeckCardData[] = targetDeck.cards
+          .filter((deckCard) => deckCard.quantity > 0)
+          .map((deckCard) => ({
+            card_name: deckCard.card.name,
+            card_set: deckCard.card.set,
+            card_img_file: deckCard.card.imgFile,
+            quantity: deckCard.quantity,
+            is_reserve: deckCard.isReserve,
+          }));
+
+        // Use user-selected preview cards if set, otherwise auto-compute
+        let previewCard1 = targetDeck.previewCard1 ?? null;
+        let previewCard2 = targetDeck.previewCard2 ?? null;
+        if (!previewCard1 || !previewCard2) {
+          const mainCards = targetDeck.cards.filter(dc => !dc.isReserve && dc.quantity > 0);
+          const heroTypes = ['Hero', 'HC', 'Hero Character'];
+          const evilTypes = ['Evil Character', 'EC'];
+          const firstHero = mainCards.find(dc => heroTypes.includes(dc.card.type));
+          const firstEvil = mainCards.find(dc => evilTypes.includes(dc.card.type));
+          previewCard1 = previewCard1 ?? firstHero?.card.imgFile ?? mainCards[0]?.card.imgFile ?? null;
+          previewCard2 = previewCard2 ?? firstEvil?.card.imgFile ?? (mainCards.length > 1 ? mainCards[1]?.card.imgFile : null) ?? null;
+        }
+
+        const result = await saveDeckAction({
+          deckId: targetDeck.id,
+          name: overrideName || targetDeck.name,
+          description: targetDeck.description,
+          format: targetDeck.format,
+          paragon: targetDeck.paragon,
+          folderId: targetDeck.folderId,
+          cards: cardsData,
+          previewCard1,
+          previewCard2,
         });
-        
-        return { success: true, deckCheckResult: result.deckCheckResult ?? null };
-      } else {
+
+        if (result.success) {
+          const savedId = result.deckId ?? targetDeck.id;
+          // Snapshot the saved state (with its potentially-new id) so subsequent
+          // autosaves correctly recognize there's nothing to do.
+          lastSavedSnapshotRef.current = snapshotDeck({ ...targetDeck, id: savedId });
+
+          // Update deck with the ID if it was newly created
+          if (!targetDeck.id && result.deckId) {
+            setDeck((prevDeck) => ({ ...prevDeck, id: result.deckId }));
+          }
+
+          setHasUnsavedChanges(false);
+          setSyncStatus({
+            isSaving: false,
+            lastSavedAt: new Date(),
+            error: null,
+          });
+
+          return { success: true, deckCheckResult: result.deckCheckResult ?? null } as const;
+        } else {
+          setSyncStatus({
+            isSaving: false,
+            lastSavedAt: null,
+            error: result.error || "Failed to save deck",
+          });
+
+          return { success: false, error: result.error } as const;
+        }
+      } catch (error) {
+        console.error("Error saving deck to cloud:", error);
+        const errorMessage = "Failed to save deck";
         setSyncStatus({
           isSaving: false,
           lastSavedAt: null,
-          error: result.error || "Failed to save deck",
+          error: errorMessage,
         });
 
-        return { success: false, error: result.error };
+        return { success: false, error: errorMessage } as const;
       }
-    } catch (error) {
-      console.error("Error saving deck to cloud:", error);
-      const errorMessage = "Failed to save deck";
-      setSyncStatus({
-        isSaving: false,
-        lastSavedAt: null,
-        error: errorMessage,
-      });
-      
-      return { success: false, error: errorMessage };
+    })();
+
+    savePromiseRef.current = next;
+    try {
+      return await next;
+    } finally {
+      if (savePromiseRef.current === next) {
+        savePromiseRef.current = null;
+      }
     }
-  }, [deck]);
+  }, []);
+
+  // Autosave: 1.5s after the last edit, push the deck to the cloud.
+  // Skips when not authenticated, while still hydrating, or when nothing has changed.
+  useEffect(() => {
+    if (!autosaveEnabled) return;
+    if (isInitializing) return;
+    if (isInitialMount.current) return;
+
+    // Don't create DB rows for a brand-new pristine deck (no cards, no id)
+    if (deck.cards.length === 0 && !deck.id) return;
+
+    if (snapshotDeck(deck) === lastSavedSnapshotRef.current) return;
+
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = setTimeout(() => {
+      autosaveTimerRef.current = null;
+      // Errors surface via syncStatus; nothing to do here
+      saveDeckToCloud().catch(() => { /* noop */ });
+    }, AUTOSAVE_DEBOUNCE_MS);
+
+    return () => {
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+        autosaveTimerRef.current = null;
+      }
+    };
+  }, [deck, autosaveEnabled, isInitializing, saveDeckToCloud]);
 
   /**
    * Add a card to the deck or increase its quantity
