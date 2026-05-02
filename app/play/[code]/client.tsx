@@ -153,6 +153,12 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const [showReloadDeckPicker, setShowReloadDeckPicker] = useState(false);
   const [reloadDeckConfirm, setReloadDeckConfirm] = useState<{ deckId: string; deckName: string; deckData: string; paragon: string } | null>(null);
 
+  // Practice-mode deck swap state — separate from in-game reload because the
+  // pregame swap calls a different reducer (pregame_change_deck) that updates
+  // pendingDeckData rather than dealing a fresh hand.
+  const [showPracticeDeckPicker, setShowPracticeDeckPicker] = useState(false);
+  const [practiceDeckConfirm, setPracticeDeckConfirm] = useState<{ deckId: string; deckName: string; deckData: string; paragon: string; format: string } | null>(null);
+
   // Image preload gate — keeps the board obscured until the tier-1 (visible)
   // card images have loaded, so slow-wifi users aren't dropped into a board
   // full of generic card backs. Capped at IMAGE_GATE_TIMEOUT_MS so a truly
@@ -219,8 +225,10 @@ function GameInner({ code, isConnected }: GameInnerProps) {
     }
   }, [conn, gameId, isConnected]);
 
-  // Read session storage params set by the lobby page
-  const [gameParams] = useState<GameParams | null>(() => {
+  // Read session storage params set by the lobby page. Made mutable so a
+  // practice-mode deck swap can update gameParams.deckId/deckName/paragon
+  // without losing the rest of the session context.
+  const [gameParams, setGameParams] = useState<GameParams | null>(() => {
     if (typeof window === 'undefined') return null;
     try {
       const raw = sessionStorage.getItem(`${SESSION_KEY_PREFIX}${code}`);
@@ -896,8 +904,123 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             </div>
           </div>
           <div className="pt-12">
-            <WaitingRoomGoldfish deck={goldfishDeck} />
+            <WaitingRoomGoldfish
+              deck={goldfishDeck}
+              onLoadDeck={() => setShowPracticeDeckPicker(true)}
+            />
           </div>
+
+          {/* Practice deck picker — opens from the gear menu in practice mode */}
+          <DeckPickerModal
+            open={showPracticeDeckPicker}
+            onOpenChange={setShowPracticeDeckPicker}
+            onSelect={async (deck) => {
+              setShowPracticeDeckPicker(false);
+              if (!gameParams || deck.id === gameParams.deckId) return;
+              try {
+                const result = await loadDeckForGame(deck.id);
+                setPracticeDeckConfirm({
+                  deckId: deck.id,
+                  deckName: deck.name,
+                  deckData: JSON.stringify(result.deckData),
+                  paragon: deck.paragon || '',
+                  format: deck.format || gameParams.format || 'Type 1',
+                });
+              } catch (err) {
+                console.error('Failed to load deck for practice swap:', err);
+              }
+            }}
+            selectedDeckId={gameParams?.deckId}
+          />
+
+          {practiceDeckConfirm && (
+            <div style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+            }}>
+              <div style={{
+                background: 'rgba(14, 10, 6, 0.97)',
+                border: '1px solid rgba(107, 78, 39, 0.3)',
+                borderRadius: 8,
+                padding: '20px 28px',
+                maxWidth: 340,
+                width: '100%',
+                textAlign: 'center',
+                boxShadow: '0 8px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(196, 149, 90, 0.08)',
+              }}>
+                <p style={{
+                  fontFamily: 'Georgia, serif',
+                  color: '#e8d5a3',
+                  fontSize: 13,
+                  lineHeight: 1.5,
+                }}>
+                  Swap your game deck to <strong>{practiceDeckConfirm.deckName}</strong>?
+                  <br />
+                  <span style={{ fontSize: 11, color: 'rgba(196, 149, 90, 0.7)' }}>
+                    Your practice game will reset and your opponent will see the new deck once they join.
+                  </span>
+                </p>
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 18 }}>
+                  <button
+                    onClick={() => setPracticeDeckConfirm(null)}
+                    style={{
+                      padding: '7px 18px',
+                      background: 'transparent',
+                      border: '1px solid rgba(107, 78, 39, 0.3)',
+                      borderRadius: 4,
+                      color: 'rgba(196, 149, 90, 0.6)',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      fontFamily: 'Georgia, serif',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      const next = practiceDeckConfirm;
+                      setPracticeDeckConfirm(null);
+                      // Tell SpacetimeDB about the new deck so it gets used when
+                      // the actual game starts.
+                      gameState.pregameChangeDeck(next.deckId, next.deckData);
+                      // Update local state so practice rebuilds with new deck.
+                      // Persist to sessionStorage so a refresh keeps the swap.
+                      setGameParams((prev) => {
+                        if (!prev) return prev;
+                        const updated = {
+                          ...prev,
+                          deckId: next.deckId,
+                          deckName: next.deckName,
+                          paragon: next.paragon,
+                        };
+                        try {
+                          sessionStorage.setItem(
+                            `${SESSION_KEY_PREFIX}${code}`,
+                            JSON.stringify(updated),
+                          );
+                        } catch {}
+                        return updated;
+                      });
+                      setDeckData(next.deckData);
+                    }}
+                    style={{
+                      padding: '7px 18px',
+                      background: 'rgba(196, 149, 90, 0.15)',
+                      border: '1px solid rgba(196, 149, 90, 0.45)',
+                      borderRadius: 4,
+                      color: '#e8d5a3',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      fontFamily: 'Georgia, serif',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Swap Deck
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       );
     }
@@ -1206,6 +1329,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                 isFinished
                 winnerName={winnerName}
                 onPlayAgain={opponentDisconnected ? undefined : () => setPlayAgainTriggered(true)}
+                onBackToLobby={opponentDisconnected ? handleReturnToLobby : undefined}
                 rematchPending={rematchPending}
                 myScore={gameState.myCards['land-of-redemption']?.length ?? 0}
                 opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}
@@ -1366,6 +1490,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               isFinished
               winnerName={winnerName}
               onPlayAgain={opponentDisconnected ? undefined : () => setPlayAgainTriggered(true)}
+              onBackToLobby={opponentDisconnected ? handleReturnToLobby : undefined}
               rematchPending={rematchPending}
               myScore={gameState.myCards['land-of-redemption']?.length ?? 0}
               opponentScore={gameState.opponentCards['land-of-redemption']?.length ?? 0}

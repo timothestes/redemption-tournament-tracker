@@ -169,17 +169,19 @@ function clearCountersIfLeavingPlay(ctx: any, cardId: bigint, fromZone: string, 
 
 // ---------------------------------------------------------------------------
 // Helper: leavePlayFieldOverrides
-// Player-attached annotations (notes, Three Woes Choose Good/Evil outline) are
-// in-play state and shouldn't ride along when the card leaves Territory or
-// Land of Bondage. Returns the override map to spread into a CardInstance
-// update; preserves the existing values for moves that aren't leave-play.
+// Player-attached annotations (notes, Three Woes Choose Good/Evil outline) and
+// the meek conversion are in-play state and shouldn't ride along when the card
+// leaves Territory or Land of Bondage. Returns the override map to spread into
+// a CardInstance update; preserves the existing values for moves that aren't
+// leave-play.
 // ---------------------------------------------------------------------------
-function leavePlayFieldOverrides(card: any, fromZone: string, toZone: string): { notes: string; outlineColor: string } {
+function leavePlayFieldOverrides(card: any, fromZone: string, toZone: string): { notes: string; outlineColor: string; isMeek: boolean } {
   const leaving =
     fromZone !== toZone && (fromZone === 'territory' || fromZone === 'land-of-bondage');
   return {
     notes: leaving ? '' : card.notes,
     outlineColor: leaving ? '' : card.outlineColor,
+    isMeek: leaving ? false : card.isMeek,
   };
 }
 
@@ -1049,8 +1051,15 @@ export const pregame_change_deck = spacetimedb.reducer(
   (ctx, { gameId, deckId, deckData }) => {
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
-    if (game.status !== 'pregame') throw new SenderError('Game is not in pregame');
-    if (game.pregamePhase !== 'deck_select') throw new SenderError('Not in deck select phase');
+    // Allow swap while waiting for opponent (status='waiting') OR during the
+    // pregame deck-select phase. Both states are pre-shuffle, so swapping
+    // pendingDeckData is safe.
+    if (game.status !== 'pregame' && game.status !== 'waiting') {
+      throw new SenderError('Game is not in pregame');
+    }
+    if (game.status === 'pregame' && game.pregamePhase !== 'deck_select') {
+      throw new SenderError('Not in deck select phase');
+    }
 
     const player = findPlayerBySender(ctx, gameId);
 
@@ -2957,6 +2966,8 @@ export const execute_card_ability = spacetimedb.reducer(
         throw new SenderError('look_at_opponent_deck is dispatched by the client, not this reducer');
       case 'discard_opponent_deck':
         throw new SenderError('discard_opponent_deck is dispatched by the client, not this reducer');
+      case 'reserve_opponent_deck':
+        throw new SenderError('reserve_opponent_deck is dispatched by the client, not this reducer');
       case 'reserve_top_of_deck':
         return reserveTopOfDeckImpl(ctx, source, ability, player, gameId);
       case 'draw_bottom_of_deck':
@@ -4235,7 +4246,15 @@ export const exchange_cards = spacetimedb.reducer(
       const card = ctx.db.CardInstance.id.find(cardId);
       if (!card) continue;
       const deckOwnerId = card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId;
-      ctx.db.CardInstance.id.update({ ...card, zone: 'deck', ownerId: deckOwnerId, isFlipped: true });
+      const fromZone = card.zone;
+      clearCountersIfLeavingPlay(ctx, card.id, fromZone, 'deck');
+      ctx.db.CardInstance.id.update({
+        ...card,
+        zone: 'deck',
+        ownerId: deckOwnerId,
+        isFlipped: true,
+        ...leavePlayFieldOverrides(card, fromZone, 'deck'),
+      });
     }
 
     // Shuffle every deck that received a card (acting player's deck always,
@@ -4372,7 +4391,16 @@ export const exchange_from_deck = spacetimedb.reducer(
       const fromZone = card.zone;
       const fromOwner = card.ownerId;
       const deckOwnerId = card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId;
-      ctx.db.CardInstance.id.update({ ...card, zone: 'deck', ownerId: deckOwnerId, isFlipped: true, posX: '', posY: '' });
+      clearCountersIfLeavingPlay(ctx, card.id, fromZone, 'deck');
+      ctx.db.CardInstance.id.update({
+        ...card,
+        zone: 'deck',
+        ownerId: deckOwnerId,
+        isFlipped: true,
+        posX: '',
+        posY: '',
+        ...leavePlayFieldOverrides(card, fromZone, 'deck'),
+      });
       // Compact hand/LOB against the card's PRE-move owner (that's the pile the card left)
       if (fromZone === 'hand') {
         compactHandIndices(ctx, gameId, fromOwner);
@@ -4444,6 +4472,7 @@ export const move_card_to_top_of_deck = spacetimedb.reducer(
     // Update the target card: zone = 'deck', zoneIndex = 0n, owner = home
     const updatedCard = ctx.db.CardInstance.id.find(cardInstanceId);
     if (!updatedCard) throw new SenderError('Card not found');
+    clearCountersIfLeavingPlay(ctx, updatedCard.id, fromZone, 'deck');
     ctx.db.CardInstance.id.update({
       ...updatedCard,
       zone: 'deck',
@@ -4452,6 +4481,7 @@ export const move_card_to_top_of_deck = spacetimedb.reducer(
       isFlipped: true,
       revealExpiresAt: undefined,
       revealStartedAt: undefined,
+      ...leavePlayFieldOverrides(updatedCard, fromZone, 'deck'),
     });
 
     // Compact hand indices if card left hand
@@ -4509,6 +4539,7 @@ export const move_card_to_bottom_of_deck = spacetimedb.reducer(
       }
     }
 
+    clearCountersIfLeavingPlay(ctx, card.id, fromZone, 'deck');
     ctx.db.CardInstance.id.update({
       ...card,
       zone: 'deck',
@@ -4517,6 +4548,7 @@ export const move_card_to_bottom_of_deck = spacetimedb.reducer(
       isFlipped: true,
       revealExpiresAt: undefined,
       revealStartedAt: undefined,
+      ...leavePlayFieldOverrides(card, fromZone, 'deck'),
     });
 
     // Compact hand indices if card left hand
