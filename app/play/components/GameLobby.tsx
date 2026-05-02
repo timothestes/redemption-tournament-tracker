@@ -306,7 +306,7 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
                   size="sm"
                   onClick={() => setPickerOpen(true)}
                 >
-                  Change
+                  Swap
                 </Button>
               </div>
             </div>

@@ -30,6 +30,7 @@ export function CardBackShape({ width, height }: { width: number; height: number
         width={width}
         height={height}
         cornerRadius={4}
+        perfectDrawEnabled={false}
       />
     );
   }
@@ -42,6 +43,7 @@ export function CardBackShape({ width, height }: { width: number; height: number
       stroke="#6b4e27"
       strokeWidth={1}
       cornerRadius={4}
+      perfectDrawEnabled={false}
     />
   );
 }
@@ -159,6 +161,15 @@ export const GameCardNode = memo(function GameCardNode({
     nodeRef?.(card.instanceId, node);
   }, [card.instanceId, nodeRef]);
 
+  // Rectangular hitFunc on the outer Group short-circuits Konva's per-pointermove
+  // pixel-readback hit-test (getImageData) — the dominant cost during hover/drag.
+  const cardHitFunc = useCallback((ctx: any, shape: Konva.Shape) => {
+    ctx.beginPath();
+    ctx.rect(0, 0, cardWidth, cardHeight);
+    ctx.closePath();
+    ctx.fillStrokeShape(shape);
+  }, [cardWidth, cardHeight]);
+
   return (
     <Group
       ref={groupRefCb as any}
@@ -166,6 +177,7 @@ export const GameCardNode = memo(function GameCardNode({
       y={y}
       rotation={rotation}
       draggable={isDraggable}
+      hitFunc={cardHitFunc as any}
       onMouseDown={(e) => {
         // macOS Ctrl+click fires mousedown with button=0 + ctrlKey=true, which
         // Konva's draggable shapes consume as a left-press and call
@@ -208,6 +220,7 @@ export const GameCardNode = memo(function GameCardNode({
         visible={false}
         opacity={0}
         listening={false}
+        perfectDrawEnabled={false}
       />
 
       {/* Card outline marker — Three Woes "Choose Good"/"Choose Evil".
@@ -227,6 +240,7 @@ export const GameCardNode = memo(function GameCardNode({
           shadowBlur={10}
           shadowOpacity={0.55}
           listening={false}
+          perfectDrawEnabled={false}
         />
       )}
 
@@ -245,6 +259,7 @@ export const GameCardNode = memo(function GameCardNode({
           shadowBlur={8}
           shadowOpacity={0.6}
           listening={false}
+          perfectDrawEnabled={false}
         />
       )}
 
@@ -263,6 +278,7 @@ export const GameCardNode = memo(function GameCardNode({
           shadowBlur={6 + hoverProgress * 14}
           shadowOpacity={0.4 + hoverProgress * 0.5}
           listening={false}
+          perfectDrawEnabled={false}
         />
       )}
 
@@ -281,6 +297,7 @@ export const GameCardNode = memo(function GameCardNode({
             width={cardWidth}
             height={cardHeight}
             cornerRadius={4}
+            perfectDrawEnabled={false}
           />
         ) : (
           <CardBackShape width={cardWidth} height={cardHeight} />
@@ -295,6 +312,7 @@ export const GameCardNode = memo(function GameCardNode({
             fill="rgba(30,30,35,0.4)"
             cornerRadius={4}
             listening={false}
+            perfectDrawEnabled={false}
           />
         )}
 
@@ -309,6 +327,7 @@ export const GameCardNode = memo(function GameCardNode({
               strokeWidth={1.5}
               cornerRadius={4}
               dash={[5, 3]}
+              perfectDrawEnabled={false}
             />
             {/* "TOKEN" badge at bottom */}
             <Rect
@@ -318,6 +337,7 @@ export const GameCardNode = memo(function GameCardNode({
               height={Math.max(12, cardHeight * 0.08)}
               fill="rgba(26,21,16,0.85)"
               cornerRadius={2}
+              perfectDrawEnabled={false}
             />
             <Text
               x={cardWidth * 0.1}
@@ -331,6 +351,7 @@ export const GameCardNode = memo(function GameCardNode({
               align="center"
               verticalAlign="middle"
               letterSpacing={2}
+              perfectDrawEnabled={false}
             />
           </>
         )}
@@ -341,8 +362,8 @@ export const GameCardNode = memo(function GameCardNode({
           const r = 12;
           return (
             <Group key={counter.color} x={cardWidth - 14} y={14 + idx * 28}>
-              <Circle radius={r} fill="rgba(0,0,0,0.6)" />
-              <Circle radius={r - 2} fill={colorDef?.hex ?? '#8b1a1a'} stroke="rgba(0,0,0,0.8)" strokeWidth={2} />
+              <Circle radius={r} fill="rgba(0,0,0,0.6)" perfectDrawEnabled={false} />
+              <Circle radius={r - 2} fill={colorDef?.hex ?? '#8b1a1a'} stroke="rgba(0,0,0,0.8)" strokeWidth={2} perfectDrawEnabled={false} />
               <Text
                 text={String(counter.count)}
                 fontSize={13}
@@ -354,6 +375,7 @@ export const GameCardNode = memo(function GameCardNode({
                 verticalAlign="middle"
                 offsetX={r}
                 offsetY={r}
+                perfectDrawEnabled={false}
               />
             </Group>
           );
@@ -382,7 +404,7 @@ export const GameCardNode = memo(function GameCardNode({
             <Group x={cx} y={cy} listening={false}>
               {/* Solid dark backdrop — ensures the ring reads against any
                   card art, not just dark areas. */}
-              <Circle radius={outerRadius + 1} fill={`rgba(0,0,0,${backdropAlpha})`} />
+              <Circle radius={outerRadius + 1} fill={`rgba(0,0,0,${backdropAlpha})`} perfectDrawEnabled={false} />
               {/* Empty-track ring — shows remaining shape after the arc sweeps past */}
               <Arc
                 innerRadius={innerRadius}
@@ -390,6 +412,7 @@ export const GameCardNode = memo(function GameCardNode({
                 angle={360}
                 rotation={-90}
                 fill="rgba(40,40,40,0.95)"
+                perfectDrawEnabled={false}
               />
               {/* Remaining time arc — amber, sweeps clockwise */}
               <Arc
@@ -398,6 +421,7 @@ export const GameCardNode = memo(function GameCardNode({
                 angle={360 * remainingFrac}
                 rotation={-90}
                 fill={arcColor}
+                perfectDrawEnabled={false}
               />
             </Group>
           );
@@ -421,6 +445,7 @@ export const GameCardNode = memo(function GameCardNode({
                 fill="rgba(0, 0, 0, 0.78)"
                 stroke="#c4955a"
                 strokeWidth={1}
+                perfectDrawEnabled={false}
               />
               <Text
                 x={pillX}
@@ -436,6 +461,7 @@ export const GameCardNode = memo(function GameCardNode({
                 padding={4}
                 ellipsis
                 wrap="none"
+                perfectDrawEnabled={false}
               />
             </Group>
           );

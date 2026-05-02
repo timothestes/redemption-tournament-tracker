@@ -599,6 +599,54 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const [hoverReady, setHoverReady] = useState(false);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ---- rAF-throttled hover state updates ----
+  // Pointermove events fire 60-120/sec on high-poll mice. Each direct setState
+  // triggers a React render across ~30 cards. Coalesce updates so React only
+  // sees one hover-state change per animation frame.
+  const pendingHoverFrameRef = useRef<number | null>(null);
+  const pendingHoverPayloadRef = useRef<{
+    card: GameCard | null;
+    mousePos: { x: number; y: number };
+    instanceId: string | null;
+  } | null>(null);
+
+  const flushHoverState = useCallback(() => {
+    pendingHoverFrameRef.current = null;
+    const p = pendingHoverPayloadRef.current;
+    if (!p) return;
+    pendingHoverPayloadRef.current = null;
+    setHoveredInstanceId(p.instanceId);
+    setHoveredCard(p.card);
+    setMousePos(p.mousePos);
+  }, []);
+
+  const queueHoverUpdate = useCallback((next: {
+    card: GameCard | null;
+    mousePos: { x: number; y: number };
+    instanceId: string | null;
+  }) => {
+    pendingHoverPayloadRef.current = next;
+    if (pendingHoverFrameRef.current == null) {
+      pendingHoverFrameRef.current = requestAnimationFrame(flushHoverState);
+    }
+  }, [flushHoverState]);
+
+  const cancelPendingHoverUpdate = useCallback(() => {
+    if (pendingHoverFrameRef.current != null) {
+      cancelAnimationFrame(pendingHoverFrameRef.current);
+      pendingHoverFrameRef.current = null;
+    }
+    pendingHoverPayloadRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (pendingHoverFrameRef.current != null) {
+        cancelAnimationFrame(pendingHoverFrameRef.current);
+      }
+    };
+  }, []);
+
   // ---- Selection state (multi-select via marquee) ----
   const {
     selectedIds,
@@ -3182,39 +3230,38 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       if (isDraggingRef.current) return;
       // Ignore Konva re-firing mouseEnter immediately after a drag ends
       if (performance.now() - dragEndTimeRef.current < 100) return;
-      setHoveredInstanceId(card.instanceId);
       startHoverAnimation();
+
+      // Capture mouse position for the hover preview tooltip
+      const pos = { x: e.evt.clientX, y: e.evt.clientY };
+      mousePosRef.current = pos;
 
       // Don't show card preview for face-down opponent cards (hidden info) —
       // but actively revealed cards ARE public, so allow preview on those.
       const revealedNow =
         typeof card.revealUntil === 'number' && card.revealUntil > Date.now();
-      if (card.isFlipped && card.ownerId === 'player2' && !revealedNow) {
-        setHoveredCard(null);
-        return;
-      }
+      const previewCard =
+        card.isFlipped && card.ownerId === 'player2' && !revealedNow ? null : card;
 
-      setHoveredCard(card);
-      // Capture mouse position for the hover preview tooltip
-      const pos = { x: e.evt.clientX, y: e.evt.clientY };
-      mousePosRef.current = pos;
-      setMousePos(pos);
+      queueHoverUpdate({ instanceId: card.instanceId, card: previewCard, mousePos: pos });
+
       // Start 250ms delay before showing hover preview
       if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
       setHoverReady(false);
       hoverTimerRef.current = setTimeout(() => setHoverReady(true), 250);
     },
-    [startHoverAnimation],
+    [startHoverAnimation, queueHoverUpdate],
   );
 
   const handleMouseLeave = useCallback(() => {
+    cancelPendingHoverUpdate();
     setHoveredInstanceId(null);
     setHoveredCard(null);
     stopHoverAnimation();
     // Clear hover preview delay
     if (hoverTimerRef.current) { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = null; }
     setHoverReady(false);
-  }, [stopHoverAnimation]);
+  }, [stopHoverAnimation, cancelPendingHoverUpdate]);
 
   // ---- LOB layout: host + attached-accessory positions ----
   // LOB packs cards in a horizontal strip. Attached sites render BEHIND the
@@ -3716,7 +3763,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       const clientPos = { x: e.evt.clientX, y: e.evt.clientY };
       mousePosRef.current = clientPos;
       if (hoveredCard) {
-        setMousePos(clientPos);
+        queueHoverUpdate({ instanceId: hoveredInstanceId, card: hoveredCard, mousePos: clientPos });
       }
 
       if (!isSelectingRef.current) return;
@@ -3733,7 +3780,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         updateSelectionDrag(pos.x, pos.y, allCardBounds, e.evt.shiftKey);
       }
     },
-    [updateSelectionDrag, allCardBounds, isSelectingRef, onRectChangeRef, hoveredCard],
+    [updateSelectionDrag, allCardBounds, isSelectingRef, onRectChangeRef, hoveredCard, hoveredInstanceId, queueHoverUpdate],
   );
 
   const handleStageMouseUp = useCallback(
@@ -3820,6 +3867,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               cornerRadius={3}
               opacity={0.45}
               onContextMenu={handleSharedLobContextMenu}
+              perfectDrawEnabled={false}
             />
           )}
           {normalizedFormat === 'Paragon' && mpLayout?.zones.soulDeck && (
@@ -3833,6 +3881,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               strokeWidth={1}
               cornerRadius={3}
               opacity={0.45}
+              perfectDrawEnabled={false}
             />
           )}
           {Object.entries(myZones).map(([key, zone]) => {
@@ -3868,6 +3917,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   strokeWidth={1}
                   cornerRadius={3}
                   opacity={0.45}
+                  // Territory has no click/context handlers — drop it from the
+                  // hit graph entirely so per-pointermove traversal is cheaper.
+                  // LoB and sidebar piles must stay listening for their handlers.
+                  listening={isFreeForm ? false : undefined}
                   onClick={SIDEBAR_PILE_ZONES.includes(key as (typeof SIDEBAR_PILE_ZONES)[number]) ? myPileClickHandler : undefined}
                   onContextMenu={isLob ? (e: Konva.KonvaEventObject<PointerEvent>) => {
                     e.evt.preventDefault();
@@ -3878,6 +3931,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     const spawnY = pointer ? (pointer.y - zone.y) / zone.height : 0.5;
                     setZoneMenu({ x: e.evt.clientX, y: e.evt.clientY, spawnX, spawnY });
                   } : SIDEBAR_PILE_ZONES.includes(key as (typeof SIDEBAR_PILE_ZONES)[number]) ? myPileContextHandler : undefined}
+                  perfectDrawEnabled={false}
                 />
                 {/* Label + badge — skip for LOB/territory zones (rendered as overlay after cards) */}
                 {!skipLabel && (
@@ -3893,6 +3947,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       width={zone.width - 12}
                       ellipsis
                       listening={false}
+                      perfectDrawEnabled={false}
                     />
                   </>
                 )}
@@ -3936,6 +3991,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   strokeWidth={1}
                   cornerRadius={3}
                   opacity={0.45}
+                  listening={isFreeForm ? false : undefined}
                   onClick={SIDEBAR_PILE_ZONES.includes(key as (typeof SIDEBAR_PILE_ZONES)[number]) ? oppPileClickHandler : undefined}
                   onContextMenu={isLob ? (e: Konva.KonvaEventObject<PointerEvent>) => {
                     e.evt.preventDefault();
@@ -3946,6 +4002,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     const oppId = gameState.opponentPlayer?.id;
                     setZoneMenu({ x: e.evt.clientX, y: e.evt.clientY, spawnX, spawnY, targetPlayerId: oppId != null ? String(oppId) : undefined });
                   } : SIDEBAR_PILE_ZONES.includes(key as (typeof SIDEBAR_PILE_ZONES)[number]) ? oppPileContextHandler : undefined}
+                  perfectDrawEnabled={false}
                 />
                 {/* Label + badge — skip for LOB/territory zones (rendered as overlay after cards) */}
                 {!skipLabel && (
@@ -3961,6 +4018,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       width={zone.width - 12}
                       ellipsis
                       listening={false}
+                      perfectDrawEnabled={false}
                     />
                   </>
                 )}
@@ -3991,6 +4049,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 y: e.evt.clientY,
               });
             }}
+            perfectDrawEnabled={false}
           />
           {(() => {
             const areaRight = myHandRect.x + myHandRect.width;
@@ -4000,10 +4059,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const sx = areaRight - lw - 8 - bw - 6;
             return (
               <>
-                <Text x={sx} y={myHandRect.y + 4} text="HAND" fontSize={fs(12)} fontFamily="Cinzel, Georgia, serif" fill="#e8d5a3" letterSpacing={2} listening={false} />
+                <Text x={sx} y={myHandRect.y + 4} text="HAND" fontSize={fs(12)} fontFamily="Cinzel, Georgia, serif" fill="#e8d5a3" letterSpacing={2} listening={false} perfectDrawEnabled={false} />
                 <Group x={sx + lw + 8} y={myHandRect.y + 2} listening={false}>
-                  <Rect width={bw} height={18} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} />
-                  <Text text={String(myCards['hand']?.length ?? 0)} fontSize={fs(12)} fontStyle="bold" fill="#e8d5a3" width={bw} height={18} align="center" verticalAlign="middle" />
+                  <Rect width={bw} height={18} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} perfectDrawEnabled={false} />
+                  <Text text={String(myCards['hand']?.length ?? 0)} fontSize={fs(12)} fontStyle="bold" fill="#e8d5a3" width={bw} height={18} align="center" verticalAlign="middle" perfectDrawEnabled={false} />
                 </Group>
               </>
             );
@@ -4025,6 +4084,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 y: e.evt.clientY,
               });
             }}
+            perfectDrawEnabled={false}
           />
           {(() => {
             const areaRight = opponentHandRect.x + opponentHandRect.width;
@@ -4035,10 +4095,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const sx = areaRight - totalW - 6;
             return (
               <>
-                <Text x={sx} y={opponentHandRect.y + 4} text="OPPONENT'S HAND" fontSize={fs(12)} fontFamily="Cinzel, Georgia, serif" fill="#a3c5e8" letterSpacing={2} listening={false} />
+                <Text x={sx} y={opponentHandRect.y + 4} text="OPPONENT'S HAND" fontSize={fs(12)} fontFamily="Cinzel, Georgia, serif" fill="#a3c5e8" letterSpacing={2} listening={false} perfectDrawEnabled={false} />
                 <Group x={sx + lw + 8} y={opponentHandRect.y + 2} listening={false}>
-                  <Rect width={bw} height={18} fill="#101828" cornerRadius={4} stroke="#4a7ab5" strokeWidth={1} />
-                  <Text text={String(opponentCards['hand']?.length ?? 0)} fontSize={fs(12)} fontStyle="bold" fill="#a3c5e8" width={bw} height={18} align="center" verticalAlign="middle" />
+                  <Rect width={bw} height={18} fill="#101828" cornerRadius={4} stroke="#4a7ab5" strokeWidth={1} perfectDrawEnabled={false} />
+                  <Text text={String(opponentCards['hand']?.length ?? 0)} fontSize={fs(12)} fontStyle="bold" fill="#a3c5e8" width={bw} height={18} align="center" verticalAlign="middle" perfectDrawEnabled={false} />
                 </Group>
               </>
             );
@@ -4423,6 +4483,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                 onContextMenu={handleSharedSoulDeckContextMenu}
                 onDragStart={handleSoulDeckPileDragStart}
                 onDragEnd={handleSoulDeckPileDragEnd}
+                hitFunc={(ctx: any, shape: any) => {
+                  ctx.beginPath();
+                  ctx.rect(px - 2, py - 2, pileWidth, pileHeight);
+                  ctx.closePath();
+                  ctx.fillStrokeShape(shape);
+                }}
               >
                 {count > 1 && (
                   soulDeckBackReady && soulDeckBackRef.current ? (
@@ -4434,6 +4500,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       height={pileHeight}
                       cornerRadius={4}
                       opacity={0.85}
+                      perfectDrawEnabled={false}
                     />
                   ) : (
                     <Rect
@@ -4445,6 +4512,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       stroke="#6b4e27"
                       strokeWidth={1}
                       cornerRadius={4}
+                      perfectDrawEnabled={false}
                     />
                   )
                 )}
@@ -4456,6 +4524,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     width={pileWidth}
                     height={pileHeight}
                     cornerRadius={4}
+                    perfectDrawEnabled={false}
                   />
                 ) : (
                   <Rect
@@ -4467,10 +4536,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     stroke="#c4955a"
                     strokeWidth={1}
                     cornerRadius={4}
+                    perfectDrawEnabled={false}
                   />
                 )}
                 <Group x={px + pileWidth - 30} y={py + 4}>
-                  <Rect width={28} height={20} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} />
+                  <Rect width={28} height={20} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} perfectDrawEnabled={false} />
                   <Text
                     text={String(count)}
                     fontSize={fs(14)}
@@ -4480,6 +4550,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     height={20}
                     align="center"
                     verticalAlign="middle"
+                    perfectDrawEnabled={false}
                   />
                 </Group>
                 <Text
@@ -4492,6 +4563,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   fill="#e8d5a3"
                   letterSpacing={1}
                   align="center"
+                  perfectDrawEnabled={false}
                 />
               </Group>
             );
@@ -4528,6 +4600,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     height={20}
                     fill={bgFill}
                     cornerRadius={[0, 3, 0, 4]}
+                    perfectDrawEnabled={false}
                   />
                   <Text
                     x={labelX}
@@ -4539,6 +4612,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     letterSpacing={1}
                     width={zone.width - 44}
                     ellipsis={true}
+                    perfectDrawEnabled={false}
                   />
                   <Rect
                     x={badgeX}
@@ -4549,6 +4623,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     cornerRadius={3}
                     stroke={badgeStroke}
                     strokeWidth={0.5}
+                    perfectDrawEnabled={false}
                   />
                   <Text
                     x={badgeX}
@@ -4558,6 +4633,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     fontSize={fs(11)}
                     fill={fillColor}
                     align="center"
+                    perfectDrawEnabled={false}
                   />
                 </Group>
               );
@@ -4590,6 +4666,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   height={20}
                   fill={bgFill}
                   cornerRadius={[0, 3, 0, 4]}
+                  perfectDrawEnabled={false}
                 />
                 <Text
                   x={labelX}
@@ -4601,6 +4678,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   letterSpacing={1}
                   width={zone.width - 44}
                   ellipsis={true}
+                  perfectDrawEnabled={false}
                 />
                 <Rect
                   x={badgeX}
@@ -4611,6 +4689,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   cornerRadius={3}
                   stroke={badgeStroke}
                   strokeWidth={0.5}
+                  perfectDrawEnabled={false}
                 />
                 <Text
                   x={badgeX}
@@ -4620,6 +4699,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   fontSize={fs(11)}
                   fill={fillColor}
                   align="center"
+                  perfectDrawEnabled={false}
                 />
               </Group>
             );
@@ -4655,6 +4735,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     height={20}
                     fill={bgFill}
                     cornerRadius={[0, 3, 0, 4]}
+                    perfectDrawEnabled={false}
                   />
                   <Text
                     x={labelX}
@@ -4666,6 +4747,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     letterSpacing={1}
                     width={zone.width - 44}
                     ellipsis={true}
+                    perfectDrawEnabled={false}
                   />
                   <Rect
                     x={badgeX}
@@ -4676,6 +4758,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     cornerRadius={3}
                     stroke={badgeStroke}
                     strokeWidth={0.5}
+                    perfectDrawEnabled={false}
                   />
                   <Text
                     x={badgeX}
@@ -4685,6 +4768,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     fontSize={fs(11)}
                     fill={fillColor}
                     align="center"
+                    perfectDrawEnabled={false}
                   />
                 </Group>
               );
@@ -4729,10 +4813,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   else if (zoneKey === 'reserve') setReserveMenu(pt);
                   else if (zoneKey === 'discard' || zoneKey === 'banish') setBrowseMyZone(zoneKey);
                 }}
+                hitFunc={(ctx: any, shape: any) => {
+                  ctx.beginPath();
+                  ctx.rect(zone.x, zone.y, zone.width, zone.height);
+                  ctx.closePath();
+                  ctx.fillStrokeShape(shape);
+                }}
               >
                 {/* Count badge */}
                 <Group x={zone.x + zone.width - 32} y={zone.y + 2} listening={false}>
-                  <Rect width={26} height={18} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} />
+                  <Rect width={26} height={18} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} perfectDrawEnabled={false} />
                   <Text
                     text={String(count)}
                     fontSize={fs(12)}
@@ -4742,6 +4832,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     height={18}
                     align="center"
                     verticalAlign="middle"
+                    perfectDrawEnabled={false}
                   />
                 </Group>
 
@@ -4759,8 +4850,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     }}
                     onMouseEnter={() => { const c = stageRef.current?.container(); if (c) c.style.cursor = 'pointer'; }}
                     onMouseLeave={() => { const c = stageRef.current?.container(); if (c) c.style.cursor = 'default'; }}
+                    hitFunc={(ctx: any, shape: any) => {
+                      ctx.beginPath();
+                      ctx.rect(0, 0, 20, 18);
+                      ctx.closePath();
+                      ctx.fillStrokeShape(shape);
+                    }}
                   >
-                    <Rect width={20} height={18} fill="#1a2e1a" cornerRadius={4} stroke="#5a9a5a" strokeWidth={1} />
+                    <Rect width={20} height={18} fill="#1a2e1a" cornerRadius={4} stroke="#5a9a5a" strokeWidth={1} perfectDrawEnabled={false} />
                     <Text
                       text="👁"
                       fontSize={fs(11)}
@@ -4769,6 +4866,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       align="center"
                       verticalAlign="middle"
                       listening={false}
+                      perfectDrawEnabled={false}
                     />
                   </Group>
                 )}
@@ -4926,10 +5024,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   else if (zoneKey === 'reserve') setOpponentReserveMenu(pt);
                   else if (zoneKey === 'discard' || zoneKey === 'banish') setBrowseOpponentZone(zoneKey);
                 }}
+                hitFunc={(ctx: any, shape: any) => {
+                  ctx.beginPath();
+                  ctx.rect(zone.x, zone.y, zone.width, zone.height);
+                  ctx.closePath();
+                  ctx.fillStrokeShape(shape);
+                }}
               >
                 {/* Count badge */}
                 <Group x={zone.x + zone.width - 32} y={zone.y + 2} listening={false}>
-                  <Rect width={26} height={18} fill="#101828" cornerRadius={4} stroke="#4a7ab5" strokeWidth={1} />
+                  <Rect width={26} height={18} fill="#101828" cornerRadius={4} stroke="#4a7ab5" strokeWidth={1} perfectDrawEnabled={false} />
                   <Text
                     text={String(count)}
                     fontSize={fs(12)}
@@ -4939,13 +5043,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     height={18}
                     align="center"
                     verticalAlign="middle"
+                    perfectDrawEnabled={false}
                   />
                 </Group>
 
                 {/* Revealed indicator for opponent reserve — sits left of the count badge. Not clickable (only owner can toggle). */}
                 {zoneKey === 'reserve' && oppReserveRevealed && (
                   <Group x={zone.x + zone.width - 56} y={zone.y + 2} listening={false}>
-                    <Rect width={20} height={18} fill="#1a2e1a" cornerRadius={4} stroke="#5a9a5a" strokeWidth={1} />
+                    <Rect width={20} height={18} fill="#1a2e1a" cornerRadius={4} stroke="#5a9a5a" strokeWidth={1} perfectDrawEnabled={false} />
                     <Text
                       text="👁"
                       fontSize={fs(11)}
@@ -4953,6 +5058,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       height={18}
                       align="center"
                       verticalAlign="middle"
+                      perfectDrawEnabled={false}
                     />
                   </Group>
                 )}
@@ -5215,6 +5321,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             stroke="#c4955a"
             strokeWidth={1}
             dash={[6, 3]}
+            perfectDrawEnabled={false}
           />
         </Layer>
       </Stage>
@@ -5396,7 +5503,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  transition: 'all 0.15s ease',
+                  transition: 'none',
                 }}
               >
                 <span
