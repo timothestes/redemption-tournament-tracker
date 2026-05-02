@@ -53,7 +53,7 @@ function DeckPickerContent({
 
   // ── My Decks state (server-paginated) ──
   const [mySearch, setMySearch] = useState("");
-  const [mySort, setMySort] = useState<"latest" | "last_played" | "name">("last_played");
+  const [mySort, setMySort] = useState<"all" | "latest" | "last_played" | "name">("all");
   const [myFormat, setMyFormat] = useState("");
   const [myPage, setMyPage] = useState(1);
   const [myResults, setMyResults] = useState<DeckOption[]>([]);
@@ -268,6 +268,7 @@ function DeckPickerContent({
               onChange={(e) => setMySort(e.target.value as any)}
               className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground"
             >
+              <option value="all">All</option>
               <option value="latest">Latest</option>
               <option value="last_played">Last Played</option>
               <option value="name">Name</option>

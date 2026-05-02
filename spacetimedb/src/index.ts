@@ -3948,6 +3948,8 @@ export const meek_card = spacetimedb.reducer(
 
     ctx.db.CardInstance.id.update({ ...card, isMeek: true });
 
+    if (card.zone === 'hand') return;
+
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');
 
@@ -3971,6 +3973,8 @@ export const unmeek_card = spacetimedb.reducer(
     if (card.gameId !== gameId) throw new SenderError('Card not in this game');
 
     ctx.db.CardInstance.id.update({ ...card, isMeek: false });
+
+    if (card.zone === 'hand') return;
 
     const game = ctx.db.Game.id.find(gameId);
     if (!game) throw new SenderError('Game not found');

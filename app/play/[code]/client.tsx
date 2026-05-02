@@ -1310,7 +1310,11 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   // or render the overlay standalone if canvas data is unavailable.
   if (lifecycle === 'finished') {
     const { label: endLabel, winnerName } = deriveEndReason(gameState.gameActions, gameState.myPlayer);
-    const opponentDisconnected = endLabel === 'Opponent disconnected';
+    // "Opponent left" — either the 5-min disconnect timeout fired, or the
+    // opponent has dropped presence (explicitly left to lobby, closed tab, etc.).
+    // In either case, no rematch is possible — surface Back to Lobby instead.
+    const opponentDisconnected =
+      endLabel === 'Opponent disconnected' || gameState.opponentPlayer?.isConnected === false;
 
     // Show the overlay over the frozen canvas — always render canvas if gameId is known
     if (gameId !== null) {

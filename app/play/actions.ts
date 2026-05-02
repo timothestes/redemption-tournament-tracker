@@ -155,7 +155,7 @@ export interface LoadUserDecksPagedParams {
   page?: number;
   pageSize?: number;
   search?: string;
-  sort?: 'latest' | 'last_played' | 'name';
+  sort?: 'all' | 'latest' | 'last_played' | 'name';
   format?: string;
 }
 
@@ -175,7 +175,7 @@ export async function loadUserDecksPaged(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { decks: [], totalCount: 0 };
 
-  const { page = 1, pageSize = 12, search, sort = 'last_played', format } = params;
+  const { page = 1, pageSize = 12, search, sort = 'all', format } = params;
   const offset = (page - 1) * pageSize;
 
   let query = supabase
@@ -207,10 +207,13 @@ export async function loadUserDecksPaged(
       query = query.order('updated_at', { ascending: false });
       break;
     case 'last_played':
-    default:
       query = query
         .order('last_played_at', { ascending: false, nullsFirst: false })
         .order('updated_at', { ascending: false });
+      break;
+    case 'all':
+    default:
+      query = query.order('last_active_at', { ascending: false, nullsFirst: false });
       break;
   }
 
