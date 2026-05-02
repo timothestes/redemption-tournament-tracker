@@ -3,7 +3,7 @@
 import { useEffect, useRef, useMemo, useState } from 'react';
 import { GameCard, ZoneId, ZONE_LABELS, COUNTER_COLORS, CounterColorId } from '../../goldfish/types';
 import { GameActions } from '@/app/shared/types/gameActions';
-import { getAbilitiesForCard, abilityLabel } from '@/lib/cards/cardAbilities';
+import { getAbilitiesForCard, abilityLabel, DEFAULT_ABILITY_SOURCE_ZONES } from '@/lib/cards/cardAbilities';
 
 const MOVE_TARGETS: ZoneId[] = [
   'territory',
@@ -171,15 +171,11 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
   // click-then-fail flow when right-clicking opponent cards in multiplayer.
   // Goldfish is single-player so every card is owned by player1 — no change there.
   const isOwnedByLocalPlayer = card.ownerId === 'player1';
-  // Only allow abilities to fire when the source card is actually in play.
-  // Cards in hand/deck/reserve/discard/banish can't trigger in-play effects.
-  // "In play" means Territory, Land of Bondage, or Land of Redemption — heroes
-  // rest in LoR between battles, so omitting it blocks most Hero-source cards.
-  const ABILITY_SOURCE_ZONES: ReadonlyArray<ZoneId> = ['territory', 'land-of-bondage', 'land-of-redemption'];
-  const isInAbilityZone = ABILITY_SOURCE_ZONES.includes(card.zone);
+  // Each ability decides which zones it can fire from. Default is in-play
+  // (territory + both lands). (Star) abilities like Virgin Birth's
+  // look-at-top-6 override this to also allow 'hand'.
   const hasAbilities =
     abilities.length > 0 && typeof actions.executeCardAbility === 'function';
-  const canExecuteAbilities = hasAbilities && isOwnedByLocalPlayer && isInAbilityZone;
 
   // Per-card hand reveal — gated to local player's own hand cards and
   // suppressed when the whole hand is already publicly revealed.
@@ -288,7 +284,9 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
       {hasAbilities && (
         <>
           {abilities.map((ability, index) => {
-            const disabled = !canExecuteAbilities;
+            const allowedZones = ability.sourceZones ?? DEFAULT_ABILITY_SOURCE_ZONES;
+            const isInAbilityZone = allowedZones.includes(card.zone);
+            const disabled = !isOwnedByLocalPlayer || !isInAbilityZone;
             return (
               <button
                 key={index}

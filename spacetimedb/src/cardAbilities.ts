@@ -17,7 +17,13 @@
 // Kept local — no import from shared types.
 type ZoneId = string;
 
-export type CardAbility =
+type AbilityBase = { sourceZones?: ZoneId[] };
+
+export const DEFAULT_ABILITY_SOURCE_ZONES: ReadonlyArray<ZoneId> = [
+  'territory', 'land-of-bondage', 'land-of-redemption',
+];
+
+export type CardAbility = AbilityBase & (
   | { type: 'spawn_token'; tokenName: string; count?: number; defaultZone?: ZoneId }
   | { type: 'shuffle_and_draw'; shuffleCount: number; drawCount: number }
   | { type: 'all_players_shuffle_and_draw'; shuffleCount: number; drawCount: number }
@@ -25,10 +31,12 @@ export type CardAbility =
   | { type: 'look_at_own_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'look_at_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'discard_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
+  | { type: 'reserve_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'reserve_top_of_deck'; count: number }
   | { type: 'draw_bottom_of_deck'; count: number }
   | { type: 'set_card_outline'; color: 'good' | 'evil'; label: string }
-  | { type: 'custom'; reducerName: string; label: string };
+  | { type: 'custom'; reducerName: string; label: string }
+);
 
 export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'Two Possessed (GoC)':                                 [{ type: 'spawn_token', tokenName: 'Violent Possessor Token', count: 2 }],
@@ -66,14 +74,21 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'Mount Sinai':                                         [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
   'Faith of Isaac':                                      [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
   'False Prophecy (PoC)':                                [{ type: 'look_at_opponent_deck', position: 'top', count: 6 }],
-  'Delivered':                                           [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Delivered':                                           [{ type: 'discard_opponent_deck', position: 'top', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  'Contagious Fear (GoC)':                               [{ type: 'reserve_opponent_deck', position: 'top', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  'Jairus (GoC)':                                        [{ type: 'reserve_opponent_deck', position: 'top', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  "Jairus' Daughter (GoC)":                              [{ type: 'reserve_opponent_deck', position: 'top', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  'Massacre of Innocents (GoC)':                         [{ type: 'reserve_opponent_deck', position: 'top', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  'Submission to Christ (GoC)':                          [{ type: 'reserve_opponent_deck', position: 'top', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  'Talitha Kum! (GoC)':                                  [{ type: 'reserve_opponent_deck', position: 'top', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  'Teaching in Parables (GoC)':                          [{ type: 'reserve_opponent_deck', position: 'top', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
   'Omen Interpreter':                                    [{ type: 'reveal_own_deck', position: 'top', count: 6 }],
   "Balaam's Prophecy":                                   [{ type: 'reveal_own_deck', position: 'top', count: 6 }],
   'Fruit of the Land':                                   [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
   'Intervening of Prophecy':                             [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
   'The Coming Prince':                                   [{ type: 'look_at_own_deck', position: 'top', count: 1 }],
   'Sign of Jonah':                                       [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
-  'Virgin Birth':                                        [{ type: 'look_at_own_deck', position: 'top', count: 6 }],
+  'Virgin Birth':                                        [{ type: 'look_at_own_deck', position: 'top', count: 6, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
   'Eve, Mother of All (Roots)':                          [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
   'The Thankful Leper (GoC)':                            [{ type: 'look_at_own_deck', position: 'top', count: 10 }],
   'David (Roots)':                                       [{ type: 'look_at_own_deck', position: 'top', count: 7 }],

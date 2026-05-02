@@ -19,9 +19,10 @@ export const BANNER_HEIGHT = 48;
 
 interface WaitingRoomGoldfishProps {
   deck: DeckDataForGoldfish;
+  onLoadDeck?: () => void;
 }
 
-function GoldfishArea({ deck }: { deck: DeckDataForGoldfish }) {
+function GoldfishArea({ deck, onLoadDeck }: { deck: DeckDataForGoldfish; onLoadDeck?: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { scale, offsetX, offsetY, containerWidth, containerHeight, virtualWidth } = useVirtualCanvas(containerRef);
 
@@ -87,6 +88,7 @@ function GoldfishArea({ deck }: { deck: DeckDataForGoldfish }) {
             offsetX={offsetX}
             offsetY={offsetY}
             virtualWidth={virtualWidth}
+            onLoadDeck={onLoadDeck}
           />
         )}
       </div>
@@ -100,11 +102,13 @@ function GoldfishArea({ deck }: { deck: DeckDataForGoldfish }) {
   );
 }
 
-export default function WaitingRoomGoldfish({ deck }: WaitingRoomGoldfishProps) {
+export default function WaitingRoomGoldfish({ deck, onLoadDeck }: WaitingRoomGoldfishProps) {
   return (
     <CardPreviewProvider>
-      <GameProvider deck={deck}>
-        <GoldfishArea deck={deck} />
+      {/* Key on deck.id so swapping the deck remounts GameProvider with a fresh
+          initial state — its useMemo is keyed to mount only. */}
+      <GameProvider key={deck.id} deck={deck}>
+        <GoldfishArea deck={deck} onLoadDeck={onLoadDeck} />
       </GameProvider>
     </CardPreviewProvider>
   );

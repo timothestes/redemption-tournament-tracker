@@ -980,6 +980,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         case 'look_at_own_deck':
         case 'look_at_opponent_deck':
         case 'discard_opponent_deck':
+        case 'reserve_opponent_deck':
           // Modal-driven or opponent-required — GoldfishCanvas intercepts, or
           // the effect is multiplayer-only. No-op here.
           return state;

@@ -8,7 +8,17 @@
 import type { ZoneId } from '@/app/shared/types/gameCard';
 import { findCard, type CardData } from './lookup';
 
-export type CardAbility =
+// Per-ability override for the zones the source card may fire from. When
+// omitted, falls back to DEFAULT_ABILITY_SOURCE_ZONES (territory + both
+// lands). Used for (Star) abilities that activate from hand — see Virgin
+// Birth / Delivered.
+type AbilityBase = { sourceZones?: ZoneId[] };
+
+export const DEFAULT_ABILITY_SOURCE_ZONES: ReadonlyArray<ZoneId> = [
+  'territory', 'land-of-bondage', 'land-of-redemption',
+];
+
+export type CardAbility = AbilityBase & (
   | { type: 'spawn_token'; tokenName: string; count?: number; defaultZone?: ZoneId }
   | { type: 'shuffle_and_draw'; shuffleCount: number; drawCount: number }
   | { type: 'all_players_shuffle_and_draw'; shuffleCount: number; drawCount: number }
@@ -16,10 +26,12 @@ export type CardAbility =
   | { type: 'look_at_own_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'look_at_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'discard_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
+  | { type: 'reserve_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'reserve_top_of_deck'; count: number }
   | { type: 'draw_bottom_of_deck'; count: number }
   | { type: 'set_card_outline'; color: 'good' | 'evil'; label: string }
-  | { type: 'custom'; reducerName: string; label: string };
+  | { type: 'custom'; reducerName: string; label: string }
+);
 
 /**
  * Registry keyed by GameCard.cardName (which embeds the set suffix for the
@@ -64,14 +76,24 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'Mount Sinai':                                         [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
   'Faith of Isaac':                                      [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
   'False Prophecy (PoC)':                                [{ type: 'look_at_opponent_deck', position: 'top', count: 6 }],
-  'Delivered':                                           [{ type: 'discard_opponent_deck', position: 'top', count: 1 }],
+  'Delivered':                                           [{ type: 'discard_opponent_deck', position: 'top', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  // (Star) — "Reserve the top card of a deck". Surfaced as opponent-deck
+  // since that's the impactful play; user can still manually move from
+  // own deck via the deck-search modal.
+  'Contagious Fear (GoC)':                               [{ type: 'reserve_opponent_deck', position: 'top', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  'Jairus (GoC)':                                        [{ type: 'reserve_opponent_deck', position: 'top', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  "Jairus' Daughter (GoC)":                              [{ type: 'reserve_opponent_deck', position: 'top', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  'Massacre of Innocents (GoC)':                         [{ type: 'reserve_opponent_deck', position: 'top', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  'Submission to Christ (GoC)':                          [{ type: 'reserve_opponent_deck', position: 'top', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  'Talitha Kum! (GoC)':                                  [{ type: 'reserve_opponent_deck', position: 'top', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
+  'Teaching in Parables (GoC)':                          [{ type: 'reserve_opponent_deck', position: 'top', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
   'Omen Interpreter':                                    [{ type: 'reveal_own_deck', position: 'top', count: 6 }],
   "Balaam's Prophecy":                                   [{ type: 'reveal_own_deck', position: 'top', count: 6 }],
   'Fruit of the Land':                                   [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
   'Intervening of Prophecy':                             [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
   'The Coming Prince':                                   [{ type: 'look_at_own_deck', position: 'top', count: 1 }],
   'Sign of Jonah':                                       [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
-  'Virgin Birth':                                        [{ type: 'look_at_own_deck', position: 'top', count: 6 }],
+  'Virgin Birth':                                        [{ type: 'look_at_own_deck', position: 'top', count: 6, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
   'Eve, Mother of All (Roots)':                          [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
   'The Thankful Leper (GoC)':                            [{ type: 'look_at_own_deck', position: 'top', count: 10 }],
   'David (Roots)':                                       [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
@@ -198,6 +220,10 @@ export function abilityLabel(a: CardAbility): string {
     case 'discard_opponent_deck': {
       const where = a.position === 'random' ? `${a.count} random` : `${a.position} ${a.count}`;
       return `Discard ${where} card${a.count === 1 ? '' : 's'} of opponent's deck`;
+    }
+    case 'reserve_opponent_deck': {
+      const where = a.position === 'random' ? `${a.count} random` : `${a.position} ${a.count}`;
+      return `Reserve ${where} card${a.count === 1 ? '' : 's'} of opponent's deck`;
     }
     case 'reserve_top_of_deck':
       return `Reserve top ${a.count} card${a.count === 1 ? '' : 's'} of deck`;
