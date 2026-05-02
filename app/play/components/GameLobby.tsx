@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -292,14 +293,22 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
                   )}
                 </div>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPickerOpen(true)}
-                className="shrink-0"
-              >
-                Change
-              </Button>
+              <div className="flex items-center gap-2 shrink-0">
+                {!selectedDeck.username && (
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={`/decklist/card-search?deckId=${selectedDeck.id}`}>
+                      Edit
+                    </Link>
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPickerOpen(true)}
+                >
+                  Change
+                </Button>
+              </div>
             </div>
           </>
         ) : (
