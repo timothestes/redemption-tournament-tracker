@@ -298,16 +298,22 @@ export function MultiCardContextMenu({ selectedIds, x, y, actions, onClose, onCl
           Bottom of Deck
         </button>
       )}
-      <button
-        style={itemStyle}
-        onClick={() => doAction(() => {
-          actions.moveCardsBatch(selectedIds, 'deck');
-          actions.shuffleDeck();
-        })}
-        {...hoverHandlers}
-      >
-        Shuffle into Deck
-      </button>
+      {(() => {
+        const nonTokenIds = selectedCards.filter(c => !c.isToken).map(c => c.instanceId);
+        if (nonTokenIds.length === 0) return null;
+        return (
+          <button
+            style={itemStyle}
+            onClick={() => doAction(() => {
+              actions.moveCardsBatch(nonTokenIds, 'deck');
+              actions.shuffleDeck();
+            })}
+            {...hoverHandlers}
+          >
+            Shuffle into Deck
+          </button>
+        );
+      })()}
       {onExchange && (
         <button
           style={itemStyle}

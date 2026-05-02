@@ -252,32 +252,6 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
   return (
     <div ref={menuRef} style={menuStyle} onContextMenu={(e) => e.preventDefault()}>
 
-      {(canSurrender || canRescue) && (
-        <>
-          {canRescue && (
-            <button
-              style={itemStyle}
-              onClick={() => doAction(() => onRescue!(card.instanceId))}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-            >
-              Rescue
-            </button>
-          )}
-          {canSurrender && (
-            <button
-              style={itemStyle}
-              onClick={() => doAction(() => onSurrender!(card.instanceId))}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-            >
-              Surrender
-            </button>
-          )}
-          <div style={separatorStyle} />
-        </>
-      )}
-
       {/* Card abilities from CARD_ABILITIES registry. Rendered disabled when
           the local player doesn't own the card, or when the card isn't in a
           valid source zone — the server would reject these anyway. */}
@@ -422,6 +396,31 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
         </>
       )}
 
+      {(canSurrender || canRescue) && (
+        <>
+          {canRescue && (
+            <button
+              style={itemStyle}
+              onClick={() => doAction(() => onRescue!(card.instanceId))}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              Rescue
+            </button>
+          )}
+          {canSurrender && (
+            <button
+              style={itemStyle}
+              onClick={() => doAction(() => onSurrender!(card.instanceId))}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              Surrender
+            </button>
+          )}
+        </>
+      )}
+
       <button
         style={itemStyle}
         onClick={() => doAction(() => card.isMeek ? actions.unmeekCard(card.instanceId) : actions.meekCard(card.instanceId))}
@@ -527,14 +526,16 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
           Bottom of Deck
         </button>
       )}
-      <button
-        style={itemStyle}
-        onClick={() => doAction(() => actions.shuffleCardIntoDeck(card.instanceId))}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-      >
-        Shuffle into Deck
-      </button>
+      {!card.isToken && (
+        <button
+          style={itemStyle}
+          onClick={() => doAction(() => actions.shuffleCardIntoDeck(card.instanceId))}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+        >
+          Shuffle into Deck
+        </button>
+      )}
       {onExchange && card.zone !== 'deck' && (
         <button
           style={itemStyle}
