@@ -242,7 +242,7 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
   return (
     <div className="flex flex-col gap-5">
       {/* Deck selection — matches community/my-decks card preview style */}
-      <section className="rounded-lg border border-border bg-card overflow-hidden [.jayden_&]:border-primary/30 [.jayden_&]:bg-gradient-to-br [.jayden_&]:from-[hsla(0,80%,25%,0.15)] [.jayden_&]:via-[hsla(270,60%,20%,0.1)] [.jayden_&]:to-[hsla(230,80%,30%,0.15)]">
+      <section className="rounded-lg border border-border overflow-hidden bg-gradient-to-br from-card to-muted/40 [.jayden_&]:border-primary/30 [.jayden_&]:from-[hsla(0,80%,25%,0.15)] [.jayden_&]:via-[hsla(270,60%,20%,0.1)] [.jayden_&]:to-[hsla(230,80%,30%,0.15)]">
         {selectedDeck ? (
           <>
             {/* Card preview header — same style as community DeckCard */}
@@ -258,12 +258,12 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
                 />
               </div>
             ) : hasPreview ? (
-              <div className="h-32 overflow-hidden bg-card flex items-center justify-center gap-1 px-2 py-2">
+              <div className="h-32 overflow-hidden flex items-center justify-center gap-1 px-2 py-2">
                 {img1Url && (
-                  <img src={img1Url} alt="" className="h-full object-contain rounded" />
+                  <img src={img1Url} alt="" className="h-full object-contain rounded shadow-md" />
                 )}
                 {img2Url && (
-                  <img src={img2Url} alt="" className="h-full object-contain rounded" />
+                  <img src={img2Url} alt="" className="h-full object-contain rounded shadow-md" />
                 )}
               </div>
             ) : (

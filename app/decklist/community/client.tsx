@@ -627,9 +627,18 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
             <Image src={`/paragons/Paragon ${deck.paragon}.png`} alt={deck.paragon} width={400} height={560} className="w-full h-full object-cover object-top group-hover:brightness-90 transition-[filter]" />
           </div>
         ) : hasPreview ? (
-          <div className="h-36 overflow-hidden bg-muted flex items-center justify-center gap-1 px-2 py-2 group-hover:bg-muted/80 transition-colors">
-            {img1 && <img src={img1} alt="" className="h-full object-contain rounded group-hover:brightness-90 transition-[filter]" />}
-            {img2 && <img src={img2} alt="" className="h-full object-contain rounded group-hover:brightness-90 transition-[filter]" />}
+          <div className="relative h-36 overflow-hidden">
+            <img
+              src={(img1 || img2)!}
+              alt=""
+              aria-hidden
+              className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl opacity-25 dark:opacity-80 [.jayden_&]:opacity-80 group-hover:opacity-40 dark:group-hover:opacity-90 [.jayden_&]:group-hover:opacity-90 transition-opacity"
+            />
+            <div className="absolute inset-0 bg-background/70 dark:bg-background/20 [.jayden_&]:bg-background/20" />
+            <div className="relative h-full flex items-center justify-center gap-1 px-2 py-2">
+              {img1 && <img src={img1} alt="" className="h-full object-contain rounded shadow-md group-hover:brightness-90 transition-[filter]" />}
+              {img2 && <img src={img2} alt="" className="h-full object-contain rounded shadow-md group-hover:brightness-90 transition-[filter]" />}
+            </div>
           </div>
         ) : (
           <div className="h-36 bg-muted flex items-center justify-center group-hover:bg-muted/80 transition-colors">

@@ -361,8 +361,13 @@ export function useDeckState(
     if (isInitializing) return;
     if (isInitialMount.current) return;
 
-    // Don't create DB rows for a brand-new pristine deck (no cards, no id)
-    if (deck.cards.length === 0 && !deck.id) return;
+    // For never-saved decks, require at least 40 cards before creating a DB row.
+    // Once a deck has an id, keep syncing every change unconditionally so edits
+    // to an existing saved deck never get dropped.
+    if (!deck.id) {
+      const totalCards = deck.cards.reduce((sum, c) => sum + c.quantity, 0);
+      if (totalCards < 40) return;
+    }
 
     if (snapshotDeck(deck) === lastSavedSnapshotRef.current) return;
 
