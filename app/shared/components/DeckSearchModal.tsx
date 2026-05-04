@@ -134,7 +134,7 @@ function rectsOverlap(
 export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDragRef, isDragActive }: DeckSearchModalProps) {
   const { dragHandleProps, modalStyle } = useDraggableModal();
   const { zones, actions } = useModalGame();
-  const { moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleDeck } = actions;
+  const { moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleDeck, logDeckSearchNoShuffle } = actions;
   const [search, setSearch] = useState('');
   const [searchField, setSearchField] = useState<'all' | 'type' | 'name' | 'brigade' | 'alignment' | 'ability' | 'identifier' | 'reference'>('all');
   const [autoShuffle, setAutoShuffle] = useState(true);
@@ -227,17 +227,47 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
     ? deckCards.filter(c => matchesSearch(c, search))
     : deckCards;
 
+  // Refs tracking right-click "Top of Deck" / "Bottom of Deck" intents
+  // performed while the modal was open. We DEFER the actual placement until
+  // close so the game log shows a single clean sequence:
+  //   - autoShuffle on  → shuffle the deck, then place the chosen card(s)
+  //                       on top/bottom — log reads "shuffled, topdecked X".
+  //   - autoShuffle off → place the chosen card(s) on top/bottom and emit a
+  //                       clear "did NOT shuffle" log so opponents see that
+  //                       the deck order is now known to the searcher.
+  const pendingTopRef = useRef<string[]>([]);
+  const pendingBottomRef = useRef<string[]>([]);
+  const trackTopDeck = useCallback((id: string) => {
+    pendingTopRef.current.push(id);
+  }, []);
+  const trackBottomDeck = useCallback((id: string) => {
+    pendingBottomRef.current.push(id);
+  }, []);
+
   // Guard ref to ensure we only shuffle+close once (prevents double-shuffle
   // from effect re-fires when handleClose's dependencies change).
   const didCloseRef = useRef(false);
   const handleClose = useCallback(() => {
     if (didCloseRef.current) return;
     didCloseRef.current = true;
+    const topIds = pendingTopRef.current;
+    const bottomIds = pendingBottomRef.current;
+    const hasPending = topIds.length > 0 || bottomIds.length > 0;
     if (autoShuffle) {
       shuffleDeck();
     }
+    if (hasPending) {
+      for (const id of topIds) moveCardToTopOfDeck(id);
+      for (const id of bottomIds) moveCardToBottomOfDeck(id);
+    }
+    if (!autoShuffle) {
+      // Always log the no-shuffle decision — the searcher now knows their
+      // deck order, which is significant for opponents whether or not any
+      // cards were stacked.
+      logDeckSearchNoShuffle?.({ topCount: topIds.length, bottomCount: bottomIds.length });
+    }
     onClose();
-  }, [autoShuffle, shuffleDeck, onClose]);
+  }, [autoShuffle, shuffleDeck, moveCardToTopOfDeck, moveCardToBottomOfDeck, logDeckSearchNoShuffle, onClose]);
 
   // Close modal after a successful drag-to-canvas completes (unless "leave open" is on).
   // Use refs for handleClose/leaveOpen so the effect only re-runs when isDragActive
@@ -435,13 +465,13 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
   };
 
   const handleMultiTopDeck = () => {
-    for (const id of selectedIds) moveCardToTopOfDeck(id);
+    for (const id of selectedIds) trackTopDeck(id);
     setSelectedIds(new Set());
     setContextCard(null);
   };
 
   const handleMultiBottomDeck = () => {
-    for (const id of selectedIds) moveCardToBottomOfDeck(id);
+    for (const id of selectedIds) trackBottomDeck(id);
     setSelectedIds(new Set());
     setContextCard(null);
   };
@@ -815,8 +845,14 @@ export function DeckSearchModal({ onClose, onStartDrag, onStartMultiDrag, didDra
             y={contextCard.y}
             onClose={() => setContextCard(null)}
             onMove={(zone) => moveCard(contextCard.card.instanceId, zone)}
-            onMoveToTop={() => { moveCardToTopOfDeck(contextCard.card.instanceId); onClose(); }}
-            onMoveToBottom={() => { moveCardToBottomOfDeck(contextCard.card.instanceId); onClose(); }}
+            onMoveToTop={() => {
+              trackTopDeck(contextCard.card.instanceId);
+              handleClose();
+            }}
+            onMoveToBottom={() => {
+              trackBottomDeck(contextCard.card.instanceId);
+              handleClose();
+            }}
           />
         )
       )}

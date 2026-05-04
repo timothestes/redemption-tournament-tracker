@@ -1306,6 +1306,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           JSON.stringify(replacementMoves),
         );
       },
+      logDeckSearchNoShuffle: ({ topCount, bottomCount }) =>
+        gameState.logDeckSearchNoShuffle(topCount, bottomCount),
     },
   }), [myCards, counters, gameState, findMyCardById, checkReserveProtection, checkReserveBatchProtection, undoStack]);
 

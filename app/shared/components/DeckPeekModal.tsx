@@ -240,7 +240,20 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
   const handleCloseAction = (action: 'top' | 'bottom' | 'shuffle') => {
     if (!onClose) return;
     if (hasRemaining) {
-      if (action === 'bottom') {
+      if (action === 'top') {
+        // Skip if the peeked cards are already at the top of the deck in
+        // peek order (the common case when peeking the TOP of deck — no-op).
+        // Otherwise (bottom-peek / random-peek), actively move them.
+        const deck = zones[sourceZone] ?? [];
+        const alreadyOnTop = remainingIds.every((id, i) => deck[i]?.instanceId === id);
+        if (!alreadyOnTop) {
+          // Iterate in reverse so remainingIds[0] ends up topmost
+          // (moveCardToTopOfDeck unshifts — last call wins).
+          for (let i = remainingIds.length - 1; i >= 0; i--) {
+            moveCardToTopOfDeck(remainingIds[i]);
+          }
+        }
+      } else if (action === 'bottom') {
         // move_cards_batch to 'deck' preserves each card's existing zoneIndex,
         // so peeked cards wouldn't actually move. Use move_card_to_bottom_of_deck
         // per-card, which assigns maxIndex + 1.
@@ -248,7 +261,6 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
       } else if (action === 'shuffle') {
         shuffleDeck();
       }
-      // 'top' → cards are already on top, do nothing
     }
     onClose();
   };

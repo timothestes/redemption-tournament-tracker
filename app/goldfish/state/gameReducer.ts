@@ -478,13 +478,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return { ...state, zones, history };
     }
 
-    case 'SHUFFLE_AND_MOVE_TO_TOP': {
+    case 'MOVE_TO_TOP_OF_DECK': {
       const { cardInstanceId } = action.payload;
       if (!cardInstanceId) return state;
       const result = findAndRemoveCard(zones, cardInstanceId);
       if (!result) return state;
       if (result.card.isToken) return { ...state, zones, history };
-      zones.deck = shuffleArray(zones.deck);
       result.card.zone = 'deck';
       result.card.revealUntil = undefined;
       if (result.fromZone === 'territory' || result.fromZone === 'land-of-bondage') {
@@ -496,13 +495,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return { ...state, zones, history };
     }
 
-    case 'SHUFFLE_AND_MOVE_TO_BOTTOM': {
+    case 'MOVE_TO_BOTTOM_OF_DECK': {
       const { cardInstanceId } = action.payload;
       if (!cardInstanceId) return state;
       const result = findAndRemoveCard(zones, cardInstanceId);
       if (!result) return state;
       if (result.card.isToken) return { ...state, zones, history };
-      zones.deck = shuffleArray(zones.deck);
       result.card.zone = 'deck';
       result.card.revealUntil = undefined;
       if (result.fromZone === 'territory' || result.fromZone === 'land-of-bondage') {

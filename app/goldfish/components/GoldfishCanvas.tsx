@@ -173,6 +173,15 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       moveCardToBottomOfDeck,
       shuffleDeck,
       shuffleCardIntoDeck,
+      logDeckSearchNoShuffle: ({ topCount, bottomCount }) => {
+        const parts: string[] = [];
+        if (topCount > 0) parts.push(`${topCount} on top`);
+        if (bottomCount > 0) parts.push(`${bottomCount} on bottom`);
+        const msg = parts.length > 0
+          ? `Stacked ${parts.join(' & ')} — deck NOT shuffled`
+          : 'Searched deck — NOT shuffled';
+        showGameToast(msg);
+      },
     },
   }), [state.zones, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleDeck, shuffleCardIntoDeck]);
 

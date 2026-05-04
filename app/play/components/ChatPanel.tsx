@@ -510,6 +510,20 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
         : <>moved {cardEl} to bottom of their deck</>;
     } catch { /* fall through */ }
   }
+  if (actionType === 'MOVE_TO_BOTTOM_OF_DECK_GROUP' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const isCrossPlayer = data.targetOwnerId && data.targetOwnerId !== actorPlayerId;
+      const targetName = isCrossPlayer && playerNames?.[data.targetOwnerId];
+      const cards: { name: string; img: string }[] = Array.isArray(data.cards) ? data.cards : [];
+      const namedCards = cards.filter((c) => c.name && c.name !== 'a face-down card');
+      const deckLabel = targetName ? <>{targetName}&apos;s deck</> : <>their deck</>;
+      if (namedCards.length === cards.length && namedCards.length > 0) {
+        return <>underdecked <CardNameList cards={namedCards} /> to {deckLabel}</>;
+      }
+      return <>underdecked {data.count} cards to {deckLabel}</>;
+    } catch { /* fall through */ }
+  }
   if (actionType === 'MOVE_CARDS_BATCH' && payload) {
     try {
       const data = JSON.parse(payload);
@@ -715,6 +729,24 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       return `finished searching ${targetName}'s ${data.zone}`;
     } catch { /* fall through */ }
   }
+  if (actionType === 'DECK_SEARCH_NO_SHUFFLE' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const top = Number(data.topCount) || 0;
+      const bottom = Number(data.bottomCount) || 0;
+      const parts: string[] = [];
+      if (top > 0) parts.push(`${top} card${top === 1 ? '' : 's'} on top`);
+      if (bottom > 0) parts.push(`${bottom} card${bottom === 1 ? '' : 's'} on bottom`);
+      const message = parts.length > 0
+        ? `stacked ${parts.join(' and ')} of their deck and chose NOT to shuffle`
+        : 'searched their deck and chose NOT to shuffle';
+      return (
+        <span style={{ color: '#e8b56b', fontWeight: 600 }}>
+          {message}
+        </span>
+      );
+    } catch { /* fall through */ }
+  }
   if (actionType === 'ADD_COUNTER' && payload) {
     try {
       const data = JSON.parse(payload);
@@ -882,6 +914,51 @@ export default function ChatPanel({
   const filteredActions = isSearching
     ? visibleGameActions.filter((a) => matchesQuery(actionSearchText.get(a.id.toString()) ?? ''))
     : visibleGameActions;
+
+  // Collapse runs of same-actor MOVE_TO_BOTTOM_OF_DECK actions into a single
+  // synthetic MOVE_TO_BOTTOM_OF_DECK_GROUP entry so e.g. underdecking 5 cards
+  // from a top-N reveal renders as one line instead of five.
+  const displayActions = useMemo(() => {
+    const result: GameAction[] = [];
+    let i = 0;
+    while (i < filteredActions.length) {
+      const action = filteredActions[i];
+      if (action.actionType === 'MOVE_TO_BOTTOM_OF_DECK') {
+        let j = i + 1;
+        while (
+          j < filteredActions.length
+          && filteredActions[j].actionType === 'MOVE_TO_BOTTOM_OF_DECK'
+          && filteredActions[j].playerId === action.playerId
+        ) {
+          j++;
+        }
+        const runLength = j - i;
+        if (runLength >= 2) {
+          const cards: { name: string; img: string }[] = [];
+          let targetOwnerId: string | undefined;
+          for (let k = i; k < j; k++) {
+            try {
+              const data = JSON.parse(filteredActions[k].payload || '{}');
+              cards.push({ name: data.cardName ?? 'a face-down card', img: data.cardImgFile ?? '' });
+              if (data.targetOwnerId) targetOwnerId = data.targetOwnerId;
+            } catch { /* ignore */ }
+          }
+          const last = filteredActions[j - 1];
+          result.push({
+            ...last,
+            id: action.id,
+            actionType: 'MOVE_TO_BOTTOM_OF_DECK_GROUP',
+            payload: JSON.stringify({ count: runLength, cards, targetOwnerId }),
+          });
+          i = j;
+          continue;
+        }
+      }
+      result.push(action);
+      i++;
+    }
+    return result;
+  }, [filteredActions]);
 
   const totalMatches = isSearching ? filteredChat.length + filteredActions.length : 0;
 
@@ -1415,7 +1492,7 @@ export default function ChatPanel({
                   {isSearching ? 'No matches.' : 'No actions yet.'}
                 </p>
               )}
-              {filteredActions.map((action) => {
+              {displayActions.map((action) => {
                 const playerName =
                   playerNames[action.playerId.toString()] ??
                   `Player ${action.playerId}`;
@@ -1489,7 +1566,7 @@ export default function ChatPanel({
                   for (const msg of filteredChat) {
                     timeline.push({ kind: 'chat', msg, micros: msg.sentAt.microsSinceUnixEpoch });
                   }
-                  for (const action of filteredActions) {
+                  for (const action of displayActions) {
                     timeline.push({ kind: 'action', action, micros: action.timestamp.microsSinceUnixEpoch });
                   }
                   timeline.sort((a, b) => (a.micros < b.micros ? -1 : a.micros > b.micros ? 1 : 0));

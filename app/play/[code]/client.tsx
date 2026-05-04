@@ -9,6 +9,7 @@ import { useGameState } from '@/app/play/hooks/useGameState';
 import { useSpacetimeDB } from 'spacetimedb/react';
 import GameOverOverlay, { deriveEndReason } from '@/app/play/components/GameOverOverlay';
 import TurnIndicator from '@/app/play/components/TurnIndicator';
+import PauseConsentToast from '@/app/play/components/PauseConsentToast';
 import ChatPanel from '../components/ChatPanel';
 import { CardPreviewProvider, useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
@@ -348,8 +349,60 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const canReady = myDeckImagesPreloaded || deckPreloadFallback;
 
   // Game timer — anchored to server-recorded playingStartedAtMicros so elapsed
-  // time survives navigating away and back to the game.
-  const gameTimer = useGameTimer(gameState.game?.playingStartedAtMicros ?? null);
+  // time survives navigating away and back to the game. Server-authoritative
+  // pause fields (mutually-agreed pause feature) are folded in so both players
+  // see the same elapsed time when paused.
+  const gameTimer = useGameTimer(
+    gameState.game?.playingStartedAtMicros ?? null,
+    gameState.game?.pauseStartedAtMicros ?? 0n,
+    gameState.game?.totalPausedMicros ?? 0n,
+  );
+
+  // ---- Mutually-agreed pause callbacks (passed to TurnIndicator + ConsentToast) ----
+  const handleRequestPause = useCallback(() => {
+    if (!conn || gameId === null) return;
+    try {
+      conn.reducers.requestPause({ gameId });
+    } catch (e) {
+      console.error('Failed to request pause:', e);
+    }
+  }, [conn, gameId]);
+
+  const handleRequestResume = useCallback(() => {
+    if (!conn || gameId === null) return;
+    try {
+      conn.reducers.requestResume({ gameId });
+    } catch (e) {
+      console.error('Failed to request resume:', e);
+    }
+  }, [conn, gameId]);
+
+  const handleCancelPauseRequest = useCallback(() => {
+    if (!conn || gameId === null) return;
+    try {
+      conn.reducers.cancelPauseRequest({ gameId });
+    } catch (e) {
+      console.error('Failed to cancel pause request:', e);
+    }
+  }, [conn, gameId]);
+
+  const handleRespondToPause = useCallback((accepted: boolean) => {
+    if (!conn || gameId === null) return;
+    try {
+      conn.reducers.respondToPause({ gameId, accepted });
+    } catch (e) {
+      console.error('Failed to respond to pause:', e);
+    }
+  }, [conn, gameId]);
+
+  const handleRespondToResume = useCallback((accepted: boolean) => {
+    if (!conn || gameId === null) return;
+    try {
+      conn.reducers.respondToResume({ gameId, accepted });
+    } catch (e) {
+      console.error('Failed to respond to resume:', e);
+    }
+  }, [conn, gameId]);
 
   // Persist chat/log/all tab across loupe toggles so it doesn't reset to chat
   const [chatTab, setChatTab] = useState<'chat' | 'log' | 'all'>('all');
@@ -1248,6 +1301,9 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               timerDisplay={gameTimer.formatted}
               timerPaused={isSearchModalOpen}
               timerVisible={gameTimer.isTimerVisible}
+              onRequestPause={handleRequestPause}
+              onRequestResume={handleRequestResume}
+              onCancelPauseRequest={handleCancelPauseRequest}
             />
           </div>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
@@ -1255,8 +1311,19 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               <MultiplayerCanvas gameId={gameId} onLoadDeck={() => setShowReloadDeckPicker(true)} undoStack={undoStack} onSearchModalChange={setIsSearchModalOpen} isTimerVisible={gameTimer.isTimerVisible} onToggleTimer={gameTimer.toggleTimerVisibility} getImage={getImage} chatScale={chatScale} setChatScale={setChatScale} resetChatScale={resetChatScale} minChatScale={CHAT_MIN_SCALE} maxChatScale={CHAT_MAX_SCALE} chatStep={CHAT_STEP} />
             )}
             <PregameCeremonyOverlay gameState={gameState} />
-            <ImageLoadingGate open={!imagesGateOpen} progress={imageLoadProgress} />
+            {/* Suppress the load gate during the pregame ceremony — its 30s
+                choose-first timer is server-anchored and ticks regardless of
+                client preloading, so we don't want a full-screen loader
+                covering the decision buttons and eating into the budget. */}
+            <ImageLoadingGate open={!imagesGateOpen && !isCeremonyPhase} progress={imageLoadProgress} />
             <GameToastContainer />
+            <PauseConsentToast
+              game={gameState.game}
+              myPlayer={gameState.myPlayer}
+              opponentPlayer={gameState.opponentPlayer}
+              onRespondToPause={handleRespondToPause}
+              onRespondToResume={handleRespondToResume}
+            />
             <CardChoicePromptContainer />
           </div>
         </div>
@@ -1288,6 +1355,9 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               timerDisplay={gameTimer.formatted}
               timerPaused={isSearchModalOpen}
               timerVisible={gameTimer.isTimerVisible}
+              onRequestPause={handleRequestPause}
+              onRequestResume={handleRequestResume}
+              onCancelPauseRequest={handleCancelPauseRequest}
             />
           </div>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
@@ -1296,6 +1366,13 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             )}
             <ImageLoadingGate open={!imagesGateOpen} progress={imageLoadProgress} />
             <GameToastContainer />
+            <PauseConsentToast
+              game={gameState.game}
+              myPlayer={gameState.myPlayer}
+              opponentPlayer={gameState.opponentPlayer}
+              onRespondToPause={handleRespondToPause}
+              onRespondToResume={handleRespondToResume}
+            />
             <CardChoicePromptContainer />
           </div>
         </div>
@@ -1340,6 +1417,9 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                 timerDisplay={gameTimer.formatted}
                 timerPaused={isSearchModalOpen}
                 timerVisible={gameTimer.isTimerVisible}
+                onRequestPause={handleRequestPause}
+                onRequestResume={handleRequestResume}
+                onCancelPauseRequest={handleCancelPauseRequest}
               />
             </div>
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
@@ -1380,6 +1460,13 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                 onEndTurn={() => {}}
               />
               <GameToastContainer />
+              <PauseConsentToast
+                game={gameState.game}
+                myPlayer={gameState.myPlayer}
+                opponentPlayer={gameState.opponentPlayer}
+                onRespondToPause={handleRespondToPause}
+                onRespondToResume={handleRespondToResume}
+              />
               <CardChoicePromptContainer />
               <GameOverOverlay
                 game={gameState.game}
@@ -1501,6 +1588,9 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               timerDisplay={gameTimer.formatted}
               timerPaused={isSearchModalOpen}
               timerVisible={gameTimer.isTimerVisible}
+              onRequestPause={handleRequestPause}
+              onRequestResume={handleRequestResume}
+              onCancelPauseRequest={handleCancelPauseRequest}
             />
           </div>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
@@ -1547,6 +1637,9 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             timerDisplay={gameTimer.formatted}
             timerPaused={isSearchModalOpen}
             timerVisible={gameTimer.isTimerVisible}
+            onRequestPause={handleRequestPause}
+            onRequestResume={handleRequestResume}
+            onCancelPauseRequest={handleCancelPauseRequest}
           />
         </div>
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
@@ -1593,6 +1686,13 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             )}
           />
           <GameToastContainer />
+          <PauseConsentToast
+            game={gameState.game}
+            myPlayer={gameState.myPlayer}
+            opponentPlayer={gameState.opponentPlayer}
+            onRespondToPause={handleRespondToPause}
+            onRespondToResume={handleRespondToResume}
+          />
           <CardChoicePromptContainer />
         </div>
       </div>

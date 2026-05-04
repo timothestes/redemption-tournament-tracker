@@ -19,11 +19,11 @@ export const actions = {
   },
 
   moveCardToTopOfDeck(cardInstanceId: string): GameAction {
-    return createAction('SHUFFLE_AND_MOVE_TO_TOP', { cardInstanceId });
+    return createAction('MOVE_TO_TOP_OF_DECK', { cardInstanceId });
   },
 
   moveCardToBottomOfDeck(cardInstanceId: string): GameAction {
-    return createAction('SHUFFLE_AND_MOVE_TO_BOTTOM', { cardInstanceId });
+    return createAction('MOVE_TO_BOTTOM_OF_DECK', { cardInstanceId });
   },
 
   drawCard(): GameAction {

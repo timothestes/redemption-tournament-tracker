@@ -113,6 +113,10 @@ export const Game = __t.object("Game", {
   disconnectTimeoutFired: __t.bool(),
   choosingDeadlineMicros: __t.u64(),
   playingStartedAtMicros: __t.u64(),
+  pauseRequestedBy: __t.string(),
+  pauseRequestType: __t.string(),
+  pauseStartedAtMicros: __t.u64(),
+  totalPausedMicros: __t.u64(),
 });
 export type Game = __Infer<typeof Game>;
 

@@ -61,6 +61,12 @@ interface TurnIndicatorProps {
   timerVisible?: boolean;
   /** Whether a rematch request has been sent and we're waiting for the opponent. */
   rematchPending?: boolean;
+  /** Send a pause request to the opponent. */
+  onRequestPause?: () => void;
+  /** Send a resume request to the opponent. */
+  onRequestResume?: () => void;
+  /** Cancel the locally-initiated pending pause/resume request. */
+  onCancelPauseRequest?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -90,6 +96,9 @@ export default function TurnIndicator({
   timerPaused = false,
   timerVisible = true,
   rematchPending = false,
+  onRequestPause,
+  onRequestResume,
+  onCancelPauseRequest,
 }: TurnIndicatorProps) {
   const [showConcedeConfirm, setShowConcedeConfirm] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
@@ -99,6 +108,23 @@ export default function TurnIndicator({
   const currentIdx = PHASE_ORDER.indexOf(currentPhase as GamePhase);
   const isFirstPhase = currentIdx <= 0;
   const isLastPhase = currentIdx >= PHASE_ORDER.length - 1;
+
+  // ---- Mutually-agreed pause state (server-authoritative) ----
+  const mySeatStr: string = myPlayer?.seat?.toString() ?? '';
+  const pauseRequestedBy: string = game?.pauseRequestedBy ?? '';
+  const pauseRequestType: string = game?.pauseRequestType ?? '';
+  const isServerPaused: boolean = (game?.pauseStartedAtMicros ?? 0n) > 0n;
+  const isMyRequest = pauseRequestedBy !== '' && pauseRequestedBy === mySeatStr;
+  const isOpponentRequest = pauseRequestedBy !== '' && pauseRequestedBy !== mySeatStr;
+  // Button mode: pause | play | cancel | hidden
+  // - pause:  no request pending, not currently paused → offer to start a pause
+  // - play:   no request pending, currently paused → offer to start a resume
+  // - cancel: I have a pending request → offer to cancel it
+  // - hidden: opponent has a pending request → toast handles their consent UI
+  const pauseButtonMode: 'pause' | 'play' | 'cancel' | 'hidden' =
+    isOpponentRequest ? 'hidden' :
+    isMyRequest ? 'cancel' :
+    isServerPaused ? 'play' : 'pause';
 
   // Each client animates independently from its own currentPhase observation —
   // the SpacetimeDB subscription drives the re-render, CSS transitions do the slide.
@@ -289,18 +315,114 @@ export default function TurnIndicator({
           centered phase indicator. */}
       {timerVisible && timerDisplay && !isBarNarrow && (
         <span
-          title={timerPaused ? 'Timer paused (searching)' : 'Elapsed game time'}
+          title={
+            isServerPaused ? 'Game is paused' :
+            isMyRequest && pauseRequestType === 'pause' ? 'Waiting for opponent to accept pause' :
+            isMyRequest && pauseRequestType === 'resume' ? 'Waiting for opponent to accept resume' :
+            timerPaused ? 'Timer paused (searching)' : 'Elapsed game time'
+          }
           style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
             fontFamily: 'var(--font-cinzel), Georgia, serif',
             fontSize: FZ.body,
             fontVariantNumeric: 'tabular-nums',
             letterSpacing: '0.04em',
-            color: timerPaused ? 'rgba(232, 213, 163, 0.25)' : 'rgba(232, 213, 163, 0.45)',
+            color: (isServerPaused || timerPaused) ? 'rgba(232, 213, 163, 0.25)' : 'rgba(232, 213, 163, 0.45)',
+            fontStyle: isServerPaused ? 'italic' : 'normal',
             flexShrink: 0,
             transition: 'color 0.3s',
           }}
         >
-          {timerDisplay}
+          {/* Fixed-width slot so proportional digits in Cinzel don't shift the
+              pause button as the timer ticks (e.g. "00:51" vs "00:54"). 4.5em
+              fits "MM:SS"; once the game crosses an hour it grows to fit
+              "H:MM:SS" — a one-time shift, not a per-second jitter. */}
+          <span
+            style={{
+              display: 'inline-block',
+              minWidth: timerDisplay && timerDisplay.length > 5 ? '6em' : '4.5em',
+              textAlign: 'right',
+            }}
+          >
+            {timerDisplay}
+          </span>
+          {isServerPaused && (
+            <span
+              style={{
+                fontSize: FZ.caption,
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                color: 'rgba(234, 179, 8, 0.7)',
+                fontStyle: 'normal',
+              }}
+            >
+              paused
+            </span>
+          )}
+          {pauseButtonMode !== 'hidden' && (
+            <button
+              type="button"
+              onClick={() => {
+                if (pauseButtonMode === 'pause') onRequestPause?.();
+                else if (pauseButtonMode === 'play') onRequestResume?.();
+                else if (pauseButtonMode === 'cancel') onCancelPauseRequest?.();
+              }}
+              title={
+                pauseButtonMode === 'pause' ? 'Pause game (asks opponent)' :
+                pauseButtonMode === 'play' ? 'Resume game (asks opponent)' :
+                'Cancel pending request'
+              }
+              aria-label={
+                pauseButtonMode === 'pause' ? 'Pause game' :
+                pauseButtonMode === 'play' ? 'Resume game' :
+                'Cancel pause request'
+              }
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 22,
+                height: 22,
+                padding: 0,
+                background: 'transparent',
+                border: '1px solid rgba(232, 213, 163, 0.25)',
+                borderRadius: 4,
+                color: pauseButtonMode === 'cancel'
+                  ? 'rgba(234, 179, 8, 0.85)'
+                  : 'rgba(232, 213, 163, 0.65)',
+                cursor: 'pointer',
+                transition: 'background 0.15s, border-color 0.15s, color 0.15s',
+                flexShrink: 0,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(232, 213, 163, 0.08)';
+                e.currentTarget.style.borderColor = 'rgba(232, 213, 163, 0.5)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+                e.currentTarget.style.borderColor = 'rgba(232, 213, 163, 0.25)';
+              }}
+            >
+              {pauseButtonMode === 'pause' && (
+                <svg width="10" height="11" viewBox="0 0 10 11" fill="currentColor" aria-hidden="true">
+                  <rect x="1" y="1" width="2.5" height="9" rx="0.5" />
+                  <rect x="6.5" y="1" width="2.5" height="9" rx="0.5" />
+                </svg>
+              )}
+              {pauseButtonMode === 'play' && (
+                <svg width="10" height="11" viewBox="0 0 10 11" fill="currentColor" aria-hidden="true">
+                  <path d="M2 1.5 L2 9.5 L9 5.5 Z" />
+                </svg>
+              )}
+              {pauseButtonMode === 'cancel' && (
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+                  <path d="M2 2 L8 8 M8 2 L2 8" />
+                </svg>
+              )}
+            </button>
+          )}
         </span>
       )}
       </div>

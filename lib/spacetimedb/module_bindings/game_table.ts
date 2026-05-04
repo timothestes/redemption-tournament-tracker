@@ -43,4 +43,8 @@ export default __t.row({
   disconnectTimeoutFired: __t.bool().name("disconnect_timeout_fired"),
   choosingDeadlineMicros: __t.u64().name("choosing_deadline_micros"),
   playingStartedAtMicros: __t.u64().name("playing_started_at_micros"),
+  pauseRequestedBy: __t.string().name("pause_requested_by"),
+  pauseRequestType: __t.string().name("pause_request_type"),
+  pauseStartedAtMicros: __t.u64().name("pause_started_at_micros"),
+  totalPausedMicros: __t.u64().name("total_paused_micros"),
 });

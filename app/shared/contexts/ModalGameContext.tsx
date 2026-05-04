@@ -12,6 +12,10 @@ export interface ModalGameActions {
   shuffleCardIntoDeck(instanceId: string): void;
   /** Atomic exchange: send exchangeCardIds to deck, move replacements to target zones */
   exchangeFromDeck?(exchangeCardIds: string[], replacementMoves: { cardId: string; toZone: string; posX: string; posY: string }[]): void;
+  /** Emit a clear log/toast when the user closed Search Deck without shuffling
+   *  AFTER having sent at least one card to top/bottom of deck. Lets opponents
+   *  see that the deck order is now known to the searcher. */
+  logDeckSearchNoShuffle?(info: { topCount: number; bottomCount: number }): void;
 }
 
 export interface ModalGameContextValue {

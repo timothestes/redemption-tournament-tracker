@@ -37,6 +37,7 @@ import {
 import AddCounterReducer from "./add_counter_reducer";
 import ApproveZoneSearchReducer from "./approve_zone_search_reducer";
 import AttachCardReducer from "./attach_card_reducer";
+import CancelPauseRequestReducer from "./cancel_pause_request_reducer";
 import ClaimTimeoutVictoryReducer from "./claim_timeout_victory_reducer";
 import ClearRevealedCardsReducer from "./clear_revealed_cards_reducer";
 import CompleteZoneSearchReducer from "./complete_zone_search_reducer";
@@ -53,6 +54,7 @@ import FlipCardReducer from "./flip_card_reducer";
 import JoinAsSpectatorReducer from "./join_as_spectator_reducer";
 import JoinGameReducer from "./join_game_reducer";
 import LeaveGameReducer from "./leave_game_reducer";
+import LogDeckSearchNoShuffleReducer from "./log_deck_search_no_shuffle_reducer";
 import LogLookAtTopReducer from "./log_look_at_top_reducer";
 import LogSearchDeckReducer from "./log_search_deck_reducer";
 import MeekCardReducer from "./meek_card_reducer";
@@ -78,11 +80,15 @@ import RemoveTokenReducer from "./remove_token_reducer";
 import ReorderHandReducer from "./reorder_hand_reducer";
 import ReorderLobReducer from "./reorder_lob_reducer";
 import RequestOpponentActionReducer from "./request_opponent_action_reducer";
+import RequestPauseReducer from "./request_pause_reducer";
 import RequestRematchReducer from "./request_rematch_reducer";
+import RequestResumeReducer from "./request_resume_reducer";
 import RequestZoneSearchReducer from "./request_zone_search_reducer";
 import RescueLostSoulReducer from "./rescue_lost_soul_reducer";
 import ResignGameReducer from "./resign_game_reducer";
 import RespondRematchReducer from "./respond_rematch_reducer";
+import RespondToPauseReducer from "./respond_to_pause_reducer";
+import RespondToResumeReducer from "./respond_to_resume_reducer";
 import RevealCardInHandReducer from "./reveal_card_in_hand_reducer";
 import RevealCardsReducer from "./reveal_cards_reducer";
 import RollDiceReducer from "./roll_dice_reducer";
@@ -288,6 +294,7 @@ const reducersSchema = __reducers(
   __reducerSchema("add_counter", AddCounterReducer),
   __reducerSchema("approve_zone_search", ApproveZoneSearchReducer),
   __reducerSchema("attach_card", AttachCardReducer),
+  __reducerSchema("cancel_pause_request", CancelPauseRequestReducer),
   __reducerSchema("claim_timeout_victory", ClaimTimeoutVictoryReducer),
   __reducerSchema("clear_revealed_cards", ClearRevealedCardsReducer),
   __reducerSchema("complete_zone_search", CompleteZoneSearchReducer),
@@ -304,6 +311,7 @@ const reducersSchema = __reducers(
   __reducerSchema("join_as_spectator", JoinAsSpectatorReducer),
   __reducerSchema("join_game", JoinGameReducer),
   __reducerSchema("leave_game", LeaveGameReducer),
+  __reducerSchema("log_deck_search_no_shuffle", LogDeckSearchNoShuffleReducer),
   __reducerSchema("log_look_at_top", LogLookAtTopReducer),
   __reducerSchema("log_search_deck", LogSearchDeckReducer),
   __reducerSchema("meek_card", MeekCardReducer),
@@ -329,11 +337,15 @@ const reducersSchema = __reducers(
   __reducerSchema("reorder_hand", ReorderHandReducer),
   __reducerSchema("reorder_lob", ReorderLobReducer),
   __reducerSchema("request_opponent_action", RequestOpponentActionReducer),
+  __reducerSchema("request_pause", RequestPauseReducer),
   __reducerSchema("request_rematch", RequestRematchReducer),
+  __reducerSchema("request_resume", RequestResumeReducer),
   __reducerSchema("request_zone_search", RequestZoneSearchReducer),
   __reducerSchema("rescue_lost_soul", RescueLostSoulReducer),
   __reducerSchema("resign_game", ResignGameReducer),
   __reducerSchema("respond_rematch", RespondRematchReducer),
+  __reducerSchema("respond_to_pause", RespondToPauseReducer),
+  __reducerSchema("respond_to_resume", RespondToResumeReducer),
   __reducerSchema("reveal_card_in_hand", RevealCardInHandReducer),
   __reducerSchema("reveal_cards", RevealCardsReducer),
   __reducerSchema("roll_dice", RollDiceReducer),

@@ -97,17 +97,17 @@ describe('reveal lifecycle clears when hand card moves', () => {
     expect(next.zones.discard[0].revealUntil).toBeUndefined();
   });
 
-  it('SHUFFLE_AND_MOVE_TO_TOP clears revealUntil', () => {
+  it('MOVE_TO_TOP_OF_DECK clears revealUntil', () => {
     const card = { ...makeCard('c1', 'hand'), revealUntil: Date.now() + 10_000 };
     const state = makeState([card]);
-    const next = gameReducer(state, action('SHUFFLE_AND_MOVE_TO_TOP', { cardInstanceId: 'c1' }));
+    const next = gameReducer(state, action('MOVE_TO_TOP_OF_DECK', { cardInstanceId: 'c1' }));
     expect(next.zones.deck[0].revealUntil).toBeUndefined();
   });
 
-  it('SHUFFLE_AND_MOVE_TO_BOTTOM clears revealUntil', () => {
+  it('MOVE_TO_BOTTOM_OF_DECK clears revealUntil', () => {
     const card = { ...makeCard('c1', 'hand'), revealUntil: Date.now() + 10_000 };
     const state = makeState([card]);
-    const next = gameReducer(state, action('SHUFFLE_AND_MOVE_TO_BOTTOM', { cardInstanceId: 'c1' }));
+    const next = gameReducer(state, action('MOVE_TO_BOTTOM_OF_DECK', { cardInstanceId: 'c1' }));
     const last = next.zones.deck[next.zones.deck.length - 1];
     expect(last.revealUntil).toBeUndefined();
   });

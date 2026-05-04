@@ -45,6 +45,11 @@ export const Game = table(
     disconnectTimeoutFired: t.bool().default(false), // true when timeout fired during active game
     choosingDeadlineMicros: t.u64().default(0n),  // server timestamp (microseconds since epoch) when choosing timer expires
     playingStartedAtMicros: t.u64().default(0n),  // server timestamp (microseconds since epoch) when status transitioned to 'playing'; 0 when not yet started
+    // Mutually-agreed pause (honor system; does not lock card actions).
+    pauseRequestedBy: t.string().default(''),     // '' | '0' | '1' — seat that requested the pending pause/resume
+    pauseRequestType: t.string().default(''),     // '' | 'pause' | 'resume'
+    pauseStartedAtMicros: t.u64().default(0n),    // when current active pause began; 0 when not paused
+    totalPausedMicros: t.u64().default(0n),       // accumulated paused time across the game
   }
 );
 

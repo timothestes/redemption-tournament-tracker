@@ -12,10 +12,19 @@ const LOCALSTORAGE_KEY = 'game-timer-visible';
  * microseconds since the unix epoch). Pass `0n` / `null` when the game is not
  * yet in the 'playing' state; the display stays at 0.
  *
+ * `pauseStartedAtMicros` and `totalPausedMicros` are server-authoritative
+ * pause state (mutually-agreed pause feature). When `pauseStartedAtMicros > 0n`
+ * the game is currently paused; `totalPausedMicros` is the accumulated paused
+ * duration across the whole game.
+ *
  * Local pause/resume (e.g. deck search open) only affects the current session;
- * it resets on navigation. The underlying anchor is authoritative.
+ * it resets on navigation. Layered on top of the server pause.
  */
-export function useGameTimer(anchorMicros: bigint | null) {
+export function useGameTimer(
+  anchorMicros: bigint | null,
+  pauseStartedAtMicros: bigint = 0n,
+  totalPausedMicros: bigint = 0n,
+) {
   const [elapsed, setElapsed] = useState(0);
 
   // Local pause bookkeeping (session-only)
@@ -41,9 +50,16 @@ export function useGameTimer(anchorMicros: bigint | null) {
     const anchorMs = Number(anchorMicros / 1000n);
     const now = Date.now();
     const activePauseMs = pauseStartRef.current !== null ? now - pauseStartRef.current : 0;
-    const elapsedMs = now - anchorMs - totalPausedMsRef.current - activePauseMs;
+    const serverTotalPausedMs = Number(totalPausedMicros / 1000n);
+    const serverActivePauseMs = pauseStartedAtMicros > 0n
+      ? Math.max(0, now - Number(pauseStartedAtMicros / 1000n))
+      : 0;
+    const elapsedMs =
+      now - anchorMs
+      - totalPausedMsRef.current - activePauseMs
+      - serverTotalPausedMs - serverActivePauseMs;
     return Math.max(0, Math.floor(elapsedMs / 1000));
-  }, [anchorMicros]);
+  }, [anchorMicros, pauseStartedAtMicros, totalPausedMicros]);
 
   useEffect(() => {
     // Reset session pause state when anchor changes (new game / rematch)

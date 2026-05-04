@@ -561,6 +561,10 @@ export const create_game = spacetimedb.reducer(
       disconnectTimeoutFired: false,
       choosingDeadlineMicros: 0n,
       playingStartedAtMicros: 0n,
+      pauseRequestedBy: '',
+      pauseRequestType: '',
+      pauseStartedAtMicros: 0n,
+      totalPausedMicros: 0n,
     });
 
     // Insert player row with pending deck data (cards loaded later during pregame)
@@ -1295,6 +1299,168 @@ export const respond_rematch = spacetimedb.reducer(
   }
 );
 
+// ===========================================================================
+// Pause reducers (mutually-agreed, honor-system pause)
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Reducer: request_pause — caller asks opponent to pause the game timer.
+// ---------------------------------------------------------------------------
+export const request_pause = spacetimedb.reducer(
+  { gameId: t.u64() },
+  (ctx, { gameId }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in progress');
+    if (game.pauseRequestedBy !== '') throw new SenderError('A pause request is already pending');
+    if (game.pauseStartedAtMicros !== 0n) throw new SenderError('Game is already paused');
+
+    const player = findPlayerBySender(ctx, gameId);
+    ctx.db.Game.id.update({
+      ...game,
+      pauseRequestedBy: player.seat.toString(),
+      pauseRequestType: 'pause',
+    });
+    logAction(ctx, gameId, player.id, 'PAUSE_REQUESTED',
+      JSON.stringify({ seat: player.seat.toString() }),
+      game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: respond_to_pause — opponent accepts or declines the pause request.
+// On accept, anchors pauseStartedAtMicros so elapsed-time freezes for both.
+// ---------------------------------------------------------------------------
+export const respond_to_pause = spacetimedb.reducer(
+  { gameId: t.u64(), accepted: t.bool() },
+  (ctx, { gameId, accepted }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.pauseRequestType !== 'pause') throw new SenderError('No pause request pending');
+    if (game.pauseRequestedBy === '') throw new SenderError('No pause request pending');
+
+    const player = findPlayerBySender(ctx, gameId);
+    if (player.seat.toString() === game.pauseRequestedBy) {
+      throw new SenderError('Cannot respond to your own pause request');
+    }
+
+    if (accepted) {
+      ctx.db.Game.id.update({
+        ...game,
+        pauseRequestedBy: '',
+        pauseRequestType: '',
+        pauseStartedAtMicros: ctx.timestamp.microsSinceUnixEpoch,
+      });
+      logAction(ctx, gameId, player.id, 'PAUSE_ACCEPTED',
+        JSON.stringify({ seat: player.seat.toString() }),
+        game.turnNumber, game.currentPhase);
+    } else {
+      ctx.db.Game.id.update({
+        ...game,
+        pauseRequestedBy: '',
+        pauseRequestType: '',
+      });
+      logAction(ctx, gameId, player.id, 'PAUSE_DECLINED',
+        JSON.stringify({ seat: player.seat.toString() }),
+        game.turnNumber, game.currentPhase);
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: request_resume — caller asks opponent to resume the paused game.
+// ---------------------------------------------------------------------------
+export const request_resume = spacetimedb.reducer(
+  { gameId: t.u64() },
+  (ctx, { gameId }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in progress');
+    if (game.pauseStartedAtMicros === 0n) throw new SenderError('Game is not paused');
+    if (game.pauseRequestedBy !== '') throw new SenderError('A request is already pending');
+
+    const player = findPlayerBySender(ctx, gameId);
+    ctx.db.Game.id.update({
+      ...game,
+      pauseRequestedBy: player.seat.toString(),
+      pauseRequestType: 'resume',
+    });
+    logAction(ctx, gameId, player.id, 'RESUME_REQUESTED',
+      JSON.stringify({ seat: player.seat.toString() }),
+      game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: respond_to_resume — opponent accepts or declines the resume request.
+// On accept, accumulates the paused duration into totalPausedMicros so the
+// timer hook can subtract it from elapsed time.
+// ---------------------------------------------------------------------------
+export const respond_to_resume = spacetimedb.reducer(
+  { gameId: t.u64(), accepted: t.bool() },
+  (ctx, { gameId, accepted }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.pauseRequestType !== 'resume') throw new SenderError('No resume request pending');
+    if (game.pauseRequestedBy === '') throw new SenderError('No resume request pending');
+
+    const player = findPlayerBySender(ctx, gameId);
+    if (player.seat.toString() === game.pauseRequestedBy) {
+      throw new SenderError('Cannot respond to your own resume request');
+    }
+
+    if (accepted) {
+      const pausedDuration = ctx.timestamp.microsSinceUnixEpoch - game.pauseStartedAtMicros;
+      ctx.db.Game.id.update({
+        ...game,
+        pauseRequestedBy: '',
+        pauseRequestType: '',
+        pauseStartedAtMicros: 0n,
+        totalPausedMicros: game.totalPausedMicros + pausedDuration,
+      });
+      logAction(ctx, gameId, player.id, 'RESUME_ACCEPTED',
+        JSON.stringify({ seat: player.seat.toString() }),
+        game.turnNumber, game.currentPhase);
+    } else {
+      ctx.db.Game.id.update({
+        ...game,
+        pauseRequestedBy: '',
+        pauseRequestType: '',
+      });
+      logAction(ctx, gameId, player.id, 'RESUME_DECLINED',
+        JSON.stringify({ seat: player.seat.toString() }),
+        game.turnNumber, game.currentPhase);
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: cancel_pause_request — requester cancels their own pending
+// pause/resume request. Used when the opponent is taking too long to respond.
+// ---------------------------------------------------------------------------
+export const cancel_pause_request = spacetimedb.reducer(
+  { gameId: t.u64() },
+  (ctx, { gameId }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.pauseRequestedBy === '') throw new SenderError('No request pending');
+
+    const player = findPlayerBySender(ctx, gameId);
+    if (player.seat.toString() !== game.pauseRequestedBy) {
+      throw new SenderError('Only the requester can cancel');
+    }
+
+    ctx.db.Game.id.update({
+      ...game,
+      pauseRequestedBy: '',
+      pauseRequestType: '',
+    });
+    logAction(ctx, gameId, player.id, 'PAUSE_REQUEST_CANCELLED',
+      JSON.stringify({ seat: player.seat.toString() }),
+      game.turnNumber, game.currentPhase);
+  }
+);
+
 // ---------------------------------------------------------------------------
 // Reducer: join_as_spectator
 // ---------------------------------------------------------------------------
@@ -1812,11 +1978,19 @@ export const move_card = spacetimedb.reducer(
       return;
     }
 
-    // Home zones = private per-player piles. When a card heads home without an
-    // explicit targetOwnerId, route to its original owner so taken opponent
-    // cards return to the opponent's piles, not the controller's.
+    // Home zones = private per-player piles. The "home" owner depends on who
+    // currently controls the card:
+    // - If the actor controls the card, route home to the *original* owner so
+    //   a captured opponent card (e.g. a captured hero) returns to the
+    //   opponent's pile when banished/discarded.
+    // - If the actor does NOT control the card (taking from the opponent's
+    //   deck/reserve/banish/discard), the actor is *taking* the card — home
+    //   is the actor's own pile, not the opponent's.
     const HOME_ZONES = ['deck', 'discard', 'reserve', 'banish', 'hand', 'land-of-bondage'];
-    const homeOwnerId = card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId;
+    const homeOwnerId =
+      card.ownerId === player.id
+        ? (card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId)
+        : player.id;
 
     // Lost souls sent to discard or reserve go to land-of-bondage instead
     const isLostSoul = card.cardType === 'LS' || card.cardName.toLowerCase().includes('lost soul');
@@ -2228,10 +2402,19 @@ export const move_cards_batch = spacetimedb.reducer(
         }
       }
 
-      // Home zones = private per-player piles. Route to original owner when
-      // no explicit target is set so taken opponent cards return home.
+      // Home zones = private per-player piles. The "home" owner depends on who
+      // currently controls the card:
+      // - If the actor controls the card, route home to the *original* owner
+      //   so a captured opponent card (e.g. a captured hero) returns to the
+      //   opponent's pile when banished/discarded.
+      // - If the actor does NOT control the card (taking from the opponent's
+      //   deck/reserve/banish/discard), the actor is *taking* the card — home
+      //   is the actor's own pile, not the opponent's.
       const HOME_ZONES = ['deck', 'discard', 'reserve', 'banish', 'hand', 'land-of-bondage'];
-      const homeOwnerId = card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId;
+      const homeOwnerId =
+        card.ownerId === player.id
+          ? (card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId)
+          : player.id;
 
       // Lost souls sent to discard or reserve go to land-of-bondage instead
       const isLostSoul = card.cardType === 'LS' || card.cardName.toLowerCase().includes('lost soul');
@@ -5153,6 +5336,40 @@ export const complete_zone_search = spacetimedb.reducer(
 );
 
 // ---------------------------------------------------------------------------
+// Reducer: log_deck_search_no_shuffle
+// Pure logging reducer (no state mutation). Emitted by the client when a
+// player closes the Search Deck modal AFTER having placed at least one card
+// on top/bottom of their own deck and explicitly chose NOT to shuffle. This
+// is significant for opponents because the player now knows their own deck
+// order — surfacing it as a clear log entry (rather than a silent absence
+// of a shuffle) makes the choice unambiguous.
+// ---------------------------------------------------------------------------
+export const log_deck_search_no_shuffle = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    topCount: t.u32(),
+    bottomCount: t.u32(),
+  },
+  (ctx, { gameId, topCount, bottomCount }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
+
+    const player = findPlayerBySender(ctx, gameId);
+
+    logAction(
+      ctx,
+      gameId,
+      player.id,
+      'DECK_SEARCH_NO_SHUFFLE',
+      JSON.stringify({ topCount, bottomCount }),
+      game.turnNumber,
+      game.currentPhase,
+    );
+  }
+);
+
+// ---------------------------------------------------------------------------
 // Reducer: move_opponent_card
 // ---------------------------------------------------------------------------
 export const move_opponent_card = spacetimedb.reducer(
@@ -5306,6 +5523,18 @@ export const onDisconnect = spacetimedb.clientDisconnected((ctx) => {
   for (const player of ctx.db.Player.player_identity.filter(ctx.sender)) {
     const gameForPlayer = ctx.db.Game.id.find(player.gameId);
     ctx.db.Player.id.update({ ...player, isConnected: false });
+
+    // Clear any pending pause/resume request owned by this disconnecting player
+    // so the opponent isn't left staring at a request from someone who's gone.
+    // An already-active pause is left intact — the absent player can rejoin
+    // to a paused game, or the remaining player can request resume.
+    if (gameForPlayer && gameForPlayer.pauseRequestedBy === player.seat.toString()) {
+      ctx.db.Game.id.update({
+        ...gameForPlayer,
+        pauseRequestedBy: '',
+        pauseRequestType: '',
+      });
+    }
 
     // For waiting and pregame, use a 30-second grace window — long enough to survive
     // WebSocket reconnections and page refreshes. The client proactively
