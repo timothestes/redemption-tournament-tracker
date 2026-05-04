@@ -312,6 +312,9 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   // Ghost image for multi-card drag — a single rasterized snapshot of all followers
   const dragGhostRef = useRef<Konva.Image | null>(null);
   const dragGhostLayerRef = useRef<Konva.Layer | null>(null);
+  // Drag-start position of the leader card so we can snap it back if the drop
+  // opens a popup (deck/soul-deck) instead of moving the card immediately.
+  const dragStartPositionRef = useRef<{ instanceId: string; x: number; y: number } | null>(null);
 
   // Selection state
   const {
@@ -513,6 +516,13 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     const dragLeaderNode = cardNodeRefs.current.get(card.instanceId);
     dragLeaderNode?.moveToTop();
     dragLeaderNode?.getLayer()?.batchDraw();
+    if (dragLeaderNode) {
+      dragStartPositionRef.current = {
+        instanceId: card.instanceId,
+        x: dragLeaderNode.x(),
+        y: dragLeaderNode.y(),
+      };
+    }
 
     if (hoverTimerRef.current) {
       clearTimeout(hoverTimerRef.current);
@@ -682,6 +692,8 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       dragSourceZoneRef.current = null;
       dragFollowerOffsets.current = null;
       dragGhostOffsetRef.current = null;
+      const dragStartPosition = dragStartPositionRef.current;
+      dragStartPositionRef.current = null;
       setCanvasDragZone(null);
       setDragSourceZone(null);
 
@@ -789,13 +801,17 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
         }
         node.getLayer()?.batchDraw();
       } else if (targetZone === 'deck' && card.zone !== 'deck') {
-        // Hide the card so it doesn't awkwardly sit at the deck position while the popup is open
+        // Snap the card back to its drag-start position so it doesn't sit at
+        // the deck position while the popup is open. If the user picks an
+        // action, moveCard runs and the card animates from the source zone;
+        // if they cancel, the card is already in the right place.
         let cardGroup: Konva.Node | null = node;
         while (cardGroup && !cardGroup.draggable()) {
           cardGroup = cardGroup.parent;
         }
-        if (cardGroup) {
-          cardGroup.visible(false);
+        if (cardGroup && dragStartPosition?.instanceId === card.instanceId) {
+          cardGroup.x(dragStartPosition.x);
+          cardGroup.y(dragStartPosition.y);
           cardGroup.getLayer()?.batchDraw();
         }
         const stage = stageRef.current;
@@ -809,12 +825,14 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
         }
       } else if (targetZone === 'soul-deck' && card.zone !== 'soul-deck') {
         // Paragon: dropping on the soul deck pile opens a top/bottom/shuffle popup.
+        // Snap back to drag-start so a canceled popup leaves no stale node.
         let cardGroup: Konva.Node | null = node;
         while (cardGroup && !cardGroup.draggable()) {
           cardGroup = cardGroup.parent;
         }
-        if (cardGroup) {
-          cardGroup.visible(false);
+        if (cardGroup && dragStartPosition?.instanceId === card.instanceId) {
+          cardGroup.x(dragStartPosition.x);
+          cardGroup.y(dragStartPosition.y);
           cardGroup.getLayer()?.batchDraw();
         }
         const stage = stageRef.current;
