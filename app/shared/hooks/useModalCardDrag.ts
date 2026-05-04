@@ -207,10 +207,20 @@ export function useModalCardDrag({
               }
             } else {
               validDropRef.current = true;
+              // Pass virtual drop coords so multiplayer callbacks can re-lookup
+              // the destination zone's owner (needed for "take from opponent's
+              // pile into MY hand/reserve/banish" — the reducer rejects ""
+              // newOwnerId and leaves the card on the opponent).
+              const dropX = virt.x - cardWidth / 2;
+              const dropY = virt.y - cardHeight / 2;
               if (isMulti) {
-                moveCardsBatch(allIds, targetZone);
+                const positions: Record<string, { posX: number; posY: number }> = {};
+                allIds.forEach((id) => {
+                  positions[id] = { posX: dropX, posY: dropY };
+                });
+                moveCardsBatch(allIds, targetZone, positions);
               } else {
-                moveCard(primary.instanceId, targetZone);
+                moveCard(primary.instanceId, targetZone, undefined, dropX, dropY);
               }
             }
           }

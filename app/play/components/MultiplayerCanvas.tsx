@@ -1846,12 +1846,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           }
           // Reassign ownership to match the destination zone's owner. Without
           // this, pulling a card from the opponent's deck into my territory
-          // leaves the card still owned by the opponent (bug).
+          // leaves the card still owned by the opponent (bug). When no hit is
+          // resolved (drop coords missing), default to the actor — this is the
+          // approved-search "take" flow, so the actor is who's grabbing the card.
           const newOwnerId = hit
             ? (isOppZone
               ? (gameState.opponentPlayer ? String(gameState.opponentPlayer.id) : '')
               : (gameState.myPlayer ? String(gameState.myPlayer.id) : ''))
-            : '';
+            : (gameState.myPlayer ? String(gameState.myPlayer.id) : '');
           recordOpponentCardUndo(id);
           moveOpponentCard(
             BigInt(approvedSearchRequest.id),

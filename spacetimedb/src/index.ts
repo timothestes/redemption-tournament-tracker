@@ -5415,9 +5415,17 @@ export const move_opponent_card = spacetimedb.reducer(
       finalOwnerId = parsedOwnerId;
     }
 
-    // For free-form zones, auto-assign highest zoneIndex so new cards render on top
+    // For free-form zones, auto-assign highest zoneIndex so new cards render
+    // on top. For hand, append at the end so the taken card doesn't collide
+    // with an existing hand slot.
     let finalZoneIndex = 0n;
-    if (toZone !== 'deck' && toZone !== 'hand') {
+    if (toZone === 'hand') {
+      finalZoneIndex = BigInt(
+        [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+          (c: any) => c.ownerId === finalOwnerId && c.zone === 'hand',
+        ).length,
+      );
+    } else if (toZone !== 'deck') {
       let maxIdx = -1n;
       for (const c of ctx.db.CardInstance.card_instance_game_id.filter(gameId)) {
         if (c.ownerId === finalOwnerId && c.zone === toZone && c.zoneIndex > maxIdx) {
