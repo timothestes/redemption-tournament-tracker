@@ -3,6 +3,8 @@
 import { Card, Pagination } from "flowbite-react";
 import { Dispatch, Fragment, SetStateAction, useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "../../utils/supabase/client";
+import { recomputeTotalsFromHistory } from "../../lib/tournament/results";
+import { buildStateFromSupabase } from "../../utils/tournament/stateAdapter";
 import MatchEditModal from "./match-edit";
 import RepairPairingModal from "./RepairPairingModal";
 import { ArrowUpDown } from "lucide-react";
@@ -292,93 +294,55 @@ export default function TournamentRounds({
     try {
       const now = new Date().toISOString();
 
+      // Persist is_tie + winner_id on each match row so buildStateFromSupabase
+      // can derive per-player outcomes. (player1_score / player2_score and the
+      // per-row match_points + differential snapshots are already written by
+      // the score-input UI in components/ui/match-edit.tsx — we don't touch
+      // those denormalized snapshots here.)
       for (const match of matches) {
-        const { error: participant1SelectError, data: participant1 } = await client
-          .from("participants")
-          .select()
-          .eq("id", match.player1_id.id)
-          .single();
-        if (participant1SelectError) throw participant1SelectError;
-
-        const { error: participant2SelectError, data: participant2 } = await client
-          .from("participants")
-          .select()
-          .eq("id", match.player2_id.id)
-          .single();
-        if (participant2SelectError) throw participant2SelectError;
-
-        if (match.player2_score === match.player1_score) {
-          await Promise.all([
-            client.from("participants").update({
-              match_points: (participant1.match_points || 0) + 1.5,
-              differential: (participant1.differential || 0),
-            }).eq("id", match.player1_id.id),
-
-            client.from("participants").update({
-              match_points: (participant2.match_points || 0) + 1.5,
-              differential: (participant2.differential || 0),
-            }).eq("id", match.player2_id.id),
-          ]);
-        } else if (match.player1_score === tournamentInfo.max_score) {
-          await Promise.all([
-            client.from("participants").update({
-              match_points: (participant1.match_points || 0) + 3,
-              differential: (match.player1_score - match.player2_score) + (participant1.differential || 0),
-            }).eq("id", match.player1_id.id),
-
-            client.from("participants").update({
-              match_points: (participant2.match_points || 0),
-              differential: (match.player2_score - match.player1_score) + (participant2.differential || 0),
-            }).eq("id", match.player2_id.id),
-          ]);
-
-        } else if (match.player2_score === tournamentInfo.max_score) {
-          await Promise.all([
-            client.from("participants").update({
-              match_points: (participant2.match_points || 0) + 3,
-              differential: (match.player2_score - match.player1_score) + (participant2.differential || 0),
-            }).eq("id", match.player2_id.id),
-
-            client.from("participants").update({
-              match_points: (participant1.match_points || 0),
-              differential: (match.player1_score - match.player2_score) + (participant1.differential || 0),
-            }).eq("id", match.player1_id.id),
-          ]);
-
+        let isTie = false;
+        let winnerId: string | null = null;
+        if (match.player1_score === match.player2_score) {
+          isTie = true;
         } else if (match.player1_score > match.player2_score) {
-          await Promise.all([
-            client.from("participants").update({
-              match_points: (participant1.match_points || 0) + 2,
-              differential: (match.player1_score - match.player2_score) + (participant1.differential || 0),
-            }).eq("id", match.player1_id.id),
-
-            client.from("participants").update({
-              match_points: (participant2.match_points || 0) + 1,
-              differential: (match.player2_score - match.player1_score) + (participant2.differential || 0),
-            }).eq("id", match.player2_id.id),
-          ]);
-
-        } else if (match.player2_score > match.player1_score) {
-          await Promise.all([
-            client.from("participants").update({
-              match_points: (participant2.match_points || 0) + 2,
-              differential: (match.player2_score - match.player1_score) + (participant2.differential || 0),
-            }).eq("id", match.player2_id.id),
-
-            client.from("participants").update({
-              match_points: (participant1.match_points || 0) + 1,
-              differential: (match.player1_score - match.player2_score) + (participant1.differential || 0),
-            }).eq("id", match.player1_id.id),
-          ]);
+          winnerId = match.player1_id.id;
+        } else {
+          winnerId = match.player2_id.id;
         }
+        const { error: matchUpdateError } = await client
+          .from("matches")
+          .update({ is_tie: isTie, winner_id: winnerId })
+          .eq("id", match.id);
+        if (matchUpdateError) throw matchUpdateError;
       }
 
-      if (byes && byes.length > 0) {
-        for (const bye of byes) {
-          const { error: participantUpdateError } = await client.from("participants").update({
-            match_points: (bye.match_points ?? 0),
-            differential: (bye.differential ?? 0),
-          }).eq("id", bye.participant_id.id);
+      // Recompute participant totals from full match + bye history.
+      // This is the load-bearing fix for the double-count bug: totals are
+      // always derived from history, never incremented. Editing a result and
+      // re-running this yields the correct total regardless of prior writes.
+      // Byes are accounted for via state.byes inside recomputeTotalsFromHistory,
+      // so no separate bye participants update is needed.
+      const state = await buildStateFromSupabase(client, tournamentId);
+      if (state) {
+        const affectedIds = new Set<string>();
+        for (const m of matches) {
+          if (m.player1_id?.id) affectedIds.add(m.player1_id.id);
+          if (m.player2_id?.id) affectedIds.add(m.player2_id.id);
+        }
+        if (byes && byes.length > 0) {
+          for (const bye of byes) {
+            if (bye.participant_id?.id) affectedIds.add(bye.participant_id.id);
+          }
+        }
+        for (const pid of affectedIds) {
+          const totals = recomputeTotalsFromHistory(pid, state);
+          const { error: participantUpdateError } = await client
+            .from("participants")
+            .update({
+              match_points: totals.gameScore,
+              differential: totals.lostSoulScore,
+            })
+            .eq("id", pid);
           if (participantUpdateError) console.log(participantUpdateError);
         }
       }
