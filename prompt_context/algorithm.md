@@ -1,121 +1,186 @@
-I'm going to attempt to describe how the pairing algorithm for a swiss redemption tournament should work.
-It is a slightly modified version of a normal swiss pairing system, except it uses a tiebreaker called a "differential".
+# Redemption Swiss Tournament Algorithm
 
-First, let's define some terms.
+This document specifies the pairing algorithm and tournament rules for Redemption CCG Swiss-style tournaments. It is the authoritative reference for the tournament tracker's behavior.
 
-A game is played between two players.
+## Sources of Authority
 
-A game can have different outcomes (described in the match points section)
+- **Official Redemption Host Guide** (`tournament_structure.md` and the official PDFs in [Key References]) is authoritative for game rules, scoring, byes, forfeits, and tiebreaker order.
+- This document interprets official rules and adds implementation detail where the official guide is silent (e.g., bye selection in later rounds).
+- Where this doc adds rules beyond the official guide, those sections are marked **(Implementation policy.)**
 
-A tournament consists of at least two players.
+## Scope
 
-A tournament's number of rounds is declared by the handbook.
+- 2-player Swiss tournaments only.
+- Multi-player events are out of scope.
+- Top cut / single-elimination playoffs are out of scope (future addition).
+- Power pairings for the final round are out of scope.
+- Late-arrival lost-soul penalties (judge action) are out of scope.
 
-# Game Points
-- In a game, players play until "time" in round is called or whoever gets N "game points" first
+## Terminology and Aliases
 
-- The number of game points players play to is decided at the beginning of the tournament.
+The official rules and the codebase use different names for the same concepts. This is the canonical mapping:
 
-- It can be 5 or 7.
+| Official term | Code/DB term | Description |
+|---|---|---|
+| Lost souls (per game) | `player1_score` / `player2_score` | The per-game count of lost souls rescued. Win threshold is N (5 in Type 1, 7 in Type 2). |
+| Game score | `match_points` | The 3 / 2 / 1.5 / 1 / 0 round award. |
+| Lost soul score | `differential` | The cumulative tiebreaker tally. |
 
-# Match Points
+## Glossary
 
-If a player wins a match by getting to the full N points in their game before time is called, they are awarded 3 "match points". This is called a full win.
+- **Lost souls (per game)**: Capped at the win threshold for the tournament category. Anything beyond is not counted. Chosen by host as a tournament setting. Usually 5 or 7.
+- **Game score (cumulative)**: 3 / 2 / 1.5 / 1 / 0 awarded per round, summed across rounds. Cannot be negative.
+- **Lost soul score (per round)**: For 2-player events, equals `your_souls − opponent_souls`. Bounded by [−N, +N] where N is the win threshold (game cap also applies to the differential).
+- **Lost soul score (cumulative)**: Sum of per-round lost soul scores. May be negative.
+- **Bye**: Awarded when a player has no opponent in a round. Game score 3, lost soul score 0.
+- **Forfeit**: A player abandons a match. Forfeiter receives game score 0 and lost soul score −5. Their opponent receives game score 3 and lost soul score 0.
+- **No-show / late**: A player is unavailable for an entire round (different from forfeit). Game score 0, lost soul score 0 for the missed round.
+- **Drop-out**: A player exits the tournament. Their previous results are preserved; they are excluded from subsequent pairings and from final placings.
 
-If a player wins by being ahead in "game points" when time is called, they are awarded 2 "match points". This is called a partial win.
+## Game Score (per round)
 
-If both players have the same number of "game points" when time is called, they are each awarded 1.5 "match points". This is called a tie.
+| Outcome | Game score |
+|---|---|
+| Full win (reached N souls before time) | 3 |
+| Partial win (ahead in souls when time called) | 2 |
+| Tie (equal souls when time called) | 1.5 |
+| Partial loss (behind in souls when time called) | 1 |
+| Full loss (opponent reached N souls) | 0 |
+| Bye | 3 |
+| Forfeit (forfeiter) | 0 |
+| Forfeit (opponent of forfeiter) | 3 |
+| No-show / late | 0 |
 
-If a player loses the round when the opponent gets the full N points in their game, they get 0 "match points". This is called a full loss.
+## Lost Soul Score (per round)
 
-If a player loses the round while behind in "game points" when time is called, they get 1 "match point". This is called a partial loss.
+For 2-player events:
 
+- **Played match**: `your_souls − opponent_souls`. The cap rule applies: each player's `souls` value is capped at the win threshold N.
+- **Tied game (timed, equal souls)**: 0.
+- **Bye**: 0.
+- **Forfeit (forfeiter)**: −5.
+- **Forfeit (opponent of forfeiter)**: 0.
+- **No-show / late**: 0.
 
-# Round Pairing
+Cumulative across rounds. May be negative.
 
-Depending on the round, a different pairing method will be used. In each round, players are paired with an opponent and report their game scores that will be used to decide how many match points they are awarded for the round. The "differential" they get each game will be kept track of cumulatively throughout the tournament. The differential can be a negative number. Over the rounds, they will also accumulate match points. Match points can never be negative. At the end of the tournament, whoever has the most match points will be declared the winner. If there is a tie, between the players that have the most match points, whoever has the highest "differential" will be declared the winner. If there is still a tie between number of match points and differential, a tie is declared.
+## Round Pairing — First Round
 
-## Byes
+- Pairings are random; if odd number of players, one player is selected at random for the bye.
+- Randomness uses the seeded RNG described under "Seeded Randomness" below — derived from `(tournament_id, round_number=1)`. Production behavior is effectively random across tournaments; tests use fixed tournament UUIDs to produce deterministic results.
 
-If there are an odd number of players, a player is chosen to get the "bye", meaning they will not be paired against a player and instead sit out. But they still get match points. They are awarded 3 match points and a 0 differential.
+## Seeded Randomness
 
-## First Round
+All randomized choices in the pairing algorithm (first-round pairings, first-round bye selection, later-round bye tiebreakers) use a deterministic seeded PRNG so that:
 
-For the first round, matchups between players should be randomized. If a bye is present, the person who gets the bye should be assigned randomly. This is the simplest the pairing logic will get. Subsequent rounds have a more involved pairing algorithm.
+- Tests can construct tournaments with known UUIDs and assert exact outcomes.
+- A TO accidentally re-pairing the same round produces the same result.
 
-## Later Rounds
+**Implementation:**
+1. Compute a 32-bit seed from `${tournament_id}:${round_number}` via FNV-1a.
+2. Feed that seed into `mulberry32` to get a PRNG function.
+3. All randomized choices for that round draw from the same PRNG instance, so order of consumption matters and must be stable.
 
-Any subsequent rounds played after the first round should follow these pairing rules.
+```ts
+function fnv1a32(s: string): number {
+  let h = 2166136261;
+  for (const c of s) {
+    h ^= c.charCodeAt(0);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
 
-- First, if there is an odd number of players, decide who will get the bye. 
+function mulberry32(seed: number) {
+  return () => {
+    seed = (seed + 0x6D2B79F5) | 0;
+    let t = seed;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
-- Sort the list of players from highest number of match points from highest to lowest number of match points.
-
-- Perform a secondary sort on the list so that its sorted by match points, then differential score.
-
-- Starting with the player on the bottom of the list, go through this checklist to decide if they get the bye or not:
-
-```python
-# assume "byes" exists: a table that contains information about if a player got a bye in a given round
-sorted_list_of_players = [
-    {"name": "player_a", "match_points": 10, "differential": 11,},
-    {"name": "player_b", "match_points": 10, "differential": 9},
-    {"name": "player_c", "match_points": 10, "differential": 4},
-    {"name": "player_d", "match_points": 9, "differential": 4},
-    {"name": "player_d", "match_points": 9, "differential": -10},
-]
-
-for player in reverse(sorted_list_of_players):
-    if player hasn't gotten a bye yet:
-        give them a bye
-    else:
-        continue
-
-# if you get to the bottom of the list and have determined all players have already
-# gotten a bye, then go through the list again, using a more permissive selection rule
-for player in reverse(sorted_list_of_players):
-    if player hasn't gotten a bye in the last round:
-        give them a bye
-    else:
-        continue
-# this will always generate a bye
+function rngForRound(tournamentId: string, round: number): () => number {
+  return mulberry32(fnv1a32(`${tournamentId}:${round}`));
+}
 ```
 
-- After the bye has been decided, remove the player with the bye from the sorted list, then decide on the pairing for the rest of the players.
+## Round Pairing — Later Rounds
 
-- Starting with the player on the top of the list, go through this checklist to decide who they are paired against:
+1. **Sort active players** (excluding drop-outs) by `(game_score DESC, lost_soul_score DESC)`.
 
-```python
-# pairing psuedocode
+2. **If odd count, select bye** (Implementation policy — official guide is silent):
+   1. **Filter to fewest byes**: among active players, find the subset with the **minimum total bye count** (across all prior rounds). When no one has byed yet, this is the full pool. Once everyone has byed at least once, this naturally narrows to the players with the fewest byes.
+   2. **Lowest-ranked first**: within that subset, pick the **lowest-ranked** player by the sort order — that is, the bottom of `(game_score DESC, lost_soul_score DESC)`.
+   3. **Avoid back-to-back byes**: if the lowest-ranked candidate received a bye in the immediately previous round AND another candidate in the subset did not, prefer the one who didn't.
+   4. **Final tiebreak (seeded RNG)**: if multiple candidates remain truly tied (same bye count, same rank, same prior-round-bye status), pick using a seeded random number generator. The seed is derived from `(tournament_id, round_number)` so that re-running the pairing for the same round produces the same outcome, and tests can assert deterministic results by using fixed tournament UUIDs. Implementation:
+      - Hash `${tournament_id}:${round_number}` via FNV-1a (32-bit) → seed integer.
+      - Feed the seed into `mulberry32` → PRNG function.
+      - Use the PRNG to pick an index into the tied-candidate array.
+   5. Remove the bye player from the pairing pool.
 
-# assume "matches" exists: a table that contains a list of who played who during each round
-sorted_list_of_players = [
-    {"name": "player_a", "match_points": 10, "differential": 11,},
-    {"name": "player_b", "match_points": 10, "differential": 9},
-    {"name": "player_c", "match_points": 10, "differential": 4},
-    {"name": "player_d", "match_points": 9, "differential": 10},
-    {"name": "player_d", "match_points": 9, "differential": 4},
-    ...
-]
+   > **Behavior change vs. current code.** The existing implementation in `pairingUtilsV2.ts` uses two passes — first "no byes yet," then "didn't bye last round" — but the second pass does not prefer fewer byes. That allows over-concentration: a player can get a 3rd bye while another player still only has 1. The single-pass "fewest byes wins" rule above replaces it.
 
-for i, player in enum(sorted_list_of_players)
-    if sorted_list_of_players[i+1] havent_played_yet:
-        # then pair them. First players paired via this method should be the first players in the resulting set of matches.
-    else: # they have played
-        continue # keep going down the line until you find someone you haven't played yet
-```
+3. **Greedy pairing** (top-down) — official rule:
+   - For each unassigned player from the top of the list:
+     - Find the **highest-ranked unassigned player they have not already played**.
+     - If found, pair them. The first pair created appears first in the resulting match list (preserves `match_order`).
+     - If no eligible opponent is found (every remaining player has already been played), defer this player.
 
-If it comes to the end of the list and its determined that a player has played against everyone in the list,
-then use this logic:
+4. **Rematch fallback**:
+   - Any players left unpaired after the greedy pass are paired with each other in remaining-list order, even if they have already played. This matches the official guide's acknowledgement: *"In a smaller tournament field, it will sometimes occur that two players will be matched twice."*
+   - **Note**: greedy is non-optimal — it can produce a rematch that careful backtracking would have avoided. This is accepted complexity for v1.
 
-```python
-# go through the list again, but this time pair the players if the next player in the list didn't play
-# each other the previous round. This is a more permissive pairing rule. If you reach the bottom of the list and both players at the bottom already played each other last round, pair them again.
-```
+5. **Defensive case** (Implementation policy): if the greedy + rematch pass leaves exactly one player unpaired (which should not occur with an even pool but is possible if input is inconsistent), assign them a bye.
 
-# Data Examples
+## Determining Final Standings
 
-Here are some example tables and rows from the tables that I am using to keep track of the tournament state
+Per the official Redemption Host Guide, in this order:
+
+1. **Drop-outs are removed** from final placings entirely. Remaining players move up to fill those slots. Drop-outs retain their match history but receive no `place` value.
+
+2. **Sort remaining players by `game_score DESC`.**
+
+3. **Within a game-score tie, apply the head-to-head rule**:
+   - If exactly one tied player defeated all other players in the tie group (head-to-head), they take the top place of the group.
+   - Repeat: remove that player from the group and re-check head-to-head among the remaining tied players for the next place.
+
+4. **If no clean head-to-head winner remains**, fall to **`lost_soul_score DESC`** within the tie group.
+
+5. **Joint placement on true ties**: if players are still tied in both game score and lost soul score (and have no decisive head-to-head among them), they share that placement. The next assigned place skips ahead by the size of the tie group. (E.g., two players tied for 3rd → next player is 5th.) Per official rules, ranking points and prizes are split.
+
+> Redemption uses lost soul score as the primary numeric tiebreaker; it does **not** use OMW (opponent match-win percentage) or other strength-of-schedule tiebreakers, despite generic Swiss references mentioning them.
+
+## Lifecycle / State Transitions
+
+- **Tournament start**: `has_started=true`, `current_round=1`. After this point, no new participants may be added.
+- **Round complete**: every match in the round has a recorded result, AND every bye for that round is recorded.
+- **Tournament end**: `has_ended=true` after round `n_rounds` is complete. The TO may force-end early.
+- **Drop timing**: drops are processed between rounds. A drop submitted mid-round still records the current round's result; the drop takes effect for the next round's pairings.
+- **Re-adding a dropped player**: not supported.
+- **Result edits**: `match_points` and `differential` for participants must be derivable from match history — they are *not* incrementally updated. Editing a match result must trigger recomputation of affected players' totals from match history.
+  - **Known bug as of this writing**: the current implementation increments instead of recomputing. Editing a result double-counts. Tests for this behavior must verify correct (recompute) semantics; the test suite is intended to flush this bug out.
+
+## Worked Example (2-player, Type 1)
+
+Sally vs. Billy in round 4. Game cap = 5 lost souls.
+
+- Sally rescues 5 lost souls before time is called → full win.
+- Billy rescues 3 lost souls.
+
+| Player | Round game score | Round lost soul score |
+|---|---|---|
+| Sally | 3 (full win) | +2 (5 − 3) |
+| Billy | 0 (full loss) | −2 (3 − 5) |
+
+If before the round Sally had 9 game score and +5 lost soul score, she now has 12 game score and +7 lost soul score.
+
+If before the round Billy had 5 game score and +3 lost soul score, he now has 5 game score and +1 lost soul score.
+
+# Data Reference
+
+The DB tables that store tournament state. Schema reproduced for reference; this is the SQL definition the algorithm operates on.
 
 ## Tournaments Table
 ```sql
@@ -143,6 +208,12 @@ create table public.tournaments (
   constraint tournaments_host_id_fkey foreign KEY (host_id) references auth.users (id) on delete CASCADE
 ) TABLESPACE pg_default;
 ```
+
+Notes on tournament-level columns:
+- `max_score` is the win threshold N (5 for Type 1, 7 for Type 2).
+- `bye_points` and `bye_differential` exist as columns but per official rules are always 3 and 0 respectively. Treat as fixed; the columns are vestigial.
+- `n_rounds` is set by the TO at tournament creation; the official "rounds by player count" table (5–8 → 3, 9–16 → 4, etc.) is a recommendation, not enforced.
+
 **Relations:**
 - `tournaments` 1-to-many `rounds` (`rounds.tournament_id` → `tournaments.id`)
 - `tournaments` 1-to-many `participants` (`participants.tournament_id` → `tournaments.id`)
@@ -163,6 +234,7 @@ create table public.rounds (
   constraint rounds_tournament_id_fkey foreign KEY (tournament_id) references tournaments (id) on update CASCADE on delete CASCADE
 ) TABLESPACE pg_default;
 ```
+
 **Relations:**
 - `rounds` belongs-to `tournaments` via `tournament_id`
 - `rounds` 1-to-many `matches` (matches.round refers to `rounds.round_number` within same tournament)
@@ -183,6 +255,7 @@ create table public.participants (
   constraint participants_tournament_id_fkey foreign KEY (tournament_id) references tournaments (id) on update CASCADE on delete CASCADE
 ) TABLESPACE pg_default;
 ```
+
 **Relations:**
 - `participants` belongs-to `tournaments` via `tournament_id`
 - `participants` 1-to-many `matches` as `player1` and `player2` (`matches.player1_id`, `matches.player2_id`)
@@ -213,6 +286,7 @@ create table public.matches (
   constraint matches_winner_id_fkey foreign KEY (winner_id) references participants (id) on delete CASCADE
 ) TABLESPACE pg_default;
 ```
+
 **Relations:**
 - `matches` belongs-to `tournaments` via `tournament_id`
 - `matches` belongs-to two `participants` via `player1_id` and `player2_id`
@@ -235,31 +309,8 @@ create table public.byes (
   constraint byes_tournament_id_fkey foreign KEY (tournament_id) references tournaments (id) on update CASCADE on delete CASCADE
 ) TABLESPACE pg_default;
 ```
+
 **Relations:**
 - `byes` belongs-to `participants` via `participant_id`
 - `byes` belongs-to `rounds` via `round_id`
 - `byes` belongs-to `tournaments` via `tournament_id`
-
-
-# Storing Data Example
-
-For example, if two players have been paired to play and they finish their match, this is how their match points and differential would be determined.
-
-Sally vs Billy
-
-Sally got the full 5 game points within the time limit.
-Billy got 3 game points
-
-Sally is awarded 3 match points and +2 differential
- Billy is awarded 0 match points and a -2 differential
-
- Before the match, Sally had 3 match points and a 5 differential. After this match results are added to her score, she will have 6 match points and a 7 differential.
-
- Before the match, Billy had 5 match points and a 3 differential. After this match results are added to his score, he will have 5 match points and a 1 differential.
-
-After all the scores of each match have been reported, the current round ends and a new one begins where new pairings will be determined. This happens until the pre-determined number of rounds in the tournament have been reached. The winner is the player with the most number of match points, and if there is a tie there, the highest differential.
-
-
-## Dropping Out
-
-After a round has completed, players can choose to drop out of the tournament. They will no longer be considered when performing pairings.
