@@ -73,3 +73,61 @@ describe('selectBye', () => {
     expect(['A', 'B']).toContain(r1);
   });
 });
+
+import { pairFirstRound } from '../pairing';
+
+function makeParticipant(id: string, name = id): Participant {
+  return {
+    id,
+    name,
+    joinedAt: '2026-01-01T00:00:00Z',
+    droppedOut: false,
+  };
+}
+
+describe('pairFirstRound', () => {
+  it('pairs an even number of players, no bye', () => {
+    const participants = ['A', 'B', 'C', 'D'].map(id => makeParticipant(id));
+    const rng = rngForRound('t1', 1);
+    const result = pairFirstRound(participants, rng);
+    expect(result.bye).toBeUndefined();
+    expect(result.matches).toHaveLength(2);
+    // Each participant appears in exactly one match.
+    const ids = new Set<string>();
+    for (const m of result.matches) {
+      ids.add(m.player1Id);
+      ids.add(m.player2Id);
+    }
+    expect(ids).toEqual(new Set(['A', 'B', 'C', 'D']));
+    // match_order is 1..N
+    expect(result.matches.map(m => m.matchOrder)).toEqual([1, 2]);
+  });
+
+  it('produces a bye when player count is odd', () => {
+    const participants = ['A', 'B', 'C'].map(id => makeParticipant(id));
+    const rng = rngForRound('t1', 1);
+    const result = pairFirstRound(participants, rng);
+    expect(result.bye).toBeDefined();
+    expect(['A', 'B', 'C']).toContain(result.bye!);
+    expect(result.matches).toHaveLength(1);
+    // The bye player is NOT in any match.
+    for (const m of result.matches) {
+      expect(m.player1Id).not.toBe(result.bye);
+      expect(m.player2Id).not.toBe(result.bye);
+    }
+  });
+
+  it('is deterministic given the same RNG', () => {
+    const participants = ['A', 'B', 'C', 'D', 'E', 'F'].map(id => makeParticipant(id));
+    const r1 = pairFirstRound(participants, rngForRound('t-fixed', 1));
+    const r2 = pairFirstRound(participants, rngForRound('t-fixed', 1));
+    expect(r1).toEqual(r2);
+  });
+
+  it('throws if fewer than 2 participants', () => {
+    expect(() => pairFirstRound([makeParticipant('A')], rngForRound('t', 1)))
+      .toThrow();
+    expect(() => pairFirstRound([], rngForRound('t', 1)))
+      .toThrow();
+  });
+});

@@ -71,3 +71,57 @@ export function selectBye(
   const idx = Math.floor(rng() * ties.length);
   return ties[idx].id;
 }
+
+import type { Match, Participant } from './types';
+
+/** Output of a pairing function: a list of matches and an optional bye player. */
+export interface PairingResult {
+  matches: Array<Pick<Match, 'round' | 'player1Id' | 'player2Id' | 'matchOrder'>>;
+  bye?: string;
+}
+
+/** Fisher-Yates shuffle using the supplied PRNG. Pure: returns a new array. */
+function shuffle<T>(array: T[], rng: () => number): T[] {
+  const out = [...array];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+/**
+ * Random pairings for the first round. Per algorithm.md:
+ * - Pairings are random.
+ * - If odd number of players, one is selected at random for the bye.
+ *
+ * RNG draws are stable order: bye-selection draw first, then shuffle of remaining.
+ */
+export function pairFirstRound(
+  participants: Participant[],
+  rng: () => number,
+): PairingResult {
+  if (participants.length < 2) {
+    throw new Error(`pairFirstRound requires at least 2 participants, got ${participants.length}`);
+  }
+
+  let pool = [...participants];
+  let bye: string | undefined;
+  if (pool.length % 2 !== 0) {
+    const idx = Math.floor(rng() * pool.length);
+    bye = pool[idx].id;
+    pool = pool.filter((_, i) => i !== idx);
+  }
+
+  const shuffled = shuffle(pool, rng);
+  const matches: PairingResult['matches'] = [];
+  for (let i = 0; i < shuffled.length; i += 2) {
+    matches.push({
+      round: 1,
+      player1Id: shuffled[i].id,
+      player2Id: shuffled[i + 1].id,
+      matchOrder: matches.length + 1,
+    });
+  }
+  return { matches, bye };
+}
