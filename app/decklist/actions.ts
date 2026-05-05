@@ -543,7 +543,6 @@ export async function duplicateDeckAction(deckId: string, newName?: string) {
     // Create new deck with copied data
     const saveResult = await saveDeckAction({
       name: newName || `${originalDeck.name} (Copy)`,
-      description: originalDeck.description,
       format: originalDeck.format,
       folderId: originalDeck.folder_id,
       cards: originalDeck.cards,
@@ -1137,7 +1136,6 @@ export async function copyPublicDeckAction(sourceDeckId: string) {
     // Create the copy
     const saveResult = await saveDeckAction({
       name: `${sourceDeck.name} (Copy)`,
-      description: sourceDeck.description,
       format: sourceDeck.format,
       paragon: sourceDeck.paragon,
       previewCard1: sourceDeck.preview_card_1 ?? null,

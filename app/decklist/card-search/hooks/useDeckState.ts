@@ -162,7 +162,7 @@ export function useDeckState(
         const loadedDeck: Deck = {
           id: isOwner ? cloudDeck.id : undefined,
           name: isOwner ? cloudDeck.name : `Copy of ${cloudDeck.name}`,
-          description: cloudDeck.description || "",
+          description: isOwner ? (cloudDeck.description || "") : "",
           format: cloudDeck.format,
           paragon: cloudDeck.paragon,
           folderId: cloudDeck.folder_id,
