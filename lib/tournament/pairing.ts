@@ -125,3 +125,154 @@ export function pairFirstRound(
   }
   return { matches, bye };
 }
+
+import { gameScoreFor, lostSoulScoreFor } from './scoring';
+import type { TournamentState } from './types';
+
+interface ScoredPlayer extends ByeCandidate {
+  participant: Participant;
+}
+
+/**
+ * Compute (gameScore, lostSoulScore) for each active participant from
+ * match + bye history up through (but not including) the given round.
+ * This is identical in spirit to recomputeTotalsFromHistory in results.ts;
+ * we duplicate it here to avoid a circular import. (The shared helper
+ * would otherwise live in a 4th module.)
+ */
+function totalsForRound(state: TournamentState, round: number): Map<string, ScoredPlayer> {
+  const map = new Map<string, ScoredPlayer>();
+  for (const part of state.participants) {
+    if (part.droppedOut) continue;
+    map.set(part.id, {
+      id: part.id,
+      gameScore: 0,
+      lostSoulScore: 0,
+      joinedAt: part.joinedAt,
+      participant: part,
+    });
+  }
+  for (const m of state.matches) {
+    if (m.round >= round || !m.result) continue;
+    const p1 = map.get(m.player1Id);
+    const p2 = map.get(m.player2Id);
+    if (p1) {
+      p1.gameScore += gameScoreFor(m.result.p1Outcome);
+      p1.lostSoulScore += lostSoulScoreFor(
+        m.result.p1Outcome, m.result.p1Souls, m.result.p2Souls, state.soulCap,
+      );
+    }
+    if (p2) {
+      p2.gameScore += gameScoreFor(m.result.p2Outcome);
+      p2.lostSoulScore += lostSoulScoreFor(
+        m.result.p2Outcome, m.result.p2Souls, m.result.p1Souls, state.soulCap,
+      );
+    }
+  }
+  for (const b of state.byes) {
+    if (b.round >= round) continue;
+    const p = map.get(b.participantId);
+    if (p) p.gameScore += 3; // bye = 3 game score, 0 lost soul score
+  }
+  return map;
+}
+
+function comparePlayers(a: ScoredPlayer, b: ScoredPlayer): number {
+  // Higher gameScore first, then higher lostSoulScore first.
+  if (a.gameScore !== b.gameScore) return b.gameScore - a.gameScore;
+  return b.lostSoulScore - a.lostSoulScore;
+}
+
+/**
+ * Build the set of "already played" pairs across all prior matches.
+ * Returns a Set keyed as `${a}|${b}` where a < b lexicographically.
+ */
+function playedKey(a: string, b: string): string {
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
+}
+
+/**
+ * Pair a non-first round per algorithm.md "Round Pairing — Later Rounds":
+ *  1. Sort active players by (gameScore DESC, lostSoulScore DESC).
+ *  2. If odd, select bye via selectBye().
+ *  3. Greedy top-down: for each unassigned player from the top, find the
+ *     highest-ranked unassigned player they have not played; pair them.
+ *  4. Rematch fallback: any leftover unpaired players are paired in
+ *     remaining-list order, even if they've played.
+ *  5. Defensive lone-bye: if exactly one player is left unpaired (shouldn't
+ *     happen with even pool), give them a bye.
+ */
+export function pairLaterRound(
+  state: TournamentState,
+  round: number,
+  rng: () => number,
+): PairingResult {
+  // Build totals + sort active.
+  const totals = totalsForRound(state, round);
+  const active = state.participants
+    .filter(p => !p.droppedOut)
+    .map(p => totals.get(p.id)!)
+    .sort(comparePlayers);
+
+  // Played pairs and bye history.
+  const played = new Set<string>();
+  for (const m of state.matches) {
+    if (m.round < round) played.add(playedKey(m.player1Id, m.player2Id));
+  }
+  const byeCount = new Map<string, number>();
+  const prevRoundByes = new Set<string>();
+  for (const b of state.byes) {
+    if (b.round >= round) continue;
+    byeCount.set(b.participantId, (byeCount.get(b.participantId) ?? 0) + 1);
+    if (b.round === round - 1) prevRoundByes.add(b.participantId);
+  }
+
+  // Step 2: bye selection if odd.
+  let pool = active;
+  let bye: string | undefined;
+  if (pool.length % 2 !== 0) {
+    bye = selectBye(pool, byeCount, prevRoundByes, rng);
+    pool = pool.filter(p => p.id !== bye);
+  }
+
+  // Step 3: greedy pairing.
+  const matches: PairingResult['matches'] = [];
+  const assigned = new Set<string>();
+  for (let i = 0; i < pool.length; i++) {
+    const p1 = pool[i];
+    if (assigned.has(p1.id)) continue;
+    const partner = pool.slice(i + 1).find(
+      p => !assigned.has(p.id) && !played.has(playedKey(p1.id, p.id)),
+    );
+    if (partner) {
+      matches.push({
+        round,
+        player1Id: p1.id,
+        player2Id: partner.id,
+        matchOrder: matches.length + 1,
+      });
+      assigned.add(p1.id);
+      assigned.add(partner.id);
+    }
+  }
+
+  // Step 4: rematch fallback for any leftovers.
+  const leftover = pool.filter(p => !assigned.has(p.id));
+  while (leftover.length >= 2) {
+    const p1 = leftover.shift()!;
+    const p2 = leftover.shift()!;
+    matches.push({
+      round,
+      player1Id: p1.id,
+      player2Id: p2.id,
+      matchOrder: matches.length + 1,
+    });
+  }
+
+  // Step 5: defensive lone-bye.
+  if (leftover.length === 1 && !bye) {
+    bye = leftover[0].id;
+  }
+
+  return { matches, bye };
+}

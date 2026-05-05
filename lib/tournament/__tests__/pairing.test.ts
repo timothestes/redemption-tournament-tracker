@@ -131,3 +131,142 @@ describe('pairFirstRound', () => {
       .toThrow();
   });
 });
+
+import { pairLaterRound } from '../pairing';
+import type { TournamentState, Match, Bye } from '../types';
+
+function tState(
+  participants: Participant[],
+  matches: Match[] = [],
+  byes: Bye[] = [],
+  opts: Partial<TournamentState> = {},
+): TournamentState {
+  return {
+    id: 't1',
+    nRounds: 4,
+    currentRound: 1,
+    soulCap: 5,
+    hasStarted: true,
+    hasEnded: false,
+    participants,
+    matches,
+    byes,
+    ...opts,
+  };
+}
+
+function recordedMatch(
+  round: number,
+  p1: string,
+  p2: string,
+  p1Outcome: any,
+  p2Outcome: any,
+  p1Souls = 5,
+  p2Souls = 0,
+): Match {
+  return {
+    id: `m-${round}-${p1}-${p2}`,
+    round,
+    player1Id: p1,
+    player2Id: p2,
+    matchOrder: 1,
+    result: { p1Souls, p2Souls, p1Outcome, p2Outcome },
+  };
+}
+
+describe('pairLaterRound', () => {
+  it('sorts by (gameScore DESC, lostSoulScore DESC) and pairs top-down', () => {
+    // Pre-state: round 1 played. A>B, C>D.
+    const participants = ['A', 'B', 'C', 'D'].map(id => makeParticipant(id));
+    const matches = [
+      recordedMatch(1, 'A', 'B', 'full_win', 'full_loss'),
+      recordedMatch(1, 'C', 'D', 'full_win', 'full_loss'),
+    ];
+    const state = tState(participants, matches);
+    const result = pairLaterRound(state, 2, rngForRound('t1', 2));
+    expect(result.bye).toBeUndefined();
+    expect(result.matches).toHaveLength(2);
+    // After R1: A & C have 3 game score, B & D have 0. Sort puts A,C on top.
+    // Top-down: A vs C (haven't played); B vs D (haven't played).
+    // OR depending on (lostSoulScore): A=+5, C=+5 same; B=-5, D=-5 same.
+    // Result is deterministic given input order — A first, then C.
+    const pairs = result.matches.map(m => [m.player1Id, m.player2Id].sort()).map(s => s.join(','));
+    expect(pairs).toContain('A,C');
+    expect(pairs).toContain('B,D');
+  });
+
+  it('avoids rematches in the greedy pass', () => {
+    // 4 players, 2 rounds played. R1: A-B, C-D. R2: A-C, B-D.
+    // R3: greedy must pair A-D and B-C (no rematches).
+    const participants = ['A', 'B', 'C', 'D'].map(id => makeParticipant(id));
+    const matches = [
+      recordedMatch(1, 'A', 'B', 'full_win', 'full_loss'),
+      recordedMatch(1, 'C', 'D', 'full_win', 'full_loss'),
+      recordedMatch(2, 'A', 'C', 'full_win', 'full_loss'),
+      recordedMatch(2, 'B', 'D', 'full_win', 'full_loss'),
+    ];
+    const state = tState(participants, matches);
+    const result = pairLaterRound(state, 3, rngForRound('t1', 3));
+    const pairs = result.matches.map(m => [m.player1Id, m.player2Id].sort().join(','));
+    expect(pairs.sort()).toEqual(['A,D', 'B,C']);
+  });
+
+  it('falls back to rematches when greedy locks up', () => {
+    // 4 players, 3 rounds played: A-B, C-D / A-C, B-D / A-D, B-C.
+    // R4 must rematch — every pair has played.
+    const participants = ['A', 'B', 'C', 'D'].map(id => makeParticipant(id));
+    const matches = [
+      recordedMatch(1, 'A', 'B', 'full_win', 'full_loss'),
+      recordedMatch(1, 'C', 'D', 'full_win', 'full_loss'),
+      recordedMatch(2, 'A', 'C', 'full_win', 'full_loss'),
+      recordedMatch(2, 'B', 'D', 'full_win', 'full_loss'),
+      recordedMatch(3, 'A', 'D', 'full_win', 'full_loss'),
+      recordedMatch(3, 'B', 'C', 'full_win', 'full_loss'),
+    ];
+    const state = tState(participants, matches);
+    const result = pairLaterRound(state, 4, rngForRound('t1', 4));
+    expect(result.matches).toHaveLength(2);
+    // All 4 players paired exactly once.
+    const all = new Set<string>();
+    for (const m of result.matches) {
+      all.add(m.player1Id);
+      all.add(m.player2Id);
+    }
+    expect(all).toEqual(new Set(['A', 'B', 'C', 'D']));
+  });
+
+  it('selects bye for odd active count', () => {
+    const participants = ['A', 'B', 'C'].map(id => makeParticipant(id));
+    const matches = [
+      // R1: A had bye, B-C played.
+      recordedMatch(1, 'B', 'C', 'full_win', 'full_loss'),
+    ];
+    const byes = [{ participantId: 'A', round: 1 }];
+    const state = tState(participants, matches, byes);
+    const result = pairLaterRound(state, 2, rngForRound('t1', 2));
+    // After R1: A=3 (bye), B=3, C=0. Min byes: B,C have 0; A has 1.
+    // Bye candidates = {B, C}. Bottom of (gs, lss) sort: C (lss = -5).
+    expect(result.bye).toBe('C');
+    expect(result.matches).toHaveLength(1);
+    expect([result.matches[0].player1Id, result.matches[0].player2Id].sort()).toEqual(['A', 'B']);
+  });
+
+  it('excludes dropped-out players from the pool', () => {
+    const participants: Participant[] = [
+      { ...makeParticipant('A'), droppedOut: true, dropAfterRound: 1 },
+      makeParticipant('B'),
+      makeParticipant('C'),
+    ];
+    const matches = [
+      recordedMatch(1, 'A', 'B', 'full_loss', 'full_win'),
+    ];
+    const byes = [{ participantId: 'C', round: 1 }];
+    const state = tState(participants, matches, byes);
+    const result = pairLaterRound(state, 2, rngForRound('t1', 2));
+    // Active = {B, C}, even count, no bye.
+    expect(result.bye).toBeUndefined();
+    expect(result.matches).toHaveLength(1);
+    const ids = [result.matches[0].player1Id, result.matches[0].player2Id].sort();
+    expect(ids).toEqual(['B', 'C']);
+  });
+});
