@@ -77,6 +77,16 @@ export function getMaxPerFifty(
   return baseMax * multiplier;
 }
 
+/**
+ * Pluralize a card's canonical name for use in error messages.
+ * Adds "es" when the name ends in s/x/z/sh/ch (e.g., "Faithful Witness"
+ * -> "Faithful Witnesses"), otherwise adds "s".
+ */
+function pluralize(name: string): string {
+  if (/(?:s|x|z|sh|ch)$/i.test(name)) return `${name}es`;
+  return `${name}s`;
+}
+
 // ---------------------------------------------------------------------------
 // Banned card definitions
 // ---------------------------------------------------------------------------
@@ -728,11 +738,18 @@ export function checkSpecialAbilityLimit(
 
     const totalQty = applicableCards.reduce((sum, c) => sum + c.quantity, 0);
     if (totalQty > maxCopies) {
+      const distinctNames = Array.from(
+        new Set(applicableCards.map((c) => c.name))
+      );
+      const printingNote =
+        distinctNames.length > 1
+          ? ` (${distinctNames.map((n) => `"${n}"`).join(" + ")} count as the same card)`
+          : "";
       issues.push({
         type: "error",
         rule: "t1-quantity-special-ability",
-        message: `"${group.canonicalName}" has a special ability — max ${maxCopies} per deck (1 per 50 cards), found ${totalQty}.`,
-        cards: [group.canonicalName],
+        message: `Too many "${pluralize(group.canonicalName)}" — max ${maxCopies} per 50 cards, found ${totalQty}${printingNote}.`,
+        cards: distinctNames,
       });
     }
   }
