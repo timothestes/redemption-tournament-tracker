@@ -93,19 +93,53 @@ export async function getSameCardGroups(): Promise<
 }
 
 /**
+ * Strip "(Set)" or "[Variant]" suffixes from a card name.
+ * "Michael, Dragon Slayer (Roots)" -> "Michael, Dragon Slayer"
+ * "Lost Soul "Hopper" [II Chronicles 28:13 - RR]" -> "Lost Soul "Hopper""
+ */
+function stripSetSuffix(name: string): string {
+  let stripped = name.replace(/\s*\[[^\]]+\]\s*$/, "");
+  const match = stripped.match(/\s+\(([A-Za-z0-9][A-Za-z0-9 .''\-]*)\)\s*$/);
+  if (match && match[1].length <= 30) {
+    stripped = stripped.slice(0, match.index).trim();
+  }
+  return stripped;
+}
+
+/**
  * Resolves a card name to its duplicate group identity (case-insensitive).
- * Falls back to normalized name (commas stripped) if exact match fails.
+ * Tries exact match, then comma-normalized, then set-suffix-stripped variants.
  * Returns null if the card is not part of any duplicate group.
  */
 export async function resolveCardIdentity(
   cardName: string,
 ): Promise<SameCardEntry | null> {
   const groups = await getSameCardGroups();
+  const normalizeCommas = (s: string) =>
+    s.replace(/,\s*/g, " ").replace(/\s+/g, " ");
+
   const lower = cardName.toLowerCase();
   const found = groups.get(lower);
   if (found) return found;
 
-  // Fallback: normalize and try again
-  const normalized = lower.replace(/,\s*/g, " ").replace(/\s+/g, " ");
-  return groups.get(normalized) ?? null;
+  const normalized = normalizeCommas(lower);
+  const foundNorm = groups.get(normalized);
+  if (foundNorm) return foundNorm;
+
+  // Fallback: strip "(Set)" / "[Variant]" suffix and retry.
+  // The card database stores names like "Michael, Dragon Slayer (Roots)" but
+  // duplicate_card_group_members stores the bare "Michael, Dragon Slayer".
+  const stripped = stripSetSuffix(cardName).toLowerCase();
+  if (stripped !== lower) {
+    const foundStripped = groups.get(stripped);
+    if (foundStripped) return foundStripped;
+
+    const strippedNorm = normalizeCommas(stripped);
+    if (strippedNorm !== stripped) {
+      const foundStrippedNorm = groups.get(strippedNorm);
+      if (foundStrippedNorm) return foundStrippedNorm;
+    }
+  }
+
+  return null;
 }

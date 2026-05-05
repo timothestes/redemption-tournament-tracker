@@ -153,13 +153,23 @@ function normalizeBrigade(brigade: string): string {
 function refineCardGroup(group: CardGroup): CardGroup[] {
   if (group.cards.length <= 1) return [group];
 
+  // Groups formed via duplicate_card_groups (groupId set) are authoritative —
+  // the database explicitly says "these are the same card." Different brigade
+  // printings of the same character (e.g., Daniel, the Treasured [White] and
+  // Daniel, the Apocalyptist [Green/White]) intentionally share a group, so
+  // brigade-splitting would defeat the rule. Type-category splitting still
+  // applies as a safety net against misclassified groups (e.g., an Enhancement
+  // and an Artifact mistakenly sharing a group).
+  const splitByBrigade = group.groupId == null;
+
   const subMap = new Map<string, CardGroup>();
 
   for (const card of group.cards) {
     const typeCategory = getTypeCategory(card.type);
-    // Split by brigade for all non-LS types (different brigades = different cards)
-    // Lost Souls are handled separately by checkLostSoulAbilityLimit
-    const brigade = typeCategory === "lost_soul" ? "" : normalizeBrigade(card.brigade);
+    const brigade =
+      splitByBrigade && typeCategory !== "lost_soul"
+        ? normalizeBrigade(card.brigade)
+        : "";
     const key = `${typeCategory}::${brigade}`;
 
     const existing = subMap.get(key);
