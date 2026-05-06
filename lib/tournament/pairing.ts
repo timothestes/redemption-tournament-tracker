@@ -192,15 +192,79 @@ function playedKey(a: string, b: string): string {
 }
 
 /**
+ * DFS backtracking search for a no-rematch perfect matching of `pool`.
+ *
+ * Walks the rank-sorted pool top-down: the topmost unpaired player tries
+ * each unpaired partner in rank order. Unwinds when a sub-pool admits no
+ * legal completion. The "topmost unpaired chooses first, in rank order"
+ * structure means the first complete leaf returned is the greedy-equivalent
+ * solution — when greedy already produces a no-rematch matching, this
+ * function returns the same pairing.
+ *
+ * Includes a fail-fast prune: if any unpaired player has zero legal
+ * partners among the remaining unpaired set, the branch is dead.
+ *
+ * Returns an array of [poolIndex_a, poolIndex_b] pairs (a < b) describing
+ * a complete matching, or `null` if no rematch-free perfect matching
+ * exists for this pool. Pure: no side effects, no RNG.
+ */
+function findNoRematchPairing(
+  pool: ScoredPlayer[],
+  played: Set<string>,
+): Array<[number, number]> | null {
+  const n = pool.length;
+  if (n === 0) return [];
+  if (n % 2 !== 0) return null;
+  const partner = new Int32Array(n).fill(-1);
+
+  function recurse(): boolean {
+    // Find the top-most unpaired player. Preserves rank-priority: the
+    // highest unpaired player chooses first, exactly like greedy.
+    let i = 0;
+    while (i < n && partner[i] !== -1) i++;
+    if (i === n) return true; // all paired
+
+    // Fail-fast: any unpaired player with zero legal partners kills this branch.
+    for (let k = i; k < n; k++) {
+      if (partner[k] !== -1) continue;
+      let hasLegal = false;
+      for (let m = i; m < n; m++) {
+        if (m === k || partner[m] !== -1) continue;
+        if (!played.has(playedKey(pool[k].id, pool[m].id))) { hasLegal = true; break; }
+      }
+      if (!hasLegal) return false;
+    }
+
+    // Try each candidate j > i in rank order.
+    for (let j = i + 1; j < n; j++) {
+      if (partner[j] !== -1) continue;
+      if (played.has(playedKey(pool[i].id, pool[j].id))) continue;
+      partner[i] = j; partner[j] = i;
+      if (recurse()) return true;
+      partner[i] = -1; partner[j] = -1;
+    }
+    return false;
+  }
+
+  if (!recurse()) return null;
+  const out: Array<[number, number]> = [];
+  for (let i = 0; i < n; i++) if (partner[i] > i) out.push([i, partner[i]]);
+  return out;
+}
+
+/**
  * Pair a non-first round per algorithm.md "Round Pairing — Later Rounds":
  *  1. Sort active players by (gameScore DESC, lostSoulScore DESC).
  *  2. If odd, select bye via selectBye().
- *  3. Greedy top-down: for each unassigned player from the top, find the
- *     highest-ranked unassigned player they have not played; pair them.
- *  4. Rematch fallback: any leftover unpaired players are paired in
- *     remaining-list order, even if they've played.
- *  5. Defensive lone-bye: if exactly one player is left unpaired (shouldn't
- *     happen with even pool), give them a bye.
+ *  3. Backtracking search for a no-rematch perfect matching of the pool.
+ *     The search preserves rank-priority order, so the first solution
+ *     found is identical to greedy whenever greedy already produced a
+ *     no-rematch pairing.
+ *  4. Rematch fallback: only fires when the pool admits no no-rematch
+ *     matching (e.g., late rounds in tiny fields). Pairs the pool in
+ *     remaining-list order, even if it produces rematches.
+ *  5. Defensive lone-bye: if exactly one player is left unpaired
+ *     (shouldn't happen with even pool), give them a bye.
  */
 export function pairLaterRound(
   state: TournamentState,
@@ -235,29 +299,30 @@ export function pairLaterRound(
     pool = pool.filter(p => p.id !== bye);
   }
 
-  // Step 3: greedy pairing.
+  // Step 3: backtracking search for a no-rematch perfect matching.
+  // When greedy already produced a no-rematch pairing, this returns the
+  // identical pairing (rank-order traversal). When greedy would have
+  // produced a rematch, this finds the alternative whenever one exists.
   const matches: PairingResult['matches'] = [];
-  const assigned = new Set<string>();
-  for (let i = 0; i < pool.length; i++) {
-    const p1 = pool[i];
-    if (assigned.has(p1.id)) continue;
-    const partner = pool.slice(i + 1).find(
-      p => !assigned.has(p.id) && !played.has(playedKey(p1.id, p.id)),
-    );
-    if (partner) {
+  const found = findNoRematchPairing(pool, played);
+  if (found) {
+    for (const [i, j] of found) {
       matches.push({
         round,
-        player1Id: p1.id,
-        player2Id: partner.id,
+        player1Id: pool[i].id,
+        player2Id: pool[j].id,
         matchOrder: matches.length + 1,
       });
-      assigned.add(p1.id);
-      assigned.add(partner.id);
     }
+    return { matches, bye };
   }
 
-  // Step 4: rematch fallback for any leftovers.
-  const leftover = pool.filter(p => !assigned.has(p.id));
+  // Step 4: no no-rematch matching exists. Pair the pool in remaining-list
+  // order, even if it produces rematches. Mirrors the existing rematch-
+  // fallback semantics; only fires when the pool truly cannot be matched
+  // without rematches (e.g., late rounds in tiny fields where every pair
+  // has been played).
+  const leftover = [...pool];
   while (leftover.length >= 2) {
     const p1 = leftover.shift()!;
     const p2 = leftover.shift()!;
@@ -269,7 +334,7 @@ export function pairLaterRound(
     });
   }
 
-  // Step 5: defensive lone-bye.
+  // Step 5: defensive lone-bye (only if pool was somehow odd despite bye selection).
   if (leftover.length === 1 && !bye) {
     bye = leftover[0].id;
   }

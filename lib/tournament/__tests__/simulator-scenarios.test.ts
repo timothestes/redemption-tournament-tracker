@@ -162,7 +162,7 @@ describe('simulator scenarios: 16 players / 5 rounds (Type 1, mixed outcomes)', 
     }
     // rematchPairs counts each rematch twice (once per participant), so
     // divide. With 16 players over 5 rounds, the fallback should rarely fire.
-    expect(rematchPairs / 2).toBeLessThanOrEqual(4);
+    expect(rematchPairs).toBe(0);
 
     // Invariant C: bye spread at most 1. With 16 (even) players nobody byes.
     const counts = [...t.byeCounts().values()];
@@ -222,7 +222,7 @@ describe('simulator scenarios: 32 players / 6 rounds (Type 2, soulCap=7)', () =>
       expect(distinct).toBeLessThanOrEqual(played);
       rematchPairs += played - distinct;
     }
-    expect(rematchPairs / 2).toBeLessThanOrEqual(8);
+    expect(rematchPairs).toBe(0);
 
     // Invariant C: bye spread <= 1.
     const counts = [...t.byeCounts().values()];
