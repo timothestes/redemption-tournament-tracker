@@ -55,7 +55,7 @@ export default function TournamentStartModal({
     setNumberOfRounds(prev => Math.max(1, prev - 1));
   };
 
-  const inputClasses = "w-full bg-card border border-border text-foreground rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5";
+  const inputClasses = "w-full bg-background border border-border text-foreground rounded-lg p-2.5 focus:outline-none focus:border-primary/60 transition-colors";
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -64,191 +64,181 @@ export default function TournamentStartModal({
           <DialogTitle className="text-xl">Start Tournament</DialogTitle>
         </DialogHeader>
 
-        <DialogBody className="bg-muted space-y-6">
-          <div className="bg-muted border border-border rounded-lg p-4">
-            <h4 className="text-lg font-medium text-foreground mb-4">Tournament Settings</h4>
+        <DialogBody className="space-y-6">
+          {/* Number of Rounds */}
+          <div className="flex flex-col items-center jayden-gradient-bg rounded-lg border border-border p-5">
+            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Number of Rounds
+            </label>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1 mb-4">
+              <span>{participantCount} participants</span>
+              <span aria-hidden>&bull;</span>
+              <span>Suggested: <span className="text-foreground font-medium">{suggestedRounds}</span></span>
+            </div>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={handleDecrement}
+                disabled={numberOfRounds <= 1}
+                className="w-11 h-11 rounded-full border border-border bg-background text-foreground hover:border-primary/60 hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:hover:border-border disabled:hover:bg-background disabled:hover:text-foreground transition-colors flex items-center justify-center"
+                aria-label="Decrease rounds"
+              >
+                <span className="text-xl leading-none">&minus;</span>
+              </button>
+              <span className="text-4xl font-bold text-foreground tabular-nums min-w-[2ch] text-center">
+                {numberOfRounds}
+              </span>
+              <button
+                onClick={handleIncrement}
+                className="w-11 h-11 rounded-full border border-border bg-background text-foreground hover:border-primary/60 hover:text-primary hover:bg-primary/10 transition-colors flex items-center justify-center"
+                aria-label="Increase rounds"
+              >
+                <span className="text-xl leading-none">+</span>
+              </button>
+            </div>
+          </div>
 
-            <div className="grid gap-6">
-              {/* Number of Rounds */}
-              <div className="flex flex-col items-center">
-                <div className="text-center mb-2">
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Number of Rounds
-                  </label>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1 justify-center">
-                    <span>{participantCount} participants</span>
-                    <span>&bull;</span>
-                    <span>Suggested: {suggestedRounds}</span>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <button
-                    onClick={handleDecrement}
-                    disabled={numberOfRounds <= 1}
-                    className="bg-muted hover:bg-muted/80 w-10 h-10 rounded-md flex items-center justify-center text-foreground disabled:opacity-50"
-                  >
-                    <span className="text-lg">&minus;</span>
-                  </button>
-                  <span className="text-xl font-semibold text-foreground bg-muted min-w-[3ch] text-center py-1.5 px-3 rounded">
-                    {numberOfRounds}
-                  </span>
-                  <button
-                    onClick={handleIncrement}
-                    className="bg-muted hover:bg-muted/80 w-10 h-10 rounded-md flex items-center justify-center text-foreground"
-                  >
-                    <span className="text-lg">+</span>
-                  </button>
-                </div>
+          {/* Round Length */}
+          <div className="flex flex-col items-center jayden-gradient-bg rounded-lg border border-border p-5">
+            <label htmlFor="round-length" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+              Round Length (minutes)
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                id="round-length"
+                type="number"
+                value={roundLength}
+                onChange={(e) => {
+                  const value = Math.min(120, Math.max(0, parseInt(e.target.value) || 0));
+                  setRoundLength(value);
+                }}
+                min="0"
+                max="120"
+                className="w-24 bg-background border border-border text-foreground text-2xl font-semibold rounded-lg p-2 focus:outline-none focus:border-primary/60 transition-colors text-center tabular-nums"
+                placeholder="45"
+              />
+              <span className="text-sm text-muted-foreground">max 120</span>
+            </div>
+          </div>
+
+          {/* Advanced Settings Section */}
+          <div>
+            <button
+              onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
+              className="w-full flex items-center justify-between gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
+            >
+              <span className="font-medium uppercase tracking-wide text-xs">Advanced Settings</span>
+              <svg
+                className={`w-4 h-4 transition-transform ${isAdvancedOpen ? 'rotate-90' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+            </button>
+
+            <div className={`space-y-4 mt-3 ${isAdvancedOpen ? '' : 'hidden'}`}>
+              {/* Maximum Score */}
+              <div>
+                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                  Maximum Lost Souls Score
+                </label>
+                <select
+                  value={maxScore}
+                  onChange={(e) => setMaxScore(Number(e.target.value))}
+                  className={inputClasses}
+                >
+                  <option value="5">5 Lost Souls</option>
+                  <option value="7">7 Lost Souls</option>
+                </select>
               </div>
 
-              {/* Round Length */}
-              <div className="flex flex-col items-center">
-                <label className="text-sm font-medium text-muted-foreground mb-2">
-                  Round Length (minutes)
+              {/* Bye Points */}
+              <div>
+                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                  Match Points for Bye
                 </label>
-                <div className="flex items-center gap-2">
+                <select
+                  value={byePoints}
+                  onChange={(e) => setByePoints(Number(e.target.value))}
+                  className={inputClasses}
+                >
+                  <option value="1">1 Point</option>
+                  <option value="1.5">1.5 Points</option>
+                  <option value="2">2 Points</option>
+                  <option value="3">3 Points</option>
+                </select>
+              </div>
+
+              {/* Bye Differential */}
+              <div>
+                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                  Differential for Bye
+                </label>
+                <select
+                  value={byeDifferential}
+                  onChange={(e) => setByeDifferential(Number(e.target.value))}
+                  className={inputClasses}
+                >
+                  <option value="0">0 (No Differential)</option>
+                  <option value="1">+1</option>
+                  <option value="2">+2</option>
+                  <option value="3">+3</option>
+                  <option value="4">+4</option>
+                  <option value="5">+5</option>
+                </select>
+              </div>
+
+              {/* Starting Table Number */}
+              <div>
+                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                  Starting Table Number
+                </label>
+                <div className="flex items-center gap-3 flex-wrap">
                   <input
                     type="number"
-                    value={roundLength}
+                    value={startingTableNumber}
                     onChange={(e) => {
-                      const value = Math.min(120, Math.max(0, parseInt(e.target.value) || 0));
-                      setRoundLength(value);
+                      const value = Math.max(1, parseInt(e.target.value) || 1);
+                      setStartingTableNumber(value);
                     }}
-                    min="0"
-                    max="120"
-                    className="w-24 bg-card border border-border text-foreground rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 text-center"
-                    placeholder="Minutes"
+                    min="1"
+                    className="w-24 bg-background border border-border text-foreground rounded-lg p-2.5 focus:outline-none focus:border-primary/60 transition-colors text-center tabular-nums"
+                    placeholder="1"
                   />
-                  <span className="text-sm text-muted-foreground">max 120</span>
+                  <span className="text-xs text-muted-foreground flex-1 min-w-0">
+                    Tables will be numbered starting from this value
+                  </span>
                 </div>
               </div>
 
-              {/* Advanced Settings Section */}
-              <div className="border-t border-border pt-4">
-                <button
-                  onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
-                  className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <svg
-                    className={`w-4 h-4 transition-transform ${isAdvancedOpen ? 'rotate-90' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M9 5l7 7-7 7"
-                    />
-                  </svg>
-                  Advanced Settings
-                </button>
-
-                <div className={`space-y-4 mt-4 ${isAdvancedOpen ? '' : 'hidden'}`}>
-                  {/* Maximum Score */}
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                      Maximum Lost Souls Score
-                    </label>
-                    <select
-                      value={maxScore}
-                      onChange={(e) => setMaxScore(Number(e.target.value))}
-                      className={inputClasses}
-                    >
-                      <option value="5">5 Lost Souls</option>
-                      <option value="7">7 Lost Souls</option>
-                    </select>
-                  </div>
-
-                  {/* Bye Points */}
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                      Match Points for Bye
-                    </label>
-                    <select
-                      value={byePoints}
-                      onChange={(e) => setByePoints(Number(e.target.value))}
-                      className={inputClasses}
-                    >
-                      <option value="1">1 Point</option>
-                      <option value="1.5">1.5 Points</option>
-                      <option value="2">2 Points</option>
-                      <option value="3">3 Points</option>
-                    </select>
-                  </div>
-
-                  {/* Bye Differential */}
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                      Differential for Bye
-                    </label>
-                    <select
-                      value={byeDifferential}
-                      onChange={(e) => setByeDifferential(Number(e.target.value))}
-                      className={inputClasses}
-                    >
-                      <option value="0">0 (No Differential)</option>
-                      <option value="1">+1</option>
-                      <option value="2">+2</option>
-                      <option value="3">+3</option>
-                      <option value="4">+4</option>
-                      <option value="5">+5</option>
-                    </select>
-                  </div>
-
-                  {/* Starting Table Number */}
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                      Starting Table Number
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        value={startingTableNumber}
-                        onChange={(e) => {
-                          const value = Math.max(1, parseInt(e.target.value) || 1);
-                          setStartingTableNumber(value);
-                        }}
-                        min="1"
-                        className="w-24 bg-card border border-border text-foreground rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 text-center"
-                        placeholder="Table #"
-                      />
-                      <span className="text-sm text-muted-foreground">
-                        Tables will be numbered starting from this value
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Sound Notifications */}
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                      Sound Notifications
-                    </label>
-                    <label className="flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={soundNotifications}
-                        onChange={(e) => setSoundNotifications(e.target.checked)}
-                        className="mr-3 h-4 w-4 rounded border-2 border-border text-primary bg-card focus:outline-none focus:ring-0"
-                      />
-                      <div>
-                        <span className="text-sm text-foreground">
-                          Play sound when timer expires
-                        </span>
-                        <p className="text-xs text-muted-foreground">
-                          A notification sound will play when each round timer reaches zero
-                        </p>
-                      </div>
-                    </label>
-                  </div>
+              {/* Sound Notifications */}
+              <label className="flex items-start gap-3 cursor-pointer rounded-lg border border-border bg-background p-3 hover:bg-muted/50 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={soundNotifications}
+                  onChange={(e) => setSoundNotifications(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-2 border-border text-primary bg-card focus:outline-none focus:ring-0 flex-shrink-0"
+                />
+                <div className="min-w-0">
+                  <span className="text-sm font-medium text-foreground">
+                    Play sound when timer expires
+                  </span>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Sounds when each round timer reaches zero
+                  </p>
                 </div>
-              </div>
+              </label>
             </div>
           </div>
         </DialogBody>
 
-        <DialogFooter className="bg-muted justify-end">
+        <DialogFooter className="justify-end">
           <Button
             onClick={() => onConfirm(numberOfRounds, roundLength, maxScore, byePoints, byeDifferential, startingTableNumber, soundNotifications)}
             variant="success"

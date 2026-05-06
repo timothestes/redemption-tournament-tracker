@@ -76,8 +76,10 @@ const ToastNotification: React.FC<ToastNotificationProps> = ({
 
   return (
     <div
+      role="status"
+      aria-live="polite"
       className={cn(
-        "fixed bottom-5 right-5 z-[100] flex items-center gap-3 rounded-lg border bg-card px-4 py-3 shadow-lg transition-all duration-200",
+        "fixed left-4 right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] sm:left-auto sm:right-5 sm:bottom-5 sm:w-auto sm:max-w-md z-[100] flex items-start gap-3 rounded-xl border bg-card/95 px-4 py-3 shadow-xl backdrop-blur-sm transition-all duration-200",
         s.border,
         visible && !exiting
           ? "translate-y-0 opacity-100"
@@ -92,7 +94,9 @@ const ToastNotification: React.FC<ToastNotificationProps> = ({
       >
         <Icon className="h-4 w-4" />
       </div>
-      <p className="text-sm font-medium text-foreground">{message}</p>
+      <p className="flex-1 text-sm font-medium leading-snug text-foreground break-words">
+        {message}
+      </p>
       <button
         onClick={() => {
           setExiting(true);
@@ -101,7 +105,7 @@ const ToastNotification: React.FC<ToastNotificationProps> = ({
             onClose();
           }, 200);
         }}
-        className="ml-2 shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+        className="-mr-1 -mt-1 shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
         aria-label="Dismiss"
       >
         <X className="h-4 w-4" />

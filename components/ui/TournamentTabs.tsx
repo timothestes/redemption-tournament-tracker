@@ -1,6 +1,6 @@
 "use client";
 
-import { Tabs, Card } from "flowbite-react";
+import { Tabs } from "flowbite-react";
 import PodGenerationModal from "./PodGenerationModal";
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
 import { HiUserGroup } from "react-icons/hi";
@@ -95,13 +95,33 @@ export default function TournamentTabs({
       aria-label="Tournament tabs"
       style={{ marginTop: "1rem" }}
       onActiveTabChange={(tab) => setActiveTab(tab)}
+      theme={{
+        tablist: {
+          base: "flex text-center overflow-x-auto no-scrollbar",
+          variant: {
+            default: "border-b border-border",
+          },
+          tabitem: {
+            base: "flex items-center justify-center rounded-t-lg px-3 py-2.5 sm:px-4 sm:py-4 text-sm font-medium first:ml-0 focus:outline-none disabled:cursor-not-allowed disabled:text-muted-foreground whitespace-nowrap",
+            variant: {
+              default: {
+                base: "rounded-t-lg",
+                active: {
+                  on: "bg-muted text-primary",
+                  off: "text-muted-foreground hover:bg-muted hover:text-foreground",
+                },
+              },
+            },
+          },
+        },
+      }}
     >
       <Tabs.Item title="Participants" icon={HiUserGroup}>
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold" style={{ width: "200px" }}>
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
+          <h2 className="text-2xl font-bold">
             Participants{participants.length > 0 && ` (${participants.length})`}
           </h2>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 justify-end flex-wrap">
             {/* generate pods button only if more than one participant */}
             {participants.length > 1 && (
               <Button
@@ -119,8 +139,10 @@ export default function TournamentTabs({
               <Button
                 onClick={() => printFinalStandings(participants, tournamentName || "Tournament")}
                 variant="accent"
+                size="sm"
               >
-                Print Final Standings
+                <span className="hidden sm:inline">Print Final Standings</span>
+                <span className="sm:hidden">Print</span>
               </Button>
             )}
             <div className="relative group">
@@ -128,13 +150,13 @@ export default function TournamentTabs({
                 ref={addParticipantButtonRef}
                 onClick={() => !tournamentStarted && setIsModalOpen(true)}
                 className={`flex items-center gap-2 ${tournamentStarted ? "opacity-50 cursor-not-allowed" : ""}`}
-                style={{ width: "200px" }}
                 variant="success"
                 disabled={tournamentStarted}
               >
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
                   <HiPlus className="w-5 h-5" />
-                  Add Participant
+                  <span className="hidden sm:inline">Add Participant</span>
+                  <span className="sm:hidden">Add</span>
                 </div>
               </Button>
               {tournamentStarted && (
@@ -146,6 +168,7 @@ export default function TournamentTabs({
             </div>
             <ParticipantFormModal
               isOpen={isModalOpen}
+              existingNames={participants.map((p) => p.name)}
               onClose={() => {
                 setIsModalOpen(false);
                 setTimeout(() => {
@@ -166,14 +189,14 @@ export default function TournamentTabs({
           <p>Loading participants...</p>
         ) : participants.length === 0 ? (
           <div className="w-[800px] max-xl:w-full mx-auto overflow-x-auto">
-            <Card>
-              <div className="flex flex-col items-center justify-center py-8">
-                <p className="text-muted-foreground mb-4">No participants found</p>
-                <p className="text-sm text-muted-foreground/70">
+            <div className="rounded-lg border border-border bg-card jayden-gradient-bg shadow-sm">
+              <div className="flex flex-col items-center justify-center py-12 px-6">
+                <p className="text-foreground font-medium mb-2">No participants found</p>
+                <p className="text-sm text-muted-foreground">
                   Add participants to get started
                 </p>
               </div>
-            </Card>
+            </div>
           </div>
         ) : (
           <div className="w-[800px] max-xl:w-full mx-auto overflow-x-auto">

@@ -92,3 +92,4 @@ tmp/*
 # claude.md
 test_shopify.py
 .mcp.json
+.playwright-mcp/

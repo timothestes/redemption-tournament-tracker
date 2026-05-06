@@ -47,7 +47,7 @@ export default function TournamentPage({
   const [toast, setToast] = useState<{
     message: string;
     show: boolean;
-    type?: "success" | "error";
+    type?: "success" | "error" | "warning" | "info";
   }>({
     message: "",
     show: false,
@@ -60,7 +60,7 @@ export default function TournamentPage({
 
   const showToast = (
     message: string,
-    type: "success" | "error" = "success"
+    type: "success" | "error" | "warning" | "info" = "success"
   ) => {
     setToast({ message, show: true, type });
     setTimeout(() => setToast((prev) => ({ ...prev, show: false })), 2000);
@@ -288,7 +288,7 @@ export default function TournamentPage({
     });
 
     if (matchErrorIndexArr.length > 0) {
-      alert("Please add scores to all matches.");
+      showToast("Please add scores to all matches.", "warning");
       return;
     }
 
@@ -539,17 +539,20 @@ export default function TournamentPage({
             <div className="mb-6 space-y-4">
               {/* Title row with status badge */}
               <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-3xl font-bold">{tournament.name}</h1>
-                <button
-                  onClick={() => {
-                    setNewTournamentName(tournament.name);
-                    setIsEditTournamentModalOpen(true);
-                  }}
-                  className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  aria-label="Edit tournament name"
-                >
-                  <HiPencil className="w-5 h-5" />
-                </button>
+                <h1 className="text-3xl font-bold">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewTournamentName(tournament.name);
+                      setIsEditTournamentModalOpen(true);
+                    }}
+                    className="group inline-flex items-center gap-2 -mx-2 px-2 py-1 rounded-md text-left hover:bg-muted transition-colors"
+                    aria-label="Edit tournament name"
+                  >
+                    <span>{tournament.name}</span>
+                    <HiPencil className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+                  </button>
+                </h1>
                 {/* Status badge */}
                 <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
                   tournament.has_ended
