@@ -15,18 +15,23 @@ type AnyClient = {
  *
  * The DB stores raw scores plus is_tie + winner_id; partial-vs-full is
  * derived by comparing the winner's score against soulCap (max_score).
- * If the match has no winner_id and is_tie is false, it has no result yet.
+ *
+ * Fallback for legacy data: tournaments scored before is_tie/winner_id were
+ * persisted by match-edit.tsx have those columns null. If both scores are
+ * present we derive the result from them — equal scores → tie, otherwise
+ * the higher score wins.
  */
 function toMatchResult(m: any, soulCap: number): MatchResult | undefined {
   if (m.player1_score === null || m.player2_score === null) return undefined;
   const p1Souls = Number(m.player1_score);
   const p2Souls = Number(m.player2_score);
-  if (m.is_tie) {
+  if (m.is_tie || (m.winner_id == null && p1Souls === p2Souls)) {
     return { p1Souls, p2Souls, p1Outcome: "tie", p2Outcome: "tie" };
   }
   let p1Won: boolean;
   if (m.winner_id === m.player1_id) p1Won = true;
   else if (m.winner_id === m.player2_id) p1Won = false;
+  else if (m.winner_id == null) p1Won = p1Souls > p2Souls;
   else return undefined;
 
   const winnerSouls = p1Won ? p1Souls : p2Souls;
