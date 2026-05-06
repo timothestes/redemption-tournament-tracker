@@ -2,7 +2,7 @@ import type { Config } from "tailwindcss";
 const flowbite = require("flowbite-react/tailwind");
 
 const config = {
-  darkMode: ["class"],
+  darkMode: ["variant", ["&:is(.dark *)", "&:is(.jayden *)", "&:is(.dark)", "&:is(.jayden)"]],
   content: [
     "./pages/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",

@@ -3,11 +3,14 @@
 import { Card, Pagination } from "flowbite-react";
 import { Dispatch, Fragment, SetStateAction, useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "../../utils/supabase/client";
+import { recomputeTotalsFromHistory } from "../../lib/tournament/results";
+import { buildStateFromSupabase } from "../../utils/tournament/stateAdapter";
 import MatchEditModal from "./match-edit";
 import RepairPairingModal from "./RepairPairingModal";
 import { ArrowUpDown } from "lucide-react";
 import { printTournamentPairings, printFinalStandings, printMatchSlips } from "../../utils/printUtils";
 import { Button } from "./button";
+import ToastNotification from "./toast-notification";
 
 const formatDateTime = (timestamp: string | null) => {
   if (!timestamp) return "";
@@ -95,6 +98,21 @@ export default function TournamentRounds({
   const [repairMode, setRepairMode] = useState(false);
   const [repairSourceMatch, setRepairSourceMatch] = useState<any>(null);
   const [mounted, setMounted] = useState(false);
+  const [toast, setToast] = useState<{
+    message: string;
+    show: boolean;
+    type: "success" | "error" | "warning" | "info";
+  }>({ message: "", show: false, type: "warning" });
+
+  const showToast = useCallback(
+    (
+      message: string,
+      type: "success" | "error" | "warning" | "info" = "warning"
+    ) => {
+      setToast({ message, show: true, type });
+    },
+    []
+  );
 
   useEffect(() => {
     setMounted(true);
@@ -283,7 +301,7 @@ export default function TournamentRounds({
     });
 
     if (matchErrorIndexArr.length > 0) {
-      alert("Please add scores to all matches.");
+      showToast("Please add scores to all matches.", "warning");
       return;
     }
 
@@ -292,93 +310,55 @@ export default function TournamentRounds({
     try {
       const now = new Date().toISOString();
 
+      // Persist is_tie + winner_id on each match row so buildStateFromSupabase
+      // can derive per-player outcomes. (player1_score / player2_score and the
+      // per-row match_points + differential snapshots are already written by
+      // the score-input UI in components/ui/match-edit.tsx — we don't touch
+      // those denormalized snapshots here.)
       for (const match of matches) {
-        const { error: participant1SelectError, data: participant1 } = await client
-          .from("participants")
-          .select()
-          .eq("id", match.player1_id.id)
-          .single();
-        if (participant1SelectError) throw participant1SelectError;
-
-        const { error: participant2SelectError, data: participant2 } = await client
-          .from("participants")
-          .select()
-          .eq("id", match.player2_id.id)
-          .single();
-        if (participant2SelectError) throw participant2SelectError;
-
-        if (match.player2_score === match.player1_score) {
-          await Promise.all([
-            client.from("participants").update({
-              match_points: (participant1.match_points || 0) + 1.5,
-              differential: (participant1.differential || 0),
-            }).eq("id", match.player1_id.id),
-
-            client.from("participants").update({
-              match_points: (participant2.match_points || 0) + 1.5,
-              differential: (participant2.differential || 0),
-            }).eq("id", match.player2_id.id),
-          ]);
-        } else if (match.player1_score === tournamentInfo.max_score) {
-          await Promise.all([
-            client.from("participants").update({
-              match_points: (participant1.match_points || 0) + 3,
-              differential: (match.player1_score - match.player2_score) + (participant1.differential || 0),
-            }).eq("id", match.player1_id.id),
-
-            client.from("participants").update({
-              match_points: (participant2.match_points || 0),
-              differential: (match.player2_score - match.player1_score) + (participant2.differential || 0),
-            }).eq("id", match.player2_id.id),
-          ]);
-
-        } else if (match.player2_score === tournamentInfo.max_score) {
-          await Promise.all([
-            client.from("participants").update({
-              match_points: (participant2.match_points || 0) + 3,
-              differential: (match.player2_score - match.player1_score) + (participant2.differential || 0),
-            }).eq("id", match.player2_id.id),
-
-            client.from("participants").update({
-              match_points: (participant1.match_points || 0),
-              differential: (match.player1_score - match.player2_score) + (participant1.differential || 0),
-            }).eq("id", match.player1_id.id),
-          ]);
-
+        let isTie = false;
+        let winnerId: string | null = null;
+        if (match.player1_score === match.player2_score) {
+          isTie = true;
         } else if (match.player1_score > match.player2_score) {
-          await Promise.all([
-            client.from("participants").update({
-              match_points: (participant1.match_points || 0) + 2,
-              differential: (match.player1_score - match.player2_score) + (participant1.differential || 0),
-            }).eq("id", match.player1_id.id),
-
-            client.from("participants").update({
-              match_points: (participant2.match_points || 0) + 1,
-              differential: (match.player2_score - match.player1_score) + (participant2.differential || 0),
-            }).eq("id", match.player2_id.id),
-          ]);
-
-        } else if (match.player2_score > match.player1_score) {
-          await Promise.all([
-            client.from("participants").update({
-              match_points: (participant2.match_points || 0) + 2,
-              differential: (match.player2_score - match.player1_score) + (participant2.differential || 0),
-            }).eq("id", match.player2_id.id),
-
-            client.from("participants").update({
-              match_points: (participant1.match_points || 0) + 1,
-              differential: (match.player1_score - match.player2_score) + (participant1.differential || 0),
-            }).eq("id", match.player1_id.id),
-          ]);
+          winnerId = match.player1_id.id;
+        } else {
+          winnerId = match.player2_id.id;
         }
+        const { error: matchUpdateError } = await client
+          .from("matches")
+          .update({ is_tie: isTie, winner_id: winnerId })
+          .eq("id", match.id);
+        if (matchUpdateError) throw matchUpdateError;
       }
 
-      if (byes && byes.length > 0) {
-        for (const bye of byes) {
-          const { error: participantUpdateError } = await client.from("participants").update({
-            match_points: (bye.match_points ?? 0),
-            differential: (bye.differential ?? 0),
-          }).eq("id", bye.participant_id.id);
+      // Recompute participant totals from full match + bye history.
+      // This is the load-bearing fix for the double-count bug: totals are
+      // always derived from history, never incremented. Editing a result and
+      // re-running this yields the correct total regardless of prior writes.
+      // Byes are accounted for via state.byes inside recomputeTotalsFromHistory,
+      // so no separate bye participants update is needed.
+      const state = await buildStateFromSupabase(client, tournamentId);
+      if (state) {
+        const affectedIds = new Set<string>();
+        for (const m of matches) {
+          if (m.player1_id?.id) affectedIds.add(m.player1_id.id);
+          if (m.player2_id?.id) affectedIds.add(m.player2_id.id);
+        }
+        if (byes && byes.length > 0) {
+          for (const bye of byes) {
+            if (bye.participant_id?.id) affectedIds.add(bye.participant_id.id);
+          }
+        }
+        for (const pid of affectedIds) {
+          const totals = recomputeTotalsFromHistory(pid, state);
+          const { error: participantUpdateError } = await client
+            .from("participants")
+            .update({
+              match_points: totals.gameScore,
+              differential: totals.lostSoulScore,
+            })
+            .eq("id", pid);
           if (participantUpdateError) console.log(participantUpdateError);
         }
       }
@@ -535,7 +515,7 @@ export default function TournamentRounds({
       
     } catch (error) {
       console.error("Error swapping players:", error);
-      alert("Error swapping players. Please try again.");
+      showToast("Error swapping players. Please try again.", "error");
     } finally {
       setIsLoading(false);
     }
@@ -568,7 +548,7 @@ export default function TournamentRounds({
       await fetchCurrentRoundData();
     } catch (error) {
       console.error("Error swapping players with bye:", error);
-      alert("Error swapping players with bye. Please try again.");
+      showToast("Error swapping players with bye. Please try again.", "error");
     } finally {
       setIsLoading(false);
     }
@@ -697,7 +677,7 @@ export default function TournamentRounds({
       await fetchCurrentRoundData();
     } catch (error) {
       console.error("Error swapping player with bye:", error);
-      alert("Error swapping player with bye. Please try again.");
+      showToast("Error swapping player with bye. Please try again.", "error");
     } finally {
       setIsLoading(false);
     }
@@ -762,8 +742,16 @@ export default function TournamentRounds({
   }, [tournamentInfo.has_ended]);
 
   return (
-    <div className="w-[800px] max-xl:w-full mx-auto overflow-x-auto">
-      <Card theme={{ root: { base: "flex rounded-lg border border-border bg-card shadow-sm", children: "flex h-full flex-col justify-center gap-4 p-6" } }}>
+    <>
+    <ToastNotification
+      message={toast.message}
+      show={toast.show}
+      type={toast.type}
+      duration={3500}
+      onClose={() => setToast((prev) => ({ ...prev, show: false }))}
+    />
+    <div className="w-[800px] max-xl:w-full mx-auto">
+      <Card theme={{ root: { base: "flex rounded-lg border border-border bg-card shadow-sm", children: "flex h-full flex-col justify-center gap-4 p-3 sm:p-6" } }}>
         {error.message && (
           <div className="p-4 mb-4 text-sm text-red-800 dark:text-red-300 rounded-lg bg-red-50 dark:bg-red-900/20">
             {error.message}
@@ -777,45 +765,56 @@ export default function TournamentRounds({
           <div className="mt-4 max-w-full">
             {tournamentInfo.n_rounds && (
               <>
-                <div className="flex justify-between items-center mb-4">
-                  <div>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4">
+                  <div className="min-w-0">
                     <h3 className="text-xl font-semibold mb-1">
                       Round {currentPage} of {tournamentInfo.n_rounds}
                     </h3>
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground mr-4">
-                        Started at: <span className="text-foreground">{formatDateTime(roundInfo.started_at)}</span>
-                      </p>
-                      <p className="text-sm text-muted-foreground mr-4">
-                        Ended at: <span className="text-foreground">{formatDateTime(roundInfo.ended_at)}</span>
-                      </p>
+                    <div className="text-sm text-muted-foreground space-y-0.5">
+                      {roundInfo.started_at && (
+                        <p>
+                          Started <span className="text-foreground">{formatDateTime(roundInfo.started_at)}</span>
+                        </p>
+                      )}
+                      {roundInfo.ended_at && (
+                        <p>
+                          Ended <span className="text-foreground">{formatDateTime(roundInfo.ended_at)}</span>
+                        </p>
+                      )}
                     </div>
                   </div>
                   {currentPage === tournamentInfo.current_round && (
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
                         {tournamentInfo.has_ended ? (
                           <Button
                             variant="accent"
+                            size="sm"
                             onClick={handlePrintFinalStandings}
                           >
-                            Print Final Standings
+                            <span className="hidden sm:inline">Print Final Standings</span>
+                            <span className="sm:hidden">Print</span>
                           </Button>
                         ) : (
                           <>
                             <Button
                               variant="accent"
+                              size="sm"
                               onClick={handlePrintPairings}
                             >
-                              Print Pairings
+                              <span className="hidden sm:inline">Print Pairings</span>
+                              <span className="sm:hidden">Pairings</span>
                             </Button>
                             <Button
                               variant="accent"
+                              size="sm"
                               onClick={handlePrintMatchSlips}
                             >
-                              Print Match Slips
+                              <span className="hidden sm:inline">Print Match Slips</span>
+                              <span className="sm:hidden">Slips</span>
                             </Button>
                             <Button
-                              variant={isRoundActive ? "cancel" : "success"}
+                              variant={isRoundActive ? "destructive" : "success"}
+                              size="sm"
                               onClick={
                                 isRoundActive ? handleEndRound : handleStartRound
                               }
@@ -845,7 +844,7 @@ export default function TournamentRounds({
                       </p>
                     </div>
                   )}
-                  {matches && matches.length > 0 && <table className="min-w-full text-sm text-left text-muted-foreground border-2 border-border">
+                  {matches && matches.length > 0 && <table className="hidden md:table min-w-full text-sm text-left text-muted-foreground border-2 border-border">
                     <thead className="text-xs uppercase font-normal text-foreground bg-muted border-b-2 border-border rounded-t-lg">
                       <tr>
                         <th scope="col" className="px-4 py-2 text-center">
@@ -982,11 +981,163 @@ export default function TournamentRounds({
                         ))}
                     </tbody>
                   </table>}
+
+                  {/* Mobile pairing cards */}
+                  {matches && matches.length > 0 && (
+                    <div className="md:hidden space-y-2">
+                      {matches.map((match, index) => {
+                        const isError = matchErrorIndex.includes(index);
+                        const tableNum = index + (tournamentInfo.starting_table_number || 1);
+                        const repairEnabled =
+                          currentPage === tournamentInfo.current_round && !roundInfo.started_at;
+                        const isP1Selected =
+                          repairMode &&
+                          repairSourceMatch &&
+                          !repairSourceMatch.isBye &&
+                          repairSourceMatch.match?.id === match.id &&
+                          !repairSourceMatch.isPlayer2;
+                        const isP2Selected =
+                          repairMode &&
+                          repairSourceMatch &&
+                          !repairSourceMatch.isBye &&
+                          repairSourceMatch.match?.id === match.id &&
+                          repairSourceMatch.isPlayer2;
+
+                        const swapButtonClass = (selected: boolean) =>
+                          `p-2 rounded-md flex items-center justify-center flex-shrink-0 ${
+                            repairEnabled
+                              ? selected
+                                ? "text-yellow-600 dark:text-yellow-400 bg-primary/15 hover:bg-primary/25"
+                                : "text-primary hover:bg-muted"
+                              : "text-muted-foreground cursor-not-allowed"
+                          }`;
+
+                        return (
+                          <div
+                            key={match.id}
+                            className={`rounded-lg border ${
+                              isError ? "border-red-500/60 bg-red-600/10" : "border-border bg-card"
+                            } p-3`}
+                          >
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                              <span className="text-xs uppercase tracking-wide text-muted-foreground whitespace-nowrap">
+                                Table {tableNum}
+                              </span>
+                              <div className="flex-shrink-0 w-10 h-10">
+                                <MatchEditModal
+                                  key={match.player1_score + match.player2_score}
+                                  match={match}
+                                  fetchCurrentRoundData={fetchCurrentRoundData}
+                                  setMatchErrorIndex={setMatchErrorIndex}
+                                  isRoundActive={isRoundActive}
+                                  index={index}
+                                  tournament={tournamentInfo}
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-foreground truncate">
+                                    {match.player1_id.name}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground tabular-nums">
+                                    MP {match.player1_match_points} · Diff {match.differential ?? "N/A"}
+                                  </p>
+                                </div>
+                                <button
+                                  title={
+                                    repairEnabled
+                                      ? "Re-pair pairing"
+                                      : "Cannot re-pair after round started"
+                                  }
+                                  className={swapButtonClass(!!isP1Selected)}
+                                  onClick={() => repairEnabled && handleRepairClick(match, false)}
+                                  disabled={!repairEnabled}
+                                >
+                                  <ArrowUpDown className="h-4 w-4" />
+                                </button>
+                              </div>
+                              <div className="flex items-center gap-2 pt-2 border-t border-border">
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-foreground truncate">
+                                    {match.player2_id.name}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground tabular-nums">
+                                    MP {match.player2_match_points} · Diff {match.differential2 ?? "N/A"}
+                                  </p>
+                                </div>
+                                <button
+                                  title={
+                                    repairEnabled
+                                      ? "Re-pair pairing"
+                                      : "Cannot re-pair after round started"
+                                  }
+                                  className={swapButtonClass(!!isP2Selected)}
+                                  onClick={() => repairEnabled && handleRepairClick(match, true)}
+                                  disabled={!repairEnabled}
+                                >
+                                  <ArrowUpDown className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 {byes && byes.length > 0 && <>
                   <h3 className="text-foreground text-lg font-semibold mt-7 mb-3 text-center">Game Byes</h3>
-                  <div className="overflow-x-auto max-w-full bg-card text-foreground">
+
+                  {/* Mobile bye cards */}
+                  <div className="md:hidden space-y-2">
+                    {byes.map((bye) => {
+                      const repairEnabled =
+                        currentPage === tournamentInfo.current_round && !roundInfo.started_at;
+                      const isSelected =
+                        repairMode &&
+                        repairSourceMatch &&
+                        repairSourceMatch.isBye &&
+                        repairSourceMatch.byeId === bye.id;
+                      return (
+                        <div
+                          key={bye.id}
+                          className="rounded-lg border border-border bg-card p-3 flex items-center gap-3"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-foreground truncate">
+                              {bye.participant_id.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground tabular-nums">
+                              MP {bye.match_points} · Diff {bye.differential} · Bye
+                            </p>
+                          </div>
+                          <button
+                            title={
+                              repairEnabled
+                                ? "Re-pair pairing"
+                                : "Cannot re-pair after round started"
+                            }
+                            className={`p-2 rounded-md flex items-center justify-center flex-shrink-0 ${
+                              repairEnabled
+                                ? isSelected
+                                  ? "text-yellow-600 dark:text-yellow-400 bg-primary/15 hover:bg-primary/25"
+                                  : "text-primary hover:bg-muted"
+                                : "text-muted-foreground cursor-not-allowed"
+                            }`}
+                            onClick={() => repairEnabled && handleByeRepairClick(bye)}
+                            disabled={!repairEnabled}
+                          >
+                            <ArrowUpDown className="h-4 w-4" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="hidden md:block overflow-x-auto max-w-full bg-card text-foreground">
                     <table className="min-w-full text-sm text-left text-muted-foreground border-2 border-border">
                       <thead className="text-xs uppercase font-normal text-foreground bg-muted border-b-2 border-border rounded-t-lg">
                         <tr>
@@ -1065,6 +1216,25 @@ export default function TournamentRounds({
                     totalPages={tournamentInfo.current_round || 1}
                     onPageChange={onPageChange}
                     showIcons
+                    theme={{
+                      pages: {
+                        base: "xs:mt-0 mt-2 inline-flex items-center -space-x-px",
+                        showIcon: "inline-flex",
+                        previous: {
+                          base: "ml-0 rounded-l-lg border border-border bg-card px-3 py-2 leading-tight text-muted-foreground enabled:hover:bg-muted enabled:hover:text-foreground",
+                          icon: "h-5 w-5",
+                        },
+                        next: {
+                          base: "rounded-r-lg border border-border bg-card px-3 py-2 leading-tight text-muted-foreground enabled:hover:bg-muted enabled:hover:text-foreground",
+                          icon: "h-5 w-5",
+                        },
+                        selector: {
+                          base: "w-12 border border-border bg-card py-2 leading-tight text-muted-foreground enabled:hover:bg-muted enabled:hover:text-foreground",
+                          active: "bg-primary/15 text-primary border-primary/40 hover:bg-primary/25 hover:text-primary",
+                          disabled: "cursor-not-allowed opacity-50",
+                        },
+                      },
+                    }}
                   />
                 </div>
               </>
@@ -1086,5 +1256,6 @@ export default function TournamentRounds({
         />
       )}
     </div >
+    </>
   );
 }

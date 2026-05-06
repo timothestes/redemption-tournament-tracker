@@ -2,6 +2,8 @@
 
 import { createClient } from "../../../utils/supabase/server";
 import { getSupabaseAdmin } from "../../../lib/pricing/supabase-admin";
+import { computeFinalStandings } from "../../../lib/tournament/standings";
+import { buildStateFromSupabase } from "../../../utils/tournament/stateAdapter";
 
 // System user that owns published tournament deck copies
 const REDEMPTIONCCG_USER_ID = "a0a8e980-f372-4ebd-be25-d2f26507e98f";
@@ -255,30 +257,29 @@ export async function publishTournamentDecklistsAction(
     return { success: false, error: "No decklists to publish" };
   }
 
-  // Calculate and persist placements first
+  // Calculate and persist placements first.
+  // Uses the pure standings module so head-to-head tiebreakers are applied
+  // (previous code only sorted by match_points then differential, which missed
+  // the head-to-head step required by algorithm.md).
   const placementMap = new Map<string, number>(); // participant_id → place
-  const { data: participants, error: partError } = await supabase
-    .from("participants")
-    .select("id, match_points, differential, dropped_out")
-    .eq("tournament_id", tournamentId)
-    .order("match_points", { ascending: false });
-
-  if (!partError && participants) {
-    const sorted = [...participants].sort((a, b) => {
-      // Dropped players always rank after active players
-      if (a.dropped_out !== b.dropped_out) return a.dropped_out ? 1 : -1;
-      const mpDiff = (b.match_points || 0) - (a.match_points || 0);
-      if (mpDiff !== 0) return mpDiff;
-      return (b.differential || 0) - (a.differential || 0);
-    });
-
-    for (let i = 0; i < sorted.length; i++) {
-      placementMap.set(sorted[i].id, i + 1);
+  const state = await buildStateFromSupabase(supabase, tournamentId);
+  if (state) {
+    const standings = computeFinalStandings(state);
+    for (const placement of standings) {
+      placementMap.set(placement.participantId, placement.place);
       await supabase
         .from("participants")
-        .update({ place: i + 1 })
-        .eq("id", sorted[i].id);
+        .update({ place: placement.place })
+        .eq("id", placement.participantId);
     }
+    // Dropped players are excluded from `standings` per algorithm.md
+    // ("no place value at all"). Clear any stale `place` left over from a
+    // prior publish so the data accurately reflects their dropped status.
+    await supabase
+      .from("participants")
+      .update({ place: null })
+      .eq("tournament_id", tournamentId)
+      .eq("dropped_out", true);
   }
 
   // Check if copies already exist (previous publish that was unpublished)

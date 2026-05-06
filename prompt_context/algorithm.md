@@ -122,15 +122,14 @@ function rngForRound(tournamentId: string, round: number): () => number {
 
    > **Behavior change vs. current code.** The existing implementation in `pairingUtilsV2.ts` uses two passes — first "no byes yet," then "didn't bye last round" — but the second pass does not prefer fewer byes. That allows over-concentration: a player can get a 3rd bye while another player still only has 1. The single-pass "fewest byes wins" rule above replaces it.
 
-3. **Greedy pairing** (top-down) — official rule:
-   - For each unassigned player from the top of the list:
-     - Find the **highest-ranked unassigned player they have not already played**.
-     - If found, pair them. The first pair created appears first in the resulting match list (preserves `match_order`).
-     - If no eligible opponent is found (every remaining player has already been played), defer this player.
+3. **Backtracking pairing** (top-down) — implementation:
+   - The pairer performs a depth-first search over the rank-sorted pool. The topmost unpaired player tries each unpaired partner in rank order; the search unwinds when a sub-pool admits no legal completion.
+   - The first complete leaf the search returns is the greedy-equivalent solution — when greedy would already produce a no-rematch pairing, the search returns the identical pairing (and `match_order` is assigned top-down exactly as before).
+   - When greedy would have produced an avoidable rematch, the search finds an alternative whenever one exists. A fail-fast prune (any unpaired player with zero legal partners terminates the branch immediately) keeps the common case effectively linear.
 
 4. **Rematch fallback**:
-   - Any players left unpaired after the greedy pass are paired with each other in remaining-list order, even if they have already played. This matches the official guide's acknowledgement: *"In a smaller tournament field, it will sometimes occur that two players will be matched twice."*
-   - **Note**: greedy is non-optimal — it can produce a rematch that careful backtracking would have avoided. This is accepted complexity for v1.
+   - Only fires when the pool admits no rematch-free perfect matching at all — a corner case visible only in tiny fields exhausted across many rounds (e.g., 4 players × 4 rounds).
+   - When it fires, the pool is paired in remaining-list order, even if it produces rematches. This matches the official guide's acknowledgement: *"In a smaller tournament field, it will sometimes occur that two players will be matched twice."*
 
 5. **Defensive case** (Implementation policy): if the greedy + rematch pass leaves exactly one player unpaired (which should not occur with an even pool but is possible if input is inconsistent), assign them a bye.
 

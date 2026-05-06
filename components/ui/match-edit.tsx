@@ -83,22 +83,30 @@ export default function MatchEditModal({
     }
 
     let player1_match_points, player2_match_points;
+    let isTie = false;
+    let winnerId: string | null = null;
 
     if (player2Score === player1Score) {
       player1_match_points = 1.5;
       player2_match_points = 1.5;
+      isTie = true;
+      winnerId = null;
     } else if (player1Score === tournament.max_score) {
       player1_match_points = 3;
       player2_match_points = 0;
+      winnerId = match.player1_id.id;
     } else if (player2Score === tournament.max_score) {
       player1_match_points = 0;
       player2_match_points = 3;
+      winnerId = match.player2_id.id;
     } else if (player1Score > player2Score) {
       player1_match_points = 2;
       player2_match_points = 1;
+      winnerId = match.player1_id.id;
     } else if (player2Score > player1Score) {
       player1_match_points = 1;
       player2_match_points = 2;
+      winnerId = match.player2_id.id;
     }
 
     // Update the match without modifying match_order
@@ -115,6 +123,8 @@ export default function MatchEditModal({
           (player1.data.match_points || 0) + player1_match_points,
         player2_match_points:
           (player2.data.match_points || 0) + player2_match_points,
+        is_tie: isTie,
+        winner_id: winnerId,
         updated_at: new Date(),
       })
       .eq("id", match.id);

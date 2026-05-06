@@ -13,6 +13,8 @@ import ToastNotification from "../../../../components/ui/toast-notification";
 import { createClient } from "../../../../utils/supabase/client";
 import { suggestNumberOfRounds } from "../../../../utils/tournamentUtils";
 import { createPairing } from "../../../../utils/tournament/pairingUtilsV2";
+import { buildStateFromSupabase } from "../../../../utils/tournament/stateAdapter";
+import { recomputeTotalsFromHistory } from "../../../../lib/tournament/results";
 import { loadTournamentDecklistsAction, type TournamentDecklistRow } from "../actions";
 import PublishDecklistsSection from "../../../../components/ui/PublishDecklistsSection";
 
@@ -45,7 +47,7 @@ export default function TournamentPage({
   const [toast, setToast] = useState<{
     message: string;
     show: boolean;
-    type?: "success" | "error";
+    type?: "success" | "error" | "warning" | "info";
   }>({
     message: "",
     show: false,
@@ -58,7 +60,7 @@ export default function TournamentPage({
 
   const showToast = (
     message: string,
-    type: "success" | "error" = "success"
+    type: "success" | "error" | "warning" | "info" = "success"
   ) => {
     setToast({ message, show: true, type });
     setTimeout(() => setToast((prev) => ({ ...prev, show: false })), 2000);
@@ -286,110 +288,62 @@ export default function TournamentPage({
     });
 
     if (matchErrorIndexArr.length > 0) {
-      alert("Please add scores to all matches.");
+      showToast("Please add scores to all matches.", "warning");
       return;
     }
 
     try {
       const now = new Date().toISOString();
 
-      // Updating the matches
+      // Persist is_tie + winner_id on each match row so buildStateFromSupabase
+      // can derive per-player outcomes. (player1_score / player2_score and the
+      // per-row match_points + differential snapshots are already written by
+      // the score-input UI in components/ui/match-edit.tsx — we don't touch
+      // those denormalized snapshots here.)
       for (const match of matches) {
-        // Fetch Participant 1
-        const { error: participant1SelectError, data: participant1 } = await client
-          .from("participants")
-          .select()
-          .eq("id", match.player1_id.id)
-          .single();
-        if (participant1SelectError) throw participant1SelectError;
-
-        // Fetch Participant 2
-        const { error: participant2SelectError, data: participant2 } = await client
-          .from("participants")
-          .select()
-          .eq("id", match.player2_id.id)
-          .single();
-        if (participant2SelectError) throw participant2SelectError;
-
-        if (match.player2_score === match.player1_score) {
-          // Draw: Both get 1.5 points, differential unchanged (tie = 0 diff)
-          await Promise.all([
-            client.from("participants").update({
-              match_points: (participant1.match_points || 0) + 1.5,
-              differential: (participant1.differential || 0),
-            }).eq("id", match.player1_id.id),
-
-            client.from("participants").update({
-              match_points: (participant2.match_points || 0) + 1.5,
-              differential: (participant2.differential || 0),
-            }).eq("id", match.player2_id.id),
-          ]);
-
-        } else if (match.player1_score === tournament.max_score) {
-          // Player 1 Wins (3 points), Player 2 gets 0
-          await Promise.all([
-            client.from("participants").update({
-              match_points: (participant1.match_points || 0) + 3,
-              differential: (match.player1_score - match.player2_score) + (participant1.differential || 0),
-            }).eq("id", match.player1_id.id),
-
-            client.from("participants").update({
-              match_points: (participant2.match_points || 0),
-              differential: (match.player2_score - match.player1_score) + (participant2.differential || 0),
-            }).eq("id", match.player2_id.id),
-          ]);
-
-        } else if (match.player2_score === tournament.max_score) {
-          // Player 2 Wins (3 points), Player 1 gets 0
-          await Promise.all([
-            client.from("participants").update({
-              match_points: (participant2.match_points || 0) + 3,
-              differential: (match.player2_score - match.player1_score) + (participant2.differential || 0),
-            }).eq("id", match.player2_id.id),
-
-            client.from("participants").update({
-              match_points: (participant1.match_points || 0),
-              differential: (match.player1_score - match.player2_score) + (participant1.differential || 0),
-            }).eq("id", match.player1_id.id),
-          ]);
-
+        let isTie = false;
+        let winnerId: string | null = null;
+        if (match.player1_score === match.player2_score) {
+          isTie = true;
         } else if (match.player1_score > match.player2_score) {
-          // Player 1 Wins (2 points), Player 2 gets 0
-          await Promise.all([
-            client.from("participants").update({
-              match_points: (participant1.match_points || 0) + 2,
-              differential: (match.player1_score - match.player2_score) + (participant1.differential || 0),
-            }).eq("id", match.player1_id.id),
-
-            client.from("participants").update({
-              match_points: (participant2.match_points || 0) + 1,
-              differential: (match.player2_score - match.player1_score) + (participant2.differential || 0),
-            }).eq("id", match.player2_id.id),
-          ]);
-
-        } else if (match.player2_score > match.player1_score) {
-          // Player 2 Wins (2 points), Player 1 gets 0
-          await Promise.all([
-            client.from("participants").update({
-              match_points: (participant2.match_points || 0) + 2,
-              differential: (match.player2_score - match.player1_score) + (participant2.differential || 0),
-            }).eq("id", match.player2_id.id),
-
-            client.from("participants").update({
-              match_points: (participant1.match_points || 0) + 1,
-              differential: (match.player1_score - match.player2_score) + (participant1.differential || 0),
-            }).eq("id", match.player1_id.id),
-          ]);
+          winnerId = match.player1_id.id;
+        } else {
+          winnerId = match.player2_id.id;
         }
+        const { error: matchUpdateError } = await client
+          .from("matches")
+          .update({ is_tie: isTie, winner_id: winnerId })
+          .eq("id", match.id);
+        if (matchUpdateError) throw matchUpdateError;
       }
 
-      // Updating byes
-      if (byes && byes.length > 0) {
-        for (const bye of byes) {
-          const { error: participantUpdateError } = await client.from("participants").update({
-            match_points: (bye.match_points ?? 0),
-            differential: (bye.differential ?? 0),
-          }).eq("id", bye.participant_id.id);
+      // Recompute participant totals from full match + bye history.
+      // This is the load-bearing fix for the double-count bug: totals are
+      // always derived from history, never incremented. Editing a result and
+      // re-running this yields the correct total regardless of prior writes.
+      // Byes are accounted for via state.byes inside recomputeTotalsFromHistory,
+      // so no separate bye participants update is needed.
+      const state = await buildStateFromSupabase(client, tournament.id);
+      if (state) {
+        const affectedIds = new Set<string>();
+        for (const m of matches) {
+          if (m.player1_id?.id) affectedIds.add(m.player1_id.id);
+          if (m.player2_id?.id) affectedIds.add(m.player2_id.id);
+        }
+        if (byes && byes.length > 0) {
+          for (const bye of byes) {
+            if (bye.participant_id?.id) affectedIds.add(bye.participant_id.id);
+          }
+        }
+        for (const pid of affectedIds) {
+          const totals = recomputeTotalsFromHistory(pid, state);
+          const { error: participantUpdateError } = await client
+            .from("participants")
+            .update({
+              match_points: totals.gameScore,
+              differential: totals.lostSoulScore,
+            })
+            .eq("id", pid);
           if (participantUpdateError) console.log(participantUpdateError);
         }
       }
@@ -585,17 +539,20 @@ export default function TournamentPage({
             <div className="mb-6 space-y-4">
               {/* Title row with status badge */}
               <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-3xl font-bold">{tournament.name}</h1>
-                <button
-                  onClick={() => {
-                    setNewTournamentName(tournament.name);
-                    setIsEditTournamentModalOpen(true);
-                  }}
-                  className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  aria-label="Edit tournament name"
-                >
-                  <HiPencil className="w-5 h-5" />
-                </button>
+                <h1 className="text-3xl font-bold">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewTournamentName(tournament.name);
+                      setIsEditTournamentModalOpen(true);
+                    }}
+                    className="group inline-flex items-center gap-2 -mx-2 px-2 py-1 rounded-md text-left hover:bg-muted transition-colors"
+                    aria-label="Edit tournament name"
+                  >
+                    <span>{tournament.name}</span>
+                    <HiPencil className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+                  </button>
+                </h1>
                 {/* Status badge */}
                 <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
                   tournament.has_ended

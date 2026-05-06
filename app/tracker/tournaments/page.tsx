@@ -118,13 +118,13 @@ function TournamentsPageInner() {
   };
 
   return (
-    <div className="flex min-h-screen px-5 w-full">
+    <div className="flex min-h-screen px-4 sm:px-5 w-full">
       <div className="max-w-4xl mx-auto space-y-3 w-full">
         <Breadcrumb
           items={[{ label: "Tournaments", href: "/tracker/tournaments" }]}
         />
-        <div className="flex items-center justify-between flex-wrap mb-6">
-          <h1 className="text-2xl font-bold mr-8 mt-2">Your Tournaments</h1>
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-6">
+          <h1 className="text-2xl font-bold mt-2">Your Tournaments</h1>
           <Button
             onClick={() => setisAddTournamentModalOpen(true)}
             className="flex items-center gap-3 mt-2 bg-primary text-primary-foreground hover:bg-primary/90"
@@ -153,45 +153,36 @@ function TournamentsPageInner() {
         ) : tournaments.length === 0 ? (
           <p className="text-muted-foreground">No tournaments found.</p>
         ) : (
-          <div className="overflow-x-auto jayden-gradient-bg rounded-lg">
-            <table className="w-full text-sm text-left">
-              <thead className="text-xs uppercase bg-muted text-muted-foreground">
-                <tr>
-                  <th className="px-6 py-3">Name</th>
-                  <th className="px-6 py-3">Created At</th>
-                  <th className="px-6 py-3">
-                    <span className="sr-only">Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {tournaments.map((tournament) => (
-                  <tr
-                    key={tournament.id}
-                    className="bg-card cursor-pointer hover:bg-muted"
-                    onClick={() =>
-                      router.push(`/tracker/tournaments/${tournament.id}`)
-                    }
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap font-medium text-foreground">
-                      {tournament.name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap min-w-[160px] text-muted-foreground">
-                      {new Intl.DateTimeFormat("en-US", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      }).format(new Date(tournament.created_at))}
-                    </td>
-                    <td className="px-6 py-4 flex items-center justify-end space-x-2">
+          <div className="jayden-gradient-bg rounded-lg overflow-hidden border border-border">
+            <ul className="divide-y divide-border">
+              {tournaments.map((tournament) => (
+                <li
+                  key={tournament.id}
+                  className="bg-card cursor-pointer hover:bg-muted transition-colors"
+                  onClick={() =>
+                    router.push(`/tracker/tournaments/${tournament.id}`)
+                  }
+                >
+                  <div className="flex items-center gap-2 px-4 sm:px-6 py-3 sm:py-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-foreground truncate">
+                        {tournament.name}
+                      </p>
+                      <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                        {new Intl.DateTimeFormat("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        }).format(new Date(tournament.created_at))}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           router.push(`/tracker/tournaments/${tournament.id}`);
                         }}
-                        className="p-2 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                        className="p-2 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors touch-manipulation"
                         aria-label="Edit"
                       >
                         <HiPencil className="w-5 h-5" />
@@ -201,16 +192,16 @@ function TournamentsPageInner() {
                           e.stopPropagation();
                           deleteTournament(tournament.id);
                         }}
-                        className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                        className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors touch-manipulation"
                         aria-label="Delete"
                       >
                         <HiTrash className="w-5 h-5" />
                       </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
         <ToastNotification
