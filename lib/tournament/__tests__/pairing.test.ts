@@ -270,3 +270,43 @@ describe('pairLaterRound', () => {
     expect(ids).toEqual(['B', 'C']);
   });
 });
+
+describe('pairLaterRound determinism', () => {
+  it('produces identical output for the same (state, round, rng)', () => {
+    // 6 players, 2 rounds played. R3 has multiple legal pairings; assert
+    // that two independent runs produce byte-identical match lists.
+    const participants = ['A', 'B', 'C', 'D', 'E', 'F'].map(id => makeParticipant(id));
+    const matches = [
+      recordedMatch(1, 'A', 'B', 'full_win', 'full_loss'),
+      recordedMatch(1, 'C', 'D', 'full_win', 'full_loss'),
+      recordedMatch(1, 'E', 'F', 'full_win', 'full_loss'),
+      recordedMatch(2, 'A', 'C', 'full_win', 'full_loss'),
+      recordedMatch(2, 'B', 'D', 'full_win', 'full_loss'),
+      recordedMatch(2, 'E', 'F', 'tie', 'tie', 3, 3),
+    ];
+    const state = tState(participants, matches);
+    const r1 = pairLaterRound(state, 3, rngForRound('det-t', 3));
+    const r2 = pairLaterRound(state, 3, rngForRound('det-t', 3));
+    expect(r1).toEqual(r2);
+  });
+
+  it('assigns matchOrder rank-top-down (top-most pair gets matchOrder 1)', () => {
+    // 4 players with clearly-separated standings: A (top), B (mid), C (mid), D (bottom).
+    // R2 with no rematches available — backtracking should produce A's pair first.
+    const participants = ['A', 'B', 'C', 'D'].map(id => makeParticipant(id));
+    // R1: A>B (full), C>D (full). After R1: A=3,+5; B=0,-5; C=3,+5; D=0,-5.
+    // Sort: [A, C, B, D] (stable input order within tied buckets).
+    const matches = [
+      recordedMatch(1, 'A', 'B', 'full_win', 'full_loss'),
+      recordedMatch(1, 'C', 'D', 'full_win', 'full_loss'),
+    ];
+    const state = tState(participants, matches);
+    const result = pairLaterRound(state, 2, rngForRound('order-t', 2));
+    expect(result.matches).toHaveLength(2);
+    expect(result.matches[0].matchOrder).toBe(1);
+    expect(result.matches[1].matchOrder).toBe(2);
+    // The first pair must contain A (the top-most player in the sort).
+    const firstPair = [result.matches[0].player1Id, result.matches[0].player2Id];
+    expect(firstPair).toContain('A');
+  });
+});
