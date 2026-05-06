@@ -146,5 +146,12 @@ Offline intallable app on phone (Progressive Web app with offline capabilities)
 
 # play features
 save game, load game, invite to game?
-Ghost cards... from exchange option
 battle phase/zone could be better
+
+
+# Tournament tracker improvements
+fix pairing bugs
+add ability to re-pair mid-round
+mobile support
+double checking colors
+add place where all tournament timers could be seen in one place
