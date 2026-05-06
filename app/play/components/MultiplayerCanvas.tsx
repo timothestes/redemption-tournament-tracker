@@ -1449,7 +1449,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     }
     const ids = selected.map(c => String(c.id));
     const fromSource = position === 'top' ? 'top-of-deck' : position === 'bottom' ? 'bottom-of-deck' : 'random-from-deck';
-    if (ids.length > 0) gameState.moveCardsBatch(JSON.stringify(ids), targetZone, undefined, undefined, fromSource);
+    // Reserve/discard/banish on the opponent's deck are *their* private piles
+    // — the card stays with them. Without an explicit targetOwnerId, the
+    // server's "actor takes opponent's card" home-routing would send it to
+    // our pile instead. Hand is the exception: the actor draws into their
+    // own hand, so leave targetOwnerId unset.
+    const opponentId = gameState.opponentPlayer?.id;
+    const targetOwnerId =
+      opponentId !== undefined && (targetZone === 'reserve' || targetZone === 'discard' || targetZone === 'banish')
+        ? String(opponentId)
+        : undefined;
+    if (ids.length > 0) gameState.moveCardsBatch(JSON.stringify(ids), targetZone, undefined, targetOwnerId, fromSource);
   }, [opponentCards, gameState]);
 
   // ---- Shared Soul Deck handlers (Paragon). Pick N card IDs from the shared

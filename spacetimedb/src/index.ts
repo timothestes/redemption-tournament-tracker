@@ -1995,10 +1995,12 @@ export const move_card = spacetimedb.reducer(
     // Lost souls sent to discard or reserve go to land-of-bondage instead
     const isLostSoul = card.cardType === 'LS' || card.cardName.toLowerCase().includes('lost soul');
     if (isLostSoul && (toZone === 'discard' || toZone === 'reserve' || toZone === 'banish')) {
-      // A drop on the actor's own pile routes home; an explicit drop on
-      // someone else's pile honors the caller's choice.
-      const droppedOnOwnZone = !targetOwnerId || BigInt(targetOwnerId) === player.id;
-      const lobOwnerId = droppedOnOwnZone ? homeOwnerId : BigInt(targetOwnerId);
+      // Lost Souls inherently belong to their deck — they always go to the
+      // deck owner's LoB, even when an opponent's effect drives them out of
+      // a hidden zone (e.g. reserving the opponent's top deck card and
+      // revealing a lost soul). The "taking opponent's card" home-routing
+      // rule does not apply: a Lost Soul is never actually taken.
+      const lobOwnerId = card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId;
       const lobIndex = BigInt(
         gameCards.filter(
           (c: any) => c.ownerId === lobOwnerId && c.zone === 'land-of-bondage'
@@ -2419,8 +2421,8 @@ export const move_cards_batch = spacetimedb.reducer(
       // Lost souls sent to discard or reserve go to land-of-bondage instead
       const isLostSoul = card.cardType === 'LS' || card.cardName.toLowerCase().includes('lost soul');
       if (isLostSoul && (toZone === 'discard' || toZone === 'reserve' || toZone === 'banish')) {
-        const droppedOnOwnZone = newOwnerId === null || newOwnerId === player.id;
-        const lobOwnerId = droppedOnOwnZone ? homeOwnerId : newOwnerId;
+        // Lost Souls always go to the deck owner's LoB — see move_card.
+        const lobOwnerId = card.originalOwnerId !== 0n ? card.originalOwnerId : card.ownerId;
         const lobIndex = BigInt(
           [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
             (c: any) => c.ownerId === lobOwnerId && c.zone === 'land-of-bondage'
