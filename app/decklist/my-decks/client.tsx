@@ -1317,10 +1317,12 @@ function DropdownMenu({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [showMoveMenu, setShowMoveMenu] = useState(false);
+  const [submenuOnLeft, setSubmenuOnLeft] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const moveItemRef = useRef<HTMLDivElement>(null);
 
   function handleToggle() {
     if (!isOpen && buttonRef.current) {
@@ -1340,6 +1342,14 @@ function DropdownMenu({
     }
     setIsOpen(!isOpen);
   }
+
+  // Flip submenu to left side when it would overflow the right edge of the viewport
+  useEffect(() => {
+    if (!showMoveMenu || !moveItemRef.current) return;
+    const rect = moveItemRef.current.getBoundingClientRect();
+    const submenuWidth = 192; // w-48
+    setSubmenuOnLeft(rect.right + 8 + submenuWidth > window.innerWidth);
+  }, [showMoveMenu]);
 
   // Reposition on scroll/resize while open
   useEffect(() => {
@@ -1511,7 +1521,7 @@ function DropdownMenu({
 
             {/* Move to Folder submenu */}
             <div className="border-t border-border my-1"></div>
-            <div className="relative">
+            <div className="relative" ref={moveItemRef}>
               <button
                 onClick={() => setShowMoveMenu(!showMoveMenu)}
                 className="w-full text-left px-4 py-2 hover:bg-muted flex items-center gap-2"
@@ -1520,13 +1530,13 @@ function DropdownMenu({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                 </svg>
                 <span className="flex-1">Move to...</span>
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <svg className={`w-4 h-4 ${submenuOnLeft ? "rotate-180" : ""}`} fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
                 </svg>
               </button>
 
               {showMoveMenu && (
-                <div className="absolute left-full top-0 ml-1 w-48 bg-card rounded-md shadow-lg border border-border max-h-60 overflow-y-auto">
+                <div className={`absolute top-0 w-48 bg-card rounded-md shadow-lg border border-border max-h-60 overflow-y-auto ${submenuOnLeft ? "right-full mr-1" : "left-full ml-1"}`}>
                   <button
                     onClick={() => {
                       onMove(null);
