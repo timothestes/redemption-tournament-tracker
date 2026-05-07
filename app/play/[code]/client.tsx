@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useSpacetimeConnection } from '@/app/play/hooks/useSpacetimeConnection';
-import { SpacetimeProvider } from '@/app/play/lib/spacetimedb-provider';
+import { SpacetimeConnectionResetWrapper } from '@/app/play/components/SpacetimeConnectionResetWrapper';
+import ReconnectOnResume from '@/app/play/components/ReconnectOnResume';
 import { useGameState } from '@/app/play/hooks/useGameState';
 import { useSpacetimeDB } from 'spacetimedb/react';
 import GameOverOverlay, { deriveEndReason } from '@/app/play/components/GameOverOverlay';
@@ -91,13 +92,14 @@ export function GameClient({ code }: GameClientProps) {
   }
 
   return (
-    <SpacetimeProvider connectionBuilder={connectionBuilder}>
+    <SpacetimeConnectionResetWrapper connectionBuilder={connectionBuilder}>
+      <ReconnectOnResume />
       <CardPreviewProvider storageKey="multiplayer-loupe-visible" defaultVisible>
         <SpreadHandProvider>
           <GameInner code={code} isConnected={isConnected} />
         </SpreadHandProvider>
       </CardPreviewProvider>
-    </SpacetimeProvider>
+    </SpacetimeConnectionResetWrapper>
   );
 }
 
