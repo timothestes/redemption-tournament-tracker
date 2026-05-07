@@ -7,6 +7,7 @@ import { useConnectionReset } from './SpacetimeConnectionResetWrapper';
 import {
   shouldRequireResetWithoutPing,
   shouldRequirePingCheck,
+  type ConnectionHealthKind,
 } from '@/app/play/lib/connectionResetDecision';
 
 const PING_TIMEOUT_MS = 5_000;
@@ -19,13 +20,12 @@ const PING_TIMEOUT_MS = 5_000;
  * AND inside <SpacetimeProvider> (for getConnection().procedures.ping).
  */
 export default function ReconnectOnResume() {
-  const { triggerReset, connectionHealth } = useConnectionReset();
+  const { triggerReset } = useConnectionReset();
   const spacetimeCtx = useSpacetimeDB() as any;
   const lastHiddenAtRef = useRef<number | null>(null);
   // Stable refs so the effect below has empty deps (event listeners must
   // not be re-attached on every render).
   const triggerResetRef = useRef(triggerReset);
-  const connectionHealthRef = useRef(connectionHealth);
   const getConnectionRef = useRef<() => DbConnection | null>(
     () => spacetimeCtx?.getConnection?.() ?? null
   );
@@ -33,9 +33,6 @@ export default function ReconnectOnResume() {
   useEffect(() => {
     triggerResetRef.current = triggerReset;
   }, [triggerReset]);
-  useEffect(() => {
-    connectionHealthRef.current = connectionHealth;
-  }, [connectionHealth]);
   useEffect(() => {
     getConnectionRef.current = () => spacetimeCtx?.getConnection?.() ?? null;
   }, [spacetimeCtx]);
@@ -50,7 +47,15 @@ export default function ReconnectOnResume() {
         ? Date.now() - lastHiddenAtRef.current
         : 0;
       lastHiddenAtRef.current = null;
-      const kind = connectionHealthRef.current;
+
+      // Read the SDK's authoritative isActive flag rather than our React-state
+      // connectionHealth. React state can lag the SDK during StrictMode dev
+      // double-mount: the wrapper's onConnect callback closes over the
+      // discarded first-instance setter, so connectionHealth can stay at its
+      // 'dropped' initial value even while the WS is alive. Reading isActive
+      // directly avoids the race entirely.
+      const sdkConn = getConnectionRef.current();
+      const kind: ConnectionHealthKind = sdkConn?.isActive ? 'live' : 'dropped';
 
       // Path 1: connection isn't live → reset immediately.
       if (shouldRequireResetWithoutPing({ kind })) {

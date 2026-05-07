@@ -71,10 +71,18 @@ export function SpacetimeConnectionResetWrapper({ connectionBuilder, children }:
   const [connectionHealth, setConnectionHealth] = useState<ConnectionHealthKind>('dropped');
   const lastReconnectAtRef = useRef(0);
 
+  // Mirror resetPhase into a ref so callbacks captured in useMemo (which has
+  // [connectionBuilder] as deps and won't re-create when resetPhase changes)
+  // can read the current value rather than a stale closure.
+  const resetPhaseRef = useRef(resetPhase);
+  useEffect(() => {
+    resetPhaseRef.current = resetPhase;
+  }, [resetPhase]);
+
   const triggerReset = useCallback(
     (reason: string): boolean => {
       const now = Date.now();
-      if (resetPhase === 'restarting') {
+      if (resetPhaseRef.current === 'restarting') {
         console.log('[connection-reset] skip — already restarting; reason:', reason);
         return false;
       }
@@ -88,7 +96,7 @@ export function SpacetimeConnectionResetWrapper({ connectionBuilder, children }:
       setResetPhase('restarting');
       return true;
     },
-    [resetPhase]
+    []
   );
 
   // After the wrapper renders `null` (because resetPhase === 'restarting'),
@@ -117,21 +125,19 @@ export function SpacetimeConnectionResetWrapper({ connectionBuilder, children }:
           setConnectionHealth('live');
         })
         .onDisconnect(() => {
+          // Early-return BEFORE touching state when a reset is already in
+          // flight. Otherwise an SDK disconnect that fires during our own
+          // null-tick remount would pollute connectionHealth and trigger a
+          // second reset on top of the first.
+          if (resetPhaseRef.current === 'restarting') return;
           setConnectionHealth(prev => (prev === 'down' ? 'down' : 'dropped'));
-          // onDisconnect → immediate reset. The connection is provably
-          // dead; no point waiting for any other signal.
-          if (resetPhase !== 'restarting') {
-            triggerResetRef.current('sdk onDisconnect');
-          }
+          triggerResetRef.current('sdk onDisconnect');
         })
         .onConnectError((_ctx: ErrorContext, err: Error) => {
           console.error('[connection-reset] onConnectError:', err.message);
           setConnectionHealth('down');
           triggerResetRef.current('sdk onConnectError');
         }),
-    // resetPhase intentionally NOT in deps — we use triggerResetRef to
-    // always read the latest triggerReset closure. Otherwise the augmented
-    // builder identity changes constantly and that breaks the SDK provider.
     [connectionBuilder]
   );
 
