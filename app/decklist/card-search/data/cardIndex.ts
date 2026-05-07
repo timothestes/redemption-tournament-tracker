@@ -12,10 +12,45 @@ import { NT_BOOKS, OT_BOOKS, GOSPEL_BOOKS } from "../constants";
 
 const gospelBooksLower = GOSPEL_BOOKS.map((b) => b.toLowerCase());
 const ntBooksLower = NT_BOOKS.map((b) => b.toLowerCase());
-const otBooksLower = OT_BOOKS.map((b) => b.toLowerCase());
+// Data uses singular "Psalm 60:5" while OT_BOOKS lists "psalms" — keep both as valid OT prefixes.
+const otBooksLower = [...OT_BOOKS.map((b) => b.toLowerCase()), "psalm"];
 
 function normalizeBookName(ref: string): string {
   return ref.replace(/^(i{1,3}|1|2|3|4|one|two|three|four)\s+/i, "").trim();
+}
+
+// Manual Testament overrides for cards with empty reference fields in carddata.txt.
+// Keyed by `name|set|imgFile` (matches dataLine).
+const TESTAMENT_OVERRIDES: ReadonlyMap<string, "NT" | "OT"> = new Map([
+  ["A Child is Born|Pmo-P1|A_Child_is_Born_(Promo)", "NT"],
+  ["Caleb (Promo)|Pmo-P1|Caleb_(Promo)", "OT"],
+  ["King Solomon (Promo)|Pmo-P1|King_Solomon_(Promo)", "OT"],
+  ["Mary's Prophetic Act|Pmo-P1|Mary's_Prophetic_Act_(Promo)", "NT"],
+  ["Threatened Lives|AW|Threatened_Lives_(AW)", "OT"],
+]);
+
+function startsWithBook(text: string, book: string): boolean {
+  if (!text.startsWith(book)) return false;
+  const next = text[book.length];
+  // Require a word boundary so "psalm" doesn't match "psalms" and "john" doesn't match "johnson".
+  return next === undefined || !/[a-z0-9]/i.test(next);
+}
+
+function getTestamentForRef(ref: string): "NT" | "OT" | null {
+  const lower = ref.toLowerCase().trim();
+  if (!lower) return null;
+
+  if (startsWithBook(lower, "old testament")) return "OT";
+  if (startsWithBook(lower, "new testament")) return "NT";
+
+  const normalized = normalizeBookName(lower);
+  for (const book of ntBooksLower) {
+    if (startsWithBook(lower, book) || startsWithBook(normalized, book)) return "NT";
+  }
+  for (const book of otBooksLower) {
+    if (startsWithBook(lower, book) || startsWithBook(normalized, book)) return "OT";
+  }
+  return null;
 }
 
 function deriveTestamentAndGospel(reference: string): { testament: string; isGospel: boolean } {
@@ -33,14 +68,10 @@ function deriveTestamentAndGospel(reference: string): { testament: string; isGos
     }
   }
 
-  const referencesLower = references.map((r) => r.toLowerCase());
-
   const foundTestaments = new Set<string>();
-  for (const ref of referencesLower) {
-    const book = ref.split(" ")[0];
-    const normalizedBook = normalizeBookName(ref).split(" ")[0];
-    if (ntBooksLower.some((b) => book === b || normalizedBook === b)) foundTestaments.add("NT");
-    if (otBooksLower.some((b) => book === b || normalizedBook === b)) foundTestaments.add("OT");
+  for (const ref of references) {
+    const t = getTestamentForRef(ref);
+    if (t) foundTestaments.add(t);
   }
 
   let testament = "";
@@ -50,13 +81,18 @@ function deriveTestamentAndGospel(reference: string): { testament: string; isGos
     testament = Array.from(foundTestaments).join("/");
   }
 
+  const referencesLower = references.map((r) => r.toLowerCase());
   const isGospel = referencesLower.some((ref) => gospelBooksLower.some((b) => ref.startsWith(b)));
 
   return { testament, isGospel };
 }
 
 export const ALL_CARDS: Card[] = CARDS.map((c) => {
-  const { testament, isGospel } = deriveTestamentAndGospel(c.reference);
+  const dataLine = `${c.name}|${c.set}|${c.imgFile}`;
+  const derived = deriveTestamentAndGospel(c.reference);
+  const override = TESTAMENT_OVERRIDES.get(dataLine);
+  const testament = override ?? derived.testament;
+  const isGospel = derived.isGospel;
 
   let normalizedBrigades: string[] = [];
   try {
@@ -66,7 +102,7 @@ export const ALL_CARDS: Card[] = CARDS.map((c) => {
   }
 
   return {
-    dataLine: `${c.name}|${c.set}|${c.imgFile}`,
+    dataLine,
     name: c.name,
     set: c.set,
     imgFile: c.imgFile,
