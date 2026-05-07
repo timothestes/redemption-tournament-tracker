@@ -5563,3 +5563,11 @@ export const onDisconnect = spacetimedb.clientDisconnected((ctx) => {
     });
   }
 });
+
+// ---------------------------------------------------------------------------
+// Procedure: ping
+// Used by client-side connection-resilience logic to verify a WebSocket
+// round-trip after the page returns from being hidden. Side-effect-free.
+// Returns 'pong' on a healthy connection.
+// ---------------------------------------------------------------------------
+export const ping = spacetimedb.procedure(t.string(), (_ctx) => 'pong');
