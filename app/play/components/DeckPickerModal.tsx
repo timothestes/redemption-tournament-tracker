@@ -33,9 +33,21 @@ interface DeckPickerModalProps {
 }
 
 // ─── Skeleton card for loading state ────────────────────────────────
+// Mirrors DeckPickerCard structure so the skeleton's height matches the
+// real card (h-24 image + body rows). withAuthor adds the third text row
+// shown on Community cards.
 
-function SkeletonCard() {
-  return <div className="animate-pulse rounded-lg bg-muted h-[140px]" />;
+function SkeletonCard({ withAuthor }: { withAuthor?: boolean }) {
+  return (
+    <div className="animate-pulse rounded-lg border border-border bg-gradient-to-br from-card to-muted/40 overflow-hidden flex flex-col">
+      <div className="h-24 bg-muted" />
+      <div className="px-3 py-2 flex flex-col gap-0.5">
+        <div className="h-5 w-3/4 bg-muted rounded" />
+        <div className="h-4 w-1/2 bg-muted rounded" />
+        {withAuthor && <div className="h-4 w-2/5 bg-muted rounded" />}
+      </div>
+    </div>
+  );
 }
 
 // ─── Shared inner content ───────────────────────────────────────────
@@ -333,7 +345,7 @@ function DeckPickerContent({
           isSearching ? (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {Array.from({ length: COMMUNITY_PAGE_SIZE }).map((_, i) => (
-                <SkeletonCard key={i} />
+                <SkeletonCard key={i} withAuthor />
               ))}
             </div>
           ) : communityResults.length === 0 ? (

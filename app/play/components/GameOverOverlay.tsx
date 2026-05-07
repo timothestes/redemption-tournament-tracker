@@ -187,7 +187,7 @@ export default function GameOverOverlay({
 
             <div style={{ marginTop: 24, display: 'flex', gap: 12 }}>
               <button
-                onClick={() => setModalDismissed(true)}
+                onClick={onReturnToLobby}
                 style={{
                   flex: 1,
                   padding: '10px 16px',
@@ -203,10 +203,10 @@ export default function GameOverOverlay({
                   cursor: 'pointer',
                 }}
               >
-                Dismiss
+                Back to Lobby
               </button>
               <button
-                onClick={onReturnToLobby}
+                onClick={() => setModalDismissed(true)}
                 style={{
                   flex: 1,
                   padding: '10px 16px',
@@ -222,7 +222,7 @@ export default function GameOverOverlay({
                   cursor: 'pointer',
                 }}
               >
-                Back to Lobby
+                Dismiss
               </button>
             </div>
           </div>
