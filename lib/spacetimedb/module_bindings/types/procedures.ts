@@ -6,5 +6,8 @@
 import { type Infer as __Infer } from "spacetimedb";
 
 // Import all procedure arg schemas
+import * as PingProcedure from "../ping_procedure";
 
+export type PingArgs = __Infer<typeof PingProcedure.params>;
+export type PingResult = __Infer<typeof PingProcedure.returnType>;
 

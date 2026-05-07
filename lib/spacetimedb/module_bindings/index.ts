@@ -109,6 +109,7 @@ import UpdateCardPositionReducer from "./update_card_position_reducer";
 import UpdateLobbyMessageReducer from "./update_lobby_message_reducer";
 
 // Import all procedure arg schemas
+import * as PingProcedure from "./ping_procedure";
 
 // Import all table schema definitions
 import CardCounterRow from "./card_counter_table";
@@ -368,6 +369,7 @@ const reducersSchema = __reducers(
 
 /** The schema information for all procedures in this module. This is defined the same way as the procedures would have been defined in the server. */
 const proceduresSchema = __procedures(
+  __procedureSchema("ping", PingProcedure.params, PingProcedure.returnType),
 );
 
 /** The remote SpacetimeDB module schema, both runtime and type information. */
