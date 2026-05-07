@@ -468,8 +468,15 @@ export default function CardSearchClient() {
     }
     if (filters.selectedAlignmentFilters.length > 0) params.set('alignment', filters.selectedAlignmentFilters.join(','));
     if (filters.selectedRarityFilters.length > 0) params.set('rarity', filters.selectedRarityFilters.join(','));
-    if (filters.selectedTestaments.length > 0) params.set('testaments', filters.selectedTestaments.join(','));
-    if (filters.isGospel) params.set('gospel', 'true');
+    if (filters.selectedTestaments.length > 0) {
+      params.set('testaments', filters.selectedTestaments.join(','));
+      const negatedTestaments = filters.selectedTestaments.filter((t: string) => filters.testamentNots?.[t]);
+      if (negatedTestaments.length > 0) params.set('testamentNots', negatedTestaments.join(','));
+    }
+    if (filters.isGospel) {
+      params.set('gospel', 'true');
+      if (filters.gospelNot) params.set('gospelNot', 'true');
+    }
     if (filters.strengthFilter !== null) {
       params.set('strength', filters.strengthFilter.toString());
       params.set('strengthOp', filters.strengthOp);
@@ -480,13 +487,34 @@ export default function CardSearchClient() {
     }
     if (!filters.noAltArt) params.set('showAltArt', 'true');
     if (!filters.noFirstPrint) params.set('showFirstPrint', 'true');
-    if (filters.nativityOnly) params.set('nativity', 'true');
-    if (filters.hasStarOnly) params.set('hasStar', 'true');
-    if (filters.cloudOnly) params.set('cloud', 'true');
-    if (filters.angelOnly) params.set('angel', 'true');
-    if (filters.demonOnly) params.set('demon', 'true');
-    if (filters.danielOnly) params.set('daniel', 'true');
-    if (filters.postexilicOnly) params.set('postexilic', 'true');
+    if (filters.nativityOnly) {
+      params.set('nativity', 'true');
+      if (filters.nativityNot) params.set('nativityNot', 'true');
+    }
+    if (filters.hasStarOnly) {
+      params.set('hasStar', 'true');
+      if (filters.hasStarNot) params.set('hasStarNot', 'true');
+    }
+    if (filters.cloudOnly) {
+      params.set('cloud', 'true');
+      if (filters.cloudNot) params.set('cloudNot', 'true');
+    }
+    if (filters.angelOnly) {
+      params.set('angel', 'true');
+      if (filters.angelNot) params.set('angelNot', 'true');
+    }
+    if (filters.demonOnly) {
+      params.set('demon', 'true');
+      if (filters.demonNot) params.set('demonNot', 'true');
+    }
+    if (filters.danielOnly) {
+      params.set('daniel', 'true');
+      if (filters.danielNot) params.set('danielNot', 'true');
+    }
+    if (filters.postexilicOnly) {
+      params.set('postexilic', 'true');
+      if (filters.postexilicNot) params.set('postexilicNot', 'true');
+    }
     if (mode === 'spotlight') params.set('mode', 'spotlight');
 
     const url = params.toString() ? `?${params.toString()}` : '';
@@ -546,29 +574,42 @@ export default function CardSearchClient() {
       setSelectedAlignmentFilters(searchParams.get('alignment')?.split(',').filter(Boolean) || []);
       setSelectedRarityFilters(searchParams.get('rarity')?.split(',').filter(Boolean) || []);
       setSelectedTestaments(searchParams.get('testaments')?.split(',').filter(Boolean) || []);
+      const testamentNotsParam = searchParams.get('testamentNots');
+      if (testamentNotsParam) {
+        const negated = testamentNotsParam.split(',').filter(Boolean);
+        setTestamentNots(Object.fromEntries(negated.map(t => [t, true])));
+      }
       setIsGospel(searchParams.get('gospel') === 'true');
-      
+      setGospelNot(searchParams.get('gospelNot') === 'true');
+
       const strengthParam = searchParams.get('strength');
       if (strengthParam) {
         setStrengthFilter(parseInt(strengthParam, 10));
         setStrengthOp(searchParams.get('strengthOp') || 'eq');
       }
-      
+
       const toughnessParam = searchParams.get('toughness');
       if (toughnessParam) {
         setToughnessFilter(parseInt(toughnessParam, 10));
         setToughnessOp(searchParams.get('toughnessOp') || 'eq');
       }
-      
+
       setnoAltArt(searchParams.get('showAltArt') !== 'true');
       setnoFirstPrint(searchParams.get('showFirstPrint') !== 'true');
       setNativityOnly(searchParams.get('nativity') === 'true');
+      setNativityNot(searchParams.get('nativityNot') === 'true');
       setHasStarOnly(searchParams.get('hasStar') === 'true');
+      setHasStarNot(searchParams.get('hasStarNot') === 'true');
       setCloudOnly(searchParams.get('cloud') === 'true');
+      setCloudNot(searchParams.get('cloudNot') === 'true');
       setAngelOnly(searchParams.get('angel') === 'true');
+      setAngelNot(searchParams.get('angelNot') === 'true');
       setDemonOnly(searchParams.get('demon') === 'true');
+      setDemonNot(searchParams.get('demonNot') === 'true');
       setDanielOnly(searchParams.get('daniel') === 'true');
+      setDanielNot(searchParams.get('danielNot') === 'true');
       setPostexilicOnly(searchParams.get('postexilic') === 'true');
+      setPostexilicNot(searchParams.get('postexilicNot') === 'true');
       
       // Spotlight mode from URL (desktop only)
       if (searchParams.get('mode') === 'spotlight' && !window.matchMedia("(max-width: 767px)").matches) {
@@ -589,7 +630,9 @@ export default function CardSearchClient() {
       selectedAlignmentFilters,
       selectedRarityFilters,
       selectedTestaments,
+      testamentNots,
       isGospel,
+      gospelNot,
       strengthFilter,
       strengthOp,
       toughnessFilter,
@@ -597,21 +640,30 @@ export default function CardSearchClient() {
       noAltArt,
       noFirstPrint,
       nativityOnly,
+      nativityNot,
       hasStarOnly,
+      hasStarNot,
       cloudOnly,
+      cloudNot,
       angelOnly,
+      angelNot,
       demonOnly,
+      demonNot,
       danielOnly,
+      danielNot,
       postexilicOnly,
+      postexilicNot,
     };
-    
+
     updateURL(filters);
   }, [
     queries, legalityMode, iconFilterMode, selectedIconFilters,
-    selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, isGospel, strengthFilter,
+    selectedAlignmentFilters, selectedRarityFilters, selectedTestaments, testamentNots,
+    isGospel, gospelNot, strengthFilter,
     strengthOp, toughnessFilter, toughnessOp, noAltArt, noFirstPrint,
-    nativityOnly, hasStarOnly, cloudOnly, angelOnly, demonOnly, danielOnly,
-    postexilicOnly, updateURL, mode
+    nativityOnly, nativityNot, hasStarOnly, hasStarNot, cloudOnly, cloudNot,
+    angelOnly, angelNot, demonOnly, demonNot, danielOnly, danielNot,
+    postexilicOnly, postexilicNot, updateURL, mode
   ]);
 
   // Note: We don't warn on page unload because the deck is always saved to localStorage
