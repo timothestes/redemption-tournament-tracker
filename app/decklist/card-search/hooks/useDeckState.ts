@@ -5,10 +5,9 @@ import { saveDeckAction, loadDeckByIdAction, DeckCardData } from "../../actions"
 import { CARD_BY_FULL_KEY } from "../data/cardIndex";
 
 const STORAGE_KEY = "redemption-deck-builder-current-deck";
-const AUTOSAVE_DEBOUNCE_MS = 1500;
 
 // Stable serialization of the persisted parts of a deck for change detection.
-// Used to skip redundant autosaves and to drive the "in-flight changes" indicator.
+// Drives the "Unsaved Changes" indicator and skips no-op saves.
 function snapshotDeck(d: Deck): string {
   const sortedCards = d.cards
     .map((c) => `${c.card.name}|${c.card.set}|${c.quantity}|${c.isReserve ? 1 : 0}`)
@@ -37,21 +36,14 @@ export interface SyncStatus {
   error: string | null;
 }
 
-export interface UseDeckStateOptions {
-  /** Whether to auto-save deck changes to the cloud (debounced). Requires the user to be authenticated. */
-  autosaveEnabled?: boolean;
-}
-
 /**
  * Custom hook for managing deck state with localStorage persistence and cloud sync
  */
 export function useDeckState(
   initialDeckId?: string,
   initialFolderId?: string | null,
-  isNewDeck?: boolean,
-  options?: UseDeckStateOptions
+  isNewDeck?: boolean
 ) {
-  const autosaveEnabled = options?.autosaveEnabled ?? false;
   // Initialize with default deck to avoid hydration mismatch
   const [deck, setDeck] = useState<Deck>(getDefaultDeck);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
@@ -64,14 +56,12 @@ export function useDeckState(
   const isInitialMount = useRef(true);
   const hasLoadedFromStorage = useRef(false);
 
-  // Mirror of `deck` for use inside async callbacks (autosave reads the latest deck via ref)
+  // Mirror of `deck` for use inside async callbacks that need the latest deck without a stale closure
   const deckRef = useRef(deck);
-  // Snapshot of the most recently saved (or just-loaded) deck — used to dedup autosaves
+  // Snapshot of the most recently saved (or just-loaded) deck — drives the dirty flag and skips no-op saves
   const lastSavedSnapshotRef = useRef<string | null>(null);
-  // Serializes saves so a manual + debounced autosave can't race
+  // Serializes saves so two saves can't race
   const savePromiseRef = useRef<Promise<unknown> | null>(null);
-  // Pending autosave debounce timer
-  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     deckRef.current = deck;
@@ -214,7 +204,7 @@ export function useDeckState(
           updatedAt: new Date(cloudDeck.updated_at),
         };
 
-        // Mark the loaded deck as the baseline so autosave doesn't immediately re-save it
+        // Set the saved-snapshot baseline so the dirty flag starts clean
         lastSavedSnapshotRef.current = snapshotDeck(loadedDeck);
         setDeck(loadedDeck);
         setHasUnsavedChanges(false);
@@ -249,7 +239,7 @@ export function useDeckState(
   const saveDeckToCloud = useCallback(async (overrideName?: string, overrideDeck?: Deck) => {
     const isExplicitCall = overrideName !== undefined || overrideDeck !== undefined;
 
-    // Serialize: chain this save behind any in-flight one so autosave + manual save can't race
+    // Serialize: chain this save behind any in-flight one so two saves can't race
     const previous = savePromiseRef.current;
     const next = (async () => {
       if (previous) {
@@ -259,7 +249,7 @@ export function useDeckState(
       try {
         const targetDeck = overrideDeck ?? deckRef.current;
 
-        // Autosave path: skip if nothing has changed since the last successful save
+        // Skip if nothing has changed since the last successful save
         if (!isExplicitCall && snapshotDeck(targetDeck) === lastSavedSnapshotRef.current) {
           return { success: true, deckCheckResult: null, skipped: true } as const;
         }
@@ -306,7 +296,7 @@ export function useDeckState(
         if (result.success) {
           const savedId = result.deckId ?? targetDeck.id;
           // Snapshot the saved state (with its potentially-new id) so subsequent
-          // autosaves correctly recognize there's nothing to do.
+          // saves dedup and the dirty flag goes clean.
           lastSavedSnapshotRef.current = snapshotDeck({ ...targetDeck, id: savedId });
 
           // Update deck with the ID if it was newly created
@@ -354,37 +344,6 @@ export function useDeckState(
     }
   }, []);
 
-  // Autosave: 1.5s after the last edit, push the deck to the cloud.
-  // Skips when not authenticated, while still hydrating, or when nothing has changed.
-  useEffect(() => {
-    if (!autosaveEnabled) return;
-    if (isInitializing) return;
-    if (isInitialMount.current) return;
-
-    // For never-saved decks, require at least 40 cards before creating a DB row.
-    // Once a deck has an id, keep syncing every change unconditionally so edits
-    // to an existing saved deck never get dropped.
-    if (!deck.id) {
-      const totalCards = deck.cards.reduce((sum, c) => sum + c.quantity, 0);
-      if (totalCards < 40) return;
-    }
-
-    if (snapshotDeck(deck) === lastSavedSnapshotRef.current) return;
-
-    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
-    autosaveTimerRef.current = setTimeout(() => {
-      autosaveTimerRef.current = null;
-      // Errors surface via syncStatus; nothing to do here
-      saveDeckToCloud().catch(() => { /* noop */ });
-    }, AUTOSAVE_DEBOUNCE_MS);
-
-    return () => {
-      if (autosaveTimerRef.current) {
-        clearTimeout(autosaveTimerRef.current);
-        autosaveTimerRef.current = null;
-      }
-    };
-  }, [deck, autosaveEnabled, isInitializing, saveDeckToCloud]);
 
   /**
    * Add a card to the deck or increase its quantity

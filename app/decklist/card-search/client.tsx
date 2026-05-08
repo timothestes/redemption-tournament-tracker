@@ -377,7 +377,7 @@ export default function CardSearchClient() {
     getCardQuantity,
     getDeckStats,
     clearUnsavedChanges,
-  } = useDeckState(deckIdFromUrl, folderIdFromUrl, isNewDeck, { autosaveEnabled: !!user });
+  } = useDeckState(deckIdFromUrl, folderIdFromUrl, isNewDeck);
 
   const [ignoreLegalityChecks, setIgnoreLegalityChecksRaw] = useState(() => {
     if (typeof window === 'undefined' || !deck.id) return false;
