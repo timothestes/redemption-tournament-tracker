@@ -203,30 +203,70 @@ export function PhaseBar() {
         End Turn
       </button>
 
-      {/* Left side: logo */}
-      <button
-        onClick={handleLogoClick}
-        title="Back to deck"
+      {/* Left side: back button + logo */}
+      <div
         style={{
           position: 'absolute',
           left: 12,
-          background: 'transparent',
-          border: 'none',
-          cursor: 'pointer',
-          padding: 0,
           display: 'flex',
           alignItems: 'center',
+          gap: 6,
         }}
       >
-        <Image
-          src="/darkmode_redemptionccgapp.webp"
-          alt="Back to deck"
-          width={96}
-          height={28}
-          className="opacity-85 hover:opacity-100 transition-opacity duration-200"
-          style={{ width: 'auto', height: 28 }}
-        />
-      </button>
+        <button
+          onClick={handleLogoClick}
+          title="Back to deck"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 28,
+            height: 28,
+            borderRadius: 4,
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            color: 'rgba(232, 213, 163, 0.35)',
+            transition: 'color 0.15s, background 0.15s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = '#e8d5a3';
+            e.currentTarget.style.background = 'rgba(196, 149, 90, 0.1)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'rgba(232, 213, 163, 0.35)';
+            e.currentTarget.style.background = 'transparent';
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 21H19a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H15" />
+            <polyline points="8 17 3 12 8 7" />
+            <line x1="3" y1="12" x2="15" y2="12" />
+          </svg>
+        </button>
+
+        <button
+          onClick={handleLogoClick}
+          title="Back to deck"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 0,
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          <Image
+            src="/darkmode_redemptionccgapp.webp"
+            alt="Back to deck"
+            width={96}
+            height={28}
+            className="opacity-85 hover:opacity-100 transition-opacity duration-200"
+            style={{ width: 'auto', height: 28 }}
+          />
+        </button>
+      </div>
 
       {/* Right side: turn counter */}
       <span

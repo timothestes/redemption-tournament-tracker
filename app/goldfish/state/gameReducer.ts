@@ -225,6 +225,37 @@ function drawBottomOfDeckInState(
   return { ...state, zones, history };
 }
 
+function playAllLostSoulsInState(
+  state: GameState,
+  source: GameCard,
+  history: GameState[],
+): GameState {
+  // Per-player: pull from soul-deck if any cards live there (Paragon mode),
+  // otherwise from the main deck. Goldfish convention (matching
+  // all_players_shuffle_and_draw) is to operate on the source's owner only.
+  const ownerId = source.ownerId;
+  const ownerSoul = state.zones['soul-deck'].filter(c => c.ownerId === ownerId);
+  const sourceZone: ZoneId = ownerSoul.length > 0 ? 'soul-deck' : 'deck';
+  const candidates = state.zones[sourceZone].filter(c => c.ownerId === ownerId);
+  const lostSouls = candidates.filter(isLostSoul);
+  if (lostSouls.length === 0) return state;
+
+  const movingIds = new Set(lostSouls.map(c => c.instanceId));
+  const zones = cloneZones(state.zones);
+  zones[sourceZone] = zones[sourceZone].filter(c => !movingIds.has(c.instanceId));
+  const moved: GameCard[] = lostSouls.map(c => ({
+    ...c,
+    zone: 'land-of-bondage',
+    isFlipped: false,
+    posX: undefined,
+    posY: undefined,
+    revealUntil: undefined,
+  }));
+  zones['land-of-bondage'] = [...zones['land-of-bondage'], ...moved];
+
+  return { ...state, zones, history };
+}
+
 function reserveTopOfDeckInState(
   state: GameState,
   _source: GameCard,
@@ -988,6 +1019,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           return drawBottomOfDeckInState(state, source, ability, history);
         case 'set_card_outline':
           return setCardOutlineInState(state, source, ability, history);
+        case 'play_all_lost_souls':
+          return playAllLostSoulsInState(state, source, history);
         case 'custom':
           // Custom abilities are dispatched client-side in multiplayer and
           // never reach the goldfish reducer in v1. No-op defensively.

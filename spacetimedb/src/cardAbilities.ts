@@ -35,6 +35,7 @@ export type CardAbility = AbilityBase & (
   | { type: 'reserve_top_of_deck'; count: number }
   | { type: 'draw_bottom_of_deck'; count: number }
   | { type: 'set_card_outline'; color: 'good' | 'evil'; label: string }
+  | { type: 'play_all_lost_souls' }
   | { type: 'custom'; reducerName: string; label: string }
 );
 
@@ -113,6 +114,8 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'Three Woes (RoJ)':                                    [{ type: 'set_card_outline', color: 'good', label: 'Choose Good' }, { type: 'set_card_outline', color: 'evil', label: 'Choose Evil' }],
   'Three Woes [Fundraiser]':                             [{ type: 'set_card_outline', color: 'good', label: 'Choose Good' }, { type: 'set_card_outline', color: 'evil', label: 'Choose Evil' }],
   'Three Woes [Fundraiser - Serialized]':                [{ type: 'set_card_outline', color: 'good', label: 'Choose Good' }, { type: 'set_card_outline', color: 'evil', label: 'Choose Evil' }],
+  'Harvest Time (GoC)':                                  [{ type: 'play_all_lost_souls' }],
+  'Harvest Time [Fundraiser]':                           [{ type: 'play_all_lost_souls' }],
 };
 
 export function getAbilitiesForCard(identifier: string): CardAbility[] {

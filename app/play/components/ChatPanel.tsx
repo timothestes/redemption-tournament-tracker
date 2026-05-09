@@ -339,6 +339,25 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       );
     } catch { /* fall through */ }
   }
+  if (actionType === 'PLAY_ALL_LOST_SOULS' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const count = Number(data.count ?? 0);
+      const sourceName: string = data.sourceCardName ?? '';
+      const sourceImg: string = data.sourceCardImgFile ?? '';
+      const noun = count === 1 ? 'Lost Soul' : 'Lost Souls';
+      return (
+        <>
+          played {count} {noun} from each deck into Land of Bondage
+          {sourceName ? (
+            <>
+              {' '}via <HoverableCard name={sourceName} img={sourceImg} />
+            </>
+          ) : null}
+        </>
+      );
+    } catch { /* fall through */ }
+  }
   if ((actionType === 'EXCHANGE' || actionType === 'EXCHANGE_CARDS') && payload) {
     try {
       const data = JSON.parse(payload);

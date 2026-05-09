@@ -3072,6 +3072,78 @@ function drawBottomOfDeckImpl(
 }
 
 // ---------------------------------------------------------------------------
+// Helper: playAllLostSoulsImpl
+// For each player in the game, moves every Lost Soul from their soul-deck
+// (if non-empty — Paragon mode) or main deck into that same player's
+// land-of-bondage. Cross-player effect — bypasses the per-player consent
+// flow used by all_players_shuffle_and_draw because the printed Harvest Time
+// text reads "Regardless of protect abilities".
+// ---------------------------------------------------------------------------
+function playAllLostSoulsImpl(
+  ctx: any,
+  source: any,
+  player: any,
+  gameId: bigint,
+) {
+  const game = ctx.db.Game.id.find(gameId);
+  if (!game) throw new SenderError('Game not found');
+
+  const players = [...ctx.db.Player.player_game_id.filter(gameId)];
+  if (players.length === 0) return;
+
+  // Single scan, then partition per-player in JS.
+  const allCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)];
+
+  let totalMoved = 0;
+
+  for (const p of players) {
+    const playerCards = allCards.filter((c: any) => c.ownerId === p.id);
+    const soulDeck = playerCards.filter((c: any) => c.zone === 'soul-deck');
+    const sourceCards = soulDeck.length > 0
+      ? soulDeck
+      : playerCards.filter((c: any) => c.zone === 'deck');
+    const lostSouls = sourceCards.filter((c: any) =>
+      c.cardType === 'LS'
+      || c.cardType === 'Lost Soul'
+      || c.cardName.toLowerCase().includes('lost soul'),
+    );
+    if (lostSouls.length === 0) continue;
+
+    let nextLobIdx = 0n;
+    for (const c of playerCards) {
+      if (c.zone === 'land-of-bondage' && c.zoneIndex >= nextLobIdx) {
+        nextLobIdx = c.zoneIndex + 1n;
+      }
+    }
+
+    for (const ls of lostSouls) {
+      ctx.db.CardInstance.id.update({
+        ...ls,
+        zone: 'land-of-bondage',
+        zoneIndex: nextLobIdx,
+        posX: '',
+        posY: '',
+        isFlipped: false,
+      });
+      nextLobIdx += 1n;
+      totalMoved++;
+    }
+  }
+
+  if (totalMoved > 0) {
+    logAction(
+      ctx, gameId, player.id, 'PLAY_ALL_LOST_SOULS',
+      JSON.stringify({
+        sourceCardName: source.cardName,
+        sourceCardImgFile: source.cardImgFile,
+        count: totalMoved,
+      }),
+      game.turnNumber, game.currentPhase,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Reducer: execute_card_ability
 //
 // Server-authoritative dispatch for per-card custom abilities defined in the
@@ -3163,6 +3235,8 @@ export const execute_card_ability = spacetimedb.reducer(
         return drawBottomOfDeckImpl(ctx, source, ability, player, gameId);
       case 'set_card_outline':
         return setCardOutlineImpl(ctx, source, ability, player, gameId);
+      case 'play_all_lost_souls':
+        return playAllLostSoulsImpl(ctx, source, player, gameId);
       case 'custom':
         throw new SenderError('Custom abilities are dispatched by the client, not this reducer');
     }

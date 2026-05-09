@@ -1176,6 +1176,79 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         requestOpponentAction(action, JSON.stringify({ count: ability.count }));
         return;
       }
+      if (ability?.type === 'play_all_lost_souls') {
+        // Capture pre-move state so undo can restore each Lost Soul to its
+        // original zone + owner. Mirrors playAllLostSoulsImpl in the server:
+        // per-player, prefer soul-deck (Paragon mode) when non-empty, else
+        // main deck.
+        if (undoStack) {
+          const isLs = (c: { cardType: string; cardName: string }) =>
+            c.cardType === 'LS'
+            || c.cardType === 'Lost Soul'
+            || c.cardName.toLowerCase().includes('lost soul');
+          const reverseEntries: Array<{
+            id: bigint;
+            zone: string;
+            ownerId: string;
+            posX: string;
+            posY: string;
+          }> = [];
+          for (const playerCards of [myCards, opponentCards]) {
+            const soulDeck = playerCards['soul-deck'] ?? [];
+            const sourceCards = soulDeck.length > 0
+              ? soulDeck
+              : (playerCards['deck'] ?? []);
+            for (const c of sourceCards) {
+              if (!isLs(c)) continue;
+              reverseEntries.push({
+                id: c.id,
+                zone: c.zone,
+                ownerId: String(c.ownerId),
+                posX: c.posX,
+                posY: c.posY,
+              });
+            }
+          }
+          if (reverseEntries.length > 0) {
+            const sourceName = source?.cardName ?? 'card';
+            undoStack.push({
+              description: `Played all Lost Souls via ${sourceName}`,
+              reverseAction: () => {
+                // Group by (ownerId, zone) so each affected deck gets exactly
+                // one shuffle. shuffle_card_into_deck routes by
+                // originalOwnerId — works for opponent cards without consent —
+                // and also reshuffles that owner's whole deck. So for each
+                // 'deck' group: moveCard the first N-1 souls back, then use
+                // shuffleCardIntoDeck on the final one as the single shuffle
+                // trigger. soul-deck groups can't auto-shuffle (no per-player
+                // soul-deck shuffle reducer exists), so just moveCard them.
+                const groups = new Map<string, typeof reverseEntries>();
+                for (const e of reverseEntries) {
+                  const key = `${e.ownerId}:${e.zone}`;
+                  const list = groups.get(key) ?? [];
+                  list.push(e);
+                  groups.set(key, list);
+                }
+                for (const list of groups.values()) {
+                  if (list[0].zone === 'deck') {
+                    for (let i = 0; i < list.length - 1; i++) {
+                      const e = list[i];
+                      gameState.moveCard(e.id, e.zone, undefined, e.posX, e.posY, e.ownerId);
+                    }
+                    gameState.shuffleCardIntoDeck(list[list.length - 1].id);
+                  } else {
+                    for (const e of list) {
+                      gameState.moveCard(e.id, e.zone, undefined, e.posX, e.posY, e.ownerId);
+                    }
+                  }
+                }
+              },
+            });
+          }
+        }
+        gameState.executeCardAbility(sourceInstanceId, abilityIndex);
+        return;
+      }
       if (ability?.type === 'reserve_opponent_deck') {
         // Same opponent-consent flow as discard_opponent_deck. On approve
         // dispatches `reserve_deck_*` → moveOpponentDeckCardsToZone(..., 'reserve').
