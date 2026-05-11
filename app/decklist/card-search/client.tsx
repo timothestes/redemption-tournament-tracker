@@ -1272,6 +1272,34 @@ export default function CardSearchClient() {
     });
   }
 
+  function handleExportCSV() {
+    if (sortedFiltered.length === 0) return;
+    const columns = [
+      'name', 'set', 'officialSet', 'imgFile', 'type', 'brigade',
+      'strength', 'toughness', 'class', 'identifier', 'specialAbility',
+      'rarity', 'reference', 'alignment', 'legality',
+    ] as const;
+    const escape = (val: string) => {
+      const s = val ?? '';
+      return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const header = columns.join(',');
+    const rows = sortedFiltered.map(card =>
+      columns.map(col => escape(String(card[col] ?? ''))).join(',')
+    );
+    const csv = '﻿' + [header, ...rows].join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const date = new Date().toISOString().slice(0, 10);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `redemption-cards-${date}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   // Export deck to clipboard (with file download fallback)
   async function handleExportDeck() {
     try {
@@ -1540,7 +1568,9 @@ export default function CardSearchClient() {
             </button>
             </div>
             {/* Desktop: centered buttons with filters right-aligned */}
-            <div className="hidden sm:flex flex-row gap-2 w-full items-center justify-center relative">
+            <div className="hidden sm:flex flex-row flex-wrap gap-2 w-full items-center">
+            <div className="hidden md:block flex-1" />
+            <div className="flex items-center gap-2 mx-auto md:mx-0">
             <button
               className="px-4 shrink-0 rounded bg-primary/15 text-primary hover:bg-primary/25 border border-primary/30 transition font-medium shadow-sm text-center relative h-9 sm:h-11"
               onClick={addNewQuery}
@@ -1570,8 +1600,9 @@ export default function CardSearchClient() {
             >
               {copyLinkNotification ? '✓' : '🔗'}
             </button>
-            {/* Sort + Filter collapse — desktop only, right-aligned */}
-            <div className="hidden md:flex absolute right-0 items-center gap-2">
+            </div>
+            {/* Sort + Filter collapse — desktop only, right-aligned via flex */}
+            <div className="hidden md:flex flex-1 justify-end items-center gap-2">
             <div className="flex items-center gap-1.5">
               <label htmlFor="card-sort" className="text-sm text-muted-foreground font-medium">Sort:</label>
               <select
@@ -1588,6 +1619,22 @@ export default function CardSearchClient() {
                 <option value="brigade">Brigade</option>
               </select>
             </div>
+            <button
+              className={`flex px-3 shrink-0 rounded items-center justify-center gap-1.5 border transition font-medium shadow-sm text-sm h-9 sm:h-11 ${
+                sortedFiltered.length === 0
+                  ? 'bg-muted text-muted-foreground/50 border-border cursor-not-allowed opacity-50'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground border-border'
+              }`}
+              onClick={sortedFiltered.length === 0 ? undefined : handleExportCSV}
+              disabled={sortedFiltered.length === 0}
+              title={sortedFiltered.length === 0 ? 'No cards to export' : `Export ${sortedFiltered.length} cards as CSV`}
+              aria-label="Export CSV"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4" />
+              </svg>
+              CSV
+            </button>
             <button
               aria-label="Toggle filter grid"
               className={`flex px-3 shrink-0 rounded items-center justify-center gap-1.5 border transition font-medium shadow-sm text-sm h-9 sm:h-11 ${
@@ -1845,6 +1892,23 @@ export default function CardSearchClient() {
             <option value="brigade">Brigade</option>
           </select>
         </div>
+        <div className="flex items-center gap-1.5">
+        <button
+          className={`flex items-center gap-1 px-3 py-1.5 rounded-full border text-xs font-semibold transition ${
+            sortedFiltered.length === 0
+              ? 'bg-muted text-muted-foreground/50 border-border cursor-not-allowed opacity-50'
+              : 'bg-muted text-muted-foreground border-border'
+          }`}
+          onClick={sortedFiltered.length === 0 ? undefined : handleExportCSV}
+          disabled={sortedFiltered.length === 0}
+          aria-label="Export CSV"
+          title={sortedFiltered.length === 0 ? 'No cards to export' : `Export ${sortedFiltered.length} cards as CSV`}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4" />
+          </svg>
+          CSV
+        </button>
         <button
           aria-label="Toggle filter grid"
           className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full border text-xs font-semibold transition ${
@@ -1866,6 +1930,7 @@ export default function CardSearchClient() {
           )}
           Filters
         </button>
+        </div>
       </div>
       <main className="p-2 pb-16 md:pb-2 md:overflow-auto md:flex-1 bg-background text-foreground transition-colors duration-200" style={{ scrollbarGutter: 'stable' }}>
         {/* Responsive grid for filters */}
