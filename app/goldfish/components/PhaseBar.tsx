@@ -25,7 +25,7 @@ const PHASE_TIPS: Record<GamePhase, string> = {
   discard: 'Discard down to hand limit if needed',
 };
 
-export function PhaseBar() {
+export function PhaseBar({ hideBackButton = false }: { hideBackButton?: boolean } = {}) {
   const { state, advancePhase, regressPhase, endTurn } = useGame();
   const router = useRouter();
   const currentPhase = state.phase;
@@ -213,37 +213,39 @@ export function PhaseBar() {
           gap: 6,
         }}
       >
-        <button
-          onClick={handleLogoClick}
-          title="Back to deck"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 28,
-            height: 28,
-            borderRadius: 4,
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-            color: 'rgba(232, 213, 163, 0.35)',
-            transition: 'color 0.15s, background 0.15s',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = '#e8d5a3';
-            e.currentTarget.style.background = 'rgba(196, 149, 90, 0.1)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = 'rgba(232, 213, 163, 0.35)';
-            e.currentTarget.style.background = 'transparent';
-          }}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 21H19a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H15" />
-            <polyline points="8 17 3 12 8 7" />
-            <line x1="3" y1="12" x2="15" y2="12" />
-          </svg>
-        </button>
+        {!hideBackButton && (
+          <button
+            onClick={handleLogoClick}
+            title="Back to deck"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 28,
+              height: 28,
+              borderRadius: 4,
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer',
+              color: 'rgba(232, 213, 163, 0.35)',
+              transition: 'color 0.15s, background 0.15s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = '#e8d5a3';
+              e.currentTarget.style.background = 'rgba(196, 149, 90, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'rgba(232, 213, 163, 0.35)';
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 21H19a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H15" />
+              <polyline points="8 17 3 12 8 7" />
+              <line x1="3" y1="12" x2="15" y2="12" />
+            </svg>
+          </button>
+        )}
 
         <button
           onClick={handleLogoClick}

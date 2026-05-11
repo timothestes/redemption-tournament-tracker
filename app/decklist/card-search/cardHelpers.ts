@@ -46,6 +46,52 @@ export function handleSimpleBrigades(brigade) {
   return [brigade];
 }
 
+// Per-card brigade overrides for cards whose printed brigade string can't be
+// parsed by the simple splitter (two-sided cards, named-city promos with no
+// printed brigade, all-brigade cards, etc.). Ported from the Python repo:
+// https://github.com/timothestes/redemption-tournament-api/blob/main/src/utilities/brigades.py
+const COMPLEX_BRIGADES: Record<string, string[]> = {
+  "Delivered": ["Green", "Teal", "Evil Gold", "Pale Green"],
+  "Eternal Judgment": ["Green", "White", "Brown", "Crimson"],
+  "Scapegoat (PoC)": ["Teal", "Green", "Crimson"],
+  "Zion": ["Purple"],
+  "Ashkelon": ["Good Gold"],
+  "Raamses": ["White"],
+  "Babel (FoM)": ["Blue"],
+  "Sodom & Gomorrah": ["Silver"],
+  "City of Enoch": ["Blue"],
+  "Hebron": ["Red"],
+  "Damascus (LoC)": ["Red"],
+  "Damascus (Promo)": ["Red"],
+  "Bethlehem (Promo)": ["White"],
+  "Samaria": ["Green"],
+  "Nineveh": ["Green"],
+  "City of Refuge": ["Teal"],
+  "Jerusalem (GoC)": ["Purple", "Good Gold", "White"],
+  "Sychar (GoC)": ["Good Gold", "Purple"],
+  "Fire Foxes": ["Good Gold", "Crimson", "Black"],
+  "Bethlehem (LoC)": ["Good Gold", "White"],
+  "New Jerusalem (Bride of Christ) (RoJ AB)": [...GOOD_BRIGADES],
+  "Doubt (LoC Plus)": [],
+  "Doubt (LoC)": [],
+  "Angel of God [2023 - National]": [],
+  "City of Refuge (PoC)": ["Teal"],
+  "Fullness of Time": [],
+  "Melchizedek (CoW AB)": ["Purple", "Teal"],
+  "Philistine Outpost": [],
+  "Philosophy": [...GOOD_BRIGADES, ...EVIL_BRIGADES],
+  "Unified Language": [...GOOD_BRIGADES, ...EVIL_BRIGADES],
+  "Saul/Paul": ["Gray", ...GOOD_BRIGADES],
+  "Coat of Many Colors (FoM)": ["Brown", ...GOOD_BRIGADES],
+};
+
+export function handleComplexBrigades(cardName: string, brigade: string): string[] {
+  if (cardName in COMPLEX_BRIGADES) {
+    return [...COMPLEX_BRIGADES[cardName]];
+  }
+  return handleSimpleBrigades(brigade);
+}
+
 export function replaceBrigades(brigades, target, replacement) {
   return brigades.map(b => b === target ? replacement : b);
 }
@@ -79,6 +125,9 @@ export function handleGoldBrigade(cardName, alignment, brigadesList) {
 }
 
 export function normalizeBrigadeField(brigade, alignment, cardName) {
+  if (cardName in COMPLEX_BRIGADES) {
+    return [...COMPLEX_BRIGADES[cardName]].sort();
+  }
   if (!brigade) return [];
   let brigadesList = handleSimpleBrigades(brigade);
   const multiCount = brigadesList.filter(b => b === "Multi").length;

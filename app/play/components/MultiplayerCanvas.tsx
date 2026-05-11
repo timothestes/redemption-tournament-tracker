@@ -49,6 +49,7 @@ import { DeckExchangeModal } from '@/app/shared/components/DeckExchangeModal';
 import { ZoneBrowseModal } from '@/app/shared/components/ZoneBrowseModal';
 import { useModalCardDrag } from '@/app/shared/hooks/useModalCardDrag';
 import { useRevealTick } from '@/app/shared/hooks/useRevealTick';
+import { computeHandBrigades } from '@/app/shared/utils/handBrigades';
 import type { ZoneId } from '@/app/shared/types/gameCard';
 import type { ZoneRect as GoldfishZoneRect } from '@/app/goldfish/layout/zoneLayout';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
@@ -487,6 +488,43 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     // re-computes when reveals arrive or expire.
   }, [myCards, opponentCards]);
   useRevealTick(anyHandActiveReveal);
+
+  const myHandBrigadeCounts = useMemo(
+    () => computeHandBrigades(
+      (myCards['hand'] ?? []).map(c => ({
+        cardName: c.cardName,
+        brigade: c.brigade,
+        alignment: c.alignment,
+        type: c.cardType,
+      })),
+    ),
+    [myCards],
+  );
+
+  // Opponent brigade counts — only meaningful when their hand is revealed to
+  // me, and only over cards captured in the reveal snapshot (cards drawn
+  // after reveal stay face-down and must NOT leak into this count).
+  const opponentHandRevealed = gameState.opponentPlayer?.handRevealed ?? false;
+  const opponentHandRevealSnapshotRaw = gameState.opponentPlayer?.handRevealSnapshot;
+  const opponentHandBrigadeCounts = useMemo(() => {
+    if (!opponentHandRevealed) return { total: 0, good: 0, evil: 0, neutral: 0 };
+    const snapshot = new Set<string>();
+    try {
+      if (opponentHandRevealSnapshotRaw) {
+        const ids = JSON.parse(opponentHandRevealSnapshotRaw);
+        if (Array.isArray(ids)) for (const id of ids) snapshot.add(String(id));
+      }
+    } catch { /* ignore malformed snapshot */ }
+    const visible = (opponentCards['hand'] ?? []).filter(c => snapshot.has(String(c.id)));
+    return computeHandBrigades(
+      visible.map(c => ({
+        cardName: c.cardName,
+        brigade: c.brigade,
+        alignment: c.alignment,
+        type: c.cardType,
+      })),
+    );
+  }, [opponentCards, opponentHandRevealed, opponentHandRevealSnapshotRaw]);
 
   // ---- Stage ref ----
   const stageRef = useRef<Konva.Stage>(null);
@@ -4157,6 +4195,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             // "HAND" at fontSize 12 + letterSpacing 2 — grows with floored text.
             const lw = 52 * fsGrowth(12);
             const sx = areaRight - lw - 8 - bw - 6;
+            const brigadeW = 200 * fsGrowth(12);
+            const brigadeX = areaRight - brigadeW - 6;
+            const brigadeTop = myHandRect.y + 24;
+            const rowH = 16 * fsGrowth(12);
             return (
               <>
                 <Text x={sx} y={myHandRect.y + 4} text="HAND" fontSize={fs(12)} fontFamily="Cinzel, Georgia, serif" fill="#e8d5a3" letterSpacing={2} listening={false} perfectDrawEnabled={false} />
@@ -4164,6 +4206,66 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   <Rect width={bw} height={18} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} perfectDrawEnabled={false} />
                   <Text text={String(myCards['hand']?.length ?? 0)} fontSize={fs(12)} fontStyle="bold" fill="#e8d5a3" width={bw} height={18} align="center" verticalAlign="middle" perfectDrawEnabled={false} />
                 </Group>
+                {myHandBrigadeCounts.total > 0 && (
+                  <>
+                    <Text
+                      x={brigadeX}
+                      y={brigadeTop}
+                      width={brigadeW}
+                      text={`Total Brigades: ${myHandBrigadeCounts.total}`}
+                      fontSize={fs(12)}
+                      fontStyle="bold"
+                      fontFamily="Cinzel, Georgia, serif"
+                      fill="#e8d5a3"
+                      letterSpacing={1}
+                      align="right"
+                      listening={false}
+                      perfectDrawEnabled={false}
+                    />
+                    <Text
+                      x={brigadeX}
+                      y={brigadeTop + rowH}
+                      width={brigadeW}
+                      text={`Good Brigades: ${myHandBrigadeCounts.good}`}
+                      fontSize={fs(12)}
+                      fontStyle="bold"
+                      fontFamily="Cinzel, Georgia, serif"
+                      fill="#9ab86a"
+                      letterSpacing={1}
+                      align="right"
+                      listening={false}
+                      perfectDrawEnabled={false}
+                    />
+                    <Text
+                      x={brigadeX}
+                      y={brigadeTop + rowH * 2}
+                      width={brigadeW}
+                      text={`Evil Brigades: ${myHandBrigadeCounts.evil}`}
+                      fontSize={fs(12)}
+                      fontStyle="bold"
+                      fontFamily="Cinzel, Georgia, serif"
+                      fill="#e87560"
+                      letterSpacing={1}
+                      align="right"
+                      listening={false}
+                      perfectDrawEnabled={false}
+                    />
+                    <Text
+                      x={brigadeX}
+                      y={brigadeTop + rowH * 3}
+                      width={brigadeW}
+                      text={`Neutral Brigades: ${myHandBrigadeCounts.neutral}`}
+                      fontSize={fs(12)}
+                      fontStyle="bold"
+                      fontFamily="Cinzel, Georgia, serif"
+                      fill="#c4955a"
+                      letterSpacing={1}
+                      align="right"
+                      listening={false}
+                      perfectDrawEnabled={false}
+                    />
+                  </>
+                )}
               </>
             );
           })()}
@@ -4193,6 +4295,15 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const lw = 178 * fsGrowth(12);
             const totalW = lw + 8 + bw;
             const sx = areaRight - totalW - 6;
+            // 2x2 grid below label to fit the cramped vertical space between
+            // the opponent hand strip and the right-side sidebar.
+            const colW = 130 * fsGrowth(12);
+            const colGap = 14;
+            const gridW = colW * 2 + colGap;
+            const col1X = areaRight - gridW - 6;
+            const col2X = col1X + colW + colGap;
+            const brigadeTop = opponentHandRect.y + 24;
+            const rowH = 16 * fsGrowth(12);
             return (
               <>
                 <Text x={sx} y={opponentHandRect.y + 4} text="OPPONENT'S HAND" fontSize={fs(12)} fontFamily="Cinzel, Georgia, serif" fill="#a3c5e8" letterSpacing={2} listening={false} perfectDrawEnabled={false} />
@@ -4200,6 +4311,66 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   <Rect width={bw} height={18} fill="#101828" cornerRadius={4} stroke="#4a7ab5" strokeWidth={1} perfectDrawEnabled={false} />
                   <Text text={String(opponentCards['hand']?.length ?? 0)} fontSize={fs(12)} fontStyle="bold" fill="#a3c5e8" width={bw} height={18} align="center" verticalAlign="middle" perfectDrawEnabled={false} />
                 </Group>
+                {opponentHandRevealed && opponentHandBrigadeCounts.total > 0 && (
+                  <>
+                    <Text
+                      x={col1X}
+                      y={brigadeTop}
+                      width={colW}
+                      text={`Total: ${opponentHandBrigadeCounts.total}`}
+                      fontSize={fs(12)}
+                      fontStyle="bold"
+                      fontFamily="Cinzel, Georgia, serif"
+                      fill="#a3c5e8"
+                      letterSpacing={1}
+                      align="right"
+                      listening={false}
+                      perfectDrawEnabled={false}
+                    />
+                    <Text
+                      x={col2X}
+                      y={brigadeTop}
+                      width={colW}
+                      text={`Good: ${opponentHandBrigadeCounts.good}`}
+                      fontSize={fs(12)}
+                      fontStyle="bold"
+                      fontFamily="Cinzel, Georgia, serif"
+                      fill="#9ab86a"
+                      letterSpacing={1}
+                      align="right"
+                      listening={false}
+                      perfectDrawEnabled={false}
+                    />
+                    <Text
+                      x={col1X}
+                      y={brigadeTop + rowH}
+                      width={colW}
+                      text={`Evil: ${opponentHandBrigadeCounts.evil}`}
+                      fontSize={fs(12)}
+                      fontStyle="bold"
+                      fontFamily="Cinzel, Georgia, serif"
+                      fill="#e87560"
+                      letterSpacing={1}
+                      align="right"
+                      listening={false}
+                      perfectDrawEnabled={false}
+                    />
+                    <Text
+                      x={col2X}
+                      y={brigadeTop + rowH}
+                      width={colW}
+                      text={`Neutral: ${opponentHandBrigadeCounts.neutral}`}
+                      fontSize={fs(12)}
+                      fontStyle="bold"
+                      fontFamily="Cinzel, Georgia, serif"
+                      fill="#c4955a"
+                      letterSpacing={1}
+                      align="right"
+                      listening={false}
+                      perfectDrawEnabled={false}
+                    />
+                  </>
+                )}
               </>
             );
           })()}

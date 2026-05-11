@@ -89,6 +89,7 @@ function GoldfishArea({ deck, onLoadDeck }: { deck: DeckDataForGoldfish; onLoadD
             offsetY={offsetY}
             virtualWidth={virtualWidth}
             onLoadDeck={onLoadDeck}
+            hideBackButton
           />
         )}
       </div>

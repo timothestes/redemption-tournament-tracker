@@ -10,6 +10,7 @@ import { CARD_WIDTH, CARD_HEIGHT, CARD_ASPECT_RATIO } from '../layout/zoneLayout
 import { calculateHandPositions } from '../layout/handLayout';
 import { calculateAutoArrangePositions } from '../../play/layout/multiplayerAutoArrange';
 import { VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen } from '@/app/shared/layout/virtualCanvas';
+import { computeHandBrigades } from '@/app/shared/utils/handBrigades';
 import { GameCard, ZoneId, ZONE_LABELS } from '../types';
 import { GameCardNode, CardBackShape, cardBackListeners, cardBackLoaded } from '../../shared/components/GameCardNode';
 import { PhaseBar } from './PhaseBar';
@@ -56,9 +57,10 @@ interface GoldfishCanvasProps {
   offsetY: number;
   virtualWidth: number;
   onLoadDeck?: () => void;
+  hideBackButton?: boolean;
 }
 
-export default function GoldfishCanvas({ containerWidth, containerHeight, scale, offsetX, offsetY, virtualWidth, onLoadDeck }: GoldfishCanvasProps) {
+export default function GoldfishCanvas({ containerWidth, containerHeight, scale, offsetX, offsetY, virtualWidth, onLoadDeck, hideBackButton }: GoldfishCanvasProps) {
   const { state, dispatch, drawCard, drawMultiple, moveCard, moveCardsBatch, moveCardToTopOfDeck, moveCardToBottomOfDeck, shuffleCardIntoDeck, shuffleDeck, meekCard, unmeekCard, flipCard, revealCardInHand, addCounter, removeCounter, addNote, addOpponentLostSoul, removeOpponentToken, executeCardAbility, addPlayerLostSoul, reorderHand, attachCard, detachCard } = useGame();
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
   const stageRef = useRef<Konva.Stage>(null);
@@ -80,6 +82,11 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     [state.zones.hand],
   );
   useRevealTick(handHasActiveReveal);
+
+  const handBrigadeCounts = useMemo(
+    () => computeHandBrigades(state.zones.hand ?? []),
+    [state.zones.hand],
+  );
 
   // ---- Three Woes "Choose Good / Choose Evil" prompt on hand → play ----
   // Generic over any card with `set_card_outline` abilities; the prompt
@@ -1569,29 +1576,104 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             fill="#0d0905"
             opacity={0.5}
           />
-          {/* Hand label + count */}
-          <Text
-            x={zoneLayout.hand.x + 8}
-            y={zoneLayout.hand.y + 4}
-            text="HAND"
-            fontSize={14}
-            fontFamily="Cinzel, Georgia, serif"
-            fill="#e8d5a3"
-            letterSpacing={2}
-          />
-          <Group x={zoneLayout.hand.x + 70} y={zoneLayout.hand.y + 2}>
-            <Rect width={28} height={20} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} />
-            <Text
-              text={String(state.zones.hand.length)}
-              fontSize={14}
-              fontStyle="bold"
-              fill="#e8d5a3"
-              width={28}
-              height={20}
-              align="center"
-              verticalAlign="middle"
-            />
-          </Group>
+          {/* Hand label + count + brigade — right-aligned to the hand zone.
+              HAND [count] on the top row, brigade counts stacked vertically below. */}
+          {(() => {
+            const right = zoneLayout.hand.x + zoneLayout.hand.width;
+            const top = zoneLayout.hand.y;
+            const badgeW = 28;
+            const labelW = 60;
+            const brigadeW = 200;
+            const badgeX = right - 8 - badgeW;
+            const labelX = badgeX - 8 - labelW;
+            const brigadeX = right - 8 - brigadeW;
+            const brigadeTop = top + 26;
+            const rowH = 18;
+            return (
+              <>
+                <Text
+                  x={labelX}
+                  y={top + 4}
+                  width={labelW}
+                  text="HAND"
+                  fontSize={14}
+                  fontFamily="Cinzel, Georgia, serif"
+                  fill="#e8d5a3"
+                  letterSpacing={2}
+                  align="right"
+                />
+                <Group x={badgeX} y={top + 2}>
+                  <Rect width={badgeW} height={20} fill="#2a1f12" cornerRadius={4} stroke="#c4955a" strokeWidth={1} />
+                  <Text
+                    text={String(state.zones.hand.length)}
+                    fontSize={14}
+                    fontStyle="bold"
+                    fill="#e8d5a3"
+                    width={badgeW}
+                    height={20}
+                    align="center"
+                    verticalAlign="middle"
+                  />
+                </Group>
+                {handBrigadeCounts.total > 0 && (
+                  <>
+                    <Text
+                      x={brigadeX}
+                      y={brigadeTop}
+                      width={brigadeW}
+                      text={`Total Brigades: ${handBrigadeCounts.total}`}
+                      fontSize={13}
+                      fontStyle="bold"
+                      fontFamily="Cinzel, Georgia, serif"
+                      fill="#e8d5a3"
+                      letterSpacing={1}
+                      align="right"
+                      listening={false}
+                    />
+                    <Text
+                      x={brigadeX}
+                      y={brigadeTop + rowH}
+                      width={brigadeW}
+                      text={`Good Brigades: ${handBrigadeCounts.good}`}
+                      fontSize={13}
+                      fontStyle="bold"
+                      fontFamily="Cinzel, Georgia, serif"
+                      fill="#9ab86a"
+                      letterSpacing={1}
+                      align="right"
+                      listening={false}
+                    />
+                    <Text
+                      x={brigadeX}
+                      y={brigadeTop + rowH * 2}
+                      width={brigadeW}
+                      text={`Evil Brigades: ${handBrigadeCounts.evil}`}
+                      fontSize={13}
+                      fontStyle="bold"
+                      fontFamily="Cinzel, Georgia, serif"
+                      fill="#e87560"
+                      letterSpacing={1}
+                      align="right"
+                      listening={false}
+                    />
+                    <Text
+                      x={brigadeX}
+                      y={brigadeTop + rowH * 3}
+                      width={brigadeW}
+                      text={`Neutral Brigades: ${handBrigadeCounts.neutral}`}
+                      fontSize={13}
+                      fontStyle="bold"
+                      fontFamily="Cinzel, Georgia, serif"
+                      fill="#c4955a"
+                      letterSpacing={1}
+                      align="right"
+                      listening={false}
+                    />
+                  </>
+                )}
+              </>
+            );
+          })()}
           {state.zones.hand.length === 0 && (
             <Text
               x={zoneLayout.hand.x}
@@ -2208,7 +2290,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
         );
       })()}
 
-      <PhaseBar />
+      <PhaseBar hideBackButton={hideBackButton} />
       <GameToolbar />
       <CardScaleControl
         cardScale={cardScale}
