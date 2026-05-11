@@ -17,7 +17,7 @@ import {
 import { ALL_CARDS } from "./data/cardIndex";
 import { useDeckState } from "./hooks/useDeckState";
 import { useDeckCheck } from "./hooks/useDeckCheck";
-import { parseDeckText, generateDeckText, downloadDeckAsFile, copyDeckToClipboard } from "./utils/deckImportExport";
+import { parseDeckText, generateDeckText, downloadDeckAsFile, downloadDeckAsFileBySet, copyDeckToClipboard } from "./utils/deckImportExport";
 import { createClient } from "../../../utils/supabase/client";
 import { getUserSafe } from "../../../utils/supabase/getUserSafe";
 import type { User } from "@supabase/supabase-js";
@@ -1318,6 +1318,10 @@ export default function CardSearchClient() {
     downloadDeckAsFile(deck);
   }
 
+  function handleDownloadDeckBySet() {
+    downloadDeckAsFileBySet(deck);
+  }
+
   // Import deck from text
   async function handleImportDeck(text: string) {
     const result = parseDeckText(text, cards);
@@ -2352,6 +2356,7 @@ export default function CardSearchClient() {
             }}
             onExport={handleExportDeck}
             onDownload={handleDownloadDeck}
+            onDownloadBySet={handleDownloadDeckBySet}
             onImport={() => setShowImportModal(true)}
             onDelete={handleDeleteDeck}
             onDuplicate={() => {
@@ -2446,6 +2451,7 @@ export default function CardSearchClient() {
               }}
               onExport={handleExportDeck}
               onDownload={handleDownloadDeck}
+              onDownloadBySet={handleDownloadDeckBySet}
               onImport={() => setShowImportModal(true)}
               onDelete={handleDeleteDeck}
               onDuplicate={() => {}}

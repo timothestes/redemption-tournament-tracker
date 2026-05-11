@@ -249,10 +249,61 @@ export function downloadDeckAsFile(deck: Deck, filename?: string): void {
   const deckText = generateDeckText(deck);
   const blob = new Blob([deckText], { type: "text/plain" });
   const url = URL.createObjectURL(blob);
-  
+
   const link = document.createElement("a");
   link.href = url;
   link.download = filename || `${deck.name.replace(/\s+/g, "_")}.txt`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+export function generateDeckTextBySet(deck: Deck): string {
+  const mainCards = deck.cards.filter((dc) => !dc.isReserve);
+  const reserveCards = deck.cards.filter((dc) => dc.isReserve);
+
+  const sortBySetThenName = (a: DeckCard, b: DeckCard) => {
+    const setA = a.card.officialSet || "";
+    const setB = b.card.officialSet || "";
+    return setA.localeCompare(setB) || a.card.name.localeCompare(b.card.name);
+  };
+
+  const formatLine = (dc: DeckCard) => {
+    const normalizedName = normalizeCardName(dc.card.name);
+    const set = dc.card.officialSet || "Unknown";
+    return `${dc.quantity}\t${normalizedName} (${set})`;
+  };
+
+  const lines: string[] = [];
+  mainCards.sort(sortBySetThenName).forEach((dc) => lines.push(formatLine(dc)));
+
+  if (reserveCards.length > 0) {
+    lines.push("");
+    lines.push("Reserve:");
+    reserveCards.sort(sortBySetThenName).forEach((dc) => lines.push(formatLine(dc)));
+  }
+
+  const requiredTokens = getRequiredTokens(deck);
+  if (requiredTokens.length > 0) {
+    lines.push("");
+    lines.push("Tokens:");
+    requiredTokens.forEach((tokenName) => {
+      lines.push(`7\t${tokenName}`);
+    });
+  }
+
+  return lines.join("\n");
+}
+
+export function downloadDeckAsFileBySet(deck: Deck, filename?: string): void {
+  const deckText = generateDeckTextBySet(deck);
+  const blob = new Blob([deckText], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename || `${deck.name.replace(/\s+/g, "_")}_by_set.txt`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

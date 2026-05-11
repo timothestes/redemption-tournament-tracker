@@ -69,6 +69,8 @@ interface DeckBuilderPanelProps {
   onExport: () => void;
   /** Callback to download deck as .txt file */
   onDownload?: () => void;
+  /** Callback to download deck as .txt file, grouped/sorted by set */
+  onDownloadBySet?: () => void;
   /** Callback to import deck - parent handles UI */
   onImport: () => void;
   /** Callback to delete deck */
@@ -126,6 +128,7 @@ export default function DeckBuilderPanel({
   onRemoveCard,
   onExport,
   onDownload,
+  onDownloadBySet,
   onImport,
   onDelete,
   onDuplicate,
@@ -910,6 +913,17 @@ export default function DeckBuilderPanel({
                       Download .txt
                     </button>
                   )}
+                  {onDownloadBySet && (
+                    <button
+                      onClick={() => { onDownloadBySet(); setShowMenu(false); }}
+                      className="w-full px-4 py-2.5 text-left hover:bg-muted flex items-center gap-2.5 text-foreground text-sm"
+                    >
+                      <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      Download .txt (by set)
+                    </button>
+                  )}
                   <div className="border-t border-border my-1" />
                   {onDuplicate && isAuthenticated && deck.id && (
                     <button
@@ -1407,6 +1421,21 @@ export default function DeckBuilderPanel({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
                   Download .txt
+                </button>
+              )}
+              {onDownloadBySet && (
+                <button
+                  onClick={() => {
+                    onDownloadBySet();
+                    setShowMenu(false);
+                  }}
+                  className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-foreground text-sm"
+                  title="Download deck as .txt file, sorted by set"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download .txt (by set)
                 </button>
               )}
               
