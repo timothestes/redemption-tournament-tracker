@@ -463,70 +463,88 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
           title={title}
           onClose={onClose ? () => handleCloseAction('top') : undefined}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {selectedIds.size > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{
-                  color: 'var(--gf-accent)',
-                  fontSize: 12,
-                  fontFamily: 'var(--font-cinzel), Georgia, serif',
-                }}>
-                  {selectedIds.size} selected
-                </span>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setSelectedIds(new Set()); }}
-                  style={{
-                    background: 'transparent',
-                    border: '1px solid var(--gf-border)',
-                    borderRadius: 4,
-                    color: 'var(--gf-text-dim)',
-                    fontSize: 10,
-                    padding: '2px 6px',
-                    cursor: 'pointer',
-                    fontFamily: 'var(--font-cinzel), Georgia, serif',
-                  }}
-                >
-                  Deselect
-                </button>
-              </div>
-            )}
-            {onClose && (
-              <label
-                onClick={(e) => e.stopPropagation()}
+          {selectedIds.size > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{
+                color: 'var(--gf-accent)',
+                fontSize: 12,
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+              }}>
+                {selectedIds.size} selected
+              </span>
+              <button
+                onClick={(e) => { e.stopPropagation(); setSelectedIds(new Set()); }}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  background: 'transparent',
+                  border: '1px solid var(--gf-border)',
+                  borderRadius: 4,
                   color: 'var(--gf-text-dim)',
-                  fontSize: 11,
+                  fontSize: 10,
+                  padding: '2px 6px',
                   cursor: 'pointer',
-                  userSelect: 'none',
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
                 }}
               >
-                <input
-                  type="checkbox"
-                  checked={keepOpen}
-                  onChange={(e) => setKeepOpen(e.target.checked)}
-                  style={{ cursor: 'pointer', accentColor: 'var(--gf-accent)' }}
-                />
-                Keep open
-              </label>
-            )}
-          </div>
+                Deselect
+              </button>
+            </div>
+          )}
         </DraggableTitleBar>
 
         <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
-        <p style={{
-          fontFamily: 'var(--font-cinzel), Georgia, serif',
-          color: isPrivateLook ? 'var(--gf-accent)' : 'var(--gf-text-dim)',
-          fontSize: 11,
-          marginBottom: 12,
-        }}>
-          {isPrivateLook
-            ? 'Only you can see this \u00b7 Drag to a zone \u00b7 Click to select'
-            : onClose ? 'Drag to a zone \u00b7 Click to select \u00b7 Lasso to multi-select' : 'Your opponent is revealing cards'}
-        </p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <p style={{
+            fontFamily: 'var(--font-cinzel), Georgia, serif',
+            color: isPrivateLook ? 'var(--gf-accent)' : 'var(--gf-text-dim)',
+            fontSize: 11,
+            margin: 0,
+          }}>
+            {isPrivateLook
+              ? 'Only you can see this \u00b7 Drag to a zone \u00b7 Click to select'
+              : onClose ? 'Drag to a zone \u00b7 Click to select \u00b7 Lasso to multi-select' : 'Your opponent is revealing cards'}
+          </p>
+          {onClose && (
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                color: 'var(--gf-text-dim)',
+                fontSize: 11,
+                cursor: 'pointer',
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+              }}
+            >
+              <span
+                style={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: 3,
+                  border: keepOpen ? '1.5px solid #c4955a' : '1.5px solid var(--gf-border)',
+                  background: keepOpen ? 'rgba(196, 149, 90, 0.25)' : 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  transition: 'border-color 0.15s, background 0.15s',
+                }}
+              >
+                {keepOpen && (
+                  <svg width="12" height="12" viewBox="0 0 10 10" fill="none">
+                    <path d="M2 5L4.5 7.5L8 3" stroke="#e8d5a3" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </span>
+              <input
+                type="checkbox"
+                checked={keepOpen}
+                onChange={(e) => setKeepOpen(e.target.checked)}
+                className="sr-only"
+              />
+              Keep open
+            </label>
+          )}
+        </div>
 
         {peekedCards.length === 0 ? (
           <p style={{
