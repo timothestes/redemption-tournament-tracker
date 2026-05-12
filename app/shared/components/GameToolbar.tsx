@@ -143,22 +143,25 @@ export function GameToolbar({
       shortcut: '',
       hidden: isMultiplayer,
     },
-    // End Turn (active player) or Request Priority (non-active player) — multiplayer only
-    ...(isMultiplayer && isMyTurn ? [{
-      icon: SkipForward,
-      key: 'endturn',
-      label: 'End Turn',
-      onClick: onEndTurn ?? (() => {}),
-      shortcut: '',
-      disabled: !!isFinished,
-    }] : isMultiplayer && !isMyTurn && !isFinished ? [{
-      icon: Hand,
-      key: 'priority',
-      label: hasPendingPriority ? 'Pending...' : 'Priority',
-      onClick: onRequestPriority ?? (() => {}),
-      shortcut: '',
-      disabled: !!hasPendingPriority,
-    }] : []),
+    // End Turn + Priority — both visible in multiplayer, gated by their own conditions
+    ...(isMultiplayer && !isFinished ? [
+      {
+        icon: SkipForward,
+        key: 'endturn',
+        label: 'End Turn',
+        onClick: onEndTurn ?? (() => {}),
+        shortcut: '',
+        disabled: !isMyTurn,
+      },
+      {
+        icon: Hand,
+        key: 'priority',
+        label: hasPendingPriority ? 'Pending...' : 'Priority',
+        onClick: onRequestPriority ?? (() => {}),
+        shortcut: '',
+        disabled: !!hasPendingPriority,
+      },
+    ] : []),
   ];
 
   const visibleButtons = buttons.filter(b => !b.hidden);
