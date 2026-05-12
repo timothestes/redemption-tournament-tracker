@@ -256,6 +256,88 @@ function playAllLostSoulsInState(
   return { ...state, zones, history };
 }
 
+function threeNailsResetInState(
+  state: GameState,
+  source: GameCard,
+  history: GameState[],
+): GameState {
+  const zones = cloneZones(state.zones);
+
+  const ownerId = source.ownerId;
+  const SWEEP_ZONES: ZoneId[] = ['hand', 'territory', 'land-of-bondage'];
+
+  // Pull the source out of territory and route to banish (cleared in-play state).
+  zones.territory = zones.territory.filter(c => c.instanceId !== source.instanceId);
+  zones.banish = [
+    ...zones.banish,
+    {
+      ...source,
+      zone: 'banish',
+      isFlipped: false,
+      posX: undefined,
+      posY: undefined,
+      counters: [],
+      outlineColor: undefined,
+      notes: '',
+      isMeek: false,
+    },
+  ];
+
+  // Sweep the owner's cards from hand + territory + land-of-bondage into deck,
+  // clearing in-play state. Only the owner's cards move (single-player goldfish
+  // means there's only one player anyway, but be explicit).
+  const swept: GameCard[] = [];
+  for (const zoneId of SWEEP_ZONES) {
+    const remaining: GameCard[] = [];
+    for (const card of zones[zoneId]) {
+      if (card.ownerId !== ownerId) {
+        remaining.push(card);
+        continue;
+      }
+      swept.push({
+        ...card,
+        zone: 'deck',
+        isFlipped: true,
+        posX: undefined,
+        posY: undefined,
+        counters: [],
+        outlineColor: undefined,
+        notes: '',
+        isMeek: false,
+      });
+    }
+    zones[zoneId] = remaining;
+  }
+
+  zones.deck = shuffleArray([...zones.deck, ...swept]);
+
+  // Draw 8 — same auto-route + hand-limit logic as shuffleAndDrawInState.
+  for (let i = 0; i < 8; i++) {
+    if (zones.deck.length === 0) break;
+    if (zones.hand.length >= HAND_LIMIT && !state.options.autoRouteLostSouls) break;
+
+    let card = zones.deck.shift()!;
+    while (state.options.autoRouteLostSouls && isLostSoul(card)) {
+      card.zone = 'land-of-bondage';
+      card.isFlipped = false;
+      zones['land-of-bondage'].push(card);
+      if (zones.deck.length === 0) { card = undefined as unknown as GameCard; break; }
+      card = zones.deck.shift()!;
+    }
+    if (!card) break;
+
+    if (zones.hand.length >= HAND_LIMIT) {
+      zones.deck.unshift(card);
+      break;
+    }
+    card.zone = 'hand';
+    card.isFlipped = false;
+    zones.hand.push(card);
+  }
+
+  return { ...state, zones, history };
+}
+
 function reserveTopOfDeckInState(
   state: GameState,
   _source: GameCard,
@@ -1026,8 +1108,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           // never reach the goldfish reducer in v1. No-op defensively.
           return state;
         case 'three_nails_reset':
-          // Multiplayer-only ability — not applicable in goldfish mode.
-          return state;
+          return threeNailsResetInState(state, source, history);
         default: {
           const _exhaustive: never = ability;
           return state;
