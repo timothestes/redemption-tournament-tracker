@@ -1214,6 +1214,15 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         requestOpponentAction(action, JSON.stringify({ count: ability.count }));
         return;
       }
+      if (ability?.type === 'three_nails_reset') {
+        // Requires opponent consent. On approve, the approvedSearchRequest
+        // effect dispatches three_nails_reset_execute.
+        requestOpponentAction(
+          'three_nails_reset',
+          JSON.stringify({ sourceInstanceId: sourceInstanceId.toString() }),
+        );
+        return;
+      }
       if (ability?.type === 'play_all_lost_souls') {
         // Capture pre-move state so undo can restore each Lost Soul to its
         // original zone + owner. Mirrors playAllLostSoulsImpl in the server:
@@ -2196,6 +2205,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         break;
       case 'shuffle_and_draw':
         gameState.opponentShuffleAndDraw(reqIdBig, params.shuffleCount ?? 0, params.drawCount ?? 0);
+        complete();
+        break;
+      case 'three_nails_reset':
+        gameState.threeNailsResetExecute(reqIdBig);
         complete();
         break;
       default:
@@ -6237,6 +6250,90 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         />
       )}
 
+      {/* Three Nails (GoC) reset approval — floating in center of board */}
+      {incomingSearchRequest && incomingSearchRequest.action === 'three_nails_reset' && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 300,
+            pointerEvents: 'auto',
+          }}
+        >
+          <div
+            style={{
+              background: 'rgba(14, 10, 6, 0.95)',
+              border: '1px solid rgba(196, 149, 90, 0.35)',
+              borderRadius: 10,
+              padding: '16px 24px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 12,
+              boxShadow: '0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(196, 149, 90, 0.08)',
+              maxWidth: 460,
+            }}
+          >
+            <div style={{
+              fontSize: 14,
+              color: '#e8d5a3',
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              letterSpacing: '0.06em',
+              textAlign: 'center',
+              lineHeight: 1.5,
+            }}>
+              <strong style={{ color: '#c4955a' }}>
+                {gameState.opponentPlayer?.displayName ?? 'Opponent'}
+              </strong>{' '}
+              is activating <strong style={{ color: '#c4955a' }}>Three Nails (GoC)</strong> — shuffles all hands, territories, and lands of bondage; each player draws 8.
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => {
+                  approveZoneSearch(BigInt(incomingSearchRequest.id));
+                  showGameToast('Three Nails reset approved');
+                }}
+                style={{
+                  padding: '9px 20px',
+                  background: '#2d5a27',
+                  border: '1px solid #4a8a42',
+                  borderRadius: 6,
+                  color: '#c4e8bf',
+                  fontSize: 14,
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  letterSpacing: '0.06em',
+                  cursor: 'pointer',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#3a7332'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#2d5a27'; }}
+              >
+                Approve
+              </button>
+              <button
+                onClick={() => denyZoneSearch(BigInt(incomingSearchRequest.id))}
+                style={{
+                  padding: '9px 20px',
+                  background: '#5a2727',
+                  border: '1px solid #8a4242',
+                  borderRadius: 6,
+                  color: '#e8bfbf',
+                  fontSize: 14,
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  letterSpacing: '0.06em',
+                  cursor: 'pointer',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#733232'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#5a2727'; }}
+              >
+                Deny
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Priority request — floating in center of board between territories */}
       {incomingSearchRequest && incomingSearchRequest.zone === 'action-priority' && (
         <div
@@ -6320,7 +6417,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       )}
 
       {/* Search/reveal/action requests — floating top-center banner */}
-      {incomingSearchRequest && incomingSearchRequest.zone !== 'action-priority' && (() => {
+      {incomingSearchRequest && incomingSearchRequest.zone !== 'action-priority' && incomingSearchRequest.action !== 'three_nails_reset' && (() => {
         const isAction = !!incomingSearchRequest.action;
         const actionDescription = isAction
           ? describeOpponentAction(incomingSearchRequest.action, incomingSearchRequest.actionParams)

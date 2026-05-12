@@ -94,6 +94,7 @@ export interface GameState {
   randomReserveToZone: (count: number, toZone: string, deckPosition: string) => void;
   randomOpponentHandToZone: (requestId: bigint, count: number, toZone: string, deckPosition: string) => void;
   opponentShuffleAndDraw: (requestId: bigint, shuffleCount: number, drawCount: number) => void;
+  threeNailsResetExecute: (requestId: bigint) => void;
   meekCard: (cardInstanceId: bigint) => void;
   unmeekCard: (cardInstanceId: bigint) => void;
   flipCard: (cardInstanceId: bigint) => void;
@@ -458,6 +459,13 @@ export function useGameState(gameId: bigint): GameState {
         shuffleCount: BigInt(shuffleCount),
         drawCount: BigInt(drawCount),
       });
+    },
+    [conn, gameId],
+  );
+
+  const threeNailsResetExecute = useCallback(
+    (requestId: bigint) => {
+      conn?.reducers.threeNailsResetExecute({ gameId, requestId });
     },
     [conn, gameId],
   );
@@ -837,6 +845,7 @@ export function useGameState(gameId: bigint): GameState {
     randomReserveToZone,
     randomOpponentHandToZone,
     opponentShuffleAndDraw,
+    threeNailsResetExecute,
     reloadDeck,
     meekCard,
     unmeekCard,
