@@ -4106,44 +4106,59 @@ export const three_nails_reset_execute = spacetimedb.reducer(
       return;
     }
 
-    // Banish Three Nails (GoC)
+    // Banish Three Nails (GoC) — clear in-play state before leaving territory.
+    clearCountersIfLeavingPlay(ctx, source.id, 'territory', 'banish');
+
     ctx.db.CardInstance.id.update({
       ...source,
+      ...leavePlayFieldOverrides(source, 'territory', 'banish'),
       zone: 'banish',
       zoneIndex: 0n,
       posX: '',
       posY: '',
       isFlipped: false,
+      equippedToInstanceId: 0n,
     });
 
     const allPlayers = [...ctx.db.Player.player_game_id.filter(gameId)];
     const SWEEP_ZONES = new Set(['hand', 'territory', 'land-of-bondage']);
 
+    // Track swept card IDs for defensive cascade below.
+    // Include the source (Three Nails) so accessories linked to it are also cleared.
+    const sweptIds = new Set<bigint>([sourceInstanceId]);
+
     for (const card of [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)]) {
       if (card.id === sourceInstanceId) continue; // already banished
       if (!SWEEP_ZONES.has(card.zone)) continue;
 
-      if (card.ownerId === 0n) {
-        // Shared paragon soul-deck card — route back to soul-deck.
-        ctx.db.CardInstance.id.update({
-          ...card,
-          zone: 'soul-deck',
-          zoneIndex: 0n,
-          posX: '',
-          posY: '',
-          isFlipped: true,
-        });
-        continue;
-      }
+      // Routing: shared-paragon souls (ownerId === 0n sentinel) → soul-deck.
+      // All other cards → owner's deck.
+      const ownerIsActivePlayer = allPlayers.some((p: any) => p.id === card.ownerId);
+      const targetZone = ownerIsActivePlayer ? 'deck' : 'soul-deck';
+
+      clearCountersIfLeavingPlay(ctx, card.id, card.zone, targetZone);
 
       ctx.db.CardInstance.id.update({
         ...card,
-        zone: 'deck',
+        ...leavePlayFieldOverrides(card, card.zone, targetZone),
+        zone: targetZone,
         zoneIndex: 0n,
         posX: '',
         posY: '',
         isFlipped: true,
+        equippedToInstanceId: 0n,
       });
+
+      sweptIds.add(card.id);
+    }
+
+    // Defensive cascade — clear stale equippedToInstanceId on any card pointing
+    // at a swept card. Cards already in non-sweep zones (deck, discard, etc.)
+    // holding a link into the sweep set get their link cleared.
+    for (const card of [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)]) {
+      if (card.equippedToInstanceId !== 0n && sweptIds.has(card.equippedToInstanceId)) {
+        ctx.db.CardInstance.id.update({ ...card, equippedToInstanceId: 0n });
+      }
     }
 
     // Reshuffle each player's deck and draw 8.
