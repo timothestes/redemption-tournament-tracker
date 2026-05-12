@@ -9,7 +9,7 @@ import {
   Dices,
   SkipForward,
   Hand,
-  Book,
+  BookOpen,
   Skull,
 } from 'lucide-react';
 import type { GameActions } from '../types/gameActions';
@@ -170,7 +170,7 @@ export function GameToolbar({
         disabled: isMyTurn || !!hasPendingPriority,
       },
       {
-        icon: isMyTurn ? Book : Skull,
+        icon: isMyTurn ? BookOpen : Skull,
         key: 'initiative',
         label: hasPendingInitiative ? 'Pending...' : 'Initiative',
         onClick: onRequestInitiative ?? (() => {}),
