@@ -74,6 +74,7 @@ import ShuffleOpponentDeckReducer from "../shuffle_opponent_deck_reducer";
 import ShuffleSoulDeckReducer from "../shuffle_soul_deck_reducer";
 import SpawnLostSoulReducer from "../spawn_lost_soul_reducer";
 import SurrenderLostSoulReducer from "../surrender_lost_soul_reducer";
+import ThreeNailsResetExecuteReducer from "../three_nails_reset_execute_reducer";
 import ToggleRevealHandReducer from "../toggle_reveal_hand_reducer";
 import ToggleRevealReserveReducer from "../toggle_reveal_reserve_reducer";
 import UnmeekCardReducer from "../unmeek_card_reducer";
@@ -148,6 +149,7 @@ export type ShuffleOpponentDeckParams = __Infer<typeof ShuffleOpponentDeckReduce
 export type ShuffleSoulDeckParams = __Infer<typeof ShuffleSoulDeckReducer>;
 export type SpawnLostSoulParams = __Infer<typeof SpawnLostSoulReducer>;
 export type SurrenderLostSoulParams = __Infer<typeof SurrenderLostSoulReducer>;
+export type ThreeNailsResetExecuteParams = __Infer<typeof ThreeNailsResetExecuteReducer>;
 export type ToggleRevealHandParams = __Infer<typeof ToggleRevealHandReducer>;
 export type ToggleRevealReserveParams = __Infer<typeof ToggleRevealReserveReducer>;
 export type UnmeekCardParams = __Infer<typeof UnmeekCardReducer>;

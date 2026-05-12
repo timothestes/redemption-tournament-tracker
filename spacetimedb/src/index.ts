@@ -3227,6 +3227,8 @@ export const execute_card_ability = spacetimedb.reducer(
         throw new SenderError('look_at_opponent_deck is dispatched by the client, not this reducer');
       case 'discard_opponent_deck':
         throw new SenderError('discard_opponent_deck is dispatched by the client, not this reducer');
+      case 'three_nails_reset':
+        throw new SenderError('three_nails_reset is dispatched by the client, not this reducer');
       case 'reserve_opponent_deck':
         throw new SenderError('reserve_opponent_deck is dispatched by the client, not this reducer');
       case 'reserve_top_of_deck':
@@ -4046,6 +4048,122 @@ export const opponent_shuffle_and_draw = spacetimedb.reducer(
     if (!target) throw new SenderError('Target player not found');
 
     shuffleAndDrawForPlayerImpl(ctx, gameId, target, Number(shuffleCount), Number(drawCount));
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: three_nails_reset_execute
+// Authorised via an approved ZoneSearchRequest (action='three_nails_reset').
+// Banishes the source Three Nails (GoC), then for each player sweeps their
+// hand + territory + land-of-bondage into their deck (lost souls owned by
+// the shared paragon soul-deck route back there), reshuffles, and draws 8.
+// Dispatched by the requester after the opponent approves.
+// ---------------------------------------------------------------------------
+export const three_nails_reset_execute = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    requestId: t.u64(),
+  },
+  (ctx, { gameId, requestId }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in progress');
+
+    const player = findPlayerBySender(ctx, gameId);
+
+    const req = ctx.db.ZoneSearchRequest.id.find(requestId);
+    if (!req) throw new SenderError('Search request not found');
+    if (req.gameId !== gameId) throw new SenderError('Request not in this game');
+    if (req.requesterId !== player.id) throw new SenderError('Not your search request');
+    if (req.status !== 'approved') throw new SenderError('Search request not approved');
+    if (req.action !== 'three_nails_reset') throw new SenderError('Wrong action type');
+
+    // Parse sourceInstanceId from actionParams
+    let sourceInstanceId: bigint;
+    try {
+      const params = JSON.parse(req.actionParams);
+      sourceInstanceId = BigInt(params.sourceInstanceId);
+    } catch {
+      throw new SenderError('Invalid actionParams');
+    }
+
+    // Locate Three Nails (GoC) — verify still in territory and owned by requester
+    const source = ctx.db.CardInstance.id.find(sourceInstanceId);
+    if (
+      !source ||
+      source.gameId !== gameId ||
+      source.ownerId !== player.id ||
+      source.cardName !== 'Three Nails (GoC)' ||
+      source.zone !== 'territory'
+    ) {
+      // No-op path: Nails was moved/negated mid-flight.
+      logAction(
+        ctx, gameId, player.id, 'THREE_NAILS_RESET_CANCELLED',
+        JSON.stringify({ reason: 'source_card_not_in_territory' }),
+        game.turnNumber, game.currentPhase,
+      );
+      // Leave request cleanup to complete_zone_search (client responsibility).
+      return;
+    }
+
+    // Banish Three Nails (GoC)
+    ctx.db.CardInstance.id.update({
+      ...source,
+      zone: 'banish',
+      zoneIndex: 0n,
+      posX: '',
+      posY: '',
+      isFlipped: false,
+    });
+
+    const allPlayers = [...ctx.db.Player.player_game_id.filter(gameId)];
+    const SWEEP_ZONES = new Set(['hand', 'territory', 'land-of-bondage']);
+
+    for (const card of [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)]) {
+      if (card.id === sourceInstanceId) continue; // already banished
+      if (!SWEEP_ZONES.has(card.zone)) continue;
+
+      if (card.ownerId === 0n) {
+        // Shared paragon soul-deck card — route back to soul-deck.
+        ctx.db.CardInstance.id.update({
+          ...card,
+          zone: 'soul-deck',
+          zoneIndex: 0n,
+          posX: '',
+          posY: '',
+          isFlipped: true,
+        });
+        continue;
+      }
+
+      ctx.db.CardInstance.id.update({
+        ...card,
+        zone: 'deck',
+        zoneIndex: 0n,
+        posX: '',
+        posY: '',
+        isFlipped: true,
+      });
+    }
+
+    // Reshuffle each player's deck and draw 8.
+    // shuffleAndDrawForPlayerImpl with shuffleCount=0 skips moving hand cards
+    // (there are none left after the sweep above) then reshuffles the entire
+    // deck and draws drawCount.
+    for (const target of allPlayers) {
+      shuffleAndDrawForPlayerImpl(ctx, gameId, target, 0, 8);
+    }
+
+    // Leave request cleanup to complete_zone_search (client responsibility).
+
+    const finalGame = ctx.db.Game.id.find(gameId);
+    if (finalGame) {
+      logAction(
+        ctx, gameId, player.id, 'THREE_NAILS_RESET',
+        JSON.stringify({ requesterId: player.id.toString() }),
+        finalGame.turnNumber, finalGame.currentPhase,
+      );
+    }
   }
 );
 

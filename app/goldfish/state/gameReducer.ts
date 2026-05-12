@@ -1025,6 +1025,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           // Custom abilities are dispatched client-side in multiplayer and
           // never reach the goldfish reducer in v1. No-op defensively.
           return state;
+        case 'three_nails_reset':
+          // Multiplayer-only ability — not applicable in goldfish mode.
+          return state;
         default: {
           const _exhaustive: never = ability;
           return state;

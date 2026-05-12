@@ -102,6 +102,7 @@ import ShuffleOpponentDeckReducer from "./shuffle_opponent_deck_reducer";
 import ShuffleSoulDeckReducer from "./shuffle_soul_deck_reducer";
 import SpawnLostSoulReducer from "./spawn_lost_soul_reducer";
 import SurrenderLostSoulReducer from "./surrender_lost_soul_reducer";
+import ThreeNailsResetExecuteReducer from "./three_nails_reset_execute_reducer";
 import ToggleRevealHandReducer from "./toggle_reveal_hand_reducer";
 import ToggleRevealReserveReducer from "./toggle_reveal_reserve_reducer";
 import UnmeekCardReducer from "./unmeek_card_reducer";
@@ -360,6 +361,7 @@ const reducersSchema = __reducers(
   __reducerSchema("shuffle_soul_deck", ShuffleSoulDeckReducer),
   __reducerSchema("spawn_lost_soul", SpawnLostSoulReducer),
   __reducerSchema("surrender_lost_soul", SurrenderLostSoulReducer),
+  __reducerSchema("three_nails_reset_execute", ThreeNailsResetExecuteReducer),
   __reducerSchema("toggle_reveal_hand", ToggleRevealHandReducer),
   __reducerSchema("toggle_reveal_reserve", ToggleRevealReserveReducer),
   __reducerSchema("unmeek_card", UnmeekCardReducer),
