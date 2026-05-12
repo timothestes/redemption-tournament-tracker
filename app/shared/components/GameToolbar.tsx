@@ -9,6 +9,8 @@ import {
   Dices,
   SkipForward,
   Hand,
+  Book,
+  Skull,
 } from 'lucide-react';
 import type { GameActions } from '../types/gameActions';
 
@@ -43,10 +45,14 @@ export interface GameToolbarProps {
   onNewGame?: () => void;
   /** Called for end turn (multiplayer only). */
   onEndTurn?: () => void;
-  /** Called to request action priority (multiplayer only). */
+  /** Called to request action priority (multiplayer, non-active player only). */
   onRequestPriority?: () => void;
   /** Whether a priority request is currently pending. */
   hasPendingPriority?: boolean;
+  /** Called to request battle initiative (multiplayer, any player). */
+  onRequestInitiative?: () => void;
+  /** Whether an initiative request is currently pending. */
+  hasPendingInitiative?: boolean;
   /** Game is finished — keep toolbar active for review but disable end turn. */
   isFinished?: boolean;
 }
@@ -71,6 +77,8 @@ export function GameToolbar({
   onEndTurn,
   onRequestPriority,
   hasPendingPriority,
+  onRequestInitiative,
+  hasPendingInitiative,
   isFinished,
 }: GameToolbarProps) {
   const isMultiplayer = mode === 'multiplayer';
@@ -143,7 +151,7 @@ export function GameToolbar({
       shortcut: '',
       hidden: isMultiplayer,
     },
-    // End Turn + Priority — both visible in multiplayer, gated by their own conditions
+    // End Turn (active player), Priority (non-active player), Initiative (any) — multiplayer only
     ...(isMultiplayer && !isFinished ? [
       {
         icon: SkipForward,
@@ -159,7 +167,15 @@ export function GameToolbar({
         label: hasPendingPriority ? 'Pending...' : 'Priority',
         onClick: onRequestPriority ?? (() => {}),
         shortcut: '',
-        disabled: !!hasPendingPriority,
+        disabled: isMyTurn || !!hasPendingPriority,
+      },
+      {
+        icon: isMyTurn ? Book : Skull,
+        key: 'initiative',
+        label: hasPendingInitiative ? 'Pending...' : 'Initiative',
+        onClick: onRequestInitiative ?? (() => {}),
+        shortcut: '',
+        disabled: !!hasPendingInitiative,
       },
     ] : []),
   ];

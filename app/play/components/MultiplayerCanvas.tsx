@@ -809,7 +809,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       (approvedSearchRequest != null &&
         !approvedSearchRequest.action &&
         approvedSearchRequest.zone !== 'hand-reveal' &&
-        approvedSearchRequest.zone !== 'action-priority');
+        approvedSearchRequest.zone !== 'action-priority' &&
+        approvedSearchRequest.zone !== 'initiative');
     onSearchModalChange(anyModalOpen);
   }, [
     onSearchModalChange,
@@ -2087,13 +2088,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       const msg = prev.action ? `Opponent denied: ${describeRequesterAction(prev.action, prev.actionParams)}`
         : zone === 'hand-reveal' ? 'Opponent declined to reveal their hand'
         : zone === 'action-priority' ? 'Opponent declined priority'
+        : zone === 'initiative' ? 'Opponent declined initiative'
         : `Opponent declined to share their ${zone}`;
       showGameToast(msg);
     }
     pendingSearchRef.current = myPending ?? null;
   }, [zoneSearchRequests, gameState.myPlayer, approvedSearchRequest]);
 
-  // Auto-complete hand-reveal and action-priority requests — no browse modal needed
+  // Auto-complete hand-reveal, action-priority, and initiative requests — no browse modal needed
   useEffect(() => {
     if (approvedSearchRequest && approvedSearchRequest.zone === 'hand-reveal') {
       completeZoneSearch(BigInt(approvedSearchRequest.id));
@@ -2102,6 +2104,10 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     if (approvedSearchRequest && approvedSearchRequest.zone === 'action-priority') {
       completeZoneSearch(BigInt(approvedSearchRequest.id));
       showGameToast('Action priority granted — take your action');
+    }
+    if (approvedSearchRequest && approvedSearchRequest.zone === 'initiative') {
+      completeZoneSearch(BigInt(approvedSearchRequest.id));
+      showGameToast('Initiative granted');
     }
   }, [approvedSearchRequest, completeZoneSearch]);
 
@@ -6422,8 +6428,90 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         </div>
       )}
 
+      {/* Initiative request — floating in center of board between territories */}
+      {incomingSearchRequest && incomingSearchRequest.zone === 'initiative' && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 300,
+            pointerEvents: 'auto',
+          }}
+        >
+          <div
+            style={{
+              background: 'rgba(14, 10, 6, 0.95)',
+              border: '1px solid rgba(196, 149, 90, 0.35)',
+              borderRadius: 10,
+              padding: '16px 24px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 12,
+              boxShadow: '0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(196, 149, 90, 0.08)',
+            }}
+          >
+            <div style={{
+              fontSize: 15,
+              color: '#e8d5a3',
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              letterSpacing: '0.06em',
+              textAlign: 'center',
+            }}>
+              <strong style={{ color: '#c4955a' }}>
+                {gameState.opponentPlayer?.displayName ?? 'Opponent'}
+              </strong>{' '}
+              requests initiative
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => {
+                  approveZoneSearch(BigInt(incomingSearchRequest.id));
+                  showGameToast('Initiative granted');
+                }}
+                style={{
+                  padding: '9px 20px',
+                  background: '#2d5a27',
+                  border: '1px solid #4a8a42',
+                  borderRadius: 6,
+                  color: '#c4e8bf',
+                  fontSize: 14,
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  letterSpacing: '0.06em',
+                  cursor: 'pointer',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#3a7332'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#2d5a27'; }}
+              >
+                Grant
+              </button>
+              <button
+                onClick={() => denyZoneSearch(BigInt(incomingSearchRequest.id))}
+                style={{
+                  padding: '9px 20px',
+                  background: '#5a2727',
+                  border: '1px solid #8a4242',
+                  borderRadius: 6,
+                  color: '#e8bfbf',
+                  fontSize: 14,
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  letterSpacing: '0.06em',
+                  cursor: 'pointer',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#733232'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#5a2727'; }}
+              >
+                Deny
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Search/reveal/action requests — floating top-center banner */}
-      {incomingSearchRequest && incomingSearchRequest.zone !== 'action-priority' && incomingSearchRequest.action !== 'three_nails_reset' && (() => {
+      {incomingSearchRequest && incomingSearchRequest.zone !== 'action-priority' && incomingSearchRequest.zone !== 'initiative' && incomingSearchRequest.action !== 'three_nails_reset' && (() => {
         const isAction = !!incomingSearchRequest.action;
         const actionDescription = isAction
           ? describeOpponentAction(incomingSearchRequest.action, incomingSearchRequest.actionParams)

@@ -1686,6 +1686,10 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             hasPendingPriority={gameState.zoneSearchRequests.some(
               (r: any) => r.zone === 'action-priority' && r.status === 'pending' && r.requesterId === gameState.myPlayer?.id
             )}
+            onRequestInitiative={() => gameState.requestZoneSearch('initiative')}
+            hasPendingInitiative={gameState.zoneSearchRequests.some(
+              (r: any) => r.zone === 'initiative' && r.status === 'pending' && r.requesterId === gameState.myPlayer?.id
+            )}
           />
           <GameToastContainer />
           <PauseConsentToast

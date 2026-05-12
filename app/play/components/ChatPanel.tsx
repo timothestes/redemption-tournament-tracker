@@ -671,10 +671,11 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
   if (actionType === 'REQUEST_ZONE_SEARCH' && payload) {
     try {
       const data = JSON.parse(payload);
-      const zoneName = data.zone === 'hand-reveal' ? 'hand' : data.zone === 'action-priority' ? 'action priority' : data.zone;
+      const zoneName = data.zone === 'hand-reveal' ? 'hand' : data.zone === 'action-priority' ? 'action priority' : data.zone === 'initiative' ? 'initiative' : data.zone;
       const targetName = data.targetName ?? 'opponent';
       if (data.zone === 'hand-reveal') return `requested to reveal ${targetName}'s hand`;
       if (data.zone === 'action-priority') return `requested action priority`;
+      if (data.zone === 'initiative') return `requested initiative`;
       return `requested to search ${targetName}'s ${zoneName}`;
     } catch { /* fall through */ }
   }
@@ -725,6 +726,7 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       const data = JSON.parse(payload);
       if (data.zone === 'hand-reveal') return 'approved hand reveal';
       if (data.zone === 'action-priority') return 'granted action priority';
+      if (data.zone === 'initiative') return 'granted initiative';
       return `allowed ${data.zone} search`;
     } catch { /* fall through */ }
   }
@@ -733,6 +735,7 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       const data = JSON.parse(payload);
       if (data.zone === 'hand-reveal') return 'denied hand reveal';
       if (data.zone === 'action-priority') return 'denied action priority';
+      if (data.zone === 'initiative') return 'denied initiative';
       return `denied ${data.zone} search`;
     } catch { /* fall through */ }
   }
@@ -742,6 +745,7 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       const targetName = data.targetName ?? 'opponent';
       if (data.zone === 'hand-reveal') return `finished viewing ${targetName}'s hand`;
       if (data.zone === 'action-priority') return 'finished action priority';
+      if (data.zone === 'initiative') return 'finished initiative';
       if (data.zone === 'deck') {
         const suffix = data.shuffled ? ' (and shuffled it)' : ' (and chose not to shuffle it)';
         return `finished searching ${targetName}'s deck${suffix}`;
@@ -905,10 +909,11 @@ export default function ChatPanel({
     ? gameActions
     : gameActions.filter((a) => !hiddenActionIds.has(a.id.toString()))
   ).filter((a) => {
-    // Suppress "finished action priority" — the grant/request pair is enough.
+    // Suppress "finished action priority" / "finished initiative" — the grant/request pair is enough.
     if (a.actionType === 'COMPLETE_ZONE_SEARCH' && a.payload) {
       try {
-        if (JSON.parse(a.payload).zone === 'action-priority') return false;
+        const z = JSON.parse(a.payload).zone;
+        if (z === 'action-priority' || z === 'initiative') return false;
       } catch { /* fall through */ }
     }
     return true;
