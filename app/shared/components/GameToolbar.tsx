@@ -43,7 +43,7 @@ export interface GameToolbarProps {
   onNewGame?: () => void;
   /** Called for end turn (multiplayer only). */
   onEndTurn?: () => void;
-  /** Called to request action priority (multiplayer, non-active player). */
+  /** Called to request action priority (multiplayer only). */
   onRequestPriority?: () => void;
   /** Whether a priority request is currently pending. */
   hasPendingPriority?: boolean;
