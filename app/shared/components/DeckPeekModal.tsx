@@ -170,6 +170,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [keepOpen, setKeepOpen] = useState(false);
 
   // Timestamp of last drag end — used by the backdrop click handler as a reliable
   // guard against the spurious click that fires when mousedown-on-card + mouseup-on-backdrop
@@ -232,10 +233,10 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
 
   // Auto-close when all revealed cards have been moved
   useEffect(() => {
-    if (!hasRemaining && peekedIds.length > 0 && onClose) {
+    if (!hasRemaining && peekedIds.length > 0 && onClose && !keepOpen) {
       onClose();
     }
-  }, [hasRemaining]);
+  }, [hasRemaining, keepOpen]);
 
   const handleCloseAction = (action: 'top' | 'bottom' | 'shuffle') => {
     if (!onClose) return;
@@ -462,32 +463,57 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
           title={title}
           onClose={onClose ? () => handleCloseAction('top') : undefined}
         >
-          {selectedIds.size > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{
-                color: 'var(--gf-accent)',
-                fontSize: 12,
-                fontFamily: 'var(--font-cinzel), Georgia, serif',
-              }}>
-                {selectedIds.size} selected
-              </span>
-              <button
-                onClick={(e) => { e.stopPropagation(); setSelectedIds(new Set()); }}
-                style={{
-                  background: 'transparent',
-                  border: '1px solid var(--gf-border)',
-                  borderRadius: 4,
-                  color: 'var(--gf-text-dim)',
-                  fontSize: 10,
-                  padding: '2px 6px',
-                  cursor: 'pointer',
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {selectedIds.size > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{
+                  color: 'var(--gf-accent)',
+                  fontSize: 12,
                   fontFamily: 'var(--font-cinzel), Georgia, serif',
+                }}>
+                  {selectedIds.size} selected
+                </span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setSelectedIds(new Set()); }}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid var(--gf-border)',
+                    borderRadius: 4,
+                    color: 'var(--gf-text-dim)',
+                    fontSize: 10,
+                    padding: '2px 6px',
+                    cursor: 'pointer',
+                    fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  }}
+                >
+                  Deselect
+                </button>
+              </div>
+            )}
+            {onClose && (
+              <label
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontFamily: 'var(--font-cinzel), Georgia, serif',
+                  color: 'var(--gf-text-dim)',
+                  fontSize: 11,
+                  cursor: 'pointer',
+                  userSelect: 'none',
                 }}
               >
-                Deselect
-              </button>
-            </div>
-          )}
+                <input
+                  type="checkbox"
+                  checked={keepOpen}
+                  onChange={(e) => setKeepOpen(e.target.checked)}
+                  style={{ cursor: 'pointer', accentColor: 'var(--gf-accent)' }}
+                />
+                Keep open
+              </label>
+            )}
+          </div>
         </DraggableTitleBar>
 
         <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
