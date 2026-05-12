@@ -170,7 +170,7 @@ export function DeckPeekModal({ cardIds, title, onClose, onStartDrag, onStartMul
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [keepOpen, setKeepOpen] = useState(false);
+  const [keepOpen, setKeepOpen] = useState(true);
 
   // Timestamp of last drag end — used by the backdrop click handler as a reliable
   // guard against the spurious click that fires when mousedown-on-card + mouseup-on-backdrop
