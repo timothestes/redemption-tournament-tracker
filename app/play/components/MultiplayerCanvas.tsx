@@ -1166,7 +1166,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       // opponents/spectators so the implicit "reveal from hand" cost is
       // visible. Reveal duration matches the standard 30s — see
       // reveal_card_in_hand reducer in spacetimedb/src/index.ts.
-      const firedFromHand = !!source && source.zone === 'hand' && !!ability;
+      const firedFromHand =
+        !!source &&
+        source.zone === 'hand' &&
+        !!ability &&
+        ability.type !== 'three_nails_reset';
       if (firedFromHand) {
         gameState.revealCardInHand(BigInt(sourceInstanceId));
       }
@@ -2111,7 +2115,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     dispatchedActionRef.current = reqId;
 
     const { action, actionParams } = approvedSearchRequest;
-    let params: { count?: number; shuffleCount?: number; drawCount?: number } = {};
+    let params: { count?: number; shuffleCount?: number; drawCount?: number; sourceInstanceId?: string } = {};
     try { params = actionParams ? JSON.parse(actionParams) : {}; } catch {}
     const count = params.count ?? 0;
     const reqIdBig = BigInt(approvedSearchRequest.id);
@@ -2208,6 +2212,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         complete();
         break;
       case 'three_nails_reset':
+        // sourceInstanceId is encoded in actionParams and re-parsed server-side
+        // by three_nails_reset_execute; the client only needs to fire the reducer.
         gameState.threeNailsResetExecute(reqIdBig);
         complete();
         break;
