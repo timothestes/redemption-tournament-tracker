@@ -707,6 +707,7 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
         case 'random_hand_to_deck_top': return `asked to send ${count} random card${plural} from ${targetName}'s hand to the top of their deck`;
         case 'random_hand_to_deck_bottom': return `asked to send ${count} random card${plural} from ${targetName}'s hand to the bottom of their deck`;
         case 'random_hand_to_deck_shuffle': return `asked to shuffle ${count} random card${plural} from ${targetName}'s hand into their deck`;
+        case 'three_nails_reset': return `asked to activate Three Nails (GoC) reset`;
         case 'shuffle_and_draw': {
           let s = 0, d = 0;
           try {
@@ -747,6 +748,12 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       }
       return `finished searching ${targetName}'s ${data.zone}`;
     } catch { /* fall through */ }
+  }
+  if (actionType === 'THREE_NAILS_RESET') {
+    return 'activated Three Nails (GoC) reset — both players drew 8';
+  }
+  if (actionType === 'THREE_NAILS_RESET_CANCELLED') {
+    return 'tried to activate Three Nails (GoC), but the source card was no longer in play';
   }
   if (actionType === 'DECK_SEARCH_NO_SHUFFLE' && payload) {
     try {
