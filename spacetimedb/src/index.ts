@@ -5361,7 +5361,7 @@ export const request_zone_search = spacetimedb.reducer(
 
     const player = findPlayerBySender(ctx, gameId);
 
-    if (!['deck', 'hand', 'reserve', 'hand-reveal', 'action-priority'].includes(zone)) {
+    if (!['deck', 'hand', 'reserve', 'hand-reveal', 'action-priority', 'initiative'].includes(zone)) {
       throw new SenderError('Invalid zone for search: ' + zone);
     }
 
