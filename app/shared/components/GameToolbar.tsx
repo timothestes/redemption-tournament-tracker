@@ -109,6 +109,7 @@ export function GameToolbar({
     shortcut: string;
     disabled?: boolean;
     hidden?: boolean;
+    pushRight?: boolean;
   }
 
   const buttons: ToolbarButton[] = [
@@ -151,33 +152,33 @@ export function GameToolbar({
       shortcut: '',
       hidden: isMultiplayer,
     },
-    // End Turn (active player), Priority (non-active player), Initiative (any) — multiplayer only
-    ...(isMultiplayer && !isFinished ? [
-      {
-        icon: SkipForward,
-        key: 'endturn',
-        label: 'End Turn',
-        onClick: onEndTurn ?? (() => {}),
-        shortcut: '',
-        disabled: !isMyTurn,
-      },
-      {
-        icon: Hand,
-        key: 'priority',
-        label: hasPendingPriority ? 'Pending...' : 'Priority',
-        onClick: onRequestPriority ?? (() => {}),
-        shortcut: '',
-        disabled: isMyTurn || !!hasPendingPriority,
-      },
-      {
-        icon: isMyTurn ? BookOpen : Skull,
-        key: 'initiative',
-        label: hasPendingInitiative ? 'Pending...' : 'Initiative',
-        onClick: onRequestInitiative ?? (() => {}),
-        shortcut: '',
-        disabled: !!hasPendingInitiative,
-      },
-    ] : []),
+    // Initiative (any player) — multiplayer only
+    ...(isMultiplayer && !isFinished ? [{
+      icon: isMyTurn ? BookOpen : Skull,
+      key: 'initiative',
+      label: hasPendingInitiative ? 'Pending...' : 'Initiative',
+      onClick: onRequestInitiative ?? (() => {}),
+      shortcut: '',
+      disabled: !!hasPendingInitiative,
+    }] : []),
+    // End Turn (active player) or Priority (non-active player) — multiplayer only,
+    // anchored to the far right of the toolbar
+    ...(isMultiplayer && isMyTurn && !isFinished ? [{
+      icon: SkipForward,
+      key: 'endturn',
+      label: 'End Turn',
+      onClick: onEndTurn ?? (() => {}),
+      shortcut: '',
+      pushRight: true,
+    }] : isMultiplayer && !isMyTurn && !isFinished ? [{
+      icon: Hand,
+      key: 'priority',
+      label: hasPendingPriority ? 'Pending...' : 'Priority',
+      onClick: onRequestPriority ?? (() => {}),
+      shortcut: '',
+      disabled: !!hasPendingPriority,
+      pushRight: true,
+    }] : []),
   ];
 
   const visibleButtons = buttons.filter(b => !b.hidden);
@@ -200,7 +201,7 @@ export function GameToolbar({
         zIndex: 200,
       }}
     >
-      {visibleButtons.map(({ icon: Icon, key, label, onClick, shortcut, disabled: btnDisabled }) => (
+      {visibleButtons.map(({ icon: Icon, key, label, onClick, shortcut, disabled: btnDisabled, pushRight }) => (
         <button
           key={key}
           onClick={onClick}
@@ -219,6 +220,9 @@ export function GameToolbar({
             borderRadius: 4,
             transition: 'background 0.15s, color 0.15s',
             opacity: btnDisabled ? 0.5 : 1,
+            marginLeft: pushRight ? 24 : undefined,
+            borderLeft: pushRight ? '1px solid var(--gf-border)' : undefined,
+            paddingLeft: pushRight ? 18 : undefined,
           }}
           onMouseEnter={(e) => {
             if (!btnDisabled) {
