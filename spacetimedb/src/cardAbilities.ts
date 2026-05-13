@@ -30,6 +30,7 @@ export type CardAbility = AbilityBase & (
   | { type: 'reveal_own_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'look_at_own_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'look_at_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
+  | { type: 'reveal_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'discard_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'reserve_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'reserve_top_of_deck'; count: number }
@@ -76,6 +77,9 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'Mount Sinai':                                         [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
   'Faith of Isaac':                                      [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
   'False Prophecy (PoC)':                                [{ type: 'look_at_opponent_deck', position: 'top', count: 6 }],
+  'The Ends of the Earth (RoJ AB)':                      [{ type: 'reveal_opponent_deck', position: 'top', count: 7 }],
+  'The Ends of the Earth (RoJ)':                         [{ type: 'reveal_opponent_deck', position: 'top', count: 7 }],
+  'Matthew the Publican / Matthew (Levi) (GoC)':         [{ type: 'custom', reducerName: 'matthewDrawBrigades', label: "Draw cards equal to brigades in opponent's hand" }],
   'Delivered':                                           [{ type: 'discard_opponent_deck', position: 'top', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
   'Contagious Fear (GoC)':                               [{ type: 'reserve_opponent_deck', position: 'top', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
   'Jairus (GoC)':                                        [{ type: 'reserve_opponent_deck', position: 'top', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],

@@ -25,6 +25,7 @@ export type CardAbility = AbilityBase & (
   | { type: 'reveal_own_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'look_at_own_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'look_at_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
+  | { type: 'reveal_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'discard_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'reserve_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'reserve_top_of_deck'; count: number }
@@ -78,6 +79,9 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'Mount Sinai':                                         [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
   'Faith of Isaac':                                      [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
   'False Prophecy (PoC)':                                [{ type: 'look_at_opponent_deck', position: 'top', count: 6 }],
+  'The Ends of the Earth (RoJ AB)':                      [{ type: 'reveal_opponent_deck', position: 'top', count: 7 }],
+  'The Ends of the Earth (RoJ)':                         [{ type: 'reveal_opponent_deck', position: 'top', count: 7 }],
+  'Matthew the Publican / Matthew (Levi) (GoC)':         [{ type: 'custom', reducerName: 'matthewDrawBrigades', label: "Draw cards equal to brigades in opponent's hand" }],
   'Delivered':                                           [{ type: 'discard_opponent_deck', position: 'top', count: 1, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
   // (Star) — "Reserve the top card of a deck". Surfaced as opponent-deck
   // since that's the impactful play; user can still manually move from
@@ -221,6 +225,10 @@ export function abilityLabel(a: CardAbility): string {
     case 'look_at_opponent_deck': {
       const where = a.position === 'random' ? `${a.count} random` : `${a.position} ${a.count}`;
       return `Look at ${where} card${a.count === 1 ? '' : 's'} of opponent's deck`;
+    }
+    case 'reveal_opponent_deck': {
+      const where = a.position === 'random' ? `${a.count} random` : `${a.position} ${a.count}`;
+      return `Reveal ${where} card${a.count === 1 ? '' : 's'} of opponent's deck`;
     }
     case 'discard_opponent_deck': {
       const where = a.position === 'random' ? `${a.count} random` : `${a.position} ${a.count}`;

@@ -81,6 +81,7 @@ export interface GameState {
   // Action methods — each wraps a SpacetimeDB reducer call
   drawCard: () => void;
   drawMultiple: (count: bigint) => void;
+  matthewDrawBrigades: (cardInstanceId: bigint, brigadeCount: bigint) => void;
   moveCard: (cardInstanceId: bigint, toZone: string, zoneIndex?: string, posX?: string, posY?: string, targetOwnerId?: string) => void;
   moveCardsBatch: (cardInstanceIds: string, toZone: string, positions?: string, targetOwnerId?: string, fromSource?: string) => void;
   attachCard: (weaponInstanceId: bigint, warriorInstanceId: bigint) => void;
@@ -363,6 +364,13 @@ export function useGameState(gameId: bigint): GameState {
   const drawMultiple = useCallback(
     (count: bigint) => {
       conn?.reducers.drawMultiple({ gameId, count });
+    },
+    [conn, gameId],
+  );
+
+  const matthewDrawBrigades = useCallback(
+    (cardInstanceId: bigint, brigadeCount: bigint) => {
+      conn?.reducers.matthewDrawBrigades({ gameId, cardInstanceId, brigadeCount });
     },
     [conn, gameId],
   );
@@ -834,6 +842,7 @@ export function useGameState(gameId: bigint): GameState {
     identityHex,
     drawCard,
     drawMultiple,
+    matthewDrawBrigades,
     moveCard,
     moveCardsBatch,
     attachCard,

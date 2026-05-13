@@ -782,7 +782,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   }, [exchangeState]);
   const [opponentZoneMenu, setOpponentZoneMenu] = useState<{ x: number; y: number; zone: string; zoneName: string } | null>(null);
   const [opponentDeckMenu, setOpponentDeckMenu] = useState<{ x: number; y: number } | null>(null);
-  const [opponentPeekState, setOpponentPeekState] = useState<{ position: 'top' | 'bottom' | 'random'; count: number } | null>(null);
+  const [opponentPeekState, setOpponentPeekState] = useState<{ position: 'top' | 'bottom' | 'random'; count: number; cardIds: string[] } | null>(null);
   const [opponentLookState, setOpponentLookState] = useState<{ position: 'top' | 'bottom' | 'random'; count: number } | null>(null);
   const [opponentRevealDismissed, setOpponentRevealDismissed] = useState(false);
   const [opponentRevealSnapshot, setOpponentRevealSnapshot] = useState<string[]>([]);
@@ -1207,6 +1207,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         requestOpponentAction(action, JSON.stringify({ count: ability.count }));
         return;
       }
+      if (ability?.type === 'reveal_opponent_deck') {
+        // Requires opponent consent — routes through the existing
+        // request_opponent_action flow. On approve, the approvedSearchRequest
+        // effect dispatches `reveal_deck_*` which opens opponentPeekState.
+        const action =
+          ability.position === 'top' ? 'reveal_deck_top'
+          : ability.position === 'bottom' ? 'reveal_deck_bottom'
+          : 'reveal_deck_random';
+        requestOpponentAction(action, JSON.stringify({ count: ability.count }));
+        return;
+      }
       if (ability?.type === 'discard_opponent_deck') {
         // Requires opponent consent — routes through the existing
         // request_opponent_action flow. On approve, the approvedSearchRequest
@@ -1311,6 +1322,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         requestOpponentAction(action, JSON.stringify({ count: ability.count }));
         return;
       }
+      if (ability?.type === 'custom' && ability.reducerName === 'matthewDrawBrigades') {
+        // Matthew the Publican — draw cards equal to distinct brigades in
+        // opponent's revealed hand. Brigade count is computed client-side from
+        // the live snapshot; server validates handRevealed + caps the count.
+        if (!opponentHandRevealed) return;
+        gameState.matthewDrawBrigades(
+          BigInt(sourceInstanceId),
+          BigInt(opponentHandBrigadeCounts.total),
+        );
+        return;
+      }
       gameState.executeCardAbility(sourceInstanceId, abilityIndex);
     },
     randomHandToZone: (count, toZone, deckPosition) =>
@@ -1328,7 +1350,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         posY !== undefined ? String(posY) : '',
       );
     },
-  }), [gameState, findMyCardById, checkReserveProtection, checkReserveBatchProtection, undoStack]);
+  }), [gameState, findMyCardById, checkReserveProtection, checkReserveBatchProtection, undoStack, opponentHandRevealed, opponentHandBrigadeCounts]);
 
   // ---- ModalGameProvider value (for shared deck modals) ----
   const modalGameValue = useMemo<ModalGameContextValue>(() => ({
@@ -2146,15 +2168,15 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         complete();
         break;
       case 'reveal_deck_top':
-        setOpponentPeekState({ position: 'top', count });
+        setOpponentPeekState({ position: 'top', count, cardIds: sampleOpponentDeckCardIds('top', count) });
         complete();
         break;
       case 'reveal_deck_bottom':
-        setOpponentPeekState({ position: 'bottom', count });
+        setOpponentPeekState({ position: 'bottom', count, cardIds: sampleOpponentDeckCardIds('bottom', count) });
         complete();
         break;
       case 'reveal_deck_random':
-        setOpponentPeekState({ position: 'random', count });
+        setOpponentPeekState({ position: 'random', count, cardIds: sampleOpponentDeckCardIds('random', count) });
         complete();
         break;
       case 'draw_deck_top':
@@ -2277,6 +2299,27 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     [myCards],
   );
 
+  const sampleOpponentDeckCardIds = useCallback(
+    (position: 'top' | 'bottom' | 'random', count: number): string[] => {
+      const sorted = [...(opponentCards['deck'] ?? [])].sort(
+        (a, b) => Number(a.zoneIndex) - Number(b.zoneIndex)
+      );
+      let selected: typeof sorted;
+      if (position === 'top') selected = sorted.slice(0, count);
+      else if (position === 'bottom') selected = sorted.slice(-count);
+      else {
+        const shuffled = [...sorted];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        selected = shuffled.slice(0, count);
+      }
+      return selected.map(c => String(c.id));
+    },
+    [opponentCards],
+  );
+
   // ---- Look card IDs (private peek — no broadcast to opponent) ----
   const lookCardIds = useMemo(() => {
     if (!lookState) return [];
@@ -2353,24 +2396,26 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     }
   }, [opponentRevealedCardIds]);
 
-  const opponentPeekCardIds = useMemo(() => {
-    if (!opponentPeekState) return [];
-    const sorted = [...(opponentCards['deck'] ?? [])].sort(
-      (a, b) => Number(a.zoneIndex) - Number(b.zoneIndex)
-    );
-    let selected: typeof sorted;
-    if (opponentPeekState.position === 'top') selected = sorted.slice(0, opponentPeekState.count);
-    else if (opponentPeekState.position === 'bottom') selected = sorted.slice(-opponentPeekState.count);
-    else {
-      const shuffled = [...sorted];
-      for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-      }
-      selected = shuffled.slice(0, opponentPeekState.count);
+  // Snapshot stored on opponentPeekState — see sampleOpponentDeckCardIds.
+  // Reading from the live opponent deck would refill the "top N" as cards
+  // are dragged out, re-firing the broadcast effect (which is logged) and
+  // spamming the chat log with "revealed N cards".
+  const opponentPeekCardIds = opponentPeekState?.cardIds ?? [];
+
+  // Broadcast a reveal of opponent's deck to both players. The activator
+  // already sees opponentPeekState locally; the opponent needs the same
+  // modal so the reveal is truly public (e.g. The Ends of the Earth).
+  const opponentPeekBroadcastRef = useRef<string>('');
+  useEffect(() => {
+    if (opponentPeekCardIds.length === 0) {
+      opponentPeekBroadcastRef.current = '';
+      return;
     }
-    return selected.map(c => String(c.id));
-  }, [opponentPeekState, opponentCards]);
+    const serialized = JSON.stringify(opponentPeekCardIds);
+    if (opponentPeekBroadcastRef.current === serialized) return;
+    opponentPeekBroadcastRef.current = serialized;
+    gameState.revealCards(serialized);
+  }, [opponentPeekCardIds, gameState]);
 
   // Private look at opponent's deck — never broadcasts
   const opponentLookCardIds = useMemo(() => {
@@ -3320,9 +3365,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     [mpLayout, closeAllMenus],
   );
 
+  // Konva fires `dblclick` whenever two pointer-ups happen on the same shape
+  // within the dblClickWindow — including right-click followed by left-click.
+  // To ensure meek only toggles on a true left+left double-click, count
+  // left-clicks since the last right-click on any card. A right-click resets
+  // the counter to 0; each left-click increments it; the dblclick handler
+  // requires the counter to be ≥ 2 before firing.
+  const leftClicksSinceContextMenuRef = useRef<number>(99);
+
   // Universal card click handler — shift-click toggles selection
   const handleCardClick = useCallback(
     (card: GameCard, e: Konva.KonvaEventObject<MouseEvent>) => {
+      if (e.evt.button === 0) leftClicksSinceContextMenuRef.current += 1;
       if (e.evt.shiftKey) {
         toggleSelect(card.instanceId);
         return;
@@ -3338,6 +3392,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     (card: GameCard, e: Konva.KonvaEventObject<PointerEvent>) => {
       e.evt.preventDefault();
       e.cancelBubble = true;
+      leftClicksSinceContextMenuRef.current = 0;
       const stage = stageRef.current;
       if (!stage) return;
       const container = stage.container().getBoundingClientRect();
@@ -3367,6 +3422,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   );
   // Double-click toggles meek on your own cards
   const handleDblClick = useCallback((card: GameCard) => {
+    if (leftClicksSinceContextMenuRef.current < 2) return;
     if (card.ownerId !== 'player1') return; // only your own cards
     const willBeMeek = !card.isMeek;
     if (card.isMeek) {
@@ -5851,6 +5907,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           y={contextMenu.y}
           actions={{ ...multiplayerActions, ...(sharedSoulActions ?? {}) }}
           isHandRevealed={gameState.myPlayer?.handRevealed ?? false}
+          opponentHandRevealed={opponentHandRevealed}
           onClose={() => setContextMenu(null)}
           onExchange={(cardIds) => {
             setContextMenu(null);
@@ -6723,7 +6780,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           <DeckPeekModal
             cardIds={opponentPeekCardIds}
             title={`Opponent ${opponentPeekState.position === 'top' ? 'Top' : opponentPeekState.position === 'bottom' ? 'Bottom' : 'Random'} ${opponentPeekState.count}`}
-            onClose={() => setOpponentPeekState(null)}
+            onClose={() => { setOpponentPeekState(null); gameState.clearRevealedCards(); }}
             onStartDrag={modalStartDrag}
             onStartMultiDrag={modalStartMultiDrag}
             didDragRef={modalDidDragRef}
@@ -6799,14 +6856,24 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
       {/* Opponent's server-revealed cards — shown from snapshot so it persists even after revealer closes their reveal */}
       {opponentRevealSnapshot.length > 0 && !opponentRevealDismissed && (() => {
-        // Detect a soul-deck reveal: any revealed ID in sharedCards['soul-deck']
-        // means the opponent revealed from the shared pile. Use the soul-deck
-        // provider so the modal can resolve the cards.
+        // The revealed IDs can live in different zones depending on the source:
+        //   - shared soul-deck (Paragon reveal) → soulDeckModalGameValue
+        //   - the revealer's own deck (their standard reveal) → opponentModalGameValue
+        //   - MY deck (revealer used "reveal opponent's deck" e.g. Ends of the Earth)
+        //     → modalGameValue so the card lookup actually finds the cards.
         const sharedSoulIds = new Set(
           (sharedCards['soul-deck'] ?? []).map((c) => String(c.id)),
         );
+        const myIds = new Set(
+          Object.values(myCards).flat().map((c) => String(c.id)),
+        );
         const isSoulDeckReveal = opponentRevealSnapshot.some((id) => sharedSoulIds.has(id));
-        const provider = isSoulDeckReveal ? soulDeckModalGameValue : opponentModalGameValue;
+        const isMyDeckReveal = !isSoulDeckReveal && opponentRevealSnapshot.some((id) => myIds.has(id));
+        const provider = isSoulDeckReveal
+          ? soulDeckModalGameValue
+          : isMyDeckReveal
+            ? modalGameValue
+            : opponentModalGameValue;
         const sourceZone: ZoneId = isSoulDeckReveal ? 'soul-deck' : 'deck';
         return (
           <ModalGameProvider value={provider}>
