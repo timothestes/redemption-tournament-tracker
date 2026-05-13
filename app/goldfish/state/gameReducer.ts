@@ -1090,6 +1090,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         case 'reveal_own_deck':
         case 'look_at_own_deck':
         case 'look_at_opponent_deck':
+        case 'reveal_opponent_deck':
         case 'discard_opponent_deck':
         case 'reserve_opponent_deck':
           // Modal-driven or opponent-required — GoldfishCanvas intercepts, or

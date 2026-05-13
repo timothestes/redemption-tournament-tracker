@@ -57,6 +57,7 @@ import LeaveGameReducer from "./leave_game_reducer";
 import LogDeckSearchNoShuffleReducer from "./log_deck_search_no_shuffle_reducer";
 import LogLookAtTopReducer from "./log_look_at_top_reducer";
 import LogSearchDeckReducer from "./log_search_deck_reducer";
+import MatthewDrawBrigadesReducer from "./matthew_draw_brigades_reducer";
 import MeekCardReducer from "./meek_card_reducer";
 import MoveCardReducer from "./move_card_reducer";
 import MoveCardToBottomOfDeckReducer from "./move_card_to_bottom_of_deck_reducer";
@@ -316,6 +317,7 @@ const reducersSchema = __reducers(
   __reducerSchema("log_deck_search_no_shuffle", LogDeckSearchNoShuffleReducer),
   __reducerSchema("log_look_at_top", LogLookAtTopReducer),
   __reducerSchema("log_search_deck", LogSearchDeckReducer),
+  __reducerSchema("matthew_draw_brigades", MatthewDrawBrigadesReducer),
   __reducerSchema("meek_card", MeekCardReducer),
   __reducerSchema("move_card", MoveCardReducer),
   __reducerSchema("move_card_to_bottom_of_deck", MoveCardToBottomOfDeckReducer),

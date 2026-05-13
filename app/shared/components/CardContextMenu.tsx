@@ -51,9 +51,13 @@ interface CardContextMenuProps {
   /** When true, the whole-hand reveal is active — suppress the per-card
    *  "Reveal for 30s" entry as redundant. Optional; defaults to false. */
   isHandRevealed?: boolean;
+  /** When true, the opponent's hand is currently revealed. Used to gate
+   *  abilities that read the opponent's revealed hand (e.g. Matthew the
+   *  Publican's "Draw cards equal to brigades"). Defaults to false. */
+  opponentHandRevealed?: boolean;
 }
 
-export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onExchange, onDetach, onEditNote, onSurrender, onRescue, zones, isHandRevealed }: CardContextMenuProps) {
+export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onExchange, onDetach, onEditNote, onSurrender, onRescue, zones, isHandRevealed, opponentHandRevealed }: CardContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number; ready: boolean }>({ left: x, top: y, ready: false });
 
@@ -260,12 +264,22 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
           {abilities.map((ability, index) => {
             const allowedZones = ability.sourceZones ?? DEFAULT_ABILITY_SOURCE_ZONES;
             const isInAbilityZone = allowedZones.includes(card.zone);
-            const disabled = !isOwnedByLocalPlayer || !isInAbilityZone;
+            // Matthew the Publican reads the opponent's revealed hand —
+            // disable when the opponent isn't currently revealing.
+            const needsOpponentReveal =
+              ability.type === 'custom' && ability.reducerName === 'matthewDrawBrigades';
+            const opponentRevealMissing = needsOpponentReveal && !opponentHandRevealed;
+            const disabled = !isOwnedByLocalPlayer || !isInAbilityZone || opponentRevealMissing;
+            const disabledReason = !isOwnedByLocalPlayer
+              ? "You don't control this card"
+              : opponentRevealMissing
+                ? "Opponent's hand isn't revealed"
+                : undefined;
             return (
               <button
                 key={index}
                 disabled={disabled}
-                title={disabled && !isOwnedByLocalPlayer ? "You don't control this card" : undefined}
+                title={disabled ? disabledReason : undefined}
                 style={{
                   ...itemStyle,
                   opacity: disabled ? 0.4 : 1,

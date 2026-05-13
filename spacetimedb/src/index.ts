@@ -1919,6 +1919,64 @@ export const draw_multiple = spacetimedb.reducer(
 );
 
 // ---------------------------------------------------------------------------
+// Reducer: matthew_draw_brigades
+// Matthew the Publican custom ability — draws cards equal to the number of
+// distinct brigades in the opponent's revealed hand. Brigade count is
+// computed client-side from opponent.handRevealSnapshot and passed in.
+// Server validates source ownership/zone, opponent.handRevealed, and caps
+// the count to prevent abuse. Redemption has at most 12 brigades.
+// ---------------------------------------------------------------------------
+export const matthew_draw_brigades = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    cardInstanceId: t.u64(),
+    brigadeCount: t.u64(),
+  },
+  (ctx, { gameId, cardInstanceId, brigadeCount }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    const source = ctx.db.CardInstance.id.find(cardInstanceId);
+    if (!source) throw new SenderError('Card not found');
+    if (source.gameId !== gameId) throw new SenderError('Card not in this game');
+    if (source.ownerId !== player.id) throw new SenderError('Not your card');
+    const ABILITY_SOURCE_ZONES = ['territory', 'land-of-bondage', 'land-of-redemption'];
+    if (!ABILITY_SOURCE_ZONES.includes(source.zone)) {
+      throw new SenderError('Source card must be in play');
+    }
+
+    const opponent = [...ctx.db.Player.player_game_id.filter(gameId)].find(
+      (p: any) => p.id !== player.id,
+    );
+    if (!opponent) throw new SenderError('Opponent not found');
+    if (!opponent.handRevealed) {
+      throw new SenderError("Opponent's hand is not revealed");
+    }
+
+    const count = Math.max(0, Math.min(Number(brigadeCount), 12));
+    if (count === 0) return;
+
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+
+    const result = drawCardsForPlayer(ctx, game, player, count);
+
+    logAction(
+      ctx,
+      gameId,
+      player.id,
+      'MATTHEW_DRAW_BRIGADES',
+      JSON.stringify({
+        sourceCardName: source.cardName,
+        sourceCardImgFile: source.cardImgFile,
+        brigadeCount: count.toString(),
+        cards: result.cards,
+      }),
+      game.turnNumber,
+      game.currentPhase,
+    );
+  },
+);
+
+// ---------------------------------------------------------------------------
 // Reducer: move_card
 // ---------------------------------------------------------------------------
 export const move_card = spacetimedb.reducer(
@@ -3225,6 +3283,8 @@ export const execute_card_ability = spacetimedb.reducer(
         throw new SenderError('look_at_own_deck is dispatched by the client, not this reducer');
       case 'look_at_opponent_deck':
         throw new SenderError('look_at_opponent_deck is dispatched by the client, not this reducer');
+      case 'reveal_opponent_deck':
+        throw new SenderError('reveal_opponent_deck is dispatched by the client, not this reducer');
       case 'discard_opponent_deck':
         throw new SenderError('discard_opponent_deck is dispatched by the client, not this reducer');
       case 'three_nails_reset':

@@ -183,6 +183,29 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
     }
     return 'drew multiple cards';
   }
+  if (actionType === 'MATTHEW_DRAW_BRIGADES' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const count = data.brigadeCount ? Number(data.brigadeCount) : 0;
+      const isViewer = actorPlayerId && viewerPlayerId && actorPlayerId === viewerPlayerId;
+      const hasCards = data.cards && Array.isArray(data.cards) && data.cards.length > 0;
+      const sourceNode = data.sourceCardName
+        ? <HoverableCard name={data.sourceCardName} img={data.sourceCardImgFile} />
+        : 'Matthew';
+      const drewText = `drew ${count} card${count === 1 ? '' : 's'}`;
+      if (isViewer && hasCards) {
+        return (
+          <>
+            {drewText} via {sourceNode}: <CardNameList cards={data.cards} />
+            <span style={{ fontSize: 'calc(9px * var(--chat-fs, 1))', fontStyle: 'italic', color: 'rgba(232, 213, 163, 0.35)', marginLeft: 4 }}>
+              (only visible to you)
+            </span>
+          </>
+        );
+      }
+      return <>{drewText} via {sourceNode}</>;
+    } catch { /* fall through */ }
+  }
   if ((actionType === 'MEEK' || actionType === 'MEEK_CARD') && payload) {
     try {
       const data = JSON.parse(payload);

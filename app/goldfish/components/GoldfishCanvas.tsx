@@ -908,9 +908,16 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     [findZoneAtPosition, moveCard, moveCardsBatch, handleDeckDrop, cardWidth, cardHeight, selectedIds, clearSelection, state.turn, scale, offsetX, offsetY, state.zones.hand, state.zones['land-of-bondage'], state.zones.territory, state.isSpreadHand, virtualWidth, reorderHand, zoneLayout, attachCard]
   );
 
+  // Konva fires `dblclick` whenever two pointer-ups happen on the same shape
+  // within the dblClickWindow — including right-click followed by left-click.
+  // Track left-clicks since the last right-click so meek only toggles on a
+  // genuine left+left double-click.
+  const leftClicksSinceContextMenuRef = useRef<number>(99);
+
   const handleCardContextMenu = useCallback(
     (card: GameCard, e: Konva.KonvaEventObject<PointerEvent>) => {
       e.evt.preventDefault();
+      leftClicksSinceContextMenuRef.current = 0;
       const stage = stageRef.current;
       if (!stage) return;
       const container = stage.container().getBoundingClientRect();
@@ -1025,6 +1032,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
 
   const handleCardDblClick = useCallback(
     (card: GameCard) => {
+      if (leftClicksSinceContextMenuRef.current < 2) return;
       const willBeMeek = !card.isMeek;
       if (card.isMeek) {
         unmeekCard(card.instanceId);
@@ -1197,6 +1205,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   // Universal card click handler for selection support
   const handleCardClick = useCallback(
     (card: GameCard, e: Konva.KonvaEventObject<MouseEvent>) => {
+      if (e.evt.button === 0) leftClicksSinceContextMenuRef.current += 1;
       if (e.evt.shiftKey) {
         toggleSelect(card.instanceId);
         return;
