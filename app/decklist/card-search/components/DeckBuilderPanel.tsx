@@ -230,11 +230,11 @@ export default function DeckBuilderPanel({
     if (card) setActiveDragCard(card);
   }, []);
 
-  const handleDragOver = useCallback((event: DragOverEvent) => {
-    const overId = event.over?.id;
-    if (overId === "tab:main") setActiveTab("main");
-    else if (overId === "tab:reserve") setActiveTab("reserve");
-  }, []);
+  // No-op for tab targets — switching activeTab here would unmount the source
+  // draggable (Main/Reserve are conditionally rendered) and abort the drag.
+  // The tab trigger's `isOver` ring is sufficient feedback during the drag;
+  // we switch activeTab after the drop completes (see handleDragEnd).
+  const handleDragOver = useCallback((_event: DragOverEvent) => {}, []);
 
   const handleDragCancel = useCallback(() => {
     setActiveDragCard(null);
@@ -587,14 +587,22 @@ export default function DeckBuilderPanel({
 
       // Resolve target zone. zone:* and tab:* both encode a target zone in
       // their data; fall back to parsing the id.
+      const overId = String(over.id);
+      const isTabDrop = overId.startsWith("tab:");
       let toZone = over.data.current?.zone as DeckZone | undefined;
       if (!toZone) {
-        const id = String(over.id);
-        if (id.startsWith("zone:")) toZone = id.slice(5) as DeckZone;
-        else if (id.startsWith("tab:")) toZone = id.slice(4) as DeckZone;
+        if (overId.startsWith("zone:")) toZone = overId.slice(5) as DeckZone;
+        else if (isTabDrop) toZone = overId.slice(4) as DeckZone;
       }
       if (!toZone || toZone === fromZone) return; // same-zone drop: silent no-op
       handleMoveCard(card.name, card.set, fromZone, toZone);
+
+      // After a tab-drop, switch the active tab so the user sees their card
+      // land. We defer this until after the move (vs. mid-drag) because
+      // switching tabs mid-drag unmounts the source draggable and aborts.
+      if (isTabDrop && (toZone === "main" || toZone === "reserve")) {
+        setActiveTab(toZone);
+      }
     },
     // handleMoveCard is a stable closure over deck/onRemoveCard/onAddCard
     // captured each render; we don't memoize it, so this callback re-creates

@@ -1,10 +1,11 @@
 "use client";
 
 import React from "react";
-import { useDraggable, useDroppable } from "@dnd-kit/core";
+import { useDndContext, useDraggable, useDroppable } from "@dnd-kit/core";
 import { DeckCard, DeckZone } from "../types/deck";
 import { Card } from "../utils";
 import { useCardImageUrl } from "../hooks/useCardImageUrl";
+import { cn } from "@/lib/utils";
 
 interface MaybeboardStripProps {
   /** Maybeboard cards (caller filters by zone === 'maybeboard'). */
@@ -48,6 +49,31 @@ export default function MaybeboardStrip({
     id: "zone:maybeboard",
     data: { zone: "maybeboard" as DeckZone },
   });
+
+  // Surface drag state so we can grow the strip + show a "Drop here" overlay
+  // while a card is being dragged from main/reserve. `useDndContext` returns
+  // the same context shared by `useDroppable`, so no extra provider needed.
+  const { active } = useDndContext();
+  const fromZone = active?.data.current?.fromZone as DeckZone | undefined;
+  const isDragging = !!active;
+  const isValidDrop = isDragging && fromZone !== "maybeboard";
+
+  // Auto-expand a collapsed strip while a drag is in progress so the drop
+  // target is actually visible. Save the user's pre-drag preference in a ref
+  // and restore on drag end or cancel.
+  const prevCollapsedRef = React.useRef<boolean | null>(null);
+  React.useEffect(() => {
+    if (isDragging) {
+      if (prevCollapsedRef.current === null) {
+        prevCollapsedRef.current = collapsed;
+        if (collapsed) setCollapsed(false);
+      }
+    } else if (prevCollapsedRef.current !== null) {
+      const prev = prevCollapsedRef.current;
+      prevCollapsedRef.current = null;
+      if (prev !== collapsed) setCollapsed(prev);
+    }
+  }, [isDragging, collapsed]);
 
   const totalCount = cards.reduce((sum, dc) => sum + dc.quantity, 0);
   const uniqueCount = cards.length;
@@ -105,10 +131,16 @@ export default function MaybeboardStrip({
 
   return (
     <section
+      ref={setDroppableRef}
       aria-label={`Maybeboard, ${totalCount} ${totalCount === 1 ? "card" : "cards"}`}
-      className={`border-t bg-card/50 flex-shrink-0 transition-colors ${
-        isOver ? "border-primary bg-primary/5" : "border-border"
-      }`}
+      className={cn(
+        "sticky bottom-0 z-10 border-t bg-card/95 backdrop-blur flex-shrink-0",
+        "transition-all duration-200",
+        isValidDrop && "min-h-[120px] md:min-h-[160px]",
+        isOver
+          ? "border-2 border-primary bg-primary/15"
+          : "border-border",
+      )}
     >
       {/* Polite live region for stepper changes */}
       <div role="status" aria-live="polite" className="sr-only">
@@ -173,9 +205,10 @@ export default function MaybeboardStrip({
         </div>
       </div>
 
-      {/* Body: empty state, collapsed, or scroll strip */}
+      {/* Droppable ref is on the parent <section> so the drop target survives
+          the collapsed → expanded transition during a drag. */}
       {!collapsed && (
-        <div id="maybeboard-strip-content" ref={setDroppableRef}>
+        <div id="maybeboard-strip-content">
           {uniqueCount === 0 ? (
             <div
               className={`mx-3 mb-2 h-[72px] md:h-[80px] rounded border border-dashed flex items-center justify-center px-3 transition-colors ${
@@ -218,6 +251,14 @@ export default function MaybeboardStrip({
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {isValidDrop && (
+        <div className="absolute inset-x-0 bottom-2 flex items-center justify-center pointer-events-none">
+          <span className="text-sm font-medium text-primary/90 bg-card/80 backdrop-blur px-3 py-1 rounded-md border border-primary/40 shadow-sm">
+            Drop into Maybeboard
+          </span>
         </div>
       )}
     </section>
