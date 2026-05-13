@@ -1,5 +1,5 @@
 import React from "react";
-import { useDraggable, useDroppable } from "@dnd-kit/core";
+import { useDraggable } from "@dnd-kit/core";
 import { DeckCard, DeckZone } from "../types/deck";
 import { Card } from "../utils";
 import { useCardImageUrl } from "../hooks/useCardImageUrl";
@@ -9,7 +9,9 @@ import { useCardPrices } from "../hooks/useCardPrices";
  * Wrapper that makes a deck-card row draggable. The activation distance on
  * PointerSensor (6px) plus TouchSensor delay (200ms) keep ordinary clicks
  * from accidentally initiating a drag — so the existing onClick / stepper
- * handlers inside the row keep working.
+ * handlers inside the row keep working. We deliberately do *not* set
+ * `touch-action: none` here so the parent list still scrolls on mobile;
+ * TouchSensor's delay/tolerance handles scroll-vs-drag arbitration.
  */
 function DraggableRow({
   zone,
@@ -31,7 +33,7 @@ function DraggableRow({
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      className={`${className ?? ""} ${isDragging ? "opacity-40" : ""} touch-none`}
+      className={`${className ?? ""} ${isDragging ? "opacity-40" : ""}`}
       aria-roledescription="Draggable card"
     >
       {children}
@@ -836,13 +838,14 @@ export default function DeckCardList({
 }
 
 /**
- * Wraps a zone-specific list/grid in a droppable. We only register a
- * droppable when filterZone is 'main' or 'reserve' — the maybeboard
- * droppable lives in MaybeboardStrip, and a mixed-zone view (filterZone
- * undefined) wouldn't have a meaningful drop target.
+ * Layout wrapper for the cards in a single DeckCardList. The actual
+ * `useDroppable` for zone:main / zone:reserve lives one level up in
+ * `DeckBuilderPanel`, registered once per tab — this avoids duplicate
+ * droppable ids when grouped views render multiple DeckCardList instances
+ * for one zone. (Maybeboard's droppable lives in `MaybeboardStrip`.)
  */
 function ZoneDroppable({
-  filterZone,
+  filterZone: _filterZone,
   viewLayout,
   children,
 }: {
@@ -850,24 +853,9 @@ function ZoneDroppable({
   viewLayout: 'grid' | 'list';
   children: React.ReactNode;
 }) {
-  const enabled = filterZone === 'main' || filterZone === 'reserve';
-  const { setNodeRef, isOver } = useDroppable({
-    id: enabled ? `zone:${filterZone}` : 'zone:__disabled__',
-    data: { zone: filterZone },
-    disabled: !enabled,
-  });
   const wrapClass =
     viewLayout === 'grid'
       ? 'grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 sm:gap-2'
       : 'space-y-1';
-  return (
-    <div
-      ref={setNodeRef}
-      className={`${wrapClass} rounded transition-colors ${
-        enabled && isOver ? 'ring-2 ring-primary/40 bg-primary/5' : ''
-      }`}
-    >
-      {children}
-    </div>
-  );
+  return <div className={wrapClass}>{children}</div>;
 }

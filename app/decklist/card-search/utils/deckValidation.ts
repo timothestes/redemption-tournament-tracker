@@ -526,9 +526,11 @@ export function validateDeck(deck: Deck): DeckValidation {
   // Exception: Lost Souls with no special ability can have multiples
   const isType1 = !isType2; // Type 1 if not Type 2
   if (isType1) {
-    // Find Lost Soul duplicates (excluding those with no special ability)
+    // Find Lost Soul duplicates (excluding those with no special ability).
+    // Maybeboard is a scratchpad — never counts toward legality.
     const lostSoulCounts = deck.cards
       .filter((dc) => {
+        if (dc.zone === 'maybeboard') return false;
         if (!isLostSoul(dc.card)) return false;
         // Allow multiples of Lost Souls with no special ability
         const hasSpecialAbility = dc.card.specialAbility && dc.card.specialAbility.trim() !== '';
@@ -559,9 +561,11 @@ export function validateDeck(deck: Deck): DeckValidation {
   // Validation: Type 2 allows maximum 2 copies of each Lost Soul
   // Exception: Lost Souls with no special ability can have unlimited copies
   if (isType2) {
-    // Find Lost Souls with more than 2 copies (excluding those with no special ability)
+    // Find Lost Souls with more than 2 copies (excluding those with no special ability).
+    // Maybeboard is a scratchpad — never counts toward legality.
     const lostSoulCounts = deck.cards
       .filter((dc) => {
+        if (dc.zone === 'maybeboard') return false;
         if (!isLostSoul(dc.card)) return false;
         // Allow unlimited copies of Lost Souls with no special ability
         const hasSpecialAbility = dc.card.specialAbility && dc.card.specialAbility.trim() !== '';

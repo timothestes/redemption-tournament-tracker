@@ -19,6 +19,7 @@ import BuyDeckModal from "../card-search/components/BuyDeckModal";
 import GeneratePDFModal from "../card-search/components/GeneratePDFModal";
 import GenerateDeckImageModal from "../card-search/components/GenerateDeckImageModal";
 import { Deck as DeckType } from "../card-search/types/deck";
+import { generateDeckText } from "../card-search/utils/deckImportExport";
 
 interface PublicDeckData {
   id: string;
@@ -448,16 +449,10 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   }
 
   function handleDownloadTxt() {
-    const mainCards = deck.cards.filter((c) => c.zone === 'main').slice().sort((a, b) => a.card_name.localeCompare(b.card_name));
-    const reserveCards = deck.cards.filter((c) => c.zone === 'reserve').slice().sort((a, b) => a.card_name.localeCompare(b.card_name));
-    const lines: string[] = [];
-    mainCards.forEach((c) => lines.push(`${c.quantity}\t${c.card_name}`));
-    if (reserveCards.length > 0) {
-      lines.push("");
-      lines.push("Reserve:");
-      reserveCards.forEach((c) => lines.push(`${c.quantity}\t${c.card_name}`));
-    }
-    const text = lines.join("\n");
+    // Use the canonical generator so the public-page export matches the
+    // builder's format — including the `Tokens:` section with
+    // `# auto-generated` and `# maybeboard` markers required for round-trip.
+    const text = generateDeckText(deckForModal);
     const blob = new Blob([text], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");

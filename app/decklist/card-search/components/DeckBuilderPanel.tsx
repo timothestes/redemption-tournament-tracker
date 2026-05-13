@@ -213,6 +213,17 @@ export default function DeckBuilderPanel({
     data: { zone: "reserve" as DeckZone },
     disabled: !isDragging,
   });
+  // Zone-content droppables — registered once at the panel level (not per
+  // grouped DeckCardList) so the id is unique. Each wraps the tab's content
+  // area below.
+  const { setNodeRef: setMainZoneDropRef, isOver: isMainZoneOver } = useDroppable({
+    id: "zone:main",
+    data: { zone: "main" as DeckZone },
+  });
+  const { setNodeRef: setReserveZoneDropRef, isOver: isReserveZoneOver } = useDroppable({
+    id: "zone:reserve",
+    data: { zone: "reserve" as DeckZone },
+  });
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const card = event.active.data.current?.card as Card | undefined;
@@ -517,6 +528,8 @@ export default function DeckBuilderPanel({
     let total = 0;
     let hasAnyPrice = false;
     for (const dc of deck.cards) {
+      // Maybeboard is a scratchpad — excluded from the deck's price total.
+      if (dc.zone === 'maybeboard') continue;
       const priceKey = `${dc.card.name}|${dc.card.set}|${dc.card.imgFile}`;
       const priceInfo = getPrice(priceKey);
       if (priceInfo) {
@@ -2343,7 +2356,12 @@ export default function DeckBuilderPanel({
         ) : (
           <>
         {activeTab === "main" ? (
-          <div className="space-y-4">
+          <div
+            ref={setMainZoneDropRef}
+            className={`space-y-4 rounded transition-shadow ${
+              isMainZoneOver ? "ring-2 ring-primary/40 bg-primary/5" : ""
+            }`}
+          >
             {mainDeckCards.length > 0 ? (
               groupCards(mainDeckCards).map(({ type, cards, count }) => {
                 const typeIcon = groupBy === 'type' ? getTypeIcon(type) : null;
@@ -2435,7 +2453,12 @@ export default function DeckBuilderPanel({
             )}
           </div>
         ) : activeTab === "reserve" ? (
-          <div className="space-y-4">
+          <div
+            ref={setReserveZoneDropRef}
+            className={`space-y-4 rounded transition-shadow ${
+              isReserveZoneOver ? "ring-2 ring-primary/40 bg-primary/5" : ""
+            }`}
+          >
             {reserveCards.length > 0 ? (
               groupCards(reserveCards).map(({ type, cards, count }) => {
                 const typeIcon = groupBy === 'type' ? getTypeIcon(type) : null;
@@ -2922,8 +2945,10 @@ export default function DeckBuilderPanel({
                 {(() => {
                   const isT2Format = deck.format?.toLowerCase().includes("type 2");
 
-                  // Calculate raw alignment counts (all cards)
+                  // Calculate raw alignment counts. Maybeboard is a scratchpad
+                  // and never rolls into deck composition.
                   const alignmentCounts = deck.cards.reduce((acc, deckCard) => {
+                    if (deckCard.zone === 'maybeboard') return acc;
                     let alignment = deckCard.card.alignment || "Neutral";
                     if (alignment.includes("Good/Evil")) {
                       alignment = "Neutral";
@@ -3069,8 +3094,10 @@ export default function DeckBuilderPanel({
                   </div>
                   <div className="space-y-0.5">
                     {(() => {
-                      // Calculate card type counts
+                      // Calculate card type counts. Maybeboard is a scratchpad
+                      // and never rolls into deck composition.
                       const typeCounts = deck.cards.reduce((acc, deckCard) => {
+                        if (deckCard.zone === 'maybeboard') return acc;
                         const type = deckCard.card.type || "Unknown";
                         const prettyType = prettifyTypeName(type);
                         if (!acc[prettyType]) {
@@ -3397,8 +3424,9 @@ export default function DeckBuilderPanel({
         document.body
       )}
     </div>
-    {/* DragOverlay: card ghost that follows the pointer during a drag. */}
-    <DragOverlay dropAnimation={null}>
+    {/* DragOverlay: card ghost that follows the pointer during a drag.
+        Default dropAnimation lets unresolved drops snap back to the source. */}
+    <DragOverlay>
       {activeDragCard ? <DragGhost card={activeDragCard} /> : null}
     </DragOverlay>
     </DndContext>

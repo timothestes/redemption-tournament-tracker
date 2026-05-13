@@ -178,7 +178,7 @@ export default function MaybeboardStrip({
         <div id="maybeboard-strip-content" ref={setDroppableRef}>
           {uniqueCount === 0 ? (
             <div
-              className={`mx-3 mb-2 h-[64px] md:h-[72px] rounded border border-dashed flex items-center justify-center px-3 transition-colors ${
+              className={`mx-3 mb-2 h-[72px] md:h-[80px] rounded border border-dashed flex items-center justify-center px-3 transition-colors ${
                 isOver ? "border-primary bg-primary/10" : "border-border/70"
               }`}
             >
@@ -276,7 +276,9 @@ function MaybeboardThumbnail({
       className="relative group flex-shrink-0"
       style={{ width: 48 }}
     >
-      {/* Drag handle / clickable image area */}
+      {/* Drag handle / clickable image area. No `touch-action: none` so the
+          strip's horizontal scroll still works; TouchSensor's 200ms delay
+          arbitrates scroll vs drag. */}
       <div
         ref={setNodeRef}
         {...attributes}
@@ -286,7 +288,7 @@ function MaybeboardThumbnail({
         aria-label={`${dc.card.name}, ${dc.quantity} ${
           dc.quantity === 1 ? "copy" : "copies"
         }. Press Space to pick up, Enter to view details.`}
-        className={`relative w-12 h-[64px] md:h-[72px] rounded overflow-hidden bg-muted cursor-grab active:cursor-grabbing touch-none outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+        className={`relative w-12 h-[72px] md:h-[80px] rounded overflow-hidden bg-muted cursor-grab active:cursor-grabbing outline-none focus-visible:ring-2 focus-visible:ring-primary ${
           isDragging ? "opacity-40" : ""
         }`}
         onClick={(e) => {
@@ -319,10 +321,10 @@ function MaybeboardThumbnail({
         </span>
       </div>
 
-      {/* Stepper +/− (always visible on touch, hover on desktop). These sit
-          on top of the drag handle and stopPropagation to avoid initiating
-          a drag on tap. */}
-      <div className="absolute inset-y-0 left-0 right-0 pointer-events-none flex flex-col justify-between items-stretch opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+      {/* Stepper +/− — always visible on touch (no hover), revealed on hover
+          on desktop. These sit on top of the drag handle and stopPropagation
+          to avoid initiating a drag on tap. */}
+      <div className="absolute inset-y-0 left-0 right-0 pointer-events-none flex flex-col justify-between items-stretch opacity-100 md:opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
         <button
           type="button"
           onClick={(e) => {
