@@ -9,6 +9,7 @@ import { useIsAdmin } from "../../../hooks/useIsAdmin";
 import { createRuling, updateRuling, deleteRuling } from "../../admin/rulings/actions";
 import { DuplicateCards, DuplicateCardsMobile } from "./components/DuplicateCards";
 import type { Card } from "./utils";
+import type { DeckZone } from "./types/deck";
 
 /* ------------------------------------------------------------------ */
 /*  Inline Edit Ruling (replaces a ruling's text with editable fields) */
@@ -506,9 +507,9 @@ export default function ModalWithClose({
   visibleCards: Card[];
   /** Called when modal navigation lands on a new index — lets parent extend its rendered window. */
   onNavigateToIndex?: (index: number) => void;
-  onAddCard: ((card: Card, isReserve: boolean) => void) | null;
-  onRemoveCard: ((name: string, set: string, isReserve: boolean) => void) | null;
-  getCardQuantity: ((name: string, set: string, isReserve: boolean) => number) | null;
+  onAddCard: ((card: Card, zone: DeckZone) => void) | null;
+  onRemoveCard: ((name: string, set: string, zone: DeckZone) => void) | null;
+  getCardQuantity: ((name: string, set: string, zone: DeckZone) => number) | null;
   activeDeckTab?: string;
   /** Current legality filter for duplicate cards. null = show all. */
   legalityFilter?: string | null;
@@ -623,12 +624,11 @@ export default function ModalWithClose({
       } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
         if (!onAddCard || !onRemoveCard) return;
 
+        const zone: DeckZone = activeDeckTab === "reserve" ? "reserve" : "main";
         if (e.key === "ArrowUp") {
-          const isReserve = activeDeckTab === "reserve";
-          onAddCard(modalCard, isReserve);
+          onAddCard(modalCard, zone);
         } else {
-          const isReserve = activeDeckTab === "reserve";
-          onRemoveCard(modalCard.name, modalCard.set, isReserve);
+          onRemoveCard(modalCard.name, modalCard.set, zone);
         }
       }
     }
@@ -766,8 +766,8 @@ export default function ModalWithClose({
   const isFundraiser = modalCard.set === "Fund" || modalCard.officialSet === "Fundraiser";
 
   // Get quantities for badge display
-  const quantityInDeck = getCardQuantity ? getCardQuantity(modalCard.name, modalCard.set, false) : 0;
-  const quantityInReserve = getCardQuantity ? getCardQuantity(modalCard.name, modalCard.set, true) : 0;
+  const quantityInDeck = getCardQuantity ? getCardQuantity(modalCard.name, modalCard.set, 'main') : 0;
+  const quantityInReserve = getCardQuantity ? getCardQuantity(modalCard.name, modalCard.set, 'reserve') : 0;
 
   // Mobile footer needs row 2 when: has rulings, is admin, minus buttons showing, or has duplicates
   const hasMinusButtons = quantityInDeck > 0 || quantityInReserve > 0;
@@ -954,9 +954,9 @@ export default function ModalWithClose({
               <>
                 {/* Main deck group */}
                 <div className="flex flex-shrink-0">
-                  {getCardQuantity(modalCard.name, modalCard.set, false) > 0 && (
+                  {getCardQuantity(modalCard.name, modalCard.set, 'main') > 0 && (
                     <button
-                      onClick={() => onRemoveCard(modalCard.name, modalCard.set, false)}
+                      onClick={() => onRemoveCard(modalCard.name, modalCard.set, 'main')}
                       className="h-10 w-8 flex items-center justify-center rounded-l-lg bg-primary active:bg-primary/90 text-primary-foreground"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -965,9 +965,9 @@ export default function ModalWithClose({
                     </button>
                   )}
                   <button
-                    onClick={() => onAddCard(modalCard, false)}
+                    onClick={() => onAddCard(modalCard, 'main')}
                     className={`h-10 px-3 bg-primary active:bg-primary/90 text-primary-foreground flex items-center gap-1.5 font-medium text-sm transition-colors ${
-                      getCardQuantity(modalCard.name, modalCard.set, false) > 0
+                      getCardQuantity(modalCard.name, modalCard.set, 'main') > 0
                         ? 'rounded-r-lg border-l border-primary/30'
                         : 'rounded-lg'
                     }`}
@@ -977,7 +977,7 @@ export default function ModalWithClose({
                     </svg>
                     Main
                     {(() => {
-                      const qty = getCardQuantity(modalCard.name, modalCard.set, false);
+                      const qty = getCardQuantity(modalCard.name, modalCard.set, 'main');
                       return qty > 0 ? (
                         <span className="bg-white/25 px-1.5 rounded text-xs font-bold">{qty}</span>
                       ) : null;
@@ -986,9 +986,9 @@ export default function ModalWithClose({
                 </div>
                 {/* Reserve group */}
                 <div className="flex flex-shrink-0">
-                  {getCardQuantity(modalCard.name, modalCard.set, true) > 0 && (
+                  {getCardQuantity(modalCard.name, modalCard.set, 'reserve') > 0 && (
                     <button
-                      onClick={() => onRemoveCard(modalCard.name, modalCard.set, true)}
+                      onClick={() => onRemoveCard(modalCard.name, modalCard.set, 'reserve')}
                       className="h-10 w-8 flex items-center justify-center rounded-l-lg bg-amber-700 active:bg-amber-800 text-white"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -997,9 +997,9 @@ export default function ModalWithClose({
                     </button>
                   )}
                   <button
-                    onClick={() => onAddCard(modalCard, true)}
+                    onClick={() => onAddCard(modalCard, 'reserve')}
                     className={`h-10 px-3 bg-amber-600 active:bg-amber-700 text-white flex items-center gap-1.5 font-medium text-sm transition-colors ${
-                      getCardQuantity(modalCard.name, modalCard.set, true) > 0
+                      getCardQuantity(modalCard.name, modalCard.set, 'reserve') > 0
                         ? 'rounded-r-lg border-l border-amber-500/30'
                         : 'rounded-lg'
                     }`}
@@ -1009,7 +1009,7 @@ export default function ModalWithClose({
                     </svg>
                     Rsv
                     {(() => {
-                      const qty = getCardQuantity(modalCard.name, modalCard.set, true);
+                      const qty = getCardQuantity(modalCard.name, modalCard.set, 'reserve');
                       return qty > 0 ? (
                         <span className="bg-white/25 px-1.5 rounded text-xs font-bold">{qty}</span>
                       ) : null;
@@ -1325,8 +1325,8 @@ export default function ModalWithClose({
                   {/* Main add button - adds to active tab */}
                   <button
                     onClick={() => {
-                      const isReserve = activeDeckTab === "reserve";
-                      onAddCard(modalCard, isReserve);
+                      const zone: DeckZone = activeDeckTab === "reserve" ? "reserve" : "main";
+                      onAddCard(modalCard, zone);
                     }}
                     className="px-4 h-10 bg-primary hover:bg-primary/90 text-primary-foreground rounded-l-lg flex items-center gap-1.5 font-semibold transition-colors text-sm whitespace-nowrap"
                   >
@@ -1335,8 +1335,8 @@ export default function ModalWithClose({
                     </svg>
                     Add to {activeDeckTab === "reserve" ? "Reserve" : activeDeckTab === "main" ? "Main" : "Deck"}
                     {(() => {
-                      const isReserve = activeDeckTab === "reserve";
-                      const quantity = getCardQuantity(modalCard.name, modalCard.set, isReserve);
+                      const zone: DeckZone = activeDeckTab === "reserve" ? "reserve" : "main";
+                      const quantity = getCardQuantity(modalCard.name, modalCard.set, zone);
                       return quantity > 0 && (
                         <span className="bg-primary-foreground/20 text-primary-foreground px-2 py-0.5 rounded-md font-bold text-xs">
                           ×{quantity}
@@ -1361,7 +1361,7 @@ export default function ModalWithClose({
                   <div className="absolute bottom-full mb-2 left-0 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[200px] z-50">
                     <button
                       onClick={() => {
-                        onAddCard(modalCard, false);
+                        onAddCard(modalCard, 'main');
                         setShowMenu(false);
                       }}
                       className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-foreground"
@@ -1373,7 +1373,7 @@ export default function ModalWithClose({
                     </button>
                     <button
                       onClick={() => {
-                        onAddCard(modalCard, true);
+                        onAddCard(modalCard, 'reserve');
                         setShowMenu(false);
                       }}
                       className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-foreground"
@@ -1383,13 +1383,13 @@ export default function ModalWithClose({
                       </svg>
                       Add to Reserve
                     </button>
-                    {(getCardQuantity(modalCard.name, modalCard.set, false) > 0 || getCardQuantity(modalCard.name, modalCard.set, true) > 0) && (
+                    {(getCardQuantity(modalCard.name, modalCard.set, 'main') > 0 || getCardQuantity(modalCard.name, modalCard.set, 'reserve') > 0) && (
                       <>
                         <div className="border-t border-border my-1"></div>
-                        {getCardQuantity(modalCard.name, modalCard.set, false) > 0 && (
+                        {getCardQuantity(modalCard.name, modalCard.set, 'main') > 0 && (
                           <button
                             onClick={() => {
-                              onRemoveCard(modalCard.name, modalCard.set, false);
+                              onRemoveCard(modalCard.name, modalCard.set, 'main');
                               setShowMenu(false);
                             }}
                             className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-red-600 dark:text-red-400"
@@ -1400,10 +1400,10 @@ export default function ModalWithClose({
                             Remove from Main Deck
                           </button>
                         )}
-                        {getCardQuantity(modalCard.name, modalCard.set, true) > 0 && (
+                        {getCardQuantity(modalCard.name, modalCard.set, 'reserve') > 0 && (
                           <button
                             onClick={() => {
-                              onRemoveCard(modalCard.name, modalCard.set, true);
+                              onRemoveCard(modalCard.name, modalCard.set, 'reserve');
                               setShowMenu(false);
                             }}
                             className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-red-600 dark:text-red-400"

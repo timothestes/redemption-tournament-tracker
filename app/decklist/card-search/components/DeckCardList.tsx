@@ -1,31 +1,22 @@
 import React from "react";
-import { DeckCard } from "../types/deck";
+import { DeckCard, DeckZone } from "../types/deck";
 import { Card } from "../utils";
 import { useCardImageUrl } from "../hooks/useCardImageUrl";
 import { useCardPrices } from "../hooks/useCardPrices";
 
 interface DeckCardListProps {
-  /** Array of cards to display */
   cards: DeckCard[];
-  /** Callback when quantity is increased */
-  onIncrement: (cardName: string, cardSet: string, isReserve: boolean) => void;
-  /** Callback when quantity is decreased */
-  onDecrement: (cardName: string, cardSet: string, isReserve: boolean) => void;
-  /** Callback when card is removed entirely */
-  onRemove: (cardName: string, cardSet: string, isReserve: boolean) => void;
-  /** Optional: Show only main deck or reserve cards */
-  filterReserve?: boolean;
-  /** Optional: Callback when card is clicked to view details */
+  onIncrement: (cardName: string, cardSet: string, zone: DeckZone) => void;
+  onDecrement: (cardName: string, cardSet: string, zone: DeckZone) => void;
+  onRemove: (cardName: string, cardSet: string, zone: DeckZone) => void;
+  /** Optional: Show only cards in a specific zone */
+  filterZone?: DeckZone;
   onViewCard?: (card: Card) => void;
-  /** Optional: Callback to move card between main deck and reserve */
-  onMoveCard?: (cardName: string, cardSet: string, fromReserve: boolean, toReserve: boolean) => void;
-  /** Optional: Whether to show type icons in card rows (default: true) */
+  /** Move a card between zones. Today the move button only swaps main↔reserve. */
+  onMoveCard?: (cardName: string, cardSet: string, fromZone: DeckZone, toZone: DeckZone) => void;
   showTypeIcons?: boolean;
-  /** Optional: Layout view mode (default: 'list') */
   viewLayout?: 'grid' | 'list';
-  /** Optional: Disable card hover preview */
   disableHoverPreview?: boolean;
-  /** Whether to show prices below card images in grid view */
   showPrices?: boolean;
 }
 
@@ -37,7 +28,7 @@ export default function DeckCardList({
   onIncrement,
   onDecrement,
   onRemove,
-  filterReserve,
+  filterZone,
   onViewCard,
   onMoveCard,
   showTypeIcons = true,
@@ -118,11 +109,11 @@ export default function DeckCardList({
     return { x, y };
   };
   
-  // Filter cards based on filterReserve prop
+  // Filter cards based on filterZone prop
   const filteredCards = React.useMemo(() => {
-    if (filterReserve === undefined) return cards;
-    return cards.filter((dc) => dc.isReserve === filterReserve);
-  }, [cards, filterReserve]);
+    if (filterZone === undefined) return cards;
+    return cards.filter((dc) => dc.zone === filterZone);
+  }, [cards, filterZone]);
 
   if (filteredCards.length === 0) {
     return (
@@ -137,8 +128,9 @@ export default function DeckCardList({
     return (
       <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 sm:gap-2">
         {filteredCards.map((deckCard) => {
-          const { card, quantity, isReserve } = deckCard;
-          const cardKey = `${card.name}-${card.set}-${isReserve}`;
+          const { card, quantity, zone } = deckCard;
+          const cardKey = `${card.name}-${card.set}-${zone}`;
+          const isReserve = zone === 'reserve';
           
           return (
             <div key={cardKey} className="deck-card-enter">
@@ -189,12 +181,12 @@ export default function DeckCardList({
               {openMenuCard === cardKey && (
                 <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-1.5 py-6 z-40">
                   {/* Move to Reserve/Main */}
-                  {onMoveCard && filterReserve !== undefined && (
+                  {onMoveCard && filterZone !== undefined && filterZone !== 'maybeboard' && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setOpenMenuCard(null);
-                        onMoveCard(card.name, card.set, isReserve, !isReserve);
+                        onMoveCard(card.name, card.set, zone, isReserve ? 'main' : 'reserve');
                       }}
                       className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-foreground transition-all"
                       title={isReserve ? "Move to main deck" : "Move to reserve"}
@@ -233,7 +225,7 @@ export default function DeckCardList({
                     onClick={(e) => {
                       e.stopPropagation();
                       setOpenMenuCard(null);
-                      onRemove(card.name, card.set, isReserve);
+                      onRemove(card.name, card.set, zone);
                     }}
                     className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-red-600 dark:text-red-400 transition-all"
                     title="Remove all copies"
@@ -254,7 +246,7 @@ export default function DeckCardList({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        onDecrement(card.name, card.set, isReserve);
+                        onDecrement(card.name, card.set, zone);
                       }}
                       className="w-14 h-14 max-w-full max-h-full flex items-center justify-center rounded-lg bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-3xl border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
                       aria-label="Decrease quantity"
@@ -268,7 +260,7 @@ export default function DeckCardList({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        onIncrement(card.name, card.set, isReserve);
+                        onIncrement(card.name, card.set, zone);
                       }}
                       className="w-14 h-14 max-w-full max-h-full flex items-center justify-center rounded-lg bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-3xl border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
                       aria-label="Increase quantity"
@@ -343,8 +335,9 @@ export default function DeckCardList({
   return (
     <div className="space-y-1">
       {filteredCards.map((deckCard) => {
-        const { card, quantity, isReserve } = deckCard;
-        const cardKey = `${card.name}-${card.set}-${isReserve}`;
+        const { card, quantity, zone } = deckCard;
+        const cardKey = `${card.name}-${card.set}-${zone}`;
+        const isReserve = zone === 'reserve';
         
         // Determine icon path for dominants, fortresses, and enhancements based on alignment/type
         const getIconPath = () => {
@@ -658,7 +651,7 @@ export default function DeckCardList({
             <div className="flex items-center gap-0.5 flex-shrink-0">
               {/* Decrement Button (always visible) */}
               <button
-                onClick={() => onDecrement(card.name, card.set, isReserve)}
+                onClick={() => onDecrement(card.name, card.set, zone)}
                 className="w-7 h-7 flex items-center justify-center rounded bg-muted hover:bg-muted/70 text-foreground transition-colors font-semibold text-base"
                 aria-label="Decrease quantity"
                 title="Decrease quantity"
@@ -673,7 +666,7 @@ export default function DeckCardList({
 
               {/* Increment Button (always visible) */}
               <button
-                onClick={() => onIncrement(card.name, card.set, isReserve)}
+                onClick={() => onIncrement(card.name, card.set, zone)}
                 className="w-7 h-7 flex items-center justify-center rounded bg-muted hover:bg-muted/70 text-foreground transition-colors font-semibold text-base"
                 aria-label="Increase quantity"
                 title="Increase quantity"
@@ -727,9 +720,9 @@ export default function DeckCardList({
               )}
               
               {/* Move Card Button (between main deck and reserve) */}
-              {onMoveCard && filterReserve !== undefined && (
+              {onMoveCard && filterZone !== undefined && filterZone !== 'maybeboard' && (
                 <button
-                  onClick={() => onMoveCard(card.name, card.set, isReserve, !isReserve)}
+                  onClick={() => onMoveCard(card.name, card.set, zone, isReserve ? 'main' : 'reserve')}
                   className="w-8 h-6 flex items-center justify-center rounded bg-muted hover:bg-muted/70 text-foreground transition-colors text-xs font-bold"
                   aria-label={isReserve ? "Move to main deck" : "Move to reserve"}
                   title={isReserve ? "Move to main deck" : "Move to reserve"}
@@ -740,7 +733,7 @@ export default function DeckCardList({
 
               {/* Remove Button */}
               <button
-                onClick={() => onRemove(card.name, card.set, isReserve)}
+                onClick={() => onRemove(card.name, card.set, zone)}
                 className="w-6 h-6 flex items-center justify-center rounded bg-red-500 hover:bg-red-600 text-white transition-colors"
                 aria-label="Remove card"
                 title="Remove card from deck"

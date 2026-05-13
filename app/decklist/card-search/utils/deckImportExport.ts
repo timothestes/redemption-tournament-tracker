@@ -80,7 +80,7 @@ export function parseDeckText(
   const lines = text.trim().split("\n");
   const deckCards: DeckCard[] = [];
   const errors: string[] = [];
-  let isReserve = false;
+  let inReserve = false;
   let isTokens = false; // Track if we're in the Tokens section
 
   for (let i = 0; i < lines.length; i++) {
@@ -102,7 +102,7 @@ export function parseDeckText(
     
     // Check for Reserve section marker
     if (line.toLowerCase() === "reserve:") {
-      isReserve = true;
+      inReserve = true;
       continue;
     }
     
@@ -170,7 +170,7 @@ export function parseDeckText(
     deckCards.push({
       card: matchingCard,
       quantity,
-      isReserve,
+      zone: inReserve ? 'reserve' : 'main',
     });
   }
   
@@ -199,8 +199,8 @@ export function parseDeckText(
  * Card names are normalized to use standard apostrophes
  */
 export function generateDeckText(deck: Deck): string {
-  const mainCards = deck.cards.filter((dc) => !dc.isReserve);
-  const reserveCards = deck.cards.filter((dc) => dc.isReserve);
+  const mainCards = deck.cards.filter((dc) => dc.zone === 'main');
+  const reserveCards = deck.cards.filter((dc) => dc.zone === 'reserve');
   
   const lines: string[] = [];
   
@@ -260,8 +260,8 @@ export function downloadDeckAsFile(deck: Deck, filename?: string): void {
 }
 
 export function generateDeckTextBySet(deck: Deck): string {
-  const mainCards = deck.cards.filter((dc) => !dc.isReserve);
-  const reserveCards = deck.cards.filter((dc) => dc.isReserve);
+  const mainCards = deck.cards.filter((dc) => dc.zone === 'main');
+  const reserveCards = deck.cards.filter((dc) => dc.zone === 'reserve');
 
   const sortBySetThenName = (a: DeckCard, b: DeckCard) => {
     const setA = a.card.officialSet || "";

@@ -75,12 +75,13 @@ export function useDeckCheck(deck: Deck, enabled: boolean = true) {
     const reserveCards: DeckCheckCard[] = [];
 
     for (const dc of deck.cards) {
+      if (dc.zone === 'maybeboard') continue;
       const entry: DeckCheckCard = {
         name: dc.card.name,
         set: dc.card.set,
         quantity: dc.quantity,
       };
-      if (dc.isReserve) {
+      if (dc.zone === 'reserve') {
         reserveCards.push(entry);
       } else {
         mainCards.push(entry);

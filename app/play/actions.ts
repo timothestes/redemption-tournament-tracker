@@ -63,10 +63,12 @@ export async function loadDeckForGame(deckId: string): Promise<LoadDeckResult> {
     throw new Error('Deck not found.');
   }
 
+  // Maybeboard rows are excluded — game state only sees main + reserve.
   const { data: cards, error: cardsError } = await supabase
     .from('deck_cards')
-    .select('card_name, card_set, card_img_file, quantity, is_reserve')
-    .eq('deck_id', deckId);
+    .select('card_name, card_set, card_img_file, quantity, zone')
+    .eq('deck_id', deckId)
+    .in('zone', ['main', 'reserve']);
 
   if (cardsError) {
     throw new Error('Failed to load deck cards.');
@@ -92,7 +94,7 @@ export async function loadDeckForGame(deckId: string): Promise<LoadDeckResult> {
         identifier: enriched?.identifier || '',
         reference: enriched?.reference || '',
         specialAbility: enriched?.specialAbility || '',
-        isReserve: card.is_reserve || false,
+        isReserve: card.zone === 'reserve',
       });
     }
   }

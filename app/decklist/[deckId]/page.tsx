@@ -19,9 +19,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const deck = result.deck;
   const cards = deck.cards || [];
-  const mainCards = cards.filter((c: any) => !c.is_reserve);
+  const mainCards = cards.filter((c: any) => c.zone === 'main');
   const cardCount = mainCards.reduce((sum: number, c: any) => sum + c.quantity, 0);
-  const reserveCount = cards.filter((c: any) => c.is_reserve).reduce((sum: number, c: any) => sum + c.quantity, 0);
+  const reserveCount = cards.filter((c: any) => c.zone === 'reserve').reduce((sum: number, c: any) => sum + c.quantity, 0);
   const format = deck.format || "Type 1";
   const description = [
     `${format} deck with ${cardCount} cards`,

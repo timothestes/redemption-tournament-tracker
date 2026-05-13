@@ -357,14 +357,14 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
         legality: "", testament: "", isGospel: false,
       } as Card),
       quantity: c.quantity,
-      isReserve: c.is_reserve,
+      zone: c.zone,
     })),
     createdAt: new Date(deck.created_at),
     updatedAt: new Date(deck.updated_at),
   }), [deck, enrichedCards]);
 
-  const mainCards = enrichedCards.filter((c) => !c.is_reserve);
-  const reserveCards = enrichedCards.filter((c) => c.is_reserve);
+  const mainCards = enrichedCards.filter((c) => c.zone === 'main');
+  const reserveCards = enrichedCards.filter((c) => c.zone === 'reserve');
   const mainDeckCount = mainCards.reduce((sum, c) => sum + c.quantity, 0);
   const reserveCount = reserveCards.reduce((sum, c) => sum + c.quantity, 0);
 
@@ -436,8 +436,8 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   }
 
   function handleDownloadTxt() {
-    const mainCards = deck.cards.filter((c) => !c.is_reserve).slice().sort((a, b) => a.card_name.localeCompare(b.card_name));
-    const reserveCards = deck.cards.filter((c) => c.is_reserve).slice().sort((a, b) => a.card_name.localeCompare(b.card_name));
+    const mainCards = deck.cards.filter((c) => c.zone === 'main').slice().sort((a, b) => a.card_name.localeCompare(b.card_name));
+    const reserveCards = deck.cards.filter((c) => c.zone === 'reserve').slice().sort((a, b) => a.card_name.localeCompare(b.card_name));
     const lines: string[] = [];
     mainCards.forEach((c) => lines.push(`${c.quantity}\t${c.card_name}`));
     if (reserveCards.length > 0) {
@@ -942,7 +942,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
 
       {/* Cover card editor modal — owner only */}
       {isOwner && coverEditorOpen && (() => {
-        const coverMainCards = enrichedCards.filter(c => !c.is_reserve);
+        const coverMainCards = enrichedCards.filter(c => c.zone === 'main');
         const filteredCoverCards = coverPickerSearch.trim()
           ? coverMainCards.filter(c => c.card_name.toLowerCase().includes(coverPickerSearch.trim().toLowerCase()))
           : coverMainCards;
@@ -1595,7 +1595,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
             card_name: c.card_name,
             card_key: `${c.card_name}|${c.card_set}|${sanitizeImgFile(c.card_img_file || "")}`,
             quantity: c.quantity,
-            isReserve: c.is_reserve,
+            zone: c.zone,
           }))}
           onClose={() => setShowBuyDeckModal(false)}
           initialMode={buyModalMode}

@@ -1,12 +1,13 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
+import type { DeckZone } from "../types/deck";
 
 /** Generic card item that both Deck and PublicDeck formats can provide */
 export interface BuyDeckCard {
   card_name: string;
   card_key: string;
   quantity: number;
-  isReserve: boolean;
+  zone: DeckZone;
 }
 
 interface MatchedCard {
@@ -101,11 +102,13 @@ export default function BuyDeckModal({ cards: allCards, onClose, initialMode }: 
     dragStartY.current = null;
   }, [dragY, onClose]);
 
-  const mainCards = allCards.filter(c => !c.isReserve);
-  const reserveCards = allCards.filter(c => c.isReserve);
+  // Maybeboard is a scratchpad — never buyable, never part of any scope
+  const buyableCards = allCards.filter(c => c.zone !== 'maybeboard');
+  const mainCards = buyableCards.filter(c => c.zone === 'main');
+  const reserveCards = buyableCards.filter(c => c.zone === 'reserve');
   const hasReserve = reserveCards.length > 0;
 
-  const scopedCards = scope === "main" ? mainCards : scope === "reserve" ? reserveCards : allCards;
+  const scopedCards = scope === "main" ? mainCards : scope === "reserve" ? reserveCards : buyableCards;
 
   const fetchCart = useCallback(async () => {
     setLoading(true);

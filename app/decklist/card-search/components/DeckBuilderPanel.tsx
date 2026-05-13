@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import { createPortal } from "react-dom";
-import { Deck } from "../types/deck";
+import { Deck, DeckZone } from "../types/deck";
 import { SyncStatus } from "../hooks/useDeckState";
 import DeckCardList from "./DeckCardList";
 import FullDeckView from "./FullDeckView";
@@ -62,9 +62,9 @@ interface DeckBuilderPanelProps {
   /** Callback to save deck to cloud */
   onSaveDeck?: () => Promise<{ success: boolean; error?: string }>;
   /** Callback to add a card */
-  onAddCard: (cardName: string, cardSet: string, isReserve: boolean) => void;
+  onAddCard: (cardName: string, cardSet: string, zone: DeckZone) => void;
   /** Callback to remove a card */
-  onRemoveCard: (cardName: string, cardSet: string, isReserve: boolean) => void;
+  onRemoveCard: (cardName: string, cardSet: string, zone: DeckZone) => void;
   /** Callback to export deck (copy to clipboard) */
   onExport: () => void;
   /** Callback to download deck as .txt file */
@@ -83,8 +83,8 @@ interface DeckBuilderPanelProps {
   onNewDeck?: (name?: string, folderId?: string | null, skipConfirmation?: boolean) => void;
   /** Callback when active tab changes */
   onActiveTabChange?: (tab: TabType) => void;
-  /** Callback when user wants to view card details */
-  onViewCard?: (card: Card, isReserve?: boolean) => void;
+  /** Callback when user wants to view card details. Boolean kept for compat — true when viewing from reserve. */
+  onViewCard?: (card: Card, fromReserve?: boolean) => void;
   /** Callback to show notifications */
   onNotify?: (message: string, type: 'success' | 'error' | 'info') => void;
   /** Callback when user changes cover card selections */
@@ -449,8 +449,8 @@ export default function DeckBuilderPanel({
   }, [showParagonModal]);
 
   // Calculate deck stats
-  const mainDeckCards = deck.cards.filter((dc) => !dc.isReserve);
-  const reserveCards = deck.cards.filter((dc) => dc.isReserve);
+  const mainDeckCards = deck.cards.filter((dc) => dc.zone === 'main');
+  const reserveCards = deck.cards.filter((dc) => dc.zone === 'reserve');
   const mainDeckCount = mainDeckCards.reduce((sum, dc) => sum + dc.quantity, 0);
   const reserveCount = reserveCards.reduce((sum, dc) => sum + dc.quantity, 0);
   const totalCards = mainDeckCount + reserveCount;
@@ -491,17 +491,16 @@ export default function DeckBuilderPanel({
     }
   };
 
-  // Handle moving card between main deck and reserve
-  const handleMoveCard = (cardName: string, cardSet: string, fromReserve: boolean, toReserve: boolean) => {
-    // Find the card
+  // Handle moving card between zones
+  const handleMoveCard = (cardName: string, cardSet: string, fromZone: DeckZone, toZone: DeckZone) => {
     const deckCard = deck.cards.find(
-      (dc) => dc.card.name === cardName && dc.card.set === cardSet && dc.isReserve === fromReserve
+      (dc) => dc.card.name === cardName && dc.card.set === cardSet && dc.zone === fromZone
     );
-    
+
     if (deckCard) {
-      // Move one copy from current location to new location
-      onRemoveCard(cardName, cardSet, fromReserve);
-      onAddCard(cardName, cardSet, toReserve);
+      // Move one copy from current zone to target zone
+      onRemoveCard(cardName, cardSet, fromZone);
+      onAddCard(cardName, cardSet, toZone);
     }
   };
 
@@ -1708,6 +1707,7 @@ export default function DeckBuilderPanel({
             if (isT2Fmt && !isDeckChecking) {
               const counts = { mainGood: 0, mainEvil: 0, resGood: 0, resEvil: 0 };
               for (const dc of deck.cards) {
+                if (dc.zone === 'maybeboard') continue;
                 const a = dc.card.alignment || "";
                 let side: "good" | "evil" | null = null;
                 if (a.includes("Good") && a.includes("Evil")) side = null; // neutral
@@ -1716,7 +1716,7 @@ export default function DeckBuilderPanel({
                 else if (a.includes("Good")) side = "good";
                 else if (a.includes("Evil")) side = "evil";
                 if (!side) continue;
-                if (dc.isReserve) {
+                if (dc.zone === 'reserve') {
                   if (side === "good") counts.resGood += dc.quantity;
                   else counts.resEvil += dc.quantity;
                 } else {
@@ -1724,7 +1724,7 @@ export default function DeckBuilderPanel({
                   else counts.mainEvil += dc.quantity;
                 }
               }
-              const resCount = deck.cards.filter(c => c.isReserve).reduce((s, c) => s + c.quantity, 0);
+              const resCount = deck.cards.filter(c => c.zone === 'reserve').reduce((s, c) => s + c.quantity, 0);
               balanceLine = `Main: ${counts.mainGood}G · ${counts.mainEvil}E`;
               if (resCount > 0) {
                 balanceLine += `  |  Res: ${counts.resGood}G · ${counts.resEvil}E`;
@@ -2259,20 +2259,20 @@ export default function DeckBuilderPanel({
                   </div>
                   <DeckCardList
                     cards={cards}
-                    onIncrement={(name, set, isReserve) => onAddCard(name, set, isReserve)}
-                    onDecrement={(name, set, isReserve) => onRemoveCard(name, set, isReserve)}
-                    onRemove={(name, set, isReserve) => {
+                    onIncrement={(name, set, zone) => onAddCard(name, set, zone)}
+                    onDecrement={(name, set, zone) => onRemoveCard(name, set, zone)}
+                    onRemove={(name, set, zone) => {
                       // Remove all copies
                       const card = deck.cards.find(
-                        (dc) => dc.card.name === name && dc.card.set === set && dc.isReserve === isReserve
+                        (dc) => dc.card.name === name && dc.card.set === set && dc.zone === zone
                       );
                       if (card) {
                         for (let i = 0; i < card.quantity; i++) {
-                          onRemoveCard(name, set, isReserve);
+                          onRemoveCard(name, set, zone);
                         }
                       }
                     }}
-                    filterReserve={false}
+                    filterZone="main"
                     onViewCard={onViewCard}
                     onMoveCard={handleMoveCard}
                     showTypeIcons={false}
@@ -2351,20 +2351,20 @@ export default function DeckBuilderPanel({
                   </div>
                   <DeckCardList
                     cards={cards}
-                    onIncrement={(name, set, isReserve) => onAddCard(name, set, isReserve)}
-                    onDecrement={(name, set, isReserve) => onRemoveCard(name, set, isReserve)}
-                    onRemove={(name, set, isReserve) => {
+                    onIncrement={(name, set, zone) => onAddCard(name, set, zone)}
+                    onDecrement={(name, set, zone) => onRemoveCard(name, set, zone)}
+                    onRemove={(name, set, zone) => {
                       // Remove all copies
                       const card = deck.cards.find(
-                        (dc) => dc.card.name === name && dc.card.set === set && dc.isReserve === isReserve
+                        (dc) => dc.card.name === name && dc.card.set === set && dc.zone === zone
                       );
                       if (card) {
                         for (let i = 0; i < card.quantity; i++) {
-                          onRemoveCard(name, set, isReserve);
+                          onRemoveCard(name, set, zone);
                         }
                       }
                     }}
-                    filterReserve={true}
+                    filterZone="reserve"
                     onViewCard={onViewCard}
                     onMoveCard={handleMoveCard}
                     showTypeIcons={false}
@@ -2435,7 +2435,7 @@ export default function DeckBuilderPanel({
 
               {/* Card picker grid */}
               {coverPickerSlot !== null && (() => {
-                const mainCards = deck.cards.filter(dc => !dc.isReserve && dc.quantity > 0);
+                const mainCards = deck.cards.filter(dc => dc.zone === 'main' && dc.quantity > 0);
                 const filteredPickerCards = coverPickerSearch.trim()
                   ? mainCards.filter(dc => dc.card.name.toLowerCase().includes(coverPickerSearch.trim().toLowerCase()))
                   : mainCards;
@@ -2822,7 +2822,7 @@ export default function DeckBuilderPanel({
                   let balanceGood = 0;
                   let balanceEvil = 0;
                   if (isT2Format) {
-                    for (const dc of deck.cards.filter(c => !c.isReserve)) {
+                    for (const dc of deck.cards.filter(c => c.zone === 'main')) {
                       const a = dc.card.alignment || "";
                       if (a.includes("Good") && a.includes("Evil")) continue; // Good/Evil = neutral
                       if (a.includes("Good") && a.includes("Neutral")) { balanceGood += dc.quantity; continue; }
@@ -3069,7 +3069,7 @@ export default function DeckBuilderPanel({
             card_name: dc.card.name,
             card_key: `${dc.card.name}|${dc.card.set}|${dc.card.imgFile}`,
             quantity: dc.quantity,
-            isReserve: dc.isReserve,
+            zone: dc.zone,
           }))}
           onClose={() => setShowBuyDeckModal(false)}
           initialMode={buyModalMode}

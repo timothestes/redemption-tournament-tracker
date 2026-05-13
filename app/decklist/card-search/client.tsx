@@ -1451,7 +1451,7 @@ export default function CardSearchClient() {
           setModalCard={setModalCard}
           visibleCards={!showSearch
             ? deck.cards
-                .filter(dc => dc.isReserve === (fullDeckViewSection === 'reserve'))
+                .filter(dc => dc.zone === (fullDeckViewSection === 'reserve' ? 'reserve' : 'main'))
                 .map(dc => dc.card)
                 .sort((a, b) => {
                   // Sort by type first
@@ -2010,8 +2010,8 @@ export default function CardSearchClient() {
           {/* Sort + count bar */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-4 mt-2 sm:mt-4">
             {visibleCards.map((c, cardIndex) => {
-              const quantityInDeck = getCardQuantity(c.name, c.set, false);
-              const quantityInReserve = getCardQuantity(c.name, c.set, true);
+              const quantityInDeck = getCardQuantity(c.name, c.set, 'main');
+              const quantityInReserve = getCardQuantity(c.name, c.set, 'reserve');
               const isMenuOpen = openSearchMenuCard === c.dataLine;
               return (
                 <div
@@ -2040,7 +2040,7 @@ export default function CardSearchClient() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          addCard(c, false);
+                          addCard(c, 'main');
                           setOpenSearchMenuCard(null);
                         }}
                         className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-muted-foreground transition-all"
@@ -2055,7 +2055,7 @@ export default function CardSearchClient() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          addCard(c, true);
+                          addCard(c, 'reserve');
                           setOpenSearchMenuCard(null);
                         }}
                         className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-muted-foreground transition-all"
@@ -2071,7 +2071,7 @@ export default function CardSearchClient() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            removeCard(c.name, c.set, false);
+                            removeCard(c.name, c.set, 'main');
                             setOpenSearchMenuCard(null);
                           }}
                           className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-red-600 dark:text-red-400 transition-all"
@@ -2088,7 +2088,7 @@ export default function CardSearchClient() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            removeCard(c.name, c.set, true);
+                            removeCard(c.name, c.set, 'reserve');
                             setOpenSearchMenuCard(null);
                           }}
                           className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-orange-600 dark:text-orange-400 transition-all"
@@ -2135,7 +2135,7 @@ export default function CardSearchClient() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              removeCard(c.name, c.set, activeDeckTab === "reserve");
+                              removeCard(c.name, c.set, activeDeckTab === "reserve" ? 'reserve' : 'main');
                             }}
                             className="flex w-11 h-11 md:w-9 md:h-9 items-center justify-center rounded-lg bg-black/50 md:bg-black/30 md:hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-2xl md:text-xl border border-white/20 md:opacity-0 md:group-hover:opacity-100 md:pointer-events-none md:group-hover:pointer-events-auto"
                             aria-label="Remove card"
@@ -2146,7 +2146,7 @@ export default function CardSearchClient() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              addCard(c, activeDeckTab === "reserve");
+                              addCard(c, activeDeckTab === "reserve" ? 'reserve' : 'main');
                             }}
                             className="flex w-11 h-11 md:w-9 md:h-9 items-center justify-center rounded-lg bg-black/50 md:bg-black/30 md:hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-2xl md:text-xl border border-white/20 md:opacity-0 md:group-hover:opacity-100 md:pointer-events-none md:group-hover:pointer-events-auto"
                             aria-label="Add card"
@@ -2344,15 +2344,15 @@ export default function CardSearchClient() {
             onParagonChange={setDeckParagon}
             onDeckPublicChange={setDeckPublic}
             onSaveDeck={saveDeckToCloud}
-            onAddCard={(cardName, cardSet, isReserve) => {
+            onAddCard={(cardName, cardSet, zone) => {
               // Find the card in the cards array
               const card = cards.find(c => c.name === cardName && c.set === cardSet);
               if (card) {
-                addCard(card, isReserve);
+                addCard(card, zone);
               }
             }}
-            onRemoveCard={(cardName, cardSet, isReserve) => {
-              removeCard(cardName, cardSet, isReserve);
+            onRemoveCard={(cardName, cardSet, zone) => {
+              removeCard(cardName, cardSet, zone);
             }}
             onExport={handleExportDeck}
             onDownload={handleDownloadDeck}
@@ -2367,8 +2367,8 @@ export default function CardSearchClient() {
             onLoadDeck={loadDeckFromCloud}
             defaultTab={activeDeckTab}
             onActiveTabChange={setActiveDeckTab}
-            onViewCard={(card, isReserve) => {
-              setFullDeckViewSection(isReserve ? 'reserve' : 'main');
+            onViewCard={(card, fromReserve) => {
+              setFullDeckViewSection(fromReserve ? 'reserve' : 'main');
               setModalCard(card);
             }}
             onNotify={(message, type) => {
@@ -2440,14 +2440,14 @@ export default function CardSearchClient() {
               onParagonChange={setDeckParagon}
               onDeckPublicChange={setDeckPublic}
               onSaveDeck={saveDeckToCloud}
-              onAddCard={(cardName, cardSet, isReserve) => {
+              onAddCard={(cardName, cardSet, zone) => {
                 const card = cards.find(c => c.name === cardName && c.set === cardSet);
                 if (card) {
-                  addCard(card, isReserve);
+                  addCard(card, zone);
                 }
               }}
-              onRemoveCard={(cardName, cardSet, isReserve) => {
-                removeCard(cardName, cardSet, isReserve);
+              onRemoveCard={(cardName, cardSet, zone) => {
+                removeCard(cardName, cardSet, zone);
               }}
               onExport={handleExportDeck}
               onDownload={handleDownloadDeck}
@@ -2459,8 +2459,8 @@ export default function CardSearchClient() {
               onLoadDeck={loadDeckFromCloud}
               defaultTab={activeDeckTab}
               onActiveTabChange={setActiveDeckTab}
-              onViewCard={(card, isReserve) => {
-                setFullDeckViewSection(isReserve ? 'reserve' : 'main');
+              onViewCard={(card, fromReserve) => {
+                setFullDeckViewSection(fromReserve ? 'reserve' : 'main');
                 modalOpenedFromDeckRef.current = true;
                 setModalCard(card);
                 setIsMobileDeckDrawerOpen(false);

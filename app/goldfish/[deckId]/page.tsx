@@ -31,7 +31,8 @@ export default async function GoldfishPage({
     format: deck.format || 'Type 1',
     paragon: deck.paragon || null,
     isOwner: result.isOwner ?? false,
-    cards: (deck.cards || []).map((c: any) => {
+    // Maybeboard rows are filtered out — goldfish never sees the scratchpad.
+    cards: (deck.cards || []).filter((c: any) => c.zone !== 'maybeboard').map((c: any) => {
       const imgFile = (c.card_img_file || '').replace(/\.jpe?g$/i, '');
       const enriched = findCard(c.card_name, c.card_set || undefined, imgFile);
 
@@ -48,7 +49,7 @@ export default async function GoldfishPage({
         card_reference: enriched?.reference || '',
         card_alignment: enriched?.alignment || '',
         quantity: c.quantity || 1,
-        is_reserve: c.is_reserve || false,
+        is_reserve: c.zone === 'reserve',
       };
     }),
   };

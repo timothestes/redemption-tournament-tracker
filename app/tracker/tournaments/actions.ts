@@ -332,11 +332,13 @@ export async function publishTournamentDecklistsAction(
 
     if (!origDeck) continue;
 
-    // Fetch original deck cards
+    // Fetch original deck cards. Maybeboard rows are excluded from the
+    // tournament submission — only main + reserve get published.
     const { data: origCards } = await admin
       .from("deck_cards")
-      .select("card_name, card_set, card_img_file, quantity, is_reserve")
-      .eq("deck_id", dl.deck_id);
+      .select("card_name, card_set, card_img_file, quantity, zone")
+      .eq("deck_id", dl.deck_id)
+      .in("zone", ["main", "reserve"]);
 
     // Create copy owned by RedemptionCCG.app
     const place = placementMap.get(dl.participant_id);
@@ -373,7 +375,7 @@ export async function publishTournamentDecklistsAction(
         card_set: c.card_set || null,
         card_img_file: c.card_img_file || null,
         quantity: c.quantity,
-        is_reserve: c.is_reserve,
+        zone: c.zone,
       }));
 
       await admin.from("deck_cards").insert(cardRows);

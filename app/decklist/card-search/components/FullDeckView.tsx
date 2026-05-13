@@ -19,7 +19,7 @@ function getTagContrastColor(hex: string): string {
 
 interface FullDeckViewProps {
   deck: Deck;
-  onViewCard?: (card: Card, isReserve?: boolean) => void;
+  onViewCard?: (card: Card, fromReserve?: boolean) => void;
   isAuthenticated?: boolean;
   viewMode: 'normal' | 'stacked';
   groupBy: 'none' | 'alignment' | 'type';
@@ -143,9 +143,10 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
     setTagFilter("");
   }
 
-  // Separate main deck and reserve
-  const mainDeckCards = deck.cards.filter((dc) => !dc.isReserve);
-  const reserveCards = deck.cards.filter((dc) => dc.isReserve);
+  // Separate main deck and reserve. Maybeboard is intentionally excluded —
+  // PR 1 of the maybeboard rollout doesn't render the strip publicly yet.
+  const mainDeckCards = deck.cards.filter((dc) => dc.zone === 'main');
+  const reserveCards = deck.cards.filter((dc) => dc.zone === 'reserve');
 
     // Sort cards by type, then alignment, then name
   const sortCards = (cards: typeof deck.cards, sortByAlignmentTypeBrigade = false) => {
@@ -421,7 +422,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
         onClick={(e) => {
           e.stopPropagation();
           if (onViewCard) {
-            onViewCard(card, deckCard.isReserve);
+            onViewCard(card, deckCard.zone === 'reserve');
           }
         }}
         onMouseEnter={() => setHoveredCard(card)}

@@ -215,8 +215,10 @@ function calculateParagonStats(
     dominants: 0,
   };
 
-  // Count all cards (main deck + reserve)
+  // Count main deck + reserve only — maybeboard is a scratchpad and doesn't
+  // count toward Paragon brigade requirements
   deck.cards.forEach((dc) => {
+    if (dc.zone === 'maybeboard') return;
     const alignment = getCardAlignment(dc.card);
     const hasPrimaryGood = cardHasBrigade(dc.card, paragonData.goodBrigade);
     const hasPrimaryEvil = cardHasBrigade(dc.card, paragonData.evilBrigade);
@@ -327,8 +329,8 @@ export function validateDeck(deck: Deck): DeckValidation {
   const issues: ValidationIssue[] = [];
   
   // Calculate basic stats
-  const mainDeckCards = deck.cards.filter((dc) => !dc.isReserve);
-  const reserveCards = deck.cards.filter((dc) => dc.isReserve);
+  const mainDeckCards = deck.cards.filter((dc) => dc.zone === 'main');
+  const reserveCards = deck.cards.filter((dc) => dc.zone === 'reserve');
   
   const mainDeckSize = mainDeckCards.reduce((sum, dc) => sum + dc.quantity, 0);
   const reserveSize = reserveCards.reduce((sum, dc) => sum + dc.quantity, 0);
@@ -345,12 +347,12 @@ export function validateDeck(deck: Deck): DeckValidation {
     .reduce((sum, dc) => sum + dc.quantity, 0);
   
   const totalLostSoulCount = deck.cards
-    .filter((dc) => isLostSoul(dc.card) && !isHopperLostSoul(dc.card))
+    .filter((dc) => dc.zone !== 'maybeboard' && isLostSoul(dc.card) && !isHopperLostSoul(dc.card))
     .reduce((sum, dc) => sum + dc.quantity, 0);
-  
-  // Count Dominants
+
+  // Count Dominants (maybeboard excluded — scratchpad)
   const dominantCount = deck.cards
-    .filter((dc) => isDominant(dc.card))
+    .filter((dc) => dc.zone !== 'maybeboard' && isDominant(dc.card))
     .reduce((sum, dc) => sum + dc.quantity, 0);
   
   // Lost Soul requirement based on Main Deck size ONLY
@@ -446,6 +448,7 @@ export function validateDeck(deck: Deck): DeckValidation {
   const dominantQuantities = new Map<string, number>();
   
   deck.cards.forEach((dc) => {
+    if (dc.zone === 'maybeboard') return;
     if (isDominant(dc.card)) {
       const key = dc.card.name.toLowerCase();
       dominantQuantities.set(key, (dominantQuantities.get(key) || 0) + dc.quantity);
@@ -480,11 +483,11 @@ export function validateDeck(deck: Deck): DeckValidation {
   if (isType2) {
     // Check Main Deck - INCLUDE Lost Souls and Dominants in alignment check
     const mainGoodCards = deck.cards
-      .filter((dc) => !dc.isReserve && dc.card.alignment?.toLowerCase() === "good")
+      .filter((dc) => dc.zone === 'main' && dc.card.alignment?.toLowerCase() === "good")
       .reduce((sum, dc) => sum + dc.quantity, 0);
-    
+
     const mainEvilCards = deck.cards
-      .filter((dc) => !dc.isReserve && dc.card.alignment?.toLowerCase() === "evil")
+      .filter((dc) => dc.zone === 'main' && dc.card.alignment?.toLowerCase() === "evil")
       .reduce((sum, dc) => sum + dc.quantity, 0);
     
     if (mainGoodCards !== mainEvilCards && (mainGoodCards > 0 || mainEvilCards > 0)) {
@@ -500,11 +503,11 @@ export function validateDeck(deck: Deck): DeckValidation {
     
     // Check Reserve - INCLUDE Lost Souls and Dominants in alignment check
     const reserveGoodCards = deck.cards
-      .filter((dc) => dc.isReserve && dc.card.alignment?.toLowerCase() === "good")
+      .filter((dc) => dc.zone === 'reserve' && dc.card.alignment?.toLowerCase() === "good")
       .reduce((sum, dc) => sum + dc.quantity, 0);
-    
+
     const reserveEvilCards = deck.cards
-      .filter((dc) => dc.isReserve && dc.card.alignment?.toLowerCase() === "evil")
+      .filter((dc) => dc.zone === 'reserve' && dc.card.alignment?.toLowerCase() === "evil")
       .reduce((sum, dc) => sum + dc.quantity, 0);
     
     if (reserveGoodCards !== reserveEvilCards && (reserveGoodCards > 0 || reserveEvilCards > 0)) {
