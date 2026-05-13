@@ -1,10 +1,25 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import { createPortal } from "react-dom";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  TouchSensor,
+  KeyboardSensor,
+  useSensors,
+  useSensor,
+  useDroppable,
+  type DragStartEvent,
+  type DragOverEvent,
+  type DragEndEvent,
+} from "@dnd-kit/core";
 import { Deck, DeckZone } from "../types/deck";
 import { SyncStatus } from "../hooks/useDeckState";
 import DeckCardList from "./DeckCardList";
 import FullDeckView from "./FullDeckView";
+import MaybeboardStrip from "./MaybeboardStrip";
+import DragGhost from "./DragGhost";
 import { Switch } from "@headlessui/react";
 import { Card, normalizeBrigadeField } from "../utils";
 import { validateDeck } from "../utils/deckValidation";
@@ -172,6 +187,47 @@ export default function DeckBuilderPanel({
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   
   const { getImageUrl } = useCardImageUrl();
+
+  // ── DnD state + sensors ──────────────────────────────────────────────
+  const [activeDragCard, setActiveDragCard] = useState<Card | null>(null);
+  const isDragging = activeDragCard !== null;
+  const dndSensors = useSensors(
+    // Mouse/pen: 6px movement before drag activates — preserves clicks on
+    // steppers and other inline controls.
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    // Touch: 200ms long-press + 5px tolerance — doesn't fight scroll.
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+    useSensor(KeyboardSensor),
+  );
+
+  // Conditional tab droppables — main/reserve tab triggers accept drops only
+  // while a drag is active. Only main/reserve are valid targets; info and
+  // cover are inert during drag.
+  const { setNodeRef: setMainTabDropRef, isOver: isMainTabOver } = useDroppable({
+    id: "tab:main",
+    data: { zone: "main" as DeckZone },
+    disabled: !isDragging,
+  });
+  const { setNodeRef: setReserveTabDropRef, isOver: isReserveTabOver } = useDroppable({
+    id: "tab:reserve",
+    data: { zone: "reserve" as DeckZone },
+    disabled: !isDragging,
+  });
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const card = event.active.data.current?.card as Card | undefined;
+    if (card) setActiveDragCard(card);
+  }, []);
+
+  const handleDragOver = useCallback((event: DragOverEvent) => {
+    const overId = event.over?.id;
+    if (overId === "tab:main") setActiveTab("main");
+    else if (overId === "tab:reserve") setActiveTab("reserve");
+  }, []);
+
+  const handleDragCancel = useCallback(() => {
+    setActiveDragCard(null);
+  }, []);
 
   // Cover card picker: which slot is open (1, 2, or null)
   const [coverPickerSlot, setCoverPickerSlot] = useState<1 | 2 | null>(null);
@@ -504,6 +560,35 @@ export default function DeckBuilderPanel({
     }
   };
 
+  // Resolve drag-end: source droppable's `data.fromZone` + target's id/data
+  // tell us the move. tab:* targets map to the matching zone:* zone.
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const active = event.active;
+      const over = event.over;
+      setActiveDragCard(null);
+      if (!over) return;
+      const fromZone = active.data.current?.fromZone as DeckZone | undefined;
+      const card = active.data.current?.card as Card | undefined;
+      if (!fromZone || !card) return;
+
+      // Resolve target zone. zone:* and tab:* both encode a target zone in
+      // their data; fall back to parsing the id.
+      let toZone = over.data.current?.zone as DeckZone | undefined;
+      if (!toZone) {
+        const id = String(over.id);
+        if (id.startsWith("zone:")) toZone = id.slice(5) as DeckZone;
+        else if (id.startsWith("tab:")) toZone = id.slice(4) as DeckZone;
+      }
+      if (!toZone || toZone === fromZone) return; // same-zone drop: silent no-op
+      handleMoveCard(card.name, card.set, fromZone, toZone);
+    },
+    // handleMoveCard is a stable closure over deck/onRemoveCard/onAddCard
+    // captured each render; we don't memoize it, so this callback re-creates
+    // each render too — acceptable, DndContext only reads it during a drag.
+    [handleMoveCard]
+  );
+
   // Group cards by type
   const groupCardsByType = (cards: typeof deck.cards) => {
     const grouped = cards.reduce((acc, deckCard) => {
@@ -672,6 +757,19 @@ export default function DeckBuilderPanel({
   };
 
   return (
+    <DndContext
+      sensors={dndSensors}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+      accessibility={{
+        screenReaderInstructions: {
+          draggable:
+            "To pick up a card, press Space or Enter. Use the arrow keys to move between drop targets. Press Space or Enter again to drop, or Escape to cancel.",
+        },
+      }}
+    >
     <div className="w-full h-full flex flex-col bg-background">
       {/* Header */}
       <div className="flex-shrink-0 px-3 py-2 md:p-4 border-b border-border/60 overflow-visible relative z-30">
@@ -1627,36 +1725,53 @@ export default function DeckBuilderPanel({
             transform: `translateX(${tabIndicator.left}px)`,
           }}
         />
-        <button
-          ref={(el) => { tabRefs.current.main = el; }}
-          onClick={() => handleTabChange("main")}
-          className={`flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
-            activeTab === "main"
-              ? "text-blue-600 dark:text-blue-400"
-              : "text-muted-foreground hover:text-foreground"
+        <div
+          ref={setMainTabDropRef}
+          className={`flex-1 min-w-0 transition-shadow ${
+            isDragging && isMainTabOver ? "ring-2 ring-primary/60 rounded" : ""
           }`}
         >
-          <span className="md:hidden">Main <span className="text-[10px] opacity-75">{mainDeckCount}</span></span>
-          <span className="hidden md:inline">Main ({mainDeckCount})</span>
-        </button>
-        <button
-          ref={(el) => { tabRefs.current.reserve = el; }}
-          onClick={() => handleTabChange("reserve")}
-          className={`flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
-            activeTab === "reserve"
-              ? "text-blue-600 dark:text-blue-400"
-              : "text-muted-foreground hover:text-foreground"
+          <button
+            ref={(el) => { tabRefs.current.main = el; }}
+            onClick={() => handleTabChange("main")}
+            className={`w-full px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
+              activeTab === "main"
+                ? "text-blue-600 dark:text-blue-400"
+                : "text-muted-foreground hover:text-foreground"
+            } ${isDragging ? "bg-primary/5" : ""}`}
+          >
+            <span className="md:hidden">Main <span className="text-[10px] opacity-75">{mainDeckCount}</span></span>
+            <span className="hidden md:inline">Main ({mainDeckCount})</span>
+          </button>
+        </div>
+        <div
+          ref={setReserveTabDropRef}
+          className={`flex-1 min-w-0 transition-shadow ${
+            isDragging && isReserveTabOver ? "ring-2 ring-primary/60 rounded" : ""
           }`}
         >
-          <span className="md:hidden">Res <span className="text-[10px] opacity-75">{reserveCount}</span></span>
-          <span className="hidden md:inline">Reserve ({reserveCount})</span>
-        </button>
+          <button
+            ref={(el) => { tabRefs.current.reserve = el; }}
+            onClick={() => handleTabChange("reserve")}
+            className={`w-full px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
+              activeTab === "reserve"
+                ? "text-blue-600 dark:text-blue-400"
+                : "text-muted-foreground hover:text-foreground"
+            } ${isDragging ? "bg-primary/5" : ""}`}
+          >
+            <span className="md:hidden">Res <span className="text-[10px] opacity-75">{reserveCount}</span></span>
+            <span className="hidden md:inline">Reserve ({reserveCount})</span>
+          </button>
+        </div>
         <button
           ref={(el) => { tabRefs.current.info = el; }}
           onClick={() => handleTabChange("info")}
           onMouseEnter={() => setShowValidationTooltip(true)}
           onMouseLeave={() => setShowValidationTooltip(false)}
+          aria-disabled={isDragging || undefined}
           className={`relative flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
+            isDragging ? "opacity-40 pointer-events-none" : ""
+          } ${
             activeTab === "info"
               ? "text-blue-600 dark:text-blue-400"
               : "text-muted-foreground hover:text-foreground"
@@ -1747,7 +1862,10 @@ export default function DeckBuilderPanel({
         <button
           ref={(el) => { tabRefs.current.cover = el; }}
           onClick={() => handleTabChange("cover")}
+          aria-disabled={isDragging || undefined}
           className={`flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
+            isDragging ? "opacity-40 pointer-events-none" : ""
+          } ${
             activeTab === "cover"
               ? "text-blue-600 dark:text-blue-400"
               : "text-muted-foreground hover:text-foreground"
@@ -3032,6 +3150,23 @@ export default function DeckBuilderPanel({
         )}
       </div>
 
+      {/* Maybeboard strip — pinned to the bottom of the panel, visible across all tabs. */}
+      <MaybeboardStrip
+        cards={deck.cards.filter((dc) => dc.zone === 'maybeboard')}
+        onIncrement={(name, set) => onAddCard(name, set, 'maybeboard')}
+        onDecrement={(name, set) => onRemoveCard(name, set, 'maybeboard')}
+        onRemove={(name, set) => {
+          // Remove all copies by stepping down to 0.
+          const dc = deck.cards.find(
+            (c) => c.card.name === name && c.card.set === set && c.zone === 'maybeboard'
+          );
+          if (!dc) return;
+          for (let i = 0; i < dc.quantity; i++) onRemoveCard(name, set, 'maybeboard');
+        }}
+        onMoveCard={(name, set, toZone) => handleMoveCard(name, set, 'maybeboard', toZone)}
+        onViewCard={onViewCard}
+      />
+
       {/* Generate PDF Modal */}
       {showGeneratePDFModal && (
         <GeneratePDFModal
@@ -3262,5 +3397,10 @@ export default function DeckBuilderPanel({
         document.body
       )}
     </div>
+    {/* DragOverlay: card ghost that follows the pointer during a drag. */}
+    <DragOverlay dropAnimation={null}>
+      {activeDragCard ? <DragGhost card={activeDragCard} /> : null}
+    </DragOverlay>
+    </DndContext>
   );
 }

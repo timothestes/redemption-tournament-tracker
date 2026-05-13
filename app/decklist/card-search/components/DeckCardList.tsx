@@ -1,8 +1,43 @@
 import React from "react";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { DeckCard, DeckZone } from "../types/deck";
 import { Card } from "../utils";
 import { useCardImageUrl } from "../hooks/useCardImageUrl";
 import { useCardPrices } from "../hooks/useCardPrices";
+
+/**
+ * Wrapper that makes a deck-card row draggable. The activation distance on
+ * PointerSensor (6px) plus TouchSensor delay (200ms) keep ordinary clicks
+ * from accidentally initiating a drag — so the existing onClick / stepper
+ * handlers inside the row keep working.
+ */
+function DraggableRow({
+  zone,
+  card,
+  className,
+  children,
+}: {
+  zone: DeckZone;
+  card: Card;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `${zone}:${card.name}|${card.set}`,
+    data: { fromZone: zone, card },
+  });
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      className={`${className ?? ""} ${isDragging ? "opacity-40" : ""} touch-none`}
+      aria-roledescription="Draggable card"
+    >
+      {children}
+    </div>
+  );
+}
 
 interface DeckCardListProps {
   cards: DeckCard[];
@@ -126,14 +161,14 @@ export default function DeckCardList({
   // Grid View
   if (viewLayout === 'grid') {
     return (
-      <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 sm:gap-2">
+      <ZoneDroppable filterZone={filterZone} viewLayout="grid">
         {filteredCards.map((deckCard) => {
           const { card, quantity, zone } = deckCard;
           const cardKey = `${card.name}-${card.set}-${zone}`;
           const isReserve = zone === 'reserve';
-          
+
           return (
-            <div key={cardKey} className="deck-card-enter">
+            <DraggableRow key={cardKey} zone={zone} card={card} className="deck-card-enter">
             <div
               className="relative group rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-200"
               onMouseEnter={disableHoverPreview ? undefined : (e) => {
@@ -200,6 +235,23 @@ export default function DeckCardList({
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
                         </svg>
                       )}
+                    </button>
+                  )}
+
+                  {/* Move to Maybeboard */}
+                  {onMoveCard && filterZone !== undefined && filterZone !== 'maybeboard' && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenMenuCard(null);
+                        onMoveCard(card.name, card.set, zone, 'maybeboard');
+                      }}
+                      className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-violet-600 dark:text-violet-400 transition-all"
+                      title="Move to maybeboard"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
                     </button>
                   )}
 
@@ -305,10 +357,10 @@ export default function DeckCardList({
                 </div>
               ) : null;
             })()}
-            </div>
+            </DraggableRow>
           );
         })}
-        
+
         {/* Card Preview on Hover */}
   {(!disableHoverPreview && previewCard) && (
           <div
@@ -327,13 +379,13 @@ export default function DeckCardList({
             />
           </div>
         )}
-      </div>
+      </ZoneDroppable>
     );
   }
 
   // List View (default)
   return (
-    <div className="space-y-1">
+    <ZoneDroppable filterZone={filterZone} viewLayout="list">
       {filteredCards.map((deckCard) => {
         const { card, quantity, zone } = deckCard;
         const cardKey = `${card.name}-${card.set}-${zone}`;
@@ -411,8 +463,10 @@ export default function DeckCardList({
         const isDualGEEC = card.type === 'GE/Evil Character' || card.type === 'Evil Character/GE';
 
         return (
-          <div
+          <DraggableRow
             key={cardKey}
+            zone={zone}
+            card={card}
             className="flex items-center gap-2 p-2 rounded bg-muted hover:bg-muted/80 transition-colors group"
           >
             {/* Type Icon */}
@@ -731,6 +785,20 @@ export default function DeckCardList({
                 </button>
               )}
 
+              {/* Move to Maybeboard Button */}
+              {onMoveCard && filterZone !== undefined && filterZone !== 'maybeboard' && (
+                <button
+                  onClick={() => onMoveCard(card.name, card.set, zone, 'maybeboard')}
+                  className="w-6 h-6 flex items-center justify-center rounded bg-violet-100 hover:bg-violet-200 dark:bg-violet-900/40 dark:hover:bg-violet-900/60 text-violet-700 dark:text-violet-300 transition-colors"
+                  aria-label="Move to maybeboard"
+                  title="Move to maybeboard"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                </button>
+              )}
+
               {/* Remove Button */}
               <button
                 onClick={() => onRemove(card.name, card.set, zone)}
@@ -741,10 +809,10 @@ export default function DeckCardList({
                 <span className="text-lg leading-none">×</span>
               </button>
             </div>
-          </div>
+          </DraggableRow>
         );
       })}
-      
+
       {/* Card Preview on Hover */}
   {(!disableHoverPreview && previewCard) && (
         <div
@@ -763,6 +831,43 @@ export default function DeckCardList({
           />
         </div>
       )}
+    </ZoneDroppable>
+  );
+}
+
+/**
+ * Wraps a zone-specific list/grid in a droppable. We only register a
+ * droppable when filterZone is 'main' or 'reserve' — the maybeboard
+ * droppable lives in MaybeboardStrip, and a mixed-zone view (filterZone
+ * undefined) wouldn't have a meaningful drop target.
+ */
+function ZoneDroppable({
+  filterZone,
+  viewLayout,
+  children,
+}: {
+  filterZone: DeckZone | undefined;
+  viewLayout: 'grid' | 'list';
+  children: React.ReactNode;
+}) {
+  const enabled = filterZone === 'main' || filterZone === 'reserve';
+  const { setNodeRef, isOver } = useDroppable({
+    id: enabled ? `zone:${filterZone}` : 'zone:__disabled__',
+    data: { zone: filterZone },
+    disabled: !enabled,
+  });
+  const wrapClass =
+    viewLayout === 'grid'
+      ? 'grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 sm:gap-2'
+      : 'space-y-1';
+  return (
+    <div
+      ref={setNodeRef}
+      className={`${wrapClass} rounded transition-colors ${
+        enabled && isOver ? 'ring-2 ring-primary/40 bg-primary/5' : ''
+      }`}
+    >
+      {children}
     </div>
   );
 }

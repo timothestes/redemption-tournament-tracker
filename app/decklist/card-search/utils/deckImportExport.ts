@@ -1,5 +1,5 @@
 import { Card } from "../utils";
-import { Deck, DeckCard, ImportResult } from "../types/deck";
+import { Deck, DeckCard, DeckZone, ImportResult } from "../types/deck";
 
 /**
  * Normalize card name for comparison by replacing various apostrophe types with standard apostrophe
@@ -33,21 +33,23 @@ const CARD_TO_TOKEN_MAP: Record<string, string> = {
  */
 function getRequiredTokens(deck: Deck): string[] {
   const tokenSet = new Set<string>();
-  
+
   deck.cards.forEach((dc) => {
+    // Maybeboard cards never contribute auto-generated tokens — they're a scratchpad.
+    if (dc.zone === 'maybeboard') return;
     const cardName = normalizeCardName(dc.card.name);
-    
+
     // Check if this card generates tokens
     Object.entries(CARD_TO_TOKEN_MAP).forEach(([sourceCard, tokens]) => {
       const normalizedSourceCard = normalizeCardName(sourceCard);
-      
+
       // Check for exact match or if the card name contains the source card pattern
       // This handles cases where the card database might have slight variations
-      const matches = cardName === normalizedSourceCard || 
+      const matches = cardName === normalizedSourceCard ||
                      cardName.toLowerCase() === normalizedSourceCard.toLowerCase() ||
-                     (normalizedSourceCard.includes("(") && 
+                     (normalizedSourceCard.includes("(") &&
                       cardName.toLowerCase().includes(normalizedSourceCard.toLowerCase()));
-      
+
       if (matches) {
         // Some cards generate multiple tokens (separated by |)
         const tokenNames = tokens.split("|");
@@ -55,9 +57,24 @@ function getRequiredTokens(deck: Deck): string[] {
       }
     });
   });
-  
+
   return Array.from(tokenSet).sort();
 }
+
+/**
+ * Flattened, normalized set of auto-token names. Used on import to identify
+ * lines that should be discarded (auto-tokens are derived on export from
+ * main+reserve cards — re-importing them would pollute the maybeboard).
+ */
+const AUTO_TOKEN_NAMES_NORMALIZED: Set<string> = (() => {
+  const set = new Set<string>();
+  Object.values(CARD_TO_TOKEN_MAP).forEach((value) => {
+    value.split("|").forEach((token) => {
+      set.add(normalizeCardName(token).toLowerCase());
+    });
+  });
+  return set;
+})();
 
 /**
  * Parse a deck text in standard tab-separated format
@@ -80,66 +97,99 @@ export function parseDeckText(
   const lines = text.trim().split("\n");
   const deckCards: DeckCard[] = [];
   const errors: string[] = [];
+  const warnings: string[] = [];
   let inReserve = false;
   let isTokens = false; // Track if we're in the Tokens section
+  // Within the Tokens section, the # maybeboard marker flips routing so lines
+  // route to the maybeboard zone instead of being treated as auto-tokens.
+  // Before any marker (or after # auto-generated), Tokens-section lines are
+  // discarded — they'll be regenerated on next export.
+  let inMaybeboard = false;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
-    
+
     // Skip empty lines
     if (!line) continue;
-    
-    // Check for Tokens section marker - ignore all cards after this
+
+    // Section markers inside the Tokens section (#-prefixed comments).
+    // Two layers: explicit comment markers (primary signal) + auto-token
+    // name set (fallback for unmarked legacy lines).
+    if (isTokens && line.startsWith("#")) {
+      const marker = line.slice(1).trim().toLowerCase();
+      if (marker === "maybeboard") {
+        inMaybeboard = true;
+      } else if (marker === "auto-generated") {
+        inMaybeboard = false;
+      }
+      continue;
+    }
+
+    // Check for Tokens section marker
     if (line.toLowerCase() === "tokens:") {
       isTokens = true;
+      inMaybeboard = false;
       continue;
     }
-    
-    // Skip all lines if we're in the Tokens section
-    if (isTokens) {
-      continue;
-    }
-    
+
     // Check for Reserve section marker
-    if (line.toLowerCase() === "reserve:") {
+    if (!isTokens && line.toLowerCase() === "reserve:") {
       inReserve = true;
       continue;
     }
-    
+
     // Parse tab-separated line
     const parts = line.split("\t");
-    
+
     if (parts.length < 2) {
       errors.push(`Line ${i + 1}: Invalid format (expected tab-separated values)`);
       continue;
     }
-    
+
     // Extract quantity and card name (minimum required fields)
     const quantityStr = parts[0].trim();
     const cardName = parts[1].trim();
-    
+
     // Parse quantity
     const quantity = parseInt(quantityStr, 10);
     if (isNaN(quantity) || quantity < 1) {
       errors.push(`Line ${i + 1}: Invalid quantity "${quantityStr}" (must be at least 1)`);
       continue;
     }
-    
+
     // Optional: Extract set name if provided (3rd column)
     const setName = parts.length >= 3 ? parts[2].trim() : undefined;
-    
+
     // Normalize card name for comparison
     const normalizedInputName = normalizeCardName(cardName);
-    
+
+    // Tokens-section routing:
+    // - Under `# maybeboard`: route to maybeboard zone.
+    // - Otherwise (under `# auto-generated`, or under no marker for legacy
+    //   exports): discard if it matches a known auto-token name; otherwise
+    //   fall through to maybeboard with a warning so manually-added cards
+    //   in legacy exports aren't silently lost.
+    if (isTokens) {
+      if (inMaybeboard) {
+        // fall through to lookup + add as maybeboard
+      } else if (AUTO_TOKEN_NAMES_NORMALIZED.has(normalizedInputName.toLowerCase())) {
+        continue;
+      } else {
+        warnings.push(
+          `Line ${i + 1}: "${cardName}" found in Tokens section without a # maybeboard marker — routing to maybeboard`
+        );
+      }
+    }
+
     // Find matching card in allCards
     let matchingCard: Card | undefined;
-    
+
     if (setName) {
       // Try to find exact match with set name (using normalized names)
       matchingCard = allCards.find(
         (c) => normalizeCardName(c.name) === normalizedInputName && c.set === setName
       );
-      
+
       if (!matchingCard) {
         // Try matching with officialSet as fallback
         matchingCard = allCards.find(
@@ -147,11 +197,11 @@ export function parseDeckText(
         );
       }
     }
-    
+
     // If no set specified or no match found, try finding by name only
     if (!matchingCard) {
       const matchingCards = allCards.filter((c) => normalizeCardName(c.name) === normalizedInputName);
-      
+
       if (matchingCards.length === 0) {
         errors.push(`Line ${i + 1}: Card not found: "${cardName}"`);
         continue;
@@ -165,12 +215,15 @@ export function parseDeckText(
         matchingCard = matchingCards[0];
       }
     }
-    
+
+    // Route to the appropriate zone.
+    const zone: DeckZone = isTokens ? 'maybeboard' : (inReserve ? 'reserve' : 'main');
+
     // Add to deck
     deckCards.push({
       card: matchingCard,
       quantity,
-      zone: inReserve ? 'reserve' : 'main',
+      zone,
     });
   }
   
@@ -186,7 +239,7 @@ export function parseDeckText(
   
   return {
     deck,
-    warnings: [], // Could separate warnings from errors in the future
+    warnings,
     errors,
   };
 }
@@ -201,13 +254,14 @@ export function parseDeckText(
 export function generateDeckText(deck: Deck): string {
   const mainCards = deck.cards.filter((dc) => dc.zone === 'main');
   const reserveCards = deck.cards.filter((dc) => dc.zone === 'reserve');
-  
+  const maybeboardCards = deck.cards.filter((dc) => dc.zone === 'maybeboard');
+
   const lines: string[] = [];
-  
+
   // Sort cards alphabetically by name
   const sortCards = (a: DeckCard, b: DeckCard) =>
     a.card.name.localeCompare(b.card.name);
-  
+
   // Add main deck cards
   mainCards.sort(sortCards).forEach((dc) => {
     const { card, quantity } = dc;
@@ -215,30 +269,44 @@ export function generateDeckText(deck: Deck): string {
     const normalizedName = normalizeCardName(card.name);
     lines.push(`${quantity}\t${normalizedName}`);
   });
-  
+
   // Add reserve section if there are reserve cards
   if (reserveCards.length > 0) {
     lines.push(""); // Empty line before Reserve
     lines.push("Reserve:");
-    
+
     reserveCards.sort(sortCards).forEach((dc) => {
       const { card, quantity } = dc;
       const normalizedName = normalizeCardName(card.name);
       lines.push(`${quantity}\t${normalizedName}`);
     });
   }
-  
-  // Add tokens section if any cards in the deck generate tokens
+
+  // Tokens section: auto-generated tokens first (under `# auto-generated`),
+  // then maybeboard cards (under `# maybeboard`). Markers let parseDeckText
+  // route maybeboard cards back to the correct zone on re-import.
   const requiredTokens = getRequiredTokens(deck);
-  if (requiredTokens.length > 0) {
+  if (requiredTokens.length > 0 || maybeboardCards.length > 0) {
     lines.push(""); // Empty line before Tokens
     lines.push("Tokens:");
-    
-    requiredTokens.forEach((tokenName) => {
-      lines.push(`7\t${tokenName}`);
-    });
+
+    if (requiredTokens.length > 0) {
+      lines.push("# auto-generated");
+      requiredTokens.forEach((tokenName) => {
+        lines.push(`7\t${tokenName}`);
+      });
+    }
+
+    if (maybeboardCards.length > 0) {
+      lines.push("# maybeboard");
+      maybeboardCards.sort(sortCards).forEach((dc) => {
+        const { card, quantity } = dc;
+        const normalizedName = normalizeCardName(card.name);
+        lines.push(`${quantity}\t${normalizedName}`);
+      });
+    }
   }
-  
+
   return lines.join("\n");
 }
 
@@ -262,6 +330,7 @@ export function downloadDeckAsFile(deck: Deck, filename?: string): void {
 export function generateDeckTextBySet(deck: Deck): string {
   const mainCards = deck.cards.filter((dc) => dc.zone === 'main');
   const reserveCards = deck.cards.filter((dc) => dc.zone === 'reserve');
+  const maybeboardCards = deck.cards.filter((dc) => dc.zone === 'maybeboard');
 
   const sortBySetThenName = (a: DeckCard, b: DeckCard) => {
     const setA = a.card.officialSet || "";
@@ -285,12 +354,19 @@ export function generateDeckTextBySet(deck: Deck): string {
   }
 
   const requiredTokens = getRequiredTokens(deck);
-  if (requiredTokens.length > 0) {
+  if (requiredTokens.length > 0 || maybeboardCards.length > 0) {
     lines.push("");
     lines.push("Tokens:");
-    requiredTokens.forEach((tokenName) => {
-      lines.push(`7\t${tokenName}`);
-    });
+    if (requiredTokens.length > 0) {
+      lines.push("# auto-generated");
+      requiredTokens.forEach((tokenName) => {
+        lines.push(`7\t${tokenName}`);
+      });
+    }
+    if (maybeboardCards.length > 0) {
+      lines.push("# maybeboard");
+      maybeboardCards.sort(sortBySetThenName).forEach((dc) => lines.push(formatLine(dc)));
+    }
   }
 
   return lines.join("\n");

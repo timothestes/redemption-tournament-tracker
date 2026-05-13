@@ -2066,6 +2066,21 @@ export default function CardSearchClient() {
                         </svg>
                       </button>
 
+                      {/* Add to Maybeboard */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addCard(c, 'maybeboard');
+                          setOpenSearchMenuCard(null);
+                        }}
+                        className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-violet-600 dark:text-violet-400 transition-all"
+                        title="Add to maybeboard"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                      </button>
+
                       {/* Remove from Deck (only if card is in deck) */}
                       {quantityInDeck > 0 && (
                         <button

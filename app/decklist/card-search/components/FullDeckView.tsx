@@ -143,10 +143,11 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
     setTagFilter("");
   }
 
-  // Separate main deck and reserve. Maybeboard is intentionally excluded —
-  // PR 1 of the maybeboard rollout doesn't render the strip publicly yet.
+  // Separate main, reserve, and maybeboard cards. Maybeboard renders as a
+  // muted secondary "Considering" section after Reserve in both layouts.
   const mainDeckCards = deck.cards.filter((dc) => dc.zone === 'main');
   const reserveCards = deck.cards.filter((dc) => dc.zone === 'reserve');
+  const maybeboardCards = deck.cards.filter((dc) => dc.zone === 'maybeboard');
 
     // Sort cards by type, then alignment, then name
   const sortCards = (cards: typeof deck.cards, sortByAlignmentTypeBrigade = false) => {
@@ -366,6 +367,7 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
   // Calculate stats
   const mainDeckCount = mainDeckCards.reduce((sum, dc) => sum + dc.quantity, 0);
   const reserveCount = reserveCards.reduce((sum, dc) => sum + dc.quantity, 0);
+  const maybeboardCount = maybeboardCards.reduce((sum, dc) => sum + dc.quantity, 0);
   const totalCards = mainDeckCount + reserveCount;
   const uniqueCards = deck.cards.length;
   
@@ -734,6 +736,56 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                         </div>
                       </>
                     )}
+
+                    {/* Maybeboard ("Considering") — muted secondary, after Reserve */}
+                    {maybeboardCount > 0 && (
+                      <>
+                        {/* Mobile */}
+                        <div className="md:hidden opacity-80">
+                          <div className="mb-1.5 flex items-center gap-2">
+                            <h3 className="text-sm font-semibold italic text-muted-foreground">Considering</h3>
+                            <span className="text-xs text-muted-foreground">({maybeboardCount})</span>
+                            <span
+                              title="A scratchpad — not part of the deck."
+                              className="w-4 h-4 rounded-full bg-muted text-muted-foreground text-[10px] font-bold flex items-center justify-center cursor-help"
+                            >
+                              ?
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-2 items-start">
+                            {sortCards(maybeboardCards).flatMap((deckCard) =>
+                              Array.from({ length: viewMode === 'stacked' ? deckCard.quantity : 1 }, (_, i) => (
+                                <React.Fragment key={`${deckCard.card.name}-${deckCard.card.set}-maybeboard-m-${i}`}>
+                                  {renderCompactCard(deckCard, i, false, viewMode === 'stacked')}
+                                </React.Fragment>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                        {/* Desktop */}
+                        <div className="hidden md:flex flex-col ml-4 opacity-80">
+                          <div className="mb-2 flex items-center gap-2">
+                            <h3 className="text-lg font-semibold italic text-muted-foreground">Considering</h3>
+                            <span className="text-xs text-muted-foreground">({maybeboardCount})</span>
+                            <span
+                              title="A scratchpad — not part of the deck."
+                              className="w-4 h-4 rounded-full bg-muted text-muted-foreground text-[10px] font-bold flex items-center justify-center cursor-help"
+                            >
+                              ?
+                            </span>
+                          </div>
+                          <div className="flex flex-col gap-2 items-center">
+                            {sortCards(maybeboardCards).flatMap((deckCard) =>
+                              Array.from({ length: viewMode === 'stacked' ? deckCard.quantity : 1 }, (_, i) => (
+                                <React.Fragment key={`${deckCard.card.name}-${deckCard.card.set}-maybeboard-${i}`}>
+                                  {renderCompactCard(deckCard, i, viewMode === 'stacked', viewMode === 'stacked')}
+                                </React.Fragment>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center py-12 text-muted-foreground">
@@ -780,14 +832,44 @@ export default function FullDeckView({ deck, onViewCard, isAuthenticated = false
                 <h2 className="text-xl font-bold text-purple-400">Reserve</h2>
                 <span className="text-sm text-muted-foreground">({reserveCount} cards)</span>
               </div>
-              
+
               <div>
                 {Object.entries(groupCards(reserveCards)).map(([groupName, cards]) => (
                   <div key={groupName} className="mb-8">
-                    
+
                     <div className={`flex flex-wrap gap-2 items-start ${viewMode === 'stacked' ? 'mt-8' : ''}`}>
                       {cards.map((deckCard, index) => (
                         <React.Fragment key={`${deckCard.card.name}-${deckCard.card.set}-reserve`}>
+                          {renderCompactCard(deckCard, index, false)}
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Maybeboard ("Considering") - Below Reserve when groupBy === 'none' */}
+          {maybeboardCount > 0 && groupBy === 'none' && (
+            <div className="mt-12 pt-6 opacity-80">
+              <div className="flex items-center gap-3 mb-2">
+                <h2 className="text-xl font-bold italic text-muted-foreground">Considering</h2>
+                <span className="text-sm text-muted-foreground not-italic">({maybeboardCount} cards)</span>
+                <span
+                  title="A scratchpad — not part of the deck."
+                  className="w-4 h-4 rounded-full bg-muted text-muted-foreground text-[10px] font-bold flex items-center justify-center cursor-help"
+                >
+                  ?
+                </span>
+              </div>
+
+              <div>
+                {Object.entries(groupCards(maybeboardCards)).map(([groupName, cards]) => (
+                  <div key={groupName} className="mb-8">
+                    <div className={`flex flex-wrap gap-2 items-start ${viewMode === 'stacked' ? 'mt-8' : ''}`}>
+                      {cards.map((deckCard, index) => (
+                        <React.Fragment key={`${deckCard.card.name}-${deckCard.card.set}-maybeboard`}>
                           {renderCompactCard(deckCard, index, false)}
                         </React.Fragment>
                       ))}

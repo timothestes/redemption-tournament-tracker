@@ -1016,6 +1016,39 @@ export default function ModalWithClose({
                     })()}
                   </button>
                 </div>
+                {/* Maybeboard group */}
+                <div className="flex flex-shrink-0">
+                  {getCardQuantity(modalCard.name, modalCard.set, 'maybeboard') > 0 && (
+                    <button
+                      onClick={() => onRemoveCard(modalCard.name, modalCard.set, 'maybeboard')}
+                      className="h-10 w-8 flex items-center justify-center rounded-l-lg bg-violet-700 active:bg-violet-800 text-white"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
+                      </svg>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => onAddCard(modalCard, 'maybeboard')}
+                    className={`h-10 px-3 bg-violet-600 active:bg-violet-700 text-white flex items-center gap-1.5 font-medium text-sm transition-colors ${
+                      getCardQuantity(modalCard.name, modalCard.set, 'maybeboard') > 0
+                        ? 'rounded-r-lg border-l border-violet-500/30'
+                        : 'rounded-lg'
+                    }`}
+                    title="Add to maybeboard"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    Mb
+                    {(() => {
+                      const qty = getCardQuantity(modalCard.name, modalCard.set, 'maybeboard');
+                      return qty > 0 ? (
+                        <span className="bg-white/25 px-1.5 rounded text-xs font-bold">{qty}</span>
+                      ) : null;
+                    })()}
+                  </button>
+                </div>
               </>
             )}
             {/* Public view: spacer (metadata removed — redundant with card image) */}
@@ -1383,7 +1416,19 @@ export default function ModalWithClose({
                       </svg>
                       Add to Reserve
                     </button>
-                    {(getCardQuantity(modalCard.name, modalCard.set, 'main') > 0 || getCardQuantity(modalCard.name, modalCard.set, 'reserve') > 0) && (
+                    <button
+                      onClick={() => {
+                        onAddCard(modalCard, 'maybeboard');
+                        setShowMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-violet-700 dark:text-violet-300"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Add to Maybeboard
+                    </button>
+                    {(getCardQuantity(modalCard.name, modalCard.set, 'main') > 0 || getCardQuantity(modalCard.name, modalCard.set, 'reserve') > 0 || getCardQuantity(modalCard.name, modalCard.set, 'maybeboard') > 0) && (
                       <>
                         <div className="border-t border-border my-1"></div>
                         {getCardQuantity(modalCard.name, modalCard.set, 'main') > 0 && (
@@ -1412,6 +1457,20 @@ export default function ModalWithClose({
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
                             </svg>
                             Remove from Reserve
+                          </button>
+                        )}
+                        {getCardQuantity(modalCard.name, modalCard.set, 'maybeboard') > 0 && (
+                          <button
+                            onClick={() => {
+                              onRemoveCard(modalCard.name, modalCard.set, 'maybeboard');
+                              setShowMenu(false);
+                            }}
+                            className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 text-red-600 dark:text-red-400"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                            </svg>
+                            Remove from Maybeboard
                           </button>
                         )}
                       </>
