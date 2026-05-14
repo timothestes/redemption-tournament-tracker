@@ -149,7 +149,11 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
           ids = deck.slice(-n).map(c => c.instanceId);
           title = `Bottom ${n} of Deck`;
         } else {
-          const shuffled = [...deck].sort(() => Math.random() - 0.5);
+          const shuffled = [...deck];
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+          }
           ids = shuffled.slice(0, n).map(c => c.instanceId);
           title = `Random ${n} from Deck`;
         }
@@ -2484,7 +2488,11 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             if (deck.length === 0) { showGameToast('Deck is empty'); return; }
             const handSpace = 16 - state.zones.hand.length;
             if (handSpace <= 0) { showGameToast('Hand is full (max 16 cards)'); return; }
-            const shuffled = [...deck].sort(() => Math.random() - 0.5);
+            const shuffled = [...deck];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
             const cards = shuffled.slice(0, Math.min(count, deck.length));
             let drawn = 0;
             cards.forEach(c => {
@@ -2504,7 +2512,11 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             setDeckMenu(null);
             const deck = state.zones.deck;
             if (deck.length === 0) { showGameToast('Deck is empty'); return; }
-            const shuffled = [...deck].sort(() => Math.random() - 0.5);
+            const shuffled = [...deck];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
             const n = Math.min(count, deck.length);
             const ids = shuffled.slice(0, n).map(c => c.instanceId);
             setPeekState({ cardIds: ids, title: `Random ${n} from Deck` });
@@ -2513,7 +2525,11 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             setDeckMenu(null);
             const deck = state.zones.deck;
             if (deck.length === 0) { showGameToast('Deck is empty'); return; }
-            const shuffled = [...deck].sort(() => Math.random() - 0.5);
+            const shuffled = [...deck];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
             const ids = shuffled.slice(0, Math.min(count, deck.length)).map(c => c.instanceId);
             ids.forEach(id => moveCard(id, 'discard'));
           }}
@@ -2521,7 +2537,11 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
             setDeckMenu(null);
             const deck = state.zones.deck;
             if (deck.length === 0) { showGameToast('Deck is empty'); return; }
-            const shuffled = [...deck].sort(() => Math.random() - 0.5);
+            const shuffled = [...deck];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
             const ids = shuffled.slice(0, Math.min(count, deck.length)).map(c => c.instanceId);
             ids.forEach(id => moveCard(id, 'reserve'));
           }}

@@ -30,7 +30,11 @@ export default function PodGenerationModal({ show, participants, onClose }: PodG
   }, [show, participants.length]);
 
   const handleGenerate = () => {
-    const shuffled = [...participants].sort(() => Math.random() - 0.5);
+    const shuffled = [...participants];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
     const total = shuffled.length;
     const S = podSize;
     const fullPods = Math.floor(total / S);
