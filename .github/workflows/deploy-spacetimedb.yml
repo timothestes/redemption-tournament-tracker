@@ -44,21 +44,3 @@ jobs:
 
       - name: Publish module
         run: spacetime publish ${{ steps.module.outputs.name }} --module-path spacetimedb --server maincloud --no-config --yes
-
-      - name: Generate client bindings
-        if: github.ref_name == 'main'
-        run: |
-          spacetime generate --lang typescript \
-            --out-dir lib/spacetimedb/module_bindings \
-            --module-path spacetimedb
-
-      - name: Commit bindings if changed
-        if: github.ref_name == 'main'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git diff --quiet lib/spacetimedb/module_bindings/ || {
-            git add lib/spacetimedb/module_bindings/
-            git commit -m "chore: regenerate SpacetimeDB client bindings"
-            git push
-          }
