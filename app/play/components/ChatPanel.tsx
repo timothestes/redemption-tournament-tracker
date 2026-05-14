@@ -300,6 +300,25 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
       );
     } catch { /* fall through */ }
   }
+  if (actionType === 'UNDERDECK_TOP_OF_DECK' && payload) {
+    try {
+      const data = JSON.parse(payload);
+      const count = Number(data.count ?? 1);
+      const sourceName: string = data.sourceCardName ?? '';
+      const sourceImg: string = data.sourceCardImgFile ?? '';
+      const prefix = count === 1 ? 'underdecked top card of deck' : `underdecked top ${count} cards of deck`;
+      return (
+        <>
+          {prefix}
+          {sourceName ? (
+            <>
+              {' '}via <HoverableCard name={sourceName} img={sourceImg} />
+            </>
+          ) : null}
+        </>
+      );
+    } catch { /* fall through */ }
+  }
   if (actionType === 'RESERVE_TOP_OF_DECK' && payload) {
     try {
       const data = JSON.parse(payload);

@@ -3007,6 +3007,61 @@ function shuffleAndDrawForPlayerImpl(
 }
 
 // ---------------------------------------------------------------------------
+// Helper: underdeckTopOfDeckImpl
+// Moves the top `count` cards of the acting player's deck to the bottom of
+// that same deck. "Top" is ascending zoneIndex; new positions are appended
+// past the current max zoneIndex so relative order is preserved without
+// shifting every other row. Cards stay face-down (they were already face-down
+// at the top of the deck).
+// ---------------------------------------------------------------------------
+function underdeckTopOfDeckImpl(
+  ctx: any,
+  source: any,
+  ability: Extract<CardAbility, { type: 'underdeck_top_of_deck' }>,
+  player: any,
+  gameId: bigint,
+) {
+  if (ability.count < 1) throw new SenderError('Invalid count');
+
+  const game = ctx.db.Game.id.find(gameId);
+  if (!game) throw new SenderError('Game not found');
+
+  const playerCards = [...ctx.db.CardInstance.card_instance_game_id.filter(gameId)].filter(
+    (c: any) => c.ownerId === player.id
+  );
+  const deckCards = playerCards
+    .filter((c: any) => c.zone === 'deck')
+    .sort((a: any, b: any) => (a.zoneIndex < b.zoneIndex ? -1 : a.zoneIndex > b.zoneIndex ? 1 : 0));
+
+  if (deckCards.length === 0) return;
+
+  const n = Math.min(ability.count, deckCards.length);
+  const maxIdx = deckCards[deckCards.length - 1].zoneIndex as bigint;
+
+  for (let i = 0; i < n; i++) {
+    const top = deckCards[i];
+    ctx.db.CardInstance.id.update({
+      ...top,
+      zoneIndex: maxIdx + BigInt(i + 1),
+      posX: '',
+      posY: '',
+      isFlipped: true,
+    });
+  }
+
+  logAction(
+    ctx, gameId, player.id, 'UNDERDECK_TOP_OF_DECK',
+    JSON.stringify({
+      count: n,
+      requested: ability.count,
+      sourceCardName: source.cardName,
+      sourceCardImgFile: source.cardImgFile,
+    }),
+    game.turnNumber, game.currentPhase,
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Helper: reserveTopOfDeckImpl
 // Moves the top `count` cards of the acting player's deck into their reserve.
 // "Top" is defined by ascending zoneIndex (same convention as drawCardsForPlayer).
@@ -3295,6 +3350,8 @@ export const execute_card_ability = spacetimedb.reducer(
         return reserveTopOfDeckImpl(ctx, source, ability, player, gameId);
       case 'draw_bottom_of_deck':
         return drawBottomOfDeckImpl(ctx, source, ability, player, gameId);
+      case 'underdeck_top_of_deck':
+        return underdeckTopOfDeckImpl(ctx, source, ability, player, gameId);
       case 'set_card_outline':
         return setCardOutlineImpl(ctx, source, ability, player, gameId);
       case 'play_all_lost_souls':

@@ -338,6 +338,31 @@ function threeNailsResetInState(
   return { ...state, zones, history };
 }
 
+function underdeckTopOfDeckInState(
+  state: GameState,
+  _source: GameCard,
+  ability: Extract<CardAbility, { type: 'underdeck_top_of_deck' }>,
+  history: GameState[],
+): GameState {
+  // Phase 1 — validate.
+  if (ability.count < 1) return state;
+  if (state.zones.deck.length === 0) return state;
+
+  // Phase 2 — take top N off the deck (index 0..n-1, matching shift() top-of-deck
+  // convention) and re-append at the bottom. Stays in deck zone face-down.
+  const zones = cloneZones(state.zones);
+  const n = Math.min(ability.count, zones.deck.length);
+  const taken = zones.deck.slice(0, n).map(c => ({
+    ...c,
+    isFlipped: true,
+    posX: undefined,
+    posY: undefined,
+  }));
+  zones.deck = [...zones.deck.slice(n), ...taken];
+
+  return { ...state, zones, history };
+}
+
 function reserveTopOfDeckInState(
   state: GameState,
   _source: GameCard,
@@ -1100,6 +1125,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           return reserveTopOfDeckInState(state, source, ability, history);
         case 'draw_bottom_of_deck':
           return drawBottomOfDeckInState(state, source, ability, history);
+        case 'underdeck_top_of_deck':
+          return underdeckTopOfDeckInState(state, source, ability, history);
         case 'set_card_outline':
           return setCardOutlineInState(state, source, ability, history);
         case 'play_all_lost_souls':

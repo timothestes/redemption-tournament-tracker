@@ -35,6 +35,7 @@ export type CardAbility = AbilityBase & (
   | { type: 'reserve_opponent_deck'; position: 'top' | 'bottom' | 'random'; count: number }
   | { type: 'reserve_top_of_deck'; count: number }
   | { type: 'draw_bottom_of_deck'; count: number }
+  | { type: 'underdeck_top_of_deck'; count: number }
   | { type: 'set_card_outline'; color: 'good' | 'evil'; label: string }
   | { type: 'play_all_lost_souls' }
   | { type: 'three_nails_reset' }
@@ -92,7 +93,8 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   "Balaam's Prophecy":                                   [{ type: 'reveal_own_deck', position: 'top', count: 6 }],
   'Fruit of the Land':                                   [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
   'Intervening of Prophecy':                             [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
-  'The Coming Prince':                                   [{ type: 'look_at_own_deck', position: 'top', count: 1 }],
+  'The Coming Prince':                                   [{ type: 'look_at_own_deck', position: 'top', count: 1 }, { type: 'underdeck_top_of_deck', count: 1 }],
+  'Abed-nego (Azariah) (PoC)':                           [{ type: 'underdeck_top_of_deck', count: 1 }],
   'Sign of Jonah':                                       [{ type: 'look_at_own_deck', position: 'top', count: 3 }],
   'Virgin Birth':                                        [{ type: 'look_at_own_deck', position: 'top', count: 6, sourceZones: ['hand', 'territory', 'land-of-bondage', 'land-of-redemption'] }],
   'Eve, Mother of All (Roots)':                          [{ type: 'look_at_own_deck', position: 'top', count: 7 }],
