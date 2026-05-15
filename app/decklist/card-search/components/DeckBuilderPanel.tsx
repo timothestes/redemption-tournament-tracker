@@ -46,6 +46,7 @@ import DeckLegalityChecklist from "./DeckLegalityChecklist";
 import type { DeckCheckResult } from "@/utils/deckcheck/types";
 import { useBudgetPricing } from '../hooks/useBudgetPricing';
 import type { BudgetCard } from '@/lib/pricing/budgetPricing';
+import { useExternalDropTarget, combineRefs, type SearchDragPayload } from '../hooks/useExternalDropTarget';
 
 function getTagContrastColor(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -61,21 +62,32 @@ export type TabType = "main" | "reserve" | "info" | "cover";
  * which means it can render anywhere in the DeckBuilderPanel JSX tree (which IS
  * inside DndContext), but the same call from the parent function body would not
  * see the context.
+ *
+ * Also registers a native HTML5 drop target via `useExternalDropTarget` when
+ * `onExternalDrop` is provided. This lets external sources (the search-results
+ * column, which renders OUTSIDE this DndContext) drop cards onto the same
+ * zones via native `draggable=true` + `dataTransfer` — no DndContext lift
+ * required. The two systems coexist because dnd-kit listens to PointerEvents
+ * and HTML5 listens to DragEvents.
  */
 function Droppable({
   id,
   zone,
   children,
   className,
+  onExternalDrop,
 }: {
   id: string;
   zone: DeckZone;
   children: React.ReactNode;
   className: (isOver: boolean) => string;
+  onExternalDrop?: (payload: SearchDragPayload) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id, data: { zone } });
+  const { setRef: setExternalRef, isOver: isExternalOver } = useExternalDropTarget(onExternalDrop);
+  const combinedRef = combineRefs<HTMLDivElement>(setNodeRef, setExternalRef);
   return (
-    <div ref={setNodeRef} className={className(isOver)}>
+    <div ref={combinedRef} className={className(isOver || isExternalOver)}>
       {children}
     </div>
   );
@@ -1771,9 +1783,13 @@ export default function DeckBuilderPanel({
         <Droppable
           id="tab:main"
           zone="main"
+          onExternalDrop={(payload) => {
+            onAddCard(payload.name, payload.set, "main");
+            setActiveTab("main");
+          }}
           className={(isOver) =>
             `flex-1 min-w-0 rounded transition-colors ${
-              isDragging && isOver ? "bg-primary/10 ring-1 ring-inset ring-primary/40" : ""
+              isOver ? "bg-primary/10 ring-1 ring-inset ring-primary/40" : ""
             }`
           }
         >
@@ -1793,9 +1809,13 @@ export default function DeckBuilderPanel({
         <Droppable
           id="tab:reserve"
           zone="reserve"
+          onExternalDrop={(payload) => {
+            onAddCard(payload.name, payload.set, "reserve");
+            setActiveTab("reserve");
+          }}
           className={(isOver) =>
             `flex-1 min-w-0 rounded transition-colors ${
-              isDragging && isOver ? "bg-primary/10 ring-1 ring-inset ring-primary/40" : ""
+              isOver ? "bg-primary/10 ring-1 ring-inset ring-primary/40" : ""
             }`
           }
         >
@@ -2395,6 +2415,7 @@ export default function DeckBuilderPanel({
           <Droppable
             id="zone:main"
             zone="main"
+            onExternalDrop={(payload) => onAddCard(payload.name, payload.set, "main")}
             className={(isOver) =>
               `space-y-4 rounded transition-colors flex-1 min-h-[240px] ${
                 isDragging ? "border-2 border-dashed border-border/40 -m-0.5" : ""
@@ -2497,6 +2518,7 @@ export default function DeckBuilderPanel({
           <Droppable
             id="zone:reserve"
             zone="reserve"
+            onExternalDrop={(payload) => onAddCard(payload.name, payload.set, "reserve")}
             className={(isOver) =>
               `space-y-4 rounded transition-colors flex-1 min-h-[240px] ${
                 isDragging ? "border-2 border-dashed border-border/40 -m-0.5" : ""
@@ -3237,6 +3259,7 @@ export default function DeckBuilderPanel({
           for (let i = 0; i < dc.quantity; i++) onRemoveCard(name, set, 'maybeboard');
         }}
         onMoveCard={(name, set, toZone) => handleMoveCard(name, set, 'maybeboard', toZone)}
+        onAddCard={(name, set) => onAddCard(name, set, 'maybeboard')}
         onViewCard={onViewCard}
         deckId={deck.id}
       />

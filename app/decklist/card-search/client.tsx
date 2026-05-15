@@ -2016,6 +2016,27 @@ export default function CardSearchClient() {
               return (
                 <div
                   key={c.dataLine}
+                  draggable={!isSpotlight}
+                  onDragStart={(e) => {
+                    if (isSpotlight) return;
+                    // Native HTML5 drag — picked up by `useExternalDropTarget`
+                    // on the deck-panel zones. No @dnd-kit dependency, so this
+                    // works across the search↔deck context boundary without
+                    // lifting DndContext. Click-to-add via the inner buttons
+                    // is unaffected (HTML5 drag only fires after press+move).
+                    e.dataTransfer.setData(
+                      "application/x-redemption-card",
+                      JSON.stringify({ name: c.name, set: c.set }),
+                    );
+                    e.dataTransfer.effectAllowed = "copy";
+                    // Use the card image as the drag preview so it matches the
+                    // in-deck @dnd-kit DragGhost visually.
+                    const img = e.currentTarget.querySelector("img");
+                    if (img && img.complete && img.naturalWidth > 0) {
+                      const rect = img.getBoundingClientRect();
+                      e.dataTransfer.setDragImage(img, rect.width / 2, rect.height / 2);
+                    }
+                  }}
                   className={`relative cursor-pointer group rounded overflow-hidden transition-all duration-200 ${
                     isSpotlight && spotlightCard?.dataLine === c.dataLine
                       ? "ring-2 ring-amber-500 dark:ring-amber-400"

@@ -6,6 +6,7 @@ import { DeckCard, DeckZone } from "../types/deck";
 import { Card } from "../utils";
 import { useCardImageUrl } from "../hooks/useCardImageUrl";
 import { cn } from "@/lib/utils";
+import { useExternalDropTarget, combineRefs } from "../hooks/useExternalDropTarget";
 
 interface MaybeboardStripProps {
   /** Maybeboard cards (caller filters by zone === 'maybeboard'). */
@@ -15,6 +16,8 @@ interface MaybeboardStripProps {
   onRemove: (cardName: string, cardSet: string) => void;
   onMoveCard: (cardName: string, cardSet: string, toZone: DeckZone) => void;
   onViewCard?: (card: Card) => void;
+  /** Add a card directly to the maybeboard from an external source (search-tile drag). */
+  onAddCard?: (cardName: string, cardSet: string) => void;
   /** Stable identifier for persisting collapsed state per deck. */
   deckId?: string;
 }
@@ -41,6 +44,7 @@ export default function MaybeboardStrip({
   onRemove,
   onMoveCard,
   onViewCard,
+  onAddCard,
   deckId,
 }: MaybeboardStripProps) {
   // Default to collapsed on touch / narrow viewports — the strip eats too much
@@ -60,6 +64,14 @@ export default function MaybeboardStrip({
     id: "zone:maybeboard",
     data: { zone: "maybeboard" as DeckZone },
   });
+
+  // Native HTML5 drop target so the search-results column (rendered outside
+  // this DndContext) can drop directly into the maybeboard. See
+  // `useExternalDropTarget` for why both systems coexist.
+  const { setRef: setExternalDropRef, isOver: isExternalOver } = useExternalDropTarget(
+    onAddCard ? (payload) => onAddCard(payload.name, payload.set) : undefined,
+  );
+  const sectionRef = combineRefs<HTMLElement>(setDroppableRef, setExternalDropRef);
 
   // Surface drag state so we can grow the strip + show a "Drop here" overlay
   // while a card is being dragged from main/reserve. `useDndContext` returns
@@ -203,9 +215,11 @@ export default function MaybeboardStrip({
     return `linear-gradient(to right, ${left}, ${right})`;
   }, [overflows, overflowsLeft, overflowsRight, isValidDrop]);
 
+  const showDropAffordance = isOver || isExternalOver;
+
   return (
     <section
-      ref={setDroppableRef}
+      ref={sectionRef}
       aria-label={`Maybeboard, ${totalCount} ${totalCount === 1 ? "card" : "cards"}`}
       className={cn(
         "relative sticky bottom-0 z-10 bg-card/95 backdrop-blur flex-shrink-0",
@@ -215,7 +229,7 @@ export default function MaybeboardStrip({
         // border-t → border-2 would.
         "border-t-2 border-transparent",
         isValidDrop && "min-h-[120px] md:min-h-[160px]",
-        isOver ? "bg-primary/10 border-primary" : "border-t-border",
+        showDropAffordance ? "bg-primary/10 border-primary" : "border-t-border",
       )}
     >
       {/* Polite live region for stepper changes */}
@@ -303,7 +317,7 @@ export default function MaybeboardStrip({
             <div
               className={cn(
                 "mx-3 mb-2 h-[72px] md:h-[80px] rounded border border-dashed flex items-center justify-center px-3 transition-colors",
-                isOver ? "border-primary bg-primary/10" : "border-border/70",
+                showDropAffordance ? "border-primary bg-primary/10" : "border-border/70",
               )}
             >
               <p className="text-[11px] text-muted-foreground text-center leading-tight">
@@ -426,7 +440,7 @@ function MaybeboardThumbnail({
           isDragging ? "opacity-40" : ""
         }`}
         onClick={(e) => {
-          // Drag activation distance (6px pointer / 200ms touch) means a true
+          // 10px pointer activation distance / 200ms touch delay means a true
           // click reaches us here — open the modal.
           e.stopPropagation();
           if (isMenuOpen) {
@@ -456,8 +470,8 @@ function MaybeboardThumbnail({
       </div>
 
       {/* Stepper +/− — always visible on touch (no hover), revealed on hover
-          on desktop. These sit on top of the drag handle and stopPropagation
-          to avoid initiating a drag on tap. */}
+          on desktop. WCAG-compliant 24x24 touch targets. These sit on top of
+          the drag handle and stopPropagation to avoid initiating a drag on tap. */}
       <div className="absolute inset-y-0 left-0 right-0 pointer-events-none flex flex-col justify-between items-stretch opacity-100 md:opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
         <button
           type="button"
@@ -466,7 +480,7 @@ function MaybeboardThumbnail({
             onIncrement();
           }}
           onPointerDown={(e) => e.stopPropagation()}
-          className="pointer-events-auto self-end m-0.5 w-5 h-5 rounded bg-black/60 hover:bg-black/80 text-white text-xs font-bold leading-none"
+          className="pointer-events-auto self-end m-0.5 w-6 h-6 rounded bg-black/60 hover:bg-black/80 text-white text-sm font-bold leading-none"
           aria-label={`Increase quantity of ${dc.card.name}`}
         >
           +
@@ -478,7 +492,7 @@ function MaybeboardThumbnail({
             onDecrement();
           }}
           onPointerDown={(e) => e.stopPropagation()}
-          className="pointer-events-auto self-start m-0.5 w-5 h-5 rounded bg-black/60 hover:bg-black/80 text-white text-xs font-bold leading-none"
+          className="pointer-events-auto self-start m-0.5 w-6 h-6 rounded bg-black/60 hover:bg-black/80 text-white text-sm font-bold leading-none"
           aria-label={`Decrease quantity of ${dc.card.name}`}
         >
           −
@@ -495,7 +509,7 @@ function MaybeboardThumbnail({
           setMenuOpen(!isMenuOpen);
         }}
         onPointerDown={(e) => e.stopPropagation()}
-        className="absolute top-0.5 left-0.5 w-5 h-5 rounded bg-black/60 hover:bg-black/80 text-white text-xs leading-none flex items-center justify-center md:opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+        className="absolute top-0.5 left-0.5 w-6 h-6 rounded bg-black/60 hover:bg-black/80 text-white text-sm leading-none flex items-center justify-center md:opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
         aria-label={`Options for ${dc.card.name}`}
         aria-haspopup="menu"
         aria-expanded={isMenuOpen}
