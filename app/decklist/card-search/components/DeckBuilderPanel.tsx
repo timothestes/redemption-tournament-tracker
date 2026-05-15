@@ -3249,24 +3249,29 @@ export default function DeckBuilderPanel({
         )}
       </div>
 
-      {/* Maybeboard strip — pinned to the bottom of the panel, visible across all tabs. */}
-      <MaybeboardStrip
-        cards={deck.cards.filter((dc) => dc.zone === 'maybeboard')}
-        onIncrement={(name, set) => onAddCard(name, set, 'maybeboard')}
-        onDecrement={(name, set) => onRemoveCard(name, set, 'maybeboard')}
-        onRemove={(name, set) => {
-          // Remove all copies by stepping down to 0.
-          const dc = deck.cards.find(
-            (c) => c.card.name === name && c.card.set === set && c.zone === 'maybeboard'
-          );
-          if (!dc) return;
-          for (let i = 0; i < dc.quantity; i++) onRemoveCard(name, set, 'maybeboard');
-        }}
-        onMoveCard={(name, set, toZone) => handleMoveCard(name, set, 'maybeboard', toZone)}
-        onAddCard={(name, set) => onAddCard(name, set, 'maybeboard')}
-        onViewCard={onViewCard}
-        deckId={deck.id}
-      />
+      {/* Maybeboard strip — only relevant on deck-zone tabs (Main / Reserve).
+          Hidden on Stats / Details where the user is reading data, not editing
+          card composition. Also hidden in expanded full-deck view, where the
+          maybeboard doesn't have a logical home. */}
+      {!isExpanded && (activeTab === 'main' || activeTab === 'reserve') && (
+        <MaybeboardStrip
+          cards={deck.cards.filter((dc) => dc.zone === 'maybeboard')}
+          onIncrement={(name, set) => onAddCard(name, set, 'maybeboard')}
+          onDecrement={(name, set) => onRemoveCard(name, set, 'maybeboard')}
+          onRemove={(name, set) => {
+            // Remove all copies by stepping down to 0.
+            const dc = deck.cards.find(
+              (c) => c.card.name === name && c.card.set === set && c.zone === 'maybeboard'
+            );
+            if (!dc) return;
+            for (let i = 0; i < dc.quantity; i++) onRemoveCard(name, set, 'maybeboard');
+          }}
+          onMoveCard={(name, set, toZone) => handleMoveCard(name, set, 'maybeboard', toZone)}
+          onAddCard={(name, set) => onAddCard(name, set, 'maybeboard')}
+          onViewCard={onViewCard}
+          deckId={deck.id}
+        />
+      )}
 
       {/* Generate PDF Modal */}
       {showGeneratePDFModal && (
