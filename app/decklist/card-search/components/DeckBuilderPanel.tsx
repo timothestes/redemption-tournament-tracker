@@ -10,6 +10,9 @@ import {
   useSensors,
   useSensor,
   useDroppable,
+  pointerWithin,
+  rectIntersection,
+  type CollisionDetection,
   type DragStartEvent,
   type DragOverEvent,
   type DragEndEvent,
@@ -52,6 +55,31 @@ function getTagContrastColor(hex: string): string {
 }
 
 export type TabType = "main" | "reserve" | "info" | "cover";
+
+/**
+ * Wrapper that registers a @dnd-kit droppable. Must be used inside a DndContext —
+ * which means it can render anywhere in the DeckBuilderPanel JSX tree (which IS
+ * inside DndContext), but the same call from the parent function body would not
+ * see the context.
+ */
+function Droppable({
+  id,
+  zone,
+  children,
+  className,
+}: {
+  id: string;
+  zone: DeckZone;
+  children: React.ReactNode;
+  className: (isOver: boolean) => string;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id, data: { zone } });
+  return (
+    <div ref={setNodeRef} className={className(isOver)}>
+      {children}
+    </div>
+  );
+}
 
 interface DeckBuilderPanelProps {
   /** Current deck state */
@@ -192,42 +220,34 @@ export default function DeckBuilderPanel({
   const [activeDragCard, setActiveDragCard] = useState<Card | null>(null);
   const isDragging = activeDragCard !== null;
   const dndSensors = useSensors(
-    // Mouse/pen: 6px movement before drag activates — preserves clicks on
-    // steppers and other inline controls.
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    // Mouse/pen: 10px movement before drag activates — gives twitchy hands
+    // and precision trackpads more room before a click becomes a drag.
+    useSensor(PointerSensor, { activationConstraint: { distance: 10 } }),
     // Touch: 200ms long-press + 5px tolerance — doesn't fight scroll.
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
     useSensor(KeyboardSensor),
   );
 
-  // Conditional tab droppables — main/reserve tab triggers accept drops only
-  // while a drag is active. Only main/reserve are valid targets; info and
-  // cover are inert during drag.
-  const { setNodeRef: setMainTabDropRef, isOver: isMainTabOver } = useDroppable({
-    id: "tab:main",
-    data: { zone: "main" as DeckZone },
-    disabled: !isDragging,
-  });
-  const { setNodeRef: setReserveTabDropRef, isOver: isReserveTabOver } = useDroppable({
-    id: "tab:reserve",
-    data: { zone: "reserve" as DeckZone },
-    disabled: !isDragging,
-  });
-  // Zone-content droppables — registered once at the panel level (not per
-  // grouped DeckCardList) so the id is unique. Each wraps the tab's content
-  // area below.
-  const { setNodeRef: setMainZoneDropRef, isOver: isMainZoneOver } = useDroppable({
-    id: "zone:main",
-    data: { zone: "main" as DeckZone },
-  });
-  const { setNodeRef: setReserveZoneDropRef, isOver: isReserveZoneOver } = useDroppable({
-    id: "zone:reserve",
-    data: { zone: "reserve" as DeckZone },
-  });
+  // Tab / zone droppables are declared via the <Droppable> wrapper component
+  // (see bottom of file). They CANNOT be set up via useDroppable at the panel
+  // level because the panel itself renders DndContext — its own hooks run
+  // outside the context provider and never register with the manager.
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const card = event.active.data.current?.card as Card | undefined;
     if (card) setActiveDragCard(card);
+  }, []);
+
+  // Custom collision detection: prefer pointer-within for precision (small tab
+  // triggers, the maybeboard strip), fall back to rectIntersection when the
+  // pointer is in a gap. Default rectIntersection alone fails for the tab
+  // triggers because the source draggable's rect doesn't translate during
+  // drag — DragOverlay renders separately, so the active rect never overlaps
+  // the tab bar above the card grid.
+  const dndCollisionDetection = useCallback<CollisionDetection>((args) => {
+    const pointer = pointerWithin(args);
+    if (pointer.length > 0) return pointer;
+    return rectIntersection(args);
   }, []);
 
   // No-op for tab targets — switching activeTab here would unmount the source
@@ -780,6 +800,8 @@ export default function DeckBuilderPanel({
   return (
     <DndContext
       sensors={dndSensors}
+      collisionDetection={dndCollisionDetection}
+      autoScroll={false}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
@@ -1746,11 +1768,14 @@ export default function DeckBuilderPanel({
             transform: `translateX(${tabIndicator.left}px)`,
           }}
         />
-        <div
-          ref={setMainTabDropRef}
-          className={`flex-1 min-w-0 transition-shadow ${
-            isDragging && isMainTabOver ? "ring-2 ring-primary/60 rounded" : ""
-          }`}
+        <Droppable
+          id="tab:main"
+          zone="main"
+          className={(isOver) =>
+            `flex-1 min-w-0 rounded transition-colors ${
+              isDragging && isOver ? "bg-primary/10 ring-1 ring-inset ring-primary/40" : ""
+            }`
+          }
         >
           <button
             ref={(el) => { tabRefs.current.main = el; }}
@@ -1764,12 +1789,15 @@ export default function DeckBuilderPanel({
             <span className="md:hidden">Main <span className="text-[10px] opacity-75">{mainDeckCount}</span></span>
             <span className="hidden md:inline">Main ({mainDeckCount})</span>
           </button>
-        </div>
-        <div
-          ref={setReserveTabDropRef}
-          className={`flex-1 min-w-0 transition-shadow ${
-            isDragging && isReserveTabOver ? "ring-2 ring-primary/60 rounded" : ""
-          }`}
+        </Droppable>
+        <Droppable
+          id="tab:reserve"
+          zone="reserve"
+          className={(isOver) =>
+            `flex-1 min-w-0 rounded transition-colors ${
+              isDragging && isOver ? "bg-primary/10 ring-1 ring-inset ring-primary/40" : ""
+            }`
+          }
         >
           <button
             ref={(el) => { tabRefs.current.reserve = el; }}
@@ -1783,7 +1811,7 @@ export default function DeckBuilderPanel({
             <span className="md:hidden">Res <span className="text-[10px] opacity-75">{reserveCount}</span></span>
             <span className="hidden md:inline">Reserve ({reserveCount})</span>
           </button>
-        </div>
+        </Droppable>
         <button
           ref={(el) => { tabRefs.current.info = el; }}
           onClick={() => handleTabChange("info")}
@@ -2219,7 +2247,7 @@ export default function DeckBuilderPanel({
       )}
 
       {/* Content */}
-      <div ref={contentRef} className={`flex-1 overflow-y-auto overflow-x-hidden ${isExpanded ? '' : 'p-4'}`} data-deck-grid>
+      <div ref={contentRef} className={`flex-1 overflow-y-auto overflow-x-hidden flex flex-col ${isExpanded ? '' : 'p-4'}`} data-deck-grid>
         {/* Paragon Requirements (only show for Paragon format with a selected Paragon) */}
         {deckType === 'Paragon' && deck.paragon && validation.paragonStats && (activeTab === 'main' || activeTab === 'reserve') && (
           <div className="mb-4">
@@ -2364,11 +2392,16 @@ export default function DeckBuilderPanel({
         ) : (
           <>
         {activeTab === "main" ? (
-          <div
-            ref={setMainZoneDropRef}
-            className={`space-y-4 rounded transition-shadow ${
-              isMainZoneOver ? "ring-2 ring-primary/40 bg-primary/5" : ""
-            }`}
+          <Droppable
+            id="zone:main"
+            zone="main"
+            className={(isOver) =>
+              `space-y-4 rounded transition-colors flex-1 min-h-[240px] ${
+                isDragging ? "border-2 border-dashed border-border/40 -m-0.5" : ""
+              } ${
+                isOver ? "border-primary bg-primary/5" : ""
+              }`
+            }
           >
             {mainDeckCards.length > 0 ? (
               groupCards(mainDeckCards).map(({ type, cards, count }) => {
@@ -2459,13 +2492,18 @@ export default function DeckBuilderPanel({
                 </button>
               </div>
             )}
-          </div>
+          </Droppable>
         ) : activeTab === "reserve" ? (
-          <div
-            ref={setReserveZoneDropRef}
-            className={`space-y-4 rounded transition-shadow ${
-              isReserveZoneOver ? "ring-2 ring-primary/40 bg-primary/5" : ""
-            }`}
+          <Droppable
+            id="zone:reserve"
+            zone="reserve"
+            className={(isOver) =>
+              `space-y-4 rounded transition-colors flex-1 min-h-[240px] ${
+                isDragging ? "border-2 border-dashed border-border/40 -m-0.5" : ""
+              } ${
+                isOver ? "border-primary bg-primary/5" : ""
+              }`
+            }
           >
             {reserveCards.length > 0 ? (
               groupCards(reserveCards).map(({ type, cards, count }) => {
@@ -2534,7 +2572,7 @@ export default function DeckBuilderPanel({
                 </p>
               </div>
             )}
-          </div>
+          </Droppable>
         ) : activeTab === "cover" ? (
           // Details Tab (Cover Cards + Description)
           <div className="space-y-4 text-sm">
@@ -3200,6 +3238,7 @@ export default function DeckBuilderPanel({
         }}
         onMoveCard={(name, set, toZone) => handleMoveCard(name, set, 'maybeboard', toZone)}
         onViewCard={onViewCard}
+        deckId={deck.id}
       />
 
       {/* Generate PDF Modal */}

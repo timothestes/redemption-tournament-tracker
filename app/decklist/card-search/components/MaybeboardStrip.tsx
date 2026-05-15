@@ -15,10 +15,14 @@ interface MaybeboardStripProps {
   onRemove: (cardName: string, cardSet: string) => void;
   onMoveCard: (cardName: string, cardSet: string, toZone: DeckZone) => void;
   onViewCard?: (card: Card) => void;
+  /** Stable identifier for persisting collapsed state per deck. */
+  deckId?: string;
 }
 
 const cardKey = (dc: DeckCard) => `${dc.card.name}|${dc.card.set}`;
 const draggableId = (dc: DeckCard) => `maybeboard:${cardKey(dc)}`;
+const collapsedKey = (deckId?: string) =>
+  `redemption-maybeboard-collapsed:${deckId ?? "local"}`;
 
 /**
  * Persistent horizontal-scroll strip pinned to the bottom of the deck panel,
@@ -37,10 +41,17 @@ export default function MaybeboardStrip({
   onRemove,
   onMoveCard,
   onViewCard,
+  deckId,
 }: MaybeboardStripProps) {
+  // Default to collapsed on touch / narrow viewports — the strip eats too much
+  // vertical real estate at rest on phones (collapsed: ~32px, expanded: ~80px+).
+  // SSR defaults to false so hydration matches; the effect below corrects per
+  // viewport / persisted preference once mounted.
   const [collapsed, setCollapsed] = React.useState(false);
+  const [collapsedHydrated, setCollapsedHydrated] = React.useState(false);
   const [openMenuKey, setOpenMenuKey] = React.useState<string | null>(null);
-  const [overflows, setOverflows] = React.useState(false);
+  const [overflowsLeft, setOverflowsLeft] = React.useState(false);
+  const [overflowsRight, setOverflowsRight] = React.useState(false);
   const [showHelp, setShowHelp] = React.useState(false);
   const [announcement, setAnnouncement] = React.useState("");
   const scrollRef = React.useRef<HTMLDivElement | null>(null);
@@ -58,9 +69,42 @@ export default function MaybeboardStrip({
   const isDragging = !!active;
   const isValidDrop = isDragging && fromZone !== "maybeboard";
 
+  // Hydrate persisted collapsed state once. Per-deck so different decks remember
+  // independently. If no preference saved, default to collapsed on mobile-ish
+  // viewports (touch-no-hover OR narrow viewport) to recover ~50px of vertical
+  // real estate at rest.
+  React.useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(collapsedKey(deckId));
+      if (saved !== null) {
+        setCollapsed(saved === "1");
+      } else {
+        const isCoarse =
+          typeof window.matchMedia === "function" &&
+          window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+        const isNarrow = window.innerWidth <= 640;
+        if (isCoarse || isNarrow) setCollapsed(true);
+      }
+    } catch {
+      // localStorage may throw in private modes; safe to ignore.
+    }
+    setCollapsedHydrated(true);
+  }, [deckId]);
+
+  // Persist the user's collapsed preference. Skip until hydrated so we don't
+  // overwrite the saved value with the SSR default on first mount.
+  React.useEffect(() => {
+    if (!collapsedHydrated) return;
+    try {
+      window.localStorage.setItem(collapsedKey(deckId), collapsed ? "1" : "0");
+    } catch {
+      // ignore
+    }
+  }, [collapsed, collapsedHydrated, deckId]);
+
   // Auto-expand a collapsed strip while a drag is in progress so the drop
   // target is actually visible. Save the user's pre-drag preference in a ref
-  // and restore on drag end or cancel.
+  // and restore on drag end or cancel — but persist nothing while toggling.
   const prevCollapsedRef = React.useRef<boolean | null>(null);
   React.useEffect(() => {
     if (isDragging) {
@@ -78,17 +122,34 @@ export default function MaybeboardStrip({
   const totalCount = cards.reduce((sum, dc) => sum + dc.quantity, 0);
   const uniqueCount = cards.length;
 
-  // Track horizontal overflow so the → indicator + edge fade only show when scrollable.
+  // Track which side(s) of the horizontal scroll have hidden content. The
+  // edge fade-mask should only appear on a side that actually has more to see —
+  // hiding cards behind a permanent right-edge fade looks broken when the
+  // user is already scrolled to the end.
   React.useEffect(() => {
-    if (collapsed) return;
+    if (collapsed) {
+      setOverflowsLeft(false);
+      setOverflowsRight(false);
+      return;
+    }
     const el = scrollRef.current;
     if (!el) return;
-    const check = () => setOverflows(el.scrollWidth > el.clientWidth + 1);
+    const check = () => {
+      const max = el.scrollWidth - el.clientWidth;
+      setOverflowsLeft(el.scrollLeft > 1);
+      setOverflowsRight(el.scrollLeft < max - 1);
+    };
     check();
     const ro = new ResizeObserver(check);
     ro.observe(el);
-    return () => ro.disconnect();
+    el.addEventListener("scroll", check, { passive: true });
+    return () => {
+      ro.disconnect();
+      el.removeEventListener("scroll", check);
+    };
   }, [collapsed, cards.length]);
+
+  const overflows = overflowsLeft || overflowsRight;
 
   // Close context menu on outside click / Escape.
   React.useEffect(() => {
@@ -129,17 +190,32 @@ export default function MaybeboardStrip({
     setOpenMenuKey(null);
   };
 
+  // Compute the mask-image only on sides that actually have hidden content,
+  // and only when not in a valid drop (during a drop, the drop overlay sits
+  // over the right edge anyway and the fade reads as visual noise).
+  const maskImage = React.useMemo(() => {
+    if (!overflows || isValidDrop) return undefined;
+    const fadeWidth = 24;
+    const left = overflowsLeft ? `transparent 0, black ${fadeWidth}px` : "black 0";
+    const right = overflowsRight
+      ? `black calc(100% - ${fadeWidth}px), transparent 100%`
+      : "black 100%";
+    return `linear-gradient(to right, ${left}, ${right})`;
+  }, [overflows, overflowsLeft, overflowsRight, isValidDrop]);
+
   return (
     <section
       ref={setDroppableRef}
       aria-label={`Maybeboard, ${totalCount} ${totalCount === 1 ? "card" : "cards"}`}
       className={cn(
-        "sticky bottom-0 z-10 border-t bg-card/95 backdrop-blur flex-shrink-0",
-        "transition-all duration-200",
+        "relative sticky bottom-0 z-10 bg-card/95 backdrop-blur flex-shrink-0",
+        "transition-[min-height,background-color] duration-150 ease-out",
+        // Permanent 2px transparent border to reserve space — switching to a
+        // colored border on `isOver` doesn't shift the layout by 1px the way
+        // border-t → border-2 would.
+        "border-t-2 border-transparent",
         isValidDrop && "min-h-[120px] md:min-h-[160px]",
-        isOver
-          ? "border-2 border-primary bg-primary/15"
-          : "border-border",
+        isOver ? "bg-primary/10 border-primary" : "border-t-border",
       )}
     >
       {/* Polite live region for stepper changes */}
@@ -147,28 +223,49 @@ export default function MaybeboardStrip({
         {announcement}
       </div>
 
-      {/* Header bar */}
-      <div className="flex items-center justify-between gap-2 px-3 py-1.5 text-xs">
+      {/* Drawer header — full-width tap target so the chrome doubles as the
+          collapse handle. The pill-shaped grabber + bigger chevron read as a
+          drawer affordance even when collapsed flat. */}
+      <div className="relative flex items-center px-3 text-xs">
         <button
           type="button"
           onClick={() => setCollapsed((v) => !v)}
-          className="flex items-center gap-1.5 font-medium text-foreground hover:text-primary transition-colors"
+          className={cn(
+            "group/drawer flex flex-1 items-center justify-between gap-2 py-1.5",
+            "rounded-md transition-colors",
+            "hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40",
+          )}
           aria-expanded={!collapsed}
           aria-controls="maybeboard-strip-content"
           title={collapsed ? "Expand maybeboard" : "Collapse maybeboard"}
         >
-          <span>Maybeboard ({totalCount})</span>
-          <svg
-            className={`w-3 h-3 transition-transform ${collapsed ? "" : "rotate-90"}`}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-          </svg>
+          <span className="flex items-center gap-2 font-medium text-foreground">
+            <svg
+              className={cn(
+                "w-4 h-4 text-muted-foreground transition-transform duration-150 ease-out",
+                collapsed ? "" : "rotate-90",
+              )}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+            </svg>
+            <span>Maybeboard ({totalCount})</span>
+          </span>
+          {/* Centered pill grabber — always visible, signals "this is a sheet" */}
+          <span
+            aria-hidden
+            className={cn(
+              "absolute left-1/2 -translate-x-1/2 h-1 w-9 rounded-full transition-colors",
+              "bg-border group-hover/drawer:bg-muted-foreground/40",
+            )}
+          />
+          <span className="sr-only">{collapsed ? "Expand" : "Collapse"} maybeboard</span>
         </button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 pl-2">
           {/* Info tooltip */}
           <div className="relative">
             <button
@@ -195,13 +292,6 @@ export default function MaybeboardStrip({
               </div>
             )}
           </div>
-
-          {/* Overflow scroll indicator (decorative) */}
-          {!collapsed && overflows && (
-            <span aria-hidden className="text-muted-foreground">
-              →
-            </span>
-          )}
         </div>
       </div>
 
@@ -211,9 +301,10 @@ export default function MaybeboardStrip({
         <div id="maybeboard-strip-content">
           {uniqueCount === 0 ? (
             <div
-              className={`mx-3 mb-2 h-[72px] md:h-[80px] rounded border border-dashed flex items-center justify-center px-3 transition-colors ${
-                isOver ? "border-primary bg-primary/10" : "border-border/70"
-              }`}
+              className={cn(
+                "mx-3 mb-2 h-[72px] md:h-[80px] rounded border border-dashed flex items-center justify-center px-3 transition-colors",
+                isOver ? "border-primary bg-primary/10" : "border-border/70",
+              )}
             >
               <p className="text-[11px] text-muted-foreground text-center leading-tight">
                 Drag or use the menu to add cards.
@@ -223,16 +314,7 @@ export default function MaybeboardStrip({
             <div
               ref={scrollRef}
               className="relative overflow-x-auto overflow-y-hidden flex gap-1.5 px-3 pb-2"
-              style={
-                overflows
-                  ? {
-                      maskImage:
-                        "linear-gradient(to right, black 0, black calc(100% - 24px), transparent 100%)",
-                      WebkitMaskImage:
-                        "linear-gradient(to right, black 0, black calc(100% - 24px), transparent 100%)",
-                    }
-                  : undefined
-              }
+              style={maskImage ? { maskImage, WebkitMaskImage: maskImage } : undefined}
             >
               {cards.map((dc) => (
                 <MaybeboardThumbnail
@@ -249,6 +331,17 @@ export default function MaybeboardStrip({
                   onView={() => onViewCard?.(dc.card)}
                 />
               ))}
+              {/* Drop-target placeholder — only appears when an active drag from
+                  another zone could land here. Otherwise the row hugs left and
+                  the rest of the strip is quiet droppable background. */}
+              {isValidDrop && !overflows && (
+                <div
+                  aria-hidden
+                  className="flex-1 h-[72px] md:h-[80px] min-w-[120px] rounded border border-dashed border-primary/60 bg-primary/5 flex items-center justify-center px-3 text-[11px] leading-tight text-center text-primary/80 transition-colors pointer-events-none"
+                >
+                  Drop here
+                </div>
+              )}
             </div>
           )}
         </div>
