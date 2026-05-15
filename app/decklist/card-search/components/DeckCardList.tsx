@@ -240,64 +240,72 @@ export default function DeckCardList({
                 />
               </div>
               
-              {/* Dropdown Menu - Vertical stack centered on card */}
+              {/* Dropdown Menu - 2×2 grid centered on card. Vertical stack
+                  overflowed the card boundary on the small grid-view tile;
+                  a compact grid keeps every action inside the thumbnail. */}
               {openMenuCard === cardKey && (
-                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-1.5 py-6 z-40">
+                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 grid grid-cols-2 gap-1 z-40">
                   {/* Move to Reserve/Main */}
-                  {onMoveCard && filterZone !== undefined && filterZone !== 'maybeboard' && (
+                  {onMoveCard && filterZone !== undefined && filterZone !== 'maybeboard' ? (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setOpenMenuCard(null);
                         onMoveCard(card.name, card.set, zone, isReserve ? 'main' : 'reserve');
                       }}
-                      className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-foreground transition-all"
+                      className="w-8 h-8 hover:scale-110 bg-card/95 backdrop-blur rounded-md shadow-lg border border-border flex items-center justify-center text-foreground transition-all"
                       title={isReserve ? "Move to main deck" : "Move to reserve"}
                     >
                       {isReserve ? (
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
                         </svg>
                       ) : (
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
                         </svg>
                       )}
                     </button>
+                  ) : (
+                    <span aria-hidden />
                   )}
 
                   {/* Move to Maybeboard */}
-                  {onMoveCard && filterZone !== undefined && filterZone !== 'maybeboard' && (
+                  {onMoveCard && filterZone !== undefined && filterZone !== 'maybeboard' ? (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setOpenMenuCard(null);
                         onMoveCard(card.name, card.set, zone, 'maybeboard');
                       }}
-                      className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-violet-600 dark:text-violet-400 transition-all"
+                      className="w-8 h-8 hover:scale-110 bg-card/95 backdrop-blur rounded-md shadow-lg border border-border flex items-center justify-center text-violet-600 dark:text-violet-400 transition-all"
                       title="Move to maybeboard"
                     >
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                       </svg>
                     </button>
+                  ) : (
+                    <span aria-hidden />
                   )}
 
                   {/* View Card Details */}
-                  {onViewCard && (
+                  {onViewCard ? (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         onViewCard(card);
                         setOpenMenuCard(null);
                       }}
-                      className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-foreground transition-all"
+                      className="w-8 h-8 hover:scale-110 bg-card/95 backdrop-blur rounded-md shadow-lg border border-border flex items-center justify-center text-foreground transition-all"
                       title="View card details"
                     >
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                       </svg>
                     </button>
+                  ) : (
+                    <span aria-hidden />
                   )}
 
                   {/* Remove All Copies */}
@@ -307,10 +315,10 @@ export default function DeckCardList({
                       setOpenMenuCard(null);
                       onRemove(card.name, card.set, zone);
                     }}
-                    className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-red-600 dark:text-red-400 transition-all"
+                    className="w-8 h-8 hover:scale-110 bg-card/95 backdrop-blur rounded-md shadow-lg border border-border flex items-center justify-center text-red-600 dark:text-red-400 transition-all"
                     title="Remove all copies"
                   >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>

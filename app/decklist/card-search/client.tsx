@@ -2029,43 +2029,15 @@ export default function CardSearchClient() {
                       JSON.stringify({ name: c.name, set: c.set }),
                     );
                     e.dataTransfer.effectAllowed = "copy";
-                    // Build a small off-screen ghost matching the in-deck
-                    // DragGhost (96px wide). setDragImage on the bare <img>
-                    // would use the image's intrinsic size (~400×550) —
-                    // huge and ugly. Cloning into a fixed-width wrapper gives
-                    // the browser an element whose layout box is the size we
-                    // want. The ghost must remain in the DOM for the entire
-                    // drag — Firefox snapshots asynchronously, so removing it
-                    // synchronously (setTimeout(0)) leaves Firefox with an
-                    // empty snapshot. Clean up on `dragend` instead.
-                    const sourceImg = e.currentTarget.querySelector("img");
-                    if (sourceImg && sourceImg.complete && sourceImg.naturalWidth > 0) {
-                      const ghost = document.createElement("div");
-                      // top:0 (not -9999) keeps the element inside the viewport
-                      // so Firefox treats it as visible per setDragImage rules.
-                      // pointer-events:none prevents it from intercepting drag
-                      // events. opacity:0.85 + offset shadow matches DragGhost.
-                      ghost.style.cssText =
-                        "position:fixed;top:0;left:-9999px;width:96px;border-radius:6px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,0.4);opacity:0.85;pointer-events:none;z-index:-1;";
-                      const ghostImg = sourceImg.cloneNode() as HTMLImageElement;
-                      ghostImg.style.cssText = "display:block;width:100%;height:auto;";
-                      ghost.appendChild(ghostImg);
-                      document.body.appendChild(ghost);
-                      // Force a synchronous layout so the cloned image has a
-                      // box to be snapshotted from. Without this, Firefox may
-                      // snapshot an unpainted/empty ghost on dragstart.
-                      void ghost.offsetHeight;
-                      // Center the ghost on the cursor; the 96px width is
-                      // halved → 48 for x. Approx height = 96 * 1.4 ≈ 134.
-                      e.dataTransfer.setDragImage(ghost, 48, 67);
-                      // Remove on dragend (fires for both successful drop and
-                      // cancel). { once } cleans up the listener too.
-                      e.currentTarget.addEventListener(
-                        "dragend",
-                        () => ghost.remove(),
-                        { once: true },
-                      );
-                    }
+                    // Intentionally NOT calling setDragImage — every browser
+                    // (Chrome, Firefox, Safari) shows the source element as
+                    // its default drag ghost, which is exactly the card tile
+                    // the user grabbed. Custom off-screen ghosts via
+                    // setDragImage have flaky behavior in Firefox (async
+                    // snapshot timing, image-decode races, hidden-element
+                    // rules). The default ghost is universally reliable and
+                    // visually accurate — it shows precisely what's being
+                    // dragged.
                   }}
                   className={`relative group rounded overflow-hidden transition-all duration-200 ${
                     isSpotlight
