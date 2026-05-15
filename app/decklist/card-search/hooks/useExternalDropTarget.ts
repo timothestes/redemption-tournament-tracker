@@ -12,6 +12,37 @@ import React from "react";
  */
 export const SEARCH_DRAG_MIME = "application/x-redemption-card";
 
+/**
+ * Subscribes to a global "an external (search-tile) drag is in progress" flag.
+ * Used by deck-panel zones to surface a subtle "drop here" hint while the
+ * user is dragging a card out of the search column — solves the discoverability
+ * problem of "I have a card in flight, but where can I drop it?". The flag is
+ * set/cleared by document-level dragstart/dragend listeners that look for our
+ * MIME type in `dataTransfer.types`.
+ */
+export function useIsExternalDragActive(): boolean {
+  const [active, setActive] = React.useState(false);
+  React.useEffect(() => {
+    const isOurDrag = (e: DragEvent) =>
+      !!e.dataTransfer && Array.from(e.dataTransfer.types).includes(SEARCH_DRAG_MIME);
+    const onStart = (e: DragEvent) => {
+      if (isOurDrag(e)) setActive(true);
+    };
+    // dragend fires on the source even if the drop was canceled. dragexit isn't
+    // standard cross-browser; dragend is the universal "drag is done" signal.
+    const onEnd = () => setActive(false);
+    document.addEventListener("dragstart", onStart);
+    document.addEventListener("dragend", onEnd);
+    document.addEventListener("drop", onEnd);
+    return () => {
+      document.removeEventListener("dragstart", onStart);
+      document.removeEventListener("dragend", onEnd);
+      document.removeEventListener("drop", onEnd);
+    };
+  }, []);
+  return active;
+}
+
 export interface SearchDragPayload {
   name: string;
   set: string;

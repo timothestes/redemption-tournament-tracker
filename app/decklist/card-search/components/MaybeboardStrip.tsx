@@ -6,7 +6,7 @@ import { DeckCard, DeckZone } from "../types/deck";
 import { Card } from "../utils";
 import { useCardImageUrl } from "../hooks/useCardImageUrl";
 import { cn } from "@/lib/utils";
-import { useExternalDropTarget, combineRefs } from "../hooks/useExternalDropTarget";
+import { useExternalDropTarget, useIsExternalDragActive, combineRefs } from "../hooks/useExternalDropTarget";
 
 interface MaybeboardStripProps {
   /** Maybeboard cards (caller filters by zone === 'maybeboard'). */
@@ -74,12 +74,16 @@ export default function MaybeboardStrip({
   const sectionRef = combineRefs<HTMLElement>(setDroppableRef, setExternalDropRef);
 
   // Surface drag state so we can grow the strip + show a "Drop here" overlay
-  // while a card is being dragged from main/reserve. `useDndContext` returns
-  // the same context shared by `useDroppable`, so no extra provider needed.
+  // while a card is being dragged from main/reserve OR from the search column.
+  // `useDndContext` returns the same context shared by `useDroppable`, so no
+  // extra provider needed for in-deck drags. External (HTML5) drags surface
+  // through `useIsExternalDragActive`.
   const { active } = useDndContext();
   const fromZone = active?.data.current?.fromZone as DeckZone | undefined;
-  const isDragging = !!active;
-  const isValidDrop = isDragging && fromZone !== "maybeboard";
+  const isExternalDragActive = useIsExternalDragActive();
+  const isDragging = !!active || isExternalDragActive;
+  const isValidDrop =
+    (!!active && fromZone !== "maybeboard") || isExternalDragActive;
 
   // Hydrate persisted collapsed state once. Per-deck so different decks remember
   // independently. If no preference saved, default to collapsed on mobile-ish

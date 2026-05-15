@@ -46,7 +46,7 @@ import DeckLegalityChecklist from "./DeckLegalityChecklist";
 import type { DeckCheckResult } from "@/utils/deckcheck/types";
 import { useBudgetPricing } from '../hooks/useBudgetPricing';
 import type { BudgetCard } from '@/lib/pricing/budgetPricing';
-import { useExternalDropTarget, combineRefs, type SearchDragPayload } from '../hooks/useExternalDropTarget';
+import { useExternalDropTarget, useIsExternalDragActive, combineRefs, type SearchDragPayload } from '../hooks/useExternalDropTarget';
 
 function getTagContrastColor(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -230,7 +230,11 @@ export default function DeckBuilderPanel({
 
   // ── DnD state + sensors ──────────────────────────────────────────────
   const [activeDragCard, setActiveDragCard] = useState<Card | null>(null);
-  const isDragging = activeDragCard !== null;
+  const isExternalDragActive = useIsExternalDragActive();
+  // `isDragging` powers the "drop hint" UI on zone droppables. It now fires
+  // for both in-deck @dnd-kit drags AND external HTML5 drags from the search
+  // column, so users see drop affordances regardless of source.
+  const isDragging = activeDragCard !== null || isExternalDragActive;
   const dndSensors = useSensors(
     // Mouse/pen: 10px movement before drag activates — gives twitchy hands
     // and precision trackpads more room before a click becomes a drag.
