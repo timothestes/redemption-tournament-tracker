@@ -2029,12 +2029,27 @@ export default function CardSearchClient() {
                       JSON.stringify({ name: c.name, set: c.set }),
                     );
                     e.dataTransfer.effectAllowed = "copy";
-                    // Use the card image as the drag preview so it matches the
-                    // in-deck @dnd-kit DragGhost visually.
-                    const img = e.currentTarget.querySelector("img");
-                    if (img && img.complete && img.naturalWidth > 0) {
-                      const rect = img.getBoundingClientRect();
-                      e.dataTransfer.setDragImage(img, rect.width / 2, rect.height / 2);
+                    // Build a small off-screen ghost matching the in-deck
+                    // DragGhost (96px wide). setDragImage on the bare <img>
+                    // would use the image's intrinsic size (~400×550) —
+                    // huge and ugly. Cloning into a fixed-width wrapper gives
+                    // the browser an element whose layout box is the size we
+                    // want.
+                    const sourceImg = e.currentTarget.querySelector("img");
+                    if (sourceImg && sourceImg.complete && sourceImg.naturalWidth > 0) {
+                      const ghost = document.createElement("div");
+                      ghost.style.cssText =
+                        "position:fixed;top:-9999px;left:-9999px;width:96px;border-radius:6px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,0.4);opacity:0.85;pointer-events:none;";
+                      const ghostImg = sourceImg.cloneNode() as HTMLImageElement;
+                      ghostImg.style.cssText = "display:block;width:100%;height:auto;";
+                      ghost.appendChild(ghostImg);
+                      document.body.appendChild(ghost);
+                      // Center the ghost on the cursor; the 96px width is
+                      // halved → 48 for x. Approx height = 96 * 1.4 ≈ 134.
+                      e.dataTransfer.setDragImage(ghost, 48, 67);
+                      // Browser snapshots the element synchronously inside
+                      // setDragImage, so we can drop it on the next tick.
+                      setTimeout(() => ghost.remove(), 0);
                     }
                   }}
                   className={`relative group rounded overflow-hidden transition-all duration-200 ${
