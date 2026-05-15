@@ -2037,7 +2037,11 @@ export default function CardSearchClient() {
                       e.dataTransfer.setDragImage(img, rect.width / 2, rect.height / 2);
                     }
                   }}
-                  className={`relative cursor-pointer group rounded overflow-hidden transition-all duration-200 ${
+                  className={`relative group rounded overflow-hidden transition-all duration-200 ${
+                    isSpotlight
+                      ? "cursor-pointer"
+                      : "cursor-grab active:cursor-grabbing"
+                  } ${
                     isSpotlight && spotlightCard?.dataLine === c.dataLine
                       ? "ring-2 ring-amber-500 dark:ring-amber-400"
                       : ""
