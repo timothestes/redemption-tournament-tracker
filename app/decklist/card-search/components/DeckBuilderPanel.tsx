@@ -2430,7 +2430,7 @@ export default function DeckBuilderPanel({
             onExternalDrop={(payload) => onAddCard(payload.name, payload.set, "main")}
             className={(isOver) =>
               `space-y-4 rounded transition-colors flex-1 min-h-[240px] ${
-                isDragging ? "border-2 border-dashed border-border/40 -m-0.5" : ""
+                isDragging ? "md:border-2 md:border-dashed md:border-border/40 md:-m-0.5" : ""
               } ${
                 isOver ? "border-primary bg-primary/5" : ""
               }`
@@ -2533,7 +2533,7 @@ export default function DeckBuilderPanel({
             onExternalDrop={(payload) => onAddCard(payload.name, payload.set, "reserve")}
             className={(isOver) =>
               `space-y-4 rounded transition-colors flex-1 min-h-[240px] ${
-                isDragging ? "border-2 border-dashed border-border/40 -m-0.5" : ""
+                isDragging ? "md:border-2 md:border-dashed md:border-border/40 md:-m-0.5" : ""
               } ${
                 isOver ? "border-primary bg-primary/5" : ""
               }`

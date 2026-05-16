@@ -631,7 +631,7 @@ export default function FilterGrid({
                   aria-pressed={isActive}
                   title={t.id}
                   className={clsx(
-                    'flex flex-col items-center justify-end gap-0.5 px-1 py-0.5 rounded border transition-colors w-[44px]',
+                    'flex flex-col items-center justify-end gap-0.5 px-1.5 sm:px-1 py-1 sm:py-0.5 rounded border transition-colors w-[56px] sm:w-[44px]',
                     isActive
                       ? 'bg-primary/15 border-primary/40'
                       : 'bg-muted/40 border-transparent hover:bg-muted hover:border-border'
@@ -641,10 +641,10 @@ export default function FilterGrid({
                     src={`/filter-icons/${encodeURIComponent(t.id)}.png`}
                     alt=""
                     aria-hidden="true"
-                    className="h-6 w-auto"
+                    className="h-8 sm:h-6 w-auto"
                   />
                   <span className={clsx(
-                    'text-[9px] font-medium leading-none whitespace-nowrap',
+                    'text-[10px] sm:text-[9px] font-medium leading-none whitespace-nowrap',
                     isActive ? 'text-primary' : 'text-muted-foreground'
                   )}>
                     {t.label}
@@ -668,7 +668,7 @@ export default function FilterGrid({
                   aria-pressed={isActive}
                   title={b.id}
                   className={clsx(
-                    'flex flex-col items-center justify-end gap-0.5 px-1 py-0.5 rounded border transition-colors w-[44px]',
+                    'flex flex-col items-center justify-end gap-0.5 px-1.5 sm:px-1 py-1 sm:py-0.5 rounded border transition-colors w-[56px] sm:w-[44px]',
                     isActive
                       ? 'bg-primary/15 border-primary/40'
                       : 'bg-muted/40 border-transparent hover:bg-muted hover:border-border'
@@ -678,10 +678,10 @@ export default function FilterGrid({
                     src={`/filter-icons/Color=${encodeURIComponent(b.id)}.png`}
                     alt=""
                     aria-hidden="true"
-                    className="h-6 w-auto"
+                    className="h-8 sm:h-6 w-auto"
                   />
                   <span className={clsx(
-                    'text-[9px] font-medium leading-none whitespace-nowrap',
+                    'text-[10px] sm:text-[9px] font-medium leading-none whitespace-nowrap',
                     isActive ? 'text-primary' : 'text-muted-foreground'
                   )}>
                     {b.label}
@@ -705,7 +705,7 @@ export default function FilterGrid({
                   aria-pressed={isActive}
                   title={b.id}
                   className={clsx(
-                    'flex flex-col items-center justify-end gap-0.5 px-1 py-0.5 rounded border transition-colors w-[44px]',
+                    'flex flex-col items-center justify-end gap-0.5 px-1.5 sm:px-1 py-1 sm:py-0.5 rounded border transition-colors w-[56px] sm:w-[44px]',
                     isActive
                       ? 'bg-primary/15 border-primary/40'
                       : 'bg-muted/40 border-transparent hover:bg-muted hover:border-border'
@@ -715,10 +715,10 @@ export default function FilterGrid({
                     src={`/filter-icons/Color=${encodeURIComponent(b.id)}.png`}
                     alt=""
                     aria-hidden="true"
-                    className="h-6 w-auto"
+                    className="h-8 sm:h-6 w-auto"
                   />
                   <span className={clsx(
-                    'text-[9px] font-medium leading-none whitespace-nowrap',
+                    'text-[10px] sm:text-[9px] font-medium leading-none whitespace-nowrap',
                     isActive ? 'text-primary' : 'text-muted-foreground'
                   )}>
                     {b.label}

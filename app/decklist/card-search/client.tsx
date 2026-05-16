@@ -17,6 +17,7 @@ import {
 import { ALL_CARDS } from "./data/cardIndex";
 import { useDeckState } from "./hooks/useDeckState";
 import { useDeckCheck } from "./hooks/useDeckCheck";
+import { useCardImageUrl } from "./hooks/useCardImageUrl";
 import { parseDeckText, generateDeckText, downloadDeckAsFile, downloadDeckAsFileBySet, copyDeckToClipboard } from "./utils/deckImportExport";
 import { createClient } from "../../../utils/supabase/client";
 import { getUserSafe } from "../../../utils/supabase/getUserSafe";
@@ -146,6 +147,7 @@ function NewDeckRenameForm({
 export default function CardSearchClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { getImageUrl } = useCardImageUrl();
   
   // Get deck ID from URL params if editing existing deck
   const deckIdFromUrl = searchParams.get("deckId") || undefined;
@@ -2090,8 +2092,10 @@ export default function CardSearchClient() {
         </div>
       </div>
       <main className="p-2 pb-16 md:pb-2 md:overflow-auto md:flex-1 bg-background text-foreground transition-colors duration-200" style={{ scrollbarGutter: 'stable' }}>
-        {/* Responsive grid for filters */}
-        {!filterGridCollapsed && (
+        {/* Responsive grid for filters. We hide via CSS instead of conditionally unmounting because
+            the FilterGrid has ~50 buttons and ~35 images — mount/unmount on every toggle was
+            stalling the main thread on mobile and producing a perceptible collapse lag. */}
+        <div className={filterGridCollapsed ? 'hidden' : ''}>
           <FilterGrid
             legalityMode={legalityMode}
             setLegalityMode={setLegalityMode}
@@ -2156,10 +2160,28 @@ export default function CardSearchClient() {
             iconFilterMode={iconFilterMode}
             setIconFilterMode={setIconFilterMode}
           />
-        )}
+        </div>
         {/* Card grid */}
         {visibleCards.length > 0 ? (
           <>
+          {/* Hidden preloader: warms the raw-blob URL cache so that adding a
+              card to the deck panel (which uses plain <img> against the blob
+              URL, not next/image's /_next/image variant) doesn't briefly show
+              the bg-muted/animate-pulse placeholder. Mirrors the reserve-card
+              preloader in DeckBuilderPanel.tsx. */}
+          <div className="hidden" aria-hidden="true">
+            {visibleCards.map((c) => {
+              const url = getImageUrl(c.imgFile || "");
+              return url ? (
+                <img
+                  key={`search-preload-${c.dataLine}`}
+                  src={url}
+                  alt=""
+                  loading="eager"
+                />
+              ) : null;
+            })}
+          </div>
           {/* Sort + count bar */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-4 mt-2 sm:mt-4">
             {visibleCards.map((c, cardIndex) => {

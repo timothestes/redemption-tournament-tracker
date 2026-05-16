@@ -227,10 +227,14 @@ export default function DeckCardList({
                 <img
                   src={getImageUrl(card.imgFile)}
                   alt={card.name}
-                  className="w-full h-full object-cover opacity-0 transition-opacity duration-300"
+                  className="w-full h-full object-cover"
                   crossOrigin="anonymous"
+                  ref={(el) => {
+                    if (el?.complete && el.naturalWidth > 0) {
+                      el.parentElement?.classList.remove('animate-pulse');
+                    }
+                  }}
                   onLoad={(e) => {
-                    e.currentTarget.classList.replace('opacity-0', 'opacity-100');
                     e.currentTarget.parentElement?.classList.remove('animate-pulse');
                   }}
                   onError={(e) => {

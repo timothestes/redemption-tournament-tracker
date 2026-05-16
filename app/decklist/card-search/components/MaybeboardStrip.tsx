@@ -25,7 +25,7 @@ interface MaybeboardStripProps {
 const cardKey = (dc: DeckCard) => `${dc.card.name}|${dc.card.set}`;
 const draggableId = (dc: DeckCard) => `maybeboard:${cardKey(dc)}`;
 const collapsedKey = (deckId?: string) =>
-  `redemption-maybeboard-collapsed:${deckId ?? "local"}`;
+  `redemption-maybeboard-collapsed-v2:${deckId ?? "local"}`;
 
 /**
  * Persistent horizontal-scroll strip pinned to the bottom of the deck panel,
@@ -47,17 +47,37 @@ export default function MaybeboardStrip({
   onAddCard,
   deckId,
 }: MaybeboardStripProps) {
-  // Two states: "peek" (default, ~56px row visible) and collapsed (header only).
-  // We default to peek across all viewports so the strip stays a visible
-  // first-class drop target — the user has to opt into collapsing it.
+  // Two states: "peek" (~56px row visible) and collapsed (header only).
+  // Default: collapsed on mobile (the peek row sticks out under the bottom nav
+  // and crowds the deck list); peek on desktop where there's room. Hydration
+  // effect below resolves the viewport-based default after mount.
   const [collapsed, setCollapsed] = React.useState(false);
-  const [collapsedHydrated, setCollapsedHydrated] = React.useState(false);
   const [openMenuKey, setOpenMenuKey] = React.useState<string | null>(null);
   const [overflowsLeft, setOverflowsLeft] = React.useState(false);
   const [overflowsRight, setOverflowsRight] = React.useState(false);
   const [showHelp, setShowHelp] = React.useState(false);
   const [announcement, setAnnouncement] = React.useState("");
   const scrollRef = React.useRef<HTMLDivElement | null>(null);
+
+  // Live vertical drag offset from the drawer header (touch-style sheet drag).
+  // null when not dragging; otherwise the current pointer deltaY in px. Drag-up
+  // is negative, drag-down is positive. See onHeaderPointerDown/Move/Up below.
+  const [dragOffset, setDragOffset] = React.useState<number | null>(null);
+  const dragRef = React.useRef<{
+    pointerId: number;
+    startY: number;
+    startTime: number;
+    startedCollapsed: boolean;
+    moved: boolean;
+  } | null>(null);
+  // Set when a pointer drag committed a real motion, so the synthesized
+  // post-pointerup `click` on the header button doesn't ALSO toggle.
+  const justDraggedRef = React.useRef(false);
+
+  // Inner content wrapper used to measure the natural unfurled height of the
+  // strip so we can animate `height: 0 ↔ height: contentHeight` smoothly.
+  const contentRef = React.useRef<HTMLDivElement | null>(null);
+  const [contentHeight, setContentHeight] = React.useState(0);
 
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({
     id: "zone:maybeboard",
@@ -85,29 +105,37 @@ export default function MaybeboardStrip({
     (!!active && fromZone !== "maybeboard") || isExternalDragActive;
 
   // Hydrate persisted collapsed state once. Per-deck so different decks remember
-  // independently. No viewport-based default — peek is always the initial state.
+  // independently. When no saved value exists, default to collapsed on mobile
+  // (< md) and peek on desktop.
   React.useEffect(() => {
     try {
       const saved = window.localStorage.getItem(collapsedKey(deckId));
       if (saved !== null) {
         setCollapsed(saved === "1");
+      } else {
+        const isMobile = window.matchMedia("(max-width: 767px)").matches;
+        if (isMobile) setCollapsed(true);
       }
     } catch {
       // localStorage may throw in private modes; safe to ignore.
     }
-    setCollapsedHydrated(true);
   }, [deckId]);
 
-  // Persist the user's collapsed preference. Skip until hydrated so we don't
-  // overwrite the saved value with the SSR default on first mount.
-  React.useEffect(() => {
-    if (!collapsedHydrated) return;
-    try {
-      window.localStorage.setItem(collapsedKey(deckId), collapsed ? "1" : "0");
-    } catch {
-      // ignore
-    }
-  }, [collapsed, collapsedHydrated, deckId]);
+  // Persist only on explicit user toggle (see toggleCollapsed). We don't use a
+  // [collapsed]-effect because that would also save the viewport-derived default
+  // on first mount, defeating the mobile-collapsed-by-default behavior on any
+  // device that ever loaded an older build that saved "0".
+  const toggleCollapsed = React.useCallback(() => {
+    setCollapsed((v) => {
+      const next = !v;
+      try {
+        window.localStorage.setItem(collapsedKey(deckId), next ? "1" : "0");
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }, [deckId]);
 
   // Auto-expand a collapsed strip while a drag is in progress so the drop
   // target is actually visible. Save the user's pre-drag preference in a ref
@@ -173,6 +201,121 @@ export default function MaybeboardStrip({
     };
   }, [openMenuKey]);
 
+  // Measure the natural height of the inner content so the height-animated
+  // wrapper can resolve `height: contentHeight` instead of `auto` (auto can't
+  // animate). ResizeObserver covers the empty-state → populated transition.
+  React.useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const update = () => setContentHeight(el.scrollHeight);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const isHeaderDragging = dragOffset !== null;
+
+  // Live wrapper height during a drag: anchored to whichever state we started
+  // in, plus the inverse of deltaY (drag-up = negative delta = grows height).
+  const liveHeight = React.useMemo(() => {
+    if (!isHeaderDragging || !dragRef.current) {
+      return collapsed ? 0 : contentHeight;
+    }
+    const base = dragRef.current.startedCollapsed ? 0 : contentHeight;
+    const next = base - (dragOffset ?? 0);
+    return Math.max(0, Math.min(contentHeight, next));
+  }, [isHeaderDragging, dragOffset, collapsed, contentHeight]);
+
+  const onHeaderPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    // While a card drag is in flight, the header is a passive drop surface —
+    // don't start a drawer drag that would fight dnd-kit's pointer capture.
+    if (isDragging) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    dragRef.current = {
+      pointerId: e.pointerId,
+      startY: e.clientY,
+      startTime: Date.now(),
+      startedCollapsed: collapsed,
+      moved: false,
+    };
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // Some browsers throw if the pointer can't be captured; safe to ignore.
+    }
+  };
+
+  const onHeaderPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (isDragging) return;
+    const s = dragRef.current;
+    if (!s || e.pointerId !== s.pointerId) return;
+    const delta = e.clientY - s.startY;
+    if (!s.moved && Math.abs(delta) > 4) {
+      s.moved = true;
+    }
+    if (s.moved) {
+      setDragOffset(delta);
+    }
+  };
+
+  const finishDrag = (commit: boolean, e?: React.PointerEvent<HTMLButtonElement>) => {
+    const s = dragRef.current;
+    if (!s) return;
+    if (e) {
+      try {
+        e.currentTarget.releasePointerCapture(s.pointerId);
+      } catch {
+        // ignore
+      }
+    }
+    dragRef.current = null;
+    setDragOffset(null);
+
+    if (!commit || !s.moved) {
+      // Tap (no meaningful motion) — let the button's onClick handle it.
+      return;
+    }
+
+    // Suppress the synthesized click that follows pointerup-after-drag.
+    justDraggedRef.current = true;
+
+    const now = Date.now();
+    const duration = Math.max(now - s.startTime, 1);
+    const finalDelta = e ? e.clientY - s.startY : (dragOffset ?? 0);
+    const velocity = finalDelta / duration; // px/ms; +ve = downward (closing)
+
+    const DIST_THRESHOLD = Math.max(20, contentHeight * 0.33);
+    const FLICK = 0.5;
+
+    if (s.startedCollapsed) {
+      // Drag-up opens.
+      const shouldOpen = -finalDelta > DIST_THRESHOLD || -velocity > FLICK;
+      if (shouldOpen && collapsed) toggleCollapsed();
+    } else {
+      // Drag-down closes.
+      const shouldClose = finalDelta > DIST_THRESHOLD || velocity > FLICK;
+      if (shouldClose && !collapsed) toggleCollapsed();
+    }
+  };
+
+  const onHeaderPointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!dragRef.current || e.pointerId !== dragRef.current.pointerId) return;
+    finishDrag(true, e);
+  };
+  const onHeaderPointerCancel = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!dragRef.current || e.pointerId !== dragRef.current.pointerId) return;
+    finishDrag(false, e);
+  };
+
+  const onHeaderClick = () => {
+    if (justDraggedRef.current) {
+      justDraggedRef.current = false;
+      return;
+    }
+    toggleCollapsed();
+  };
+
   const announce = (msg: string) => {
     setAnnouncement(msg);
     setTimeout(() => setAnnouncement(""), 1000);
@@ -237,10 +380,15 @@ export default function MaybeboardStrip({
       <div className="relative flex items-center px-3 text-xs">
         <button
           type="button"
-          onClick={() => setCollapsed((v) => !v)}
+          onClick={onHeaderClick}
+          onPointerDown={onHeaderPointerDown}
+          onPointerMove={onHeaderPointerMove}
+          onPointerUp={onHeaderPointerUp}
+          onPointerCancel={onHeaderPointerCancel}
+          style={{ touchAction: isDragging ? "auto" : "none" }}
           className={cn(
             "group/drawer flex flex-1 items-center justify-between gap-2 py-1.5",
-            "rounded-md transition-colors",
+            "rounded-md transition-colors select-none",
             "hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40",
           )}
           aria-expanded={!collapsed}
@@ -304,9 +452,21 @@ export default function MaybeboardStrip({
       </div>
 
       {/* Droppable ref is on the parent <section> so the drop target survives
-          the collapsed → expanded transition during a drag. */}
-      {!collapsed && (
-        <div id="maybeboard-strip-content">
+          the collapsed → expanded transition during a drag. Height-animated
+          wrapper drives both the tap-toggle and the live drag-from-header
+          gesture; the inner `contentRef` is the measurement target. */}
+      <div
+        id="maybeboard-strip-content"
+        aria-hidden={collapsed && !isHeaderDragging}
+        style={{
+          height: liveHeight,
+          overflow: "hidden",
+          transition: isHeaderDragging
+            ? "none"
+            : "height 220ms cubic-bezier(0.2, 0.0, 0.0, 1)",
+        }}
+      >
+        <div ref={contentRef}>
           {uniqueCount === 0 ? (
             <div
               className={cn(
@@ -342,7 +502,7 @@ export default function MaybeboardStrip({
             </div>
           )}
         </div>
-      )}
+      </div>
     </section>
   );
 }
