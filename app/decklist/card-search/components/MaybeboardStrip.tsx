@@ -47,10 +47,9 @@ export default function MaybeboardStrip({
   onAddCard,
   deckId,
 }: MaybeboardStripProps) {
-  // Default to collapsed on touch / narrow viewports — the strip eats too much
-  // vertical real estate at rest on phones (collapsed: ~32px, expanded: ~80px+).
-  // SSR defaults to false so hydration matches; the effect below corrects per
-  // viewport / persisted preference once mounted.
+  // Two states: "peek" (default, ~56px row visible) and collapsed (header only).
+  // We default to peek across all viewports so the strip stays a visible
+  // first-class drop target — the user has to opt into collapsing it.
   const [collapsed, setCollapsed] = React.useState(false);
   const [collapsedHydrated, setCollapsedHydrated] = React.useState(false);
   const [openMenuKey, setOpenMenuKey] = React.useState<string | null>(null);
@@ -86,20 +85,12 @@ export default function MaybeboardStrip({
     (!!active && fromZone !== "maybeboard") || isExternalDragActive;
 
   // Hydrate persisted collapsed state once. Per-deck so different decks remember
-  // independently. If no preference saved, default to collapsed on mobile-ish
-  // viewports (touch-no-hover OR narrow viewport) to recover ~50px of vertical
-  // real estate at rest.
+  // independently. No viewport-based default — peek is always the initial state.
   React.useEffect(() => {
     try {
       const saved = window.localStorage.getItem(collapsedKey(deckId));
       if (saved !== null) {
         setCollapsed(saved === "1");
-      } else {
-        const isCoarse =
-          typeof window.matchMedia === "function" &&
-          window.matchMedia("(hover: none) and (pointer: coarse)").matches;
-        const isNarrow = window.innerWidth <= 640;
-        if (isCoarse || isNarrow) setCollapsed(true);
       }
     } catch {
       // localStorage may throw in private modes; safe to ignore.
@@ -226,14 +217,13 @@ export default function MaybeboardStrip({
       ref={sectionRef}
       aria-label={`Maybeboard, ${totalCount} ${totalCount === 1 ? "card" : "cards"}`}
       className={cn(
-        "relative sticky bottom-0 z-10 bg-card/95 backdrop-blur flex-shrink-0",
-        "transition-[min-height,background-color] duration-150 ease-out",
+        "relative sticky bottom-0 z-10 bg-card backdrop-blur flex-shrink-0",
+        "transition-[background-color,border-color] duration-150 ease-out",
         // Permanent 2px transparent border to reserve space — switching to a
         // colored border on `isOver` doesn't shift the layout by 1px the way
         // border-t → border-2 would.
-        "border-t-2 border-transparent",
-        isValidDrop && "min-h-[120px] md:min-h-[160px]",
-        showDropAffordance ? "bg-primary/10 border-primary" : "border-t-border",
+        "border-t-2 border-transparent shadow-[0_-4px_12px_-6px_rgba(0,0,0,0.4)]",
+        showDropAffordance ? "bg-primary/5 border-primary/70" : "border-t-border",
       )}
     >
       {/* Polite live region for stepper changes */}
@@ -320,7 +310,7 @@ export default function MaybeboardStrip({
           {uniqueCount === 0 ? (
             <div
               className={cn(
-                "mx-3 mb-2 h-[72px] md:h-[80px] rounded border border-dashed flex items-center justify-center px-3 transition-colors",
+                "mx-3 mb-2 h-[56px] rounded border border-dashed flex items-center justify-center px-3 transition-colors",
                 showDropAffordance ? "border-primary bg-primary/10" : "border-border/70",
               )}
             >
@@ -349,27 +339,8 @@ export default function MaybeboardStrip({
                   onView={() => onViewCard?.(dc.card)}
                 />
               ))}
-              {/* Drop-target placeholder — only appears when an active drag from
-                  another zone could land here. Otherwise the row hugs left and
-                  the rest of the strip is quiet droppable background. */}
-              {isValidDrop && !overflows && (
-                <div
-                  aria-hidden
-                  className="flex-1 h-[72px] md:h-[80px] min-w-[120px] rounded border border-dashed border-primary/60 bg-primary/5 flex items-center justify-center px-3 text-[11px] leading-tight text-center text-primary/80 transition-colors pointer-events-none"
-                >
-                  Drop here
-                </div>
-              )}
             </div>
           )}
-        </div>
-      )}
-
-      {isValidDrop && (
-        <div className="absolute inset-x-0 bottom-2 flex items-center justify-center pointer-events-none">
-          <span className="text-sm font-medium text-primary/90 bg-card/80 backdrop-blur px-3 py-1 rounded-md border border-primary/40 shadow-sm">
-            Drop into Maybeboard
-          </span>
         </div>
       )}
     </section>
@@ -440,7 +411,7 @@ function MaybeboardThumbnail({
         aria-label={`${dc.card.name}, ${dc.quantity} ${
           dc.quantity === 1 ? "copy" : "copies"
         }. Press Space to pick up, Enter to view details.`}
-        className={`relative w-12 h-[72px] md:h-[80px] rounded overflow-hidden bg-muted cursor-grab active:cursor-grabbing outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+        className={`relative w-12 h-[56px] rounded overflow-hidden bg-muted cursor-grab active:cursor-grabbing outline-none focus-visible:ring-2 focus-visible:ring-primary ${
           isDragging ? "opacity-40" : ""
         }`}
         onClick={(e) => {
@@ -473,22 +444,10 @@ function MaybeboardThumbnail({
         </span>
       </div>
 
-      {/* Stepper +/− — always visible on touch (no hover), revealed on hover
+      {/* Stepper −/+ — always visible on touch (no hover), revealed on hover
           on desktop. WCAG-compliant 24x24 touch targets. These sit on top of
           the drag handle and stopPropagation to avoid initiating a drag on tap. */}
-      <div className="absolute inset-y-0 left-0 right-0 pointer-events-none flex flex-col justify-between items-stretch opacity-100 md:opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onIncrement();
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-          className="pointer-events-auto self-end m-0.5 w-6 h-6 rounded bg-black/60 hover:bg-black/80 text-white text-sm font-bold leading-none"
-          aria-label={`Increase quantity of ${dc.card.name}`}
-        >
-          +
-        </button>
+      <div className="absolute top-0 right-0 pointer-events-none flex opacity-100 md:opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
         <button
           type="button"
           onClick={(e) => {
@@ -496,10 +455,22 @@ function MaybeboardThumbnail({
             onDecrement();
           }}
           onPointerDown={(e) => e.stopPropagation()}
-          className="pointer-events-auto self-start m-0.5 w-6 h-6 rounded bg-black/60 hover:bg-black/80 text-white text-sm font-bold leading-none"
+          className="pointer-events-auto w-6 h-6 rounded-l bg-black/60 hover:bg-black/80 text-white text-sm font-bold leading-none"
           aria-label={`Decrease quantity of ${dc.card.name}`}
         >
           −
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onIncrement();
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          className="pointer-events-auto w-6 h-6 rounded-r bg-black/60 hover:bg-black/80 text-white text-sm font-bold leading-none"
+          aria-label={`Increase quantity of ${dc.card.name}`}
+        >
+          +
         </button>
       </div>
 
@@ -513,7 +484,7 @@ function MaybeboardThumbnail({
           setMenuOpen(!isMenuOpen);
         }}
         onPointerDown={(e) => e.stopPropagation()}
-        className="absolute top-0.5 left-0.5 w-6 h-6 rounded bg-black/60 hover:bg-black/80 text-white text-sm leading-none flex items-center justify-center md:opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+        className="absolute bottom-0.5 left-0.5 w-6 h-6 rounded bg-black/60 hover:bg-black/80 text-white text-sm leading-none flex items-center justify-center md:opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
         aria-label={`Options for ${dc.card.name}`}
         aria-haspopup="menu"
         aria-expanded={isMenuOpen}

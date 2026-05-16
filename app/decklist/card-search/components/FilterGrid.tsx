@@ -1,6 +1,5 @@
 "use client";
 import React from "react";
-import { useRouter } from "next/navigation";
 import clsx from "clsx";
 
 interface FilterGridProps {
@@ -137,50 +136,49 @@ export default function FilterGrid({
   setIconFilterMode,
   updateAllIconFilterOperators,
 }: FilterGridProps) {
-  const router = useRouter();
   // Quick icon filters for type-based icons (reordered) and color-coded brigades
-  const typeIcons = [
-    "Good Dominant",
-    "Evil Dominant",
-    "Artifact",
-    "Covenant",
-    "Curse",
-    "Good Fortress",
-    "Evil Fortress",
-    "Hero",
-    "Evil Character",
-    "GE",
-    "EE",
-    "Lost Soul",
-    "Territory-Class",
-    "Site",
-    "City",
-    "Warrior-Class",
-    "Weapon-Class",
+  const typeIcons: Array<{ id: string; label: string }> = [
+    { id: "Good Dominant", label: "G Dom" },
+    { id: "Evil Dominant", label: "E Dom" },
+    { id: "Artifact", label: "Artifact" },
+    { id: "Covenant", label: "Covenant" },
+    { id: "Curse", label: "Curse" },
+    { id: "Good Fortress", label: "G Fort" },
+    { id: "Evil Fortress", label: "E Fort" },
+    { id: "Hero", label: "Hero" },
+    { id: "Evil Character", label: "EC" },
+    { id: "GE", label: "GE" },
+    { id: "EE", label: "EE" },
+    { id: "Lost Soul", label: "Lost Soul" },
+    { id: "Territory-Class", label: "Territory" },
+    { id: "Site", label: "Site" },
+    { id: "City", label: "City" },
+    { id: "Warrior-Class", label: "Warrior" },
+    { id: "Weapon-Class", label: "Weapon" },
   ];
 
   // Grouped color icons by brigade alignment
-  const goodBrigadeIcons = [
-    "Blue",
-    "Clay",
-    "Good Gold",
-    "Green",
-    "Purple",
-    "Silver",
-    "White",
-    "Red",
-    "Teal",
-    "Good Multi"
+  const goodBrigadeIcons: Array<{ id: string; label: string }> = [
+    { id: "Blue", label: "Blue" },
+    { id: "Clay", label: "Clay" },
+    { id: "Good Gold", label: "Gold" },
+    { id: "Green", label: "Green" },
+    { id: "Purple", label: "Purple" },
+    { id: "Silver", label: "Silver" },
+    { id: "White", label: "White" },
+    { id: "Red", label: "Red" },
+    { id: "Teal", label: "Teal" },
+    { id: "Good Multi", label: "Multi" },
   ];
-  const evilBrigadeIcons = [
-    "Black",
-    "Brown",
-    "Crimson",
-    "Evil Gold",
-    "Gray",
-    "Orange",
-    "Pale Green",
-    "Evil Multi"
+  const evilBrigadeIcons: Array<{ id: string; label: string }> = [
+    { id: "Black", label: "Black" },
+    { id: "Brown", label: "Brown" },
+    { id: "Crimson", label: "Crimson" },
+    { id: "Evil Gold", label: "Gold" },
+    { id: "Gray", label: "Gray" },
+    { id: "Orange", label: "Orange" },
+    { id: "Pale Green", label: "Pale Grn" },
+    { id: "Evil Multi", label: "Multi" },
   ];
 
   return (
@@ -194,7 +192,7 @@ export default function FilterGrid({
               <button
                 key={mode}
                 className={clsx(
-                  'px-2 py-0.5 md:px-3 md:py-1.5 border rounded text-sm font-semibold transition-colors duration-150',
+                  'px-2 py-1 border rounded text-xs font-semibold transition-colors duration-150',
                   legalityMode === mode
                     ? 'bg-primary/20 text-primary border-primary/30'
                     : 'bg-muted text-foreground hover:bg-muted/80 border-border'
@@ -213,7 +211,7 @@ export default function FilterGrid({
               <button
                 key={mode}
                 className={clsx(
-                  'px-2 py-0.5 md:px-3 md:py-1.5 border rounded text-sm font-semibold transition-colors duration-150',
+                  'px-2 py-1 border rounded text-xs font-semibold transition-colors duration-150',
                   selectedAlignmentFilters.includes(mode)
                     ? 'bg-primary/20 text-primary border-primary/30'
                     : 'bg-muted text-foreground hover:bg-muted/80 border-border'
@@ -232,7 +230,7 @@ export default function FilterGrid({
               <button
                 key={rarity}
                 className={clsx(
-                  'px-2 py-0.5 md:px-3 md:py-1.5 border rounded text-sm font-semibold transition-colors duration-150',
+                  'px-2 py-1 border rounded text-xs font-semibold transition-colors duration-150',
                   selectedRarityFilters.includes(rarity)
                     ? 'bg-primary/20 text-primary border-primary/30'
                     : 'bg-muted text-foreground hover:bg-muted/80 border-border'
@@ -247,14 +245,14 @@ export default function FilterGrid({
         {/* Utility controls — inline with text filter rows */}
         <div className="flex items-center gap-2">
           <span
-            className="text-muted-foreground text-sm cursor-help"
+            className="text-muted-foreground uppercase text-xs font-medium cursor-help"
             title="Controls how multiple icon filters combine: Click button to cycle through modes"
           >
-            Icon Filter Mode:
+            Icon Mode
           </span>
           <button
             className={clsx(
-              'px-2 py-0.5 md:px-2 md:py-1.5 border rounded text-sm font-semibold transition',
+              'px-2 py-1 border rounded text-xs font-semibold transition',
               'bg-muted text-foreground border-border hover:bg-muted/80'
             )}
             onClick={(e) => {
@@ -274,27 +272,14 @@ export default function FilterGrid({
           >
             {iconFilterMode}
           </button>
-          <span className="text-border select-none">|</span>
           <button
             className={clsx(
-              'px-2 py-0.5 md:px-2 md:py-1.5 border rounded text-sm transition hover:bg-muted/80',
-              'bg-muted text-foreground border-border'
-            )}
-            onClick={(e) => {
-              e.preventDefault();
-              router.push('/decklist/card-search/random');
-            }}
-            title="I'm feeling lucky"
-          >
-            🎲
-          </button>
-          <button
-            className={clsx(
-              'px-2.5 py-0.5 md:px-3 md:py-1.5 border text-sm font-semibold transition-colors',
+              'px-2 py-1 border text-xs font-semibold transition-colors rounded',
               advancedOpen
-                ? 'bg-destructive text-destructive-foreground border-destructive rounded rounded-b-none'
-                : 'bg-muted text-foreground border-border rounded hover:bg-muted/80'
+                ? 'bg-primary/15 text-primary border-primary/40'
+                : 'bg-muted text-foreground border-border hover:bg-muted/80'
             )}
+            aria-expanded={advancedOpen}
             onClick={() => setAdvancedOpen(!advancedOpen)}
           >
             Advanced Filters
@@ -318,9 +303,10 @@ export default function FilterGrid({
 
       {/* Advanced Filters panel — full width when open */}
       {advancedOpen && (
-        <div className="p-2 border border-destructive rounded rounded-tl-none space-y-2">
-          <p className="font-bold text-base md:text-lg text-foreground rounded px-2 py-1 inline-block shadow-none">Testament</p>
-          <div className="flex flex-wrap gap-1.5 mb-2">
+        <div className="p-3 border border-primary/30 rounded bg-primary/[0.03] flex flex-col gap-2">
+          <section className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+          <span className="text-muted-foreground uppercase text-xs font-medium shrink-0 sm:w-[88px]">Testament</span>
+          <div className="flex flex-wrap gap-1">
             {['OT','NT'].map((t) => {
               const isActive = selectedTestaments.includes(t);
               const isNot = testamentNots[t] || false;
@@ -328,7 +314,7 @@ export default function FilterGrid({
                 <button
                   key={t}
                   className={clsx(
-                    'px-2.5 py-1 md:px-3 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
+                    'px-2 py-1 border rounded text-xs font-semibold transition-colors duration-150',
                     isActive && !isNot && 'bg-primary/20 text-primary border-primary/30',
                     isActive && isNot && 'bg-destructive/20 text-destructive border-destructive/30',
                     !isActive && 'bg-muted text-foreground hover:bg-muted/80 border-border'
@@ -357,7 +343,7 @@ export default function FilterGrid({
             })}
             <button
               className={clsx(
-                'px-2.5 py-1 md:px-3 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
+                'px-2 py-1 border rounded text-xs font-semibold transition-colors duration-150',
                 isGospel && !gospelNot && 'bg-primary/20 text-primary border-primary/30',
                 isGospel && gospelNot && 'bg-destructive/20 text-destructive border-destructive/30',
                 !isGospel && 'bg-muted text-foreground hover:bg-muted/80 border-border'
@@ -379,62 +365,67 @@ export default function FilterGrid({
               {gospelNot ? 'NOT ' : ''}Gospel
             </button>
           </div>
+          </section>
           {/* Strength and Toughness Filters */}
-          <div className="flex flex-wrap gap-4 mb-2 items-start">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-lg text-foreground rounded px-2 py-1 inline-block shadow-none">Strength</span>
-              <select
-                value={strengthOp}
-                onChange={e => setStrengthOp(e.target.value)}
-                className="border rounded px-2 py-1 bg-muted text-foreground border-border shadow-sm focus:ring-2 focus:ring-ring"
-              >
-                <option value="lt">&lt;</option>
-                <option value="lte">&le;</option>
-                <option value="eq">=</option>
-                <option value="gt">&gt;</option>
-                <option value="gte">&ge;</option>
-              </select>
-              <select
-                value={strengthFilter === null ? '' : strengthFilter}
-                onChange={e => setStrengthFilter(e.target.value === '' ? null : Number(e.target.value))}
-                className="border rounded px-2 py-1 bg-muted text-foreground border-border shadow-sm focus:ring-2 focus:ring-ring"
-              >
-                <option value="">Any</option>
-                {[...Array(14).keys()].map(n => (
-                  <option key={n} value={n}>{n}</option>
-                ))}
-              </select>
+          <section className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+            <span className="text-muted-foreground uppercase text-xs font-medium shrink-0 sm:w-[88px]">Stats</span>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-medium text-foreground">Strength</span>
+                <select
+                  value={strengthOp}
+                  onChange={e => setStrengthOp(e.target.value)}
+                  className="border rounded px-1.5 py-0.5 bg-muted text-foreground border-border text-xs focus:outline-none"
+                >
+                  <option value="lt">&lt;</option>
+                  <option value="lte">&le;</option>
+                  <option value="eq">=</option>
+                  <option value="gt">&gt;</option>
+                  <option value="gte">&ge;</option>
+                </select>
+                <select
+                  value={strengthFilter === null ? '' : strengthFilter}
+                  onChange={e => setStrengthFilter(e.target.value === '' ? null : Number(e.target.value))}
+                  className="border rounded px-1.5 py-0.5 bg-muted text-foreground border-border text-xs focus:outline-none"
+                >
+                  <option value="">Any</option>
+                  {[...Array(14).keys()].map(n => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-medium text-foreground">Toughness</span>
+                <select
+                  value={toughnessOp}
+                  onChange={e => setToughnessOp(e.target.value)}
+                  className="border rounded px-1.5 py-0.5 bg-muted text-foreground border-border text-xs focus:outline-none"
+                >
+                  <option value="lt">&lt;</option>
+                  <option value="lte">&le;</option>
+                  <option value="eq">=</option>
+                  <option value="gt">&gt;</option>
+                  <option value="gte">&ge;</option>
+                </select>
+                <select
+                  value={toughnessFilter === null ? '' : toughnessFilter}
+                  onChange={e => setToughnessFilter(e.target.value === '' ? null : Number(e.target.value))}
+                  className="border rounded px-1.5 py-0.5 bg-muted text-foreground border-border text-xs focus:outline-none"
+                >
+                  <option value="">Any</option>
+                  {[...Array(14).keys()].map(n => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-lg text-foreground rounded px-2 py-1 inline-block shadow-none">Toughness</span>
-              <select
-                value={toughnessOp}
-                onChange={e => setToughnessOp(e.target.value)}
-                className="border rounded px-2 py-1 bg-muted text-foreground border-border shadow-sm focus:ring-2 focus:ring-ring"
-              >
-                <option value="lt">&lt;</option>
-                <option value="lte">&le;</option>
-                <option value="eq">=</option>
-                <option value="gt">&gt;</option>
-                <option value="gte">&ge;</option>
-              </select>
-              <select
-                value={toughnessFilter === null ? '' : toughnessFilter}
-                onChange={e => setToughnessFilter(e.target.value === '' ? null : Number(e.target.value))}
-                className="border rounded px-2 py-1 bg-muted text-foreground border-border shadow-sm focus:ring-2 focus:ring-ring"
-              >
-                <option value="">Any</option>
-                {[...Array(14).keys()].map(n => (
-                  <option key={n} value={n}>{n}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <p className="font-bold text-lg rounded px-2 py-1 inline-block shadow-none mt-2 text-foreground">Misc</p>
-          <div className="flex flex-wrap gap-2">
+          </section>
+          <section className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+          <span className="text-muted-foreground uppercase text-xs font-medium shrink-0 sm:w-[88px]">Misc</span>
+          <div className="flex flex-wrap gap-1">
             <button
               className={clsx(
-                'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
+                'px-2 py-1 border rounded text-xs font-semibold transition-colors duration-150',
                 noAltArt
                   ? 'bg-primary/20 text-primary border-primary/30'
                   : 'bg-muted text-foreground hover:bg-muted/80 border-border'
@@ -445,7 +436,7 @@ export default function FilterGrid({
             </button>
             <button
               className={clsx(
-                'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
+                'px-2 py-1 border rounded text-xs font-semibold transition-colors duration-150',
                 noFirstPrint
                   ? 'bg-primary/20 text-primary border-primary/30'
                   : 'bg-muted text-foreground hover:bg-muted/80 border-border'
@@ -456,7 +447,7 @@ export default function FilterGrid({
             </button>
             <button
               className={clsx(
-                'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
+                'px-2 py-1 border rounded text-xs font-semibold transition-colors duration-150',
                 nativityOnly && !nativityNot && 'bg-primary/20 text-primary border-primary/30',
                 nativityOnly && nativityNot && 'bg-destructive/20 text-destructive border-destructive/30',
                 !nativityOnly && 'bg-muted text-foreground hover:bg-muted/80 border-border'
@@ -479,7 +470,7 @@ export default function FilterGrid({
             </button>
             <button
               className={clsx(
-                'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
+                'px-2 py-1 border rounded text-xs font-semibold transition-colors duration-150',
                 hasStarOnly && !hasStarNot && 'bg-primary/20 text-primary border-primary/30',
                 hasStarOnly && hasStarNot && 'bg-destructive/20 text-destructive border-destructive/30',
                 !hasStarOnly && 'bg-muted text-foreground hover:bg-muted/80 border-border'
@@ -502,7 +493,7 @@ export default function FilterGrid({
             </button>
             <button
               className={clsx(
-                'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
+                'px-2 py-1 border rounded text-xs font-semibold transition-colors duration-150',
                 cloudOnly && !cloudNot && 'bg-primary/20 text-primary border-primary/30',
                 cloudOnly && cloudNot && 'bg-destructive/20 text-destructive border-destructive/30',
                 !cloudOnly && 'bg-muted text-foreground hover:bg-muted/80 border-border'
@@ -525,7 +516,7 @@ export default function FilterGrid({
             </button>
             <button
               className={clsx(
-                'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
+                'px-2 py-1 border rounded text-xs font-semibold transition-colors duration-150',
                 angelOnly && !angelNot && 'bg-primary/20 text-primary border-primary/30',
                 angelOnly && angelNot && 'bg-destructive/20 text-destructive border-destructive/30',
                 !angelOnly && 'bg-muted text-foreground hover:bg-muted/80 border-border'
@@ -548,7 +539,7 @@ export default function FilterGrid({
             </button>
             <button
               className={clsx(
-                'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
+                'px-2 py-1 border rounded text-xs font-semibold transition-colors duration-150',
                 demonOnly && !demonNot && 'bg-primary/20 text-primary border-primary/30',
                 demonOnly && demonNot && 'bg-destructive/20 text-destructive border-destructive/30',
                 !demonOnly && 'bg-muted text-foreground hover:bg-muted/80 border-border'
@@ -571,7 +562,7 @@ export default function FilterGrid({
             </button>
             <button
               className={clsx(
-                'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
+                'px-2 py-1 border rounded text-xs font-semibold transition-colors duration-150',
                 danielOnly && !danielNot && 'bg-primary/20 text-primary border-primary/30',
                 danielOnly && danielNot && 'bg-destructive/20 text-destructive border-destructive/30',
                 !danielOnly && 'bg-muted text-foreground hover:bg-muted/80 border-border'
@@ -594,7 +585,7 @@ export default function FilterGrid({
             </button>
             <button
               className={clsx(
-                'px-2.5 py-1 md:px-4 md:py-2 border rounded text-sm md:text-base font-semibold shadow transition-colors duration-150',
+                'px-2 py-1 border rounded text-xs font-semibold transition-colors duration-150',
                 postexilicOnly && !postexilicNot && 'bg-primary/20 text-primary border-primary/30',
                 postexilicOnly && postexilicNot && 'bg-destructive/20 text-destructive border-destructive/30',
                 !postexilicOnly && 'bg-muted text-foreground hover:bg-muted/80 border-border'
@@ -616,80 +607,127 @@ export default function FilterGrid({
               {postexilicOnly && postexilicNot ? 'NOT ' : ''}Postexilic
             </button>
           </div>
+          </section>
         </div>
       )}
 
       {/* Divider between text and icon bands */}
       <div className="h-px bg-border" />
 
-      {/* Band 2: Icon filters — full width, types + brigades */}
-      <div className="flex flex-wrap items-start gap-x-6 gap-y-2">
+      {/* Band 2: Icon filters — section labels on the left (matching Band 1) so each row is one line on desktop.
+          Tiles are compact: small icon + small label, unified active state. */}
+      <div className="flex flex-col gap-1.5">
         {/* Types */}
-        <div>
-          <p className="text-muted-foreground uppercase mb-1 text-xs font-medium">Types</p>
+        <section className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+          <span className="text-muted-foreground uppercase text-xs font-medium shrink-0 sm:w-[88px]">Types</span>
           <div className="flex flex-wrap gap-1">
             {typeIcons.map((t) => {
-              const src = `/filter-icons/${encodeURIComponent(t)}.png`;
+              const isActive = selectedIconFilters.some(f => f.icon === t.id);
               return (
-                <img
-                  key={t}
-                  src={src}
-                  alt={t}
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => toggleIconFilter(t.id)}
+                  aria-pressed={isActive}
+                  title={t.id}
                   className={clsx(
-                    'h-8 w-auto md:h-10 cursor-pointer rounded transition-transform duration-150',
-                    selectedIconFilters.some(f => f.icon === t)
-                      ? 'ring-2 ring-blue-400 scale-110'
-                      : 'opacity-80 hover:opacity-100'
+                    'flex flex-col items-center justify-end gap-0.5 px-1 py-0.5 rounded border transition-colors w-[44px]',
+                    isActive
+                      ? 'bg-primary/15 border-primary/40'
+                      : 'bg-muted/40 border-transparent hover:bg-muted hover:border-border'
                   )}
-                  onClick={() => toggleIconFilter(t)}
-                  style={{ minWidth: 28, minHeight: 28 }}
-                />
+                >
+                  <img
+                    src={`/filter-icons/${encodeURIComponent(t.id)}.png`}
+                    alt=""
+                    aria-hidden="true"
+                    className="h-6 w-auto"
+                  />
+                  <span className={clsx(
+                    'text-[9px] font-medium leading-none whitespace-nowrap',
+                    isActive ? 'text-primary' : 'text-muted-foreground'
+                  )}>
+                    {t.label}
+                  </span>
+                </button>
               );
             })}
           </div>
-        </div>
+        </section>
         {/* Good Brigades */}
-        <div>
-          <p className="text-muted-foreground uppercase mb-1 text-xs font-medium">Good Brigades</p>
+        <section className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+          <span className="text-muted-foreground uppercase text-xs font-medium shrink-0 sm:w-[88px]">Good Brig.</span>
           <div className="flex flex-wrap gap-1">
-            {goodBrigadeIcons.map((icon) => (
-              <img
-                key={icon}
-                src={`/filter-icons/Color=${encodeURIComponent(icon)}.png`}
-                alt={icon}
-                className={clsx(
-                  "h-8 w-auto md:h-9 cursor-pointer rounded-md transition-transform duration-150",
-                  selectedIconFilters.some(f => f.icon === icon)
-                    ? "ring-2 ring-blue-400 scale-110"
-                    : "opacity-80 hover:opacity-100"
-                )}
-                onClick={() => toggleIconFilter(icon)}
-                style={{ minWidth: 28, minHeight: 28 }}
-              />
-            ))}
+            {goodBrigadeIcons.map((b) => {
+              const isActive = selectedIconFilters.some(f => f.icon === b.id);
+              return (
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => toggleIconFilter(b.id)}
+                  aria-pressed={isActive}
+                  title={b.id}
+                  className={clsx(
+                    'flex flex-col items-center justify-end gap-0.5 px-1 py-0.5 rounded border transition-colors w-[44px]',
+                    isActive
+                      ? 'bg-primary/15 border-primary/40'
+                      : 'bg-muted/40 border-transparent hover:bg-muted hover:border-border'
+                  )}
+                >
+                  <img
+                    src={`/filter-icons/Color=${encodeURIComponent(b.id)}.png`}
+                    alt=""
+                    aria-hidden="true"
+                    className="h-6 w-auto"
+                  />
+                  <span className={clsx(
+                    'text-[9px] font-medium leading-none whitespace-nowrap',
+                    isActive ? 'text-primary' : 'text-muted-foreground'
+                  )}>
+                    {b.label}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-        </div>
+        </section>
         {/* Evil Brigades */}
-        <div>
-          <p className="text-muted-foreground uppercase mb-1 text-xs font-medium">Evil Brigades</p>
+        <section className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+          <span className="text-muted-foreground uppercase text-xs font-medium shrink-0 sm:w-[88px]">Evil Brig.</span>
           <div className="flex flex-wrap gap-1">
-            {evilBrigadeIcons.map((icon) => (
-              <img
-                key={icon}
-                src={`/filter-icons/Color=${encodeURIComponent(icon)}.png`}
-                alt={icon}
-                className={clsx(
-                  "h-8 w-auto md:h-9 cursor-pointer rounded-md transition-transform duration-150",
-                  selectedIconFilters.some(f => f.icon === icon)
-                    ? "ring-2 ring-blue-400 scale-110"
-                    : "opacity-80 hover:opacity-100"
-                )}
-                onClick={() => toggleIconFilter(icon)}
-                style={{ minWidth: 28, minHeight: 28 }}
-              />
-            ))}
+            {evilBrigadeIcons.map((b) => {
+              const isActive = selectedIconFilters.some(f => f.icon === b.id);
+              return (
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => toggleIconFilter(b.id)}
+                  aria-pressed={isActive}
+                  title={b.id}
+                  className={clsx(
+                    'flex flex-col items-center justify-end gap-0.5 px-1 py-0.5 rounded border transition-colors w-[44px]',
+                    isActive
+                      ? 'bg-primary/15 border-primary/40'
+                      : 'bg-muted/40 border-transparent hover:bg-muted hover:border-border'
+                  )}
+                >
+                  <img
+                    src={`/filter-icons/Color=${encodeURIComponent(b.id)}.png`}
+                    alt=""
+                    aria-hidden="true"
+                    className="h-6 w-auto"
+                  />
+                  <span className={clsx(
+                    'text-[9px] font-medium leading-none whitespace-nowrap',
+                    isActive ? 'text-primary' : 'text-muted-foreground'
+                  )}>
+                    {b.label}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );

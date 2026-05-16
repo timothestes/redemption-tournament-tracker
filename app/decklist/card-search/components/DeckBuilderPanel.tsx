@@ -616,10 +616,18 @@ export default function DeckBuilderPanel({
       const active = event.active;
       const over = event.over;
       setActiveDragCard(null);
-      if (!over) return;
       const fromZone = active.data.current?.fromZone as DeckZone | undefined;
       const card = active.data.current?.card as Card | undefined;
       if (!fromZone || !card) return;
+
+      // Dropped outside any droppable — treat as "drag to remove": decrement
+      // one copy from the source zone. ESC cancels fire onDragCancel (not
+      // onDragEnd) so this only triggers on a real release. The DragGhost
+      // turns red while over=null to telegraph the consequence.
+      if (!over) {
+        onRemoveCard(card.name, card.set, fromZone);
+        return;
+      }
 
       // Resolve target zone. zone:* and tab:* both encode a target zone in
       // their data; fall back to parsing the id.
@@ -643,7 +651,7 @@ export default function DeckBuilderPanel({
     // handleMoveCard is a stable closure over deck/onRemoveCard/onAddCard
     // captured each render; we don't memoize it, so this callback re-creates
     // each render too — acceptable, DndContext only reads it during a drag.
-    [handleMoveCard]
+    [handleMoveCard, onRemoveCard]
   );
 
   // Group cards by type
@@ -2271,7 +2279,7 @@ export default function DeckBuilderPanel({
       )}
 
       {/* Content */}
-      <div ref={contentRef} className={`flex-1 overflow-y-auto overflow-x-hidden flex flex-col ${isExpanded ? '' : 'p-4'}`} data-deck-grid>
+      <div ref={contentRef} className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col ${isExpanded ? '' : 'p-4'}`} data-deck-grid>
         {/* Paragon Requirements (only show for Paragon format with a selected Paragon) */}
         {deckType === 'Paragon' && deck.paragon && validation.paragonStats && (activeTab === 'main' || activeTab === 'reserve') && (
           <div className="mb-4">
@@ -3249,10 +3257,10 @@ export default function DeckBuilderPanel({
         )}
       </div>
 
-      {/* Maybeboard strip — only relevant on deck-zone tabs (Main / Reserve).
-          Hidden on Stats / Details where the user is reading data, not editing
-          card composition. Also hidden in expanded full-deck view, where the
-          maybeboard doesn't have a logical home. */}
+      {/* Maybeboard strip — sits outside the scroll area as its own row at the
+          panel bottom, so it's always pinned to the viewport bottom regardless
+          of deck length. Only relevant on Main / Reserve tabs; hidden in
+          expanded full-deck view. */}
       {!isExpanded && (activeTab === 'main' || activeTab === 'reserve') && (
         <MaybeboardStrip
           cards={deck.cards.filter((dc) => dc.zone === 'maybeboard')}
