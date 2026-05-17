@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "../../utils/supabase/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { checkDeck } from "@/utils/deckcheck";
 import type { DeckCheckCard, DeckCheckResult } from "@/utils/deckcheck/types";
 import type { DeckZone } from "./card-search/types/deck";
@@ -151,6 +151,8 @@ export async function saveDeckAction(params: SaveDeckParams) {
 
       revalidatePath("/decklist/my-decks");
       revalidatePath(`/decklist/card-search`);
+      revalidateTag("public-decks-list");
+      revalidateTag(`public-deck:${deckId}`);
 
       return {
         success: true,
@@ -497,6 +499,8 @@ export async function deleteDeckAction(deckId: string) {
     }
 
     revalidatePath("/decklist/my-decks");
+    revalidateTag("public-decks-list");
+    revalidateTag(`public-deck:${deckId}`);
 
     return {
       success: true,
@@ -912,6 +916,8 @@ export async function toggleDeckPublicAction(deckId: string, isPublic: boolean) 
 
     revalidatePath("/decklist/my-decks");
     revalidatePath(`/decklist/${deckId}`);
+    revalidateTag("public-decks-list");
+    revalidateTag(`public-deck:${deckId}`);
 
     return {
       success: true,
@@ -1520,6 +1526,8 @@ export async function renameDeckAction(deckId: string, name: string) {
     revalidatePath(`/decklist/${deckId}`);
     revalidatePath("/decklist/community");
     revalidatePath("/decklist/my-decks");
+    revalidateTag("public-decks-list");
+    revalidateTag(`public-deck:${deckId}`);
     return { success: true };
   } catch (error) {
     console.error("Error in renameDeckAction:", error);
@@ -1720,6 +1728,8 @@ export async function updateDeckDescriptionAction(deckId: string, description: s
     }
 
     revalidatePath(`/decklist/${deckId}`);
+    revalidateTag("public-decks-list");
+    revalidateTag(`public-deck:${deckId}`);
     return { success: true };
   } catch (error) {
     console.error("Error in updateDeckDescriptionAction:", error);
