@@ -148,11 +148,13 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Fetch all cards for the deck
+      // Fetch deck cards. Maybeboard rows are explicitly excluded — legality
+      // never sees the scratchpad.
       const { data: deckCards, error: cardsError } = await supabase
         .from("deck_cards")
-        .select("card_name, card_set, quantity, is_reserve")
-        .eq("deck_id", deckId);
+        .select("card_name, card_set, quantity, zone")
+        .eq("deck_id", deckId)
+        .in("zone", ["main", "reserve"]);
 
       if (cardsError) {
         return NextResponse.json(
@@ -172,7 +174,7 @@ export async function POST(request: NextRequest) {
           quantity: card.quantity,
         };
 
-        if (card.is_reserve) {
+        if (card.zone === "reserve") {
           reserveCards.push(deckCheckCard);
         } else {
           mainCards.push(deckCheckCard);

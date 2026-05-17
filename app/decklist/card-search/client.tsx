@@ -17,6 +17,7 @@ import {
 import { ALL_CARDS } from "./data/cardIndex";
 import { useDeckState } from "./hooks/useDeckState";
 import { useDeckCheck } from "./hooks/useDeckCheck";
+import { useCardImageUrl } from "./hooks/useCardImageUrl";
 import { parseDeckText, generateDeckText, downloadDeckAsFile, downloadDeckAsFileBySet, copyDeckToClipboard } from "./utils/deckImportExport";
 import { createClient } from "../../../utils/supabase/client";
 import { getUserSafe } from "../../../utils/supabase/getUserSafe";
@@ -26,6 +27,57 @@ import { MobileBottomNav } from "./components/MobileBottomNav";
 import { useCardPrices } from "./hooks/useCardPrices";
 
 const supabase = createClient();
+
+// Active-filter pill styling. Compact base + color-coded variants so the summary bar reads as
+// a typed list at a glance rather than a wall of identical blue chips.
+const PILL_BASE =
+  'animate-pill-enter px-2 py-0.5 rounded-full text-xs flex items-center gap-1 cursor-pointer whitespace-nowrap transition-colors';
+const PILL_STYLES = {
+  query: 'bg-blue-500/15 text-blue-300 hover:bg-blue-500/25',
+  legality: 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25',
+  alignmentGood: 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25',
+  alignmentEvil: 'bg-rose-500/15 text-rose-300 hover:bg-rose-500/25',
+  alignmentNeutral: 'bg-slate-500/20 text-slate-200 hover:bg-slate-500/30',
+  rarity: 'bg-violet-500/15 text-violet-300 hover:bg-violet-500/25',
+  type: 'bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25',
+  testament: 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25',
+  gospel: 'bg-yellow-500/15 text-yellow-200 hover:bg-yellow-500/25',
+  misc: 'bg-fuchsia-500/15 text-fuchsia-300 hover:bg-fuchsia-500/25',
+  stat: 'bg-orange-500/15 text-orange-300 hover:bg-orange-500/25',
+} as const;
+// Brigade pills get tinted with their own brigade color so "Green AND White" reads as the
+// brigades themselves, not generic blue chips.
+const BRIGADE_PILL_STYLES: Record<string, string> = {
+  Blue: 'bg-blue-500/20 text-blue-300 hover:bg-blue-500/30',
+  Clay: 'bg-rose-300/15 text-rose-200 hover:bg-rose-300/25',
+  'Good Gold': 'bg-yellow-400/20 text-yellow-200 hover:bg-yellow-400/30',
+  Green: 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30',
+  Purple: 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30',
+  Silver: 'bg-slate-300/20 text-slate-200 hover:bg-slate-300/30',
+  White: 'bg-zinc-100/15 text-zinc-50 hover:bg-zinc-100/25',
+  Red: 'bg-red-500/20 text-red-300 hover:bg-red-500/30',
+  Teal: 'bg-teal-500/20 text-teal-200 hover:bg-teal-500/30',
+  'Good Multi': 'bg-gradient-to-r from-pink-500/15 to-violet-500/15 text-pink-200 hover:from-pink-500/25 hover:to-violet-500/25',
+  Black: 'bg-zinc-700/40 text-zinc-200 hover:bg-zinc-700/60',
+  Brown: 'bg-amber-800/40 text-amber-200 hover:bg-amber-800/60',
+  Crimson: 'bg-pink-600/20 text-pink-300 hover:bg-pink-600/30',
+  'Evil Gold': 'bg-yellow-500/20 text-yellow-200 hover:bg-yellow-500/30',
+  Gray: 'bg-gray-500/25 text-gray-200 hover:bg-gray-500/35',
+  Orange: 'bg-orange-500/20 text-orange-300 hover:bg-orange-500/30',
+  'Pale Green': 'bg-lime-300/15 text-lime-200 hover:bg-lime-300/25',
+  'Evil Multi': 'bg-gradient-to-r from-pink-500/15 to-violet-500/15 text-pink-200 hover:from-pink-500/25 hover:to-violet-500/25',
+};
+function iconPillClass(name: string): string {
+  const brigade = BRIGADE_PILL_STYLES[name];
+  return `${PILL_BASE} ${brigade ?? PILL_STYLES.type}`;
+}
+function alignmentPillClass(mode: string): string {
+  const variant =
+    mode === 'Good' ? PILL_STYLES.alignmentGood :
+    mode === 'Evil' ? PILL_STYLES.alignmentEvil :
+    PILL_STYLES.alignmentNeutral;
+  return `${PILL_BASE} ${variant}`;
+}
 
 // Helper component for rename form in new deck modal
 function NewDeckRenameForm({ 
@@ -95,6 +147,7 @@ function NewDeckRenameForm({
 export default function CardSearchClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { getImageUrl } = useCardImageUrl();
   
   // Get deck ID from URL params if editing existing deck
   const deckIdFromUrl = searchParams.get("deckId") || undefined;
@@ -675,19 +728,36 @@ export default function CardSearchClient() {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Check for Ctrl (Windows/Linux) or Cmd (Mac)
       const modKey = e.ctrlKey || e.metaKey;
-      
+      const target = e.target as HTMLElement;
+      const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+      // "/" resets all filters and focuses the first search input — power-user "start fresh" gesture.
+      if (!modKey && e.key === '/' && !isTyping && !modalCard) {
+        e.preventDefault();
+        handleResetFilters();
+        inputRefs.current[0]?.focus();
+        return;
+      }
+
+      // Esc: if focused on a search input — first press clears, second press blurs.
+      if (!modKey && e.key === 'Escape' && isTyping && target.tagName === 'INPUT') {
+        const inputIdx = inputRefs.current.findIndex(el => el === target);
+        if (inputIdx !== -1) {
+          const inputEl = target as HTMLInputElement;
+          if (inputEl.value !== '') {
+            e.preventDefault();
+            setQueries(prev => prev.map((q, i) => i === inputIdx ? { ...q, text: '' } : q));
+          } else {
+            inputEl.blur();
+          }
+          return;
+        }
+      }
+
       // Arrow key navigation for panel visibility (without modifier keys)
       if (!modKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
-        // Only handle arrow keys if not focused on an input element
-        const target = e.target as HTMLElement;
-        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
-          return;
-        }
-        
-        // Don't handle arrow keys if modal is open
-        if (modalCard) {
-          return;
-        }
+        if (isTyping) return;
+        if (modalCard) return;
         
         e.preventDefault();
         
@@ -1451,7 +1521,7 @@ export default function CardSearchClient() {
           setModalCard={setModalCard}
           visibleCards={!showSearch
             ? deck.cards
-                .filter(dc => dc.isReserve === (fullDeckViewSection === 'reserve'))
+                .filter(dc => dc.zone === (fullDeckViewSection === 'reserve' ? 'reserve' : 'main'))
                 .map(dc => dc.card)
                 .sort((a, b) => {
                   // Sort by type first
@@ -1477,7 +1547,7 @@ export default function CardSearchClient() {
         />
       )}
       
-    <div ref={containerRef} className="flex w-full h-screen overflow-hidden bg-background jayden-gradient-bg">
+    <div ref={containerRef} className="flex w-full h-[calc(100dvh-4rem-1px)] overflow-hidden bg-background jayden-gradient-bg">
       {/* Left panel: Card search */}
       {showSearch && (
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
@@ -1525,16 +1595,87 @@ export default function CardSearchClient() {
                     )}
                   </select>
                   
-                  {/* Search input */}
-                  <input
-                    ref={el => { inputRefs.current[index] = el; }}
-                    type="text"
-                    placeholder={index === 0 ? "Search" : `Search ${index + 1}`}
-                    className="flex-1 min-w-0 px-2 sm:px-3 h-9 sm:h-11 border rounded text-base focus:outline-none focus:ring-2 focus:ring-ring text-foreground bg-card border-border"
-                    value={queryObj.text}
-                    onChange={(e) => updateQuery(index, e.target.value)}
-                    maxLength={64}
-                  />
+                  {/* Search input. The "/" hint appears on the first input when empty/unfocused, telling new
+                      users about the global shortcut. Tab cycles between search inputs when there are 2+ queries. */}
+                  <div className="relative flex-1 min-w-0">
+                    <input
+                      ref={el => { inputRefs.current[index] = el; }}
+                      type="text"
+                      placeholder={index === 0 ? "Search" : `Search ${index + 1}`}
+                      className="peer w-full px-2 sm:px-3 h-9 sm:h-11 pr-9 border rounded text-base focus:outline-none focus:ring-2 focus:ring-ring text-foreground bg-card border-border"
+                      value={queryObj.text}
+                      onChange={(e) => updateQuery(index, e.target.value)}
+                      onKeyDown={(e) => {
+                        // Backspace on an empty, non-first query removes it and focuses the previous one.
+                        // This is the symmetric inverse of "Tab to spawn" — the keyboard-only way to undo a query.
+                        if (
+                          e.key === 'Backspace' &&
+                          !queryObj.text &&
+                          queries.length > 1 &&
+                          index > 0
+                        ) {
+                          e.preventDefault();
+                          const prevIndex = index - 1;
+                          removeQuery(index);
+                          setTimeout(() => {
+                            const prevEl = inputRefs.current[prevIndex];
+                            if (prevEl) {
+                              prevEl.focus();
+                              // Park the cursor at the end of the previous query so the user can keep editing.
+                              const len = prevEl.value.length;
+                              prevEl.setSelectionRange(len, len);
+                            }
+                          }, 0);
+                          return;
+                        }
+                        if (e.key !== 'Tab') return;
+                        const isLast = index === queries.length - 1;
+                        if (e.shiftKey) {
+                          // Shift+Tab — cycle backward through existing queries; never create new ones.
+                          if (queries.length > 1) {
+                            e.preventDefault();
+                            const prev = (index - 1 + queries.length) % queries.length;
+                            inputRefs.current[prev]?.focus();
+                            inputRefs.current[prev]?.select();
+                          }
+                          return;
+                        }
+                        // Tab forward: if not on the last query, jump to the next existing one.
+                        if (!isLast) {
+                          e.preventDefault();
+                          inputRefs.current[index + 1]?.focus();
+                          inputRefs.current[index + 1]?.select();
+                          return;
+                        }
+                        // On the last query: if it has text, spawn a new query and focus it.
+                        // If it's empty, wrap back to the first query (or do nothing if only one).
+                        if (queryObj.text.trim()) {
+                          e.preventDefault();
+                          const newIndex = queries.length;
+                          addNewQuery();
+                          // The new input mounts on the next render — wait a tick before focusing.
+                          setTimeout(() => {
+                            inputRefs.current[newIndex]?.focus();
+                          }, 0);
+                        } else if (queries.length > 1) {
+                          e.preventDefault();
+                          inputRefs.current[0]?.focus();
+                          inputRefs.current[0]?.select();
+                        }
+                      }}
+                      maxLength={64}
+                    />
+                    {index === 0 && !queryObj.text && (
+                      <span
+                        aria-hidden="true"
+                        className="hidden sm:flex peer-focus:opacity-0 transition-opacity absolute right-2 top-1/2 -translate-y-1/2 items-center gap-1.5 text-xs text-muted-foreground pointer-events-none select-none"
+                      >
+                        <span>Type</span>
+                        <kbd className="px-1 py-px text-[11px] font-mono leading-none text-foreground/80 bg-muted/60 rounded">/</kbd>
+                        <span>to reset</span>
+                      </span>
+                    )}
+                  </div>
                   
                   {/* Remove button - only show if more than one query */}
                   {queries.length > 1 && (
@@ -1604,6 +1745,14 @@ export default function CardSearchClient() {
             >
               {copyLinkNotification ? '✓' : '🔗'}
             </button>
+            <button
+              className="px-4 rounded bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground border border-border transition font-medium shadow-sm text-center h-9 sm:h-11"
+              onClick={() => router.push('/decklist/card-search/random')}
+              title="Random card"
+              aria-label="Show a random card"
+            >
+              🎲
+            </button>
             </div>
             {/* Sort + Filter collapse — desktop only, right-aligned via flex */}
             <div className="hidden md:flex flex-1 justify-end items-center gap-2">
@@ -1641,25 +1790,28 @@ export default function CardSearchClient() {
             </button>
             <button
               aria-label="Toggle filter grid"
+              aria-expanded={!filterGridCollapsed}
               className={`flex px-3 shrink-0 rounded items-center justify-center gap-1.5 border transition font-medium shadow-sm text-sm h-9 sm:h-11 ${
-                filterGridCollapsed
-                  ? 'bg-primary/15 text-primary border-primary/30'
+                !filterGridCollapsed
+                  ? 'bg-primary/15 text-primary border-primary/40'
                   : 'bg-muted text-muted-foreground hover:bg-muted/80 border-border'
               }`}
               onClick={() => setFilterGridCollapsed(v => !v)}
               title={filterGridCollapsed ? 'Show filters' : 'Hide filters'}
             >
-              {filterGridCollapsed ? (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
-                </svg>
-              )}
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18M6 12h12M10 20h4" />
+              </svg>
               Filters
+              <svg
+                className={`w-3.5 h-3.5 transition-transform duration-200 ${filterGridCollapsed ? '' : 'rotate-180'}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2.5}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
             </button>
             </div>{/* end Sort + Filter collapse wrapper */}
             </div>
@@ -1669,7 +1821,7 @@ export default function CardSearchClient() {
       {/* Active Filters Summary Bar — always visible on desktop to prevent layout jump, hidden on mobile when empty */}
       <div className={`w-full transition-all duration-300 md:sticky md:top-[64px] z-30 bg-background text-foreground border-b border-border ${hasActiveFilters ? 'flex' : 'hidden md:flex'} items-center`}>
         {/* Scrollable pills area */}
-        <div className="flex-1 overflow-x-auto flex flex-nowrap sm:flex-wrap gap-1.5 sm:gap-2 items-center sm:justify-center px-2 sm:px-4 py-1.5 sm:py-2 sm:overflow-visible min-h-[44px]">
+        <div className="flex-1 overflow-x-auto flex flex-nowrap sm:flex-wrap gap-1 sm:gap-1.5 items-center sm:justify-center px-2 sm:px-4 py-1 sm:overflow-visible min-h-[28px]">
         {/* Query Pills */}
         {queries.map((queryObj, originalIndex) => {
           if (!queryObj.text.trim()) return null;
@@ -1691,7 +1843,7 @@ export default function CardSearchClient() {
           return (
             <span
               key={`${originalIndex}-${queryObj.field}-${queryObj.text}`}
-              className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap"
+              className={`${PILL_BASE} ${PILL_STYLES.query}`}
               onClick={() => updateQuery(originalIndex, "")}
               tabIndex={0}
               role="button"
@@ -1712,16 +1864,16 @@ export default function CardSearchClient() {
         })}
         {/* Legality */}
         {legalityMode !== 'Rotation' && (
-          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => setLegalityMode('Rotation')} tabIndex={0} role="button" aria-label="Remove Legality filter">
+          <span className={`${PILL_BASE} ${PILL_STYLES.legality}`} onClick={() => setLegalityMode('Rotation')} tabIndex={0} role="button" aria-label="Remove Legality filter">
             {legalityMode}
             <span className="ml-1">×</span>
           </span>
         )}
-        {/* Alignment */}
+        {/* Alignment — Good/Evil/Neutral tinted to match the alignment they represent. */}
         {selectedAlignmentFilters.map(mode => (
           <span
             key={mode}
-            className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap"
+            className={alignmentPillClass(mode)}
             onClick={() => setSelectedAlignmentFilters(selectedAlignmentFilters.filter(m => m !== mode))}
             tabIndex={0}
             role="button"
@@ -1735,7 +1887,7 @@ export default function CardSearchClient() {
         {selectedRarityFilters.map(rarity => (
           <span
             key={rarity}
-            className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap"
+            className={`${PILL_BASE} ${PILL_STYLES.rarity}`}
             onClick={() => setSelectedRarityFilters(selectedRarityFilters.filter(r => r !== rarity))}
             tabIndex={0}
             role="button"
@@ -1745,9 +1897,9 @@ export default function CardSearchClient() {
             <span className="ml-1">×</span>
           </span>
         ))}
-        {/* Icon Filters */}
+        {/* Icon Filters — brigades use brigade-color tints; types use a neutral cyan. */}
         {selectedIconFilters.map((filter, idx) => {
-          const pillClass = 'animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap';
+          const pillClass = iconPillClass(filter.icon);
           return (
             <React.Fragment key={filter.icon}>
               <span className={pillClass} onClick={() => setSelectedIconFilters(selectedIconFilters.filter(f => f.icon !== filter.icon))} tabIndex={0} role="button" aria-label={`Remove ${filter.icon} filter`}>
@@ -1795,83 +1947,83 @@ export default function CardSearchClient() {
         })}
         {/* Testament */}
         {selectedTestaments.map(t => (
-          <span key={t} className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setSelectedTestaments(selectedTestaments.filter(x => x !== t)); setTestamentNots(prev => { const newNots = { ...prev }; delete newNots[t]; return newNots; }); }} tabIndex={0} role="button" aria-label={`Remove ${t} testament filter`}>
+          <span key={t} className={`${PILL_BASE} ${PILL_STYLES.testament}`} onClick={() => { setSelectedTestaments(selectedTestaments.filter(x => x !== t)); setTestamentNots(prev => { const newNots = { ...prev }; delete newNots[t]; return newNots; }); }} tabIndex={0} role="button" aria-label={`Remove ${t} testament filter`}>
             {testamentNots[t] ? 'NOT ' : ''}{t}
             <span className="ml-1">×</span>
           </span>
         ))}
         {/* Gospel */}
         {isGospel && (
-          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setIsGospel(false); setGospelNot(false); }} tabIndex={0} role="button" aria-label="Remove Gospel filter">
+          <span className={`${PILL_BASE} ${PILL_STYLES.gospel}`} onClick={() => { setIsGospel(false); setGospelNot(false); }} tabIndex={0} role="button" aria-label="Remove Gospel filter">
             {gospelNot ? 'NOT ' : ''}Gospel
             <span className="ml-1">×</span>
           </span>
         )}
         {/* Strength */}
         {strengthFilter !== null && (
-          <span className="animate-pill-enter bg-destructive/15 text-destructive px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => setStrengthFilter(null)} tabIndex={0} role="button" aria-label="Remove Strength filter">
+          <span className={`${PILL_BASE} ${PILL_STYLES.stat}`} onClick={() => setStrengthFilter(null)} tabIndex={0} role="button" aria-label="Remove Strength filter">
             Strength {strengthOp === 'eq' ? '=' : strengthOp === 'lt' ? '<' : strengthOp === 'lte' ? '≤' : strengthOp === 'gt' ? '>' : '≥'} {strengthFilter}
             <span className="ml-1">×</span>
           </span>
         )}
         {/* Toughness */}
         {toughnessFilter !== null && (
-          <span className="animate-pill-enter bg-destructive/15 text-destructive px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => setToughnessFilter(null)} tabIndex={0} role="button" aria-label="Remove Toughness filter">
+          <span className={`${PILL_BASE} ${PILL_STYLES.stat}`} onClick={() => setToughnessFilter(null)} tabIndex={0} role="button" aria-label="Remove Toughness filter">
             Toughness {toughnessOp === 'eq' ? '=' : toughnessOp === 'lt' ? '<' : toughnessOp === 'lte' ? '≤' : toughnessOp === 'gt' ? '>' : '≥'} {toughnessFilter}
             <span className="ml-1">×</span>
           </span>
         )}
-        {/* Misc */}
+        {/* Misc booleans */}
         {noAltArt === false && (
-          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => setnoAltArt(true)} tabIndex={0} role="button" aria-label="Remove AB Versions filter">
+          <span className={`${PILL_BASE} ${PILL_STYLES.misc}`} onClick={() => setnoAltArt(true)} tabIndex={0} role="button" aria-label="Remove AB Versions filter">
             AB Versions
             <span className="ml-1">×</span>
           </span>
         )}
         {noFirstPrint === false && (
-          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => setnoFirstPrint(true)} tabIndex={0} role="button" aria-label="Remove 1st Print K/L Starters filter">
+          <span className={`${PILL_BASE} ${PILL_STYLES.misc}`} onClick={() => setnoFirstPrint(true)} tabIndex={0} role="button" aria-label="Remove 1st Print K/L Starters filter">
             1st Print K/L Starters
             <span className="ml-1">×</span>
           </span>
         )}
         {nativityOnly && (
-          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setNativityOnly(false); setNativityNot(false); }} tabIndex={0} role="button" aria-label="Remove Nativity filter">
+          <span className={`${PILL_BASE} ${PILL_STYLES.misc}`} onClick={() => { setNativityOnly(false); setNativityNot(false); }} tabIndex={0} role="button" aria-label="Remove Nativity filter">
             {nativityNot ? 'NOT ' : ''}Nativity
             <span className="ml-1">×</span>
           </span>
         )}
         {hasStarOnly && (
-          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setHasStarOnly(false); setHasStarNot(false); }} tabIndex={0} role="button" aria-label="Remove Has Star filter">
+          <span className={`${PILL_BASE} ${PILL_STYLES.misc}`} onClick={() => { setHasStarOnly(false); setHasStarNot(false); }} tabIndex={0} role="button" aria-label="Remove Has Star filter">
             {hasStarNot ? 'NOT ' : ''}Has Star
             <span className="ml-1">×</span>
           </span>
         )}
         {cloudOnly && (
-          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setCloudOnly(false); setCloudNot(false); }} tabIndex={0} role="button" aria-label="Remove Cloud filter">
+          <span className={`${PILL_BASE} ${PILL_STYLES.misc}`} onClick={() => { setCloudOnly(false); setCloudNot(false); }} tabIndex={0} role="button" aria-label="Remove Cloud filter">
             {cloudNot ? 'NOT ' : ''}Cloud
             <span className="ml-1">×</span>
           </span>
         )}
         {angelOnly && (
-          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setAngelOnly(false); setAngelNot(false); }} tabIndex={0} role="button" aria-label="Remove Angel filter">
+          <span className={`${PILL_BASE} ${PILL_STYLES.misc}`} onClick={() => { setAngelOnly(false); setAngelNot(false); }} tabIndex={0} role="button" aria-label="Remove Angel filter">
             {angelNot ? 'NOT ' : ''}Angel
             <span className="ml-1">×</span>
           </span>
         )}
         {demonOnly && (
-          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setDemonOnly(false); setDemonNot(false); }} tabIndex={0} role="button" aria-label="Remove Demon filter">
+          <span className={`${PILL_BASE} ${PILL_STYLES.misc}`} onClick={() => { setDemonOnly(false); setDemonNot(false); }} tabIndex={0} role="button" aria-label="Remove Demon filter">
             {demonNot ? 'NOT ' : ''}Demon
             <span className="ml-1">×</span>
           </span>
         )}
         {danielOnly && (
-          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setDanielOnly(false); setDanielNot(false); }} tabIndex={0} role="button" aria-label="Remove Daniel filter">
+          <span className={`${PILL_BASE} ${PILL_STYLES.misc}`} onClick={() => { setDanielOnly(false); setDanielNot(false); }} tabIndex={0} role="button" aria-label="Remove Daniel filter">
             {danielNot ? 'NOT ' : ''}Daniel
             <span className="ml-1">×</span>
           </span>
         )}
         {postexilicOnly && (
-          <span className="animate-pill-enter bg-blue-500/15 text-blue-400 px-3 py-1 rounded-full text-sm flex items-center gap-1 cursor-pointer whitespace-nowrap" onClick={() => { setPostexilicOnly(false); setPostexilicNot(false); }} tabIndex={0} role="button" aria-label="Remove Postexilic filter">
+          <span className={`${PILL_BASE} ${PILL_STYLES.misc}`} onClick={() => { setPostexilicOnly(false); setPostexilicNot(false); }} tabIndex={0} role="button" aria-label="Remove Postexilic filter">
             {postexilicNot ? 'NOT ' : ''}Postexilic
             <span className="ml-1">×</span>
           </span>
@@ -1915,30 +2067,35 @@ export default function CardSearchClient() {
         </button>
         <button
           aria-label="Toggle filter grid"
+          aria-expanded={!filterGridCollapsed}
           className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full border text-xs font-semibold transition ${
-            filterGridCollapsed
-              ? 'bg-primary/15 text-primary border-primary/30'
+            !filterGridCollapsed
+              ? 'bg-primary/15 text-primary border-primary/40'
               : 'bg-muted text-muted-foreground border-border'
           }`}
           onClick={() => setFilterGridCollapsed(v => !v)}
         >
-          {filterGridCollapsed ? (
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-            </svg>
-          ) : (
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
-            </svg>
-          )}
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18M6 12h12M10 20h4" />
+          </svg>
           Filters
+          <svg
+            className={`w-3 h-3 transition-transform duration-200 ${filterGridCollapsed ? '' : 'rotate-180'}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2.5}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
         </button>
         </div>
       </div>
       <main className="p-2 pb-16 md:pb-2 md:overflow-auto md:flex-1 bg-background text-foreground transition-colors duration-200" style={{ scrollbarGutter: 'stable' }}>
-        {/* Responsive grid for filters */}
-        {!filterGridCollapsed && (
+        {/* Responsive grid for filters. We hide via CSS instead of conditionally unmounting because
+            the FilterGrid has ~50 buttons and ~35 images — mount/unmount on every toggle was
+            stalling the main thread on mobile and producing a perceptible collapse lag. */}
+        <div className={filterGridCollapsed ? 'hidden' : ''}>
           <FilterGrid
             legalityMode={legalityMode}
             setLegalityMode={setLegalityMode}
@@ -2003,20 +2160,66 @@ export default function CardSearchClient() {
             iconFilterMode={iconFilterMode}
             setIconFilterMode={setIconFilterMode}
           />
-        )}
+        </div>
         {/* Card grid */}
         {visibleCards.length > 0 ? (
           <>
+          {/* Hidden preloader: warms the raw-blob URL cache so that adding a
+              card to the deck panel (which uses plain <img> against the blob
+              URL, not next/image's /_next/image variant) doesn't briefly show
+              the bg-muted/animate-pulse placeholder. Mirrors the reserve-card
+              preloader in DeckBuilderPanel.tsx. */}
+          <div className="hidden" aria-hidden="true">
+            {visibleCards.map((c) => {
+              const url = getImageUrl(c.imgFile || "");
+              return url ? (
+                <img
+                  key={`search-preload-${c.dataLine}`}
+                  src={url}
+                  alt=""
+                  loading="eager"
+                />
+              ) : null;
+            })}
+          </div>
           {/* Sort + count bar */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-4 mt-2 sm:mt-4">
             {visibleCards.map((c, cardIndex) => {
-              const quantityInDeck = getCardQuantity(c.name, c.set, false);
-              const quantityInReserve = getCardQuantity(c.name, c.set, true);
+              const quantityInDeck = getCardQuantity(c.name, c.set, 'main');
+              const quantityInReserve = getCardQuantity(c.name, c.set, 'reserve');
+              const quantityInMaybeboard = getCardQuantity(c.name, c.set, 'maybeboard');
               const isMenuOpen = openSearchMenuCard === c.dataLine;
               return (
                 <div
                   key={c.dataLine}
-                  className={`relative cursor-pointer group rounded overflow-hidden transition-all duration-200 ${
+                  draggable={!isSpotlight}
+                  onDragStart={(e) => {
+                    if (isSpotlight) return;
+                    // Native HTML5 drag — picked up by `useExternalDropTarget`
+                    // on the deck-panel zones. No @dnd-kit dependency, so this
+                    // works across the search↔deck context boundary without
+                    // lifting DndContext. Click-to-add via the inner buttons
+                    // is unaffected (HTML5 drag only fires after press+move).
+                    e.dataTransfer.setData(
+                      "application/x-redemption-card",
+                      JSON.stringify({ name: c.name, set: c.set }),
+                    );
+                    e.dataTransfer.effectAllowed = "copy";
+                    // Intentionally NOT calling setDragImage — every browser
+                    // (Chrome, Firefox, Safari) shows the source element as
+                    // its default drag ghost, which is exactly the card tile
+                    // the user grabbed. Custom off-screen ghosts via
+                    // setDragImage have flaky behavior in Firefox (async
+                    // snapshot timing, image-decode races, hidden-element
+                    // rules). The default ghost is universally reliable and
+                    // visually accurate — it shows precisely what's being
+                    // dragged.
+                  }}
+                  className={`relative group rounded overflow-hidden transition-all duration-200 ${
+                    isSpotlight
+                      ? "cursor-pointer"
+                      : "cursor-grab active:cursor-grabbing"
+                  } ${
                     isSpotlight && spotlightCard?.dataLine === c.dataLine
                       ? "ring-2 ring-amber-500 dark:ring-amber-400"
                       : ""
@@ -2033,14 +2236,20 @@ export default function CardSearchClient() {
                     />
                   )}
 
-                  {/* Menu items overlay */}
-                  {!isSpotlight && isMenuOpen && (
-                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-1.5 py-4 z-40">
-                      {/* Add to Main Deck */}
+                  {/* Menu items overlay.
+                      Layout: 2×2 square when the card is already in main/reserve
+                      (four actions: add-main, add-reserve, remove, bookmark);
+                      triangle (top: add-main, add-reserve; bottom-center:
+                      bookmark) when neither main nor reserve has it yet. The
+                      remove button decrements from whichever zone has copies. */}
+                  {!isSpotlight && isMenuOpen && (() => {
+                    const hasInDeck = quantityInDeck > 0 || quantityInReserve > 0;
+                    const addMain = (
                       <button
+                        key="add-main"
                         onClick={(e) => {
                           e.stopPropagation();
-                          addCard(c, false);
+                          addCard(c, 'main');
                           setOpenSearchMenuCard(null);
                         }}
                         className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-muted-foreground transition-all"
@@ -2050,12 +2259,13 @@ export default function CardSearchClient() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
                         </svg>
                       </button>
-
-                      {/* Add to Reserve */}
+                    );
+                    const addReserve = (
                       <button
+                        key="add-reserve"
                         onClick={(e) => {
                           e.stopPropagation();
-                          addCard(c, true);
+                          addCard(c, 'reserve');
                           setOpenSearchMenuCard(null);
                         }}
                         className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-muted-foreground transition-all"
@@ -2065,42 +2275,56 @@ export default function CardSearchClient() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
                         </svg>
                       </button>
+                    );
+                    const addMaybeboard = (
+                      <button
+                        key="add-maybeboard"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addCard(c, 'maybeboard');
+                          setOpenSearchMenuCard(null);
+                        }}
+                        className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-violet-600 dark:text-violet-400 transition-all"
+                        title="Add to maybeboard"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                        </svg>
+                      </button>
+                    );
+                    const removeFromBoth = (
+                      <button
+                        key="remove"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (quantityInDeck > 0) removeCard(c.name, c.set, 'main');
+                          if (quantityInReserve > 0) removeCard(c.name, c.set, 'reserve');
+                          setOpenSearchMenuCard(null);
+                        }}
+                        className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-red-600 dark:text-red-400 transition-all"
+                        title="Remove from deck"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20 12H4" />
+                        </svg>
+                      </button>
+                    );
 
-                      {/* Remove from Deck (only if card is in deck) */}
-                      {quantityInDeck > 0 && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeCard(c.name, c.set, false);
-                            setOpenSearchMenuCard(null);
-                          }}
-                          className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-red-600 dark:text-red-400 transition-all"
-                          title="Remove from deck"
-                        >
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20 12H4" />
-                          </svg>
-                        </button>
-                      )}
-
-                      {/* Remove from Reserve (only if card is in reserve) */}
-                      {quantityInReserve > 0 && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeCard(c.name, c.set, true);
-                            setOpenSearchMenuCard(null);
-                          }}
-                          className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-orange-600 dark:text-orange-400 transition-all"
-                          title="Remove from reserve"
-                        >
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                  )}
+                    return hasInDeck ? (
+                      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 grid grid-cols-2 gap-1.5 z-40">
+                        {addMain}
+                        {addReserve}
+                        {removeFromBoth}
+                        {addMaybeboard}
+                      </div>
+                    ) : (
+                      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 grid grid-cols-2 gap-1.5 z-40">
+                        {addMain}
+                        {addReserve}
+                        <div className="col-span-2 flex justify-center">{addMaybeboard}</div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Card Image - Click to view modal (or spotlight in spotlight mode) */}
                   <div
@@ -2135,7 +2359,7 @@ export default function CardSearchClient() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              removeCard(c.name, c.set, activeDeckTab === "reserve");
+                              removeCard(c.name, c.set, activeDeckTab === "reserve" ? 'reserve' : activeDeckTab === "maybe" ? 'maybeboard' : 'main');
                             }}
                             className="flex w-11 h-11 md:w-9 md:h-9 items-center justify-center rounded-lg bg-black/50 md:bg-black/30 md:hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-2xl md:text-xl border border-white/20 md:opacity-0 md:group-hover:opacity-100 md:pointer-events-none md:group-hover:pointer-events-auto"
                             aria-label="Remove card"
@@ -2146,7 +2370,7 @@ export default function CardSearchClient() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              addCard(c, activeDeckTab === "reserve");
+                              addCard(c, activeDeckTab === "reserve" ? 'reserve' : activeDeckTab === "maybe" ? 'maybeboard' : 'main');
                             }}
                             className="flex w-11 h-11 md:w-9 md:h-9 items-center justify-center rounded-lg bg-black/50 md:bg-black/30 md:hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-2xl md:text-xl border border-white/20 md:opacity-0 md:group-hover:opacity-100 md:pointer-events-none md:group-hover:pointer-events-auto"
                             aria-label="Add card"
@@ -2177,17 +2401,23 @@ export default function CardSearchClient() {
                     )}
 
 
-                    {/* Quantity Badge - Bottom Right, Always Visible */}
-                    {!isSpotlight && (quantityInDeck > 0 || quantityInReserve > 0) && (
+                    {/* Quantity Badge - Bottom Right, Always Visible. Color-coded so a glance tells you where the card already lives:
+                        emerald = in main deck, amber = in reserve, violet = on the maybeboard. */}
+                    {!isSpotlight && (quantityInDeck > 0 || quantityInReserve > 0 || quantityInMaybeboard > 0) && (
                       <div className="absolute bottom-1 right-1 flex flex-col items-end gap-0.5">
                         {quantityInDeck > 0 && (
-                          <div key={`m${quantityInDeck}`} className="animate-qty-pop bg-black/75 backdrop-blur-sm text-white px-1.5 py-0.5 rounded font-bold text-xs shadow-lg">
+                          <div key={`m${quantityInDeck}`} title={`${quantityInDeck} in main deck`} className="animate-qty-pop bg-emerald-500/90 backdrop-blur-sm text-white px-1.5 py-0.5 rounded font-bold text-xs shadow-lg ring-1 ring-black/20">
                             ×{quantityInDeck}
                           </div>
                         )}
                         {quantityInReserve > 0 && (
-                          <div key={`r${quantityInReserve}`} className="animate-qty-pop bg-black/75 backdrop-blur-sm text-white px-1.5 py-0.5 rounded font-bold text-xs shadow-lg">
+                          <div key={`r${quantityInReserve}`} title={`${quantityInReserve} in reserve`} className="animate-qty-pop bg-amber-500/90 backdrop-blur-sm text-white px-1.5 py-0.5 rounded font-bold text-xs shadow-lg ring-1 ring-black/20">
                             ×{quantityInReserve} R
+                          </div>
+                        )}
+                        {quantityInMaybeboard > 0 && (
+                          <div key={`mb${quantityInMaybeboard}`} title={`${quantityInMaybeboard} on maybeboard`} className="animate-qty-pop bg-violet-500/90 backdrop-blur-sm text-white px-1.5 py-0.5 rounded font-bold text-xs shadow-lg ring-1 ring-black/20">
+                            ×{quantityInMaybeboard} M
                           </div>
                         )}
                       </div>
@@ -2344,15 +2574,15 @@ export default function CardSearchClient() {
             onParagonChange={setDeckParagon}
             onDeckPublicChange={setDeckPublic}
             onSaveDeck={saveDeckToCloud}
-            onAddCard={(cardName, cardSet, isReserve) => {
+            onAddCard={(cardName, cardSet, zone) => {
               // Find the card in the cards array
               const card = cards.find(c => c.name === cardName && c.set === cardSet);
               if (card) {
-                addCard(card, isReserve);
+                addCard(card, zone);
               }
             }}
-            onRemoveCard={(cardName, cardSet, isReserve) => {
-              removeCard(cardName, cardSet, isReserve);
+            onRemoveCard={(cardName, cardSet, zone) => {
+              removeCard(cardName, cardSet, zone);
             }}
             onExport={handleExportDeck}
             onDownload={handleDownloadDeck}
@@ -2367,8 +2597,8 @@ export default function CardSearchClient() {
             onLoadDeck={loadDeckFromCloud}
             defaultTab={activeDeckTab}
             onActiveTabChange={setActiveDeckTab}
-            onViewCard={(card, isReserve) => {
-              setFullDeckViewSection(isReserve ? 'reserve' : 'main');
+            onViewCard={(card, fromReserve) => {
+              setFullDeckViewSection(fromReserve ? 'reserve' : 'main');
               setModalCard(card);
             }}
             onNotify={(message, type) => {
@@ -2440,14 +2670,14 @@ export default function CardSearchClient() {
               onParagonChange={setDeckParagon}
               onDeckPublicChange={setDeckPublic}
               onSaveDeck={saveDeckToCloud}
-              onAddCard={(cardName, cardSet, isReserve) => {
+              onAddCard={(cardName, cardSet, zone) => {
                 const card = cards.find(c => c.name === cardName && c.set === cardSet);
                 if (card) {
-                  addCard(card, isReserve);
+                  addCard(card, zone);
                 }
               }}
-              onRemoveCard={(cardName, cardSet, isReserve) => {
-                removeCard(cardName, cardSet, isReserve);
+              onRemoveCard={(cardName, cardSet, zone) => {
+                removeCard(cardName, cardSet, zone);
               }}
               onExport={handleExportDeck}
               onDownload={handleDownloadDeck}
@@ -2459,8 +2689,8 @@ export default function CardSearchClient() {
               onLoadDeck={loadDeckFromCloud}
               defaultTab={activeDeckTab}
               onActiveTabChange={setActiveDeckTab}
-              onViewCard={(card, isReserve) => {
-                setFullDeckViewSection(isReserve ? 'reserve' : 'main');
+              onViewCard={(card, fromReserve) => {
+                setFullDeckViewSection(fromReserve ? 'reserve' : 'main');
                 modalOpenedFromDeckRef.current = true;
                 setModalCard(card);
                 setIsMobileDeckDrawerOpen(false);

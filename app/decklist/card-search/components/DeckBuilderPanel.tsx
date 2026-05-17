@@ -1,10 +1,27 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import { createPortal } from "react-dom";
-import { Deck } from "../types/deck";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  TouchSensor,
+  KeyboardSensor,
+  useSensors,
+  useSensor,
+  useDroppable,
+  pointerWithin,
+  rectIntersection,
+  type CollisionDetection,
+  type DragStartEvent,
+  type DragOverEvent,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import { Deck, DeckZone } from "../types/deck";
 import { SyncStatus } from "../hooks/useDeckState";
 import DeckCardList from "./DeckCardList";
 import FullDeckView from "./FullDeckView";
+import DragGhost from "./DragGhost";
 import { Switch } from "@headlessui/react";
 import { Card, normalizeBrigadeField } from "../utils";
 import { validateDeck } from "../utils/deckValidation";
@@ -28,6 +45,7 @@ import DeckLegalityChecklist from "./DeckLegalityChecklist";
 import type { DeckCheckResult } from "@/utils/deckcheck/types";
 import { useBudgetPricing } from '../hooks/useBudgetPricing';
 import type { BudgetCard } from '@/lib/pricing/budgetPricing';
+import { useExternalDropTarget, useIsExternalDragActive, combineRefs, type SearchDragPayload } from '../hooks/useExternalDropTarget';
 
 function getTagContrastColor(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -36,7 +54,43 @@ function getTagContrastColor(hex: string): string {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.55 ? "#1f2937" : "#ffffff";
 }
 
-export type TabType = "main" | "reserve" | "info" | "cover";
+export type TabType = "main" | "reserve" | "maybe" | "info" | "cover";
+
+/**
+ * Wrapper that registers a @dnd-kit droppable. Must be used inside a DndContext —
+ * which means it can render anywhere in the DeckBuilderPanel JSX tree (which IS
+ * inside DndContext), but the same call from the parent function body would not
+ * see the context.
+ *
+ * Also registers a native HTML5 drop target via `useExternalDropTarget` when
+ * `onExternalDrop` is provided. This lets external sources (the search-results
+ * column, which renders OUTSIDE this DndContext) drop cards onto the same
+ * zones via native `draggable=true` + `dataTransfer` — no DndContext lift
+ * required. The two systems coexist because dnd-kit listens to PointerEvents
+ * and HTML5 listens to DragEvents.
+ */
+function Droppable({
+  id,
+  zone,
+  children,
+  className,
+  onExternalDrop,
+}: {
+  id: string;
+  zone: DeckZone;
+  children: React.ReactNode;
+  className: (isOver: boolean) => string;
+  onExternalDrop?: (payload: SearchDragPayload) => void;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id, data: { zone } });
+  const { setRef: setExternalRef, isOver: isExternalOver } = useExternalDropTarget(onExternalDrop);
+  const combinedRef = combineRefs<HTMLDivElement>(setNodeRef, setExternalRef);
+  return (
+    <div ref={combinedRef} className={className(isOver || isExternalOver)}>
+      {children}
+    </div>
+  );
+}
 
 interface DeckBuilderPanelProps {
   /** Current deck state */
@@ -62,9 +116,9 @@ interface DeckBuilderPanelProps {
   /** Callback to save deck to cloud */
   onSaveDeck?: () => Promise<{ success: boolean; error?: string }>;
   /** Callback to add a card */
-  onAddCard: (cardName: string, cardSet: string, isReserve: boolean) => void;
+  onAddCard: (cardName: string, cardSet: string, zone: DeckZone) => void;
   /** Callback to remove a card */
-  onRemoveCard: (cardName: string, cardSet: string, isReserve: boolean) => void;
+  onRemoveCard: (cardName: string, cardSet: string, zone: DeckZone) => void;
   /** Callback to export deck (copy to clipboard) */
   onExport: () => void;
   /** Callback to download deck as .txt file */
@@ -83,8 +137,8 @@ interface DeckBuilderPanelProps {
   onNewDeck?: (name?: string, folderId?: string | null, skipConfirmation?: boolean) => void;
   /** Callback when active tab changes */
   onActiveTabChange?: (tab: TabType) => void;
-  /** Callback when user wants to view card details */
-  onViewCard?: (card: Card, isReserve?: boolean) => void;
+  /** Callback when user wants to view card details. Boolean kept for compat — true when viewing from reserve. */
+  onViewCard?: (card: Card, fromReserve?: boolean) => void;
   /** Callback to show notifications */
   onNotify?: (message: string, type: 'success' | 'error' | 'info') => void;
   /** Callback when user changes cover card selections */
@@ -160,9 +214,15 @@ export default function DeckBuilderPanel({
   const [buyModalMode, setBuyModalMode] = useState<"exact" | "budget">("exact");
   const [showValidationTooltip, setShowValidationTooltip] = useState(false);
   const [showViewDropdown, setShowViewDropdown] = useState(false);
+  // Two triggers (mobile / desktop) live in the header action group; whichever
+  // one is currently visible (offsetParent != null) wins so the portal popover
+  // anchors to the actual rendered button.
   const viewDropdownBtnRef = useRef<HTMLButtonElement>(null);
+  const setViewDropdownTrigger = useCallback((el: HTMLButtonElement | null) => {
+    if (el && el.offsetParent !== null) viewDropdownBtnRef.current = el;
+  }, []);
   const tabBarRef = useRef<HTMLDivElement>(null);
-  const tabRefs = useRef<Record<TabType, HTMLButtonElement | null>>({ main: null, reserve: null, info: null, cover: null });
+  const tabRefs = useRef<Record<TabType, HTMLButtonElement | null>>({ main: null, reserve: null, maybe: null, info: null, cover: null });
   const [tabIndicator, setTabIndicator] = useState({ left: 0, width: 0 });
   const [showMobileFullDeckView, setShowMobileFullDeckView] = useState(false);
   const [fullViewPreviewCard, setFullViewPreviewCard] = useState<Card | null>(null);
@@ -173,20 +233,77 @@ export default function DeckBuilderPanel({
   
   const { getImageUrl } = useCardImageUrl();
 
+  // ── DnD state + sensors ──────────────────────────────────────────────
+  const [activeDragCard, setActiveDragCard] = useState<Card | null>(null);
+  const isExternalDragActive = useIsExternalDragActive();
+  // `isDragging` powers the "drop hint" UI on zone droppables. It now fires
+  // for both in-deck @dnd-kit drags AND external HTML5 drags from the search
+  // column, so users see drop affordances regardless of source.
+  const isDragging = activeDragCard !== null || isExternalDragActive;
+  const dndSensors = useSensors(
+    // Mouse/pen: 10px movement before drag activates — gives twitchy hands
+    // and precision trackpads more room before a click becomes a drag.
+    useSensor(PointerSensor, { activationConstraint: { distance: 10 } }),
+    // Touch: 200ms long-press + 5px tolerance — doesn't fight scroll.
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+    useSensor(KeyboardSensor),
+  );
+
+  // Tab / zone droppables are declared via the <Droppable> wrapper component
+  // (see bottom of file). They CANNOT be set up via useDroppable at the panel
+  // level because the panel itself renders DndContext — its own hooks run
+  // outside the context provider and never register with the manager.
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const card = event.active.data.current?.card as Card | undefined;
+    if (card) setActiveDragCard(card);
+  }, []);
+
+  // Custom collision detection: prefer pointer-within for precision (small tab
+  // triggers, the maybeboard strip), fall back to rectIntersection when the
+  // pointer is in a gap. Default rectIntersection alone fails for the tab
+  // triggers because the source draggable's rect doesn't translate during
+  // drag — DragOverlay renders separately, so the active rect never overlaps
+  // the tab bar above the card grid.
+  const dndCollisionDetection = useCallback<CollisionDetection>((args) => {
+    const pointer = pointerWithin(args);
+    if (pointer.length > 0) return pointer;
+    return rectIntersection(args);
+  }, []);
+
+  // No-op for tab targets — switching activeTab here would unmount the source
+  // draggable (Main/Reserve are conditionally rendered) and abort the drag.
+  // The tab trigger's `isOver` ring is sufficient feedback during the drag;
+  // we switch activeTab after the drop completes (see handleDragEnd).
+  const handleDragOver = useCallback((_event: DragOverEvent) => {}, []);
+
+  const handleDragCancel = useCallback(() => {
+    setActiveDragCard(null);
+  }, []);
+
   // Cover card picker: which slot is open (1, 2, or null)
   const [coverPickerSlot, setCoverPickerSlot] = useState<1 | 2 | null>(null);
   const [coverPickerSort, setCoverPickerSort] = useState<"default" | "name" | "type" | "brigade">("type");
   const [coverPickerSearch, setCoverPickerSearch] = useState("");
 
-  // Measure active tab position for sliding indicator
+  // Measure active tab position for sliding indicator. Re-measures on
+  // `activeTab` change AND whenever the tab bar resizes (e.g. user drags the
+  // deck-panel splitter, window resize) — otherwise the indicator stays at the
+  // stale pixel offset measured for the previous bar width.
   useEffect(() => {
-    const tab = tabRefs.current[activeTab];
     const bar = tabBarRef.current;
-    if (tab && bar) {
+    if (!bar) return;
+    const measure = () => {
+      const tab = tabRefs.current[activeTab];
+      if (!tab) return;
       const barRect = bar.getBoundingClientRect();
       const tabRect = tab.getBoundingClientRect();
       setTabIndicator({ left: tabRect.left - barRect.left, width: tabRect.width });
-    }
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(bar);
+    return () => ro.disconnect();
   }, [activeTab]);
 
   // Close cover picker on Escape
@@ -449,10 +566,15 @@ export default function DeckBuilderPanel({
   }, [showParagonModal]);
 
   // Calculate deck stats
-  const mainDeckCards = deck.cards.filter((dc) => !dc.isReserve);
-  const reserveCards = deck.cards.filter((dc) => dc.isReserve);
+  const mainDeckCards = deck.cards.filter((dc) => dc.zone === 'main');
+  const reserveCards = deck.cards.filter((dc) => dc.zone === 'reserve');
+  const maybeboardCards = deck.cards.filter((dc) => dc.zone === 'maybeboard');
   const mainDeckCount = mainDeckCards.reduce((sum, dc) => sum + dc.quantity, 0);
   const reserveCount = reserveCards.reduce((sum, dc) => sum + dc.quantity, 0);
+  // Maybe tab badge shows unique-card count (matches the existing Main/Reserve
+  // tab badge style which uses total quantity; here we deliberately use unique
+  // count per the redesign brief, since maybeboard quantities are noisy).
+  const maybeboardCount = maybeboardCards.length;
   const totalCards = mainDeckCount + reserveCount;
 
   // Calculate total deck price
@@ -461,6 +583,8 @@ export default function DeckBuilderPanel({
     let total = 0;
     let hasAnyPrice = false;
     for (const dc of deck.cards) {
+      // Maybeboard is a scratchpad — excluded from the deck's price total.
+      if (dc.zone === 'maybeboard') continue;
       const priceKey = `${dc.card.name}|${dc.card.set}|${dc.card.imgFile}`;
       const priceInfo = getPrice(priceKey);
       if (priceInfo) {
@@ -491,19 +615,64 @@ export default function DeckBuilderPanel({
     }
   };
 
-  // Handle moving card between main deck and reserve
-  const handleMoveCard = (cardName: string, cardSet: string, fromReserve: boolean, toReserve: boolean) => {
-    // Find the card
+  // Handle moving card between zones
+  const handleMoveCard = (cardName: string, cardSet: string, fromZone: DeckZone, toZone: DeckZone) => {
     const deckCard = deck.cards.find(
-      (dc) => dc.card.name === cardName && dc.card.set === cardSet && dc.isReserve === fromReserve
+      (dc) => dc.card.name === cardName && dc.card.set === cardSet && dc.zone === fromZone
     );
-    
+
     if (deckCard) {
-      // Move one copy from current location to new location
-      onRemoveCard(cardName, cardSet, fromReserve);
-      onAddCard(cardName, cardSet, toReserve);
+      // Move one copy from current zone to target zone
+      onRemoveCard(cardName, cardSet, fromZone);
+      onAddCard(cardName, cardSet, toZone);
     }
   };
+
+  // Resolve drag-end: source droppable's `data.fromZone` + target's id/data
+  // tell us the move. tab:* targets map to the matching zone:* zone.
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const active = event.active;
+      const over = event.over;
+      setActiveDragCard(null);
+      const fromZone = active.data.current?.fromZone as DeckZone | undefined;
+      const card = active.data.current?.card as Card | undefined;
+      if (!fromZone || !card) return;
+
+      // Dropped outside any droppable — treat as "drag to remove": decrement
+      // one copy from the source zone. ESC cancels fire onDragCancel (not
+      // onDragEnd) so this only triggers on a real release. The DragGhost
+      // turns red while over=null to telegraph the consequence.
+      if (!over) {
+        onRemoveCard(card.name, card.set, fromZone);
+        return;
+      }
+
+      // Resolve target zone. zone:* and tab:* both encode a target zone in
+      // their data; fall back to parsing the id.
+      const overId = String(over.id);
+      const isTabDrop = overId.startsWith("tab:");
+      let toZone = over.data.current?.zone as DeckZone | undefined;
+      if (!toZone) {
+        if (overId.startsWith("zone:")) toZone = overId.slice(5) as DeckZone;
+        else if (isTabDrop) toZone = overId.slice(4) as DeckZone;
+      }
+      if (!toZone || toZone === fromZone) return; // same-zone drop: silent no-op
+      handleMoveCard(card.name, card.set, fromZone, toZone);
+
+      // After a tab-drop, switch the active tab so the user sees their card
+      // land. We defer this until after the move (vs. mid-drag) because
+      // switching tabs mid-drag unmounts the source draggable and aborts.
+      if (isTabDrop) {
+        if (toZone === "main" || toZone === "reserve") setActiveTab(toZone);
+        else if (toZone === "maybeboard") setActiveTab("maybe");
+      }
+    },
+    // handleMoveCard is a stable closure over deck/onRemoveCard/onAddCard
+    // captured each render; we don't memoize it, so this callback re-creates
+    // each render too — acceptable, DndContext only reads it during a drag.
+    [handleMoveCard, onRemoveCard]
+  );
 
   // Group cards by type
   const groupCardsByType = (cards: typeof deck.cards) => {
@@ -673,6 +842,20 @@ export default function DeckBuilderPanel({
   };
 
   return (
+    <DndContext
+      sensors={dndSensors}
+      collisionDetection={dndCollisionDetection}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+      accessibility={{
+        screenReaderInstructions: {
+          draggable:
+            "To pick up a card, press Space or Enter. Use the arrow keys to move between drop targets. Press Space or Enter again to drop, or Escape to cancel.",
+        },
+      }}
+    >
     <div className="w-full h-full flex flex-col bg-background">
       {/* Header */}
       <div className="flex-shrink-0 px-3 py-2 md:p-4 border-b border-border/60 overflow-visible relative z-30">
@@ -863,6 +1046,22 @@ export default function DeckBuilderPanel({
             {deck.id && (
               <GoldfishButton deckId={deck.id} deckName={deck.name} format={deck.format} iconOnly />
             )}
+
+            {/* View (mobile) — sliders icon */}
+            <button
+              ref={setViewDropdownTrigger}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowViewDropdown(!showViewDropdown);
+              }}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground transition-colors"
+              title="View options"
+              aria-label="View options"
+            >
+              <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              </svg>
+            </button>
 
             {/* More menu */}
             <div className="relative">
@@ -1160,7 +1359,7 @@ export default function DeckBuilderPanel({
         )}
 
         {/* Card Count and Menu Button Row — desktop only */}
-        <div className="hidden md:flex mt-2 flex-col md:flex-row md:items-center md:justify-between gap-3 min-w-0">
+        <div className="deck-header-row hidden md:flex mt-2 flex-col md:flex-row md:items-center md:justify-between gap-3 min-w-0">
           <div className="flex items-center gap-2 md:gap-3 text-sm flex-wrap min-w-0" suppressHydrationWarning>
             {/* Desktop: Format Selector (T1/T2/Paragon) */}
             <div className="hidden md:flex items-center gap-1 bg-muted rounded-full p-0.5">
@@ -1303,7 +1502,7 @@ export default function DeckBuilderPanel({
                   }
                 }}
                 disabled={syncStatus?.isSaving || !isAuthenticated}
-                className={`hidden md:flex px-4 py-1.5 text-sm font-medium rounded transition-all items-center gap-2 min-w-[140px] justify-center ${
+                className={`save-btn hidden md:flex px-4 py-1.5 text-sm font-medium rounded transition-all items-center gap-2 justify-center ${
                   syncStatus?.isSaving || !isAuthenticated
                     ? 'bg-muted text-muted-foreground cursor-not-allowed'
                     : hasUnsavedChanges
@@ -1328,21 +1527,22 @@ export default function DeckBuilderPanel({
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    Saving...
+                    <span className="save-label-long">Saving...</span>
                   </>
                 ) : hasUnsavedChanges ? (
                   <>
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                     </svg>
-                    Save (Ctrl+S)
+                    <span className="save-label-long">Save (Ctrl+S)</span>
+                    <span className="save-label-short">Save</span>
                   </>
                 ) : (
                   <>
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Saved
+                    <span className="save-label-long">Saved</span>
                   </>
                 )}
               </button>
@@ -1357,7 +1557,7 @@ export default function DeckBuilderPanel({
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-                <span className="hidden md:inline">New Deck</span>
+                <span className="new-deck-label-long">New Deck</span>
               </button>
             )}
 
@@ -1365,6 +1565,22 @@ export default function DeckBuilderPanel({
             {deck.id && (
               <GoldfishButton deckId={deck.id} deckName={deck.name} format={deck.format} iconOnly />
             )}
+
+            {/* View Button (desktop) — sliders icon, icon-only to match neighbors */}
+            <button
+              ref={setViewDropdownTrigger}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowViewDropdown(!showViewDropdown);
+              }}
+              className="px-3 py-1.5 text-sm font-medium rounded border border-border bg-card hover:bg-muted text-muted-foreground transition-colors flex items-center gap-2"
+              title="View options"
+              aria-label="View options"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              </svg>
+            </button>
 
             {/* Menu Dropdown */}
             <div className="relative">
@@ -1618,7 +1834,7 @@ export default function DeckBuilderPanel({
       {/* ...existing code... */}
       {/* Tabs - Hide when expanded (full screen view) */}
       {!isExpanded && (
-      <div ref={tabBarRef} className="flex-shrink-0 flex items-center border-b border-border bg-card relative z-20">
+      <div ref={tabBarRef} className="deck-tabbar flex-shrink-0 flex items-center border-b border-border bg-card relative z-20">
         {/* Sliding tab indicator */}
         <div
           className="absolute bottom-0 h-0.5 bg-primary transition-all duration-200"
@@ -1628,36 +1844,93 @@ export default function DeckBuilderPanel({
             transform: `translateX(${tabIndicator.left}px)`,
           }}
         />
-        <button
-          ref={(el) => { tabRefs.current.main = el; }}
-          onClick={() => handleTabChange("main")}
-          className={`flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
-            activeTab === "main"
-              ? "text-blue-600 dark:text-blue-400"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
+        <Droppable
+          id="tab:main"
+          zone="main"
+          onExternalDrop={(payload) => {
+            onAddCard(payload.name, payload.set, "main");
+            setActiveTab("main");
+          }}
+          className={(isOver) =>
+            `flex-1 min-w-0 rounded transition-colors ${
+              isOver ? "bg-primary/10 ring-1 ring-inset ring-primary/40" : ""
+            }`
+          }
         >
-          <span className="md:hidden">Main <span className="text-[10px] opacity-75">{mainDeckCount}</span></span>
-          <span className="hidden md:inline">Main ({mainDeckCount})</span>
-        </button>
-        <button
-          ref={(el) => { tabRefs.current.reserve = el; }}
-          onClick={() => handleTabChange("reserve")}
-          className={`flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
-            activeTab === "reserve"
-              ? "text-blue-600 dark:text-blue-400"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
+          <button
+            ref={(el) => { tabRefs.current.main = el; }}
+            onClick={() => handleTabChange("main")}
+            className={`w-full overflow-hidden px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
+              activeTab === "main"
+                ? "text-blue-600 dark:text-blue-400"
+                : "text-muted-foreground hover:text-foreground"
+            } ${isDragging ? "bg-primary/5" : ""}`}
+          >
+            <span className="tab-label-short">Main <span className="text-[10px] opacity-75">{mainDeckCount}</span></span>
+            <span className="tab-label-long">Main ({mainDeckCount})</span>
+          </button>
+        </Droppable>
+        <Droppable
+          id="tab:reserve"
+          zone="reserve"
+          onExternalDrop={(payload) => {
+            onAddCard(payload.name, payload.set, "reserve");
+            setActiveTab("reserve");
+          }}
+          className={(isOver) =>
+            `flex-1 min-w-0 rounded transition-colors ${
+              isOver ? "bg-primary/10 ring-1 ring-inset ring-primary/40" : ""
+            }`
+          }
         >
-          <span className="md:hidden">Res <span className="text-[10px] opacity-75">{reserveCount}</span></span>
-          <span className="hidden md:inline">Reserve ({reserveCount})</span>
-        </button>
+          <button
+            ref={(el) => { tabRefs.current.reserve = el; }}
+            onClick={() => handleTabChange("reserve")}
+            className={`w-full overflow-hidden px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
+              activeTab === "reserve"
+                ? "text-blue-600 dark:text-blue-400"
+                : "text-muted-foreground hover:text-foreground"
+            } ${isDragging ? "bg-primary/5" : ""}`}
+          >
+            <span className="tab-label-short">Res <span className="text-[10px] opacity-75">{reserveCount}</span></span>
+            <span className="tab-label-long">Reserve ({reserveCount})</span>
+          </button>
+        </Droppable>
+        <Droppable
+          id="tab:maybe"
+          zone="maybeboard"
+          onExternalDrop={(payload) => {
+            onAddCard(payload.name, payload.set, "maybeboard");
+            setActiveTab("maybe");
+          }}
+          className={(isOver) =>
+            `flex-1 min-w-0 rounded transition-colors ${
+              isOver ? "bg-primary/10 ring-1 ring-inset ring-primary/40" : ""
+            }`
+          }
+        >
+          <button
+            ref={(el) => { tabRefs.current.maybe = el; }}
+            onClick={() => handleTabChange("maybe")}
+            className={`w-full overflow-hidden px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
+              activeTab === "maybe"
+                ? "text-blue-600 dark:text-blue-400"
+                : "text-muted-foreground hover:text-foreground"
+            } ${isDragging ? "bg-primary/5" : ""}`}
+          >
+            <span className="tab-label-short">Maybe <span className="text-[10px] opacity-75">{maybeboardCount}</span></span>
+            <span className="tab-label-long">Maybe ({maybeboardCount})</span>
+          </button>
+        </Droppable>
         <button
           ref={(el) => { tabRefs.current.info = el; }}
           onClick={() => handleTabChange("info")}
           onMouseEnter={() => setShowValidationTooltip(true)}
           onMouseLeave={() => setShowValidationTooltip(false)}
-          className={`relative flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
+          aria-disabled={isDragging || undefined}
+          className={`relative flex-1 min-w-0 overflow-hidden px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
+            isDragging ? "opacity-40 pointer-events-none" : ""
+          } ${
             activeTab === "info"
               ? "text-blue-600 dark:text-blue-400"
               : "text-muted-foreground hover:text-foreground"
@@ -1667,22 +1940,34 @@ export default function DeckBuilderPanel({
             Stats
             {validation.stats.totalCards > 0 && !ignoreLegalityChecks && (
               isDeckChecking ? (
-                <span className="hidden md:inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-500">
-                  <svg className="w-2.5 h-2.5 text-white animate-spin" viewBox="0 0 12 12" fill="none">
-                    <circle cx="6" cy="6" r="5" stroke="currentColor" strokeOpacity="0.3" strokeWidth="1.5" />
-                    <path d="M11 6a5 5 0 00-5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
-                </span>
+                <>
+                  <span className="tab-badge items-center justify-center w-4 h-4 rounded-full bg-gray-500">
+                    <svg className="w-2.5 h-2.5 text-white animate-spin" viewBox="0 0 12 12" fill="none">
+                      <circle cx="6" cy="6" r="5" stroke="currentColor" strokeOpacity="0.3" strokeWidth="1.5" />
+                      <path d="M11 6a5 5 0 00-5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                  </span>
+                  <span className="tab-dot w-1.5 h-1.5 rounded-full bg-gray-500" />
+                </>
               ) : (
-                <span
-                  className={`hidden md:inline-flex items-center justify-center w-4 h-4 text-xs rounded-full ${
-                    (deckCheckResult?.valid ?? validation.isValid)
-                      ? "bg-green-500 text-white"
-                      : "bg-red-500 text-white"
-                  }`}
-                >
-                  {(deckCheckResult?.valid ?? validation.isValid) ? "✓" : "!"}
-                </span>
+                <>
+                  <span
+                    className={`tab-badge items-center justify-center w-4 h-4 text-xs rounded-full ${
+                      (deckCheckResult?.valid ?? validation.isValid)
+                        ? "bg-green-500 text-white"
+                        : "bg-red-500 text-white"
+                    }`}
+                  >
+                    {(deckCheckResult?.valid ?? validation.isValid) ? "✓" : "!"}
+                  </span>
+                  <span
+                    className={`tab-dot w-1.5 h-1.5 rounded-full ${
+                      (deckCheckResult?.valid ?? validation.isValid)
+                        ? "bg-green-500"
+                        : "bg-red-500"
+                    }`}
+                  />
+                </>
               )
             )}
           </span>
@@ -1708,6 +1993,7 @@ export default function DeckBuilderPanel({
             if (isT2Fmt && !isDeckChecking) {
               const counts = { mainGood: 0, mainEvil: 0, resGood: 0, resEvil: 0 };
               for (const dc of deck.cards) {
+                if (dc.zone === 'maybeboard') continue;
                 const a = dc.card.alignment || "";
                 let side: "good" | "evil" | null = null;
                 if (a.includes("Good") && a.includes("Evil")) side = null; // neutral
@@ -1716,7 +2002,7 @@ export default function DeckBuilderPanel({
                 else if (a.includes("Good")) side = "good";
                 else if (a.includes("Evil")) side = "evil";
                 if (!side) continue;
-                if (dc.isReserve) {
+                if (dc.zone === 'reserve') {
                   if (side === "good") counts.resGood += dc.quantity;
                   else counts.resEvil += dc.quantity;
                 } else {
@@ -1724,7 +2010,7 @@ export default function DeckBuilderPanel({
                   else counts.mainEvil += dc.quantity;
                 }
               }
-              const resCount = deck.cards.filter(c => c.isReserve).reduce((s, c) => s + c.quantity, 0);
+              const resCount = deck.cards.filter(c => c.zone === 'reserve').reduce((s, c) => s + c.quantity, 0);
               balanceLine = `Main: ${counts.mainGood}G · ${counts.mainEvil}E`;
               if (resCount > 0) {
                 balanceLine += `  |  Res: ${counts.resGood}G · ${counts.resEvil}E`;
@@ -1747,7 +2033,10 @@ export default function DeckBuilderPanel({
         <button
           ref={(el) => { tabRefs.current.cover = el; }}
           onClick={() => handleTabChange("cover")}
-          className={`flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
+          aria-disabled={isDragging || undefined}
+          className={`flex-1 min-w-0 overflow-hidden px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
+            isDragging ? "opacity-40 pointer-events-none" : ""
+          } ${
             activeTab === "cover"
               ? "text-blue-600 dark:text-blue-400"
               : "text-muted-foreground hover:text-foreground"
@@ -1756,27 +2045,10 @@ export default function DeckBuilderPanel({
           Details
         </button>
 
-        {/* View Dropdown Button */}
-        <div className="relative ml-auto mr-1 md:mr-2">
-          <button
-            ref={viewDropdownBtnRef}
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowViewDropdown(!showViewDropdown);
-            }}
-            className="px-1.5 md:px-3 py-2 text-xs md:text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-            </svg>
-            <span className="hidden md:inline">View</span>
-            <svg className={`w-3 h-3 transition-transform ${showViewDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-
-          {/* View dropdown — rendered via portal to escape overflow-hidden ancestors */}
-          {showViewDropdown && createPortal(
+        {/* View dropdown trigger now lives in the deck-panel header's right
+            action group (Practice / View / ⋯), not in the tab row. The popover
+            content remains here because it portals to document.body anyway. */}
+        {showViewDropdown && createPortal(
             <>
               {/* Backdrop — mobile: visible overlay, desktop: transparent click-catcher */}
               <div
@@ -2075,12 +2347,11 @@ export default function DeckBuilderPanel({
             </>,
             document.body
           )}
-        </div>
       </div>
       )}
 
       {/* Content */}
-      <div ref={contentRef} className={`flex-1 overflow-y-auto overflow-x-hidden ${isExpanded ? '' : 'p-4'}`} data-deck-grid>
+      <div ref={contentRef} className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col ${isExpanded ? '' : 'p-4'}`} data-deck-grid>
         {/* Paragon Requirements (only show for Paragon format with a selected Paragon) */}
         {deckType === 'Paragon' && deck.paragon && validation.paragonStats && (activeTab === 'main' || activeTab === 'reserve') && (
           <div className="mb-4">
@@ -2225,7 +2496,18 @@ export default function DeckBuilderPanel({
         ) : (
           <>
         {activeTab === "main" ? (
-          <div className="space-y-4">
+          <Droppable
+            id="zone:main"
+            zone="main"
+            onExternalDrop={(payload) => onAddCard(payload.name, payload.set, "main")}
+            className={(isOver) =>
+              `space-y-4 rounded transition-colors flex-1 min-h-[240px] ${
+                isDragging ? "md:border-2 md:border-dashed md:border-border/40 md:-m-0.5" : ""
+              } ${
+                isOver ? "border-primary bg-primary/5" : ""
+              }`
+            }
+          >
             {mainDeckCards.length > 0 ? (
               groupCards(mainDeckCards).map(({ type, cards, count }) => {
                 const typeIcon = groupBy === 'type' ? getTypeIcon(type) : null;
@@ -2259,20 +2541,20 @@ export default function DeckBuilderPanel({
                   </div>
                   <DeckCardList
                     cards={cards}
-                    onIncrement={(name, set, isReserve) => onAddCard(name, set, isReserve)}
-                    onDecrement={(name, set, isReserve) => onRemoveCard(name, set, isReserve)}
-                    onRemove={(name, set, isReserve) => {
+                    onIncrement={(name, set, zone) => onAddCard(name, set, zone)}
+                    onDecrement={(name, set, zone) => onRemoveCard(name, set, zone)}
+                    onRemove={(name, set, zone) => {
                       // Remove all copies
                       const card = deck.cards.find(
-                        (dc) => dc.card.name === name && dc.card.set === set && dc.isReserve === isReserve
+                        (dc) => dc.card.name === name && dc.card.set === set && dc.zone === zone
                       );
                       if (card) {
                         for (let i = 0; i < card.quantity; i++) {
-                          onRemoveCard(name, set, isReserve);
+                          onRemoveCard(name, set, zone);
                         }
                       }
                     }}
-                    filterReserve={false}
+                    filterZone="main"
                     onViewCard={onViewCard}
                     onMoveCard={handleMoveCard}
                     showTypeIcons={false}
@@ -2315,9 +2597,20 @@ export default function DeckBuilderPanel({
                 </button>
               </div>
             )}
-          </div>
+          </Droppable>
         ) : activeTab === "reserve" ? (
-          <div className="space-y-4">
+          <Droppable
+            id="zone:reserve"
+            zone="reserve"
+            onExternalDrop={(payload) => onAddCard(payload.name, payload.set, "reserve")}
+            className={(isOver) =>
+              `space-y-4 rounded transition-colors flex-1 min-h-[240px] ${
+                isDragging ? "md:border-2 md:border-dashed md:border-border/40 md:-m-0.5" : ""
+              } ${
+                isOver ? "border-primary bg-primary/5" : ""
+              }`
+            }
+          >
             {reserveCards.length > 0 ? (
               groupCards(reserveCards).map(({ type, cards, count }) => {
                 const typeIcon = groupBy === 'type' ? getTypeIcon(type) : null;
@@ -2351,20 +2644,20 @@ export default function DeckBuilderPanel({
                   </div>
                   <DeckCardList
                     cards={cards}
-                    onIncrement={(name, set, isReserve) => onAddCard(name, set, isReserve)}
-                    onDecrement={(name, set, isReserve) => onRemoveCard(name, set, isReserve)}
-                    onRemove={(name, set, isReserve) => {
+                    onIncrement={(name, set, zone) => onAddCard(name, set, zone)}
+                    onDecrement={(name, set, zone) => onRemoveCard(name, set, zone)}
+                    onRemove={(name, set, zone) => {
                       // Remove all copies
                       const card = deck.cards.find(
-                        (dc) => dc.card.name === name && dc.card.set === set && dc.isReserve === isReserve
+                        (dc) => dc.card.name === name && dc.card.set === set && dc.zone === zone
                       );
                       if (card) {
                         for (let i = 0; i < card.quantity; i++) {
-                          onRemoveCard(name, set, isReserve);
+                          onRemoveCard(name, set, zone);
                         }
                       }
                     }}
-                    filterReserve={true}
+                    filterZone="reserve"
                     onViewCard={onViewCard}
                     onMoveCard={handleMoveCard}
                     showTypeIcons={false}
@@ -2385,7 +2678,88 @@ export default function DeckBuilderPanel({
                 </p>
               </div>
             )}
-          </div>
+          </Droppable>
+        ) : activeTab === "maybe" ? (
+          <Droppable
+            id="zone:maybeboard"
+            zone="maybeboard"
+            onExternalDrop={(payload) => onAddCard(payload.name, payload.set, "maybeboard")}
+            className={(isOver) =>
+              `space-y-4 rounded transition-colors flex-1 min-h-[240px] ${
+                isDragging ? "md:border-2 md:border-dashed md:border-border/40 md:-m-0.5" : ""
+              } ${
+                isOver ? "border-primary bg-primary/5" : ""
+              }`
+            }
+          >
+            {maybeboardCards.length > 0 ? (
+              groupCards(maybeboardCards).map(({ type, cards, count }) => {
+                const typeIcon = groupBy === 'type' ? getTypeIcon(type) : null;
+                const dualIconConfig = groupBy === 'type' ? getDualIconConfig(type) : null;
+                return (
+                <div key={type}>
+                  <div className="flex items-center gap-2 mb-2">
+                    {dualIconConfig ? (
+                      <div className="flex gap-0.5 flex-shrink-0">
+                        <img
+                          src={dualIconConfig.icon1}
+                          alt={dualIconConfig.alt1}
+                          className="w-6 h-6 object-contain"
+                        />
+                        <img
+                          src={dualIconConfig.icon2}
+                          alt={dualIconConfig.alt2}
+                          className="w-6 h-6 object-contain"
+                        />
+                      </div>
+                    ) : typeIcon && (
+                      <img
+                        src={typeIcon}
+                        alt={type}
+                        className="w-6 h-6 object-contain flex-shrink-0"
+                      />
+                    )}
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      {groupBy === 'type' ? prettifyTypeName(type) : type} ({count})
+                    </h4>
+                  </div>
+                  <DeckCardList
+                    cards={cards}
+                    onIncrement={(name, set, zone) => onAddCard(name, set, zone)}
+                    onDecrement={(name, set, zone) => onRemoveCard(name, set, zone)}
+                    onRemove={(name, set, zone) => {
+                      const card = deck.cards.find(
+                        (dc) => dc.card.name === name && dc.card.set === set && dc.zone === zone
+                      );
+                      if (card) {
+                        for (let i = 0; i < card.quantity; i++) {
+                          onRemoveCard(name, set, zone);
+                        }
+                      }
+                    }}
+                    filterZone="maybeboard"
+                    onViewCard={onViewCard}
+                    onMoveCard={handleMoveCard}
+                    showTypeIcons={false}
+                    viewLayout={viewLayout}
+                    showPrices={showPrices}
+                    disableHoverPreview={disableHoverPreview}
+                  />
+                </div>
+              );
+              })
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground text-sm">
+                  No cards on the maybeboard yet
+                </p>
+                <p className="text-muted-foreground text-xs mt-2">
+                  Drag cards here, or use the menu on a deck card to move it here.
+                  The maybeboard is a scratchpad — it&apos;s excluded from legality, totals, and play.
+                </p>
+              </div>
+            )}
+          </Droppable>
         ) : activeTab === "cover" ? (
           // Details Tab (Cover Cards + Description)
           <div className="space-y-4 text-sm">
@@ -2435,7 +2809,7 @@ export default function DeckBuilderPanel({
 
               {/* Card picker grid */}
               {coverPickerSlot !== null && (() => {
-                const mainCards = deck.cards.filter(dc => !dc.isReserve && dc.quantity > 0);
+                const mainCards = deck.cards.filter(dc => dc.zone === 'main' && dc.quantity > 0);
                 const filteredPickerCards = coverPickerSearch.trim()
                   ? mainCards.filter(dc => dc.card.name.toLowerCase().includes(coverPickerSearch.trim().toLowerCase()))
                   : mainCards;
@@ -2804,8 +3178,10 @@ export default function DeckBuilderPanel({
                 {(() => {
                   const isT2Format = deck.format?.toLowerCase().includes("type 2");
 
-                  // Calculate raw alignment counts (all cards)
+                  // Calculate raw alignment counts. Maybeboard is a scratchpad
+                  // and never rolls into deck composition.
                   const alignmentCounts = deck.cards.reduce((acc, deckCard) => {
+                    if (deckCard.zone === 'maybeboard') return acc;
                     let alignment = deckCard.card.alignment || "Neutral";
                     if (alignment.includes("Good/Evil")) {
                       alignment = "Neutral";
@@ -2822,7 +3198,7 @@ export default function DeckBuilderPanel({
                   let balanceGood = 0;
                   let balanceEvil = 0;
                   if (isT2Format) {
-                    for (const dc of deck.cards.filter(c => !c.isReserve)) {
+                    for (const dc of deck.cards.filter(c => c.zone === 'main')) {
                       const a = dc.card.alignment || "";
                       if (a.includes("Good") && a.includes("Evil")) continue; // Good/Evil = neutral
                       if (a.includes("Good") && a.includes("Neutral")) { balanceGood += dc.quantity; continue; }
@@ -2951,8 +3327,10 @@ export default function DeckBuilderPanel({
                   </div>
                   <div className="space-y-0.5">
                     {(() => {
-                      // Calculate card type counts
+                      // Calculate card type counts. Maybeboard is a scratchpad
+                      // and never rolls into deck composition.
                       const typeCounts = deck.cards.reduce((acc, deckCard) => {
+                        if (deckCard.zone === 'maybeboard') return acc;
                         const type = deckCard.card.type || "Unknown";
                         const prettyType = prettifyTypeName(type);
                         if (!acc[prettyType]) {
@@ -3069,7 +3447,7 @@ export default function DeckBuilderPanel({
             card_name: dc.card.name,
             card_key: `${dc.card.name}|${dc.card.set}|${dc.card.imgFile}`,
             quantity: dc.quantity,
-            isReserve: dc.isReserve,
+            zone: dc.zone,
           }))}
           onClose={() => setShowBuyDeckModal(false)}
           initialMode={buyModalMode}
@@ -3262,5 +3640,11 @@ export default function DeckBuilderPanel({
         document.body
       )}
     </div>
+    {/* DragOverlay: card ghost that follows the pointer during a drag.
+        Default dropAnimation lets unresolved drops snap back to the source. */}
+    <DragOverlay>
+      {activeDragCard ? <DragGhost card={activeDragCard} /> : null}
+    </DragOverlay>
+    </DndContext>
   );
 }

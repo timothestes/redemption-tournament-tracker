@@ -19,6 +19,7 @@ import BuyDeckModal from "../card-search/components/BuyDeckModal";
 import GeneratePDFModal from "../card-search/components/GeneratePDFModal";
 import GenerateDeckImageModal from "../card-search/components/GenerateDeckImageModal";
 import { Deck as DeckType } from "../card-search/types/deck";
+import { generateDeckText } from "../card-search/utils/deckImportExport";
 
 interface PublicDeckData {
   id: string;
@@ -357,16 +358,18 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
         legality: "", testament: "", isGospel: false,
       } as Card),
       quantity: c.quantity,
-      isReserve: c.is_reserve,
+      zone: c.zone,
     })),
     createdAt: new Date(deck.created_at),
     updatedAt: new Date(deck.updated_at),
   }), [deck, enrichedCards]);
 
-  const mainCards = enrichedCards.filter((c) => !c.is_reserve);
-  const reserveCards = enrichedCards.filter((c) => c.is_reserve);
+  const mainCards = enrichedCards.filter((c) => c.zone === 'main');
+  const reserveCards = enrichedCards.filter((c) => c.zone === 'reserve');
+  const maybeboardCards = enrichedCards.filter((c) => c.zone === 'maybeboard');
   const mainDeckCount = mainCards.reduce((sum, c) => sum + c.quantity, 0);
   const reserveCount = reserveCards.reduce((sum, c) => sum + c.quantity, 0);
+  const maybeboardCount = maybeboardCards.reduce((sum, c) => sum + c.quantity, 0);
 
   const totalDeckPrice = useMemo(() => {
     let total = 0;
@@ -396,16 +399,26 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
     });
   }, [reserveCards]);
 
-  // Build flat list of Card objects for modal navigation (all main + reserve)
+  const sortedMaybeboardCards = useMemo(() => {
+    return [...maybeboardCards].sort((a, b) => {
+      const typeA = prettifyTypeName(a.type);
+      const typeB = prettifyTypeName(b.type);
+      if (typeA !== typeB) return typeA.localeCompare(typeB);
+      return a.card_name.localeCompare(b.card_name);
+    });
+  }, [maybeboardCards]);
+
+  // Build flat list of Card objects for modal navigation (main + reserve + maybeboard)
   const allCardsForNav = useMemo<Card[]>(() => {
     const allEnriched = [
       ...Object.values(groupedMainCards).flat(),
       ...sortedReserveCards,
+      ...sortedMaybeboardCards,
     ];
     return allEnriched
       .filter((c) => c.fullCard)
       .map((c) => c.fullCard!);
-  }, [groupedMainCards, sortedReserveCards]);
+  }, [groupedMainCards, sortedReserveCards, sortedMaybeboardCards]);
 
   async function handleCopyLink() {
     const url = `${window.location.origin}/decklist/${deck.id}`;
@@ -436,16 +449,10 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
   }
 
   function handleDownloadTxt() {
-    const mainCards = deck.cards.filter((c) => !c.is_reserve).slice().sort((a, b) => a.card_name.localeCompare(b.card_name));
-    const reserveCards = deck.cards.filter((c) => c.is_reserve).slice().sort((a, b) => a.card_name.localeCompare(b.card_name));
-    const lines: string[] = [];
-    mainCards.forEach((c) => lines.push(`${c.quantity}\t${c.card_name}`));
-    if (reserveCards.length > 0) {
-      lines.push("");
-      lines.push("Reserve:");
-      reserveCards.forEach((c) => lines.push(`${c.quantity}\t${c.card_name}`));
-    }
-    const text = lines.join("\n");
+    // Use the canonical generator so the public-page export matches the
+    // builder's format — including the `Tokens:` section with
+    // `# auto-generated` and `# maybeboard` markers required for round-trip.
+    const text = generateDeckText(deckForModal);
     const blob = new Blob([text], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -942,7 +949,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
 
       {/* Cover card editor modal — owner only */}
       {isOwner && coverEditorOpen && (() => {
-        const coverMainCards = enrichedCards.filter(c => !c.is_reserve);
+        const coverMainCards = enrichedCards.filter(c => c.zone === 'main');
         const filteredCoverCards = coverPickerSearch.trim()
           ? coverMainCards.filter(c => c.card_name.toLowerCase().includes(coverPickerSearch.trim().toLowerCase()))
           : coverMainCards;
@@ -1442,6 +1449,51 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
                 </div>
               </div>
             ))}
+
+            {/* Maybeboard ("Considering") columns — secondary, muted */}
+            {sortedMaybeboardCards.length > 0 && splitGroup(sortedMaybeboardCards).map((col, colIndex) => (
+              <div key={`maybeboard-col-${colIndex}`} className="flex flex-col ml-4 opacity-75">
+                {colIndex === 0 && (
+                  <div className="mb-2 flex items-center gap-2">
+                    <h3 className="text-lg font-semibold italic text-muted-foreground">Considering</h3>
+                    <span className="text-xs text-muted-foreground">({maybeboardCount})</span>
+                    <span
+                      title="A scratchpad — not part of the deck."
+                      className="w-4 h-4 rounded-full bg-muted text-muted-foreground text-[10px] font-bold flex items-center justify-center cursor-help"
+                    >
+                      ?
+                    </span>
+                  </div>
+                )}
+                <div className="flex flex-col gap-2 items-center">
+                  {col.flatMap((card) =>
+                    Array.from({ length: card.quantity }, (_, i) => (
+                      <div
+                        key={`maybeboard-${card.card_name}-${card.card_set}-${colIndex}-${i}`}
+                        className="group relative w-28 flex-shrink-0 cursor-pointer transition-all -mb-32 last:mb-0"
+                        onClick={() => card.fullCard && setModalCard(card.fullCard)}
+                        onMouseEnter={() => setHoveredCard({ name: card.card_name, imgFile: card.card_img_file || "", set: card.card_set, type: card.type })}
+                        onMouseLeave={() => setHoveredCard(null)}
+                      >
+                        <div className="relative aspect-[2.5/3.5] rounded-md overflow-hidden bg-muted hover:ring-2 hover:ring-violet-500 transition-all cursor-pointer shadow-md">
+                          <img
+                            src={getImageUrl(card.card_img_file || "")}
+                            alt={card.card_name}
+                            className="w-full h-full object-cover"
+                            loading="eager"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity flex items-end">
+                            <div className="w-full p-1.5 text-white">
+                              <p className="text-xs font-semibold leading-tight truncate">{card.card_name}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
           /* Normal view: compact grid with type group headers */
@@ -1487,6 +1539,35 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
             {sortedReserveCards.map((card, index) => (
               <CardTile
                 key={`reserve-${card.card_name}-${card.card_set}-${index}`}
+                card={card}
+                onClick={() => card.fullCard && setModalCard(card.fullCard)}
+                onHover={setHoveredCard}
+                compact
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Maybeboard ("Considering") — normal view only; secondary, muted */}
+      {viewMode === "normal" && sortedMaybeboardCards.length > 0 && (
+        <div className="mb-8 opacity-80">
+          <h2 className="text-xl font-semibold italic text-muted-foreground mb-4 flex items-center gap-2">
+            Considering
+            <span className="text-sm font-normal text-muted-foreground not-italic">
+              ({maybeboardCount} cards)
+            </span>
+            <span
+              title="A scratchpad — not part of the deck."
+              className="w-4 h-4 rounded-full bg-muted text-muted-foreground text-[10px] font-bold flex items-center justify-center cursor-help not-italic"
+            >
+              ?
+            </span>
+          </h2>
+          <div className="flex flex-wrap gap-x-1.5">
+            {sortedMaybeboardCards.map((card, index) => (
+              <CardTile
+                key={`maybeboard-${card.card_name}-${card.card_set}-${index}`}
                 card={card}
                 onClick={() => card.fullCard && setModalCard(card.fullCard)}
                 onHover={setHoveredCard}
@@ -1595,7 +1676,7 @@ export default function PublicDeckClient({ deck, isOwner, isLoggedIn }: Props) {
             card_name: c.card_name,
             card_key: `${c.card_name}|${c.card_set}|${sanitizeImgFile(c.card_img_file || "")}`,
             quantity: c.quantity,
-            isReserve: c.is_reserve,
+            zone: c.zone,
           }))}
           onClose={() => setShowBuyDeckModal(false)}
           initialMode={buyModalMode}

@@ -7,6 +7,13 @@ export interface HandCardPosition {
 }
 
 /**
+ * Vertical space reserved at the bottom of the player hand zone for the
+ * floating game toolbar. Exported so callers can match the same usable
+ * region when sizing hand cards.
+ */
+export const HAND_TOOLBAR_RESERVE = 48;
+
+/**
  * Calculate card positions in a fan arc (or flat spread) for a hand zone.
  *
  * Works for both player hand (full-size cards) and opponent hand (compact
@@ -28,9 +35,7 @@ export function calculateHandPositions(
   const centerX = handRect.x + handRect.width / 2;
   // Use more of the available width — 85% gives cards more room to spread
   const handAreaWidth = handRect.width * 0.85;
-  // Reserve space at the bottom for the floating toolbar so cards don't render behind it
-  const toolbarReserve = 48;
-  const usableHeight = handRect.height - toolbarReserve;
+  const usableHeight = handRect.height - HAND_TOOLBAR_RESERVE;
   const handY =
     handRect.y + Math.max(0, (usableHeight - cardHeight) / 2);
 

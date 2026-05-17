@@ -552,9 +552,9 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
     const result = await loadPublicDeckAction(deck.id);
     setDownloading(false);
     if (!result.success || !result.deck) return;
-    const cards = (result.deck as any).cards as { card_name: string; quantity: number; is_reserve: boolean }[];
-    const main = cards.filter((c) => !c.is_reserve).sort((a, b) => a.card_name.localeCompare(b.card_name));
-    const reserve = cards.filter((c) => c.is_reserve).sort((a, b) => a.card_name.localeCompare(b.card_name));
+    const cards = (result.deck as any).cards as { card_name: string; quantity: number; zone: 'main' | 'reserve' | 'maybeboard' }[];
+    const main = cards.filter((c) => c.zone === 'main').sort((a, b) => a.card_name.localeCompare(b.card_name));
+    const reserve = cards.filter((c) => c.zone === 'reserve').sort((a, b) => a.card_name.localeCompare(b.card_name));
     const lines: string[] = [];
     main.forEach((c) => lines.push(`${c.quantity}\t${c.card_name}`));
     if (reserve.length > 0) {
@@ -608,7 +608,7 @@ function DeckCard({ deck, currentUserId }: { deck: PublicDeck; currentUserId?: s
           legality: "", testament: "", isGospel: false,
         } as Card,
         quantity: c.quantity,
-        isReserve: c.is_reserve,
+        zone: c.zone,
       })),
       createdAt: new Date(cloudDeck.created_at || deck.created_at),
       updatedAt: new Date(cloudDeck.updated_at || deck.updated_at),

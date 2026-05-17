@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, sanitizeImgFile } from "../utils";
-import { Deck, DeckCard, DeckStats } from "../types/deck";
+import { Deck, DeckCard, DeckStats, DeckZone } from "../types/deck";
 import { saveDeckAction, loadDeckByIdAction, DeckCardData } from "../../actions";
 import { CARD_BY_FULL_KEY } from "../data/cardIndex";
 
@@ -10,7 +10,7 @@ const STORAGE_KEY = "redemption-deck-builder-current-deck";
 // Drives the "Unsaved Changes" indicator and skips no-op saves.
 function snapshotDeck(d: Deck): string {
   const sortedCards = d.cards
-    .map((c) => `${c.card.name}|${c.card.set}|${c.quantity}|${c.isReserve ? 1 : 0}`)
+    .map((c) => `${c.card.name}|${c.card.set}|${c.quantity}|${c.zone}`)
     .sort()
     .join("§");
   return JSON.stringify({
@@ -169,7 +169,7 @@ export function useDeckState(
               return {
                 card: fullCard,
                 quantity: dbCard.quantity,
-                isReserve: dbCard.is_reserve,
+                zone: dbCard.zone as DeckZone,
               };
             } else {
               // Fallback: create minimal card object if not found
@@ -196,7 +196,7 @@ export function useDeckState(
                   isGospel: false,
                 } as Card,
                 quantity: dbCard.quantity,
-                isReserve: dbCard.is_reserve,
+                zone: dbCard.zone as DeckZone,
               };
             }
           }),
@@ -265,14 +265,15 @@ export function useDeckState(
             card_set: deckCard.card.set,
             card_img_file: deckCard.card.imgFile,
             quantity: deckCard.quantity,
-            is_reserve: deckCard.isReserve,
+            zone: deckCard.zone,
           }));
 
-        // Use user-selected preview cards if set, otherwise auto-compute
+        // Use user-selected preview cards if set, otherwise auto-compute.
+        // Maybeboard cards are explicitly excluded so a "considering" card never becomes a cover.
         let previewCard1 = targetDeck.previewCard1 ?? null;
         let previewCard2 = targetDeck.previewCard2 ?? null;
         if (!previewCard1 || !previewCard2) {
-          const mainCards = targetDeck.cards.filter(dc => !dc.isReserve && dc.quantity > 0);
+          const mainCards = targetDeck.cards.filter(dc => dc.zone === 'main' && dc.quantity > 0);
           const heroTypes = ['Hero', 'HC', 'Hero Character'];
           const evilTypes = ['Evil Character', 'EC'];
           const firstHero = mainCards.find(dc => heroTypes.includes(dc.card.type));
@@ -348,13 +349,13 @@ export function useDeckState(
   /**
    * Add a card to the deck or increase its quantity
    */
-  const addCard = useCallback((card: Card, isReserve: boolean = false) => {
+  const addCard = useCallback((card: Card, zone: DeckZone = 'main') => {
     setDeck((prevDeck) => {
       const existingCardIndex = prevDeck.cards.findIndex(
         (dc) =>
           dc.card.name === card.name &&
           dc.card.set === card.set &&
-          dc.isReserve === isReserve
+          dc.zone === zone
       );
 
       let newCards: DeckCard[];
@@ -375,7 +376,7 @@ export function useDeckState(
           {
             card,
             quantity: 1,
-            isReserve,
+            zone,
           },
         ];
       }
@@ -392,13 +393,13 @@ export function useDeckState(
    * Remove a card from the deck or decrease its quantity
    */
   const removeCard = useCallback(
-    (cardName: string, cardSet: string, isReserve: boolean = false) => {
+    (cardName: string, cardSet: string, zone: DeckZone = 'main') => {
       setDeck((prevDeck) => {
         const existingCardIndex = prevDeck.cards.findIndex(
           (dc) =>
             dc.card.name === cardName &&
             dc.card.set === cardSet &&
-            dc.isReserve === isReserve
+            dc.zone === zone
         );
 
         if (existingCardIndex < 0) {
@@ -438,7 +439,7 @@ export function useDeckState(
       cardName: string,
       cardSet: string,
       quantity: number,
-      isReserve: boolean = false
+      zone: DeckZone = 'main'
     ) => {
       if (quantity < 0) {
         console.warn("Invalid quantity:", quantity);
@@ -450,7 +451,7 @@ export function useDeckState(
           (dc) =>
             dc.card.name === cardName &&
             dc.card.set === cardSet &&
-            dc.isReserve === isReserve
+            dc.zone === zone
         );
 
         if (existingCardIndex < 0) {
@@ -593,12 +594,12 @@ export function useDeckState(
    * Get quantity of a specific card in the deck
    */
   const getCardQuantity = useCallback(
-    (cardName: string, cardSet: string, isReserve: boolean = false): number => {
+    (cardName: string, cardSet: string, zone: DeckZone = 'main'): number => {
       const deckCard = deck.cards.find(
         (dc) =>
           dc.card.name === cardName &&
           dc.card.set === cardSet &&
-          dc.isReserve === isReserve
+          dc.zone === zone
       );
       return deckCard?.quantity || 0;
     },
@@ -606,24 +607,27 @@ export function useDeckState(
   );
 
   /**
-   * Calculate deck statistics
+   * Calculate deck statistics. Maybeboard cards don't roll into type/brigade
+   * aggregates — those drive deck composition charts and the maybeboard is a
+   * scratchpad, not part of the deck.
    */
   const getDeckStats = useCallback((): DeckStats => {
-    const mainDeckCards = deck.cards.filter((dc) => !dc.isReserve);
-    const reserveCards = deck.cards.filter((dc) => dc.isReserve);
+    const mainDeckCards = deck.cards.filter((dc) => dc.zone === 'main');
+    const reserveCards = deck.cards.filter((dc) => dc.zone === 'reserve');
+    const maybeboardCards = deck.cards.filter((dc) => dc.zone === 'maybeboard');
 
     const mainDeckCount = mainDeckCards.reduce((sum, dc) => sum + dc.quantity, 0);
     const reserveCount = reserveCards.reduce((sum, dc) => sum + dc.quantity, 0);
+    const maybeboardCount = maybeboardCards.reduce((sum, dc) => sum + dc.quantity, 0);
 
     const cardsByType: Record<string, number> = {};
     const cardsByBrigade: Record<string, number> = {};
 
     deck.cards.forEach((dc) => {
-      // Count by type
+      if (dc.zone === 'maybeboard') return;
       const type = dc.card.type || "Unknown";
       cardsByType[type] = (cardsByType[type] || 0) + dc.quantity;
 
-      // Count by brigade
       const brigade = dc.card.brigade || "None";
       cardsByBrigade[brigade] = (cardsByBrigade[brigade] || 0) + dc.quantity;
     });
@@ -631,6 +635,7 @@ export function useDeckState(
     return {
       mainDeckCount,
       reserveCount,
+      maybeboardCount,
       uniqueCards: deck.cards.length,
       cardsByType,
       cardsByBrigade,
@@ -677,14 +682,23 @@ function loadDeckFromStorage(): Deck {
   if (typeof window === 'undefined') {
     return getDefaultDeck();
   }
-  
+
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored);
-      // Convert date strings back to Date objects
+      // Migrate legacy isReserve:boolean to zone:DeckZone (pre-PR-1 localStorage drafts)
+      const migratedCards = Array.isArray(parsed.cards)
+        ? parsed.cards.map((c: any) => {
+            if (c?.zone) return c;
+            const zone: DeckZone = c?.isReserve ? 'reserve' : 'main';
+            const { isReserve: _drop, ...rest } = c ?? {};
+            return { ...rest, zone };
+          })
+        : [];
       return {
         ...parsed,
+        cards: migratedCards,
         createdAt: new Date(parsed.createdAt),
         updatedAt: new Date(parsed.updatedAt),
       };

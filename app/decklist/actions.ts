@@ -4,6 +4,7 @@ import { createClient } from "../../utils/supabase/server";
 import { revalidatePath } from "next/cache";
 import { checkDeck } from "@/utils/deckcheck";
 import type { DeckCheckCard, DeckCheckResult } from "@/utils/deckcheck/types";
+import type { DeckZone } from "./card-search/types/deck";
 
 // Types matching the database schema
 export interface DeckData {
@@ -32,7 +33,7 @@ export interface DeckCardData {
   card_set?: string;
   card_img_file?: string;
   quantity: number;
-  is_reserve: boolean;
+  zone: DeckZone;
 }
 
 export interface SaveDeckParams {
@@ -69,9 +70,9 @@ export async function saveDeckAction(params: SaveDeckParams) {
 
     const { deckId, name, description, format, paragon, folderId, cards, previewCard1, previewCard2 } = params;
 
-    // Calculate card count (main deck only, excluding reserve)
+    // Calculate card count (main deck only — reserve and maybeboard excluded)
     const cardCount = cards
-      .filter(card => !card.is_reserve)
+      .filter(card => card.zone === 'main')
       .reduce((sum, card) => sum + card.quantity, 0);
 
     if (deckId) {
@@ -108,7 +109,7 @@ export async function saveDeckAction(params: SaveDeckParams) {
         card_set: card.card_set || null,
         card_img_file: card.card_img_file || null,
         quantity: card.quantity,
-        is_reserve: card.is_reserve ?? false,
+        zone: card.zone ?? 'main',
       }));
 
       const { error: replaceError } = await supabase.rpc("replace_deck_cards", {
@@ -124,14 +125,14 @@ export async function saveDeckAction(params: SaveDeckParams) {
         };
       }
 
-      // Run comprehensive deck legality check
+      // Run comprehensive deck legality check (maybeboard excluded — scratchpad)
       let deckCheckResult: DeckCheckResult | null = null;
       try {
         const mainCards: DeckCheckCard[] = cards
-          .filter(c => !c.is_reserve)
+          .filter(c => c.zone === 'main')
           .map(c => ({ name: c.card_name, set: c.card_set || "", quantity: c.quantity }));
         const reserveCards: DeckCheckCard[] = cards
-          .filter(c => c.is_reserve)
+          .filter(c => c.zone === 'reserve')
           .map(c => ({ name: c.card_name, set: c.card_set || "", quantity: c.quantity }));
 
         deckCheckResult = await checkDeck(mainCards, reserveCards, params.format);
@@ -191,7 +192,7 @@ export async function saveDeckAction(params: SaveDeckParams) {
           card_set: card.card_set || null,
           card_img_file: card.card_img_file || null,
           quantity: card.quantity,
-          is_reserve: card.is_reserve,
+          zone: card.zone,
         }));
 
         const BATCH_SIZE = 500;
@@ -213,14 +214,14 @@ export async function saveDeckAction(params: SaveDeckParams) {
         }
       }
 
-      // Run comprehensive deck legality check
+      // Run comprehensive deck legality check (maybeboard excluded — scratchpad)
       let deckCheckResult: DeckCheckResult | null = null;
       try {
         const mainCards: DeckCheckCard[] = cards
-          .filter(c => !c.is_reserve)
+          .filter(c => c.zone === 'main')
           .map(c => ({ name: c.card_name, set: c.card_set || "", quantity: c.quantity }));
         const reserveCards: DeckCheckCard[] = cards
-          .filter(c => c.is_reserve)
+          .filter(c => c.zone === 'reserve')
           .map(c => ({ name: c.card_name, set: c.card_set || "", quantity: c.quantity }));
 
         deckCheckResult = await checkDeck(mainCards, reserveCards, params.format);
@@ -281,7 +282,7 @@ export async function loadUserDecksAction() {
         *,
         deck_cards (
           quantity,
-          is_reserve
+          zone
         )
       `)
       .eq("user_id", user.id)
@@ -342,7 +343,7 @@ export async function loadUserDecksAction() {
 
     const decksWithCounts = (decks || []).map((deck: any) => {
       const mainDeckCount = (deck.deck_cards || [])
-        .filter((card: any) => !card.is_reserve)
+        .filter((card: any) => card.zone === 'main')
         .reduce((sum: number, card: any) => sum + card.quantity, 0);
 
       return {
@@ -884,7 +885,7 @@ export async function toggleDeckPublicAction(deckId: string, isPublic: boolean) 
           .from("deck_cards")
           .select("card_img_file")
           .eq("deck_id", deckId)
-          .eq("is_reserve", false)
+          .eq("zone", "main")
           .not("card_img_file", "is", null)
           .limit(2);
 
@@ -1145,7 +1146,7 @@ export async function copyPublicDeckAction(sourceDeckId: string) {
         card_set: card.card_set,
         card_img_file: card.card_img_file,
         quantity: card.quantity,
-        is_reserve: card.is_reserve,
+        zone: card.zone,
       })),
     });
 

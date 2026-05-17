@@ -1,15 +1,18 @@
 import { Card } from "../utils";
 
+export type DeckZone = "main" | "reserve" | "maybeboard";
+
 /**
- * Represents a card in a deck with its quantity and location (main/reserve)
+ * Represents a card in a deck with its quantity and zone.
+ * - main: counts toward legality, copy limits, paragon rules
+ * - reserve: sideboard
+ * - maybeboard: scratchpad of cards under consideration; excluded from legality,
+ *   tournament submission, game state, and deck totals
  */
 export interface DeckCard {
-  /** Reference to the full card object with all card data */
   card: Card;
-  /** Quantity of this card in the deck (1-4, enforced by validation) */
   quantity: number;
-  /** Whether this card is in the reserve/sideboard section */
-  isReserve: boolean;
+  zone: DeckZone;
 }
 
 /**
@@ -45,11 +48,9 @@ export interface Deck {
  * Helper type for deck statistics
  */
 export interface DeckStats {
-  /** Total cards in main deck */
   mainDeckCount: number;
-  /** Total cards in reserve/sideboard */
   reserveCount: number;
-  /** Total unique cards */
+  maybeboardCount: number;
   uniqueCards: number;
   /** Cards grouped by type (Hero, Evil Character, Enhancement, etc.) */
   cardsByType: Record<string, number>;

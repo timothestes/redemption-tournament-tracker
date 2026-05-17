@@ -12,7 +12,7 @@ import {
   type ZoneRect,
 } from '../layout/multiplayerLayout';
 import { toScreenPos, toDbPos, cardCenter, adjustAnchorForRotationChange } from '../utils/coordinateTransforms';
-import { calculateHandPositions } from '../layout/multiplayerHandLayout';
+import { calculateHandPositions, HAND_TOOLBAR_RESERVE } from '../layout/multiplayerHandLayout';
 import { calculateAutoArrangePositions } from '../layout/multiplayerAutoArrange';
 import {
   GameCardNode,
@@ -444,6 +444,20 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
 
   const myHandRect = mpLayout?.zones.playerHand ?? null;
   const opponentHandRect = mpLayout?.zones.opponentHand ?? null;
+
+  // Player-hand card dimensions: capped so the card bottom always stays
+  // above the floating toolbar reserve. On narrow viewports the mainCard
+  // height can exceed the hand zone's usable height, which would push card
+  // bottoms (e.g. Judas's alignment line) under the toolbar.
+  const { handCardWidth, handCardHeight } = useMemo(() => {
+    if (!myHandRect) return { handCardWidth: cardWidth, handCardHeight: cardHeight };
+    const usableHeight = Math.max(0, myHandRect.height - HAND_TOOLBAR_RESERVE);
+    if (cardHeight <= usableHeight) return { handCardWidth: cardWidth, handCardHeight: cardHeight };
+    const aspect = cardHeight / Math.max(cardWidth, 1);
+    const cappedH = Math.max(0, Math.round(usableHeight));
+    const cappedW = Math.max(0, Math.round(cappedH / aspect));
+    return { handCardWidth: cappedW, handCardHeight: cappedH };
+  }, [myHandRect, cardWidth, cardHeight]);
 
   // ---- LOB arrival glow effect ----
   const myLobIds = useMemo(
@@ -3106,14 +3120,14 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const positions = calculateHandPositions(
               handCards.length,
               myHandRect,
-              cardWidth,
-              cardHeight,
+              handCardWidth,
+              handCardHeight,
               isSpreadHand,
             );
             let targetIdx = 0;
             let minDist = Infinity;
             for (let i = 0; i < positions.length; i++) {
-              const dist = Math.abs(positions[i].x + cardWidth / 2 - center.x);
+              const dist = Math.abs(positions[i].x + handCardWidth / 2 - center.x);
               if (dist < minDist) {
                 minDist = dist;
                 targetIdx = i;
@@ -3314,6 +3328,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       updateCardPosition,
       cardWidth,
       cardHeight,
+      handCardWidth,
+      handCardHeight,
       selectedIds,
       clearSelection,
       myZones,
@@ -3907,8 +3923,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       const positions = calculateHandPositions(
         handCards.length,
         myHandRect,
-        cardWidth,
-        cardHeight,
+        handCardWidth,
+        handCardHeight,
         isSpreadHand,
       );
       handCards.forEach((card, i) => {
@@ -3918,8 +3934,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             instanceId: String(card.id),
             x: pos.x,
             y: pos.y,
-            width: cardWidth,
-            height: cardHeight,
+            width: handCardWidth,
+            height: handCardHeight,
             rotation: pos.rotation,
             owner: 'my',
           });
@@ -3928,7 +3944,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     }
 
     return bounds;
-  }, [mpLayout, myHandRect, myZones, myCards, opponentZones, opponentCards, cardWidth, cardHeight, lobCard, isSpreadHand, myDerivedWeaponPositions, opponentDerivedWeaponPositions, normalizedFormat, sharedCards, sharedLobLayout]);
+  }, [mpLayout, myHandRect, myZones, myCards, opponentZones, opponentCards, cardWidth, cardHeight, handCardWidth, handCardHeight, lobCard, isSpreadHand, myDerivedWeaponPositions, opponentDerivedWeaponPositions, normalizedFormat, sharedCards, sharedLobLayout]);
 
   // ---- Stage mouse handlers for marquee selection ----
   const handleStageMouseDown = useCallback(
@@ -5615,8 +5631,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
             const positions = calculateHandPositions(
               handCards.length,
               myHandRect!,
-              cardWidth,
-              cardHeight,
+              handCardWidth,
+              handCardHeight,
               isSpreadHand,
             );
 
@@ -5633,8 +5649,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       x={pos.x}
                       y={pos.y}
                       rotation={pos.rotation}
-                      cardWidth={cardWidth}
-                      cardHeight={cardHeight}
+                      cardWidth={handCardWidth}
+                      cardHeight={handCardHeight}
                       image={getCardImage(card)}
                       isSelected={isSelected(String(card.id))}
                       isDraggable={true}

@@ -2,7 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
+import { usePathname } from "next/navigation";
 import Image from "next/image";
+
+// Routes that intentionally skip the sponsor footer because they own the full
+// viewport (the deck-builder editors render a sticky-bottom Maybeboard strip
+// that conflicts with anything below it). Add new editor routes here as they
+// adopt the same pattern.
+const HIDE_ON_PATHS = new Set<string>([
+  "/decklist/card-search",
+]);
 
 interface Sponsor {
   name: string;
@@ -27,10 +36,13 @@ const sponsors: Sponsor[] = [
 export default function SponsorFooter() {
   const { theme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const pathname = usePathname();
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  if (pathname && HIDE_ON_PATHS.has(pathname)) return null;
 
   const activeTheme = mounted ? (theme === "system" ? resolvedTheme : theme) : undefined;
   const isDark = activeTheme === "dark" || activeTheme === "jayden";

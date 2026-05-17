@@ -10,10 +10,10 @@ import { getUserSafe } from "@/utils/supabase/getUserSafe";
  */
 function deckCardsToLackeyText(cards: DeckCardData[]): string {
   const main = cards
-    .filter((c) => !c.is_reserve)
+    .filter((c) => c.zone === 'main')
     .sort((a, b) => a.card_name.localeCompare(b.card_name));
   const reserve = cards
-    .filter((c) => c.is_reserve)
+    .filter((c) => c.zone === 'reserve')
     .sort((a, b) => a.card_name.localeCompare(b.card_name));
 
   const lines: string[] = [];
