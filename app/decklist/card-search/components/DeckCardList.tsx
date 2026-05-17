@@ -39,30 +39,6 @@ function DraggableRow({
       aria-roledescription="Draggable card"
     >
       {children}
-      {/* Drag-handle affordance. Hidden by default on hover-capable devices and
-          revealed on hover. On touch devices (no hover) it stays faintly visible
-          so users have a cue that the card is draggable without long-pressing
-          to discover it. Pointer-events-none keeps the row's drag listeners
-          firing through it. */}
-      <span
-        aria-hidden
-        className={
-          "pointer-events-none absolute top-1 left-1 z-10 inline-flex h-5 w-5 items-center justify-center rounded bg-background/80 text-foreground transition-opacity " +
-          // Touch (no hover): faintly visible at all times.
-          // Hover-capable: hidden by default, full opacity on hover.
-          "opacity-50 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/draggable:opacity-100"
-        }
-        title="Drag to move"
-      >
-        <svg viewBox="0 0 16 16" className="h-3 w-3" fill="currentColor" aria-hidden>
-          <circle cx="5" cy="3" r="1.2" />
-          <circle cx="11" cy="3" r="1.2" />
-          <circle cx="5" cy="8" r="1.2" />
-          <circle cx="11" cy="8" r="1.2" />
-          <circle cx="5" cy="13" r="1.2" />
-          <circle cx="11" cy="13" r="1.2" />
-        </svg>
-      </span>
     </div>
   );
 }
@@ -198,7 +174,7 @@ export default function DeckCardList({
           return (
             <DraggableRow key={cardKey} zone={zone} card={card} className="deck-card-enter">
             <div
-              className="relative group rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-200"
+              className="deck-card-frame relative group rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-200"
               onMouseEnter={disableHoverPreview ? undefined : (e) => {
                 const pos = calculatePreviewPosition(e.currentTarget);
                 setPreviewCard({
@@ -249,6 +225,25 @@ export default function DeckCardList({
                   a compact grid keeps every action inside the thumbnail. */}
               {openMenuCard === cardKey && (
                 <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 grid grid-cols-2 gap-1 z-40">
+                  {/* View Card Details */}
+                  {onViewCard ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewCard(card);
+                        setOpenMenuCard(null);
+                      }}
+                      className="w-8 h-8 hover:scale-110 bg-card/95 backdrop-blur rounded-md shadow-lg border border-border flex items-center justify-center text-foreground transition-all"
+                      title="View card details"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </button>
+                  ) : (
+                    <span aria-hidden />
+                  )}
+
                   {/* Move to Reserve/Main */}
                   {onMoveCard && filterZone !== undefined && filterZone !== 'maybeboard' ? (
                     <button
@@ -274,44 +269,6 @@ export default function DeckCardList({
                     <span aria-hidden />
                   )}
 
-                  {/* Move to Maybeboard */}
-                  {onMoveCard && filterZone !== undefined && filterZone !== 'maybeboard' ? (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenMenuCard(null);
-                        onMoveCard(card.name, card.set, zone, 'maybeboard');
-                      }}
-                      className="w-8 h-8 hover:scale-110 bg-card/95 backdrop-blur rounded-md shadow-lg border border-border flex items-center justify-center text-violet-600 dark:text-violet-400 transition-all"
-                      title="Move to maybeboard"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                      </svg>
-                    </button>
-                  ) : (
-                    <span aria-hidden />
-                  )}
-
-                  {/* View Card Details */}
-                  {onViewCard ? (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onViewCard(card);
-                        setOpenMenuCard(null);
-                      }}
-                      className="w-8 h-8 hover:scale-110 bg-card/95 backdrop-blur rounded-md shadow-lg border border-border flex items-center justify-center text-foreground transition-all"
-                      title="View card details"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                    </button>
-                  ) : (
-                    <span aria-hidden />
-                  )}
-
                   {/* Remove All Copies */}
                   <button
                     onClick={(e) => {
@@ -326,11 +283,32 @@ export default function DeckCardList({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
+
+                  {/* Move to Maybeboard */}
+                  {onMoveCard && filterZone !== undefined && filterZone !== 'maybeboard' ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenMenuCard(null);
+                        onMoveCard(card.name, card.set, zone, 'maybeboard');
+                      }}
+                      className="w-8 h-8 hover:scale-110 bg-card/95 backdrop-blur rounded-md shadow-lg border border-border flex items-center justify-center text-violet-600 dark:text-violet-400 transition-all"
+                      title="Move to maybeboard"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                      </svg>
+                    </button>
+                  ) : (
+                    <span aria-hidden />
+                  )}
                 </div>
               )}
 
-              {/* Controls Overlay - Shows on Hover, Golden Ratio 2x2 Grid */}
-              <div className="absolute inset-x-0 bottom-0 transition-opacity duration-200">
+              {/* Controls Overlay - Shows on Hover, Golden Ratio 2x2 Grid.
+                  Hidden via container query when the card is too narrow
+                  (see .deck-card-controls in globals.css). */}
+              <div className="deck-card-controls absolute inset-x-0 bottom-0 transition-opacity duration-200">
                 {/* Using golden ratio: top section ~61.8%, bottom ~38.2% */}
                 <div className="grid grid-rows-[1.618fr_1fr] grid-cols-2 gap-1.5 p-3 h-32">
                   {/* Top Left: Decrement */}
@@ -340,13 +318,13 @@ export default function DeckCardList({
                         e.stopPropagation();
                         onDecrement(card.name, card.set, zone);
                       }}
-                      className="w-14 h-14 max-w-full max-h-full flex items-center justify-center rounded-lg bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-3xl border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
+                      className="aspect-square w-full max-w-14 flex items-center justify-center rounded-lg bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-2xl leading-none border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
                       aria-label="Decrease quantity"
                     >
                       −
                     </button>
                   </div>
-                  
+
                   {/* Top Right: Increment */}
                   <div className="flex items-center justify-center">
                     <button
@@ -354,13 +332,13 @@ export default function DeckCardList({
                         e.stopPropagation();
                         onIncrement(card.name, card.set, zone);
                       }}
-                      className="w-14 h-14 max-w-full max-h-full flex items-center justify-center rounded-lg bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-3xl border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
+                      className="aspect-square w-full max-w-14 flex items-center justify-center rounded-lg bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-2xl leading-none border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
                       aria-label="Increase quantity"
                     >
                       +
                     </button>
                   </div>
-                  
+
                   {/* Bottom Left: Menu Button */}
                   <div className="flex items-center justify-center">
                     <button
@@ -368,7 +346,7 @@ export default function DeckCardList({
                         e.stopPropagation();
                         setOpenMenuCard(openMenuCard === cardKey ? null : cardKey);
                       }}
-                      className="w-10 h-10 max-w-full max-h-full flex items-center justify-center rounded-lg bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
+                      className="aspect-square w-full max-w-10 flex items-center justify-center rounded-lg bg-black/30 hover:bg-black/50 backdrop-blur-md text-white transition-all border border-white/20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
                       aria-label="Card options"
                     >
                       {/* Horizontal dots icon */}
@@ -377,13 +355,19 @@ export default function DeckCardList({
                       </svg>
                     </button>
                   </div>
-                  
-                  {/* Bottom Right: Quantity Display - Always Visible, Compact Style */}
-                  <div className="flex items-center justify-center">
-                    <div key={quantity} className="animate-qty-pop bg-black/75 backdrop-blur-sm text-white px-2.5 py-1 rounded-md font-bold text-sm shadow-lg">
-                      ×{quantity}
-                    </div>
-                  </div>
+
+                  {/* Bottom-right grid cell reserved so the quantity badge
+                      keeps its visual anchor when controls are visible. */}
+                  <div />
+                </div>
+              </div>
+
+              {/* Quantity Badge - Always Visible. Lives outside the controls
+                  grid so it stays readable even when the grid is hidden by
+                  the container query at narrow card widths. */}
+              <div className="deck-card-badge absolute bottom-1.5 right-1.5 pointer-events-none z-10">
+                <div key={quantity} className="animate-qty-pop bg-black/75 backdrop-blur-sm text-white px-2.5 py-1 rounded-md font-bold text-sm shadow-lg">
+                  ×{quantity}
                 </div>
               </div>
             </div>
@@ -834,7 +818,7 @@ export default function DeckCardList({
                   title="Move to maybeboard"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
                   </svg>
                 </button>
               )}

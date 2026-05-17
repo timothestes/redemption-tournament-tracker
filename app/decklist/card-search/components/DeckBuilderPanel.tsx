@@ -85,7 +85,13 @@ function Droppable({
 }) {
   const { setNodeRef, isOver } = useDroppable({ id, data: { zone } });
   const { setRef: setExternalRef, isOver: isExternalOver } = useExternalDropTarget(onExternalDrop);
-  const combinedRef = combineRefs<HTMLDivElement>(setNodeRef, setExternalRef);
+  // Stable across renders so the native dragenter/dragover listeners attached
+  // by setExternalRef don't churn off-and-on every parent re-render (which
+  // suppresses dragenter when the cursor is already inside).
+  const combinedRef = React.useMemo(
+    () => combineRefs<HTMLDivElement>(setNodeRef, setExternalRef),
+    [setNodeRef, setExternalRef],
+  );
   return (
     <div ref={combinedRef} className={className(isOver || isExternalOver)}>
       {children}
@@ -281,15 +287,24 @@ export default function DeckBuilderPanel({
   const [coverPickerSort, setCoverPickerSort] = useState<"default" | "name" | "type" | "brigade">("type");
   const [coverPickerSearch, setCoverPickerSearch] = useState("");
 
-  // Measure active tab position for sliding indicator
+  // Measure active tab position for sliding indicator. Runs on activeTab
+  // change and on tab bar resize (the container query swaps label widths
+  // when the panel crosses 560px, so the underline must remeasure).
   useEffect(() => {
-    const tab = tabRefs.current[activeTab];
     const bar = tabBarRef.current;
-    if (tab && bar) {
+    if (!bar) return;
+    const measure = () => {
+      const tab = tabRefs.current[activeTab];
+      if (!tab) return;
       const barRect = bar.getBoundingClientRect();
       const tabRect = tab.getBoundingClientRect();
       setTabIndicator({ left: tabRect.left - barRect.left, width: tabRect.width });
-    }
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(bar);
+    return () => ro.disconnect();
   }, [activeTab]);
 
   // Close cover picker on Escape
@@ -1324,7 +1339,7 @@ export default function DeckBuilderPanel({
         )}
 
         {/* Card Count and Menu Button Row — desktop only */}
-        <div className="hidden md:flex mt-2 flex-col md:flex-row md:items-center md:justify-between gap-3 min-w-0">
+        <div className="deck-header-row hidden md:flex mt-2 flex-col md:flex-row md:items-center md:justify-between gap-3 min-w-0">
           <div className="flex items-center gap-2 md:gap-3 text-sm flex-wrap min-w-0" suppressHydrationWarning>
             {/* Desktop: Format Selector (T1/T2/Paragon) */}
             <div className="hidden md:flex items-center gap-1 bg-muted rounded-full p-0.5">
@@ -1467,7 +1482,7 @@ export default function DeckBuilderPanel({
                   }
                 }}
                 disabled={syncStatus?.isSaving || !isAuthenticated}
-                className={`hidden md:flex px-4 py-1.5 text-sm font-medium rounded transition-all items-center gap-2 min-w-[140px] justify-center ${
+                className={`save-btn hidden md:flex px-4 py-1.5 text-sm font-medium rounded transition-all items-center gap-2 justify-center ${
                   syncStatus?.isSaving || !isAuthenticated
                     ? 'bg-muted text-muted-foreground cursor-not-allowed'
                     : hasUnsavedChanges
@@ -1499,7 +1514,8 @@ export default function DeckBuilderPanel({
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                     </svg>
-                    Save (Ctrl+S)
+                    <span className="save-label-long">Save (Ctrl+S)</span>
+                    <span className="save-label-short">Save</span>
                   </>
                 ) : (
                   <>
@@ -1521,7 +1537,7 @@ export default function DeckBuilderPanel({
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-                <span className="hidden md:inline">New Deck</span>
+                <span className="new-deck-label-long">New Deck</span>
               </button>
             )}
 
@@ -1782,7 +1798,7 @@ export default function DeckBuilderPanel({
       {/* ...existing code... */}
       {/* Tabs - Hide when expanded (full screen view) */}
       {!isExpanded && (
-      <div ref={tabBarRef} className="flex-shrink-0 flex items-center border-b border-border bg-card relative z-20">
+      <div ref={tabBarRef} className="deck-tabbar flex-shrink-0 flex items-center border-b border-border bg-card relative z-20">
         {/* Sliding tab indicator */}
         <div
           className="absolute bottom-0 h-0.5 bg-primary transition-all duration-200"
@@ -1808,14 +1824,14 @@ export default function DeckBuilderPanel({
           <button
             ref={(el) => { tabRefs.current.main = el; }}
             onClick={() => handleTabChange("main")}
-            className={`w-full px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
+            className={`w-full overflow-hidden px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
               activeTab === "main"
                 ? "text-blue-600 dark:text-blue-400"
                 : "text-muted-foreground hover:text-foreground"
             } ${isDragging ? "bg-primary/5" : ""}`}
           >
-            <span className="md:hidden">Main <span className="text-[10px] opacity-75">{mainDeckCount}</span></span>
-            <span className="hidden md:inline">Main ({mainDeckCount})</span>
+            <span className="tab-label-short">Main <span className="text-[10px] opacity-75">{mainDeckCount}</span></span>
+            <span className="tab-label-long">Main ({mainDeckCount})</span>
           </button>
         </Droppable>
         <Droppable
@@ -1834,14 +1850,14 @@ export default function DeckBuilderPanel({
           <button
             ref={(el) => { tabRefs.current.reserve = el; }}
             onClick={() => handleTabChange("reserve")}
-            className={`w-full px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
+            className={`w-full overflow-hidden px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
               activeTab === "reserve"
                 ? "text-blue-600 dark:text-blue-400"
                 : "text-muted-foreground hover:text-foreground"
             } ${isDragging ? "bg-primary/5" : ""}`}
           >
-            <span className="md:hidden">Res <span className="text-[10px] opacity-75">{reserveCount}</span></span>
-            <span className="hidden md:inline">Reserve ({reserveCount})</span>
+            <span className="tab-label-short">Res <span className="text-[10px] opacity-75">{reserveCount}</span></span>
+            <span className="tab-label-long">Reserve ({reserveCount})</span>
           </button>
         </Droppable>
         <button
@@ -1850,7 +1866,7 @@ export default function DeckBuilderPanel({
           onMouseEnter={() => setShowValidationTooltip(true)}
           onMouseLeave={() => setShowValidationTooltip(false)}
           aria-disabled={isDragging || undefined}
-          className={`relative flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
+          className={`relative flex-1 min-w-0 overflow-hidden px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
             isDragging ? "opacity-40 pointer-events-none" : ""
           } ${
             activeTab === "info"
@@ -1862,22 +1878,34 @@ export default function DeckBuilderPanel({
             Stats
             {validation.stats.totalCards > 0 && !ignoreLegalityChecks && (
               isDeckChecking ? (
-                <span className="hidden md:inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-500">
-                  <svg className="w-2.5 h-2.5 text-white animate-spin" viewBox="0 0 12 12" fill="none">
-                    <circle cx="6" cy="6" r="5" stroke="currentColor" strokeOpacity="0.3" strokeWidth="1.5" />
-                    <path d="M11 6a5 5 0 00-5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
-                </span>
+                <>
+                  <span className="tab-badge items-center justify-center w-4 h-4 rounded-full bg-gray-500">
+                    <svg className="w-2.5 h-2.5 text-white animate-spin" viewBox="0 0 12 12" fill="none">
+                      <circle cx="6" cy="6" r="5" stroke="currentColor" strokeOpacity="0.3" strokeWidth="1.5" />
+                      <path d="M11 6a5 5 0 00-5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                  </span>
+                  <span className="tab-dot w-1.5 h-1.5 rounded-full bg-gray-500" />
+                </>
               ) : (
-                <span
-                  className={`hidden md:inline-flex items-center justify-center w-4 h-4 text-xs rounded-full ${
-                    (deckCheckResult?.valid ?? validation.isValid)
-                      ? "bg-green-500 text-white"
-                      : "bg-red-500 text-white"
-                  }`}
-                >
-                  {(deckCheckResult?.valid ?? validation.isValid) ? "✓" : "!"}
-                </span>
+                <>
+                  <span
+                    className={`tab-badge items-center justify-center w-4 h-4 text-xs rounded-full ${
+                      (deckCheckResult?.valid ?? validation.isValid)
+                        ? "bg-green-500 text-white"
+                        : "bg-red-500 text-white"
+                    }`}
+                  >
+                    {(deckCheckResult?.valid ?? validation.isValid) ? "✓" : "!"}
+                  </span>
+                  <span
+                    className={`tab-dot w-1.5 h-1.5 rounded-full ${
+                      (deckCheckResult?.valid ?? validation.isValid)
+                        ? "bg-green-500"
+                        : "bg-red-500"
+                    }`}
+                  />
+                </>
               )
             )}
           </span>
@@ -1944,7 +1972,7 @@ export default function DeckBuilderPanel({
           ref={(el) => { tabRefs.current.cover = el; }}
           onClick={() => handleTabChange("cover")}
           aria-disabled={isDragging || undefined}
-          className={`flex-1 min-w-0 px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
+          className={`flex-1 min-w-0 overflow-hidden px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
             isDragging ? "opacity-40 pointer-events-none" : ""
           } ${
             activeTab === "cover"
@@ -1968,7 +1996,7 @@ export default function DeckBuilderPanel({
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
             </svg>
-            <span className="hidden md:inline">View</span>
+            <span className="tab-view-label">View</span>
             <svg className={`w-3 h-3 transition-transform ${showViewDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
@@ -3264,19 +3292,11 @@ export default function DeckBuilderPanel({
       {!isExpanded && (activeTab === 'main' || activeTab === 'reserve') && (
         <MaybeboardStrip
           cards={deck.cards.filter((dc) => dc.zone === 'maybeboard')}
-          onIncrement={(name, set) => onAddCard(name, set, 'maybeboard')}
+          onMoveToActive={(name, set) => handleMoveCard(name, set, 'maybeboard', activeTab === 'reserve' ? 'reserve' : 'main')}
           onDecrement={(name, set) => onRemoveCard(name, set, 'maybeboard')}
-          onRemove={(name, set) => {
-            // Remove all copies by stepping down to 0.
-            const dc = deck.cards.find(
-              (c) => c.card.name === name && c.card.set === set && c.zone === 'maybeboard'
-            );
-            if (!dc) return;
-            for (let i = 0; i < dc.quantity; i++) onRemoveCard(name, set, 'maybeboard');
-          }}
-          onMoveCard={(name, set, toZone) => handleMoveCard(name, set, 'maybeboard', toZone)}
           onAddCard={(name, set) => onAddCard(name, set, 'maybeboard')}
           onViewCard={onViewCard}
+          activeZone={activeTab === 'reserve' ? 'reserve' : 'main'}
           deckId={deck.id}
         />
       )}

@@ -1233,7 +1233,19 @@ export default function ModalWithClose({
               <img
                 src={getImageUrl(modalCard.imgFile)}
                 alt={modalCard.name}
-                className="max-w-full max-h-full object-contain rounded shadow-lg"
+                className={`max-w-full max-h-full object-contain rounded shadow-lg ${onAddCard ? "cursor-grab active:cursor-grabbing" : ""}`}
+                draggable={!!onAddCard}
+                onDragStart={onAddCard ? (e) => {
+                  e.dataTransfer.setData(
+                    "application/x-redemption-card",
+                    JSON.stringify({ name: modalCard.name, set: modalCard.set }),
+                  );
+                  e.dataTransfer.effectAllowed = "copy";
+                  // Defer modal close so the browser captures the drag-ghost
+                  // snapshot of the image first. Closing synchronously can
+                  // cancel the drag in Firefox before the snapshot is taken.
+                  requestAnimationFrame(() => closeModal());
+                } : undefined}
               />
             </div>
             <div className="flex-1 overflow-auto pr-1">

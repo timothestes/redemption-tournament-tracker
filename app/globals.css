@@ -218,3 +218,70 @@ button:focus, button:focus-visible,
     background-position: center 82% !important;
   }
 }
+
+/* Deck-card frame: container query that hides the 2x2 control overlay
+   when the card is too narrow for usable touch targets. Badge sits
+   outside this grid so the quantity stays legible at any width. */
+.deck-card-frame {
+  container-type: inline-size;
+}
+
+@container (max-width: 70px) {
+  .deck-card-controls {
+    display: none;
+  }
+  /* Shrink the badge so it doesn't dominate a tiny card. */
+  .deck-card-badge > div {
+    font-size: 10px;
+    padding: 1px 5px;
+    line-height: 1.1;
+  }
+}
+
+/* Deck builder tab bar: switch label / badge / "View" text on the panel's
+   own width instead of the viewport. The sidebar can squeeze the panel
+   below the threshold even on wide screens, which caused tab labels to
+   collide. Short labels and a status dot stay legible at any width. */
+.deck-tabbar {
+  container-type: inline-size;
+  container-name: deck-tabbar;
+}
+.deck-tabbar .tab-label-long  { display: none; }
+.deck-tabbar .tab-label-short { display: inline; }
+.deck-tabbar .tab-badge       { display: none; }
+.deck-tabbar .tab-dot         { display: inline-block; }
+.deck-tabbar .tab-view-label  { display: none; }
+@container deck-tabbar (min-width: 560px) {
+  .deck-tabbar .tab-label-long  { display: inline; }
+  .deck-tabbar .tab-label-short { display: none; }
+  .deck-tabbar .tab-badge       { display: inline-flex; }
+  .deck-tabbar .tab-dot         { display: none; }
+  .deck-tabbar .tab-view-label  { display: inline; }
+}
+
+/* Deck builder header row: collapse Save button text and hide "New Deck"
+   label when the row is too narrow to fit them alongside the format pill
+   (T1 / T2 / Paragon). Same panel-width-not-viewport-width approach. */
+.deck-header-row {
+  container-type: inline-size;
+  container-name: deck-header;
+}
+.deck-header-row .save-label-long     { display: none; }
+.deck-header-row .save-label-short    { display: inline; }
+.deck-header-row .new-deck-label-long { display: none; }
+@container deck-header (min-width: 500px) {
+  .deck-header-row .save-label-long     { display: inline; }
+  .deck-header-row .save-label-short    { display: none; }
+  .deck-header-row .new-deck-label-long { display: inline; }
+  .deck-header-row .save-btn            { min-width: 140px; }
+}
+
+/* Touch devices (no real :hover) can't trigger Tailwind's group-hover
+   variants, so the −/+/⋯ buttons would stay invisible. Reveal them
+   when the container is wide enough to host them. */
+@media (hover: none) {
+  .deck-card-controls button {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+}

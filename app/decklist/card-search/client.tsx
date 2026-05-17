@@ -731,11 +731,11 @@ export default function CardSearchClient() {
       const target = e.target as HTMLElement;
       const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
 
-      // "/" focuses the first search input from anywhere on the page (only when not already typing)
+      // "/" resets all filters and focuses the first search input — power-user "start fresh" gesture.
       if (!modKey && e.key === '/' && !isTyping && !modalCard) {
         e.preventDefault();
+        handleResetFilters();
         inputRefs.current[0]?.focus();
-        inputRefs.current[0]?.select();
         return;
       }
 
@@ -1672,7 +1672,7 @@ export default function CardSearchClient() {
                       >
                         <span>Type</span>
                         <kbd className="px-1 py-px text-[11px] font-mono leading-none text-foreground/80 bg-muted/60 rounded">/</kbd>
-                        <span>to focus</span>
+                        <span>to reset</span>
                       </span>
                     )}
                   </div>
@@ -2238,7 +2238,7 @@ export default function CardSearchClient() {
 
                   {/* Menu items overlay */}
                   {!isSpotlight && isMenuOpen && (
-                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-1.5 py-4 z-40">
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 grid grid-cols-2 gap-2 z-40">
                       {/* Add to Main Deck */}
                       <button
                         onClick={(e) => {
@@ -2246,7 +2246,7 @@ export default function CardSearchClient() {
                           addCard(c, 'main');
                           setOpenSearchMenuCard(null);
                         }}
-                        className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-muted-foreground transition-all"
+                        className="w-9 h-9 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-muted-foreground transition-all"
                         title="Add to deck"
                       >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -2261,26 +2261,11 @@ export default function CardSearchClient() {
                           addCard(c, 'reserve');
                           setOpenSearchMenuCard(null);
                         }}
-                        className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-muted-foreground transition-all"
+                        className="w-9 h-9 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-muted-foreground transition-all"
                         title="Add to reserve"
                       >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                        </svg>
-                      </button>
-
-                      {/* Add to Maybeboard */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          addCard(c, 'maybeboard');
-                          setOpenSearchMenuCard(null);
-                        }}
-                        className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-violet-600 dark:text-violet-400 transition-all"
-                        title="Add to maybeboard"
-                      >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                         </svg>
                       </button>
 
@@ -2292,7 +2277,7 @@ export default function CardSearchClient() {
                             removeCard(c.name, c.set, 'main');
                             setOpenSearchMenuCard(null);
                           }}
-                          className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-red-600 dark:text-red-400 transition-all"
+                          className="w-9 h-9 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-red-600 dark:text-red-400 transition-all"
                           title="Remove from deck"
                         >
                           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -2309,7 +2294,7 @@ export default function CardSearchClient() {
                             removeCard(c.name, c.set, 'reserve');
                             setOpenSearchMenuCard(null);
                           }}
-                          className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-orange-600 dark:text-orange-400 transition-all"
+                          className="w-9 h-9 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-orange-600 dark:text-orange-400 transition-all"
                           title="Remove from reserve"
                         >
                           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -2317,6 +2302,23 @@ export default function CardSearchClient() {
                           </svg>
                         </button>
                       )}
+
+                      {/* Add to Maybeboard */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addCard(c, 'maybeboard');
+                          setOpenSearchMenuCard(null);
+                        }}
+                        className={`w-9 h-9 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-violet-600 dark:text-violet-400 transition-all ${
+                          quantityInDeck === 0 && quantityInReserve === 0 ? "col-span-2 justify-self-center" : ""
+                        }`}
+                        title="Add to maybeboard"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                        </svg>
+                      </button>
                     </div>
                   )}
 
