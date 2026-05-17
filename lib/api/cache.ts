@@ -195,6 +195,31 @@ async function loadListFresh(params: ListParams): Promise<ListPayload> {
   q = q.range(offset, offset + params.page_size - 1);
 
   const { data, count, error } = await q;
+
+  // PGRST103 = "Requested range not satisfiable" — caller paginated past the
+  // last page. Return an empty page with the real total instead of erroring.
+  if (error && error.code === "PGRST103") {
+    let countQ = supabase
+      .from("decks")
+      .select("id", { head: true, count: "exact" })
+      .eq("is_public", true);
+    if (params.format) {
+      countQ = params.format === "Type 1"
+        ? countQ.or("format.is.null,format.eq.Type 1")
+        : countQ.eq("format", params.format);
+    }
+    if (userIdFilter) countQ = countQ.eq("user_id", userIdFilter);
+    const { count: totalCount } = await countQ;
+    return {
+      data: [],
+      pagination: {
+        page: params.page,
+        page_size: params.page_size,
+        total: totalCount ?? 0,
+        has_more: false,
+      },
+    };
+  }
   if (error) throw error;
 
   const rows = (data ?? []) as unknown as DeckRow[];
