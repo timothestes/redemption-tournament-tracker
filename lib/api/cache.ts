@@ -97,6 +97,7 @@ function deckUrl(id: string): string {
 
 type DeckRow = {
   id: string;
+  user_id: string | null;
   name: string;
   description: string | null;
   format: string | null;
@@ -106,10 +107,9 @@ type DeckRow = {
   view_count: number | null;
   created_at: string;
   updated_at: string;
-  profiles: { username: string | null } | null;
 };
 
-function rowToPayload(row: DeckRow): DeckPayload {
+function rowToPayload(row: DeckRow, username: string | null): DeckPayload {
   return {
     id: row.id,
     name: row.name,
@@ -119,7 +119,7 @@ function rowToPayload(row: DeckRow): DeckPayload {
     card_count: row.card_count ?? 0,
     is_legal: row.is_legal ?? false,
     view_count: row.view_count ?? 0,
-    username: row.profiles?.username ?? null,
+    username,
     created_at: row.created_at,
     updated_at: row.updated_at,
     url: deckUrl(row.id),
@@ -127,7 +127,23 @@ function rowToPayload(row: DeckRow): DeckPayload {
 }
 
 const DECK_COLUMNS =
-  "id, name, description, format, paragon, card_count, is_legal, view_count, created_at, updated_at, profiles!inner(username)";
+  "id, user_id, name, description, format, paragon, card_count, is_legal, view_count, created_at, updated_at";
+
+async function resolveUsernames(
+  supabase: ReturnType<typeof anonClient>,
+  userIds: string[],
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (userIds.length === 0) return map;
+  const { data } = await supabase
+    .from("profiles")
+    .select("id, username")
+    .in("id", userIds);
+  for (const row of data ?? []) {
+    if (row.username) map.set(row.id, row.username);
+  }
+  return map;
+}
 
 async function loadListFresh(params: ListParams): Promise<ListPayload> {
   const supabase = anonClient();
@@ -182,8 +198,11 @@ async function loadListFresh(params: ListParams): Promise<ListPayload> {
   if (error) throw error;
 
   const rows = (data ?? []) as unknown as DeckRow[];
+  const userIds = [...new Set(rows.map((r) => r.user_id).filter((x): x is string => !!x))];
+  const usernames = await resolveUsernames(supabase, userIds);
+
   return {
-    data: rows.map(rowToPayload),
+    data: rows.map((r) => rowToPayload(r, r.user_id ? usernames.get(r.user_id) ?? null : null)),
     pagination: {
       page: params.page,
       page_size: params.page_size,
@@ -205,13 +224,25 @@ async function loadDetailFresh(id: string): Promise<DetailPayload | null> {
   if (error) throw error;
   if (!deck) return null;
 
+  const row = deck as unknown as DeckRow;
+
   const { data: cards, error: cardsErr } = await supabase
     .from("deck_cards")
     .select("card_name, card_set, quantity, zone")
     .eq("deck_id", id);
   if (cardsErr) throw cardsErr;
 
-  const payload = rowToPayload(deck as unknown as DeckRow);
+  let username: string | null = null;
+  if (row.user_id) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("username")
+      .eq("id", row.user_id)
+      .maybeSingle();
+    username = profile?.username ?? null;
+  }
+
+  const payload = rowToPayload(row, username);
   return {
     ...payload,
     cards: (cards ?? []).map((c: { card_name: string; card_set: string | null; quantity: number; zone: string }) => ({
