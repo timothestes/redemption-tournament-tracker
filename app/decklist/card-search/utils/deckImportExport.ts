@@ -39,21 +39,15 @@ function getRequiredTokens(deck: Deck): string[] {
     if (dc.zone === 'maybeboard') return;
     const cardName = normalizeCardName(dc.card.name);
 
-    // Check if this card generates tokens
     Object.entries(CARD_TO_TOKEN_MAP).forEach(([sourceCard, tokens]) => {
       const normalizedSourceCard = normalizeCardName(sourceCard);
-
-      // Check for exact match or if the card name contains the source card pattern
-      // This handles cases where the card database might have slight variations
       const matches = cardName === normalizedSourceCard ||
                      cardName.toLowerCase() === normalizedSourceCard.toLowerCase() ||
                      (normalizedSourceCard.includes("(") &&
                       cardName.toLowerCase().includes(normalizedSourceCard.toLowerCase()));
 
       if (matches) {
-        // Some cards generate multiple tokens (separated by |)
-        const tokenNames = tokens.split("|");
-        tokenNames.forEach(token => tokenSet.add(token));
+        tokens.split("|").forEach(token => tokenSet.add(token));
       }
     });
   });
@@ -283,8 +277,8 @@ export function generateDeckText(deck: Deck): string {
   }
 
   // Tokens section: auto-generated tokens first (under `# auto-generated`),
-  // then maybeboard cards (under `# maybeboard`). Markers let parseDeckText
-  // route maybeboard cards back to the correct zone on re-import.
+  // then maybeboard cards (under `# maybeboard`). Both can coexist; the
+  // markers let parseDeckText route each set back to the correct zone.
   const requiredTokens = getRequiredTokens(deck);
   if (requiredTokens.length > 0 || maybeboardCards.length > 0) {
     lines.push(""); // Empty line before Tokens

@@ -731,11 +731,11 @@ export default function CardSearchClient() {
       const target = e.target as HTMLElement;
       const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
 
-      // "/" focuses the first search input from anywhere on the page (only when not already typing)
+      // "/" resets all filters and focuses the first search input — power-user "start fresh" gesture.
       if (!modKey && e.key === '/' && !isTyping && !modalCard) {
         e.preventDefault();
+        handleResetFilters();
         inputRefs.current[0]?.focus();
-        inputRefs.current[0]?.select();
         return;
       }
 
@@ -1672,7 +1672,7 @@ export default function CardSearchClient() {
                       >
                         <span>Type</span>
                         <kbd className="px-1 py-px text-[11px] font-mono leading-none text-foreground/80 bg-muted/60 rounded">/</kbd>
-                        <span>to focus</span>
+                        <span>to reset</span>
                       </span>
                     )}
                   </div>
