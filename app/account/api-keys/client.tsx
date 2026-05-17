@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { createApiKeyAction, revokeApiKeyAction } from "./actions";
+import ConfirmationDialog from "@/components/ui/confirmation-dialog";
 
 export type ApiKeyRow = {
   id: string;
@@ -39,6 +40,7 @@ export function ApiKeysClient({ initialKeys }: { initialKeys: ApiKeyRow[] }) {
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [newlyCreated, setNewlyCreated] = useState<{ fullKey: string; name: string } | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<ApiKeyRow | null>(null);
   const [pending, startTransition] = useTransition();
 
   function handleCreate() {
@@ -66,8 +68,7 @@ export function ApiKeysClient({ initialKeys }: { initialKeys: ApiKeyRow[] }) {
     });
   }
 
-  function handleRevoke(id: string) {
-    if (!confirm("Revoke this API key? Active integrations using it will stop working.")) return;
+  function confirmRevoke(id: string) {
     startTransition(async () => {
       const result = await revokeApiKeyAction(id);
       if (result.ok) {
@@ -122,7 +123,7 @@ export function ApiKeysClient({ initialKeys }: { initialKeys: ApiKeyRow[] }) {
                 {!k.revokedAt && (
                   <button
                     type="button"
-                    onClick={() => handleRevoke(k.id)}
+                    onClick={() => setRevokeTarget(k)}
                     disabled={pending}
                     className="text-red-600 hover:underline"
                   >
@@ -172,6 +173,20 @@ export function ApiKeysClient({ initialKeys }: { initialKeys: ApiKeyRow[] }) {
       )}
 
       {newlyCreated && <RevealModal {...newlyCreated} onDismiss={() => setNewlyCreated(null)} />}
+
+      <ConfirmationDialog
+        open={revokeTarget !== null}
+        onOpenChange={(open) => !open && setRevokeTarget(null)}
+        onConfirm={() => {
+          if (revokeTarget) confirmRevoke(revokeTarget.id);
+          setRevokeTarget(null);
+        }}
+        variant="destructive"
+        title="Revoke API key"
+        description={revokeTarget ? `Active integrations using "${revokeTarget.name}" will stop working immediately.` : undefined}
+        confirmLabel="Revoke"
+        cancelLabel="Cancel"
+      />
     </div>
   );
 }
