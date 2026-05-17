@@ -4,6 +4,7 @@
 
 **Spec:** [`docs/superpowers/specs/2026-05-17-public-deck-api-design.md`](../specs/2026-05-17-public-deck-api-design.md)
 
+**Goal:** Ship a v1 read-only public HTTP API at `/api/v1/decks` exposing community deck data, gated by user-generated API keys, rate-limited via Upstash, cached via `unstable_cache` + Vercel edge CDN.
 
 **Architecture:** Next.js 15 App Router Route Handlers backed by the **anon** Supabase client (existing RLS enforces `is_public = true`). New `lib/api/` module hosts auth, rate-limit, cache, error, and CORS helpers — all consumed by the two route handlers. API keys are stored in a new `api_keys` table; users manage their own keys at `/account/api-keys`. Invalidation hooks added to existing deck-mutation actions in `app/decklist/actions.ts`.
 
