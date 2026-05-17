@@ -39,30 +39,6 @@ function DraggableRow({
       aria-roledescription="Draggable card"
     >
       {children}
-      {/* Drag-handle affordance. Hidden by default on hover-capable devices and
-          revealed on hover. On touch devices (no hover) it stays faintly visible
-          so users have a cue that the card is draggable without long-pressing
-          to discover it. Pointer-events-none keeps the row's drag listeners
-          firing through it. */}
-      <span
-        aria-hidden
-        className={
-          "pointer-events-none absolute top-1 left-1 z-10 inline-flex h-5 w-5 items-center justify-center rounded bg-background/80 text-foreground transition-opacity " +
-          // Touch (no hover): faintly visible at all times.
-          // Hover-capable: hidden by default, full opacity on hover.
-          "opacity-50 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/draggable:opacity-100"
-        }
-        title="Drag to move"
-      >
-        <svg viewBox="0 0 16 16" className="h-3 w-3" fill="currentColor" aria-hidden>
-          <circle cx="5" cy="3" r="1.2" />
-          <circle cx="11" cy="3" r="1.2" />
-          <circle cx="5" cy="8" r="1.2" />
-          <circle cx="11" cy="8" r="1.2" />
-          <circle cx="5" cy="13" r="1.2" />
-          <circle cx="11" cy="13" r="1.2" />
-        </svg>
-      </span>
     </div>
   );
 }
