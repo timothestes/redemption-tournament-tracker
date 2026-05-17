@@ -21,7 +21,6 @@ import { Deck, DeckZone } from "../types/deck";
 import { SyncStatus } from "../hooks/useDeckState";
 import DeckCardList from "./DeckCardList";
 import FullDeckView from "./FullDeckView";
-import MaybeboardStrip from "./MaybeboardStrip";
 import DragGhost from "./DragGhost";
 import { Switch } from "@headlessui/react";
 import { Card, normalizeBrigadeField } from "../utils";
@@ -55,7 +54,7 @@ function getTagContrastColor(hex: string): string {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.55 ? "#1f2937" : "#ffffff";
 }
 
-export type TabType = "main" | "reserve" | "info" | "cover";
+export type TabType = "main" | "reserve" | "maybe" | "info" | "cover";
 
 /**
  * Wrapper that registers a @dnd-kit droppable. Must be used inside a DndContext —
@@ -85,13 +84,7 @@ function Droppable({
 }) {
   const { setNodeRef, isOver } = useDroppable({ id, data: { zone } });
   const { setRef: setExternalRef, isOver: isExternalOver } = useExternalDropTarget(onExternalDrop);
-  // Stable across renders so the native dragenter/dragover listeners attached
-  // by setExternalRef don't churn off-and-on every parent re-render (which
-  // suppresses dragenter when the cursor is already inside).
-  const combinedRef = React.useMemo(
-    () => combineRefs<HTMLDivElement>(setNodeRef, setExternalRef),
-    [setNodeRef, setExternalRef],
-  );
+  const combinedRef = combineRefs<HTMLDivElement>(setNodeRef, setExternalRef);
   return (
     <div ref={combinedRef} className={className(isOver || isExternalOver)}>
       {children}
@@ -221,9 +214,15 @@ export default function DeckBuilderPanel({
   const [buyModalMode, setBuyModalMode] = useState<"exact" | "budget">("exact");
   const [showValidationTooltip, setShowValidationTooltip] = useState(false);
   const [showViewDropdown, setShowViewDropdown] = useState(false);
+  // Two triggers (mobile / desktop) live in the header action group; whichever
+  // one is currently visible (offsetParent != null) wins so the portal popover
+  // anchors to the actual rendered button.
   const viewDropdownBtnRef = useRef<HTMLButtonElement>(null);
+  const setViewDropdownTrigger = useCallback((el: HTMLButtonElement | null) => {
+    if (el && el.offsetParent !== null) viewDropdownBtnRef.current = el;
+  }, []);
   const tabBarRef = useRef<HTMLDivElement>(null);
-  const tabRefs = useRef<Record<TabType, HTMLButtonElement | null>>({ main: null, reserve: null, info: null, cover: null });
+  const tabRefs = useRef<Record<TabType, HTMLButtonElement | null>>({ main: null, reserve: null, maybe: null, info: null, cover: null });
   const [tabIndicator, setTabIndicator] = useState({ left: 0, width: 0 });
   const [showMobileFullDeckView, setShowMobileFullDeckView] = useState(false);
   const [fullViewPreviewCard, setFullViewPreviewCard] = useState<Card | null>(null);
@@ -287,9 +286,10 @@ export default function DeckBuilderPanel({
   const [coverPickerSort, setCoverPickerSort] = useState<"default" | "name" | "type" | "brigade">("type");
   const [coverPickerSearch, setCoverPickerSearch] = useState("");
 
-  // Measure active tab position for sliding indicator. Runs on activeTab
-  // change and on tab bar resize (the container query swaps label widths
-  // when the panel crosses 560px, so the underline must remeasure).
+  // Measure active tab position for sliding indicator. Re-measures on
+  // `activeTab` change AND whenever the tab bar resizes (e.g. user drags the
+  // deck-panel splitter, window resize) — otherwise the indicator stays at the
+  // stale pixel offset measured for the previous bar width.
   useEffect(() => {
     const bar = tabBarRef.current;
     if (!bar) return;
@@ -301,7 +301,6 @@ export default function DeckBuilderPanel({
       setTabIndicator({ left: tabRect.left - barRect.left, width: tabRect.width });
     };
     measure();
-    if (typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver(measure);
     ro.observe(bar);
     return () => ro.disconnect();
@@ -569,8 +568,13 @@ export default function DeckBuilderPanel({
   // Calculate deck stats
   const mainDeckCards = deck.cards.filter((dc) => dc.zone === 'main');
   const reserveCards = deck.cards.filter((dc) => dc.zone === 'reserve');
+  const maybeboardCards = deck.cards.filter((dc) => dc.zone === 'maybeboard');
   const mainDeckCount = mainDeckCards.reduce((sum, dc) => sum + dc.quantity, 0);
   const reserveCount = reserveCards.reduce((sum, dc) => sum + dc.quantity, 0);
+  // Maybe tab badge shows unique-card count (matches the existing Main/Reserve
+  // tab badge style which uses total quantity; here we deliberately use unique
+  // count per the redesign brief, since maybeboard quantities are noisy).
+  const maybeboardCount = maybeboardCards.length;
   const totalCards = mainDeckCount + reserveCount;
 
   // Calculate total deck price
@@ -659,8 +663,9 @@ export default function DeckBuilderPanel({
       // After a tab-drop, switch the active tab so the user sees their card
       // land. We defer this until after the move (vs. mid-drag) because
       // switching tabs mid-drag unmounts the source draggable and aborts.
-      if (isTabDrop && (toZone === "main" || toZone === "reserve")) {
-        setActiveTab(toZone);
+      if (isTabDrop) {
+        if (toZone === "main" || toZone === "reserve") setActiveTab(toZone);
+        else if (toZone === "maybeboard") setActiveTab("maybe");
       }
     },
     // handleMoveCard is a stable closure over deck/onRemoveCard/onAddCard
@@ -840,7 +845,6 @@ export default function DeckBuilderPanel({
     <DndContext
       sensors={dndSensors}
       collisionDetection={dndCollisionDetection}
-      autoScroll={false}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
@@ -1042,6 +1046,22 @@ export default function DeckBuilderPanel({
             {deck.id && (
               <GoldfishButton deckId={deck.id} deckName={deck.name} format={deck.format} iconOnly />
             )}
+
+            {/* View (mobile) — sliders icon */}
+            <button
+              ref={setViewDropdownTrigger}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowViewDropdown(!showViewDropdown);
+              }}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground transition-colors"
+              title="View options"
+              aria-label="View options"
+            >
+              <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              </svg>
+            </button>
 
             {/* More menu */}
             <div className="relative">
@@ -1546,6 +1566,22 @@ export default function DeckBuilderPanel({
               <GoldfishButton deckId={deck.id} deckName={deck.name} format={deck.format} iconOnly />
             )}
 
+            {/* View Button (desktop) — sliders icon, icon-only to match neighbors */}
+            <button
+              ref={setViewDropdownTrigger}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowViewDropdown(!showViewDropdown);
+              }}
+              className="px-3 py-1.5 text-sm font-medium rounded border border-border bg-card hover:bg-muted text-muted-foreground transition-colors flex items-center gap-2"
+              title="View options"
+              aria-label="View options"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              </svg>
+            </button>
+
             {/* Menu Dropdown */}
             <div className="relative">
               <button
@@ -1860,6 +1896,32 @@ export default function DeckBuilderPanel({
             <span className="tab-label-long">Reserve ({reserveCount})</span>
           </button>
         </Droppable>
+        <Droppable
+          id="tab:maybe"
+          zone="maybeboard"
+          onExternalDrop={(payload) => {
+            onAddCard(payload.name, payload.set, "maybeboard");
+            setActiveTab("maybe");
+          }}
+          className={(isOver) =>
+            `flex-1 min-w-0 rounded transition-colors ${
+              isOver ? "bg-primary/10 ring-1 ring-inset ring-primary/40" : ""
+            }`
+          }
+        >
+          <button
+            ref={(el) => { tabRefs.current.maybe = el; }}
+            onClick={() => handleTabChange("maybe")}
+            className={`w-full overflow-hidden px-1.5 md:px-3 py-3 text-xs md:text-sm font-medium transition-colors duration-200 whitespace-nowrap text-center ${
+              activeTab === "maybe"
+                ? "text-blue-600 dark:text-blue-400"
+                : "text-muted-foreground hover:text-foreground"
+            } ${isDragging ? "bg-primary/5" : ""}`}
+          >
+            <span className="tab-label-short">Maybe <span className="text-[10px] opacity-75">{maybeboardCount}</span></span>
+            <span className="tab-label-long">Maybe ({maybeboardCount})</span>
+          </button>
+        </Droppable>
         <button
           ref={(el) => { tabRefs.current.info = el; }}
           onClick={() => handleTabChange("info")}
@@ -1983,27 +2045,10 @@ export default function DeckBuilderPanel({
           Details
         </button>
 
-        {/* View Dropdown Button */}
-        <div className="relative ml-auto mr-1 md:mr-2">
-          <button
-            ref={viewDropdownBtnRef}
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowViewDropdown(!showViewDropdown);
-            }}
-            className="px-1.5 md:px-3 py-2 text-xs md:text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-            </svg>
-            <span className="tab-view-label">View</span>
-            <svg className={`w-3 h-3 transition-transform ${showViewDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-
-          {/* View dropdown — rendered via portal to escape overflow-hidden ancestors */}
-          {showViewDropdown && createPortal(
+        {/* View dropdown trigger now lives in the deck-panel header's right
+            action group (Practice / View / ⋯), not in the tab row. The popover
+            content remains here because it portals to document.body anyway. */}
+        {showViewDropdown && createPortal(
             <>
               {/* Backdrop — mobile: visible overlay, desktop: transparent click-catcher */}
               <div
@@ -2302,7 +2347,6 @@ export default function DeckBuilderPanel({
             </>,
             document.body
           )}
-        </div>
       </div>
       )}
 
@@ -2631,6 +2675,87 @@ export default function DeckBuilderPanel({
                 </p>
                 <p className="text-muted-foreground text-xs mt-2">
                   Use the <span className="font-medium">...</span> menu on cards to add to reserve
+                </p>
+              </div>
+            )}
+          </Droppable>
+        ) : activeTab === "maybe" ? (
+          <Droppable
+            id="zone:maybeboard"
+            zone="maybeboard"
+            onExternalDrop={(payload) => onAddCard(payload.name, payload.set, "maybeboard")}
+            className={(isOver) =>
+              `space-y-4 rounded transition-colors flex-1 min-h-[240px] ${
+                isDragging ? "md:border-2 md:border-dashed md:border-border/40 md:-m-0.5" : ""
+              } ${
+                isOver ? "border-primary bg-primary/5" : ""
+              }`
+            }
+          >
+            {maybeboardCards.length > 0 ? (
+              groupCards(maybeboardCards).map(({ type, cards, count }) => {
+                const typeIcon = groupBy === 'type' ? getTypeIcon(type) : null;
+                const dualIconConfig = groupBy === 'type' ? getDualIconConfig(type) : null;
+                return (
+                <div key={type}>
+                  <div className="flex items-center gap-2 mb-2">
+                    {dualIconConfig ? (
+                      <div className="flex gap-0.5 flex-shrink-0">
+                        <img
+                          src={dualIconConfig.icon1}
+                          alt={dualIconConfig.alt1}
+                          className="w-6 h-6 object-contain"
+                        />
+                        <img
+                          src={dualIconConfig.icon2}
+                          alt={dualIconConfig.alt2}
+                          className="w-6 h-6 object-contain"
+                        />
+                      </div>
+                    ) : typeIcon && (
+                      <img
+                        src={typeIcon}
+                        alt={type}
+                        className="w-6 h-6 object-contain flex-shrink-0"
+                      />
+                    )}
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      {groupBy === 'type' ? prettifyTypeName(type) : type} ({count})
+                    </h4>
+                  </div>
+                  <DeckCardList
+                    cards={cards}
+                    onIncrement={(name, set, zone) => onAddCard(name, set, zone)}
+                    onDecrement={(name, set, zone) => onRemoveCard(name, set, zone)}
+                    onRemove={(name, set, zone) => {
+                      const card = deck.cards.find(
+                        (dc) => dc.card.name === name && dc.card.set === set && dc.zone === zone
+                      );
+                      if (card) {
+                        for (let i = 0; i < card.quantity; i++) {
+                          onRemoveCard(name, set, zone);
+                        }
+                      }
+                    }}
+                    filterZone="maybeboard"
+                    onViewCard={onViewCard}
+                    onMoveCard={handleMoveCard}
+                    showTypeIcons={false}
+                    viewLayout={viewLayout}
+                    showPrices={showPrices}
+                    disableHoverPreview={disableHoverPreview}
+                  />
+                </div>
+              );
+              })
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground text-sm">
+                  No cards on the maybeboard yet
+                </p>
+                <p className="text-muted-foreground text-xs mt-2">
+                  Drag cards here, or use the menu on a deck card to move it here.
+                  The maybeboard is a scratchpad — it&apos;s excluded from legality, totals, and play.
                 </p>
               </div>
             )}
@@ -3284,22 +3409,6 @@ export default function DeckBuilderPanel({
         </>
         )}
       </div>
-
-      {/* Maybeboard strip — sits outside the scroll area as its own row at the
-          panel bottom, so it's always pinned to the viewport bottom regardless
-          of deck length. Only relevant on Main / Reserve tabs; hidden in
-          expanded full-deck view. */}
-      {!isExpanded && (activeTab === 'main' || activeTab === 'reserve') && (
-        <MaybeboardStrip
-          cards={deck.cards.filter((dc) => dc.zone === 'maybeboard')}
-          onMoveToActive={(name, set) => handleMoveCard(name, set, 'maybeboard', activeTab === 'reserve' ? 'reserve' : 'main')}
-          onDecrement={(name, set) => onRemoveCard(name, set, 'maybeboard')}
-          onAddCard={(name, set) => onAddCard(name, set, 'maybeboard')}
-          onViewCard={onViewCard}
-          activeZone={activeTab === 'reserve' ? 'reserve' : 'main'}
-          deckId={deck.id}
-        />
-      )}
 
       {/* Generate PDF Modal */}
       {showGeneratePDFModal && (

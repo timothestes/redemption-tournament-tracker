@@ -5,6 +5,7 @@ import { useCardImageUrl } from "./hooks/useCardImageUrl";
 import { useCardPrices } from "./hooks/useCardPrices";
 import { useCardRulings, type CardRuling } from "./hooks/useCardRulings";
 import { useDuplicateCards } from "./hooks/useDuplicateCards";
+import { SEARCH_DRAG_MIME } from "./hooks/useExternalDropTarget";
 import { useIsAdmin } from "../../../hooks/useIsAdmin";
 import { createRuling, updateRuling, deleteRuling } from "../../admin/rulings/actions";
 import { DuplicateCards, DuplicateCardsMobile } from "./components/DuplicateCards";
@@ -624,7 +625,7 @@ export default function ModalWithClose({
       } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
         if (!onAddCard || !onRemoveCard) return;
 
-        const zone: DeckZone = activeDeckTab === "reserve" ? "reserve" : "main";
+        const zone: DeckZone = activeDeckTab === "reserve" ? "reserve" : activeDeckTab === "maybe" ? "maybeboard" : "main";
         if (e.key === "ArrowUp") {
           onAddCard(modalCard, zone);
         } else {
@@ -1237,12 +1238,12 @@ export default function ModalWithClose({
                 draggable={!!onAddCard}
                 onDragStart={onAddCard ? (e) => {
                   e.dataTransfer.setData(
-                    "application/x-redemption-card",
+                    SEARCH_DRAG_MIME,
                     JSON.stringify({ name: modalCard.name, set: modalCard.set }),
                   );
                   e.dataTransfer.effectAllowed = "copy";
-                  // Defer modal close so the browser captures the drag-ghost
-                  // snapshot of the image first. Closing synchronously can
+                  // Defer close one frame so the browser captures the drag-ghost
+                  // snapshot of the image first — closing synchronously can
                   // cancel the drag in Firefox before the snapshot is taken.
                   requestAnimationFrame(() => closeModal());
                 } : undefined}
@@ -1370,7 +1371,7 @@ export default function ModalWithClose({
                   {/* Main add button - adds to active tab */}
                   <button
                     onClick={() => {
-                      const zone: DeckZone = activeDeckTab === "reserve" ? "reserve" : "main";
+                      const zone: DeckZone = activeDeckTab === "reserve" ? "reserve" : activeDeckTab === "maybe" ? "maybeboard" : "main";
                       onAddCard(modalCard, zone);
                     }}
                     className="px-4 h-10 bg-primary hover:bg-primary/90 text-primary-foreground rounded-l-lg flex items-center gap-1.5 font-semibold transition-colors text-sm whitespace-nowrap"
@@ -1378,9 +1379,9 @@ export default function ModalWithClose({
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
-                    Add to {activeDeckTab === "reserve" ? "Reserve" : activeDeckTab === "main" ? "Main" : "Deck"}
+                    Add to {activeDeckTab === "reserve" ? "Reserve" : activeDeckTab === "maybe" ? "Maybe" : activeDeckTab === "main" ? "Main" : "Deck"}
                     {(() => {
-                      const zone: DeckZone = activeDeckTab === "reserve" ? "reserve" : "main";
+                      const zone: DeckZone = activeDeckTab === "reserve" ? "reserve" : activeDeckTab === "maybe" ? "maybeboard" : "main";
                       const quantity = getCardQuantity(modalCard.name, modalCard.set, zone);
                       return quantity > 0 && (
                         <span className="bg-primary-foreground/20 text-primary-foreground px-2 py-0.5 rounded-md font-bold text-xs">

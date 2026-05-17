@@ -731,11 +731,11 @@ export default function CardSearchClient() {
       const target = e.target as HTMLElement;
       const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
 
-      // "/" resets all filters and focuses the first search input — power-user "start fresh" gesture.
+      // "/" focuses the first search input from anywhere on the page (only when not already typing)
       if (!modKey && e.key === '/' && !isTyping && !modalCard) {
         e.preventDefault();
-        handleResetFilters();
         inputRefs.current[0]?.focus();
+        inputRefs.current[0]?.select();
         return;
       }
 
@@ -1672,7 +1672,7 @@ export default function CardSearchClient() {
                       >
                         <span>Type</span>
                         <kbd className="px-1 py-px text-[11px] font-mono leading-none text-foreground/80 bg-muted/60 rounded">/</kbd>
-                        <span>to reset</span>
+                        <span>to focus</span>
                       </span>
                     )}
                   </div>
@@ -2236,91 +2236,95 @@ export default function CardSearchClient() {
                     />
                   )}
 
-                  {/* Menu items overlay */}
-                  {!isSpotlight && isMenuOpen && (
-                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 grid grid-cols-2 gap-2 z-40">
-                      {/* Add to Main Deck */}
+                  {/* Menu items overlay.
+                      Layout: 2×2 square when the card is already in main/reserve
+                      (four actions: add-main, add-reserve, remove, bookmark);
+                      triangle (top: add-main, add-reserve; bottom-center:
+                      bookmark) when neither main nor reserve has it yet. The
+                      remove button decrements from whichever zone has copies. */}
+                  {!isSpotlight && isMenuOpen && (() => {
+                    const hasInDeck = quantityInDeck > 0 || quantityInReserve > 0;
+                    const addMain = (
                       <button
+                        key="add-main"
                         onClick={(e) => {
                           e.stopPropagation();
                           addCard(c, 'main');
                           setOpenSearchMenuCard(null);
                         }}
-                        className="w-9 h-9 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-muted-foreground transition-all"
+                        className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-muted-foreground transition-all"
                         title="Add to deck"
                       >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
                         </svg>
                       </button>
-
-                      {/* Add to Reserve */}
+                    );
+                    const addReserve = (
                       <button
+                        key="add-reserve"
                         onClick={(e) => {
                           e.stopPropagation();
                           addCard(c, 'reserve');
                           setOpenSearchMenuCard(null);
                         }}
-                        className="w-9 h-9 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-muted-foreground transition-all"
+                        className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-muted-foreground transition-all"
                         title="Add to reserve"
                       >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
                         </svg>
                       </button>
-
-                      {/* Remove from Deck (only if card is in deck) */}
-                      {quantityInDeck > 0 && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeCard(c.name, c.set, 'main');
-                            setOpenSearchMenuCard(null);
-                          }}
-                          className="w-9 h-9 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-red-600 dark:text-red-400 transition-all"
-                          title="Remove from deck"
-                        >
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20 12H4" />
-                          </svg>
-                        </button>
-                      )}
-
-                      {/* Remove from Reserve (only if card is in reserve) */}
-                      {quantityInReserve > 0 && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeCard(c.name, c.set, 'reserve');
-                            setOpenSearchMenuCard(null);
-                          }}
-                          className="w-9 h-9 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-orange-600 dark:text-orange-400 transition-all"
-                          title="Remove from reserve"
-                        >
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      )}
-
-                      {/* Add to Maybeboard */}
+                    );
+                    const addMaybeboard = (
                       <button
+                        key="add-maybeboard"
                         onClick={(e) => {
                           e.stopPropagation();
                           addCard(c, 'maybeboard');
                           setOpenSearchMenuCard(null);
                         }}
-                        className={`w-9 h-9 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-violet-600 dark:text-violet-400 transition-all ${
-                          quantityInDeck === 0 && quantityInReserve === 0 ? "col-span-2 justify-self-center" : ""
-                        }`}
+                        className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-violet-600 dark:text-violet-400 transition-all"
                         title="Add to maybeboard"
                       >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
                         </svg>
                       </button>
-                    </div>
-                  )}
+                    );
+                    const removeFromBoth = (
+                      <button
+                        key="remove"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (quantityInDeck > 0) removeCard(c.name, c.set, 'main');
+                          if (quantityInReserve > 0) removeCard(c.name, c.set, 'reserve');
+                          setOpenSearchMenuCard(null);
+                        }}
+                        className="w-10 h-10 hover:scale-110 bg-card rounded-lg shadow-xl border border-border flex items-center justify-center text-red-600 dark:text-red-400 transition-all"
+                        title="Remove from deck"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20 12H4" />
+                        </svg>
+                      </button>
+                    );
+
+                    return hasInDeck ? (
+                      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 grid grid-cols-2 gap-1.5 z-40">
+                        {addMain}
+                        {addReserve}
+                        {removeFromBoth}
+                        {addMaybeboard}
+                      </div>
+                    ) : (
+                      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 grid grid-cols-2 gap-1.5 z-40">
+                        {addMain}
+                        {addReserve}
+                        <div className="col-span-2 flex justify-center">{addMaybeboard}</div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Card Image - Click to view modal (or spotlight in spotlight mode) */}
                   <div
@@ -2355,7 +2359,7 @@ export default function CardSearchClient() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              removeCard(c.name, c.set, activeDeckTab === "reserve" ? 'reserve' : 'main');
+                              removeCard(c.name, c.set, activeDeckTab === "reserve" ? 'reserve' : activeDeckTab === "maybe" ? 'maybeboard' : 'main');
                             }}
                             className="flex w-11 h-11 md:w-9 md:h-9 items-center justify-center rounded-lg bg-black/50 md:bg-black/30 md:hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-2xl md:text-xl border border-white/20 md:opacity-0 md:group-hover:opacity-100 md:pointer-events-none md:group-hover:pointer-events-auto"
                             aria-label="Remove card"
@@ -2366,7 +2370,7 @@ export default function CardSearchClient() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              addCard(c, activeDeckTab === "reserve" ? 'reserve' : 'main');
+                              addCard(c, activeDeckTab === "reserve" ? 'reserve' : activeDeckTab === "maybe" ? 'maybeboard' : 'main');
                             }}
                             className="flex w-11 h-11 md:w-9 md:h-9 items-center justify-center rounded-lg bg-black/50 md:bg-black/30 md:hover:bg-black/50 backdrop-blur-md text-white transition-all font-bold text-2xl md:text-xl border border-white/20 md:opacity-0 md:group-hover:opacity-100 md:pointer-events-none md:group-hover:pointer-events-auto"
                             aria-label="Add card"
