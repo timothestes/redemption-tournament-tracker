@@ -1,5 +1,20 @@
 import { unstable_cache } from "next/cache";
-import { createClient } from "@/utils/supabase/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+
+/**
+ * Cookie-free anon client for the cached public-deck loaders. The standard
+ * `utils/supabase/server` createClient reads cookies(), which Next forbids
+ * inside unstable_cache. Public-API reads don't need a user session — RLS on
+ * `decks` already permits anon SELECT where is_public = true.
+ */
+function anonClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) throw new Error("Supabase anon env vars missing");
+  return createSupabaseClient(url, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
 
 export const PUBLIC_DECKS_LIST_TAG = "public-decks-list" as const;
 export const publicDeckTag = (id: string) => `public-deck:${id}` as const;
@@ -115,7 +130,7 @@ const DECK_COLUMNS =
   "id, name, description, format, paragon, card_count, is_legal, view_count, created_at, updated_at, profiles!inner(username)";
 
 async function loadListFresh(params: ListParams): Promise<ListPayload> {
-  const supabase = await createClient();
+  const supabase = anonClient();
 
   let userIdFilter: string | null = null;
   if (params.username) {
@@ -179,7 +194,7 @@ async function loadListFresh(params: ListParams): Promise<ListPayload> {
 }
 
 async function loadDetailFresh(id: string): Promise<DetailPayload | null> {
-  const supabase = await createClient();
+  const supabase = anonClient();
   const { data: deck, error } = await supabase
     .from("decks")
     .select(DECK_COLUMNS)
