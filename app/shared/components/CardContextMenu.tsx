@@ -287,7 +287,18 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
                 }}
                 onClick={() => {
                   if (disabled) return;
-                  actions.executeCardAbility?.(card.instanceId, index);
+                  if (ability.type === 'imitate_lost_soul') {
+                    actions.beginTargeting?.({
+                      prompt: 'Click a Lost Soul to imitate',
+                      isEligible: (c) => isLostSoul(c) && c.zone === 'land-of-bondage',
+                      onSelect: (targetId) => {
+                        actions.imitateLostSoul?.(card.instanceId, targetId);
+                      },
+                      onCancel: () => {},
+                    });
+                  } else {
+                    actions.executeCardAbility?.(card.instanceId, index);
+                  }
                   onClose();
                 }}
                 onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.background = 'var(--gf-hover)'; }}
@@ -297,6 +308,19 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
               </button>
             );
           })}
+          {(card.imitatingName ?? '') !== '' && (
+            <button
+              style={itemStyle}
+              onClick={() => {
+                actions.stopImitatingLostSoul?.(card.instanceId);
+                onClose();
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gf-hover)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              Stop Imitating
+            </button>
+          )}
           <div style={separatorStyle} />
         </>
       )}
