@@ -95,6 +95,11 @@ export interface GameCard {
    *  (Three Woes "Choose Good"/"Choose Evil"). 'good' = green border,
    *  'evil' = red border. Cleared when the card leaves Territory. */
   outlineColor?: 'good' | 'evil';
+  /** Name of the Lost Soul this card is currently imitating (set by the
+   *  imitate_lost_soul reducer). Empty string or undefined when not
+   *  imitating. The label overlay in GameCardNode renders this value
+   *  only when no art swap occurred (fallback-only). */
+  imitatingName?: string;
 }
 
 export type ActionType =
@@ -126,7 +131,9 @@ export type ActionType =
   | 'DETACH_CARD'
   | 'EXECUTE_CARD_ABILITY'
   | 'REVEAL_CARD_IN_HAND'
-  | 'SET_CARD_OUTLINE';
+  | 'SET_CARD_OUTLINE'
+  | 'IMITATE_LOST_SOUL'
+  | 'STOP_IMITATING_LOST_SOUL';
 
 export interface GameAction {
   id: string;
@@ -147,6 +154,9 @@ export interface GameAction {
     posY?: number;
     positions?: Record<string, { posX: number; posY: number }>;
     abilityIndex?: number;
+    /** Instance id of a target card chosen via the targeting overlay
+     *  (currently only used by IMITATE_LOST_SOUL). */
+    targetInstanceId?: string;
   };
 }
 
