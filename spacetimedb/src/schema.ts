@@ -141,6 +141,13 @@ export const CardInstance = table(
     // Woes "Choose Good"/"Choose Evil"). '' = no outline; 'good' renders
     // green, 'evil' renders red. Cleared when the card leaves Territory.
     outlineColor: t.string().default(''),
+    // Set by imitate_lost_soul to the simplifyLostSoulName(target.cardName)
+    // value when this card is currently imitating another Lost Soul. Empty
+    // string when not imitating. The card's cardImgFile is also mutated when
+    // the target has registered art; otherwise GameCardNode renders this
+    // value as a label overlay (fallback-only). Cleared by
+    // stop_imitating_lost_soul.
+    imitatingName: t.string().default(''),
   }
 );
 
