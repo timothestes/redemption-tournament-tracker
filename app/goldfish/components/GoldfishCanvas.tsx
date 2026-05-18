@@ -10,6 +10,7 @@ import { CARD_WIDTH, CARD_HEIGHT, CARD_ASPECT_RATIO } from '../layout/zoneLayout
 import { calculateHandPositions } from '../layout/handLayout';
 import { calculateAutoArrangePositions } from '../../play/layout/multiplayerAutoArrange';
 import { VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen } from '@/app/shared/layout/virtualCanvas';
+import { preloadImitateSouls } from '@/app/shared/utils/preloadImitateSouls';
 import { computeHandBrigades } from '@/app/shared/utils/handBrigades';
 import { GameCard, ZoneId, ZONE_LABELS } from '../types';
 import { GameCardNode, CardBackShape, cardBackListeners, cardBackLoaded } from '../../shared/components/GameCardNode';
@@ -291,6 +292,16 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       setHoverCard(null);
     }
   }, [state.zones, hoverCard?.card.instanceId]);
+
+  // Warm up the imitate-souls art cache once an Imitate Lost Soul exists
+  // anywhere on the board. Avoids a 1s placeholder flash when the player
+  // actually triggers the swap. preloadImitateSouls is idempotent.
+  useEffect(() => {
+    const hasImitate = Object.values(state.zones)
+      .flat()
+      .some(c => c.cardName.startsWith('Lost Soul "Imitate"'));
+    if (hasImitate) preloadImitateSouls();
+  }, [state.zones]);
   const [showDeckSearch, setShowDeckSearch] = useState(false);
   const [deckMenu, setDeckMenu] = useState<{ x: number; y: number } | null>(null);
   const [soulDeckMenu, setSoulDeckMenu] = useState<{ x: number; y: number } | null>(null);

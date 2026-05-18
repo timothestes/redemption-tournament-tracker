@@ -56,6 +56,7 @@ import type { ZoneRect as GoldfishZoneRect } from '@/app/goldfish/layout/zoneLay
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import DiceOverlay from './DiceOverlay';
 import { getCardImageUrl as getSharedCardImageUrl } from '@/app/shared/utils/cardImageUrl';
+import { preloadImitateSouls } from '@/app/shared/utils/preloadImitateSouls';
 import { useVirtualCanvas, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, virtualToScreen } from '@/app/shared/layout/virtualCanvas';
 import { computeEquipOffset, hitTestWarrior, MAX_EQUIPPED_WEAPONS_PER_WARRIOR } from '@/app/goldfish/utils/equipLayout';
 import { findCard, isWarrior, isWeapon, isSite } from '@/lib/cards/lookup';
@@ -302,6 +303,17 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       if (found) return found;
     }
     return undefined;
+  }, [myCards, opponentCards]);
+
+  // Warm up the imitate-souls art cache once an Imitate Lost Soul exists
+  // anywhere on either side. Avoids a ~1s placeholder flash when the player
+  // triggers the swap. preloadImitateSouls is idempotent.
+  useEffect(() => {
+    const inAnyZone = (cards: Record<string, CardInstance[]>) =>
+      Object.values(cards).some(zone => zone.some(c => c.cardName.startsWith('Lost Soul "Imitate"')));
+    if (inAnyZone(myCards) || inAnyZone(opponentCards)) {
+      preloadImitateSouls();
+    }
   }, [myCards, opponentCards]);
 
   const moveCard: typeof rawMoveCard = useCallback(
