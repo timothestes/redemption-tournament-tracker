@@ -187,6 +187,7 @@ describe('imitate_lost_soul', () => {
       instanceId: 'tgt',
       cardName: 'Lost Soul "Awake" [Ephesians 5:14 - TPC]',
       cardImgFile: 'awake-original',
+      reference: 'Ephesians 5:14',
       type: 'Lost Soul',
       zone: 'land-of-bondage',
       ownerId: 'player1',
@@ -211,6 +212,7 @@ describe('imitate_lost_soul', () => {
       instanceId: 'tgt',
       cardName: 'Lost Soul Matthew 19:23 (Speed Bump)',
       cardImgFile: 'speed-bump-original',
+      reference: 'Matthew 19:23',
       type: 'Lost Soul',
       zone: 'land-of-bondage',
       ownerId: 'player1',
@@ -314,6 +316,7 @@ describe('imitate_lost_soul', () => {
     const target = makeCard({
       instanceId: 'tgt',
       cardName: 'Lost Soul "Forsaken" [Hebrews 10:25]',
+      reference: 'Hebrews 10:25',
       type: 'Lost Soul',
       zone: 'land-of-bondage',
       ownerId: 'player1',
@@ -323,6 +326,29 @@ describe('imitate_lost_soul', () => {
     const updatedSource = next.zones['land-of-bondage'].find(c => c.instanceId === 'src')!;
     expect(updatedSource.cardImgFile).toBe('/imitate-souls/cards/forsaken.jpg');
     expect(updatedSource.imitatingName).toBe('Forsaken');
+  });
+
+  it('rejects O.T. Lost Soul target (Imitate restricts to N.T. souls)', () => {
+    const source = makeCard({
+      instanceId: 'src',
+      cardName: 'Lost Soul "Imitate" [III John 1:11]',
+      cardImgFile: '23-Lost-Soul-Imitate-R',
+      reference: 'III John 1:11',
+      type: 'Lost Soul',
+      zone: 'land-of-bondage',
+      ownerId: 'player1',
+    });
+    const otTarget = makeCard({
+      instanceId: 'tgt',
+      cardName: 'Lost Soul "Accusers" [Ezra 4:6]',
+      reference: 'Ezra 4:6',
+      type: 'Lost Soul',
+      zone: 'land-of-bondage',
+      ownerId: 'player1',
+    });
+    const initial = makeState([source, otTarget]);
+    const next = gameReducer(initial, gameActions.imitateLostSoul('src', 'tgt'));
+    expect(next).toBe(initial);
   });
 
   it('re-imitate from art-supported to unsupported soul reverts art to canonical (regression)', () => {
@@ -342,6 +368,7 @@ describe('imitate_lost_soul', () => {
     const target = makeCard({
       instanceId: 'tgt',
       cardName: 'Lost Soul Matthew 19:23 (Speed Bump)',  // no art available
+      reference: 'Matthew 19:23',
       type: 'Lost Soul',
       zone: 'land-of-bondage',
       ownerId: 'player1',

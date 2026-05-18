@@ -13,6 +13,7 @@ import {
   resolveTokenCard,
   IMITATE_SOUL_IMAGES,
   simplifyLostSoulName,
+  isNewTestamentLostSoul,
 } from '@/lib/cards/cardAbilities';
 import { findCard } from '@/lib/cards/lookup';
 
@@ -138,9 +139,11 @@ function imitateLostSoulInState(
   const ABILITY_SOURCE_ZONES: ZoneId[] = ['territory', 'land-of-bondage', 'land-of-redemption'];
   if (!ABILITY_SOURCE_ZONES.includes(source.zone)) return state;
 
-  // Validate target is a Lost Soul in LoB. Use isLostSoul() helper.
+  // Validate target is a Lost Soul in LoB, and is a New Testament soul
+  // (Imitate's rules text only permits copying N.T. Lost Souls).
   if (!isLostSoul(target)) return state;
   if (target.zone !== 'land-of-bondage') return state;
+  if (!isNewTestamentLostSoul(target.reference)) return state;
 
   // When the target has registered art, swap to it. Otherwise fall back to
   // the *canonical* Imitate art (not source.cardImgFile, which could be a

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useMemo, useState } from 'react';
 import { GameCard, ZoneId, ZONE_LABELS, COUNTER_COLORS, CounterColorId } from '../../goldfish/types';
 import { GameActions } from '@/app/shared/types/gameActions';
-import { getAbilitiesForCard, abilityLabel, DEFAULT_ABILITY_SOURCE_ZONES } from '@/lib/cards/cardAbilities';
+import { getAbilitiesForCard, abilityLabel, DEFAULT_ABILITY_SOURCE_ZONES, isNewTestamentLostSoul } from '@/lib/cards/cardAbilities';
 
 const MOVE_TARGETS: ZoneId[] = [
   'territory',
@@ -289,8 +289,8 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
                   if (disabled) return;
                   if (ability.type === 'imitate_lost_soul') {
                     actions.beginTargeting?.({
-                      prompt: 'Click a Lost Soul to imitate',
-                      isEligible: (c) => isLostSoul(c) && c.zone === 'land-of-bondage',
+                      prompt: 'Click a New Testament Lost Soul to imitate',
+                      isEligible: (c) => isLostSoul(c) && c.zone === 'land-of-bondage' && isNewTestamentLostSoul(c.reference),
                       onSelect: (targetId) => {
                         actions.imitateLostSoul?.(card.instanceId, targetId);
                       },

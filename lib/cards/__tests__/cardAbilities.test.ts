@@ -12,10 +12,12 @@ import {
   IMITATE_SOUL_IMAGES as libImitateImages,
   CARD_ABILITIES as libCardAbilities,
   simplifyLostSoulName,
+  isNewTestamentLostSoul,
 } from '../cardAbilities';
 import {
   IMITATE_SOUL_IMAGES as serverImitateImages,
   IMITATE_ORIGINAL_IMG,
+  isNewTestamentLostSoul as serverIsNewTestamentLostSoul,
 } from '@/spacetimedb/src/cardAbilities';
 
 describe('CARD_ABILITIES registry', () => {
@@ -167,6 +169,52 @@ describe('IMITATE_SOUL_IMAGES parity + integrity', () => {
       const card = findCard(cardName);
       expect(card, `findCard(${cardName})`).toBeTruthy();
       expect(card?.imgFile).toBe(originalImg);
+    }
+  });
+});
+
+describe('isNewTestamentLostSoul', () => {
+  it('recognizes NT books across various reference formats', () => {
+    expect(isNewTestamentLostSoul('Ephesians 5:14')).toBe(true);
+    expect(isNewTestamentLostSoul('III John 1:11')).toBe(true);
+    expect(isNewTestamentLostSoul('II Timothy 3:6-7')).toBe(true);
+    expect(isNewTestamentLostSoul('I Corinthians 1:27')).toBe(true);
+    expect(isNewTestamentLostSoul('1 Corinthians 1:27')).toBe(true);
+    expect(isNewTestamentLostSoul('Acts 11:18')).toBe(true);
+    expect(isNewTestamentLostSoul('Luke 13:25')).toBe(true);
+    expect(isNewTestamentLostSoul('Revelation 22:1')).toBe(true);
+  });
+
+  it('rejects OT books and empty/unknown input', () => {
+    expect(isNewTestamentLostSoul('Genesis 1:1')).toBe(false);
+    expect(isNewTestamentLostSoul('Ezekiel 34:12')).toBe(false);
+    expect(isNewTestamentLostSoul('Isaiah 6:1')).toBe(false);
+    expect(isNewTestamentLostSoul('II Kings 1:1')).toBe(false);
+    expect(isNewTestamentLostSoul('1 Samuel 17')).toBe(false);
+    expect(isNewTestamentLostSoul('Proverbs 3:34')).toBe(false);
+    expect(isNewTestamentLostSoul('')).toBe(false);
+    expect(isNewTestamentLostSoul('Unknown Book 1:1')).toBe(false);
+  });
+
+  it('every IMITATE_SOUL_IMAGES key resolves to an NT reference', () => {
+    for (const cardName of Object.keys(libImitateImages)) {
+      const card = findCard(cardName);
+      expect(card, `findCard(${cardName})`).toBeTruthy();
+      expect(
+        isNewTestamentLostSoul(card!.reference),
+        `${cardName} reference "${card!.reference}" should be NT`,
+      ).toBe(true);
+    }
+  });
+
+  it('lib and spacetimedb copies behave identically on a sample of references', () => {
+    const samples = [
+      'Ephesians 5:14', 'III John 1:11', 'I Corinthians 1:27',
+      'Genesis 1:1', 'Ezekiel 34:12', 'Isaiah 6:1',
+      '', 'Unknown 1:1',
+    ];
+    for (const ref of samples) {
+      expect(serverIsNewTestamentLostSoul(ref), `parity for "${ref}"`).toBe(isNewTestamentLostSoul(ref));
     }
   });
 });

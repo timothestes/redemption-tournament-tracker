@@ -186,6 +186,30 @@ export const IMITATE_ORIGINAL_IMG: Record<string, string> = {
 };
 
 /**
+ * New Testament book names (lowercased). Duplicate of the array in
+ * lib/cards/cardAbilities.ts; parity test enforces equality.
+ */
+const NT_BOOK_NAMES = [
+  'matthew', 'mark', 'luke', 'john', 'acts', 'romans',
+  'corinthians', 'galatians', 'ephesians', 'philippians',
+  'colossians', 'thessalonians', 'timothy', 'titus', 'philemon',
+  'hebrews', 'james', 'peter', 'jude', 'revelation',
+];
+
+/**
+ * Returns true when the Lost Soul's reference is from the New Testament.
+ * Strips leading Roman numerals (I, II, III, IV) or Arabic numerals
+ * (1, 2, 3) so "III John 1:11" / "II Timothy 3:6-7" / "1 Corinthians 1:27"
+ * all match their underlying book.
+ */
+export function isNewTestamentLostSoul(reference: string): boolean {
+  if (!reference) return false;
+  const lower = reference.toLowerCase().trim();
+  const stripped = lower.replace(/^(i{1,3}|iv|\d+)\s+/, '');
+  return NT_BOOK_NAMES.some(book => stripped.startsWith(book));
+}
+
+/**
  * Extracts a short label from a Lost Soul cardName for the imitation overlay.
  * Priority: quoted name → first parenthetical → cardName with "Lost Soul " prefix stripped.
  */

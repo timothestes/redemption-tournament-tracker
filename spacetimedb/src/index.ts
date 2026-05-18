@@ -8,6 +8,7 @@ import {
   getAbilitiesForCard,
   findTokenCard,
   IMITATE_SOUL_IMAGES,
+  isNewTestamentLostSoul,
   IMITATE_ORIGINAL_IMG,
   simplifyLostSoulName,
   type CardAbility,
@@ -3410,6 +3411,9 @@ export const imitate_lost_soul = spacetimedb.reducer(
     if (target.cardType !== 'Lost Soul') throw new SenderError('Target must be a Lost Soul');
     if (target.zone !== 'land-of-bondage') {
       throw new SenderError('Target must be in a Land of Bondage');
+    }
+    if (!isNewTestamentLostSoul(target.reference)) {
+      throw new SenderError('Target must be a New Testament Lost Soul');
     }
 
     // When the target has registered art, swap to it. Otherwise fall back to
