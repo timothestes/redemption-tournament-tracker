@@ -1,7 +1,22 @@
 // lib/cards/__tests__/cardAbilities.test.ts
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { findCard } from '../lookup';
-import { CARD_ABILITIES, SPECIAL_TOKEN_CARDS, abilityLabel, getAbilitiesForCard, resolveTokenCard } from '../cardAbilities';
+import {
+  CARD_ABILITIES,
+  SPECIAL_TOKEN_CARDS,
+  abilityLabel,
+  getAbilitiesForCard,
+  resolveTokenCard,
+  IMITATE_SOUL_IMAGES as libImitateImages,
+  CARD_ABILITIES as libCardAbilities,
+  simplifyLostSoulName,
+} from '../cardAbilities';
+import {
+  IMITATE_SOUL_IMAGES as serverImitateImages,
+  IMITATE_ORIGINAL_IMG,
+} from '@/spacetimedb/src/cardAbilities';
 
 describe('CARD_ABILITIES registry', () => {
   it('every key resolves to a real card via findCard()', () => {
@@ -114,5 +129,60 @@ describe('abilityLabel', () => {
   it('formats discard_opponent_deck for random position', () => {
     expect(abilityLabel({ type: 'discard_opponent_deck', position: 'random', count: 4 }))
       .toBe("Discard 4 random cards of opponent's deck");
+  });
+});
+
+describe('IMITATE_SOUL_IMAGES parity + integrity', () => {
+  it('lib and spacetimedb copies are identical', () => {
+    expect(serverImitateImages).toEqual(libImitateImages);
+  });
+
+  it('every key resolves to a real card via findCard', () => {
+    for (const cardName of Object.keys(libImitateImages)) {
+      expect(findCard(cardName), `findCard(${JSON.stringify(cardName)})`).toBeTruthy();
+    }
+  });
+
+  it('every value points to an existing file under public/imitate-souls/cards/', () => {
+    for (const [cardName, imgPath] of Object.entries(libImitateImages)) {
+      const absPath = path.join(process.cwd(), 'public', imgPath);
+      expect(
+        fs.existsSync(absPath),
+        `${cardName} → ${imgPath} (resolved: ${absPath})`,
+      ).toBe(true);
+    }
+  });
+
+  it('both Imitate Lost Soul variants are registered with imitate_lost_soul', () => {
+    const a = libCardAbilities['Lost Soul "Imitate" [III John 1:11]'];
+    const b = libCardAbilities['Lost Soul "Imitate" [III John 1:11]  [AB - RoJ]'];
+    expect(a, 'regular variant registered').toBeDefined();
+    expect(b, 'AB variant registered (note literal double space)').toBeDefined();
+    expect(a?.[0]?.type).toBe('imitate_lost_soul');
+    expect(b?.[0]?.type).toBe('imitate_lost_soul');
+  });
+
+  it('IMITATE_ORIGINAL_IMG matches findCard().imgFile for each Imitate variant', () => {
+    for (const [cardName, originalImg] of Object.entries(IMITATE_ORIGINAL_IMG)) {
+      const card = findCard(cardName);
+      expect(card, `findCard(${cardName})`).toBeTruthy();
+      expect(card?.imgFile).toBe(originalImg);
+    }
+  });
+});
+
+describe('simplifyLostSoulName', () => {
+  it('extracts the quoted name when present', () => {
+    expect(simplifyLostSoulName('Lost Soul "Awake" [Ephesians 5:14 - TPC]')).toBe('Awake');
+    expect(simplifyLostSoulName('Lost Soul "Open Hand" [Hebrews 4:13]')).toBe('Open Hand');
+  });
+
+  it('falls back to the parenthetical when no quoted name', () => {
+    expect(simplifyLostSoulName('Lost Soul Acts 11:18 (NT Only)')).toBe('NT Only');
+    expect(simplifyLostSoulName('Lost Soul Matthew 19:26 (First Round Protect)')).toBe('First Round Protect');
+  });
+
+  it('strips "Lost Soul " prefix when neither quoted nor parenthetical exists', () => {
+    expect(simplifyLostSoulName('Lost Soul Romans 3:23')).toBe('Romans 3:23');
   });
 });
