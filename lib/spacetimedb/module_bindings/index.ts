@@ -51,6 +51,7 @@ import ExchangeCardsReducer from "./exchange_cards_reducer";
 import ExchangeFromDeckReducer from "./exchange_from_deck_reducer";
 import ExecuteCardAbilityReducer from "./execute_card_ability_reducer";
 import FlipCardReducer from "./flip_card_reducer";
+import ImitateLostSoulReducer from "./imitate_lost_soul_reducer";
 import JoinAsSpectatorReducer from "./join_as_spectator_reducer";
 import JoinGameReducer from "./join_game_reducer";
 import LeaveGameReducer from "./leave_game_reducer";
@@ -102,6 +103,7 @@ import ShuffleDeckReducer from "./shuffle_deck_reducer";
 import ShuffleOpponentDeckReducer from "./shuffle_opponent_deck_reducer";
 import ShuffleSoulDeckReducer from "./shuffle_soul_deck_reducer";
 import SpawnLostSoulReducer from "./spawn_lost_soul_reducer";
+import StopImitatingLostSoulReducer from "./stop_imitating_lost_soul_reducer";
 import SurrenderLostSoulReducer from "./surrender_lost_soul_reducer";
 import ThreeNailsResetExecuteReducer from "./three_nails_reset_execute_reducer";
 import ToggleRevealHandReducer from "./toggle_reveal_hand_reducer";
@@ -311,6 +313,7 @@ const reducersSchema = __reducers(
   __reducerSchema("exchange_from_deck", ExchangeFromDeckReducer),
   __reducerSchema("execute_card_ability", ExecuteCardAbilityReducer),
   __reducerSchema("flip_card", FlipCardReducer),
+  __reducerSchema("imitate_lost_soul", ImitateLostSoulReducer),
   __reducerSchema("join_as_spectator", JoinAsSpectatorReducer),
   __reducerSchema("join_game", JoinGameReducer),
   __reducerSchema("leave_game", LeaveGameReducer),
@@ -362,6 +365,7 @@ const reducersSchema = __reducers(
   __reducerSchema("shuffle_opponent_deck", ShuffleOpponentDeckReducer),
   __reducerSchema("shuffle_soul_deck", ShuffleSoulDeckReducer),
   __reducerSchema("spawn_lost_soul", SpawnLostSoulReducer),
+  __reducerSchema("stop_imitating_lost_soul", StopImitatingLostSoulReducer),
   __reducerSchema("surrender_lost_soul", SurrenderLostSoulReducer),
   __reducerSchema("three_nails_reset_execute", ThreeNailsResetExecuteReducer),
   __reducerSchema("toggle_reveal_hand", ToggleRevealHandReducer),

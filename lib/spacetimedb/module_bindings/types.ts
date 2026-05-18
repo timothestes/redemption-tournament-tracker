@@ -47,6 +47,7 @@ export const CardInstance = __t.object("CardInstance", {
   originalOwnerId: __t.u64(),
   revealStartedAt: __t.option(__t.timestamp()),
   outlineColor: __t.string(),
+  imitatingName: __t.string(),
 });
 export type CardInstance = __Infer<typeof CardInstance>;
 

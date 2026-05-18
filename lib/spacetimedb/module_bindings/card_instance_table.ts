@@ -39,4 +39,5 @@ export default __t.row({
   originalOwnerId: __t.u64().name("original_owner_id"),
   revealStartedAt: __t.option(__t.timestamp()).name("reveal_started_at"),
   outlineColor: __t.string().name("outline_color"),
+  imitatingName: __t.string().name("imitating_name"),
 });
