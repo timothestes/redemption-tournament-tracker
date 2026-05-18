@@ -4,7 +4,14 @@ import { DisconnectTimeout, setDisconnectTimeoutReducer, ChooseFirstTimeout, set
 import { t, SenderError } from 'spacetimedb/server';
 import { ScheduleAt, Timestamp } from 'spacetimedb';
 import { makeSeed, seededShuffle, seededDiceRoll, xorshift64, generateGameCode } from './utils';
-import { getAbilitiesForCard, findTokenCard, type CardAbility } from './cardAbilities';
+import {
+  getAbilitiesForCard,
+  findTokenCard,
+  IMITATE_SOUL_IMAGES,
+  IMITATE_ORIGINAL_IMG,
+  simplifyLostSoulName,
+  type CardAbility,
+} from './cardAbilities';
 
 // Auto-reveal duration for cards that land in a hand via a move whose log
 // payload reveals the card identity (cross-player moves, face-up moves, etc.).
@@ -307,6 +314,7 @@ function insertCardsShuffleDraw(
       revealExpiresAt: undefined,
       revealStartedAt: undefined,
       outlineColor: '',
+      imitatingName: '',
     });
   }
 
@@ -408,6 +416,7 @@ function initializeSoulDeck(ctx: any, game: any) {
       revealExpiresAt: undefined,
       revealStartedAt: undefined,
       outlineColor: '',
+      imitatingName: '',
     });
   }
 
@@ -2889,6 +2898,7 @@ function spawnTokenImpl(
       revealExpiresAt: undefined,
       revealStartedAt: undefined,
       outlineColor: '',
+      imitatingName: '',
     });
   }
 
@@ -3344,6 +3354,8 @@ export const execute_card_ability = spacetimedb.reducer(
         throw new SenderError('discard_opponent_deck is dispatched by the client, not this reducer');
       case 'three_nails_reset':
         throw new SenderError('three_nails_reset is dispatched by the client, not this reducer');
+      case 'imitate_lost_soul':
+        throw new SenderError('imitate_lost_soul is dispatched directly by the client');
       case 'reserve_opponent_deck':
         throw new SenderError('reserve_opponent_deck is dispatched by the client, not this reducer');
       case 'reserve_top_of_deck':
@@ -3358,6 +3370,114 @@ export const execute_card_ability = spacetimedb.reducer(
         return playAllLostSoulsImpl(ctx, source, player, gameId);
       case 'custom':
         throw new SenderError('Custom abilities are dispatched by the client, not this reducer');
+    }
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: imitate_lost_soul
+//
+// Swaps the source Imitate Lost Soul's cardImgFile to the target's bespoke
+// art when registered in IMITATE_SOUL_IMAGES; always sets imitatingName so
+// GameCardNode can render a label overlay when no art was swapped. The
+// source must be an Imitate variant (per IMITATE_ORIGINAL_IMG keys); the
+// target must be a Lost Soul currently in a Land of Bondage.
+// ---------------------------------------------------------------------------
+export const imitate_lost_soul = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    sourceInstanceId: t.u64(),
+    targetInstanceId: t.u64(),
+  },
+  (ctx, { gameId, sourceInstanceId, targetInstanceId }) => {
+    const player = findPlayerBySender(ctx, gameId);
+
+    const source = ctx.db.CardInstance.id.find(sourceInstanceId);
+    if (!source) throw new SenderError('Source card not found');
+    if (source.gameId !== gameId) throw new SenderError('Source not in this game');
+    if (source.ownerId !== player.id) throw new SenderError('Not your card');
+    if (!(source.cardName in IMITATE_ORIGINAL_IMG)) {
+      throw new SenderError('Source is not an Imitate Lost Soul');
+    }
+    const ABILITY_SOURCE_ZONES = ['territory', 'land-of-bondage', 'land-of-redemption'];
+    if (!ABILITY_SOURCE_ZONES.includes(source.zone)) {
+      throw new SenderError('Source card must be in play');
+    }
+
+    const target = ctx.db.CardInstance.id.find(targetInstanceId);
+    if (!target) throw new SenderError('Target card not found');
+    if (target.gameId !== gameId) throw new SenderError('Target not in this game');
+    if (target.cardType !== 'Lost Soul') throw new SenderError('Target must be a Lost Soul');
+    if (target.zone !== 'land-of-bondage') {
+      throw new SenderError('Target must be in a Land of Bondage');
+    }
+
+    const registered = IMITATE_SOUL_IMAGES[target.cardName];
+    const newImg = registered ?? source.cardImgFile;
+    const newLabel = simplifyLostSoulName(target.cardName);
+
+    ctx.db.CardInstance.id.update({
+      ...source,
+      cardImgFile: newImg,
+      imitatingName: newLabel,
+    });
+
+    const game = ctx.db.Game.id.find(gameId);
+    if (game) {
+      logAction(
+        ctx,
+        gameId,
+        player.id,
+        'IMITATE_LOST_SOUL',
+        JSON.stringify({
+          targetCardName: target.cardName,
+          label: newLabel,
+          hasArt: !!registered,
+        }),
+        game.turnNumber,
+        game.currentPhase,
+      );
+    }
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: stop_imitating_lost_soul
+//
+// Reverts an Imitate Lost Soul's cardImgFile to the canonical value from
+// IMITATE_ORIGINAL_IMG and clears imitatingName. Safe to call when the card
+// is not currently imitating (idempotent: rewrites with the same values).
+// ---------------------------------------------------------------------------
+export const stop_imitating_lost_soul = spacetimedb.reducer(
+  { gameId: t.u64(), sourceInstanceId: t.u64() },
+  (ctx, { gameId, sourceInstanceId }) => {
+    const player = findPlayerBySender(ctx, gameId);
+
+    const source = ctx.db.CardInstance.id.find(sourceInstanceId);
+    if (!source) throw new SenderError('Source card not found');
+    if (source.gameId !== gameId) throw new SenderError('Source not in this game');
+    if (source.ownerId !== player.id) throw new SenderError('Not your card');
+
+    const original = IMITATE_ORIGINAL_IMG[source.cardName];
+    if (!original) throw new SenderError('Source is not an Imitate Lost Soul');
+
+    ctx.db.CardInstance.id.update({
+      ...source,
+      cardImgFile: original,
+      imitatingName: '',
+    });
+
+    const game = ctx.db.Game.id.find(gameId);
+    if (game) {
+      logAction(
+        ctx,
+        gameId,
+        player.id,
+        'STOP_IMITATING_LOST_SOUL',
+        '{}',
+        game.turnNumber,
+        game.currentPhase,
+      );
     }
   },
 );
@@ -5159,6 +5279,7 @@ export const spawn_lost_soul = spacetimedb.reducer(
       revealExpiresAt: undefined,
       revealStartedAt: undefined,
       outlineColor: '',
+      imitatingName: '',
     });
 
     logAction(ctx, gameId, player.id, 'SPAWN_LOST_SOUL', JSON.stringify({ testament }), game.turnNumber, game.currentPhase);
