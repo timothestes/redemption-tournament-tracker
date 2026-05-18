@@ -5,6 +5,9 @@ import { Group, Rect, Image as KonvaImage, Circle, Text, Arc } from 'react-konva
 import type Konva from 'konva';
 import KonvaLib from 'konva';
 import { GameCard, COUNTER_COLORS } from '../../goldfish/types';
+import { findCard } from '@/lib/cards/lookup';
+
+const IMITATE_LABEL_HEIGHT = 18;
 
 // Card back image — loaded once and shared across all instances
 let cardBackImage: HTMLImageElement | null = null;
@@ -75,6 +78,14 @@ export interface GameCardNodeProps {
   onDblClick: (card: GameCard) => void;
   onMouseEnter: (card: GameCard, e: Konva.KonvaEventObject<MouseEvent>) => void;
   onMouseLeave: () => void;
+  /** When true, render the card at reduced opacity (used during targeting). */
+  isDimmed?: boolean;
+  /** When set, the card is part of a targeting selection. `isEligible` controls
+   *  whether the card is selectable; `onSelect` is called on click/tap. */
+  targetingMode?: {
+    isEligible: boolean;
+    onSelect: () => void;
+  };
 }
 
 // Individual card component — memoized to avoid re-rendering cards that haven't changed
@@ -100,6 +111,8 @@ export const GameCardNode = memo(function GameCardNode({
   onDblClick,
   onMouseEnter,
   onMouseLeave,
+  isDimmed,
+  targetingMode,
 }: GameCardNodeProps) {
   const isToken = card.isToken;
   const isActivelyRevealed =
@@ -177,6 +190,7 @@ export const GameCardNode = memo(function GameCardNode({
       y={y}
       rotation={rotation}
       draggable={isDraggable}
+      opacity={isDimmed ? 0.3 : 1}
       hitFunc={cardHitFunc as any}
       onMouseDown={(e) => {
         // macOS Ctrl+click fires mousedown with button=0 + ctrlKey=true, which
@@ -195,8 +209,22 @@ export const GameCardNode = memo(function GameCardNode({
       onDragMove={onDragMove}
       onDragEnd={(e) => { setIsDragging(false); onDragEnd(card, e); }}
       onContextMenu={(e) => onContextMenu(card, e)}
-      onClick={onClick ? (e) => onClick(card, e) : undefined}
-      onTap={onClick ? (e) => onClick(card, e as unknown as Konva.KonvaEventObject<MouseEvent>) : undefined}
+      onClick={(e) => {
+        if (targetingMode) {
+          e.cancelBubble = true;
+          if (targetingMode.isEligible) targetingMode.onSelect();
+          return;
+        }
+        if (onClick) onClick(card, e);
+      }}
+      onTap={(e) => {
+        if (targetingMode) {
+          e.cancelBubble = true;
+          if (targetingMode.isEligible) targetingMode.onSelect();
+          return;
+        }
+        if (onClick) onClick(card, e as unknown as Konva.KonvaEventObject<MouseEvent>);
+      }}
       onDblClick={() => onDblClick(card)}
       onDblTap={() => onDblClick(card)}
       onMouseEnter={(e) => onMouseEnter(card, e)}
@@ -467,6 +495,45 @@ export const GameCardNode = memo(function GameCardNode({
           );
         })()}
       </Group>
+
+      {/* Imitate-name label overlay — only when the card has imitatingName AND
+          no art swap occurred (cardImgFile still matches the canonical imgFile).
+          Rendered in the top-level group so it never rotates with meek. */}
+      {(() => {
+        const showImitateLabel =
+          !!card.imitatingName &&
+          card.cardImgFile === findCard(card.cardName)?.imgFile;
+        if (!showImitateLabel) return null;
+        return (
+          <>
+            <Rect
+              x={0}
+              y={cardHeight - IMITATE_LABEL_HEIGHT}
+              width={cardWidth}
+              height={IMITATE_LABEL_HEIGHT}
+              fill="rgba(0, 0, 0, 0.7)"
+              listening={false}
+              perfectDrawEnabled={false}
+            />
+            <Text
+              x={0}
+              y={cardHeight - IMITATE_LABEL_HEIGHT}
+              width={cardWidth}
+              height={IMITATE_LABEL_HEIGHT}
+              text={card.imitatingName!}
+              fill="#ffffff"
+              fontSize={11}
+              fontStyle="500"
+              align="center"
+              verticalAlign="middle"
+              wrap="none"
+              ellipsis
+              listening={false}
+              perfectDrawEnabled={false}
+            />
+          </>
+        );
+      })()}
     </Group>
   );
 });
