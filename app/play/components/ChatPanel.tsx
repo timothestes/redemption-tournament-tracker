@@ -801,6 +801,23 @@ function formatActionType(actionType: string, payload?: string, playerNames?: Re
   if (actionType === 'THREE_NAILS_RESET_CANCELLED') {
     return 'tried to activate Three Nails (GoC), but the source card was no longer in play';
   }
+  if (actionType === 'IMITATE_LOST_SOUL') {
+    try {
+      const { targetCardName, label, hasArt } = JSON.parse(payload ?? '{}');
+      const short = label || targetCardName;
+      return (
+        <span>
+          imitated <strong>{short}</strong>
+          {hasArt ? '' : ' (no art)'}
+        </span>
+      );
+    } catch {
+      return <span>imitated a Lost Soul</span>;
+    }
+  }
+  if (actionType === 'STOP_IMITATING_LOST_SOUL') {
+    return <span>stopped imitating</span>;
+  }
   if (actionType === 'DECK_SEARCH_NO_SHUFFLE' && payload) {
     try {
       const data = JSON.parse(payload);
