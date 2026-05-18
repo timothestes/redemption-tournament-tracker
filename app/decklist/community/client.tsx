@@ -144,7 +144,6 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [usernameFilter, setUsernameFilter] = useState(initialUsername);
-  const [tournamentOnly, setTournamentOnly] = useState(false);
   const [excludeFullSize, setExcludeFullSize] = useState(false);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [globalTags, setGlobalTags] = useState<DeckTag[]>([]);
@@ -196,7 +195,6 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
       search: search || undefined,
       username: usernameFilter || undefined,
       tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
-      tournamentOnly: tournamentOnly || undefined,
       excludeFullSize: excludeFullSize || undefined,
     };
     const result = await loadPublicDecksAction(params);
@@ -205,7 +203,7 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
       setTotalCount(result.totalCount);
     }
     setLoading(false);
-  }, [page, sort, format, search, usernameFilter, selectedTagIds, tournamentOnly, excludeFullSize]);
+  }, [page, sort, format, search, usernameFilter, selectedTagIds, excludeFullSize]);
 
   useEffect(() => {
     // Skip the initial fetch if we already have server-provided data (no username filter)
@@ -308,19 +306,6 @@ export default function CommunityClient({ initialDecks, initialCount, currentUse
             <option value="most_viewed">Most Viewed</option>
             <option value="name">Name A-Z</option>
           </select>
-
-          {/* Tournament Results toggle */}
-          <button
-            onClick={() => { setTournamentOnly((v) => !v); setPage(1); }}
-            className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm transition-colors ${
-              tournamentOnly
-                ? "border-amber-500 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300"
-                : "border-border bg-card text-foreground hover:bg-muted"
-            }`}
-          >
-            <TrophyIcon place={1} className="w-3.5 h-3.5" />
-            Tournament Results
-          </button>
 
           {/* Exclude 100-card decks toggle */}
           <button
