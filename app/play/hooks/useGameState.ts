@@ -118,6 +118,8 @@ export interface GameState {
   spawnLostSoul: (testament: string, posX: string, posY: string, targetPlayerId?: string) => void;
   removeToken: (cardInstanceId: bigint) => void;
   executeCardAbility: (sourceInstanceId: string, abilityIndex: number) => void;
+  imitateLostSoul: (sourceInstanceId: string, targetInstanceId: string) => void;
+  stopImitatingLostSoul: (sourceInstanceId: string) => void;
   surrenderLostSoul: (cardInstanceId: bigint) => void;
   rescueLostSoul: (cardInstanceId: bigint) => void;
   resignGame: () => void;
@@ -657,6 +659,27 @@ export function useGameState(gameId: bigint): GameState {
     [conn, gameId],
   );
 
+  const imitateLostSoul = useCallback(
+    (sourceInstanceId: string, targetInstanceId: string) => {
+      conn?.reducers.imitateLostSoul({
+        gameId,
+        sourceInstanceId: BigInt(sourceInstanceId),
+        targetInstanceId: BigInt(targetInstanceId),
+      });
+    },
+    [conn, gameId],
+  );
+
+  const stopImitatingLostSoul = useCallback(
+    (sourceInstanceId: string) => {
+      conn?.reducers.stopImitatingLostSoul({
+        gameId,
+        sourceInstanceId: BigInt(sourceInstanceId),
+      });
+    },
+    [conn, gameId],
+  );
+
   const surrenderLostSoul = useCallback(
     (cardInstanceId: bigint) => {
       conn?.reducers.surrenderLostSoul({ gameId, cardInstanceId });
@@ -880,6 +903,8 @@ export function useGameState(gameId: bigint): GameState {
     spawnLostSoul,
     removeToken,
     executeCardAbility,
+    imitateLostSoul,
+    stopImitatingLostSoul,
     surrenderLostSoul,
     rescueLostSoul,
     resignGame,

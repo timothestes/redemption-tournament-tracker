@@ -1391,6 +1391,12 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
       );
     },
     beginTargeting: (req) => setTargeting(req),
+    imitateLostSoul: (sourceInstanceId, targetInstanceId) => {
+      gameState.imitateLostSoul(sourceInstanceId, targetInstanceId);
+    },
+    stopImitatingLostSoul: (sourceInstanceId) => {
+      gameState.stopImitatingLostSoul(sourceInstanceId);
+    },
   }), [gameState, findMyCardById, checkReserveProtection, checkReserveBatchProtection, undoStack, opponentHandRevealed, opponentHandBrigadeCounts]);
 
   // ---- ModalGameProvider value (for shared deck modals) ----
