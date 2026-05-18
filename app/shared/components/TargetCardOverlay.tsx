@@ -28,10 +28,13 @@ export function TargetCardOverlay({ prompt, onCancel }: TargetCardOverlayProps) 
     <div
       style={{
         position: 'fixed',
-        top: 16,
+        // PhaseBar sits at top:0 with height ~40px + safe-area inset and
+        // zIndex 100. Position the banner just below it so the phase nav
+        // doesn't clip it.
+        top: 'calc(48px + env(safe-area-inset-top, 0px))',
         left: '50%',
         transform: 'translateX(-50%)',
-        zIndex: 50,
+        zIndex: 150,
         background: 'rgba(0, 0, 0, 0.85)',
         color: '#fff',
         padding: '10px 16px',
