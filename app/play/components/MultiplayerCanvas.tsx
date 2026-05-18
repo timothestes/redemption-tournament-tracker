@@ -40,7 +40,8 @@ import { ReserveContextMenu } from '@/app/shared/components/ReserveContextMenu';
 import { ConsentDialog } from '@/app/shared/components/ConsentDialog';
 import { OpponentBrowseModal } from '@/app/shared/components/OpponentBrowseModal';
 import { showGameToast } from '@/app/shared/components/GameToast';
-import type { GameActions } from '@/app/shared/types/gameActions';
+import { TargetCardOverlay } from '@/app/shared/components/TargetCardOverlay';
+import type { GameActions, TargetingRequest } from '@/app/shared/types/gameActions';
 import { ModalGameProvider, type ModalGameContextValue } from '@/app/shared/contexts/ModalGameContext';
 import { DeckSearchModal } from '@/app/shared/components/DeckSearchModal';
 import { DeckPeekModal } from '@/app/shared/components/DeckPeekModal';
@@ -753,6 +754,13 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   } | null>(null);
   const contextMenuRef = useRef(contextMenu);
   contextMenuRef.current = contextMenu;
+
+  // ---- Targeting state ----
+  // Set by CardContextMenu when the player picks an ability that needs a
+  // follow-up card click (e.g. `imitate_lost_soul`). The canvas dims
+  // ineligible cards and routes the next eligible click through `onSelect`.
+  // Cleared by Esc, the banner's Cancel button, or any eligible card click.
+  const [targeting, setTargeting] = useState<TargetingRequest | null>(null);
   const [multiCardContextMenu, setMultiCardContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [notePopover, setNotePopover] = useState<{
     cardId: string;
@@ -806,6 +814,24 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const [opponentReserveMenu, setOpponentReserveMenu] = useState<{ x: number; y: number } | null>(null);
   const revealAutoHideRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [revealBarShrinking, setRevealBarShrinking] = useState(false);
+
+  // Per-card props derived from the active targeting request. Spread onto every
+  // GameCardNode render site so ineligible cards dim and eligible cards route
+  // their next click through `targeting.onSelect`.
+  const getTargetingProps = useCallback((card: GameCard) => {
+    if (!targeting) return undefined as undefined | { isDimmed: boolean; targetingMode: { isEligible: boolean; onSelect: () => void } };
+    const isEligible = targeting.isEligible(card);
+    return {
+      isDimmed: !isEligible,
+      targetingMode: {
+        isEligible,
+        onSelect: () => {
+          targeting.onSelect(card.instanceId);
+          setTargeting(null);
+        },
+      },
+    };
+  }, [targeting]);
 
   // ---- Report search/browse modal open state to parent (for timer pause) ----
   useEffect(() => {
@@ -1364,6 +1390,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         posY !== undefined ? String(posY) : '',
       );
     },
+    beginTargeting: (req) => setTargeting(req),
   }), [gameState, findMyCardById, checkReserveProtection, checkReserveBatchProtection, undoStack, opponentHandRevealed, opponentHandBrigadeCounts]);
 
   // ---- ModalGameProvider value (for shared deck modals) ----
@@ -4507,6 +4534,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   cardWidth={cardWidth}
                   cardHeight={cardHeight}
                   image={getCardImage(card)}
+                  {...(getTargetingProps(gameCard) ?? {})}
                   isSelected={isSelected(String(card.id))}
                   isDraggable={true}
                   hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
@@ -4582,6 +4610,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   cardWidth={cardWidth}
                   cardHeight={cardHeight}
                   image={getCardImage(card)}
+                  {...(getTargetingProps(gameCard) ?? {})}
                   isSelected={isSelected(String(card.id))}
                   isDraggable={true}
                   hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
@@ -4648,6 +4677,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   cardWidth={lobCard.cardWidth}
                   cardHeight={lobCard.cardHeight}
                   image={getCardImage(card)}
+                  {...(getTargetingProps(gameCard) ?? {})}
                   isSelected={isSelected(cardIdStr)}
                   isDraggable={true}
                   hoverProgress={hoveredInstanceId === cardIdStr ? hoverProgress : 0}
@@ -4720,6 +4750,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   cardWidth={lobCard.cardWidth}
                   cardHeight={lobCard.cardHeight}
                   image={getCardImage(card)}
+                  {...(getTargetingProps(gameCard) ?? {})}
                   isSelected={isSelected(cardIdStr)}
                   isDraggable={true}
                   hoverProgress={hoveredInstanceId === cardIdStr ? hoverProgress : 0}
@@ -4794,6 +4825,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                   cardWidth={lobCard.cardWidth}
                   cardHeight={lobCard.cardHeight}
                   image={getCardImage(card)}
+                  {...(getTargetingProps(gameCard) ?? {})}
                   isSelected={isSelected(cardIdStr)}
                   isDraggable={true}
                   hoverProgress={hoveredInstanceId === cardIdStr ? hoverProgress : 0}
@@ -5259,6 +5291,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                         cardWidth={pileCardWidth}
                         cardHeight={pileCardHeight}
                         image={img}
+                        {...(getTargetingProps(gameCard) ?? {})}
                         isSelected={isSelected(String(c.id))}
                         isDraggable={true}
                         nodeRef={registerCardNode}
@@ -5299,16 +5332,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                           : c;
                         const img = getCardImage(effective);
                         const isDraggableZone = zoneKey === 'discard' || zoneKey === 'reserve' || zoneKey === 'banish';
+                        const gameCard = adaptCard(effective, 'player1');
                         return img ? (
                           <GameCardNode
                             key={String(c.id)}
-                            card={adaptCard(effective, 'player1')}
+                            card={gameCard}
                             x={0}
                             y={0}
                             rotation={0}
                             cardWidth={pileCardWidth}
                             cardHeight={pileCardHeight}
                             image={img}
+                            {...(getTargetingProps(gameCard) ?? {})}
                             isSelected={false}
                             isDraggable={isDraggableZone}
                             nodeRef={isDraggableZone ? registerCardNode : undefined}
@@ -5330,26 +5365,32 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                     ) : zoneKey === 'deck' && topCard ? (
                       // Deck top card is draggable (to draw) but its identity is
                       // hidden information — suppress hover preview.
-                      <GameCardNode
-                        card={adaptCard(topCard, 'player1')}
-                        x={0}
-                        y={0}
-                        rotation={0}
-                        cardWidth={pileCardWidth}
-                        cardHeight={pileCardHeight}
-                        image={undefined}
-                        isSelected={false}
-                        isDraggable={true}
-                        nodeRef={registerCardNode}
-                        hoverProgress={0}
-                        onDragStart={handleCardDragStart}
-                        onDragMove={handleCardDragMove}
-                        onDragEnd={handleCardDragEnd}
-                        onContextMenu={noopContextMenu}
-                        onDblClick={noopDblClick}
-                        onMouseEnter={noopMouseEnter}
-                        onMouseLeave={noopMouseLeave}
-                      />
+                      (() => {
+                        const gameCard = adaptCard(topCard, 'player1');
+                        return (
+                          <GameCardNode
+                            card={gameCard}
+                            x={0}
+                            y={0}
+                            rotation={0}
+                            cardWidth={pileCardWidth}
+                            cardHeight={pileCardHeight}
+                            image={undefined}
+                            {...(getTargetingProps(gameCard) ?? {})}
+                            isSelected={false}
+                            isDraggable={true}
+                            nodeRef={registerCardNode}
+                            hoverProgress={0}
+                            onDragStart={handleCardDragStart}
+                            onDragMove={handleCardDragMove}
+                            onDragEnd={handleCardDragEnd}
+                            onContextMenu={noopContextMenu}
+                            onDblClick={noopDblClick}
+                            onMouseEnter={noopMouseEnter}
+                            onMouseLeave={noopMouseLeave}
+                          />
+                        );
+                      })()
                     ) : (
                       <CardBackShape width={pileCardWidth} height={pileCardHeight} />
                     )}
@@ -5451,6 +5492,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                         cardWidth={pileCardWidth}
                         cardHeight={pileCardHeight}
                         image={img}
+                        {...(getTargetingProps(gameCard) ?? {})}
                         isSelected={isSelected(String(c.id))}
                         isDraggable={true}
                         nodeRef={registerCardNode}
@@ -5487,16 +5529,18 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                           ? { ...topCard, isFlipped: false }
                           : topCard;
                         const img = getCardImage(effectiveTop);
+                        const gameCard = adaptCard(effectiveTop, 'player2');
                         return img ? (
                           <GameCardNode
                             key={String(effectiveTop.id)}
-                            card={adaptCard(effectiveTop, 'player2')}
+                            card={gameCard}
                             x={pileCardWidth}
                             y={pileCardHeight}
                             rotation={180}
                             cardWidth={pileCardWidth}
                             cardHeight={pileCardHeight}
                             image={img}
+                            {...(getTargetingProps(gameCard) ?? {})}
                             isSelected={false}
                             isDraggable={zoneKey === 'discard'}
                             nodeRef={zoneKey === 'discard' ? registerCardNode : undefined}
@@ -5598,6 +5642,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                         cardWidth={oppHandCard.cardWidth}
                         cardHeight={oppHandCard.cardHeight}
                         image={getCardImage(card)}
+                        {...(getTargetingProps(gameCard) ?? {})}
                         isDraggable={true}
                         hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
                         nodeRef={registerCardNode}
@@ -5652,6 +5697,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
                       cardWidth={handCardWidth}
                       cardHeight={handCardHeight}
                       image={getCardImage(card)}
+                      {...(getTargetingProps(gameCard) ?? {})}
                       isSelected={isSelected(String(card.id))}
                       isDraggable={true}
                       hoverProgress={hoveredInstanceId === String(card.id) ? hoverProgress : 0}
@@ -7293,6 +7339,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
           </div>
         );
       })()}
+
+      {targeting && (
+        <TargetCardOverlay
+          prompt={targeting.prompt}
+          onCancel={() => {
+            targeting.onCancel();
+            setTargeting(null);
+          }}
+        />
+      )}
     </div>
   );
 }
