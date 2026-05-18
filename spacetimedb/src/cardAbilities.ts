@@ -39,6 +39,7 @@ export type CardAbility = AbilityBase & (
   | { type: 'set_card_outline'; color: 'good' | 'evil'; label: string }
   | { type: 'play_all_lost_souls' }
   | { type: 'three_nails_reset' }
+  | { type: 'imitate_lost_soul' }
   | { type: 'custom'; reducerName: string; label: string }
 );
 
@@ -53,6 +54,8 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
   'Kingdom of the Divine [T2C AB]':                      [{ type: 'spawn_token', tokenName: 'Daniel Soul Token' }],
   'Lost Soul "Harvest" [John 4:35]':                     [{ type: 'spawn_token', tokenName: 'Harvest Soul Token' }],
   'Lost Soul "Harvest" [John 4:35] [2023 - 2nd Place]':  [{ type: 'spawn_token', tokenName: 'Harvest Soul Token' }],
+  'Lost Soul "Imitate" [III John 1:11]':                 [{ type: 'imitate_lost_soul' }],
+  'Lost Soul "Imitate" [III John 1:11]  [AB - RoJ]':     [{ type: 'imitate_lost_soul' }],
   'Lost Soul "Lost Souls" [Proverbs 2:16-17]':           [{ type: 'spawn_token', tokenName: 'Lost Souls Token' }],
   'Mayhem':                                              [{ type: 'all_players_shuffle_and_draw', shuffleCount: 6, drawCount: 6 }],
   'Mayhem (2020 Promo)':                                 [{ type: 'all_players_shuffle_and_draw', shuffleCount: 6, drawCount: 6 }],
@@ -128,6 +131,70 @@ export const CARD_ABILITIES: Record<string, CardAbility[]> = {
 
 export function getAbilitiesForCard(identifier: string): CardAbility[] {
   return CARD_ABILITIES[identifier] ?? [];
+}
+
+/**
+ * Exact-cardName → image path map for Imitate Lost Soul art swaps.
+ * Files live under public/imitate-souls/cards/ (see public/imitate-souls/README.md).
+ * Multiple cardName variants can point at the same file when the card
+ * has alternate-border or promo variants sharing the same art.
+ */
+export const IMITATE_SOUL_IMAGES: Record<string, string> = {
+  'Lost Soul "Awake" [Ephesians 5:14 - TPC]':                          '/imitate-souls/cards/awake.jpg',
+  'Lost Soul "Crowds" [Luke 5:15] [2016 - Local]':                     '/imitate-souls/cards/crowds_local.jpg',
+  'Lost Soul "Crowds" [Luke 5:15] [2025 - Worker]':                    '/imitate-souls/cards/crowds_worker.jpg',
+  'Lost Soul "Defiled" [Mark 7:21-22]':                                '/imitate-souls/cards/defiled.jpg',
+  'Lost Soul "Destruction" [Hebrews 10:39]':                           '/imitate-souls/cards/destruction.jpg',
+  'Lost Soul "Destruction" [Hebrews 10:39] [AB - CoW]':                '/imitate-souls/cards/destruction.jpg',
+  'Lost Soul "Dull" [Hebrews 5:11]':                                   '/imitate-souls/cards/dull.jpg',
+  'Lost Soul "Dull" [Hebrews 5:11] [AB - CoW]':                        '/imitate-souls/cards/dull.jpg',
+  'Lost Soul "Forsaken" [Hebrews 10:25]':                              '/imitate-souls/cards/forsaken.jpg',
+  'Lost Soul "Forsaken" [Hebrews 10:25] [AB - CoW]':                   '/imitate-souls/cards/forsaken.jpg',
+  'Lost Soul "Gain" [Jude 1:16]':                                      '/imitate-souls/cards/gain.jpg',
+  'Lost Soul "Gain" [Jude 1:16]  [AB - RoJ]':                          '/imitate-souls/cards/gain.jpg',
+  'Lost Soul "Galileans" [Luke 13:2]':                                 '/imitate-souls/cards/galileans.jpg',
+  'Lost Soul "Harvest" [John 4:35]':                                   '/imitate-souls/cards/harvest.jpg',
+  'Lost Soul "Harvest" [John 4:35] [2023 - 2nd Place]':                '/imitate-souls/cards/harvest_2nd.jpg',
+  'Lost Soul "Humble" [James 4:6 / Proverbs 3:34 - RoJ]':              '/imitate-souls/cards/humble.jpg',
+  'Lost Soul "Humble" [James 4:6 / Proverbs 3:34]  [AB - RoJ]':        '/imitate-souls/cards/humble.jpg',
+  'Lost Soul "Humble" [James 4:6 / Proverbs 3:34] [2022 - 3rd Place]': '/imitate-souls/cards/humble_3rd.jpg',
+  'Lost Soul "Imitate" [III John 1:11]':                               '/imitate-souls/cards/imitate.jpg',
+  'Lost Soul "Imitate" [III John 1:11]  [AB - RoJ]':                   '/imitate-souls/cards/imitate.jpg',
+  'Lost Soul "Lawless" [Hebrews 12:8]':                                '/imitate-souls/cards/lawless.jpg',
+  'Lost Soul "Lawless" [Hebrews 12:8] [2021 - 1st Place]':             '/imitate-souls/cards/lawless.jpg',
+  'Lost Soul "Lawless" [Hebrews 12:8] [AB - CoW]':                     '/imitate-souls/cards/lawless.jpg',
+  'Lost Soul "Open Hand" [Hebrews 4:13]':                              '/imitate-souls/cards/open_hand.jpg',
+  'Lost Soul "Open Hand" [Hebrews 4:13] [AB - CoW]':                   '/imitate-souls/cards/open_hand.jpg',
+  'Lost Soul "Rejoice" [Luke 15:6 - J]':                               '/imitate-souls/cards/rejoice.jpg',
+  'Lost Soul "Retribution" [Acts 16:22]':                              '/imitate-souls/cards/retribution.jpg',
+  'Lost Soul "Revealer" [John 3:20]':                                  '/imitate-souls/cards/revealer.jpg',
+  'Lost Soul "Salty" [Matthew 5:13]':                                  '/imitate-souls/cards/salty.jpg',
+  'Lost Soul "Shut Door" [Luke 13:25 - LR]':                           '/imitate-souls/cards/shut_door.jpg',
+  'Lost Soul "Tempter" [II Timothy 3:6-7 - TPC]':                      '/imitate-souls/cards/tempter.jpg',
+  'Lost Soul "The First" [Luke 13:30]':                                '/imitate-souls/cards/the_first.jpg',
+  'Lost Soul "Undesirables" [Luke 14:13]':                             '/imitate-souls/cards/undesireables.jpg',
+};
+
+/**
+ * Original (canonical) imgFile for each Imitate Lost Soul variant. Used by
+ * stop_imitating_lost_soul to revert. Values match the imgFile field in
+ * lib/cards/generated/cardData.ts. Parity test enforces this.
+ */
+export const IMITATE_ORIGINAL_IMG: Record<string, string> = {
+  'Lost Soul "Imitate" [III John 1:11]':              '23-Lost-Soul-Imitate-R',
+  'Lost Soul "Imitate" [III John 1:11]  [AB - RoJ]':  'RoJ_AB_N23-Lost-Soul-Imitate-R',
+};
+
+/**
+ * Extracts a short label from a Lost Soul cardName for the imitation overlay.
+ * Priority: quoted name → first parenthetical → cardName with "Lost Soul " prefix stripped.
+ */
+export function simplifyLostSoulName(cardName: string): string {
+  const quoted = cardName.match(/"([^"]+)"/);
+  if (quoted) return quoted[1];
+  const paren = cardName.match(/\(([^)]+)\)/);
+  if (paren) return paren[1];
+  return cardName.replace(/^Lost Soul\s+/, '').trim();
 }
 
 export interface TokenCardData {
