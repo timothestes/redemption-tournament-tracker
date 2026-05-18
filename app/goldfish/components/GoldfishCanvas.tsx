@@ -32,7 +32,8 @@ import { CardScaleControl } from '@/app/shared/components/CardScaleControl';
 import { useModalCardDrag } from '@/app/shared/hooks/useModalCardDrag';
 import { useSelectionState, type CardBound } from '../hooks/useSelectionState';
 import { MultiCardContextMenu } from '@/app/shared/components/MultiCardContextMenu';
-import { GameActions } from '@/app/shared/types/gameActions';
+import { TargetCardOverlay } from '@/app/shared/components/TargetCardOverlay';
+import { GameActions, TargetingRequest } from '@/app/shared/types/gameActions';
 import { GameToastContainer, showGameToast } from './GameToast';
 import { DiceRollOverlay } from './DiceRollOverlay';
 import { useCardPreview } from '../state/CardPreviewContext';
@@ -108,6 +109,13 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     onChoose: executeCardAbility,
   });
 
+  // Targeting state — set by CardContextMenu when the player picks an
+  // ability that needs a follow-up card click (e.g. `imitate_lost_soul`).
+  // The canvas dims ineligible cards and routes the next eligible click
+  // through `onSelect`. Cleared by Esc, the banner's Cancel button, or any
+  // eligible card click.
+  const [targeting, setTargeting] = useState<TargetingRequest | null>(null);
+
   // Adapter: bridge goldfish game context to shared GameActions interface
   const goldfishActions: GameActions = useMemo(() => ({
     moveCard: (cardId, toZone, posX, posY) => moveCard(cardId, toZone as ZoneId, undefined, posX !== undefined ? Number(posX) : undefined, posY !== undefined ? Number(posY) : undefined),
@@ -172,7 +180,14 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
     randomHandToZone: () => {}, // not used in goldfish
     randomReserveToZone: () => {}, // not used in goldfish
     reloadDeck: () => {}, // not used in goldfish
-  }), [moveCard, moveCardsBatch, flipCard, revealCardInHand, meekCard, unmeekCard, addCounter, removeCounter, shuffleCardIntoDeck, shuffleDeck, addNote, drawCard, drawMultiple, moveCardToTopOfDeck, moveCardToBottomOfDeck, removeOpponentToken, executeCardAbility, state.zones]);
+    imitateLostSoul: (sourceInstanceId, targetInstanceId) => {
+      dispatch(gameActionCreators.imitateLostSoul(sourceInstanceId, targetInstanceId));
+    },
+    stopImitatingLostSoul: (sourceInstanceId) => {
+      dispatch(gameActionCreators.stopImitatingLostSoul(sourceInstanceId));
+    },
+    beginTargeting: (req) => setTargeting(req),
+  }), [moveCard, moveCardsBatch, flipCard, revealCardInHand, meekCard, unmeekCard, addCounter, removeCounter, shuffleCardIntoDeck, shuffleDeck, addNote, drawCard, drawMultiple, moveCardToTopOfDeck, moveCardToBottomOfDeck, removeOpponentToken, executeCardAbility, state.zones, dispatch]);
 
   // Bridge goldfish game state into the shared ModalGameContext for shared modal components
   const modalGameValue = useMemo<ModalGameContextValue>(() => ({
@@ -308,6 +323,24 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
   const [zoneMenu, setZoneMenu] = useState<{ x: number; y: number; spawnX: number; spawnY: number } | null>(null);
   const [lorMenu, setLorMenu] = useState<{ x: number; y: number } | null>(null);
   const [cardRenderKey, setCardRenderKey] = useState(0);
+
+  // Per-card props derived from the active targeting request. Spread onto every
+  // GameCardNode render site so ineligible cards dim and eligible cards route
+  // their next click through `targeting.onSelect`.
+  const getTargetingProps = useCallback((card: GameCard) => {
+    if (!targeting) return undefined as undefined | { isDimmed: boolean; targetingMode: { isEligible: boolean; onSelect: () => void } };
+    const isEligible = targeting.isEligible(card);
+    return {
+      isDimmed: !isEligible,
+      targetingMode: {
+        isEligible,
+        onSelect: () => {
+          targeting.onSelect(card.instanceId);
+          setTargeting(null);
+        },
+      },
+    };
+  }, [targeting]);
 
   // Card node ref map for imperative multi-card drag
   const cardNodeRefs = useRef<Map<string, Konva.Group>>(new Map());
@@ -1761,6 +1794,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                       cardWidth={sidebarCardWidth}
                       cardHeight={sidebarCardHeight}
                       image={getImage(card.cardImgFile)}
+                      {...(getTargetingProps(card) ?? {})}
                       isSelected={selectedIds.has(card.instanceId)}
                       hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
                       nodeRef={registerCardNode}
@@ -1842,6 +1876,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                         cardWidth={sidebarCardWidth}
                         cardHeight={sidebarCardHeight}
                         image={getImage(card.cardImgFile)}
+                        {...(getTargetingProps(card) ?? {})}
                         isSelected={selectedIds.has(card.instanceId)}
                         hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
                         nodeRef={registerCardNode}
@@ -1880,6 +1915,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                       cardWidth={sidebarCardWidth}
                       cardHeight={sidebarCardHeight}
                       image={getImage(card.cardImgFile)}
+                      {...(getTargetingProps(card) ?? {})}
                       isSelected={selectedIds.has(card.instanceId)}
                       hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
                       nodeRef={registerCardNode}
@@ -1931,6 +1967,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                           cardWidth={cardWidth}
                           cardHeight={cardHeight}
                           image={getImage(w.cardImgFile)}
+                          {...(getTargetingProps(w) ?? {})}
                           isSelected={selectedIds.has(w.instanceId)}
                           hoverProgress={hoveredInstanceId === w.instanceId ? hoverProgress : 0}
                           nodeRef={registerCardNode}
@@ -1957,6 +1994,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                         cardWidth={cardWidth}
                         cardHeight={cardHeight}
                         image={getImage(card.cardImgFile)}
+                        {...(getTargetingProps(card) ?? {})}
                         isSelected={selectedIds.has(card.instanceId)}
                         hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
                         nodeRef={registerCardNode}
@@ -1998,6 +2036,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                         cardWidth={cardWidth}
                         cardHeight={cardHeight}
                         image={getImage(card.cardImgFile)}
+                        {...(getTargetingProps(card) ?? {})}
                         isSelected={selectedIds.has(card.instanceId)}
                         hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
                         lobArrivalGlow={getLobGlow(card.instanceId) > 0}
@@ -2041,6 +2080,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                       cardWidth={cardWidth}
                       cardHeight={cardHeight}
                       image={getImage(card.cardImgFile)}
+                      {...(getTargetingProps(card) ?? {})}
                       isSelected={selectedIds.has(card.instanceId)}
                       hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
                       nodeRef={registerCardNode}
@@ -2167,6 +2207,7 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
                 cardWidth={cardWidth}
                 cardHeight={cardHeight}
                 image={getImage(card.cardImgFile)}
+                {...(getTargetingProps(card) ?? {})}
                 isSelected={selectedIds.has(card.instanceId)}
                       hoverProgress={hoveredInstanceId === card.instanceId ? hoverProgress : 0}
                 nodeRef={registerCardNode}
@@ -2868,6 +2909,16 @@ export default function GoldfishCanvas({ containerWidth, containerHeight, scale,
       <GameToastContainer />
       <CardChoicePromptContainer />
       <DiceRollOverlay />
+
+      {targeting && (
+        <TargetCardOverlay
+          prompt={targeting.prompt}
+          onCancel={() => {
+            targeting.onCancel();
+            setTargeting(null);
+          }}
+        />
+      )}
     </>
   );
 }

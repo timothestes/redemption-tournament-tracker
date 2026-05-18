@@ -1,3 +1,18 @@
+import type { GameCard } from '@/app/goldfish/types';
+
+/**
+ * Targeting request issued by the menu when the player picks an ability that
+ * needs a follow-up card click (currently only `imitate_lost_soul`). The
+ * canvas owns the state — it stores the request, dims ineligible cards, and
+ * routes the next eligible card click through `onSelect`.
+ */
+export interface TargetingRequest {
+  prompt: string;
+  isEligible: (card: GameCard) => boolean;
+  onSelect: (targetInstanceId: string) => void;
+  onCancel: () => void;
+}
+
 /**
  * Common interface for game actions shared between goldfish and multiplayer modes.
  * All IDs are strings — multiplayer adapter converts to bigint internally.
@@ -46,4 +61,12 @@ export interface GameActions {
   // Temporarily reveals a single hand card to opponents/spectators for 30 seconds.
   // Duration is fixed at the callee — callers don't pass it.
   revealCardInHand?(cardId: string): void;
+
+  // Imitate Lost Soul ability (optional — implemented by both goldfish and multiplayer).
+  // beginTargeting puts the canvas into "click a card" mode for ability flows
+  // that need a follow-up target; CardContextMenu calls it for the
+  // `imitate_lost_soul` ability variant.
+  imitateLostSoul?(sourceInstanceId: string, targetInstanceId: string): void;
+  stopImitatingLostSoul?(sourceInstanceId: string): void;
+  beginTargeting?(req: TargetingRequest): void;
 }
