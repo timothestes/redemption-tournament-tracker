@@ -141,6 +141,18 @@ reasons: it's the same key shape used by `CARD_ABILITIES`, and it lets us
 deliberately steer ambiguous names like "Revealer" and "Shut Door" to the
 right art rather than the generic verse-only sibling.
 
+**Whitespace warning.** Three keys contain a literal **double space** that
+must be preserved byte-for-byte (the source carddata has the two spaces
+between the verse bracket and the AB bracket):
+
+```
+'Lost Soul "Gain" [Jude 1:16]  [AB - RoJ]'
+'Lost Soul "Humble" [James 4:6 / Proverbs 3:34]  [AB - RoJ]'
+'Lost Soul "Imitate" [III John 1:11]  [AB - RoJ]'
+```
+
+One accidental normalize-spaces pass silently breaks registration.
+
 The corresponding `IMITATE_ORIGINAL_IMG` server-side map for revert:
 
 ```ts
@@ -178,11 +190,16 @@ export function simplifyLostSoulName(cardName: string): string {
 }
 ```
 
-The reducer always sets `imitatingName` to this value when it would
-otherwise be missing an image — i.e. when the target's cardName is NOT in
-`IMITATE_SOUL_IMAGES`. When the target IS in the map, `imitatingName` is
-set to the empty string so the overlay does not render (label is
-fallback-only, per design decision).
+The reducer **always** sets `imitatingName` to the simplified name when
+imitating, regardless of whether art exists. This makes `imitatingName`
+the single source of truth for "is currently imitating", which the menu
+and revert logic key off of.
+
+The label, however, is fallback-only: `GameCardNode` only renders the
+label when `imitatingName !== ''` **AND** `cardImgFile` still equals the
+canonical Imitate imgFile (i.e. no art swap happened). The label-gating
+check uses `findCard(card.cardName)?.imgFile` (cheap, pure lookup) so the
+canvas doesn't need a separate "had art" boolean.
 
 ## Schema change
 
@@ -289,11 +306,11 @@ export const imitate_lost_soul = spacetimedb.reducer(
     if (target.cardType !== 'Lost Soul') throw new SenderError('Target must be a Lost Soul');
     if (target.zone !== 'land-of-bondage') throw new SenderError('Target must be in a Land of Bondage');
 
-    // Compute new state
+    // Compute new state. imitatingName is ALWAYS set when imitating —
+    // it's the single source of truth for "is currently imitating".
+    // The label-gating in GameCardNode handles the fallback-only display.
     const newImg = IMITATE_SOUL_IMAGES[target.cardName] ?? source.cardImgFile;
-    const newLabel = IMITATE_SOUL_IMAGES[target.cardName]
-      ? ''                                       // art exists → no label
-      : simplifyLostSoulName(target.cardName);   // no art → label fallback
+    const newLabel = simplifyLostSoulName(target.cardName);
 
     // Commit (spread to avoid nulling other fields — see spacetimedb/CLAUDE.md)
     ctx.db.CardInstance.id.update({
@@ -354,126 +371,280 @@ Mirror helpers `imitateLostSoulInState(state, sourceId, targetId)` and
 pattern. Revert uses `findCard(source.cardName).imgFile` directly (no need
 for a separate ORIGINAL_IMG map client-side).
 
-Two new action types in `gameCard.ts`:
+Two new action types added to the `ActionType` union in
+`app/shared/types/gameCard.ts`:
 
 ```ts
 | 'IMITATE_LOST_SOUL'
 | 'STOP_IMITATING_LOST_SOUL'
 ```
 
-The goldfish dispatch `EXECUTE_CARD_ABILITY` switch needs a case for
-`imitate_lost_soul` to satisfy the exhaustiveness check. It returns
-`state` unchanged with a comment noting the variant is dispatched via
-the dedicated `IMITATE_LOST_SOUL` action (the client routes around
-`EXECUTE_CARD_ABILITY` for this variant after the targeting overlay
-resolves).
+The matching `GameAction.payload` shape needs no new fields — existing
+`cardInstanceId` (source) and a new optional `targetInstanceId` (already
+fits as `warriorInstanceId` does today, or add an explicit
+`targetInstanceId?: string`).
 
-## Targeting overlay (client)
+### Dispatch routing changes (CRITICAL)
 
-A new generic component:
+The existing dispatch flow is: `CardContextMenu` calls
+`actions.executeCardAbility?.(card.instanceId, index)` unconditionally
+for every ability (`CardContextMenu.tsx:~290`), which routes to the
+generic `execute_card_ability` server reducer + `EXECUTE_CARD_ABILITY`
+goldfish action. `imitate_lost_soul` bypasses this path entirely because
+it needs a target. Four edits to wire it correctly:
 
-```tsx
-// app/shared/components/TargetCardOverlay.tsx
-interface TargetCardOverlayProps {
-  prompt: string;                                          // e.g. "Click a Lost Soul to imitate"
-  isEligible: (card: GameCard) => boolean;                 // predicate
-  onSelect: (targetInstanceId: string) => void;
-  onCancel: () => void;
-}
-```
+1. **CardContextMenu special-case.** In the `abilities.map()` loop,
+   branch on `ability.type`. When `'imitate_lost_soul'`, the button's
+   `onClick` calls `setTargeting({...})` (see Targeting flow). Other
+   types are unchanged.
 
-It renders:
-- A fixed-position banner at the top of the canvas with the prompt and an
-  "Esc to cancel" hint. Clicking the banner does nothing; tabbing focus is
-  not stolen.
-- A semi-transparent dim layer over the whole canvas (~40% black) **except**
-  cards that pass `isEligible`. Implementation: drop the dim z-index below
-  eligible cards and above ineligible ones, OR add a CSS class to eligible
-  cards that boosts their z-index above the overlay. The latter is simpler
-  with React state since cards are already individually rendered.
-- Captures Escape key on `document.addEventListener('keydown', ...)`
-  while mounted.
+2. **Goldfish exhaustive stub.** Add to the
+   `EXECUTE_CARD_ABILITY` inner switch in
+   `app/goldfish/state/gameReducer.ts`:
+   ```ts
+   case 'imitate_lost_soul':
+     // Targeting variant — dispatched via IMITATE_LOST_SOUL with a target.
+     return state;
+   ```
+   This is for exhaustiveness only. The real path goes through new
+   `IMITATE_LOST_SOUL` and `STOP_IMITATING_LOST_SOUL` actions.
 
-A new React context exposes the imperative API:
+3. **Server exhaustive stub.** Add to the `execute_card_ability`
+   switch in `spacetimedb/src/index.ts` (precedent:
+   `three_nails_reset` at `index.ts:~3345`):
+   ```ts
+   case 'imitate_lost_soul':
+     throw new SenderError('imitate_lost_soul is dispatched directly by the client');
+   ```
 
-```tsx
-// app/shared/components/TargetingContext.tsx
-const TargetingContext = createContext<{
-  beginTargeting: (opts: Omit<TargetCardOverlayProps, 'onSelect' | 'onCancel'>) =>
-    Promise<string | null>;  // resolves to targetInstanceId, or null on cancel
-}>(...);
-```
+4. **`useGameState` wrappers.** This codebase has **no existing
+   `type: 'custom'` client-routing branch** — the comment at
+   `app/play/hooks/useGameState.ts:~648` notes that "v1 registry has no
+   custom entries; when the first custom ability ships, branch here."
+   This feature ships the first such ability, so add two new wrappers
+   alongside the existing `executeCardAbility`:
 
-The Imitate flow consumes this:
+   ```ts
+   const imitateLostSoul = useCallback(
+     (sourceInstanceId: string, targetInstanceId: string) => {
+       conn?.reducers.imitateLostSoul({
+         gameId,
+         sourceInstanceId: BigInt(sourceInstanceId),
+         targetInstanceId: BigInt(targetInstanceId),
+       });
+     },
+     [conn, gameId],
+   );
+
+   const stopImitatingLostSoul = useCallback(
+     (sourceInstanceId: string) => {
+       conn?.reducers.stopImitatingLostSoul({
+         gameId,
+         sourceInstanceId: BigInt(sourceInstanceId),
+       });
+     },
+     [conn, gameId],
+   );
+   ```
+
+   Both go on the `GameActions` interface alongside `executeCardAbility`.
+   The goldfish equivalent (`gameActions.ts`) gets parallel
+   action-creator helpers that dispatch `IMITATE_LOST_SOUL` and
+   `STOP_IMITATING_LOST_SOUL`.
+
+## Targeting flow (client)
+
+**The canvas is Konva (`react-konva`), not DOM.** Cards render as
+`<Group>` + `<Rect>` + `<KonvaImage>` primitives inside a `<Stage>` (see
+`GoldfishCanvas.tsx`, `MultiplayerCanvas.tsx`, `GameCardNode.tsx`).
+`data-*` attributes do not exist; DOM-level `onClickCapture` will not see
+card clicks. All design choices below reflect this.
+
+### State shape
+
+Targeting is a single piece of state owned by the canvas component (or
+hoisted to its parent if multiple canvases need to share it):
 
 ```ts
-// CardContextMenu handler for "Imitate..."
-const targetId = await beginTargeting({
-  prompt: 'Click a Lost Soul to imitate',
-  isEligible: (c) => c.cardType === 'Lost Soul' && c.zone === 'land-of-bondage',
-});
-if (targetId == null) return;  // cancelled
-actions.imitateLostSoul(card.instanceId, targetId);
+type TargetingRequest = {
+  prompt: string;                                  // banner text
+  isEligible: (card: GameCard) => boolean;         // predicate
+  onSelect: (targetInstanceId: string) => void;
+  onCancel: () => void;
+};
+
+const [targeting, setTargeting] = useState<TargetingRequest | null>(null);
 ```
 
-The provider is mounted once at the top of the game screen (goldfish page
-and multiplayer play page both wrap in `<TargetingProvider>`). The overlay
-component renders inside the provider whenever a request is pending.
+This mirrors the existing modal idiom in this codebase
+(`DeckSearchModal`, `DeckExchangeModal`, `OpponentBrowseModal` etc. — all
+use `useState<X | null>` + conditional JSX + `onClose` callbacks). No
+React context, no imperative promise API.
 
-## Card click handling
+### Banner overlay
 
-The targeting overlay needs to intercept clicks on eligible cards without
-breaking the normal click/drag behavior. Approach:
+`<TargetCardOverlay>` is a sibling component rendered alongside the
+`<Stage>` (or as a fixed-position div over it — it's pure UI chrome, can
+be DOM):
 
-1. While targeting is active, a top-level `onClickCapture` handler on the
-   canvas root checks if the click landed on a card with
-   `data-card-instance-id`.
-2. If yes and the predicate passes, call `onSelect(instanceId)`,
-   `stopPropagation()`, and tear down the overlay.
-3. If no, swallow the click (prevent normal dispatch) — keeps targeting
-   atomic and avoids accidental moves.
+```tsx
+{targeting && (
+  <TargetCardOverlay
+    prompt={targeting.prompt}
+    onCancel={() => { targeting.onCancel(); setTargeting(null); }}
+  />
+)}
+```
 
-This avoids modifying every card-node component's click handler. The cards
-already render with a stable `data-card-instance-id` (or it's a 1-line add
-where missing).
+It renders a fixed-position banner with the prompt, an "Esc to cancel"
+hint, AND a visible "Cancel" button (touch users have no Escape key —
+`GameCardNode` already wires `onTap`, so the rest of the targeting flow
+works on touch; only the cancel affordance needs the button).
 
-## Label overlay rendering
+Escape key cancellation: `useEffect(() => { document.addEventListener('keydown', ...); return () => document.removeEventListener(...); }, [targeting])` on the canvas, gated by `targeting !== null`.
 
-When `card.imitatingName` is set, the canvas renders a small label
-overlay on the card:
+### Card-click interception (Konva)
 
-- Position: bottom 20% of the card, centered horizontally.
-- Background: `bg-black/70` (semi-transparent dark) for readability over
-  the original Imitate art.
-- Text: `text-white text-xs font-medium` with `truncate` for long names.
-- Reads `imitatingName` verbatim — no further transformation at render.
+Two equally clean options for routing card clicks during targeting:
 
-The same component is rendered in both the goldfish canvas
-(`GoldfishCanvas.tsx`) and the multiplayer board view. Extract as
-`<CardImitateLabel name={...} />` in `app/shared/components/`.
+1. **Prop drilling.** `GameCardNode` accepts a new optional prop
+   `targetingMode?: { isEligible: boolean; onSelect: () => void }`. The
+   canvas's existing per-card render passes
+   `targetingMode={targeting ? { isEligible: targeting.isEligible(card), onSelect: () => targeting.onSelect(card.instanceId) } : undefined}`.
+   Inside `GameCardNode`, `handleClick`/`handleTap` checks
+   `targetingMode` first and routes to `onSelect()` if eligible, swallows
+   otherwise.
+2. **Stage-level listener.** `stageRef.current.on('click', ...)`. Walk
+   `e.target` up to its enclosing `Group` and read a custom Konva attr
+   (`card.setAttr('cardInstanceId', ...)` set when the card mounts).
+
+**Decision: option 1 (prop drilling).** It matches how Konva click
+handling already works in `GameCardNode`, doesn't require introducing
+custom Konva attrs, and keeps targeting state colocated with the canvas
+that owns it. The extra prop adds ~3 lines per card-render site.
+
+### Dimming (Konva)
+
+Pass an `isDimmed` prop to `GameCardNode`:
+
+```tsx
+<GameCardNode
+  card={card}
+  isDimmed={targeting !== null && !targeting.isEligible(card)}
+  targetingMode={targeting ? { ... } : undefined}
+  // ...
+/>
+```
+
+Inside `GameCardNode`, apply `opacity={isDimmed ? 0.3 : 1}` to the
+top-level `<Group>`. No CSS, no z-index. Konva handles compositing.
+
+### Menu → targeting hand-off
+
+In `CardContextMenu.tsx`, the "Imitate..." button calls:
+
+```ts
+setTargeting({
+  prompt: 'Click a Lost Soul to imitate',
+  isEligible: (c) => isLostSoul(c) && c.zone === 'land-of-bondage',
+  onSelect: (targetId) => {
+    actions.imitateLostSoul(card.instanceId, targetId);
+    setTargeting(null);
+  },
+  onCancel: () => setTargeting(null),
+});
+```
+
+`isLostSoul` is the existing helper (`app/goldfish/state/gameReducer.ts:19`,
+also in `CardContextMenu.tsx:15`); it handles the `LS` / `Lost Soul` /
+contains-`lost soul` variants and reads `card.type` (the client field is
+`type`, not `cardType`). Reuse, don't duplicate the equality check.
+
+`setTargeting` is exposed via a prop or by hoisting the state to a
+canvas-level provider. Since `CardContextMenu` is rendered as a child of
+the canvas, prop drilling one callback is fine.
+
+## Label overlay rendering (Konva)
+
+When `card.imitatingName !== ''`, render the label as Konva primitives
+**inside `GameCardNode`'s existing `<Group>`** — not as a separate React
+component, not as a JSX `<div>`. JSX outside Konva primitives inside a
+`<Stage>` is silently dropped by `react-konva`.
+
+```tsx
+// Inside GameCardNode's <Group>, after the card <Image>:
+const showImitateLabel =
+  !!card.imitatingName &&
+  card.cardImgFile === findCard(card.cardName)?.imgFile;  // fallback-only
+
+{showImitateLabel && (
+  <>
+    <Rect
+      x={0}
+      y={cardHeight - LABEL_HEIGHT}
+      width={cardWidth}
+      height={LABEL_HEIGHT}
+      fill="rgba(0, 0, 0, 0.7)"
+    />
+    <Text
+      x={0}
+      y={cardHeight - LABEL_HEIGHT}
+      width={cardWidth}
+      height={LABEL_HEIGHT}
+      text={card.imitatingName!}
+      fill="#ffffff"
+      fontSize={11}
+      fontStyle="500"
+      align="center"
+      verticalAlign="middle"
+      wrap="none"
+      ellipsis
+    />
+  </>
+)}
+```
+
+Constants (`LABEL_HEIGHT ≈ 18px` at default card scale) live alongside
+existing `GameCardNode` size constants. No Tailwind classes — Konva
+takes pixel-typed props directly. Both goldfish and multiplayer canvases
+get the label for free because both render cards through `GameCardNode`.
 
 ## Menu rendering
 
-In `CardContextMenu.tsx`, when iterating `CARD_ABILITIES[card.cardName]`:
+`CardContextMenu.tsx` currently renders each ability as a plain
+`<button style={itemStyle}>...</button>` and unconditionally calls
+`actions.executeCardAbility?.(card.instanceId, index)` (line ~290). The
+`<MenuItem>` component referenced in earlier drafts does not exist —
+follow the existing pattern.
+
+Two edits to that file:
+
+1. **Special-case the dispatch.** In the abilities `.map()`, branch on
+   `ability.type`. When it's `'imitate_lost_soul'`, the click handler
+   calls `setTargeting({ ... })` (see Targeting flow section) instead of
+   `actions.executeCardAbility`. All other ability types continue to
+   route through `executeCardAbility` unchanged.
+
+2. **Render "Stop Imitating" as a sibling button.** After the
+   `.map()`, conditionally render a second `<button style={itemStyle}>`
+   when the card is currently imitating:
 
 ```tsx
-case 'imitate_lost_soul': {
-  const isImitating = (card.imitatingName ?? '') !== '' ||
-                      card.cardImgFile !== originalImgFor(card.cardName);
-  return (
-    <>
-      <MenuItem onClick={handleImitate}>Imitate...</MenuItem>
-      {isImitating && (
-        <MenuItem onClick={handleStopImitating}>Stop Imitating</MenuItem>
-      )}
-    </>
-  );
-}
+{(card.imitatingName ?? '') !== '' && (
+  <button
+    style={itemStyle}
+    onClick={() => { actions.stopImitatingLostSoul?.(card.instanceId); onClose(); }}
+  >
+    Stop Imitating
+  </button>
+)}
 ```
 
-`originalImgFor()` is a helper that returns the canonical imgFile from
-`findCard(cardName)`. Client-side `findCard` is fine here — the registry
-duplication is only needed server-side.
+The single source of truth for "is currently imitating" is
+`(card.imitatingName ?? '') !== ''`. Avoid a secondary `cardImgFile` vs
+canonical comparison — `imitatingName` is set on every imitation
+(whether art-swap or label-fallback path) and cleared on revert, so it's
+the cleanest test.
 
 ## Edge cases
 
@@ -507,11 +678,17 @@ case 'STOP_IMITATING_LOST_SOUL':
 
 ## Testing
 
-- **Registry parity tests** (`lib/cards/__tests__/cardAbilities.test.ts`):
-  extend to assert `IMITATE_SOUL_IMAGES` is identical between the lib and
-  spacetimedb copies, and that every key resolves to a real card via
-  `findCard()`, and every value resolves to an existing file under
-  `public/imitate-souls/cards/`.
+- **Registry parity tests** (`lib/cards/__tests__/cardAbilities.test.ts`)
+  — extend with explicit assertions:
+  - `expect(spacetimebDbCopy.IMITATE_SOUL_IMAGES).toEqual(IMITATE_SOUL_IMAGES)`.
+  - For every key in `IMITATE_SOUL_IMAGES`: `findCard(key)` returns truthy.
+  - For every value: `fs.existsSync(path.join('public', value))` (or
+    equivalent) — image file actually exists.
+  - Both `Lost Soul "Imitate" [III John 1:11]` AND the AB variant appear
+    in `CARD_ABILITIES` with `type: 'imitate_lost_soul'` in both copies.
+  - For both Imitate variants in `IMITATE_ORIGINAL_IMG` (server file):
+    `IMITATE_ORIGINAL_IMG[name] === findCard(name)?.imgFile` (drift
+    detection between the hardcoded original-img map and the carddata).
 - **`simplifyLostSoulName` unit tests**: covering quoted, parenthesized,
   and fallback cases — at minimum one per row of the txt list, plus an
   edge case like `Lost Soul "Has \"escaped\" quotes"` (probably none in
