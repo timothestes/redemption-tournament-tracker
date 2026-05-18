@@ -123,4 +123,17 @@ export const actions = {
   executeCardAbility(cardInstanceId: string, abilityIndex: number): GameAction {
     return createAction('EXECUTE_CARD_ABILITY', { cardInstanceId, abilityIndex });
   },
+
+  imitateLostSoul(sourceInstanceId: string, targetInstanceId: string): GameAction {
+    return createAction('IMITATE_LOST_SOUL', {
+      cardInstanceId: sourceInstanceId,
+      targetInstanceId,
+    });
+  },
+
+  stopImitatingLostSoul(sourceInstanceId: string): GameAction {
+    return createAction('STOP_IMITATING_LOST_SOUL', {
+      cardInstanceId: sourceInstanceId,
+    });
+  },
 };
