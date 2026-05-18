@@ -324,4 +324,32 @@ describe('imitate_lost_soul', () => {
     expect(updatedSource.cardImgFile).toBe('/imitate-souls/cards/forsaken.jpg');
     expect(updatedSource.imitatingName).toBe('Forsaken');
   });
+
+  it('re-imitate from art-supported to unsupported soul reverts art to canonical (regression)', () => {
+    // Regression: previously the reducer fell back to source.cardImgFile when
+    // the target had no registered art, leaving the stale awake.jpg in place
+    // AND hiding the label (since cardImgFile !== canonical). The fix is to
+    // fall back to the canonical Imitate art instead.
+    const source = makeCard({
+      instanceId: 'src',
+      cardName: 'Lost Soul "Imitate" [III John 1:11]',
+      cardImgFile: '/imitate-souls/cards/awake.jpg',  // already imitating Awake
+      imitatingName: 'Awake',
+      type: 'Lost Soul',
+      zone: 'land-of-bondage',
+      ownerId: 'player1',
+    });
+    const target = makeCard({
+      instanceId: 'tgt',
+      cardName: 'Lost Soul Matthew 19:23 (Speed Bump)',  // no art available
+      type: 'Lost Soul',
+      zone: 'land-of-bondage',
+      ownerId: 'player1',
+    });
+    const initial = makeState([source, target]);
+    const next = gameReducer(initial, gameActions.imitateLostSoul('src', 'tgt'));
+    const updatedSource = next.zones['land-of-bondage'].find(c => c.instanceId === 'src')!;
+    expect(updatedSource.cardImgFile).toBe('23-Lost-Soul-Imitate-R');  // canonical, not awake.jpg
+    expect(updatedSource.imitatingName).toBe('Speed Bump');
+  });
 });

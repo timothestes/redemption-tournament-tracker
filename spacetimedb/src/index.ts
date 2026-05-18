@@ -3412,8 +3412,12 @@ export const imitate_lost_soul = spacetimedb.reducer(
       throw new SenderError('Target must be in a Land of Bondage');
     }
 
+    // When the target has registered art, swap to it. Otherwise fall back to
+    // the *canonical* Imitate art (not source.cardImgFile, which could be a
+    // stale swap URL from a prior imitation). Pairs with the label-gating in
+    // GameCardNode (renders the label only when cardImgFile equals canonical).
     const registered = IMITATE_SOUL_IMAGES[target.cardName];
-    const newImg = registered ?? source.cardImgFile;
+    const newImg = registered ?? IMITATE_ORIGINAL_IMG[source.cardName];
     const newLabel = simplifyLostSoulName(target.cardName);
 
     ctx.db.CardInstance.id.update({

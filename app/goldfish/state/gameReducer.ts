@@ -142,7 +142,12 @@ function imitateLostSoulInState(
   if (!isLostSoul(target)) return state;
   if (target.zone !== 'land-of-bondage') return state;
 
-  const newImg = IMITATE_SOUL_IMAGES[target.cardName] ?? source.cardImgFile;
+  // When the target has registered art, swap to it. Otherwise fall back to
+  // the *canonical* Imitate art (not source.cardImgFile, which could be a
+  // stale swap URL from a prior imitation). Pairs with the label-gating in
+  // GameCardNode (renders the label only when cardImgFile equals canonical).
+  const canonical = findCard(source.cardName)?.imgFile ?? source.cardImgFile;
+  const newImg = IMITATE_SOUL_IMAGES[target.cardName] ?? canonical;
   const newLabel = simplifyLostSoulName(target.cardName);
 
   // Build updated zones — mutate the source card in place.
