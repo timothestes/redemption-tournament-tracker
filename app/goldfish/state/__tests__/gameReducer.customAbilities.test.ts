@@ -1,6 +1,7 @@
 // app/goldfish/state/__tests__/gameReducer.customAbilities.test.ts
 import { describe, it, expect } from 'vitest';
 import { gameReducer } from '../gameReducer';
+import { actions as gameActions } from '../gameActions';
 import type { GameCard, GameState, GameAction } from '../../types';
 
 function makeCard(overrides: Partial<GameCard>): GameCard {
@@ -169,5 +170,158 @@ describe("EXECUTE_CARD_ABILITY — discard_opponent_deck (goldfish no-op)", () =
     // Single-player goldfish: no opponent → ability is a no-op.
     // Reducer must return the same state reference (no clone, no history push).
     expect(next).toBe(state);
+  });
+});
+
+describe('imitate_lost_soul', () => {
+  it('swaps cardImgFile and sets imitatingName when target has registered art', () => {
+    const source = makeCard({
+      instanceId: 'src',
+      cardName: 'Lost Soul "Imitate" [III John 1:11]',
+      cardImgFile: '23-Lost-Soul-Imitate-R',
+      type: 'Lost Soul',
+      zone: 'land-of-bondage',
+      ownerId: 'player1',
+    });
+    const target = makeCard({
+      instanceId: 'tgt',
+      cardName: 'Lost Soul "Awake" [Ephesians 5:14 - TPC]',
+      cardImgFile: 'awake-original',
+      type: 'Lost Soul',
+      zone: 'land-of-bondage',
+      ownerId: 'player1',
+    });
+    const initial = makeState([source, target]);
+    const next = gameReducer(initial, gameActions.imitateLostSoul('src', 'tgt'));
+    const updatedSource = next.zones['land-of-bondage'].find(c => c.instanceId === 'src')!;
+    expect(updatedSource.cardImgFile).toBe('/imitate-souls/cards/awake.jpg');
+    expect(updatedSource.imitatingName).toBe('Awake');
+  });
+
+  it('leaves cardImgFile unchanged and sets imitatingName when target has no registered art', () => {
+    const source = makeCard({
+      instanceId: 'src',
+      cardName: 'Lost Soul "Imitate" [III John 1:11]',
+      cardImgFile: '23-Lost-Soul-Imitate-R',
+      type: 'Lost Soul',
+      zone: 'land-of-bondage',
+      ownerId: 'player1',
+    });
+    const target = makeCard({
+      instanceId: 'tgt',
+      cardName: 'Lost Soul Matthew 19:23 (Speed Bump)',
+      cardImgFile: 'speed-bump-original',
+      type: 'Lost Soul',
+      zone: 'land-of-bondage',
+      ownerId: 'player1',
+    });
+    const initial = makeState([source, target]);
+    const next = gameReducer(initial, gameActions.imitateLostSoul('src', 'tgt'));
+    const updatedSource = next.zones['land-of-bondage'].find(c => c.instanceId === 'src')!;
+    expect(updatedSource.cardImgFile).toBe('23-Lost-Soul-Imitate-R');
+    expect(updatedSource.imitatingName).toBe('Speed Bump');
+  });
+
+  it('stop_imitating reverts cardImgFile and clears imitatingName', () => {
+    const source = makeCard({
+      instanceId: 'src',
+      cardName: 'Lost Soul "Imitate" [III John 1:11]',
+      cardImgFile: '/imitate-souls/cards/awake.jpg',
+      imitatingName: 'Awake',
+      type: 'Lost Soul',
+      zone: 'land-of-bondage',
+      ownerId: 'player1',
+    });
+    const initial = makeState([source]);
+    const next = gameReducer(initial, gameActions.stopImitatingLostSoul('src'));
+    const updatedSource = next.zones['land-of-bondage'].find(c => c.instanceId === 'src')!;
+    expect(updatedSource.cardImgFile).toBe('23-Lost-Soul-Imitate-R');
+    expect(updatedSource.imitatingName).toBe('');
+  });
+
+  it('rejects non-Lost-Soul target', () => {
+    const source = makeCard({
+      instanceId: 'src',
+      cardName: 'Lost Soul "Imitate" [III John 1:11]',
+      cardImgFile: '23-Lost-Soul-Imitate-R',
+      type: 'Lost Soul',
+      zone: 'land-of-bondage',
+      ownerId: 'player1',
+    });
+    const target = makeCard({
+      instanceId: 'tgt',
+      cardName: 'Mayhem',
+      type: 'Evil Card',
+      zone: 'land-of-bondage',
+      ownerId: 'player1',
+    });
+    const initial = makeState([source, target]);
+    const next = gameReducer(initial, gameActions.imitateLostSoul('src', 'tgt'));
+    expect(next).toBe(initial);
+  });
+
+  it('rejects target outside Land of Bondage', () => {
+    const source = makeCard({
+      instanceId: 'src',
+      cardName: 'Lost Soul "Imitate" [III John 1:11]',
+      cardImgFile: '23-Lost-Soul-Imitate-R',
+      type: 'Lost Soul',
+      zone: 'land-of-bondage',
+      ownerId: 'player1',
+    });
+    const target = makeCard({
+      instanceId: 'tgt',
+      cardName: 'Lost Soul "Awake" [Ephesians 5:14 - TPC]',
+      type: 'Lost Soul',
+      zone: 'deck',
+      ownerId: 'player1',
+    });
+    const initial = makeState([source, target]);
+    const next = gameReducer(initial, gameActions.imitateLostSoul('src', 'tgt'));
+    expect(next).toBe(initial);
+  });
+
+  it('rejects when source is not an Imitate Lost Soul', () => {
+    const notImitate = makeCard({
+      instanceId: 'src',
+      cardName: 'Lost Soul "Awake" [Ephesians 5:14 - TPC]',
+      type: 'Lost Soul',
+      zone: 'land-of-bondage',
+      ownerId: 'player1',
+    });
+    const target = makeCard({
+      instanceId: 'tgt',
+      cardName: 'Lost Soul "Forsaken" [Hebrews 10:25]',
+      type: 'Lost Soul',
+      zone: 'land-of-bondage',
+      ownerId: 'player1',
+    });
+    const initial = makeState([notImitate, target]);
+    const next = gameReducer(initial, gameActions.imitateLostSoul('src', 'tgt'));
+    expect(next).toBe(initial);
+  });
+
+  it('re-imitate overwrites prior imitation', () => {
+    const source = makeCard({
+      instanceId: 'src',
+      cardName: 'Lost Soul "Imitate" [III John 1:11]',
+      cardImgFile: '/imitate-souls/cards/awake.jpg',
+      imitatingName: 'Awake',
+      type: 'Lost Soul',
+      zone: 'land-of-bondage',
+      ownerId: 'player1',
+    });
+    const target = makeCard({
+      instanceId: 'tgt',
+      cardName: 'Lost Soul "Forsaken" [Hebrews 10:25]',
+      type: 'Lost Soul',
+      zone: 'land-of-bondage',
+      ownerId: 'player1',
+    });
+    const initial = makeState([source, target]);
+    const next = gameReducer(initial, gameActions.imitateLostSoul('src', 'tgt'));
+    const updatedSource = next.zones['land-of-bondage'].find(c => c.instanceId === 'src')!;
+    expect(updatedSource.cardImgFile).toBe('/imitate-souls/cards/forsaken.jpg');
+    expect(updatedSource.imitatingName).toBe('Forsaken');
   });
 });
