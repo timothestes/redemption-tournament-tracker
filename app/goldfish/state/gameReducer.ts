@@ -11,7 +11,10 @@ import {
   type CardAbility,
   getAbilitiesForCard,
   resolveTokenCard,
+  IMITATE_SOUL_IMAGES,
+  simplifyLostSoulName,
 } from '@/lib/cards/cardAbilities';
+import { findCard } from '@/lib/cards/lookup';
 
 const MAX_HISTORY = 20;
 const HAND_LIMIT = 16;
@@ -110,6 +113,87 @@ function spawnTokenInState(
   // Phase 3 — commit in a single shallow clone.
   const zones = cloneZones(state.zones);
   zones[targetZone] = [...zones[targetZone], ...newCards];
+  return { ...state, zones, history };
+}
+
+function imitateLostSoulInState(
+  state: GameState,
+  sourceInstanceId: string,
+  targetInstanceId: string,
+  history: GameState[],
+): GameState {
+  // Locate source and target across all zones.
+  let source: GameCard | undefined;
+  let target: GameCard | undefined;
+  for (const zone of Object.values(state.zones)) {
+    for (const c of zone) {
+      if (c.instanceId === sourceInstanceId) source = c;
+      else if (c.instanceId === targetInstanceId) target = c;
+    }
+  }
+  if (!source || !target) return state;
+
+  // Validate source is an Imitate Soul and in play.
+  if (!source.cardName.startsWith('Lost Soul "Imitate"')) return state;
+  const ABILITY_SOURCE_ZONES: ZoneId[] = ['territory', 'land-of-bondage', 'land-of-redemption'];
+  if (!ABILITY_SOURCE_ZONES.includes(source.zone)) return state;
+
+  // Validate target is a Lost Soul in LoB. Use isLostSoul() helper.
+  if (!isLostSoul(target)) return state;
+  if (target.zone !== 'land-of-bondage') return state;
+
+  const newImg = IMITATE_SOUL_IMAGES[target.cardName] ?? source.cardImgFile;
+  const newLabel = simplifyLostSoulName(target.cardName);
+
+  // Build updated zones — mutate the source card in place.
+  const zones = cloneZones(state.zones);
+  for (const zoneKey of Object.keys(zones) as ZoneId[]) {
+    const idx = zones[zoneKey].findIndex(c => c.instanceId === sourceInstanceId);
+    if (idx !== -1) {
+      zones[zoneKey] = [...zones[zoneKey]];
+      zones[zoneKey][idx] = {
+        ...zones[zoneKey][idx],
+        cardImgFile: newImg,
+        imitatingName: newLabel,
+      };
+      break;
+    }
+  }
+
+  return { ...state, zones, history };
+}
+
+function stopImitatingInState(
+  state: GameState,
+  sourceInstanceId: string,
+  history: GameState[],
+): GameState {
+  let source: GameCard | undefined;
+  for (const zone of Object.values(state.zones)) {
+    const found = zone.find(c => c.instanceId === sourceInstanceId);
+    if (found) { source = found; break; }
+  }
+  if (!source) return state;
+  if (!source.cardName.startsWith('Lost Soul "Imitate"')) return state;
+
+  // Restore canonical imgFile from cardData.
+  const canonical = findCard(source.cardName)?.imgFile;
+  if (!canonical) return state;
+
+  const zones = cloneZones(state.zones);
+  for (const zoneKey of Object.keys(zones) as ZoneId[]) {
+    const idx = zones[zoneKey].findIndex(c => c.instanceId === sourceInstanceId);
+    if (idx !== -1) {
+      zones[zoneKey] = [...zones[zoneKey]];
+      zones[zoneKey][idx] = {
+        ...zones[zoneKey][idx],
+        cardImgFile: canonical,
+        imitatingName: '',
+      };
+      break;
+    }
+  }
+
   return { ...state, zones, history };
 }
 
@@ -1137,11 +1221,27 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           return state;
         case 'three_nails_reset':
           return threeNailsResetInState(state, source, history);
+        case 'imitate_lost_soul':
+          // Targeting variant — dispatched via the dedicated IMITATE_LOST_SOUL
+          // action which carries a target. No-op here.
+          return state;
         default: {
           const _exhaustive: never = ability;
           return state;
         }
       }
+    }
+
+    case 'IMITATE_LOST_SOUL': {
+      const { cardInstanceId, targetInstanceId } = action.payload;
+      if (!cardInstanceId || !targetInstanceId) return state;
+      return imitateLostSoulInState(state, cardInstanceId, targetInstanceId, history);
+    }
+
+    case 'STOP_IMITATING_LOST_SOUL': {
+      const { cardInstanceId } = action.payload;
+      if (!cardInstanceId) return state;
+      return stopImitatingInState(state, cardInstanceId, history);
     }
 
     case 'REVEAL_CARD_IN_HAND': {
