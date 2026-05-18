@@ -10,9 +10,9 @@ import { refillSoulDeck } from '@/app/shared/paragon/refill';
 import {
   type CardAbility,
   getAbilitiesForCard,
+  getEffectiveAbilities,
   resolveTokenCard,
   IMITATE_SOUL_IMAGES,
-  simplifyLostSoulName,
   isNewTestamentLostSoul,
 } from '@/lib/cards/cardAbilities';
 import { findCard } from '@/lib/cards/lookup';
@@ -151,7 +151,10 @@ function imitateLostSoulInState(
   // GameCardNode (renders the label only when cardImgFile equals canonical).
   const canonical = findCard(source.cardName)?.imgFile ?? source.cardImgFile;
   const newImg = IMITATE_SOUL_IMAGES[target.cardName] ?? canonical;
-  const newLabel = simplifyLostSoulName(target.cardName);
+  // Store the FULL target cardName so the menu can resolve its abilities via
+  // getEffectiveAbilities(). simplifyLostSoulName() is computed at render time
+  // for the label overlay.
+  const newImitating = target.cardName;
 
   // Build updated zones — mutate the source card in place.
   const zones = cloneZones(state.zones);
@@ -162,7 +165,7 @@ function imitateLostSoulInState(
       zones[zoneKey][idx] = {
         ...zones[zoneKey][idx],
         cardImgFile: newImg,
-        imitatingName: newLabel,
+        imitatingName: newImitating,
       };
       break;
     }
@@ -568,6 +571,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         result.card.counters = [];
         result.card.notes = '';
         result.card.outlineColor = undefined;
+        // If the Imitate Lost Soul leaves LoB (rescued, shuffled, banished,
+        // etc.), drop the imitation and restore its canonical art.
+        if (result.card.imitatingName) {
+          const canonical = findCard(result.card.cardName)?.imgFile;
+          if (canonical) result.card.cardImgFile = canonical;
+          result.card.imitatingName = '';
+        }
       }
       // Paragon: rescuing a Soul-Deck-origin card transfers ownership from
       // the shared sentinel to the rescuing player. Marker stays set.
@@ -1192,7 +1202,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       // v1 cards, e.g., "Two Possessed (GoC)"). The card's identifier field is
       // a taxonomy descriptor ("Generic, Demon", etc.) and is NOT unique enough
       // to key the registry.
-      const ability = getAbilitiesForCard(source.cardName)[abilityIndex];
+      // Use effective abilities so an Imitate Soul's inherited abilities
+      // resolve at the correct index when dispatched from the menu.
+      const ability = getEffectiveAbilities(source)[abilityIndex];
       if (!ability) return state;
 
       switch (ability.type) {

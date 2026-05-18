@@ -134,6 +134,19 @@ export function getAbilitiesForCard(identifier: string): CardAbility[] {
 }
 
 /**
+ * Returns the abilities for this card plus any inherited from a soul it's
+ * currently imitating (filter out the nested imitate_lost_soul variant so
+ * "Imitate..." doesn't appear twice). Server execute_card_ability and the
+ * client CardContextMenu must both use this so abilityIndex stays in sync.
+ */
+export function getEffectiveAbilities(card: { cardName: string; imitatingName?: string }): CardAbility[] {
+  const base = getAbilitiesForCard(card.cardName);
+  if (!card.imitatingName) return base;
+  const imitated = getAbilitiesForCard(card.imitatingName).filter(a => a.type !== 'imitate_lost_soul');
+  return [...base, ...imitated];
+}
+
+/**
  * Exact-cardName → image path map for Imitate Lost Soul art swaps.
  * Files live under public/imitate-souls/cards/ (see public/imitate-souls/README.md).
  * Multiple cardName variants can point at the same file when the card

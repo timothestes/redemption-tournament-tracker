@@ -6,6 +6,7 @@ import type Konva from 'konva';
 import KonvaLib from 'konva';
 import { GameCard, COUNTER_COLORS } from '../../goldfish/types';
 import { findCard } from '@/lib/cards/lookup';
+import { simplifyLostSoulName } from '@/lib/cards/cardAbilities';
 
 const IMITATE_LABEL_HEIGHT = 18;
 
@@ -520,7 +521,7 @@ export const GameCardNode = memo(function GameCardNode({
               y={cardHeight - IMITATE_LABEL_HEIGHT}
               width={cardWidth}
               height={IMITATE_LABEL_HEIGHT}
-              text={card.imitatingName!}
+              text={simplifyLostSoulName(card.imitatingName!)}
               fill="#ffffff"
               fontSize={11}
               fontStyle="500"

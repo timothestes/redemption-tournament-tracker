@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { gameReducer } from '../gameReducer';
 import { actions as gameActions } from '../gameActions';
+import { getEffectiveAbilities } from '@/lib/cards/cardAbilities';
 import type { GameCard, GameState, GameAction } from '../../types';
 
 function makeCard(overrides: Partial<GameCard>): GameCard {
@@ -196,7 +197,9 @@ describe('imitate_lost_soul', () => {
     const next = gameReducer(initial, gameActions.imitateLostSoul('src', 'tgt'));
     const updatedSource = next.zones['land-of-bondage'].find(c => c.instanceId === 'src')!;
     expect(updatedSource.cardImgFile).toBe('/imitate-souls/cards/awake.jpg');
-    expect(updatedSource.imitatingName).toBe('Awake');
+    // imitatingName stores the FULL target cardName so the menu can resolve
+    // inherited abilities. simplifyLostSoulName() is applied at render time.
+    expect(updatedSource.imitatingName).toBe('Lost Soul "Awake" [Ephesians 5:14 - TPC]');
   });
 
   it('leaves cardImgFile unchanged and sets imitatingName when target has no registered art', () => {
@@ -221,7 +224,7 @@ describe('imitate_lost_soul', () => {
     const next = gameReducer(initial, gameActions.imitateLostSoul('src', 'tgt'));
     const updatedSource = next.zones['land-of-bondage'].find(c => c.instanceId === 'src')!;
     expect(updatedSource.cardImgFile).toBe('23-Lost-Soul-Imitate-R');
-    expect(updatedSource.imitatingName).toBe('Speed Bump');
+    expect(updatedSource.imitatingName).toBe('Lost Soul Matthew 19:23 (Speed Bump)');
   });
 
   it('stop_imitating reverts cardImgFile and clears imitatingName', () => {
@@ -229,7 +232,7 @@ describe('imitate_lost_soul', () => {
       instanceId: 'src',
       cardName: 'Lost Soul "Imitate" [III John 1:11]',
       cardImgFile: '/imitate-souls/cards/awake.jpg',
-      imitatingName: 'Awake',
+      imitatingName: 'Lost Soul "Awake" [Ephesians 5:14 - TPC]',
       type: 'Lost Soul',
       zone: 'land-of-bondage',
       ownerId: 'player1',
@@ -308,7 +311,7 @@ describe('imitate_lost_soul', () => {
       instanceId: 'src',
       cardName: 'Lost Soul "Imitate" [III John 1:11]',
       cardImgFile: '/imitate-souls/cards/awake.jpg',
-      imitatingName: 'Awake',
+      imitatingName: 'Lost Soul "Awake" [Ephesians 5:14 - TPC]',
       type: 'Lost Soul',
       zone: 'land-of-bondage',
       ownerId: 'player1',
@@ -325,7 +328,7 @@ describe('imitate_lost_soul', () => {
     const next = gameReducer(initial, gameActions.imitateLostSoul('src', 'tgt'));
     const updatedSource = next.zones['land-of-bondage'].find(c => c.instanceId === 'src')!;
     expect(updatedSource.cardImgFile).toBe('/imitate-souls/cards/forsaken.jpg');
-    expect(updatedSource.imitatingName).toBe('Forsaken');
+    expect(updatedSource.imitatingName).toBe('Lost Soul "Forsaken" [Hebrews 10:25]');
   });
 
   it('rejects O.T. Lost Soul target (Imitate restricts to N.T. souls)', () => {
@@ -360,7 +363,7 @@ describe('imitate_lost_soul', () => {
       instanceId: 'src',
       cardName: 'Lost Soul "Imitate" [III John 1:11]',
       cardImgFile: '/imitate-souls/cards/awake.jpg',  // already imitating Awake
-      imitatingName: 'Awake',
+      imitatingName: 'Lost Soul "Awake" [Ephesians 5:14 - TPC]',
       type: 'Lost Soul',
       zone: 'land-of-bondage',
       ownerId: 'player1',
@@ -377,6 +380,58 @@ describe('imitate_lost_soul', () => {
     const next = gameReducer(initial, gameActions.imitateLostSoul('src', 'tgt'));
     const updatedSource = next.zones['land-of-bondage'].find(c => c.instanceId === 'src')!;
     expect(updatedSource.cardImgFile).toBe('23-Lost-Soul-Imitate-R');  // canonical, not awake.jpg
-    expect(updatedSource.imitatingName).toBe('Speed Bump');
+    expect(updatedSource.imitatingName).toBe('Lost Soul Matthew 19:23 (Speed Bump)');
+  });
+
+  it('clears imitation and restores canonical art when the card leaves LoB', () => {
+    const source = makeCard({
+      instanceId: 'src',
+      cardName: 'Lost Soul "Imitate" [III John 1:11]',
+      cardImgFile: '/imitate-souls/cards/awake.jpg',
+      imitatingName: 'Lost Soul "Awake" [Ephesians 5:14 - TPC]',
+      type: 'Lost Soul',
+      zone: 'land-of-bondage',
+      ownerId: 'player1',
+    });
+    const initial = makeState([source]);
+    // Move from LoB to deck (simulates shuffle / rescue back to deck).
+    const next = gameReducer(initial, gameActions.moveCard('src', 'deck'));
+    const moved = next.zones.deck.find(c => c.instanceId === 'src')!;
+    expect(moved.imitatingName).toBe('');
+    expect(moved.cardImgFile).toBe('23-Lost-Soul-Imitate-R');
+  });
+});
+
+describe('getEffectiveAbilities — Imitate inherits the imitated soul abilities', () => {
+  it('returns base + imitated abilities (filtered to avoid nested imitate_lost_soul)', () => {
+    const card = {
+      cardName: 'Lost Soul "Imitate" [III John 1:11]',
+      imitatingName: 'Lost Soul "Lawless" [Hebrews 12:8]',  // has reveal_own_deck count:6
+    };
+    const abilities = getEffectiveAbilities(card);
+    // First entry is the source card's own imitate_lost_soul, then inherited.
+    expect(abilities[0]?.type).toBe('imitate_lost_soul');
+    expect(abilities[1]).toEqual({ type: 'reveal_own_deck', position: 'top', count: 6 });
+    expect(abilities).toHaveLength(2);
+  });
+
+  it('drops nested imitate_lost_soul so chained imitation does not duplicate the Imitate item', () => {
+    const card = {
+      cardName: 'Lost Soul "Imitate" [III John 1:11]',
+      imitatingName: 'Lost Soul "Imitate" [III John 1:11]  [AB - RoJ]',  // silly but legal
+    };
+    const abilities = getEffectiveAbilities(card);
+    expect(abilities).toHaveLength(1);
+    expect(abilities[0]?.type).toBe('imitate_lost_soul');
+  });
+
+  it('returns just the base abilities when imitatingName is empty', () => {
+    const card = {
+      cardName: 'Lost Soul "Imitate" [III John 1:11]',
+      imitatingName: '',
+    };
+    const abilities = getEffectiveAbilities(card);
+    expect(abilities).toHaveLength(1);
+    expect(abilities[0]?.type).toBe('imitate_lost_soul');
   });
 });

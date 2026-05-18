@@ -6,8 +6,10 @@ import { ScheduleAt, Timestamp } from 'spacetimedb';
 import { makeSeed, seededShuffle, seededDiceRoll, xorshift64, generateGameCode } from './utils';
 import {
   getAbilitiesForCard,
+  getEffectiveAbilities,
   findTokenCard,
   IMITATE_SOUL_IMAGES,
+  IMITATE_ORIGINAL_IMG,
   isNewTestamentLostSoul,
   IMITATE_ORIGINAL_IMG,
   simplifyLostSoulName,
@@ -183,13 +185,22 @@ function clearCountersIfLeavingPlay(ctx: any, cardId: bigint, fromZone: string, 
 // a CardInstance update; preserves the existing values for moves that aren't
 // leave-play.
 // ---------------------------------------------------------------------------
-function leavePlayFieldOverrides(card: any, fromZone: string, toZone: string): { notes: string; outlineColor: string; isMeek: boolean } {
+function leavePlayFieldOverrides(card: any, fromZone: string, toZone: string): { notes: string; outlineColor: string; isMeek: boolean; imitatingName: string; cardImgFile: string } {
   const leaving =
     fromZone !== toZone && (fromZone === 'territory' || fromZone === 'land-of-bondage');
+  // When an Imitate Lost Soul leaves play (rescued, shuffled, banished, etc.),
+  // drop the imitation and restore its canonical art. Pre-existing cardImgFile
+  // is returned unchanged for non-imitating cards so this is a no-op write.
+  const wasImitating = leaving && !!card.imitatingName;
+  const canonicalImg = wasImitating
+    ? (IMITATE_ORIGINAL_IMG[card.cardName] ?? card.cardImgFile)
+    : card.cardImgFile;
   return {
     notes: leaving ? '' : card.notes,
     outlineColor: leaving ? '' : card.outlineColor,
     isMeek: leaving ? false : card.isMeek,
+    imitatingName: wasImitating ? '' : card.imitatingName,
+    cardImgFile: canonicalImg,
   };
 }
 
@@ -3301,7 +3312,9 @@ export const execute_card_ability = spacetimedb.reducer(
 
     // Registry keys match cardName (e.g., "Two Possessed (GoC)"). The
     // identifier field is a taxonomy descriptor and is not unique enough.
-    const abilities = getAbilitiesForCard(source.cardName);
+    // Use effective abilities so imitated souls' right-click abilities
+    // dispatch correctly when triggered on an Imitate Lost Soul.
+    const abilities = getEffectiveAbilities(source);
     const ability = abilities[Number(abilityIndex)];
     if (!ability) throw new SenderError('No such ability');
 
@@ -3422,12 +3435,14 @@ export const imitate_lost_soul = spacetimedb.reducer(
     // GameCardNode (renders the label only when cardImgFile equals canonical).
     const registered = IMITATE_SOUL_IMAGES[target.cardName];
     const newImg = registered ?? IMITATE_ORIGINAL_IMG[source.cardName];
-    const newLabel = simplifyLostSoulName(target.cardName);
 
+    // Store the FULL target cardName so the menu (via getEffectiveAbilities)
+    // can resolve the imitated soul's right-click abilities. The simplified
+    // label is computed at render time in GameCardNode.
     ctx.db.CardInstance.id.update({
       ...source,
       cardImgFile: newImg,
-      imitatingName: newLabel,
+      imitatingName: target.cardName,
     });
 
     const game = ctx.db.Game.id.find(gameId);
@@ -3439,7 +3454,7 @@ export const imitate_lost_soul = spacetimedb.reducer(
         'IMITATE_LOST_SOUL',
         JSON.stringify({
           targetCardName: target.cardName,
-          label: newLabel,
+          label: simplifyLostSoulName(target.cardName),
           hasArt: !!registered,
         }),
         game.turnNumber,

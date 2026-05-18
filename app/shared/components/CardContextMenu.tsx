@@ -3,7 +3,7 @@
 import { useEffect, useRef, useMemo, useState } from 'react';
 import { GameCard, ZoneId, ZONE_LABELS, COUNTER_COLORS, CounterColorId } from '../../goldfish/types';
 import { GameActions } from '@/app/shared/types/gameActions';
-import { getAbilitiesForCard, abilityLabel, DEFAULT_ABILITY_SOURCE_ZONES, isNewTestamentLostSoul } from '@/lib/cards/cardAbilities';
+import { getEffectiveAbilities, abilityLabel, DEFAULT_ABILITY_SOURCE_ZONES, isNewTestamentLostSoul } from '@/lib/cards/cardAbilities';
 
 const MOVE_TARGETS: ZoneId[] = [
   'territory',
@@ -169,7 +169,9 @@ export function CardContextMenu({ card: initialCard, x, y, actions, onClose, onE
   // Per-card abilities from the CARD_ABILITIES registry. Keyed by cardName
   // (includes the set suffix, e.g., "Two Possessed (GoC)") — the identifier
   // field is a taxonomy descriptor, not a stable lookup key.
-  const abilities = getAbilitiesForCard(card.cardName);
+  // Effective abilities = card's own + inherited from imitated soul (if any).
+  // abilityIndex in the dispatch path lines up with this list.
+  const abilities = getEffectiveAbilities(card);
   // Only the local player (player1) can fire abilities on their own cards. The
   // server enforces this too, but hiding the menu items avoids a confusing
   // click-then-fail flow when right-clicking opponent cards in multiplayer.

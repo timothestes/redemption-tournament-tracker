@@ -13,6 +13,7 @@ import {
   CARD_ABILITIES as libCardAbilities,
   simplifyLostSoulName,
   isNewTestamentLostSoul,
+  getEffectiveAbilities,
 } from '../cardAbilities';
 import {
   IMITATE_SOUL_IMAGES as serverImitateImages,
@@ -232,5 +233,47 @@ describe('simplifyLostSoulName', () => {
 
   it('strips "Lost Soul " prefix when neither quoted nor parenthetical exists', () => {
     expect(simplifyLostSoulName('Lost Soul Romans 3:23')).toBe('Romans 3:23');
+  });
+});
+
+describe('getEffectiveAbilities', () => {
+  it('returns base abilities when not imitating', () => {
+    const out = getEffectiveAbilities({
+      cardName: 'Lost Soul "Imitate" [III John 1:11]',
+      imitatingName: '',
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0]?.type).toBe('imitate_lost_soul');
+  });
+
+  it('appends abilities from the imitated soul (Lawless reveal_own_deck)', () => {
+    const out = getEffectiveAbilities({
+      cardName: 'Lost Soul "Imitate" [III John 1:11]',
+      imitatingName: 'Lost Soul "Lawless" [Hebrews 12:8]',
+    });
+    expect(out).toHaveLength(2);
+    expect(out[0]?.type).toBe('imitate_lost_soul');
+    expect(out[1]).toEqual({ type: 'reveal_own_deck', position: 'top', count: 6 });
+  });
+
+  it('filters nested imitate_lost_soul so chained imitation does not duplicate the entry', () => {
+    const out = getEffectiveAbilities({
+      cardName: 'Lost Soul "Imitate" [III John 1:11]',
+      imitatingName: 'Lost Soul "Imitate" [III John 1:11]  [AB - RoJ]',
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0]?.type).toBe('imitate_lost_soul');
+  });
+
+  it('handles non-Imitate base card (target inheritance still works)', () => {
+    // A hypothetical non-Imitate card pretending to imitate Lawless — used to
+    // verify the helper doesn't assume the base is the Imitate variant.
+    const out = getEffectiveAbilities({
+      cardName: 'Three Nails (GoC)',  // has its own three_nails_reset ability
+      imitatingName: 'Lost Soul "Lawless" [Hebrews 12:8]',
+    });
+    expect(out).toHaveLength(2);
+    expect(out[0]?.type).toBe('three_nails_reset');
+    expect(out[1]?.type).toBe('reveal_own_deck');
   });
 });

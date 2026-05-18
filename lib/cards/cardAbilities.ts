@@ -291,6 +291,23 @@ export function getAbilitiesForCard(identifier: string): CardAbility[] {
   return CARD_ABILITIES[identifier] ?? [];
 }
 
+/**
+ * Returns the abilities to render in this card's right-click menu, including
+ * any inherited from a soul it's currently imitating. When `imitatingName` is
+ * set (full cardName of the imitated target), its abilities are appended after
+ * the card's own — but any nested `imitate_lost_soul` ability is filtered out
+ * to prevent a stray duplicate "Imitate..." item from chained imitation.
+ *
+ * Server's execute_card_ability dispatch and the client's CardContextMenu must
+ * both use this function so abilityIndex resolution stays in sync.
+ */
+export function getEffectiveAbilities(card: { cardName: string; imitatingName?: string }): CardAbility[] {
+  const base = getAbilitiesForCard(card.cardName);
+  if (!card.imitatingName) return base;
+  const imitated = getAbilitiesForCard(card.imitatingName).filter(a => a.type !== 'imitate_lost_soul');
+  return [...base, ...imitated];
+}
+
 export function abilityLabel(a: CardAbility): string {
   switch (a.type) {
     case 'spawn_token': {
