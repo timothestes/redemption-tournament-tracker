@@ -22,7 +22,8 @@ export default function SpectatorHandRequestBanner({
   gameId,
   myPlayer,
 }: SpectatorHandRequestBannerProps) {
-  const { conn } = useSpacetimeDB() as any;
+  const spacetimeCtx = useSpacetimeDB() as any;
+  const conn = spacetimeCtx?.getConnection?.() ?? null;
   const [allRequests] = useTable(
     tables.SpectatorHandRequest.where(r => r.gameId.eq(gameId ?? 0n)),
   );

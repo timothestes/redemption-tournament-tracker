@@ -10,7 +10,8 @@ interface SpectatorBarProps {
 }
 
 export function SpectatorBar({ code, spectatorCount, gameId }: SpectatorBarProps) {
-  const { conn } = useSpacetimeDB() as any;
+  const spacetimeCtx = useSpacetimeDB() as any;
+  const conn = spacetimeCtx?.getConnection?.() ?? null;
   const [cooldownUntil, setCooldownUntil] = useState<number>(0);
   const isCooling = Date.now() < cooldownUntil;
 

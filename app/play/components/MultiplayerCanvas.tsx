@@ -298,7 +298,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const fsGrowth = (virtualSize: number) => fs(virtualSize) / virtualSize;
 
   // ---- Connection (for spectator-management reducer calls) ----
-  const { conn } = useSpacetimeDB() as any;
+  const spacetimeCtx = useSpacetimeDB() as any;
+  const conn = spacetimeCtx?.getConnection?.() ?? null;
 
   // ---- Game state ----
   // Both hooks must always be called (rules of hooks). Pass null to the unused
