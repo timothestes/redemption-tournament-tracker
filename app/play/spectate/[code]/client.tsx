@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useSpacetimeConnection } from '@/app/play/hooks/useSpacetimeConnection';
@@ -11,6 +11,10 @@ import { SpectatorPregameView } from '@/app/play/components/PregameScreen';
 import { CardPreviewProvider } from '@/app/goldfish/state/CardPreviewContext';
 import { useSpacetimeDB } from 'spacetimedb/react';
 import { showGameToast } from '@/app/shared/components/GameToast';
+import { useMultiplayerImagePreloader } from '@/app/play/hooks/useMultiplayerImagePreloader';
+import { buildPrioritizedImageUrls } from '@/app/play/lib/multiplayerImageUrls';
+import TurnIndicator from '@/app/play/components/TurnIndicator';
+import { useGameTimer } from '../../hooks/useGameTimer';
 
 // Konva requires browser APIs — lazy-load to avoid SSR issues
 const MultiplayerCanvas = dynamic(
@@ -144,7 +148,7 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
       setGameId(game.id);
     }
 
-    if (game.status === 'playing' || game.status === 'waiting') {
+    if (game.status === 'playing' || game.status === 'waiting' || game.status === 'pregame') {
       setLifecycle('watching');
     } else if (game.status === 'finished') {
       setLifecycle('finished');
@@ -166,6 +170,26 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
       router.push('/play');
     }
   }, [gameState.spectators, lifecycle, gameId, myIdentityHex, router]);
+
+  // Image preloader — mirrors player client but without the myDeckImageUrls
+  // since spectators don't have a personal deck.
+  const allImageUrls = useMemo(() => {
+    return buildPrioritizedImageUrls(
+      gameState.myCards,
+      gameState.opponentCards,
+      gameState.sharedCards ?? {},
+    );
+  }, [gameState.myCards, gameState.opponentCards, gameState.sharedCards]);
+
+  const { getImage } = useMultiplayerImagePreloader(allImageUrls);
+
+  // Game timer — anchored to server-recorded playingStartedAtMicros so
+  // elapsed time survives navigating away and back. Matches player client.
+  const gameTimer = useGameTimer(
+    gameState.game?.playingStartedAtMicros ?? null,
+    gameState.game?.pauseStartedAtMicros ?? 0n,
+    gameState.game?.totalPausedMicros ?? 0n,
+  );
 
   // -------------------------------------------------------------------------
   // Render
@@ -223,15 +247,29 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
   ) ?? (gameState.allGames ?? []).find((g: any) => g.code === code);
   const status = game?.status;
 
+  const myScore = gameState.myCards['land-of-redemption']?.length ?? 0;
+  const opponentScore = gameState.opponentCards['land-of-redemption']?.length ?? 0;
+
   return (
-    <div className="h-screen w-screen overflow-hidden bg-background">
+    <div
+      style={{
+        display: 'flex',
+        width: '100vw',
+        height: '100dvh',
+        backgroundImage: 'url(/gameplay/cave_background.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}
+    >
+      {/* SpectatorBar — fixed overlay at top */}
       <SpectatorBar
         code={code}
         spectatorCount={spectatorCount}
         gameId={gameId ?? 0n}
       />
 
-      <div className="pt-10 h-full w-full relative">
+      {/* Main content column — below the SpectatorBar (40px) */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingTop: 40 }}>
         {gameId === null || !game ? (
           <div className="flex h-full items-center justify-center">
             <div className="text-center">
@@ -259,11 +297,32 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
             <SpectatorPregameView game={game} />
           </div>
         ) : (
-          <MultiplayerCanvas
-            gameId={gameId}
-            viewerKind="spectator"
-            getImage={() => null}
-          />
+          // status === 'playing' — TurnIndicator + canvas
+          <>
+            <div style={{ flexShrink: 0, height: 48 }}>
+              <TurnIndicator
+                readOnly
+                game={gameState.game}
+                myPlayer={gameState.myPlayer}
+                opponentPlayer={gameState.opponentPlayer}
+                opponentConnectionStatus={gameState.opponentConnectionStatus}
+                isMyTurn={false}
+                onSetPhase={() => {}}
+                onEndTurn={() => {}}
+                myScore={myScore}
+                opponentScore={opponentScore}
+                timerDisplay={gameTimer.formatted}
+                timerVisible={gameTimer.isTimerVisible}
+              />
+            </div>
+            <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+              <MultiplayerCanvas
+                gameId={gameId}
+                viewerKind="spectator"
+                getImage={getImage}
+              />
+            </div>
+          </>
         )}
       </div>
     </div>

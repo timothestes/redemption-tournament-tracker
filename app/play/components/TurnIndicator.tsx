@@ -67,6 +67,8 @@ interface TurnIndicatorProps {
   onRequestResume?: () => void;
   /** Cancel the locally-initiated pending pause/resume request. */
   onCancelPauseRequest?: () => void;
+  /** When true, hide interactive buttons (END TURN, CONCEDE, pause) and disable phase tab clicks. */
+  readOnly?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -99,6 +101,7 @@ export default function TurnIndicator({
   onRequestPause,
   onRequestResume,
   onCancelPauseRequest,
+  readOnly = false,
 }: TurnIndicatorProps) {
   const [showConcedeConfirm, setShowConcedeConfirm] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
@@ -361,7 +364,7 @@ export default function TurnIndicator({
               paused
             </span>
           )}
-          {pauseButtonMode !== 'hidden' && (
+          {pauseButtonMode !== 'hidden' && !readOnly && (
             <button
               type="button"
               onClick={() => {
@@ -446,13 +449,13 @@ export default function TurnIndicator({
       >
         {/* Previous phase arrow */}
         <button
-          onClick={handlePrevPhase}
-          disabled={!isMyTurn || isFirstPhase}
+          onClick={readOnly ? undefined : handlePrevPhase}
+          disabled={readOnly || !isMyTurn || isFirstPhase}
           title="Previous phase"
           style={{
             background: 'transparent',
             border: 'none',
-            cursor: !isMyTurn || isFirstPhase ? 'default' : 'pointer',
+            cursor: readOnly || !isMyTurn || isFirstPhase ? 'default' : 'pointer',
             color: !isMyTurn || isFirstPhase ? 'rgba(107, 78, 39, 0.3)' : 'rgba(232, 213, 163, 0.45)',
             fontSize: FZ.headline,
             fontFamily: 'serif',
@@ -525,9 +528,9 @@ export default function TurnIndicator({
               <button
                 key={phase}
                 ref={(el) => { buttonRefs.current[phase] = el; }}
-                onClick={() => canClick && onSetPhase(phase)}
-                disabled={!isMyTurn}
-                title={isMyTurn ? `Go to ${PHASE_LABELS[phase]}` : PHASE_LABELS[phase]}
+                onClick={() => !readOnly && canClick && onSetPhase(phase)}
+                disabled={!isMyTurn || readOnly}
+                title={PHASE_LABELS[phase]}
                 style={{
                   position: 'relative',
                   padding: '4px 10px',
@@ -563,13 +566,13 @@ export default function TurnIndicator({
 
         {/* Next phase / End Turn arrow */}
         <button
-          onClick={handleNextPhase}
-          disabled={!isMyTurn}
+          onClick={readOnly ? undefined : handleNextPhase}
+          disabled={readOnly || !isMyTurn}
           title={isLastPhase ? 'End turn' : 'Next phase'}
           style={{
             background: 'transparent',
             border: 'none',
-            cursor: !isMyTurn ? 'default' : 'pointer',
+            cursor: readOnly || !isMyTurn ? 'default' : 'pointer',
             color: !isMyTurn ? 'rgba(107, 78, 39, 0.3)' : 'rgba(232, 213, 163, 0.45)',
             fontSize: FZ.headline,
             fontFamily: 'serif',
@@ -584,7 +587,7 @@ export default function TurnIndicator({
         </button>
 
         {/* End Turn button */}
-        <button
+        {!readOnly && <button
           onClick={onEndTurn}
           disabled={!isMyTurn}
           title={isMyTurn ? 'End your turn' : "Wait for opponent's turn to end"}
@@ -615,7 +618,7 @@ export default function TurnIndicator({
           }}
         >
           End Turn
-        </button>
+        </button>}
       </div>
 
       {/* ================================================================
@@ -720,7 +723,7 @@ export default function TurnIndicator({
             Claim Victory
           </button>
         )}
-        {!isFinished && !disconnectTimeoutFired && onConcede && (
+        {!isFinished && !disconnectTimeoutFired && onConcede && !readOnly && (
           <button
             onClick={() => setShowConcedeConfirm(true)}
             style={{
