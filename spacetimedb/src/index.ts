@@ -11,7 +11,6 @@ import {
   IMITATE_SOUL_IMAGES,
   IMITATE_ORIGINAL_IMG,
   isNewTestamentLostSoul,
-  IMITATE_ORIGINAL_IMG,
   simplifyLostSoulName,
   type CardAbility,
 } from './cardAbilities';
