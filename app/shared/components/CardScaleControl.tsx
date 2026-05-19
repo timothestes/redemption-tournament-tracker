@@ -457,7 +457,7 @@ export function CardScaleControl({
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: 'var(--gf-text, #e8d5a3)', fontSize: 12 }}>
                 <input
                   type="checkbox"
-                  checked={!isGamePublic}
+                  checked={isGamePublic === false}
                   onChange={(e) => onSetGamePrivate?.(!e.target.checked)}
                 />
                 <span>Private game (no new spectators)</span>

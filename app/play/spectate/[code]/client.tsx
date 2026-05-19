@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useSpacetimeConnection } from '@/app/play/hooks/useSpacetimeConnection';
 import { SpacetimeProvider } from '@/app/play/lib/spacetimedb-provider';
 import { useSpectatorGameState } from '@/app/play/hooks/useGameState';
 import { SpectatorBar } from '@/app/play/components/SpectatorBar';
 import { useSpacetimeDB } from 'spacetimedb/react';
+import { showGameToast } from '@/app/shared/components/GameToast';
 
 // Konva requires browser APIs — lazy-load to avoid SSR issues
 const MultiplayerCanvas = dynamic(
@@ -64,27 +66,32 @@ interface SpectatorInnerProps {
 }
 
 function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps) {
-  const { conn } = useSpacetimeDB() as any;
+  const spacetimeCtx = useSpacetimeDB() as any;
+  const conn = spacetimeCtx?.getConnection?.() ?? null;
+  const myIdentityHex: string | undefined = spacetimeCtx?.identity?.toHexString?.();
+  const router = useRouter();
 
   const [lifecycle, setLifecycle] = useState<LifecycleState>('joining');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [gameId, setGameId] = useState<bigint | null>(null);
   const didCallReducer = useRef(false);
+  const wasWatching = useRef(false);
 
   // Once connected, call joinAsSpectator once
   useEffect(() => {
     if (!isConnected || !conn || didCallReducer.current) return;
     didCallReducer.current = true;
 
-    try {
-      conn.reducers.joinAsSpectator({
-        code,
-        displayName,
-      });
-    } catch (e: unknown) {
+    // joinAsSpectator returns a Promise that rejects asynchronously on
+    // server-side SenderError. A synchronous try/catch won't catch those
+    // rejections — attach .catch() instead.
+    conn.reducers.joinAsSpectator({
+      code,
+      displayName,
+    }).catch((e: unknown) => {
       setErrorMessage(e instanceof Error ? e.message : 'Failed to join as spectator');
       setLifecycle('error');
-    }
+    });
   }, [isConnected, conn, code, displayName]);
 
   // Leave as spectator on unmount
@@ -114,6 +121,22 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
       setLifecycle('finished');
     }
   }, [gameState, code, gameId]);
+
+  // Detect kick: once we're watching, if our Spectator row disappears, redirect.
+  useEffect(() => {
+    if (lifecycle !== 'watching' || !gameId || !myIdentityHex) return;
+    const isStillSpectator = gameState.spectators.some(
+      (s: any) => s.identity?.toHexString?.() === myIdentityHex,
+    );
+    if (isStillSpectator) {
+      wasWatching.current = true;
+      return;
+    }
+    if (wasWatching.current) {
+      showGameToast('You were removed from this game');
+      router.push('/play');
+    }
+  }, [gameState.spectators, lifecycle, gameId, myIdentityHex, router]);
 
   // -------------------------------------------------------------------------
   // Render

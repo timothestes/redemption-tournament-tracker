@@ -5,7 +5,7 @@ import { Stage, Layer, Rect, Text, Group, Image as KonvaImage } from 'react-konv
 import type Konva from 'konva';
 import KonvaLib from 'konva';
 
-import { useGameState } from '../hooks/useGameState';
+import { useGameState, useSpectatorGameState } from '../hooks/useGameState';
 import { useSpacetimeDB } from 'spacetimedb/react';
 import { useSpreadHand } from '../contexts/SpreadHandContext';
 import {
@@ -301,7 +301,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const { conn } = useSpacetimeDB() as any;
 
   // ---- Game state ----
-  const gameState = useGameState(gameId);
+  // Both hooks must always be called (rules of hooks). Pass null to the unused
+  // one — its subscriptions will match zero rows when effectiveGameId === 0n.
+  const playerGameState = useGameState(viewerKind === 'spectator' ? 0n : gameId);
+  const spectatorGameState = useSpectatorGameState(viewerKind === 'spectator' ? gameId : null);
+  const gameState = viewerKind === 'spectator' ? spectatorGameState : playerGameState;
   const {
     myCards,
     opponentCards,

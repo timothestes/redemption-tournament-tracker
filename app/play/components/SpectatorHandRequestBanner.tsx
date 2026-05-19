@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTable, useSpacetimeDB } from 'spacetimedb/react';
 import { tables } from '@/lib/spacetimedb/module_bindings';
 
@@ -27,10 +27,16 @@ export default function SpectatorHandRequestBanner({
     tables.SpectatorHandRequest.where(r => r.gameId.eq(gameId ?? 0n)),
   );
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const prevSharingRef = useRef(false);
 
-  // Auto-dismiss any active banner once shareHandWithSpectators flips true
+  // Auto-dismiss only when shareHandWithSpectators flips false → true.
+  // Excluding allRequests from the transition check so new incoming requests
+  // while the toggle is already on still render a banner.
   useEffect(() => {
-    if (!myPlayer?.shareHandWithSpectators) return;
+    const sharing = !!myPlayer?.shareHandWithSpectators;
+    const flipped = !prevSharingRef.current && sharing;
+    prevSharingRef.current = sharing;
+    if (!flipped) return;
     setDismissed(prev => {
       const next = new Set(prev);
       for (const r of allRequests) next.add(r.id.toString());
