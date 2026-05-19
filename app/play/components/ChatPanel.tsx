@@ -994,11 +994,13 @@ export default function ChatPanel({
 
   const matchesQuery = (text: string) => !isSearching || text.includes(normalizedQuery);
 
+  const senderNameOf = (msg: { senderId: bigint }) =>
+    msg.senderId === 0n ? '' : (playerNames[msg.senderId.toString()] ?? '');
+
   const filteredChat = isSearching
-    ? chatMessages.filter((msg) => {
-        const senderName = playerNames[msg.senderId.toString()] ?? '';
-        return `${senderName} ${msg.text}`.toLowerCase().includes(normalizedQuery);
-      })
+    ? chatMessages.filter((msg) =>
+        `${senderNameOf(msg)} ${msg.text}`.toLowerCase().includes(normalizedQuery),
+      )
     : chatMessages;
 
   const filteredActions = isSearching
@@ -1426,6 +1428,23 @@ export default function ChatPanel({
                   </p>
                 )}
                 {filteredChat.map((msg) => {
+                  if (msg.senderId === 0n) {
+                    return (
+                      <div
+                        key={msg.id.toString()}
+                        style={{
+                          textAlign: 'center',
+                          fontStyle: 'italic',
+                          opacity: 0.6,
+                          fontSize: 11,
+                          margin: '4px 0',
+                          padding: '0 8px',
+                        }}
+                      >
+                        {msg.text}
+                      </div>
+                    );
+                  }
                   const isMe = msg.senderId === myPlayerId;
                   const senderName =
                     playerNames[msg.senderId.toString()] ??
@@ -1664,6 +1683,23 @@ export default function ChatPanel({
                   return timeline.map((entry) => {
                     if (entry.kind === 'chat') {
                       const msg = entry.msg;
+                      if (msg.senderId === 0n) {
+                        return (
+                          <div
+                            key={`chat-${msg.id.toString()}`}
+                            style={{
+                              textAlign: 'center',
+                              fontStyle: 'italic',
+                              opacity: 0.6,
+                              fontSize: 11,
+                              margin: '4px 0',
+                              padding: '0 8px',
+                            }}
+                          >
+                            {msg.text}
+                          </div>
+                        );
+                      }
                       const isMe = msg.senderId === myPlayerId;
                       const senderName =
                         playerNames[msg.senderId.toString()] ??
