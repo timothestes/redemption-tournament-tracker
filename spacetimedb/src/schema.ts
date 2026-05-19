@@ -81,6 +81,7 @@ export const Player = table(
     revealedCards: t.string(),    // JSON array of card instance IDs revealed from deck, "" when none
     reserveRevealed: t.bool().default(false), // When true, reserve is visible to opponent
     handRevealSnapshot: t.string().default('[]'), // JSON array of card IDs visible during reveal — cards drawn after reveal stay hidden
+    shareHandWithSpectators: t.bool().default(false),
   }
 );
 
@@ -233,6 +234,73 @@ export const Spectator = table(
 );
 
 // ---------------------------------------------------------------------------
+// 7b. SpectatorBan — per-game identity ban list, enforced by join_as_spectator
+// ---------------------------------------------------------------------------
+export const SpectatorBan = table(
+  {
+    name: 'spectator_ban',
+    public: true,
+    indexes: [
+      { accessor: 'spectator_ban_game_id', algorithm: 'btree' as const, columns: ['gameId'] },
+    ],
+  },
+  {
+    id: t.u64().primaryKey().autoInc(),
+    gameId: t.u64(),
+    identity: t.identity(),
+    bannedBySeat: t.u64(),
+    bannedAt: t.timestamp(),
+  }
+);
+
+// ---------------------------------------------------------------------------
+// 7c. SpectatorHandRequest — transient signal for the player-side banner.
+// Rate-limited per-spectator by request_spectator_hand_reveal.
+// Auto-cleaned 30s after requestedAt by expire_spectator_hand_request.
+// ---------------------------------------------------------------------------
+export const SpectatorHandRequest = table(
+  {
+    name: 'spectator_hand_request',
+    public: true,
+    indexes: [
+      { accessor: 'spectator_hand_request_game_id', algorithm: 'btree' as const, columns: ['gameId'] },
+    ],
+  },
+  {
+    id: t.u64().primaryKey().autoInc(),
+    gameId: t.u64(),
+    spectatorId: t.u64(),
+    spectatorName: t.string(),
+    requestedAt: t.timestamp(),
+  }
+);
+
+// ---------------------------------------------------------------------------
+// 7d. SpectatorHandRequestExpiry (scheduled)
+// Deletes the matching SpectatorHandRequest row 30s after creation.
+// ---------------------------------------------------------------------------
+let _handleSpectatorHandRequestExpiry: any;
+export const setSpectatorHandRequestExpiryReducer = (reducer: any) => {
+  _handleSpectatorHandRequestExpiry = reducer;
+};
+
+export const SpectatorHandRequestExpiry = table(
+  {
+    name: 'spectator_hand_request_expiry',
+    public: true,
+    scheduled: () => _handleSpectatorHandRequestExpiry,
+    indexes: [
+      { accessor: 'spectator_hand_request_expiry_request_id', algorithm: 'btree' as const, columns: ['requestId'] },
+    ],
+  },
+  {
+    scheduledId: t.u64().primaryKey().autoInc(),
+    scheduledAt: t.scheduleAt(),
+    requestId: t.u64(),
+  }
+);
+
+// ---------------------------------------------------------------------------
 // 8. DisconnectTimeout (scheduled table)
 //    The `scheduled` option references a reducer that will be defined in
 //    index.ts (Task 4). We use a forward reference via arrow function —
@@ -350,6 +418,9 @@ const spacetimedb = schema({
   GameAction,
   ChatMessage,
   Spectator,
+  SpectatorBan,                  // new
+  SpectatorHandRequest,          // new
+  SpectatorHandRequestExpiry,    // new
   DisconnectTimeout,
   ZoneSearchRequest,
   ChooseFirstTimeout,

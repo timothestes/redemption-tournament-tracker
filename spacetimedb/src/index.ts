@@ -604,6 +604,7 @@ export const create_game = spacetimedb.reducer(
       reserveRevealed: false,
       pendingDeckData: deckData,
       revealedCards: '',
+      shareHandWithSpectators: false,
     });
 
     logAction(ctx, game.id, player.id, 'GAME_CREATED', JSON.stringify({ code }), 0n, 'draw');
@@ -675,6 +676,7 @@ export const join_game = spacetimedb.reducer(
       reserveRevealed: false,
       pendingDeckData: deckData,
       revealedCards: '',
+      shareHandWithSpectators: false,
     });
 
     // Log join
