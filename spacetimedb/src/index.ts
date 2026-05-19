@@ -5408,6 +5408,48 @@ export const send_chat = spacetimedb.reducer(
 );
 
 // ---------------------------------------------------------------------------
+// Reducer: set_share_hand_with_spectators
+// Per-player toggle that controls hand visibility to all current and future
+// spectators. Global per player (not per-spectator).
+// ---------------------------------------------------------------------------
+export const set_share_hand_with_spectators = spacetimedb.reducer(
+  { gameId: t.u64(), share: t.bool() },
+  (ctx, { gameId, share }) => {
+    const player = findPlayerBySender(ctx, gameId);
+    if (player.shareHandWithSpectators === share) return;
+    ctx.db.Player.id.update({ ...player, shareHandWithSpectators: share });
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: set_game_private
+// Either seated player flips Game.isPublic. Existing spectators stay; new
+// joins via join_as_spectator are blocked while isPublic=false.
+// ---------------------------------------------------------------------------
+export const set_game_private = spacetimedb.reducer(
+  { gameId: t.u64(), isPublic: t.bool() },
+  (ctx, { gameId, isPublic }) => {
+    const caller = findPlayerBySender(ctx, gameId);
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.isPublic === isPublic) return;
+
+    ctx.db.Game.id.update({ ...game, isPublic });
+
+    const text = isPublic
+      ? `Game set to public by ${caller.displayName}`
+      : `Game set to private by ${caller.displayName}`;
+    ctx.db.ChatMessage.insert({
+      id: 0n,
+      gameId,
+      senderId: 0n, // 0n = system message sentinel; autoInc IDs start at 1
+      text,
+      sentAt: ctx.timestamp,
+    });
+  }
+);
+
+// ---------------------------------------------------------------------------
 // Reducer: set_player_option
 // ---------------------------------------------------------------------------
 export const set_player_option = spacetimedb.reducer(
