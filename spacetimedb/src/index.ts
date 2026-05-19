@@ -1,6 +1,6 @@
 import spacetimedb from './schema';
 export default spacetimedb;
-import { DisconnectTimeout, setDisconnectTimeoutReducer, ChooseFirstTimeout, setChooseFirstTimeoutReducer, CleanupSchedule, setCleanupStaleGamesReducer } from './schema';
+import { DisconnectTimeout, setDisconnectTimeoutReducer, ChooseFirstTimeout, setChooseFirstTimeoutReducer, CleanupSchedule, setCleanupStaleGamesReducer, SpectatorHandRequestExpiry, setSpectatorHandRequestExpiryReducer } from './schema';
 import { t, SenderError } from 'spacetimedb/server';
 import { ScheduleAt, Timestamp } from 'spacetimedb';
 import { makeSeed, seededShuffle, seededDiceRoll, xorshift64, generateGameCode } from './utils';
@@ -6106,6 +6106,73 @@ export const shuffle_opponent_deck = spacetimedb.reducer(
       game.turnNumber, game.currentPhase);
   }
 );
+
+// ---------------------------------------------------------------------------
+// Reducer: request_spectator_hand_reveal
+// Spectator-initiated request that prompts both players via a banner.
+// Rate-limited: if a request from this spectator is already pending,
+// silently no-op (client-side disable is bypassable; this is the real gate).
+// ---------------------------------------------------------------------------
+export const request_spectator_hand_reveal = spacetimedb.reducer(
+  { gameId: t.u64() },
+  (ctx, { gameId }) => {
+    // Find the spectator row for the caller
+    let spectator: any = null;
+    for (const s of ctx.db.Spectator.spectator_game_id.filter(gameId)) {
+      if (s.identity.toHexString() === ctx.sender.toHexString()) {
+        spectator = s;
+        break;
+      }
+    }
+    if (!spectator) throw new SenderError('Not a spectator in this game');
+
+    // Rate limit: silently no-op if an active request already exists for
+    // this (gameId, spectatorId).
+    for (const req of ctx.db.SpectatorHandRequest.spectator_hand_request_game_id.filter(gameId)) {
+      if (req.spectatorId === spectator.id) return;
+    }
+
+    const row = ctx.db.SpectatorHandRequest.insert({
+      id: 0n,
+      gameId,
+      spectatorId: spectator.id,
+      spectatorName: spectator.displayName,
+      requestedAt: ctx.timestamp,
+    });
+
+    ctx.db.ChatMessage.insert({
+      id: 0n,
+      gameId,
+      senderId: 0n,
+      text: `${spectator.displayName} requested to see hands`,
+      sentAt: ctx.timestamp,
+    });
+
+    // Schedule expiry 30s out
+    const future = ctx.timestamp.microsSinceUnixEpoch + 30_000_000n;
+    ctx.db.SpectatorHandRequestExpiry.insert({
+      scheduledId: 0n,
+      scheduledAt: ScheduleAt.time(future),
+      requestId: row.id,
+    });
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Scheduled reducer: expire_spectator_hand_request
+// Auto-cleanup of SpectatorHandRequest 30s after creation. .find() before
+// .delete() to no-op safely if the row was already removed elsewhere.
+// ---------------------------------------------------------------------------
+export const expire_spectator_hand_request = spacetimedb.reducer(
+  { arg: SpectatorHandRequestExpiry.rowType },
+  (ctx, { arg }) => {
+    const row = ctx.db.SpectatorHandRequest.id.find(arg.requestId);
+    if (row) ctx.db.SpectatorHandRequest.id.delete(arg.requestId);
+  }
+);
+
+// Wire the scheduled reducer to the schema's forward reference
+setSpectatorHandRequestExpiryReducer(expire_spectator_hand_request);
 
 // ---------------------------------------------------------------------------
 // Lifecycle: clientDisconnected
