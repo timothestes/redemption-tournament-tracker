@@ -11,6 +11,7 @@ import { useSpacetimeDB } from 'spacetimedb/react';
 import GameOverOverlay, { deriveEndReason } from '@/app/play/components/GameOverOverlay';
 import TurnIndicator from '@/app/play/components/TurnIndicator';
 import PauseConsentToast from '@/app/play/components/PauseConsentToast';
+import SpectatorHandRequestBanner from '@/app/play/components/SpectatorHandRequestBanner';
 import ChatPanel from '../components/ChatPanel';
 import { CardPreviewProvider, useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
@@ -1326,6 +1327,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               onRespondToPause={handleRespondToPause}
               onRespondToResume={handleRespondToResume}
             />
+            <SpectatorHandRequestBanner gameId={gameId} myPlayer={gameState.myPlayer ?? null} />
             <CardChoicePromptContainer />
           </div>
         </div>
@@ -1375,6 +1377,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
               onRespondToPause={handleRespondToPause}
               onRespondToResume={handleRespondToResume}
             />
+            <SpectatorHandRequestBanner gameId={gameId} myPlayer={gameState.myPlayer ?? null} />
             <CardChoicePromptContainer />
           </div>
         </div>
@@ -1469,6 +1472,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
                 onRespondToPause={handleRespondToPause}
                 onRespondToResume={handleRespondToResume}
               />
+              <SpectatorHandRequestBanner gameId={gameId} myPlayer={gameState.myPlayer ?? null} />
               <CardChoicePromptContainer />
               <GameOverOverlay
                 game={gameState.game}
@@ -1699,6 +1703,7 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             onRespondToPause={handleRespondToPause}
             onRespondToResume={handleRespondToResume}
           />
+          <SpectatorHandRequestBanner gameId={gameId} myPlayer={gameState.myPlayer ?? null} />
           <CardChoicePromptContainer />
         </div>
       </div>
