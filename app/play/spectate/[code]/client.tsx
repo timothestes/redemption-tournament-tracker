@@ -8,6 +8,7 @@ import { SpacetimeProvider } from '@/app/play/lib/spacetimedb-provider';
 import { useSpectatorGameState } from '@/app/play/hooks/useGameState';
 import { SpectatorBar } from '@/app/play/components/SpectatorBar';
 import { SpectatorPregameView } from '@/app/play/components/PregameScreen';
+import { CardPreviewProvider } from '@/app/goldfish/state/CardPreviewContext';
 import { useSpacetimeDB } from 'spacetimedb/react';
 import { showGameToast } from '@/app/shared/components/GameToast';
 
@@ -50,7 +51,9 @@ export function SpectatorClient({ code, displayName }: SpectatorClientProps) {
 
   return (
     <SpacetimeProvider connectionBuilder={connectionBuilder}>
-      <SpectatorInner code={code} isConnected={isConnected} displayName={displayName} />
+      <CardPreviewProvider storageKey="multiplayer-loupe-visible" defaultVisible>
+        <SpectatorInner code={code} isConnected={isConnected} displayName={displayName} />
+      </CardPreviewProvider>
     </SpacetimeProvider>
   );
 }
