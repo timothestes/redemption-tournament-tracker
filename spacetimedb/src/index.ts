@@ -1537,12 +1537,48 @@ export const leave_game = spacetimedb.reducer(
     // Try to find as spectator
     for (const spectator of ctx.db.Spectator.spectator_game_id.filter(gameId)) {
       if (spectator.identity.toHexString() === ctx.sender.toHexString()) {
+        const displayName = spectator.displayName;
         ctx.db.Spectator.id.delete(spectator.id);
+        ctx.db.ChatMessage.insert({
+          id: 0n,
+          gameId,
+          senderId: 0n,
+          text: `${displayName} stopped spectating`,
+          sentAt: ctx.timestamp,
+        });
         return;
       }
     }
 
     throw new SenderError('Not a participant in this game');
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Reducer: leave_as_spectator
+// Spectator-only leave path. Used by the spectator tab on unmount so that
+// self-spectate works: leave_game above hits the Player branch first when
+// the same identity has both rows, so spectators need a dedicated reducer.
+// Silent no-op if no Spectator row exists (e.g. ban-rejected join, double
+// fire on unmount).
+// ---------------------------------------------------------------------------
+export const leave_as_spectator = spacetimedb.reducer(
+  { gameId: t.u64() },
+  (ctx, { gameId }) => {
+    for (const spectator of ctx.db.Spectator.spectator_game_id.filter(gameId)) {
+      if (spectator.identity.toHexString() === ctx.sender.toHexString()) {
+        const displayName = spectator.displayName;
+        ctx.db.Spectator.id.delete(spectator.id);
+        ctx.db.ChatMessage.insert({
+          id: 0n,
+          gameId,
+          senderId: 0n,
+          text: `${displayName} stopped spectating`,
+          sentAt: ctx.timestamp,
+        });
+        return;
+      }
+    }
   }
 );
 
@@ -6106,6 +6142,24 @@ export const onDisconnect = spacetimedb.clientDisconnected((ctx) => {
       scheduledAt: ScheduleAt.time(futureTime),
       gameId: player.gameId,
       playerId: player.id,
+    });
+  }
+
+  // Safety net for spectators when leave_as_spectator never fires
+  // (mobile backgrounding, crashes, network drops). Unlike Players,
+  // Spectators get no reconnect grace — their only persistent state is
+  // the row itself, so reconnect = re-call joinAsSpectator.
+  for (const spectator of ctx.db.Spectator.iter()) {
+    if (spectator.identity.toHexString() !== ctx.sender.toHexString()) continue;
+    const displayName = spectator.displayName;
+    const gameId = spectator.gameId;
+    ctx.db.Spectator.id.delete(spectator.id);
+    ctx.db.ChatMessage.insert({
+      id: 0n,
+      gameId,
+      senderId: 0n,
+      text: `${displayName} stopped spectating`,
+      sentAt: ctx.timestamp,
     });
   }
 });
