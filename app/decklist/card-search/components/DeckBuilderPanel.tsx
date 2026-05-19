@@ -685,14 +685,6 @@ export default function DeckBuilderPanel({
       }
       if (!toZone || toZone === fromZone) return; // same-zone drop: silent no-op
       handleMoveCard(card.name, card.set, fromZone, toZone);
-
-      // After a tab-drop, switch the active tab so the user sees their card
-      // land. We defer this until after the move (vs. mid-drag) because
-      // switching tabs mid-drag unmounts the source draggable and aborts.
-      if (isTabDrop) {
-        if (toZone === "main" || toZone === "reserve") setActiveTab(toZone);
-        else if (toZone === "maybeboard") setActiveTab("maybe");
-      }
     },
     // handleMoveCard is a stable closure over deck/onRemoveCard/onAddCard
     // captured each render; we don't memoize it, so this callback re-creates
