@@ -2044,11 +2044,14 @@ export default function DeckBuilderPanel({
         >
           Details
         </button>
+      </div>
+      )}
 
-        {/* View dropdown trigger now lives in the deck-panel header's right
-            action group (Practice / View / ⋯), not in the tab row. The popover
-            content remains here because it portals to document.body anyway. */}
-        {showViewDropdown && createPortal(
+      {/* View dropdown trigger lives in the deck-panel header's right action
+          group (Practice / View / ⋯). The popover is rendered outside the
+          (collapsed-only) tab bar so it also works in the expanded full deck
+          view; it portals to document.body in either case. */}
+      {showViewDropdown && createPortal(
             <>
               {/* Backdrop — mobile: visible overlay, desktop: transparent click-catcher */}
               <div
@@ -2347,8 +2350,6 @@ export default function DeckBuilderPanel({
             </>,
             document.body
           )}
-      </div>
-      )}
 
       {/* Content */}
       <div ref={contentRef} className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col ${isExpanded ? '' : 'p-4'}`} data-deck-grid>
