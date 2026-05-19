@@ -1498,15 +1498,43 @@ export const join_as_spectator = spacetimedb.reducer(
       game = g;
       break;
     }
-    if (!game) {
-      throw new SenderError('No game found with that code');
+    if (!game) throw new SenderError('No game found with that code');
+
+    // Ban check
+    for (const ban of ctx.db.SpectatorBan.spectator_ban_game_id.filter(game.id)) {
+      if (ban.identity.toHexString() === ctx.sender.toHexString()) {
+        throw new SenderError('You have been removed from this game');
+      }
     }
+
+    // Idempotent reconnect: if a row already exists for (gameId, sender),
+    // refresh displayName so renames propagate and return without inserting
+    // a second row.
+    for (const existing of ctx.db.Spectator.spectator_game_id.filter(game.id)) {
+      if (existing.identity.toHexString() === ctx.sender.toHexString()) {
+        if (existing.displayName !== displayName) {
+          ctx.db.Spectator.id.update({ ...existing, displayName });
+        }
+        return;
+      }
+    }
+
+    // Private games block new spectators (existing ones already returned above)
+    if (!game.isPublic) throw new SenderError('This game is private');
 
     ctx.db.Spectator.insert({
       id: 0n,
       gameId: game.id,
       identity: ctx.sender,
       displayName,
+    });
+
+    ctx.db.ChatMessage.insert({
+      id: 0n,
+      gameId: game.id,
+      senderId: 0n,
+      text: `${displayName} started spectating`,
+      sentAt: ctx.timestamp,
     });
   }
 );
