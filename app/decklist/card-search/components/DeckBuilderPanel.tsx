@@ -235,6 +235,12 @@ export default function DeckBuilderPanel({
 
   // ── DnD state + sensors ──────────────────────────────────────────────
   const [activeDragCard, setActiveDragCard] = useState<Card | null>(null);
+  // Drag-to-remove: drop a deck card to the LEFT of the deck panel (i.e., over
+  // the search/filter column) to discard one copy. Tracks live pointer X so
+  // the DragGhost can turn red while the pointer is in the remove zone.
+  const panelRootRef = useRef<HTMLDivElement>(null);
+  const lastPointerXRef = useRef(0);
+  const [willRemoveOnDrop, setWillRemoveOnDrop] = useState(false);
   const isExternalDragActive = useIsExternalDragActive();
   // `isDragging` powers the "drop hint" UI on zone droppables. It now fires
   // for both in-deck @dnd-kit drags AND external HTML5 drags from the search
@@ -258,6 +264,23 @@ export default function DeckBuilderPanel({
     const card = event.active.data.current?.card as Card | undefined;
     if (card) setActiveDragCard(card);
   }, []);
+
+  // Track pointer X during drag so handleDragEnd can decide "drag to remove"
+  // and DragGhost can flip to its red state in the remove zone.
+  useEffect(() => {
+    if (!activeDragCard) {
+      setWillRemoveOnDrop(false);
+      return;
+    }
+    const handlePointerMove = (e: PointerEvent) => {
+      lastPointerXRef.current = e.clientX;
+      const rect = panelRootRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setWillRemoveOnDrop(e.clientX < rect.left);
+    };
+    window.addEventListener('pointermove', handlePointerMove);
+    return () => window.removeEventListener('pointermove', handlePointerMove);
+  }, [activeDragCard]);
 
   // Custom collision detection: prefer pointer-within for precision (small tab
   // triggers, the maybeboard strip), fall back to rectIntersection when the
@@ -639,12 +662,15 @@ export default function DeckBuilderPanel({
       const card = active.data.current?.card as Card | undefined;
       if (!fromZone || !card) return;
 
-      // Dropped outside any droppable — treat as "drag to remove": decrement
-      // one copy from the source zone. ESC cancels fire onDragCancel (not
-      // onDragEnd) so this only triggers on a real release. The DragGhost
-      // turns red while over=null to telegraph the consequence.
+      // Dropped outside any droppable: if released to the LEFT of the deck
+      // panel (over the search/filter column) treat as "drag to remove" and
+      // decrement one copy from the source zone. Anywhere else is a silent
+      // no-op (treat like cancel).
       if (!over) {
-        onRemoveCard(card.name, card.set, fromZone);
+        const rect = panelRootRef.current?.getBoundingClientRect();
+        if (rect && lastPointerXRef.current < rect.left) {
+          onRemoveCard(card.name, card.set, fromZone);
+        }
         return;
       }
 
@@ -845,6 +871,7 @@ export default function DeckBuilderPanel({
     <DndContext
       sensors={dndSensors}
       collisionDetection={dndCollisionDetection}
+      autoScroll={false}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
@@ -856,7 +883,7 @@ export default function DeckBuilderPanel({
         },
       }}
     >
-    <div className="w-full h-full flex flex-col bg-background">
+    <div ref={panelRootRef} className="w-full h-full flex flex-col bg-background">
       {/* Header */}
       <div className="flex-shrink-0 px-3 py-2 md:p-4 border-b border-border/60 overflow-visible relative z-30">
         {/* Deck Name + Counts Row */}
@@ -2489,7 +2516,7 @@ export default function DeckBuilderPanel({
                 isAuthenticated={isAuthenticated}
                 viewMode={expandedViewMode}
                 groupBy={expandedGroupBy}
-                showPreview={!disableHoverPreview}
+                showPreview={!disableHoverPreview && !isDragging}
                 tagsBarContainer={tagsBarContainer}
               />
             </div>
@@ -2561,7 +2588,7 @@ export default function DeckBuilderPanel({
                     showTypeIcons={false}
                     viewLayout={viewLayout}
                     showPrices={showPrices}
-                    disableHoverPreview={disableHoverPreview}
+                    disableHoverPreview={disableHoverPreview || isDragging}
                   />
                 </div>
               );
@@ -2664,7 +2691,7 @@ export default function DeckBuilderPanel({
                     showTypeIcons={false}
                     viewLayout={viewLayout}
                     showPrices={showPrices}
-                    disableHoverPreview={disableHoverPreview}
+                    disableHoverPreview={disableHoverPreview || isDragging}
                   />
                 </div>
               );
@@ -2744,7 +2771,7 @@ export default function DeckBuilderPanel({
                     showTypeIcons={false}
                     viewLayout={viewLayout}
                     showPrices={showPrices}
-                    disableHoverPreview={disableHoverPreview}
+                    disableHoverPreview={disableHoverPreview || isDragging}
                   />
                 </div>
               );
@@ -3644,7 +3671,7 @@ export default function DeckBuilderPanel({
     {/* DragOverlay: card ghost that follows the pointer during a drag.
         Default dropAnimation lets unresolved drops snap back to the source. */}
     <DragOverlay>
-      {activeDragCard ? <DragGhost card={activeDragCard} /> : null}
+      {activeDragCard ? <DragGhost card={activeDragCard} willRemove={willRemoveOnDrop} /> : null}
     </DragOverlay>
     </DndContext>
   );

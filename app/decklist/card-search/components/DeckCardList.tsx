@@ -33,7 +33,7 @@ function DraggableRow({
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      className={`${className ?? ""} cursor-grab active:cursor-grabbing group/draggable relative ${
+      className={`${className ?? ""} cursor-grab active:cursor-grabbing group/draggable relative select-none ${
         isDragging ? "opacity-40" : ""
       }`}
       aria-roledescription="Draggable card"

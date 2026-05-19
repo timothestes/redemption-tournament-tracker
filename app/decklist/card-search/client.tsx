@@ -1665,10 +1665,10 @@ export default function CardSearchClient() {
                       }}
                       maxLength={64}
                     />
-                    {index === 0 && !queryObj.text && (
+                    {index === 0 && queryObj.text.length < 30 && (
                       <span
                         aria-hidden="true"
-                        className="hidden sm:flex peer-focus:opacity-0 transition-opacity absolute right-2 top-1/2 -translate-y-1/2 items-center gap-1.5 text-xs text-muted-foreground pointer-events-none select-none"
+                        className="hidden sm:flex transition-opacity absolute right-2 top-1/2 -translate-y-1/2 items-center gap-1.5 text-xs text-muted-foreground pointer-events-none select-none"
                       >
                         <span>Type</span>
                         <kbd className="px-1 py-px text-[11px] font-mono leading-none text-foreground/80 bg-muted/60 rounded">/</kbd>
