@@ -215,7 +215,7 @@ export const ChatMessage = table(
 );
 
 // ---------------------------------------------------------------------------
-// 7. Spectator
+// 7a. Spectator
 // ---------------------------------------------------------------------------
 export const Spectator = table(
   {
@@ -276,9 +276,16 @@ export const SpectatorHandRequest = table(
 );
 
 // ---------------------------------------------------------------------------
-// 7d. SpectatorHandRequestExpiry (scheduled)
-// Deletes the matching SpectatorHandRequest row 30s after creation.
+// 7d. SpectatorHandRequestExpiry (scheduled table)
+//     Deletes the matching SpectatorHandRequest row 30s after creation.
+//     The `scheduled` option references a reducer defined in index.ts (Task 5
+//     of the spectator-mode plan). We use a forward reference via arrow
+//     function — the arrow defers evaluation so the module loads without the
+//     reducer existing yet. The actual reducer is wired up at import time.
 // ---------------------------------------------------------------------------
+
+// Forward-reference placeholder — will be set by index.ts before schema
+// resolution occurs. The arrow function in `scheduled` defers evaluation.
 let _handleSpectatorHandRequestExpiry: any;
 export const setSpectatorHandRequestExpiryReducer = (reducer: any) => {
   _handleSpectatorHandRequestExpiry = reducer;
@@ -418,9 +425,9 @@ const spacetimedb = schema({
   GameAction,
   ChatMessage,
   Spectator,
-  SpectatorBan,                  // new
-  SpectatorHandRequest,          // new
-  SpectatorHandRequestExpiry,    // new
+  SpectatorBan,
+  SpectatorHandRequest,
+  SpectatorHandRequestExpiry,
   DisconnectTimeout,
   ZoneSearchRequest,
   ChooseFirstTimeout,
