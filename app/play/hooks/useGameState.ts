@@ -937,6 +937,288 @@ export function useGameState(gameId: bigint): GameState {
 }
 
 // ---------------------------------------------------------------------------
+// Spectator variant
+// ---------------------------------------------------------------------------
+
+/**
+ * Spectator-mode variant of useGameState. The viewer has no Player row, so we
+ * cannot key "my" vs "opponent" off identity. Instead we expose seat0/seat1
+ * directly and shape the return so the existing canvas's two-zone layout works
+ * unchanged: seat 0 takes the "my" slot, seat 1 takes "opponent".
+ *
+ * Subscribes to the SAME tables as useGameState (filtered by gameId where
+ * possible) and returns a superset of the core data fields. Action methods are
+ * all no-ops — spectators cannot mutate game state.
+ */
+export function useSpectatorGameState(gameId: bigint | null) {
+  const effectiveGameId = gameId ?? 0n;
+
+  // ---------------------------------------------------------------------------
+  // Table subscriptions — mirror every subscription in useGameState
+  // ---------------------------------------------------------------------------
+  const [allGames, gamesLoading] = useTable(tables.Game) as [GameRow[], boolean];
+  const [gamePlayers, playersLoading] = useTable(
+    tables.Player.where((p) => p.gameId.eq(effectiveGameId)),
+  ) as [PlayerRow[], boolean];
+  const [gameCards, cardsLoading] = useTable(
+    tables.CardInstance.where((c) => c.gameId.eq(effectiveGameId)),
+  ) as [CardInstanceRow[], boolean];
+  const [allCounters] = useTable(tables.CardCounter) as [CardCounterRow[], boolean];
+  const [allChat] = useTable(
+    tables.ChatMessage.where((m) => m.gameId.eq(effectiveGameId)),
+  ) as [ChatMessageRow[], boolean];
+  const [allActions] = useTable(
+    tables.GameAction.where((a) => a.gameId.eq(effectiveGameId)),
+  ) as [GameActionRow[], boolean];
+  const [allSpectators] = useTable(
+    tables.Spectator.where((s) => s.gameId.eq(effectiveGameId)),
+  ) as [SpectatorRow[], boolean];
+  const [allZoneSearchRequests] = useTable(
+    tables.ZoneSearchRequest.where((z) => z.gameId.eq(effectiveGameId)),
+  ) as [any[], boolean];
+  const [allDisconnectTimeouts] = useTable(
+    tables.DisconnectTimeout.where((t) => t.gameId.eq(effectiveGameId)),
+  ) as [DisconnectTimeoutRow[], boolean];
+
+  const isLoading = !(gamesLoading && playersLoading && cardsLoading);
+
+  // ---------------------------------------------------------------------------
+  // Derived state
+  // ---------------------------------------------------------------------------
+
+  const game = useMemo(
+    () => (gameId != null ? allGames.find((g) => g.id === gameId) : undefined),
+    [allGames, gameId],
+  );
+
+  const seat0Player = useMemo(
+    () => gamePlayers.find((p) => p.seat === 0n) ?? null,
+    [gamePlayers],
+  );
+
+  const seat1Player = useMemo(
+    () => gamePlayers.find((p) => p.seat === 1n) ?? null,
+    [gamePlayers],
+  );
+
+  // Shape for canvas compatibility: seat 0 = "my", seat 1 = "opponent"
+  const myPlayer = seat0Player;
+  const opponentPlayer = seat1Player;
+
+  const disconnectTimeoutFired = game?.disconnectTimeoutFired ?? false;
+
+  const opponentConnectionStatus = useMemo((): 'connected' | 'reconnecting' | 'disconnected' => {
+    if (!seat1Player) return 'connected';
+    if (seat1Player.isConnected) return 'connected';
+    const hasPendingTimeout = allDisconnectTimeouts.some((t) => t.playerId === seat1Player.id);
+    if (hasPendingTimeout) return 'reconnecting';
+    return disconnectTimeoutFired ? 'disconnected' : 'connected';
+  }, [seat1Player, allDisconnectTimeouts, disconnectTimeoutFired]);
+
+  const isMyTurn = useMemo(
+    () => (game && seat0Player ? game.currentTurn === seat0Player.seat : false),
+    [game, seat0Player],
+  );
+
+  const myCards = useMemo(
+    () =>
+      seat0Player
+        ? groupCardsByZone(gameCards.filter((c) => c.ownerId === seat0Player.id))
+        : ({} as Record<string, CardInstanceRow[]>),
+    [gameCards, seat0Player],
+  );
+
+  const opponentCards = useMemo(
+    () =>
+      seat1Player
+        ? groupCardsByZone(gameCards.filter((c) => c.ownerId === seat1Player.id))
+        : ({} as Record<string, CardInstanceRow[]>),
+    [gameCards, seat1Player],
+  );
+
+  const sharedCards = useMemo(
+    () => groupCardsByZone(gameCards.filter((c) => c.ownerId === 0n)),
+    [gameCards],
+  );
+
+  const counters = useMemo(() => {
+    const map = new Map<bigint, CardCounterRow[]>();
+    const gameCardIds = new Set(gameCards.map((c) => c.id));
+    for (const counter of allCounters) {
+      if (!gameCardIds.has(counter.cardInstanceId)) continue;
+      const existing = map.get(counter.cardInstanceId);
+      if (existing) {
+        existing.push(counter);
+      } else {
+        map.set(counter.cardInstanceId, [counter]);
+      }
+    }
+    return map;
+  }, [allCounters, gameCards]);
+
+  const adaptedCardsById = useStableAdaptedCards(gameCards, counters, seat1Player?.id);
+
+  const chatMessages = useMemo(
+    () =>
+      allChat
+        .filter((m) => m.gameId === effectiveGameId)
+        .sort((a, b) => {
+          const aTime = Number((a.sentAt as any).microsSinceUnixEpoch / BigInt(1000));
+          const bTime = Number((b.sentAt as any).microsSinceUnixEpoch / BigInt(1000));
+          return aTime - bTime;
+        }),
+    [allChat, effectiveGameId],
+  );
+
+  const gameActions = useMemo(
+    () =>
+      allActions
+        .filter((a) => a.gameId === effectiveGameId)
+        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
+    [allActions, effectiveGameId],
+  );
+
+  const spectators = useMemo(
+    () => allSpectators.filter((s) => s.gameId === effectiveGameId),
+    [allSpectators, effectiveGameId],
+  );
+
+  const soulsRescued = useMemo(() => {
+    const myLor = myCards['land-of-redemption'] ?? [];
+    const oppLor = opponentCards['land-of-redemption'] ?? [];
+    return { me: myLor.length, opponent: oppLor.length };
+  }, [myCards, opponentCards]);
+
+  const zoneSearchRequests = useMemo(
+    () => allZoneSearchRequests.filter((r: any) => r.gameId === effectiveGameId),
+    [allZoneSearchRequests, effectiveGameId],
+  );
+
+  // Spectators cannot issue or receive search requests; these are always null.
+  const incomingSearchRequest = null;
+  const approvedSearchRequest = null;
+
+  // ---------------------------------------------------------------------------
+  // No-op action stubs (spectators cannot mutate game state)
+  // ---------------------------------------------------------------------------
+  const noop = useCallback(() => {}, []);
+  const noopBigint = useCallback((_: bigint) => {}, []);
+  const noopString = useCallback((_: string) => {}, []);
+  const noopBool = useCallback((_: boolean) => {}, []);
+
+  // ---------------------------------------------------------------------------
+  // Return
+  // ---------------------------------------------------------------------------
+
+  return {
+    viewerKind: 'spectator' as const,
+
+    // Spectator-specific seat references
+    seat0Player,
+    seat1Player,
+
+    // Core data (canvas-compatible shape)
+    allGames,
+    allPlayers: gamePlayers,
+    game,
+    myPlayer,
+    opponentPlayer,
+    opponentConnectionStatus,
+    disconnectTimeoutFired,
+    myCards,
+    opponentCards,
+    sharedCards,
+    isMyTurn,
+    counters,
+    adaptedCardsById,
+    chatMessages,
+    gameActions,
+    spectators,
+    soulsRescued,
+    zoneSearchRequests,
+    incomingSearchRequest,
+    approvedSearchRequest,
+
+    // Loading state
+    isLoading,
+    isGamesReady: gamesLoading,
+    isPlayersReady: playersLoading,
+
+    // No identity for spectators
+    identityHex: undefined as string | undefined,
+
+    // No-op action stubs
+    drawCard: noop,
+    drawMultiple: noopBigint,
+    matthewDrawBrigades: useCallback((_cardInstanceId: bigint, _brigadeCount: bigint) => {}, []),
+    moveCard: useCallback((_cardInstanceId: bigint, _toZone: string, _zoneIndex?: string, _posX?: string, _posY?: string, _targetOwnerId?: string) => {}, []),
+    moveCardsBatch: useCallback((_cardInstanceIds: string, _toZone: string, _positions?: string, _targetOwnerId?: string, _fromSource?: string) => {}, []),
+    attachCard: useCallback((_weaponInstanceId: bigint, _warriorInstanceId: bigint) => {}, []),
+    detachCard: useCallback((_weaponInstanceId: bigint, _posX?: string, _posY?: string) => {}, []),
+    shuffleDeck: noop,
+    shuffleCardIntoDeck: noopBigint,
+    shuffleSoulDeck: noop,
+    reloadDeck: useCallback((_deckId: string, _deckData: string, _paragon: string) => {}, []),
+    randomHandToZone: useCallback((_count: number, _toZone: string, _deckPosition: string) => {}, []),
+    randomReserveToZone: useCallback((_count: number, _toZone: string, _deckPosition: string) => {}, []),
+    randomOpponentHandToZone: useCallback((_requestId: bigint, _count: number, _toZone: string, _deckPosition: string) => {}, []),
+    opponentShuffleAndDraw: useCallback((_requestId: bigint, _shuffleCount: number, _drawCount: number) => {}, []),
+    threeNailsResetExecute: noopBigint,
+    meekCard: noopBigint,
+    unmeekCard: noopBigint,
+    flipCard: noopBigint,
+    revealCardInHand: noopBigint,
+    updateCardPosition: useCallback((_cardInstanceId: bigint, _posX: string, _posY: string) => {}, []),
+    addCounter: useCallback((_cardInstanceId: bigint, _color: string) => {}, []),
+    removeCounter: useCallback((_cardInstanceId: bigint, _color: string) => {}, []),
+    setNote: useCallback((_cardInstanceId: bigint, _text: string) => {}, []),
+    exchangeCards: noopString,
+    exchangeFromDeck: useCallback((_exchangeCardIds: string, _replacementMoves: string) => {}, []),
+    setPhase: noopString,
+    endTurn: noop,
+    rollDice: noopBigint,
+    sendChat: noopString,
+    setPlayerOption: useCallback((_optionName: string, _value: string) => {}, []),
+    revealHand: noopBool,
+    revealReserve: noopBool,
+    moveCardToTopOfDeck: noopBigint,
+    moveCardToBottomOfDeck: noopBigint,
+    spawnLostSoul: useCallback((_testament: string, _posX: string, _posY: string, _targetPlayerId?: string) => {}, []),
+    removeToken: noopBigint,
+    executeCardAbility: useCallback((_sourceInstanceId: string, _abilityIndex: number) => {}, []),
+    imitateLostSoul: useCallback((_sourceInstanceId: string, _targetInstanceId: string) => {}, []),
+    stopImitatingLostSoul: noopString,
+    surrenderLostSoul: noopBigint,
+    rescueLostSoul: noopBigint,
+    resignGame: noop,
+    leaveGame: noop,
+    claimTimeoutVictory: noop,
+    pregameReady: noopBool,
+    pregameAcknowledgeRoll: noop,
+    pregameChooseFirst: noopBigint,
+    pregameAcknowledgeFirst: noop,
+    pregameSkipToReveal: noopBigint,
+    pregameChangeDeck: useCallback((_deckId: string, _deckData: string) => {}, []),
+    requestRematch: useCallback((_deckId: string, _deckData: string, _paragon: string, _format: string) => {}, []),
+    respondRematch: useCallback((_accepted: boolean, _deckId: string, _deckData: string, _paragon: string, _format: string) => {}, []),
+    revealCards: useCallback((_cardIds: string, _context?: string) => {}, []),
+    clearRevealedCards: noop,
+    logSearchDeck: noop,
+    logLookAtTop: useCallback((_count: number, _sourceCardName?: string, _position?: 'top' | 'bottom' | 'random') => {}, []),
+    logDeckSearchNoShuffle: useCallback((_topCount: number, _bottomCount: number) => {}, []),
+    requestZoneSearch: noopString,
+    requestOpponentAction: useCallback((_action: string, _actionParams?: string) => {}, []),
+    approveZoneSearch: noopBigint,
+    denyZoneSearch: noopBigint,
+    completeZoneSearch: useCallback((_requestId: bigint, _shuffled?: boolean) => {}, []),
+    moveOpponentCard: useCallback((_requestId: bigint, _cardInstanceId: bigint, _toZone: string, _posX?: string, _posY?: string, _newOwnerId?: string) => {}, []),
+    shuffleOpponentDeck: noopBigint,
+    reorderHand: noopString,
+    reorderLob: noopString,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
