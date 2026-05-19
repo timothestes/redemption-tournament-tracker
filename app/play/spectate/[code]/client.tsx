@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useSpacetimeConnection } from '@/app/play/hooks/useSpacetimeConnection';
 import { SpacetimeProvider } from '@/app/play/lib/spacetimedb-provider';
-import { useGameState } from '@/app/play/hooks/useGameState';
+import { useSpectatorGameState } from '@/app/play/hooks/useGameState';
 import { SpectatorBar } from '@/app/play/components/SpectatorBar';
 import { useSpacetimeDB } from 'spacetimedb/react';
 
@@ -19,12 +19,13 @@ const MultiplayerCanvas = dynamic(
 // ---------------------------------------------------------------------------
 interface SpectatorClientProps {
   code: string;
+  displayName: string;
 }
 
 // ---------------------------------------------------------------------------
 // Outer component — owns the connection builder and wraps the provider
 // ---------------------------------------------------------------------------
-export function SpectatorClient({ code }: SpectatorClientProps) {
+export function SpectatorClient({ code, displayName }: SpectatorClientProps) {
   const { connectionBuilder, isConnected, error } = useSpacetimeConnection();
 
   if (error) {
@@ -46,7 +47,7 @@ export function SpectatorClient({ code }: SpectatorClientProps) {
 
   return (
     <SpacetimeProvider connectionBuilder={connectionBuilder}>
-      <SpectatorInner code={code} isConnected={isConnected} />
+      <SpectatorInner code={code} isConnected={isConnected} displayName={displayName} />
     </SpacetimeProvider>
   );
 }
@@ -59,9 +60,10 @@ type LifecycleState = 'joining' | 'watching' | 'finished' | 'error';
 interface SpectatorInnerProps {
   code: string;
   isConnected: boolean;
+  displayName: string;
 }
 
-function SpectatorInner({ code, isConnected }: SpectatorInnerProps) {
+function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps) {
   const { conn } = useSpacetimeDB() as any;
 
   const [lifecycle, setLifecycle] = useState<LifecycleState>('joining');
@@ -77,17 +79,26 @@ function SpectatorInner({ code, isConnected }: SpectatorInnerProps) {
     try {
       conn.reducers.joinAsSpectator({
         code,
-        displayName: 'Spectator',
+        displayName,
       });
     } catch (e: unknown) {
       setErrorMessage(e instanceof Error ? e.message : 'Failed to join as spectator');
       setLifecycle('error');
     }
-  }, [isConnected, conn, code]);
+  }, [isConnected, conn, code, displayName]);
+
+  // Leave as spectator on unmount
+  useEffect(() => {
+    return () => {
+      if (gameId !== null && conn) {
+        conn.reducers.leaveAsSpectator({ gameId });
+      }
+    };
+  }, [gameId, conn]);
 
   // Derive gameId and lifecycle from live game data
   const resolvedGameId = gameId ?? BigInt(0);
-  const gameState = useGameState(resolvedGameId);
+  const gameState = useSpectatorGameState(resolvedGameId);
 
   useEffect(() => {
     const { game } = gameState;
@@ -153,29 +164,25 @@ function SpectatorInner({ code, isConnected }: SpectatorInnerProps) {
     );
   }
 
-  // lifecycle === 'watching' — render the canvas with a read-only overlay
+  // lifecycle === 'watching' — render the spectator canvas
   const spectatorCount = gameState.spectators.length;
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-background">
-      <SpectatorBar code={code} spectatorCount={spectatorCount} />
+      <SpectatorBar
+        code={code}
+        spectatorCount={spectatorCount}
+        gameId={gameId ?? 0n}
+      />
 
       {/* Canvas area — offset top to account for the spectator bar */}
       <div className="pt-10 h-full w-full relative">
         {gameId !== null && (
-          <>
-            {/* Spectator mode is currently disabled at the route level
-                (see page.tsx). If re-enabled, wire a real preloader here
-                instead of this no-op. */}
-            <MultiplayerCanvas gameId={gameId} getImage={() => null} />
-
-            {/* Read-only overlay — intercepts all pointer events on the canvas */}
-            <div
-              className="absolute inset-0 z-40 cursor-not-allowed"
-              aria-label="Spectator mode — read only"
-              onContextMenu={(e) => e.preventDefault()}
-            />
-          </>
+          <MultiplayerCanvas
+            gameId={gameId}
+            viewerKind="spectator"
+            getImage={() => null}
+          />
         )}
 
         {gameId === null && (
