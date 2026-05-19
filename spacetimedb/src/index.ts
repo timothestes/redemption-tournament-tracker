@@ -5450,6 +5450,41 @@ export const set_game_private = spacetimedb.reducer(
 );
 
 // ---------------------------------------------------------------------------
+// Reducer: kick_spectator
+// Either seated player removes a spectator and bans their identity from
+// rejoining for the remainder of this game.
+// ---------------------------------------------------------------------------
+export const kick_spectator = spacetimedb.reducer(
+  { gameId: t.u64(), spectatorId: t.u64() },
+  (ctx, { gameId, spectatorId }) => {
+    const caller = findPlayerBySender(ctx, gameId);
+
+    const target = ctx.db.Spectator.id.find(spectatorId);
+    if (!target || target.gameId !== gameId) {
+      throw new SenderError('Spectator not found in this game');
+    }
+
+    ctx.db.SpectatorBan.insert({
+      id: 0n,
+      gameId,
+      identity: target.identity,
+      bannedBySeat: caller.seat,
+      bannedAt: ctx.timestamp,
+    });
+
+    ctx.db.Spectator.id.delete(target.id);
+
+    ctx.db.ChatMessage.insert({
+      id: 0n,
+      gameId,
+      senderId: 0n,
+      text: `${target.displayName} was removed from spectators by ${caller.displayName}`,
+      sentAt: ctx.timestamp,
+    });
+  }
+);
+
+// ---------------------------------------------------------------------------
 // Reducer: set_player_option
 // ---------------------------------------------------------------------------
 export const set_player_option = spacetimedb.reducer(
