@@ -1062,7 +1062,7 @@ function RitualDie({
 // SpectatorPregameView — keep exactly as-is from existing file
 // ---------------------------------------------------------------------------
 
-function SpectatorPregameView({ game }: { game: any }) {
+export function SpectatorPregameView({ game }: { game: any }) {
   const phase = game.pregamePhase;
 
   return (

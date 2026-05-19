@@ -7,6 +7,7 @@ import { useSpacetimeConnection } from '@/app/play/hooks/useSpacetimeConnection'
 import { SpacetimeProvider } from '@/app/play/lib/spacetimedb-provider';
 import { useSpectatorGameState } from '@/app/play/hooks/useGameState';
 import { SpectatorBar } from '@/app/play/components/SpectatorBar';
+import { SpectatorPregameView } from '@/app/play/components/PregameScreen';
 import { useSpacetimeDB } from 'spacetimedb/react';
 import { showGameToast } from '@/app/shared/components/GameToast';
 
@@ -107,11 +108,17 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
   const resolvedGameId = gameId ?? BigInt(0);
   const gameState = useSpectatorGameState(resolvedGameId);
 
+  // Resolve gameId by scanning the unfiltered `allGames` subscription — the
+  // filtered `game` field is keyed by gameId, which we don't have yet.
+  // Prefer non-finished rows in case the code was reused.
   useEffect(() => {
-    const { game } = gameState;
+    const allGames = gameState.allGames ?? [];
+    const game =
+      allGames.find((g: any) => g.code === code && g.status !== 'finished') ??
+      allGames.find((g: any) => g.code === code);
     if (!game) return;
 
-    if (gameId === null && game.code === code) {
+    if (gameId === null) {
       setGameId(game.id);
     }
 
@@ -120,7 +127,7 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
     } else if (game.status === 'finished') {
       setLifecycle('finished');
     }
-  }, [gameState, code, gameId]);
+  }, [gameState.allGames, code, gameId]);
 
   // Detect kick: once we're watching, if our Spectator row disappears, redirect.
   useEffect(() => {
@@ -187,8 +194,12 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
     );
   }
 
-  // lifecycle === 'watching' — render the spectator canvas
+  // lifecycle === 'watching' — render based on game.status
   const spectatorCount = gameState.spectators.length;
+  const game = (gameState.allGames ?? []).find(
+    (g: any) => g.code === code && g.status !== 'finished',
+  ) ?? (gameState.allGames ?? []).find((g: any) => g.code === code);
+  const status = game?.status;
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-background">
@@ -198,23 +209,39 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
         gameId={gameId ?? 0n}
       />
 
-      {/* Canvas area — offset top to account for the spectator bar */}
       <div className="pt-10 h-full w-full relative">
-        {gameId !== null && (
-          <MultiplayerCanvas
-            gameId={gameId}
-            viewerKind="spectator"
-            getImage={() => null}
-          />
-        )}
-
-        {gameId === null && (
+        {gameId === null || !game ? (
           <div className="flex h-full items-center justify-center">
             <div className="text-center">
               <div className="mb-4 h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" />
               <p className="text-sm text-muted-foreground">Loading game state...</p>
             </div>
           </div>
+        ) : status === 'waiting' ? (
+          <div className="flex h-full items-center justify-center px-4">
+            <div className="rounded-xl border border-border bg-card/95 backdrop-blur-sm p-8 sm:p-10 text-center max-w-md w-full">
+              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground font-cinzel">
+                Spectating
+              </p>
+              <h2 className="text-2xl font-bold font-cinzel mt-2">Waiting for opponent</h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Game code <span className="font-mono tracking-wider text-primary">{code}</span>
+              </p>
+              {game.lobbyMessage && (
+                <p className="mt-4 text-sm text-foreground/80 italic">"{game.lobbyMessage}"</p>
+              )}
+            </div>
+          </div>
+        ) : status === 'pregame' ? (
+          <div className="flex h-full items-center justify-center px-4">
+            <SpectatorPregameView game={game} />
+          </div>
+        ) : (
+          <MultiplayerCanvas
+            gameId={gameId}
+            viewerKind="spectator"
+            getImage={() => null}
+          />
         )}
       </div>
     </div>
