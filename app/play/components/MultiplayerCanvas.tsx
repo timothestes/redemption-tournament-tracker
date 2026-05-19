@@ -6,6 +6,7 @@ import type Konva from 'konva';
 import KonvaLib from 'konva';
 
 import { useGameState } from '../hooks/useGameState';
+import { useSpacetimeDB } from 'spacetimedb/react';
 import { useSpreadHand } from '../contexts/SpreadHandContext';
 import {
   calculateMultiplayerLayout,
@@ -295,6 +296,9 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const safeScale = Math.max(scale, 0.01);
   const fs = (virtualSize: number) => Math.max(virtualSize, MIN_TEXT_PX / safeScale);
   const fsGrowth = (virtualSize: number) => fs(virtualSize) / virtualSize;
+
+  // ---- Connection (for spectator-management reducer calls) ----
+  const { conn } = useSpacetimeDB() as any;
 
   // ---- Game state ----
   const gameState = useGameState(gameId);
@@ -5941,6 +5945,16 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         onLoadDeck={onLoadDeck}
         isTimerVisible={isTimerVisible}
         onToggleTimer={onToggleTimer}
+        {...(viewerKind === 'player' ? {
+          spectators: gameState.spectators as Array<{ id: bigint; identity: { toHexString: () => string }; displayName: string }>,
+          myIdentityHex: gameState.identityHex,
+          shareHandWithSpectators: gameState.myPlayer?.shareHandWithSpectators,
+          gameId: gameId,
+          isGamePublic: gameState.game?.isPublic,
+          onSetShareHand: (share: boolean) => conn?.reducers.setShareHandWithSpectators({ gameId, share }),
+          onKickSpectator: (spectatorId: bigint) => conn?.reducers.kickSpectator({ gameId, spectatorId }),
+          onSetGamePrivate: (isPublic: boolean) => conn?.reducers.setGamePrivate({ gameId, isPublic }),
+        } : {})}
       />
 
       {/* ================================================================

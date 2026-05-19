@@ -23,6 +23,20 @@ interface CardScaleControlProps {
   isTimerVisible?: boolean;
   /** Toggle timer visibility. */
   onToggleTimer?: () => void;
+  /** Spectators in the current game. When provided (even empty), the subsection renders. */
+  spectators?: Array<{ id: bigint; identity: { toHexString: () => string }; displayName: string }>;
+  /** Local player's identity hex — used to filter own row from spectator list. */
+  myIdentityHex?: string;
+  /** Local player's shareHandWithSpectators value. */
+  shareHandWithSpectators?: boolean;
+  /** Game id, needed to gate the spectators subsection. */
+  gameId?: bigint;
+  /** Whether the game is currently public. */
+  isGamePublic?: boolean;
+  /** Reducer callbacks (provided by parent so this component stays presentational). */
+  onSetShareHand?: (share: boolean) => void;
+  onKickSpectator?: (spectatorId: bigint) => void;
+  onSetGamePrivate?: (isPublic: boolean) => void;
 }
 
 export function CardScaleControl({
@@ -41,6 +55,14 @@ export function CardScaleControl({
   onLoadDeck,
   isTimerVisible,
   onToggleTimer,
+  spectators,
+  myIdentityHex,
+  shareHandWithSpectators,
+  gameId,
+  isGamePublic,
+  onSetShareHand,
+  onKickSpectator,
+  onSetGamePrivate,
 }: CardScaleControlProps) {
   const [open, setOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -375,6 +397,72 @@ export function CardScaleControl({
                 {isTimerVisible ? 'Hide Timer' : 'Show Timer'}
               </button>
             </>
+          )}
+
+          {/* Spectators subsection — only shown in player mode when gameId is provided */}
+          {gameId !== undefined && (
+            <div style={{ marginTop: 4, paddingTop: 12, borderTop: '1px solid var(--gf-border, #3d2e1f)' }}>
+              <div style={{
+                fontSize: 11,
+                opacity: 0.7,
+                marginBottom: 8,
+                textTransform: 'uppercase',
+                letterSpacing: '0.1em',
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+                color: 'var(--gf-text, #e8d5a3)',
+              }}>
+                Spectators
+              </div>
+
+              {(spectators ?? []).length > 0 && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, cursor: 'pointer', color: 'var(--gf-text, #e8d5a3)', fontSize: 12 }}>
+                  <input
+                    type="checkbox"
+                    checked={!!shareHandWithSpectators}
+                    onChange={(e) => onSetShareHand?.(e.target.checked)}
+                  />
+                  <span>Share my hand with spectators</span>
+                </label>
+              )}
+
+              {(spectators ?? []).length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 4, color: 'var(--gf-text, #e8d5a3)' }}>
+                    Watching ({spectators!.filter(s => s.identity.toHexString() !== myIdentityHex).length})
+                  </div>
+                  {spectators!
+                    .filter(s => s.identity.toHexString() !== myIdentityHex)
+                    .map(s => (
+                      <div key={s.id.toString()} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0' }}>
+                        <span style={{ fontSize: 12, color: 'var(--gf-text, #e8d5a3)' }}>{s.displayName}</span>
+                        <button
+                          onClick={() => onKickSpectator?.(s.id)}
+                          style={{
+                            background: 'transparent',
+                            color: '#c4955a',
+                            border: '1px solid rgba(196, 149, 90, 0.4)',
+                            borderRadius: 4,
+                            padding: '2px 8px',
+                            cursor: 'pointer',
+                            fontSize: 11,
+                          }}
+                        >
+                          Kick
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              )}
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: 'var(--gf-text, #e8d5a3)', fontSize: 12 }}>
+                <input
+                  type="checkbox"
+                  checked={!isGamePublic}
+                  onChange={(e) => onSetGamePrivate?.(!e.target.checked)}
+                />
+                <span>Private game (no new spectators)</span>
+              </label>
+            </div>
           )}
         </div>
       )}
