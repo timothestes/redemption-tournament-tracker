@@ -75,8 +75,27 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
   const [lifecycle, setLifecycle] = useState<LifecycleState>('joining');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [gameId, setGameId] = useState<bigint | null>(null);
+  const didSubscribe = useRef(false);
   const didCallReducer = useRef(false);
   const wasWatching = useRef(false);
+
+  // Phase 1: Seed subscriptions for tables that don't auto-subscribe via
+  // typed .where() queries (Game and CardCounter). Mirrors the player
+  // client's phase-1 SQL subscription pattern in app/play/[code]/client.tsx.
+  // Without this, `useTable(tables.Game)` returns empty rows and we can
+  // never find the game by code.
+  useEffect(() => {
+    if (!isConnected || !conn || didSubscribe.current) return;
+    didSubscribe.current = true;
+    try {
+      conn.subscriptionBuilder().subscribe([
+        `SELECT * FROM game WHERE code = '${code}'`,
+        `SELECT * FROM card_counter`,
+      ]);
+    } catch (e) {
+      console.error('Failed to subscribe (spectator phase 1):', e);
+    }
+  }, [isConnected, conn, code]);
 
   // Once connected, call joinAsSpectator once
   useEffect(() => {
