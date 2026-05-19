@@ -198,6 +198,50 @@ function describeRequesterAction(action: string, paramsJson: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Hand-card visibility predicate
+// ---------------------------------------------------------------------------
+
+type ViewerKind = 'self' | 'opponent' | 'spectator';
+
+/**
+ * Decide whether a hand card should render face-up for a given viewer.
+ * - 'self': always face-up (you see your own hand).
+ * - 'opponent': face-up iff owner.handRevealed AND the card is in the snapshot,
+ *   OR the card has an active revealExpiresAt (per-card flash).
+ * - 'spectator': face-up iff owner.shareHandWithSpectators, OR the card has
+ *   an active revealExpiresAt.
+ */
+export function isHandCardFaceVisible(
+  card: { id: bigint; revealExpiresAt?: { microsSinceUnixEpoch: bigint } | null },
+  viewerKind: ViewerKind,
+  ownerPlayer: { handRevealed: boolean; handRevealSnapshot: string; shareHandWithSpectators?: boolean } | null | undefined,
+  nowMicros: bigint,
+): boolean {
+  if (viewerKind === 'self') return true;
+  if (!ownerPlayer) return false;
+
+  const flashActive =
+    card.revealExpiresAt !== undefined &&
+    card.revealExpiresAt !== null &&
+    card.revealExpiresAt.microsSinceUnixEpoch > nowMicros;
+  if (flashActive) return true;
+
+  let snapshot: Set<string>;
+  try {
+    snapshot = new Set<string>((JSON.parse(ownerPlayer.handRevealSnapshot || '[]') as unknown[]).map(String));
+  } catch {
+    snapshot = new Set<string>();
+  }
+  const inSnapshot = snapshot.has(String(card.id));
+
+  if (viewerKind === 'opponent') {
+    return ownerPlayer.handRevealed && inSnapshot;
+  }
+  // spectator
+  return ownerPlayer.shareHandWithSpectators === true || inSnapshot;
+}
+
+// ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
 
@@ -225,13 +269,15 @@ interface MultiplayerCanvasProps {
    * awaiting-start → playing).
    */
   getImage: (url: string) => HTMLImageElement | null;
+  /** 'spectator' when mounted from /play/spectate/[code]. Defaults to 'player'. */
+  viewerKind?: 'player' | 'spectator';
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSearchModalChange, isTimerVisible, onToggleTimer, getImage, chatScale, setChatScale, resetChatScale, minChatScale, maxChatScale, chatStep }: MultiplayerCanvasProps) {
+export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSearchModalChange, isTimerVisible, onToggleTimer, getImage, chatScale, setChatScale, resetChatScale, minChatScale, maxChatScale, chatStep, viewerKind = 'player' }: MultiplayerCanvasProps) {
   const { setPreviewCard, isLoupeVisible } = useCardPreview();
 
   // ---- Container sizing (respects flex layout) ----
@@ -516,17 +562,22 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   }, [myCards, opponentCards]);
   useRevealTick(anyHandActiveReveal);
 
-  const myHandBrigadeCounts = useMemo(
-    () => computeHandBrigades(
+  const myHandBrigadeCounts = useMemo(() => {
+    // In spectator mode, only reveal brigade counts when the player has
+    // explicitly shared their hand; otherwise return empty to avoid leaking
+    // card-face data indirectly.
+    if (viewerKind === 'spectator' && !gameState.myPlayer?.shareHandWithSpectators) {
+      return { total: 0, good: 0, evil: 0, neutral: 0 };
+    }
+    return computeHandBrigades(
       (myCards['hand'] ?? []).map(c => ({
         cardName: c.cardName,
         brigade: c.brigade,
         alignment: c.alignment,
         type: c.cardType,
       })),
-    ),
-    [myCards],
-  );
+    );
+  }, [myCards, viewerKind, gameState.myPlayer?.shareHandWithSpectators]);
 
   // Opponent brigade counts — only meaningful when their hand is revealed to
   // me, and only over cards captured in the reveal snapshot (cards drawn
@@ -534,6 +585,21 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
   const opponentHandRevealed = gameState.opponentPlayer?.handRevealed ?? false;
   const opponentHandRevealSnapshotRaw = gameState.opponentPlayer?.handRevealSnapshot;
   const opponentHandBrigadeCounts = useMemo(() => {
+    // In spectator mode, only reveal brigade counts when the opponent has
+    // explicitly shared their hand.
+    if (viewerKind === 'spectator') {
+      if (!gameState.opponentPlayer?.shareHandWithSpectators) {
+        return { total: 0, good: 0, evil: 0, neutral: 0 };
+      }
+      return computeHandBrigades(
+        (opponentCards['hand'] ?? []).map(c => ({
+          cardName: c.cardName,
+          brigade: c.brigade,
+          alignment: c.alignment,
+          type: c.cardType,
+        })),
+      );
+    }
     if (!opponentHandRevealed) return { total: 0, good: 0, evil: 0, neutral: 0 };
     const snapshot = new Set<string>();
     try {
@@ -551,7 +617,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         type: c.cardType,
       })),
     );
-  }, [opponentCards, opponentHandRevealed, opponentHandRevealSnapshotRaw]);
+  }, [opponentCards, opponentHandRevealed, opponentHandRevealSnapshotRaw, viewerKind, gameState.opponentPlayer?.shareHandWithSpectators]);
 
   // ---- Stage ref ----
   const stageRef = useRef<Konva.Stage>(null);
@@ -5607,19 +5673,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               true, // flat spread — no fan arc for opponent
             );
 
-            const oppHandRevealed = gameState.opponentPlayer?.handRevealed ?? false;
-            // Snapshot of card IDs visible at reveal time. Cards drawn into the
-            // hand after reveal are not in this set and stay face-down.
-            const oppHandRevealSnapshot = new Set<string>();
-            if (oppHandRevealed) {
-              try {
-                const raw = gameState.opponentPlayer?.handRevealSnapshot;
-                if (raw) {
-                  const ids = JSON.parse(raw);
-                  if (Array.isArray(ids)) for (const id of ids) oppHandRevealSnapshot.add(String(id));
-                }
-              } catch { /* ignore malformed snapshot */ }
-            }
+            const oppHandViewerKind: ViewerKind = viewerKind === 'spectator' ? 'spectator' : 'opponent';
 
             return (
               <Group
@@ -5638,17 +5692,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               >
                 {oppHandPositions.map((pos, i) => {
                   const card = opponentHandCards[i];
-                  // Per-card reveal: an individual hand card can be revealed
-                  // temporarily via revealExpiresAt. When active (or when the
-                  // whole hand is revealed), route through GameCardNode so
-                  // the face + countdown badge render correctly.
                   const nowMicros = BigInt(Date.now()) * 1000n;
-                  const cardRevealed =
-                    !!card &&
-                    card.revealExpiresAt !== undefined &&
-                    card.revealExpiresAt.microsSinceUnixEpoch > nowMicros;
-                  const inSnapshot = !!card && oppHandRevealSnapshot.has(String(card.id));
-                  if (((oppHandRevealed && inSnapshot) || cardRevealed) && card) {
+                  if (card && isHandCardFaceVisible(card, oppHandViewerKind, gameState.opponentPlayer, nowMicros)) {
                     const gameCard = adaptCard(card, 'player2');
                     return (
                       <GameCardNode
@@ -5699,11 +5744,26 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               isSpreadHand,
             );
 
+            // In spectator mode, seat-0's hand is subject to the same
+            // visibility predicate as any other hand — face-up only when
+            // the player has shared it with spectators (or a per-card flash).
+            const myHandViewerKind: ViewerKind = viewerKind === 'spectator' ? 'spectator' : 'self';
+
             return (
               <Group>
                 {handCards.map((card, i) => {
                   const pos = positions[i];
                   if (!pos) return null;
+                  if (myHandViewerKind === 'spectator') {
+                    const nowMicros = BigInt(Date.now()) * 1000n;
+                    if (!isHandCardFaceVisible(card, 'spectator', gameState.myPlayer, nowMicros)) {
+                      return (
+                        <Group key={`my-hand-${i}`} x={pos.x} y={pos.y}>
+                          <CardBackShape width={handCardWidth} height={handCardHeight} />
+                        </Group>
+                      );
+                    }
+                  }
                   const gameCard = adaptCard(card, 'player1');
                   return (
                     <GameCardNode
