@@ -36,6 +36,8 @@ interface RightPanelProps {
   playerNames: Record<string, string>;
   chatScale: number;
   unreadChatCount?: number;
+  /** When true, chat input is disabled (read-only chat). Used by spectators. */
+  chatDisabled?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -53,6 +55,7 @@ export default function RightPanel({
   playerNames,
   chatScale,
   unreadChatCount = 0,
+  chatDisabled = false,
 }: RightPanelProps) {
   const { isLoupeVisible, toggleLoupe, previewCard } = useCardPreview();
   const [chatTab, setChatTab] = useState<'chat' | 'log' | 'all'>('all');
@@ -218,6 +221,7 @@ export default function RightPanel({
               activeTab={chatTab}
               onActiveTabChange={setChatTab}
               chatScale={chatScale}
+              chatDisabled={chatDisabled}
             />
           </div>
         </>

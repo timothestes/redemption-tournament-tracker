@@ -38,6 +38,8 @@ interface ChatPanelProps {
   onActiveTabChange?: (tab: TabKey) => void;
   /** Font scale for chat/log content. Defaults to 1.0. */
   chatScale?: number;
+  /** When true, the chat input is disabled (read-only). Defaults to false. */
+  chatDisabled?: boolean;
 }
 
 // Discriminated union for interleaved timeline entries
@@ -914,6 +916,7 @@ export default function ChatPanel({
   activeTab: controlledTab,
   onActiveTabChange,
   chatScale = 1,
+  chatDisabled = false,
 }: ChatPanelProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [internalTab, setInternalTab] = useState<TabKey>('all');
@@ -1532,8 +1535,9 @@ export default function ChatPanel({
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Message..."
+                  placeholder={chatDisabled ? "Spectators can't chat" : "Message..."}
                   maxLength={500}
+                  disabled={chatDisabled}
                   style={{
                     flex: 1,
                     minWidth: 0,
@@ -1545,12 +1549,14 @@ export default function ChatPanel({
                     fontSize: 'calc(12px * var(--chat-fs, 1))',
                     fontFamily: 'inherit',
                     outline: 'none',
+                    opacity: chatDisabled ? 0.5 : 1,
+                    cursor: chatDisabled ? 'not-allowed' : 'text',
                   }}
                   aria-label="Chat message"
                 />
                 <button
                   onClick={handleSend}
-                  disabled={!inputText.trim()}
+                  disabled={chatDisabled || !inputText.trim()}
                   aria-label="Send message"
                   style={{
                     padding: '5px 8px',
@@ -1833,8 +1839,9 @@ export default function ChatPanel({
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Message..."
+                  placeholder={chatDisabled ? "Spectators can't chat" : "Message..."}
                   maxLength={500}
+                  disabled={chatDisabled}
                   style={{
                     flex: 1,
                     minWidth: 0,
@@ -1846,12 +1853,14 @@ export default function ChatPanel({
                     fontSize: 'calc(12px * var(--chat-fs, 1))',
                     fontFamily: 'inherit',
                     outline: 'none',
+                    opacity: chatDisabled ? 0.5 : 1,
+                    cursor: chatDisabled ? 'not-allowed' : 'text',
                   }}
                   aria-label="Chat message"
                 />
                 <button
                   onClick={handleSend}
-                  disabled={!inputText.trim()}
+                  disabled={chatDisabled || !inputText.trim()}
                   aria-label="Send message"
                   style={{
                     padding: '5px 8px',

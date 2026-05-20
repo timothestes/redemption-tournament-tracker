@@ -68,7 +68,7 @@ export function SpectatorClient({ code, displayName }: SpectatorClientProps) {
 // ---------------------------------------------------------------------------
 // Inner component — must live inside SpacetimeProvider to use SpacetimeDB hooks
 // ---------------------------------------------------------------------------
-type LifecycleState = 'joining' | 'watching' | 'finished' | 'error';
+type LifecycleState = 'joining' | 'watching' | 'error';
 
 interface SpectatorInnerProps {
   code: string;
@@ -152,11 +152,10 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
       setGameId(game.id);
     }
 
-    if (game.status === 'playing' || game.status === 'waiting' || game.status === 'pregame') {
-      setLifecycle('watching');
-    } else if (game.status === 'finished') {
-      setLifecycle('finished');
-    }
+    // Spectators stay in 'watching' for the entire game including after
+    // it finishes — the canvas keeps rendering the final board state so
+    // viewers can review what happened.
+    setLifecycle('watching');
   }, [gameState.allGames, code, gameId]);
 
   // Detect kick: once we're watching, if our Spectator row disappears, redirect.
@@ -262,23 +261,6 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
     );
   }
 
-  if (lifecycle === 'finished') {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <p className="text-lg font-semibold text-foreground">Game over</p>
-          <p className="mt-1 text-sm text-muted-foreground">This game has ended.</p>
-          <a
-            href="/play"
-            className="mt-4 inline-block rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            Back to lobby
-          </a>
-        </div>
-      </div>
-    );
-  }
-
   // lifecycle === 'watching' — render based on game.status
   const spectatorCount = gameState.spectators.length;
   const game = (gameState.allGames ?? []).find(
@@ -336,25 +318,26 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
             <SpectatorPregameView game={game} />
           </div>
         ) : (
-          // status === 'playing' — TurnIndicator + canvas + right panel
-          <>
-            <div style={{ flexShrink: 0, height: 48 }}>
-              <TurnIndicator
-                readOnly
-                game={gameState.game}
-                myPlayer={gameState.myPlayer}
-                opponentPlayer={gameState.opponentPlayer}
-                opponentConnectionStatus={gameState.opponentConnectionStatus}
-                isMyTurn={false}
-                onSetPhase={() => {}}
-                onEndTurn={() => {}}
-                myScore={myScore}
-                opponentScore={opponentScore}
-                timerDisplay={gameTimer.formatted}
-                timerVisible={gameTimer.isTimerVisible}
-              />
-            </div>
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'row', overflow: 'hidden' }}>
+          // status === 'playing' — RightPanel spans full height alongside
+          // a (TurnIndicator + canvas) column, matching the player layout.
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'row', overflow: 'hidden' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              <div style={{ flexShrink: 0, height: 48 }}>
+                <TurnIndicator
+                  readOnly
+                  game={gameState.game}
+                  myPlayer={gameState.myPlayer}
+                  opponentPlayer={gameState.opponentPlayer}
+                  opponentConnectionStatus={gameState.opponentConnectionStatus}
+                  isMyTurn={false}
+                  onSetPhase={() => {}}
+                  onEndTurn={() => {}}
+                  myScore={myScore}
+                  opponentScore={opponentScore}
+                  timerDisplay={gameTimer.formatted}
+                  timerVisible={gameTimer.isTimerVisible}
+                />
+              </div>
               <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
                 <MultiplayerCanvas
                   gameId={gameId}
@@ -362,17 +345,18 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
                   getImage={getImage}
                 />
               </div>
-              <RightPanel
-                chatMessages={gameState.chatMessages}
-                gameActions={gameState.gameActions}
-                myPlayerId={BigInt(0)}
-                onSendChat={gameState.sendChat}
-                playerNames={playerNameMap}
-                chatScale={chatScale}
-                unreadChatCount={unreadChatCount}
-              />
             </div>
-          </>
+            <RightPanel
+              chatMessages={gameState.chatMessages}
+              gameActions={gameState.gameActions}
+              myPlayerId={BigInt(0)}
+              onSendChat={gameState.sendChat}
+              playerNames={playerNameMap}
+              chatScale={chatScale}
+              unreadChatCount={unreadChatCount}
+              chatDisabled
+            />
+          </div>
         )}
       </div>
     </div>
