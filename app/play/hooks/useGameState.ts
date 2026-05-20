@@ -953,6 +953,10 @@ export function useGameState(gameId: bigint): GameState {
 export function useSpectatorGameState(gameId: bigint | null) {
   const effectiveGameId = gameId ?? 0n;
 
+  // Connection — needed for the sendChat reducer call
+  const spacetimeCtx = useSpacetimeDB() as any;
+  const conn = spacetimeCtx?.getConnection?.() ?? null;
+
   // ---------------------------------------------------------------------------
   // Table subscriptions — mirror every subscription in useGameState
   // ---------------------------------------------------------------------------
@@ -1177,7 +1181,10 @@ export function useSpectatorGameState(gameId: bigint | null) {
     setPhase: noopString,
     endTurn: noop,
     rollDice: noopBigint,
-    sendChat: noopString,
+    sendChat: useCallback((text: string) => {
+      if (!conn || !gameId) return;
+      conn.reducers.sendChat({ gameId, text });
+    }, [conn, gameId]),
     setPlayerOption: useCallback((_optionName: string, _value: string) => {}, []),
     revealHand: noopBool,
     revealReserve: noopBool,

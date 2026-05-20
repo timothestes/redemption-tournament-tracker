@@ -15,6 +15,9 @@ import { useMultiplayerImagePreloader } from '@/app/play/hooks/useMultiplayerIma
 import { buildPrioritizedImageUrls } from '@/app/play/lib/multiplayerImageUrls';
 import TurnIndicator from '@/app/play/components/TurnIndicator';
 import { useGameTimer } from '../../hooks/useGameTimer';
+import RightPanel from '@/app/play/components/RightPanel';
+import { useChatScale } from '@/app/shared/hooks/useChatScale';
+import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 
 // Konva requires browser APIs — lazy-load to avoid SSR issues
 const MultiplayerCanvas = dynamic(
@@ -76,6 +79,7 @@ interface SpectatorInnerProps {
 function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps) {
   const spacetimeCtx = useSpacetimeDB() as any;
   const conn = spacetimeCtx?.getConnection?.() ?? null;
+  const isActive = spacetimeCtx?.isActive ?? false;
   const myIdentityHex: string | undefined = spacetimeCtx?.identity?.toHexString?.();
   const router = useRouter();
 
@@ -92,7 +96,7 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
   // Without this, `useTable(tables.Game)` returns empty rows and we can
   // never find the game by code.
   useEffect(() => {
-    if (!isConnected || !conn || didSubscribe.current) return;
+    if ((!isConnected && !isActive) || !conn || didSubscribe.current) return;
     didSubscribe.current = true;
     try {
       conn.subscriptionBuilder().subscribe([
@@ -102,11 +106,11 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
     } catch (e) {
       console.error('Failed to subscribe (spectator phase 1):', e);
     }
-  }, [isConnected, conn, code]);
+  }, [isConnected, isActive, conn, code]);
 
   // Once connected, call joinAsSpectator once
   useEffect(() => {
-    if (!isConnected || !conn || didCallReducer.current) return;
+    if ((!isConnected && !isActive) || !conn || didCallReducer.current) return;
     didCallReducer.current = true;
 
     // joinAsSpectator returns a Promise that rejects asynchronously on
@@ -119,7 +123,7 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
       setErrorMessage(e instanceof Error ? e.message : 'Failed to join as spectator');
       setLifecycle('error');
     });
-  }, [isConnected, conn, code, displayName]);
+  }, [isConnected, isActive, conn, code, displayName]);
 
   // Leave as spectator on unmount
   useEffect(() => {
@@ -183,6 +187,41 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
 
   const { getImage } = useMultiplayerImagePreloader(allImageUrls);
 
+  // Chat/log font scale
+  const { chatScale } = useChatScale();
+
+  // Card preview — needed for unread tracking
+  const { isLoupeVisible } = useCardPreview();
+
+  // Unread chat count — increments while panel is collapsed
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const prevChatCountRef = useRef(0);
+  useEffect(() => {
+    const current = gameState.chatMessages.length;
+    if (current > prevChatCountRef.current) {
+      const newCount = current - prevChatCountRef.current;
+      if (!isLoupeVisible) {
+        setUnreadChatCount((n) => n + newCount);
+      }
+    }
+    prevChatCountRef.current = current;
+  }, [gameState.chatMessages.length, isLoupeVisible]);
+
+  // Clear unread when panel opens
+  useEffect(() => {
+    if (isLoupeVisible) {
+      setUnreadChatCount(0);
+    }
+  }, [isLoupeVisible]);
+
+  // Player name map for ChatPanel
+  const playerNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (gameState.myPlayer) map[gameState.myPlayer.id.toString()] = gameState.myPlayer.displayName;
+    if (gameState.opponentPlayer) map[gameState.opponentPlayer.id.toString()] = gameState.opponentPlayer.displayName;
+    return map;
+  }, [gameState.myPlayer, gameState.opponentPlayer]);
+
   // Game timer — anchored to server-recorded playingStartedAtMicros so
   // elapsed time survives navigating away and back. Matches player client.
   const gameTimer = useGameTimer(
@@ -212,7 +251,7 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
     );
   }
 
-  if (lifecycle === 'joining' || !isConnected) {
+  if (lifecycle === 'joining' || (!isConnected && !isActive)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
@@ -297,7 +336,7 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
             <SpectatorPregameView game={game} />
           </div>
         ) : (
-          // status === 'playing' — TurnIndicator + canvas
+          // status === 'playing' — TurnIndicator + canvas + right panel
           <>
             <div style={{ flexShrink: 0, height: 48 }}>
               <TurnIndicator
@@ -315,11 +354,22 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
                 timerVisible={gameTimer.isTimerVisible}
               />
             </div>
-            <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-              <MultiplayerCanvas
-                gameId={gameId}
-                viewerKind="spectator"
-                getImage={getImage}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'row', overflow: 'hidden' }}>
+              <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+                <MultiplayerCanvas
+                  gameId={gameId}
+                  viewerKind="spectator"
+                  getImage={getImage}
+                />
+              </div>
+              <RightPanel
+                chatMessages={gameState.chatMessages}
+                gameActions={gameState.gameActions}
+                myPlayerId={BigInt(0)}
+                onSendChat={gameState.sendChat}
+                playerNames={playerNameMap}
+                chatScale={chatScale}
+                unreadChatCount={unreadChatCount}
               />
             </div>
           </>
