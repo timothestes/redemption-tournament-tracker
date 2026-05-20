@@ -134,6 +134,10 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
     setPendingLobbyCode(null);
   }
 
+  function handleWatchFromLobby(code: string) {
+    router.push(`/play/spectate/${code}`);
+  }
+
   function handleJoinFromLobby(code: string, overrideDisplayName?: string) {
     if (!hasUsername && !overrideDisplayName) {
       setPendingAction('lobby-join');
@@ -516,6 +520,7 @@ export function GameLobby({ decks, userId, displayName: initialDisplayName, hasU
                 selectedDeckFormat={selectedDeck?.format ?? null}
                 joiningCode={isJoining ? gameCode : null}
                 onJoinGame={handleJoinFromLobby}
+                onWatchGame={handleWatchFromLobby}
               />
             </div>
           )}

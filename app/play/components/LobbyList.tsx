@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTable, useSpacetimeDB } from 'spacetimedb/react';
 import { tables } from '@/lib/spacetimedb/module_bindings';
-import type { Game } from '@/lib/spacetimedb/module_bindings/types';
+import type { Game, Spectator } from '@/lib/spacetimedb/module_bindings/types';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Eye, Loader2 } from 'lucide-react';
 import { normalizeDeckFormat } from '@/lib/deck-format';
 
 interface LobbyListProps {
@@ -13,9 +14,10 @@ interface LobbyListProps {
   selectedDeckFormat: string | null;
   joiningCode: string | null;
   onJoinGame: (code: string) => void;
+  onWatchGame: (code: string) => void;
 }
 
-export function LobbyList({ selectedDeckId, selectedDeckFormat, joiningCode, onJoinGame }: LobbyListProps) {
+export function LobbyList({ selectedDeckId, selectedDeckFormat, joiningCode, onJoinGame, onWatchGame }: LobbyListProps) {
   // Follow existing codebase pattern: useSpacetimeDB() returns a context object,
   // not the connection directly. Use .getConnection() to get the actual DbConnection.
   const spacetimeCtx = useSpacetimeDB() as any;
@@ -24,11 +26,14 @@ export function LobbyList({ selectedDeckId, selectedDeckFormat, joiningCode, onJ
   // Note: subscribeApplied is unreliable when the subscription returns no rows
   // (it may never flip to true). Don't gate rendering on it.
   const [games] = useTable(tables.Game) as [Game[], boolean];
+  const [spectators] = useTable(tables.Spectator) as [Spectator[], boolean];
   const [now, setNow] = useState(Date.now());
+  const [watchingCode, setWatchingCode] = useState<string | null>(null);
   const didSubscribe = useRef(false);
 
-  // Subscribe to waiting public games — re-subscribe when connection changes
-  // (e.g., after tab regains focus and WebSocket reconnects)
+  // Subscribe to public waiting + playing games (so live games show up too),
+  // plus spectators for live counts. Re-subscribe when connection changes
+  // (e.g., after tab regains focus and WebSocket reconnects).
   useEffect(() => {
     if (!conn) {
       didSubscribe.current = false;
@@ -38,7 +43,10 @@ export function LobbyList({ selectedDeckId, selectedDeckFormat, joiningCode, onJ
     didSubscribe.current = true;
     try {
       conn.subscriptionBuilder().subscribe([
-        "SELECT * FROM game WHERE status = 'waiting' AND is_public = true",
+        "SELECT * FROM game WHERE is_public = true AND status = 'waiting'",
+        "SELECT * FROM game WHERE is_public = true AND status = 'pregame'",
+        "SELECT * FROM game WHERE is_public = true AND status = 'playing'",
+        "SELECT * FROM spectator",
       ]);
     } catch (e) {
       console.error('Lobby subscription failed:', e);
@@ -63,12 +71,21 @@ export function LobbyList({ selectedDeckId, selectedDeckFormat, joiningCode, onJ
   // Client-side filter as safety net (subscription already filters server-side)
   // Sort newest first so freshest games appear at top
   const openGames = (games || [])
-    .filter((g) => g.status === 'waiting' && g.isPublic)
+    .filter((g) => (g.status === 'waiting' || g.status === 'pregame' || g.status === 'playing') && g.isPublic)
     .sort((a, b) => {
       const aTime = Number(a.createdAt.microsSinceUnixEpoch);
       const bTime = Number(b.createdAt.microsSinceUnixEpoch);
       return bTime - aTime;
     });
+
+  // Build a map of gameId -> spectator count for the watching indicator
+  const spectatorCounts = useMemo(() => {
+    const counts = new Map<bigint, number>();
+    for (const s of spectators || []) {
+      counts.set(s.gameId, (counts.get(s.gameId) ?? 0) + 1);
+    }
+    return counts;
+  }, [spectators]);
 
   if (!conn) {
     return (
@@ -82,7 +99,7 @@ export function LobbyList({ selectedDeckId, selectedDeckFormat, joiningCode, onJ
     return (
       <div className="py-6 text-center">
         <p className="text-sm text-muted-foreground">
-          No open games right now.
+          No games right now.
         </p>
       </div>
     );
@@ -106,10 +123,13 @@ export function LobbyList({ selectedDeckId, selectedDeckFormat, joiningCode, onJ
           minutesAgo < 1 ? 'Just now' : `${minutesAgo} min ago`;
 
         const gameFormat = normalizeDeckFormat(game.format);
+        const isPlaying = game.status === 'playing' || game.status === 'pregame';
         const formatMismatch =
-          selectedFormat !== null && selectedFormat !== gameFormat;
-        const disabled =
+          !isPlaying && selectedFormat !== null && selectedFormat !== gameFormat;
+        const joinDisabled =
           !selectedDeckId || joiningCode !== null || formatMismatch;
+        const watchDisabled = watchingCode !== null;
+        const watcherCount = spectatorCounts.get(game.id) ?? 0;
 
         return (
           <div
@@ -124,9 +144,26 @@ export function LobbyList({ selectedDeckId, selectedDeckFormat, joiningCode, onJ
                 <span className="text-xs text-muted-foreground shrink-0">
                   {gameFormat}
                 </span>
+                {isPlaying && (
+                  <Badge
+                    variant="destructive"
+                    className="shrink-0 gap-1 px-1.5 py-0 text-[10px] leading-4 tracking-wide"
+                  >
+                    <span className="relative inline-flex h-1.5 w-1.5">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-75" />
+                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-current" />
+                    </span>
+                    LIVE
+                  </Badge>
+                )}
                 <span className="text-xs text-muted-foreground shrink-0">
                   · {timeLabel}
                 </span>
+                {isPlaying && watcherCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground shrink-0">
+                    · <Eye className="h-3 w-3" /> {watcherCount} watching
+                  </span>
+                )}
               </div>
               {game.lobbyMessage && (
                 <p className="text-xs text-muted-foreground truncate">
@@ -139,29 +176,47 @@ export function LobbyList({ selectedDeckId, selectedDeckFormat, joiningCode, onJ
                 </p>
               )}
             </div>
-            <Button
-              size="sm"
-              onClick={() => onJoinGame(game.code)}
-              disabled={disabled}
-              title={
-                formatMismatch
-                  ? `This game is ${gameFormat}. Your selected deck is ${selectedFormat}.`
-                  : undefined
-              }
-              className="shrink-0"
-            >
-              {joiningCode === game.code ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                'Join'
+            <div className="flex items-center gap-2 shrink-0">
+              {!isPlaying && (
+                <Button
+                  size="sm"
+                  onClick={() => onJoinGame(game.code)}
+                  disabled={joinDisabled}
+                  title={
+                    formatMismatch
+                      ? `This game is ${gameFormat}. Your selected deck is ${selectedFormat}.`
+                      : undefined
+                  }
+                >
+                  {joiningCode === game.code ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    'Join'
+                  )}
+                </Button>
               )}
-            </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setWatchingCode(game.code);
+                  onWatchGame(game.code);
+                }}
+                disabled={watchDisabled}
+              >
+                {watchingCode === game.code ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  'Watch'
+                )}
+              </Button>
+            </div>
           </div>
         );
       })}
       {!selectedDeckId && (
         <p className="text-xs text-muted-foreground text-center mt-1">
-          Select a deck to join a game
+          Select a deck to join — or watch any live game
         </p>
       )}
     </div>

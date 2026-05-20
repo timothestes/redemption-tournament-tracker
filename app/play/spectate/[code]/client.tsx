@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import { useSpacetimeConnection } from '@/app/play/hooks/useSpacetimeConnection';
 import { SpacetimeProvider } from '@/app/play/lib/spacetimedb-provider';
 import { useSpectatorGameState } from '@/app/play/hooks/useGameState';
-import { SpectatorPregameView, SpectatorPregameCeremonyOverlay } from '@/app/play/components/PregameScreen';
+import { SpectatorPregameView, SpectatorPregameCeremonyOverlay, GameCodeHeader } from '@/app/play/components/PregameScreen';
 import { CardPreviewProvider } from '@/app/goldfish/state/CardPreviewContext';
 import { useSpacetimeDB } from 'spacetimedb/react';
 import { showGameToast } from '@/app/shared/components/GameToast';
@@ -17,6 +17,8 @@ import { useGameTimer } from '../../hooks/useGameTimer';
 import RightPanel from '@/app/play/components/RightPanel';
 import { useChatScale } from '@/app/shared/hooks/useChatScale';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
+import TopNav from '@/components/top-nav';
+import { DebugOverlay } from '@/app/play/components/DebugOverlay';
 
 // Konva requires browser APIs — lazy-load to avoid SSR issues
 const MultiplayerCanvas = dynamic(
@@ -173,6 +175,22 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
     }
   }, [gameState.spectators, lifecycle, gameId, myIdentityHex, router]);
 
+  // Detect host-abandoned lobby: when the host leaves a waiting/pregame game,
+  // the server flips status to 'finished' (immediately for waiting, after the
+  // 30s DisconnectTimeout for pregame). Without this redirect the spectator
+  // would render the canvas over an empty game — TurnIndicator + cave with no
+  // play to watch. playingStartedAtMicros stays 0n until the game actually
+  // enters 'playing', so finished + 0n distinguishes abandonment from a real
+  // game whose final board is worth reviewing.
+  useEffect(() => {
+    if (lifecycle !== 'watching') return;
+    const game = gameState.game;
+    if (!game || game.status !== 'finished') return;
+    if ((game.playingStartedAtMicros ?? 0n) > 0n) return;
+    showGameToast('Host left the lobby');
+    router.push('/play');
+  }, [gameState.game, lifecycle, router]);
+
   // Image preloader — mirrors player client but without the myDeckImageUrls
   // since spectators don't have a personal deck.
   const allImageUrls = useMemo(() => {
@@ -270,12 +288,29 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
 
   if (lifecycle === 'joining' || (!isConnected && !isActive)) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="mb-4 h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" />
-          <p className="text-sm text-muted-foreground">Joining as spectator...</p>
+      <>
+        <TopNav />
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black">
+          <div
+            className="absolute inset-0 bg-cover bg-no-repeat opacity-40"
+            style={{ backgroundImage: 'url(/gameplay/cave_background.png)', backgroundPosition: 'center 70%' }}
+          />
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{ background: 'radial-gradient(ellipse 90% 85% at 50% 50%, transparent 60%, rgba(0,0,0,0.85) 100%)' }}
+          />
+          <div className="relative z-10 text-center">
+            <p className="font-cinzel text-xl tracking-wide text-amber-200/90 mb-6">
+              Joining as spectator…
+            </p>
+            <div className="mb-4 h-8 w-8 animate-spin rounded-full border-2 border-amber-200/50 border-t-transparent mx-auto" />
+          </div>
+          <DebugOverlay
+            tone="amber"
+            text={`code: ${code} · gameId: ${gameId === null ? 'none' : String(gameId)} · phase: ${lifecycle} · conn: ${isConnected ? 'live' : (isActive ? 'reconnecting' : 'down')}`}
+          />
         </div>
-      </div>
+      </>
     );
   }
 
@@ -287,6 +322,68 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
 
   const myScore = gameState.myCards['land-of-redemption']?.length ?? 0;
   const opponentScore = gameState.opponentCards['land-of-redemption']?.length ?? 0;
+
+  if (gameId !== null && game && status === 'waiting') {
+    return (
+      <>
+        <TopNav />
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black px-4">
+          <div
+            className="absolute inset-0 bg-cover bg-no-repeat"
+            style={{ backgroundImage: 'url(/gameplay/cave_background.png)', backgroundPosition: 'center' }}
+          />
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{ background: 'radial-gradient(ellipse 90% 85% at 50% 50%, transparent 60%, rgba(0,0,0,0.85) 100%)' }}
+          />
+          <div className="relative z-10 rounded-xl border border-amber-200/10 bg-black/60 backdrop-blur-sm p-6 sm:p-8 text-center max-w-md w-full">
+            <div className="text-left mb-4">
+              <button
+                onClick={() => router.push('/play')}
+                className="inline-flex items-center gap-1 text-xs text-amber-200/40 hover:text-amber-200/60 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                </svg>
+                Back to lobby
+              </button>
+            </div>
+
+            <GameCodeHeader code={code} />
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg border border-[#c4955a]/30 bg-black/40 p-3 text-left">
+                <p className="text-xs font-cinzel text-[#c4955a] truncate">
+                  {gameState.myPlayer?.displayName ?? game.createdByName ?? 'Host'}
+                </p>
+                <p className="text-[10px] text-[#c4955a]/50 mt-1 font-cinzel tracking-wide">Ready</p>
+              </div>
+              <div className="rounded-lg border border-[#4a7ab5]/30 bg-black/40 p-3 text-left">
+                <p className="text-xs font-cinzel text-[#4a7ab5]/60">Waiting</p>
+                <div className="mt-2 flex gap-1">
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#4a7ab5]/50 [animation-delay:-0.3s]" />
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#4a7ab5]/50 [animation-delay:-0.15s]" />
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#4a7ab5]/50" />
+                </div>
+              </div>
+            </div>
+
+            {game.lobbyMessage && (
+              <p className="mt-4 text-sm text-amber-200/60 italic">"{game.lobbyMessage}"</p>
+            )}
+
+            <p className="mt-5 text-[11px] uppercase tracking-[0.2em] text-amber-200/70 font-cinzel">
+              Spectating
+            </p>
+          </div>
+        </div>
+        <DebugOverlay
+          tone="amber"
+          text={`code: ${code} · gameId: ${gameId === null ? 'none' : String(gameId)} · phase: ${lifecycle}/${status} · conn: ${isConnected ? 'live' : (isActive ? 'reconnecting' : 'down')} · players: ${(gameState.allPlayers ?? []).length}/2 · spectators: ${gameState.spectators.length}`}
+        />
+      </>
+    );
+  }
 
   return (
     <div
@@ -301,27 +398,24 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
     >
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {gameId === null || !game ? (
-          <div className="flex h-full items-center justify-center">
-            <div className="text-center">
-              <div className="mb-4 h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" />
-              <p className="text-sm text-muted-foreground">Loading game state...</p>
+          <>
+            <div className="relative flex h-full items-center justify-center">
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{ background: 'radial-gradient(ellipse 90% 85% at 50% 50%, transparent 60%, rgba(0,0,0,0.85) 100%)' }}
+              />
+              <div className="relative z-10 text-center">
+                <p className="font-cinzel text-xl tracking-wide text-amber-200/90 mb-6">
+                  Loading game state…
+                </p>
+                <div className="mb-4 h-8 w-8 animate-spin rounded-full border-2 border-amber-200/50 border-t-transparent mx-auto" />
+              </div>
             </div>
-          </div>
-        ) : status === 'waiting' ? (
-          <div className="flex h-full items-center justify-center px-4">
-            <div className="rounded-xl border border-border bg-card/95 backdrop-blur-sm p-8 sm:p-10 text-center max-w-md w-full">
-              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground font-cinzel">
-                Spectating
-              </p>
-              <h2 className="text-2xl font-bold font-cinzel mt-2">Waiting for opponent</h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Game code <span className="font-mono tracking-wider text-primary">{code}</span>
-              </p>
-              {game.lobbyMessage && (
-                <p className="mt-4 text-sm text-foreground/80 italic">"{game.lobbyMessage}"</p>
-              )}
-            </div>
-          </div>
+            <DebugOverlay
+              tone="amber"
+              text={`code: ${code} · gameId: ${gameId === null ? 'none' : String(gameId)} · phase: ${lifecycle} · conn: ${isConnected ? 'live' : (isActive ? 'reconnecting' : 'down')} · games seen: ${(gameState.allGames ?? []).length}`}
+            />
+          </>
         ) : status === 'pregame' && game.pregamePhase !== 'rolling' && game.pregamePhase !== 'choosing' && game.pregamePhase !== 'revealing' ? (
           // Pre-deal stage (deck selection / ready-up). No hands dealt yet,
           // so the canvas would be empty — show the simple status card.

@@ -1094,16 +1094,22 @@ export default function ChatPanel({
   const chatEndRef = useRef<HTMLDivElement>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
   const allEndRef = useRef<HTMLDivElement>(null);
-  const prevChatLengthRef = useRef(chatMessages.length);
+  // System messages (senderId === 0n) render in LOG, not CHAT — don't count
+  // them toward the CHAT unread badge.
+  const userChatCount = useMemo(
+    () => chatMessages.reduce((n, m) => (m.senderId !== 0n ? n + 1 : n), 0),
+    [chatMessages],
+  );
+  const prevChatLengthRef = useRef(userChatCount);
 
   // Track unread messages when chat isn't actively visible
   useEffect(() => {
     const chatVisible = isOpen && (activeTab === 'chat' || activeTab === 'all');
-    if (!chatVisible && chatMessages.length > prevChatLengthRef.current) {
-      setUnreadCount((n) => n + (chatMessages.length - prevChatLengthRef.current));
+    if (!chatVisible && userChatCount > prevChatLengthRef.current) {
+      setUnreadCount((n) => n + (userChatCount - prevChatLengthRef.current));
     }
-    prevChatLengthRef.current = chatMessages.length;
-  }, [chatMessages.length, isOpen, activeTab]);
+    prevChatLengthRef.current = userChatCount;
+  }, [userChatCount, isOpen, activeTab]);
 
   // Clear unread when opening chat or all tab
   useEffect(() => {

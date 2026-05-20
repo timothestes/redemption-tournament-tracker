@@ -8,6 +8,7 @@ import { DeckPickerModal } from './DeckPickerModal';
 import type { DeckOption } from './DeckPickerCard';
 import { loadDeckForGame } from '../actions';
 import type { GameState } from '../hooks/useGameState';
+import { DebugOverlay } from './DebugOverlay';
 
 // ---------------------------------------------------------------------------
 // Timing constants
@@ -203,9 +204,13 @@ export default function PregameScreen({
               </>
             ) : null}
           </div>
-
         </div>
       </div>
+
+      <DebugOverlay
+        tone="amber"
+        text={`code: ${code} · gameId: ${gameId === null ? 'none' : String(gameId)} · phase: ${lifecycle}${phase !== 'deck_select' ? `/${phase}` : ''} · players: ${(myPlayer ? 1 : 0) + (opponentPlayer ? 1 : 0)}/2 · spectators: ${gameState.spectators?.length ?? 0} · ready: ${myReady ? 'me' : '—'}${opponentReady ? '+opp' : ''}`}
+      />
     </>
   );
 }
@@ -214,7 +219,7 @@ export default function PregameScreen({
 // GameCodeHeader — game code display + copy buttons
 // ---------------------------------------------------------------------------
 
-function GameCodeHeader({ code }: { code: string }) {
+export function GameCodeHeader({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
 
   const copyInviteLink = () => {
@@ -255,7 +260,7 @@ function GameCodeHeader({ code }: { code: string }) {
       {copied ? (
         <p className="mt-1 text-[10px] text-green-400 font-cinzel tracking-wide">Invite link copied!</p>
       ) : (
-        <p className="mt-1 text-[10px] text-amber-200/25 font-cinzel tracking-wide">Tap to copy invite link</p>
+        <p className="mt-1 text-[10px] text-amber-200/55 font-cinzel tracking-wide">Tap to copy invite link</p>
       )}
     </div>
   );

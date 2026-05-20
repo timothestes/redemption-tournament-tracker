@@ -28,6 +28,7 @@ import { SpreadHandProvider, useSpreadHand } from '../contexts/SpreadHandContext
 import { convertToGoldfishDeck, type GameCardData } from '../utils/convertToGoldfishDeck';
 import PregameScreen, { PregameCeremonyOverlay } from '../components/PregameScreen';
 import { ImageLoadingGate } from '../components/ImageLoadingGate';
+import { DebugOverlay } from '../components/DebugOverlay';
 import { useMultiplayerImagePreloader } from '@/app/play/hooks/useMultiplayerImagePreloader';
 import { buildPrioritizedImageUrls, buildCriticalImageUrls } from '@/app/play/lib/multiplayerImageUrls';
 import { DeckPickerModal } from '../components/DeckPickerModal';
@@ -698,10 +699,31 @@ function GameInner({ code, isConnected }: GameInnerProps) {
   const gameStateRef = useRef(gameState);
   gameStateRef.current = gameState;
 
+  // Track whether the page is being unloaded (refresh / tab close) so we can
+  // skip the synchronous leave_game on unmount in that case. Refreshes fire
+  // React's useEffect cleanup BEFORE the page tears down, and calling
+  // leave_game would mark a waiting game 'finished' — kicking spectators
+  // before the host's refresh completes. The server's 30-second
+  // DisconnectTimeout handles refreshes/crashes; the unmount cleanup is only
+  // needed for in-app navigation away.
+  const isUnloadingRef = useRef(false);
+  useEffect(() => {
+    const onPageHide = () => { isUnloadingRef.current = true; };
+    window.addEventListener('pagehide', onPageHide);
+    window.addEventListener('beforeunload', onPageHide);
+    return () => {
+      window.removeEventListener('pagehide', onPageHide);
+      window.removeEventListener('beforeunload', onPageHide);
+    };
+  }, []);
+
   useEffect(() => {
     if (gameId === null) return;
     return () => {
-      // Component unmount (navigation away) — clean up if still waiting
+      // SPA-navigation cleanup only — skip if the page itself is unloading
+      // (refresh / tab close), since those fire this same cleanup but the
+      // host is coming right back. Let the server's 30s timeout handle them.
+      if (isUnloadingRef.current) return;
       if (lifecycleRef.current === 'waiting') {
         gameStateRef.current.leaveGame();
       }
@@ -895,6 +917,10 @@ function GameInner({ code, isConnected }: GameInnerProps) {
           </p>
           <div className="mb-4 h-8 w-8 animate-spin rounded-full border-2 border-amber-200/50 border-t-transparent mx-auto" />
         </div>
+        <DebugOverlay
+          tone="amber"
+          text={`code: ${code} · gameId: ${gameId === null ? 'none' : String(gameId)} · phase: ${lifecycle} · conn: ${isConnected ? 'live' : (isActive ? 'reconnecting' : 'down')} · games: ${gameState.isGamesReady ? 'ready' : 'loading'} · players: ${gameState.isPlayersReady ? 'ready' : 'loading'} · deck: ${deckData ? 'loaded' : 'loading'}`}
+        />
       </div>
       </>
     );
