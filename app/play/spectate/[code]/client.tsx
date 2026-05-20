@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { useSpacetimeConnection } from '@/app/play/hooks/useSpacetimeConnection';
 import { SpacetimeProvider } from '@/app/play/lib/spacetimedb-provider';
 import { useGameState } from '@/app/play/hooks/useGameState';
+import { EmoteOverlay } from '@/app/shared/components/EmoteOverlay';
 import { SpectatorBar } from '@/app/play/components/SpectatorBar';
 import { useSpacetimeDB } from 'spacetimedb/react';
 
@@ -175,6 +176,8 @@ function SpectatorInner({ code, isConnected }: SpectatorInnerProps) {
               aria-label="Spectator mode — read only"
               onContextMenu={(e) => e.preventDefault()}
             />
+
+            <EmoteOverlay emotes={gameState.emotes} myPlayerId={null} />
           </>
         )}
 

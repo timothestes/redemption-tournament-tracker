@@ -16,6 +16,7 @@ import { CardPreviewProvider, useCardPreview } from '@/app/goldfish/state/CardPr
 import { getCardImageUrl } from '@/app/shared/utils/cardImageUrl';
 import TopNav from '@/components/top-nav';
 import { GameToolbar } from '@/app/shared/components/GameToolbar';
+import { EmoteOverlay } from '@/app/shared/components/EmoteOverlay';
 import { useGameHotkeys } from '@/app/shared/hooks/useGameHotkeys';
 import { GameToastContainer, showGameToast } from '@/app/shared/components/GameToast';
 import { CardChoicePromptContainer } from '@/app/shared/components/CardChoicePrompt';
@@ -1690,8 +1691,20 @@ function GameInner({ code, isConnected }: GameInnerProps) {
             hasPendingInitiative={gameState.zoneSearchRequests.some(
               (r: any) => r.zone === 'initiative' && r.status === 'pending' && r.requesterId === gameState.myPlayer?.id
             )}
-            onPassInitiative={() => gameState.passInitiative()}
+            onPassInitiative={() => {
+              const pendingInit = gameState.zoneSearchRequests.find(
+                (r: any) => r.zone === 'initiative' && r.status === 'pending' && r.targetPlayerId === gameState.myPlayer?.id
+              );
+              if (pendingInit) {
+                gameState.approveZoneSearch(BigInt(pendingInit.id));
+                showGameToast('Initiative granted');
+                return;
+              }
+              gameState.passInitiative();
+            }}
+            onSendEmote={(kind) => gameState.sendEmote(kind)}
           />
+          <EmoteOverlay emotes={gameState.emotes} myPlayerId={gameState.myPlayer?.id ?? null} />
           <GameToastContainer />
           <PauseConsentToast
             game={gameState.game}

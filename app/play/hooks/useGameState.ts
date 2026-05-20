@@ -12,6 +12,7 @@ import type {
   GameAction,
   Spectator,
   DisconnectTimeout,
+  Emote,
 } from '@/lib/spacetimedb/module_bindings/types';
 import type { GameCard } from '@/app/goldfish/types';
 import { useStableAdaptedCards } from '../utils/cardAdapter';
@@ -27,6 +28,7 @@ type ChatMessageRow = ChatMessage;
 type GameActionRow = GameAction;
 type SpectatorRow = Spectator;
 type DisconnectTimeoutRow = DisconnectTimeout;
+type EmoteRow = Emote;
 
 // ---------------------------------------------------------------------------
 // Public interface
@@ -64,6 +66,7 @@ export interface GameState {
   zoneSearchRequests: any[];
   incomingSearchRequest: any | null;
   approvedSearchRequest: any | null;
+  emotes: EmoteRow[];
 
   // Loading state
   isLoading: boolean;
@@ -142,6 +145,7 @@ export interface GameState {
   logDeckSearchNoShuffle: (topCount: number, bottomCount: number) => void;
   requestZoneSearch: (zone: string) => void;
   passInitiative: () => void;
+  sendEmote: (kind: string) => void;
   requestOpponentAction: (action: string, actionParams?: string) => void;
   approveZoneSearch: (requestId: bigint) => void;
   denyZoneSearch: (requestId: bigint) => void;
@@ -199,6 +203,9 @@ export function useGameState(gameId: bigint): GameState {
   const [allDisconnectTimeouts] = useTable(
     tables.DisconnectTimeout.where(t => t.gameId.eq(gameId)),
   ) as [DisconnectTimeoutRow[], boolean];
+  const [allEmotes] = useTable(
+    tables.Emote.where(e => e.gameId.eq(gameId)),
+  ) as [EmoteRow[], boolean];
 
   // useTable returns [rows, subscribeApplied] where subscribeApplied=true means data is ready
   // Only require core tables (game, player, cards) — chat/actions/spectators can load async
@@ -778,6 +785,13 @@ export function useGameState(gameId: bigint): GameState {
     conn?.reducers.passInitiative({ gameId });
   }, [conn, gameId]);
 
+  const sendEmote = useCallback(
+    (kind: string) => {
+      conn?.reducers.sendEmote({ gameId, kind });
+    },
+    [conn, gameId],
+  );
+
   const requestOpponentAction = useCallback(
     (action: string, actionParams: string = '') => {
       conn?.reducers.requestOpponentAction({ gameId, action, actionParams });
@@ -931,6 +945,8 @@ export function useGameState(gameId: bigint): GameState {
     logDeckSearchNoShuffle,
     requestZoneSearch,
     passInitiative,
+    sendEmote,
+    emotes: allEmotes,
     requestOpponentAction,
     approveZoneSearch,
     denyZoneSearch,

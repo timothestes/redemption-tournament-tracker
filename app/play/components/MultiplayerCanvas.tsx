@@ -6710,7 +6710,7 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
         );
       })()}
 
-      {approvedSearchRequest && !approvedSearchRequest.action && approvedSearchRequest.zone !== 'hand-reveal' && approvedSearchRequest.zone !== 'action-priority' && (() => {
+      {approvedSearchRequest && !approvedSearchRequest.action && approvedSearchRequest.zone !== 'hand-reveal' && approvedSearchRequest.zone !== 'action-priority' && approvedSearchRequest.zone !== 'initiative' && (() => {
         const zoneCards = (opponentCards[approvedSearchRequest.zone] ?? [])
           .map((c: CardInstance) => adaptCard(c, 'player2'));
         return (

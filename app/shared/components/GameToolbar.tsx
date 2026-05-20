@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import {
   Play,
   Undo2,
@@ -11,6 +11,7 @@ import {
   Hand,
   BookOpen,
   Skull,
+  ThumbsUp,
 } from 'lucide-react';
 import type { GameActions } from '../types/gameActions';
 
@@ -55,6 +56,8 @@ export interface GameToolbarProps {
   hasPendingInitiative?: boolean;
   /** Called to pass battle initiative to the opponent (multiplayer, any player). Instant — no approval handshake. */
   onPassInitiative?: () => void;
+  /** Called to send a player emote (multiplayer only). Fire-and-forget. */
+  onSendEmote?: (kind: string) => void;
   /** Game is finished — keep toolbar active for review but disable end turn. */
   isFinished?: boolean;
 }
@@ -82,10 +85,19 @@ export function GameToolbar({
   onRequestInitiative,
   hasPendingInitiative,
   onPassInitiative,
+  onSendEmote,
   isFinished,
 }: GameToolbarProps) {
   const isMultiplayer = mode === 'multiplayer';
   const disabled = isMultiplayer && !isMyTurn && !isFinished;
+
+  const [emoteCoolingDown, setEmoteCoolingDown] = useState(false);
+  const handleSendEmote = useCallback(() => {
+    if (emoteCoolingDown) return;
+    onSendEmote?.('thumbs_up');
+    setEmoteCoolingDown(true);
+    setTimeout(() => setEmoteCoolingDown(false), 2000);
+  }, [emoteCoolingDown, onSendEmote]);
 
   const handleDraw = useCallback(() => {
     if (handCount >= 16) {
@@ -161,7 +173,7 @@ export function GameToolbar({
     ...(isMultiplayer && !isFinished ? [{
       icon: isMyTurn ? Skull : BookOpen,
       key: 'your-initiative',
-      label: 'Your initiative',
+      label: 'Your init',
       onClick: onPassInitiative ?? (() => {}),
       shortcut: '',
     }] : []),
@@ -171,10 +183,19 @@ export function GameToolbar({
     ...(isMultiplayer && !isFinished ? [{
       icon: isMyTurn ? BookOpen : Skull,
       key: 'my-initiative',
-      label: hasPendingInitiative ? 'Pending...' : 'My initiative',
+      label: 'My init',
       onClick: onRequestInitiative ?? (() => {}),
       shortcut: '',
       disabled: !!hasPendingInitiative,
+    }] : []),
+    // OK / thumbs-up emote — multiplayer only, 2s client-side cooldown
+    ...(isMultiplayer && !isFinished && onSendEmote ? [{
+      icon: ThumbsUp,
+      key: 'emote-thumbs-up',
+      label: 'OK',
+      onClick: handleSendEmote,
+      shortcut: '',
+      disabled: emoteCoolingDown,
     }] : []),
     // End Turn (active player) or Priority (non-active player) — multiplayer only,
     // anchored to the far right of the toolbar
@@ -188,7 +209,7 @@ export function GameToolbar({
     }] : isMultiplayer && !isMyTurn && !isFinished ? [{
       icon: Hand,
       key: 'priority',
-      label: hasPendingPriority ? 'Pending...' : 'Priority',
+      label: 'Priority',
       onClick: onRequestPriority ?? (() => {}),
       shortcut: '',
       disabled: !!hasPendingPriority,
@@ -207,9 +228,9 @@ export function GameToolbar({
         left: '50%',
         transform: 'translateX(-50%)',
         display: 'flex',
-        alignItems: 'center',
-        gap: 4,
-        padding: '6px 12px',
+        alignItems: 'stretch',
+        gap: 0,
+        padding: '3px 6px',
         background: 'rgba(30,22,16,0.92)',
         border: '1px solid var(--gf-border)',
         borderRadius: 8,
@@ -226,8 +247,10 @@ export function GameToolbar({
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: 2,
-            padding: '4px 10px',
+            justifyContent: 'center',
+            gap: 1,
+            minWidth: 50,
+            padding: '4px 6px',
             background: 'transparent',
             border: 'none',
             cursor: btnDisabled ? 'not-allowed' : 'pointer',
@@ -235,9 +258,9 @@ export function GameToolbar({
             borderRadius: 4,
             transition: 'background 0.15s, color 0.15s',
             opacity: btnDisabled ? 0.5 : 1,
-            marginLeft: pushRight ? 24 : undefined,
+            marginLeft: pushRight ? 6 : undefined,
             borderLeft: pushRight ? '1px solid var(--gf-border)' : undefined,
-            paddingLeft: pushRight ? 18 : undefined,
+            paddingLeft: pushRight ? 10 : 6,
           }}
           onMouseEnter={(e) => {
             if (!btnDisabled) {

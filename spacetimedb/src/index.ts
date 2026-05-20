@@ -5691,6 +5691,35 @@ export const pass_initiative = spacetimedb.reducer(
 );
 
 // ---------------------------------------------------------------------------
+// Reducer: send_emote
+// Fire-and-forget player emote (e.g. 'thumbs_up'). Both players and any
+// spectators subscribed to the game see the new row and render an animation.
+// ---------------------------------------------------------------------------
+export const send_emote = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+    kind: t.string(),
+  },
+  (ctx, { gameId, kind }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
+
+    if (!kind) throw new SenderError('kind required');
+
+    const player = findPlayerBySender(ctx, gameId);
+
+    ctx.db.Emote.insert({
+      id: 0n,
+      gameId,
+      senderId: player.id,
+      kind,
+      createdAt: ctx.timestamp,
+    });
+  }
+);
+
+// ---------------------------------------------------------------------------
 // Reducer: request_opponent_action
 // Creates a pending ZoneSearchRequest tagged with an `action` (e.g.
 // 'shuffle_deck', 'draw_deck_top') and JSON params. The requester waits for
