@@ -15,8 +15,10 @@ interface SpectatorHandRequestBannerProps {
  * this game. Each banner has Share / Dismiss buttons. Dismiss is local-only
  * (no server signal — the server only tracks the request itself).
  * Auto-dismisses when the underlying row is deleted by the 30s expiry
- * reducer OR when myPlayer.shareHandWithSpectators flips to true (covers
- * the two-tab race where a sibling tab accepted).
+ * reducer OR when myPlayer.shareHandWithSpectators flips from false to true.
+ *
+ * Styled to match PauseConsentToast — see that component for the canonical
+ * consent-banner pattern in this app.
  */
 export default function SpectatorHandRequestBanner({
   gameId,
@@ -31,8 +33,6 @@ export default function SpectatorHandRequestBanner({
   const prevSharingRef = useRef(false);
 
   // Auto-dismiss only when shareHandWithSpectators flips false → true.
-  // Excluding allRequests from the transition check so new incoming requests
-  // while the toggle is already on still render a banner.
   useEffect(() => {
     const sharing = !!myPlayer?.shareHandWithSpectators;
     const flipped = !prevSharingRef.current && sharing;
@@ -68,13 +68,13 @@ export default function SpectatorHandRequestBanner({
     <div
       style={{
         position: 'absolute',
-        top: 80,
+        top: '50%',
         left: '50%',
-        transform: 'translateX(-50%)',
+        transform: 'translate(-50%, -50%)',
         zIndex: 800,
         display: 'flex',
         flexDirection: 'column',
-        gap: 8,
+        gap: 12,
         pointerEvents: 'none',
       }}
     >
@@ -85,42 +85,109 @@ export default function SpectatorHandRequestBanner({
             background: 'rgba(14, 10, 6, 0.95)',
             border: '1px solid rgba(196, 149, 90, 0.4)',
             borderRadius: 8,
-            padding: '12px 20px',
+            padding: '14px 20px',
             display: 'flex',
-            alignItems: 'center',
-            gap: 16,
-            color: '#e6dbc4',
+            flexDirection: 'column',
+            gap: 12,
+            boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
             pointerEvents: 'auto',
+            minWidth: 360,
           }}
         >
-          <span>{req.spectatorName} wants to see hands</span>
-          <button
-            onClick={onShare}
+          {/* Header — explicit "spectator request" label */}
+          <div
             style={{
-              background: '#c4955a',
-              color: '#0e0a06',
-              border: 'none',
-              borderRadius: 4,
-              padding: '6px 12px',
-              cursor: 'pointer',
-              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              paddingBottom: 8,
+              borderBottom: '1px solid rgba(107, 78, 39, 0.3)',
             }}
           >
-            Share with spectators
-          </button>
-          <button
-            onClick={() => onDismiss(req.id)}
+            {/* Eye icon makes it visually clear this is from a spectator */}
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="rgba(196, 149, 90, 0.85)"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            <span
+              style={{
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                color: 'rgba(196, 149, 90, 0.85)',
+              }}
+            >
+              Spectator request
+            </span>
+          </div>
+
+          {/* Body — who and what */}
+          <p
             style={{
-              background: 'transparent',
-              color: '#e6dbc4',
-              border: '1px solid rgba(196, 149, 90, 0.4)',
-              borderRadius: 4,
-              padding: '6px 12px',
-              cursor: 'pointer',
+              fontFamily: 'Georgia, serif',
+              fontSize: 14,
+              color: '#e8d5a3',
+              margin: 0,
+              lineHeight: 1.4,
             }}
           >
-            Dismiss
-          </button>
+            <span style={{ fontWeight: 700 }}>{req.spectatorName}</span>
+            {' is spectating and would like to see hands.'}
+          </p>
+
+          {/* Actions */}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => onDismiss(req.id)}
+              style={{
+                padding: '8px 16px',
+                borderRadius: 4,
+                border: '1px solid rgba(107, 78, 39, 0.3)',
+                background: 'transparent',
+                color: 'rgba(196, 149, 90, 0.7)',
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Dismiss
+            </button>
+            <button
+              onClick={onShare}
+              style={{
+                padding: '8px 16px',
+                borderRadius: 4,
+                border: '1px solid rgba(196, 149, 90, 0.45)',
+                background: 'rgba(196, 149, 90, 0.15)',
+                color: '#e8d5a3',
+                fontFamily: 'var(--font-cinzel), Georgia, serif',
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Share hand
+            </button>
+          </div>
         </div>
       ))}
     </div>
