@@ -2188,7 +2188,8 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
     }
     if (approvedSearchRequest && approvedSearchRequest.zone === 'initiative') {
       completeZoneSearch(BigInt(approvedSearchRequest.id));
-      showGameToast('Initiative granted');
+      const passed = approvedSearchRequest.action === 'pass';
+      showGameToast(passed ? 'Opponent passed initiative to you' : 'Initiative granted');
     }
   }, [approvedSearchRequest, completeZoneSearch]);
 

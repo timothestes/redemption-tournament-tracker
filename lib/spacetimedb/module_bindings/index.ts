@@ -66,6 +66,7 @@ import MoveCardToTopOfDeckReducer from "./move_card_to_top_of_deck_reducer";
 import MoveCardsBatchReducer from "./move_cards_batch_reducer";
 import MoveOpponentCardReducer from "./move_opponent_card_reducer";
 import OpponentShuffleAndDrawReducer from "./opponent_shuffle_and_draw_reducer";
+import PassInitiativeReducer from "./pass_initiative_reducer";
 import PregameAcknowledgeFirstReducer from "./pregame_acknowledge_first_reducer";
 import PregameAcknowledgeRollReducer from "./pregame_acknowledge_roll_reducer";
 import PregameChangeDeckReducer from "./pregame_change_deck_reducer";
@@ -328,6 +329,7 @@ const reducersSchema = __reducers(
   __reducerSchema("move_cards_batch", MoveCardsBatchReducer),
   __reducerSchema("move_opponent_card", MoveOpponentCardReducer),
   __reducerSchema("opponent_shuffle_and_draw", OpponentShuffleAndDrawReducer),
+  __reducerSchema("pass_initiative", PassInitiativeReducer),
   __reducerSchema("pregame_acknowledge_first", PregameAcknowledgeFirstReducer),
   __reducerSchema("pregame_acknowledge_roll", PregameAcknowledgeRollReducer),
   __reducerSchema("pregame_change_deck", PregameChangeDeckReducer),

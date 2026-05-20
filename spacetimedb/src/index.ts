@@ -5652,6 +5652,45 @@ export const request_zone_search = spacetimedb.reducer(
 );
 
 // ---------------------------------------------------------------------------
+// Reducer: pass_initiative
+// One-way "I give initiative to my opponent" — no request/approve handshake.
+// Inserts a synthetic, pre-approved ZoneSearchRequest so the opponent's
+// existing approved-initiative subscription fires (toast + auto-complete).
+// ---------------------------------------------------------------------------
+export const pass_initiative = spacetimedb.reducer(
+  {
+    gameId: t.u64(),
+  },
+  (ctx, { gameId }) => {
+    const game = ctx.db.Game.id.find(gameId);
+    if (!game) throw new SenderError('Game not found');
+    if (game.status !== 'playing') throw new SenderError('Game is not in playing state');
+
+    const player = findPlayerBySender(ctx, gameId);
+
+    const allPlayers = [...ctx.db.Player.player_game_id.filter(gameId)];
+    const opponent = allPlayers.find(p => p.id !== player.id);
+    if (!opponent) throw new SenderError('Opponent not found');
+
+    // requesterId=opponent so their client picks it up via approvedSearchRequest
+    // (which filters on requesterId === myPlayer.id).
+    ctx.db.ZoneSearchRequest.insert({
+      id: 0n,
+      gameId,
+      requesterId: opponent.id,
+      targetPlayerId: player.id,
+      zone: 'initiative',
+      status: 'approved',
+      createdAt: ctx.timestamp,
+      action: 'pass',
+      actionParams: '',
+    });
+
+    logAction(ctx, gameId, player.id, 'PASS_INITIATIVE', '', game.turnNumber, game.currentPhase);
+  }
+);
+
+// ---------------------------------------------------------------------------
 // Reducer: request_opponent_action
 // Creates a pending ZoneSearchRequest tagged with an `action` (e.g.
 // 'shuffle_deck', 'draw_deck_top') and JSON params. The requester waits for
