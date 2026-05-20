@@ -38,6 +38,14 @@ interface RightPanelProps {
   unreadChatCount?: number;
   /** When true, chat input is disabled (read-only chat). Used by spectators. */
   chatDisabled?: boolean;
+  // ---- Spectator-controls subsection (player-mode only) ----
+  spectators?: Array<{ id: bigint; identity: { toHexString: () => string }; displayName: string }>;
+  myIdentityHex?: string;
+  shareHandWithSpectators?: boolean;
+  isGamePublic?: boolean;
+  onSetShareHand?: (share: boolean) => void;
+  onKickSpectator?: (spectatorId: bigint) => void;
+  onSetGamePrivate?: (isPublic: boolean) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -56,9 +64,16 @@ export default function RightPanel({
   chatScale,
   unreadChatCount = 0,
   chatDisabled = false,
+  spectators,
+  myIdentityHex,
+  shareHandWithSpectators,
+  isGamePublic,
+  onSetShareHand,
+  onKickSpectator,
+  onSetGamePrivate,
 }: RightPanelProps) {
   const { isLoupeVisible, toggleLoupe, previewCard } = useCardPreview();
-  const [chatTab, setChatTab] = useState<'chat' | 'log' | 'all'>('all');
+  const [chatTab, setChatTab] = useState<'chat' | 'log' | 'all' | 'spectators'>('all');
 
   return (
     <div style={{
@@ -222,6 +237,13 @@ export default function RightPanel({
               onActiveTabChange={setChatTab}
               chatScale={chatScale}
               chatDisabled={chatDisabled}
+              spectators={spectators}
+              myIdentityHex={myIdentityHex}
+              shareHandWithSpectators={shareHandWithSpectators}
+              isGamePublic={isGamePublic}
+              onSetShareHand={onSetShareHand}
+              onKickSpectator={onKickSpectator}
+              onSetGamePrivate={onSetGamePrivate}
             />
           </div>
         </>

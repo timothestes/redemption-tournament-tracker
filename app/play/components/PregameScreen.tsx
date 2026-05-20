@@ -446,7 +446,7 @@ function PlayerCards({
 // InlineDie — wraps RitualDie at size 56, with "Winner" label
 // ---------------------------------------------------------------------------
 
-function InlineDie({
+export function InlineDie({
   finalValue,
   accentColor,
   isWinner,
@@ -644,6 +644,98 @@ export function PregameCeremonyOverlay({ gameState }: { gameState: GameState }) 
               iWonRoll={iWonRoll}
             />
           ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SpectatorPregameCeremonyOverlay — read-only mirror of PregameCeremonyOverlay
+// for the spectator route. Same modal styling, neutral perspective (seat
+// names rather than "You"/"Opponent"), no interactive buttons.
+// ---------------------------------------------------------------------------
+
+export function SpectatorPregameCeremonyOverlay({
+  game,
+  seat0Player,
+  seat1Player,
+}: {
+  game: any;
+  seat0Player: any;
+  seat1Player: any;
+}) {
+  if (!game) return null;
+
+  const phase = game.pregamePhase;
+  const seat0Name = seat0Player?.displayName || 'Player 1';
+  const seat1Name = seat1Player?.displayName || 'Player 2';
+  const roll0 = Number(game.rollResult0) || 0;
+  const roll1 = Number(game.rollResult1) || 0;
+  const winnerSeat = String(game.rollWinner ?? '');
+  const winnerName =
+    winnerSeat === '0' ? seat0Name : winnerSeat === '1' ? seat1Name : '';
+
+  const firstSeatStr = game.currentTurn != null ? String(game.currentTurn) : '';
+  const firstSeatName =
+    firstSeatStr === '0' ? seat0Name : firstSeatStr === '1' ? seat1Name : '';
+
+  // Match the player overlay's tumble timing so the "Winner" label appears
+  // at the same moment for spectators.
+  const [diceRevealed, setDiceRevealed] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setDiceRevealed(true), 600);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <div className="absolute inset-0 z-40 flex items-center justify-center pointer-events-none">
+      <div className="pointer-events-auto rounded-xl border border-amber-200/10 bg-black/80 backdrop-blur-md p-6 sm:p-8 text-center max-w-md w-full mx-4">
+        <p className="text-xs uppercase tracking-[0.2em] text-amber-200/40 font-cinzel">
+          Spectating
+        </p>
+
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <div className="rounded-lg border border-[#c4955a]/30 bg-black/40 p-3 text-left">
+            <p className="text-xs font-cinzel text-[#c4955a] truncate">{seat0Name}</p>
+            <div className="mt-2 flex justify-center">
+              <InlineDie
+                finalValue={roll0}
+                accentColor="#c4955a"
+                isWinner={winnerSeat === '0'}
+                revealed={diceRevealed}
+              />
+            </div>
+          </div>
+          <div className="rounded-lg border border-[#4a7ab5]/30 bg-black/40 p-3 text-left">
+            <p className="text-xs font-cinzel text-[#4a7ab5] truncate">{seat1Name}</p>
+            <div className="mt-2 flex justify-center">
+              <InlineDie
+                finalValue={roll1}
+                accentColor="#4a7ab5"
+                isWinner={winnerSeat === '1'}
+                revealed={diceRevealed}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 min-h-[2.5rem]">
+          {(phase === 'rolling' || phase === 'choosing') && winnerName && (
+            <>
+              <p className="font-cinzel text-sm font-bold text-amber-200/90 tracking-wide">
+                {winnerName} wins the roll
+              </p>
+              <p className="mt-2 text-xs text-amber-200/40">
+                Waiting for {winnerName} to choose who goes first…
+              </p>
+            </>
+          )}
+          {phase === 'revealing' && firstSeatName && (
+            <p className="font-cinzel text-sm font-bold text-amber-200/90 tracking-wide">
+              {firstSeatName} goes first
+            </p>
+          )}
         </div>
       </div>
     </div>

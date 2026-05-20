@@ -1,9 +1,85 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { PHASE_ORDER } from '@/app/goldfish/types';
 import { useCardPreview } from '@/app/goldfish/state/CardPreviewContext';
 import type { GamePhase } from '@/app/shared/types/gameCard';
+
+// ---------------------------------------------------------------------------
+// NameHint — abbreviated label with an instant custom hover tooltip.
+// Replaces the browser-native `title` attribute (which has a ~500ms delay
+// and renders in OS chrome) with a styled in-canvas popover that matches
+// the rest of the multiplayer UI.
+// ---------------------------------------------------------------------------
+
+function NameHint({
+  label,
+  full,
+  color,
+  accent,
+  trailing,
+}: {
+  label: string;
+  /** Full name to reveal on hover. `null` disables the hint. */
+  full: string | null;
+  /** Color for the label caption. */
+  color: string;
+  /** Accent border color for the hover bubble. */
+  accent: string;
+  /** Optional trailing node (e.g. connection dot) rendered alongside the label. */
+  trailing?: ReactNode;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const showHint = hovered && full !== null && full !== label;
+  return (
+    <span
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 3,
+        color,
+        fontSize: FZ.caption,
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase',
+        lineHeight: 1,
+        marginTop: 2,
+        cursor: full ? 'help' : undefined,
+      }}
+    >
+      {label}
+      {trailing}
+      {showHint && (
+        <span
+          role="tooltip"
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 6px)',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            padding: '3px 8px',
+            background: 'rgba(10, 8, 5, 0.95)',
+            border: `1px solid ${accent}`,
+            borderRadius: 4,
+            color: '#e8d5a3',
+            fontFamily: 'var(--font-cinzel), Georgia, serif',
+            fontSize: FZ.caption,
+            letterSpacing: '0.04em',
+            textTransform: 'none',
+            whiteSpace: 'nowrap',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.6)',
+            pointerEvents: 'none',
+            zIndex: 60,
+          }}
+        >
+          {full}
+        </span>
+      )}
+    </span>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Phase display labels
@@ -69,6 +145,8 @@ interface TurnIndicatorProps {
   onCancelPauseRequest?: () => void;
   /** When true, hide interactive buttons (END TURN, CONCEDE, pause) and disable phase tab clicks. */
   readOnly?: boolean;
+  /** Spectator-only: request the players reveal their hands (replaces CONCEDE slot). */
+  onRequestHandReveal?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -102,9 +180,12 @@ export default function TurnIndicator({
   onRequestResume,
   onCancelPauseRequest,
   readOnly = false,
+  onRequestHandReveal,
 }: TurnIndicatorProps) {
   const [showConcedeConfirm, setShowConcedeConfirm] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [handRevealCooldownUntil, setHandRevealCooldownUntil] = useState(0);
+  const handRevealOnCooldown = Date.now() < handRevealCooldownUntil;
   const { isLoupeVisible } = useCardPreview();
   const currentPhase: string = game?.currentPhase ?? 'draw';
   const turnNumber: number = game?.turnNumber ? Number(game.turnNumber) : 1;
@@ -289,29 +370,56 @@ export default function TurnIndicator({
           fontFamily: 'var(--font-cinzel), Georgia, serif',
         }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <span style={{ color: '#c4955a', fontSize: FZ.score, fontWeight: 700, lineHeight: 1 }}>{myScore}</span>
-          <span style={{ color: 'rgba(196, 149, 90, 0.45)', fontSize: FZ.caption, letterSpacing: '0.08em', textTransform: 'uppercase', lineHeight: 1, marginTop: 2 }}>you</span>
-        </div>
-        <span style={{ color: 'rgba(232, 213, 163, 0.2)', fontSize: FZ.ui, fontWeight: 400 }}>vs</span>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <span style={{ color: '#4a7ab5', fontSize: FZ.score, fontWeight: 700, lineHeight: 1 }}>{opponentScore}</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: 'rgba(74, 122, 181, 0.45)', fontSize: FZ.caption, letterSpacing: '0.08em', textTransform: 'uppercase', lineHeight: 1, marginTop: 2 }}>
-            opp
-            <span
-              title={opponentConnectionStatus === 'connected' ? 'Connected' : opponentConnectionStatus === 'reconnecting' ? 'Reconnecting...' : 'Disconnected'}
-              style={{
-                display: 'inline-block',
-                width: 6,
-                height: 6,
-                borderRadius: '50%',
-                background: opponentConnectionStatus === 'connected' ? '#22c55e' : opponentConnectionStatus === 'reconnecting' ? '#eab308' : '#ef4444',
-                boxShadow: `0 0 5px ${opponentConnectionStatus === 'connected' ? 'rgba(34, 197, 94, 0.6)' : opponentConnectionStatus === 'reconnecting' ? 'rgba(234, 179, 8, 0.6)' : 'rgba(239, 68, 68, 0.6)'}`,
-                flexShrink: 0,
-              }}
-            />
-          </span>
-        </div>
+        {(() => {
+          // Spectators see both seats by name; players see "you" vs "opp".
+          // Names are abbreviated to the caption slot's footprint with a
+          // custom hover hint surfacing the full name with no native-title
+          // delay.
+          const abbrev = (name?: string, max = 6) =>
+            !name ? '' : name.length <= max ? name : `${name.slice(0, max)}…`;
+          const seat0Name: string | undefined = myPlayer?.displayName;
+          const seat1Name: string | undefined = opponentPlayer?.displayName;
+          const leftLabel = readOnly ? abbrev(seat0Name) || 'P1' : 'you';
+          const rightLabel = readOnly ? abbrev(seat1Name) || 'P2' : 'opp';
+          const leftFull = readOnly ? (seat0Name ?? 'Player 1') : null;
+          const rightFull = readOnly ? (seat1Name ?? 'Player 2') : null;
+          return (
+            <>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <span style={{ color: '#c4955a', fontSize: FZ.score, fontWeight: 700, lineHeight: 1 }}>{myScore}</span>
+                <NameHint
+                  label={leftLabel}
+                  full={leftFull}
+                  color="rgba(196, 149, 90, 0.45)"
+                  accent="#c4955a"
+                />
+              </div>
+              <span style={{ color: 'rgba(232, 213, 163, 0.2)', fontSize: FZ.ui, fontWeight: 400 }}>vs</span>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <span style={{ color: '#4a7ab5', fontSize: FZ.score, fontWeight: 700, lineHeight: 1 }}>{opponentScore}</span>
+                <NameHint
+                  label={rightLabel}
+                  full={rightFull}
+                  color="rgba(74, 122, 181, 0.45)"
+                  accent="#4a7ab5"
+                  trailing={
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background: opponentConnectionStatus === 'connected' ? '#22c55e' : opponentConnectionStatus === 'reconnecting' ? '#eab308' : '#ef4444',
+                        boxShadow: `0 0 5px ${opponentConnectionStatus === 'connected' ? 'rgba(34, 197, 94, 0.6)' : opponentConnectionStatus === 'reconnecting' ? 'rgba(234, 179, 8, 0.6)' : 'rgba(239, 68, 68, 0.6)'}`,
+                        flexShrink: 0,
+                      }}
+                    />
+                  }
+                />
+              </div>
+            </>
+          );
+        })()}
       </div>
 
       {/* Game timer — hidden on narrow bars to avoid colliding with the
@@ -751,6 +859,42 @@ export default function TurnIndicator({
             }}
           >
             Concede
+          </button>
+        )}
+        {!isFinished && !disconnectTimeoutFired && readOnly && onRequestHandReveal && (
+          <button
+            onClick={() => {
+              if (handRevealOnCooldown) return;
+              onRequestHandReveal();
+              setHandRevealCooldownUntil(Date.now() + 30_000);
+            }}
+            disabled={handRevealOnCooldown}
+            style={{
+              padding: '5px 12px',
+              background: 'transparent',
+              border: '1px solid rgba(196, 149, 90, 0.45)',
+              borderRadius: 4,
+              cursor: handRevealOnCooldown ? 'default' : 'pointer',
+              fontFamily: 'var(--font-cinzel), Georgia, serif',
+              fontSize: FZ.ui,
+              letterSpacing: '0.07em',
+              textTransform: 'uppercase',
+              color: '#e8d5a3',
+              opacity: handRevealOnCooldown ? 0.5 : 1,
+              transition: 'background 0.15s, border-color 0.15s, color 0.15s',
+            }}
+            onMouseEnter={(e) => {
+              if (handRevealOnCooldown) return;
+              e.currentTarget.style.background = 'rgba(196, 149, 90, 0.18)';
+              e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.75)';
+            }}
+            onMouseLeave={(e) => {
+              if (handRevealOnCooldown) return;
+              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.borderColor = 'rgba(196, 149, 90, 0.45)';
+            }}
+          >
+            {handRevealOnCooldown ? 'Request Sent' : 'Request Hands'}
           </button>
         )}
       </div>

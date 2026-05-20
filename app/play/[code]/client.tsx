@@ -1118,6 +1118,13 @@ function GameInner({ code, isConnected }: GameInnerProps) {
       playerNames={playerNameMap}
       chatScale={chatScale}
       unreadChatCount={unreadChatCount}
+      spectators={gameState.spectators as Array<{ id: bigint; identity: { toHexString: () => string }; displayName: string }>}
+      myIdentityHex={gameState.identityHex}
+      shareHandWithSpectators={gameState.myPlayer?.shareHandWithSpectators}
+      isGamePublic={gameState.game?.isPublic}
+      onSetShareHand={(share) => { if (gameId !== null) conn?.reducers.setShareHandWithSpectators({ gameId, share }); }}
+      onKickSpectator={(spectatorId) => { if (gameId !== null) conn?.reducers.kickSpectator({ gameId, spectatorId }); }}
+      onSetGamePrivate={(isPublic) => { if (gameId !== null) conn?.reducers.setGamePrivate({ gameId, isPublic }); }}
     />
   );
 

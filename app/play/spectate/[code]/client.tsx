@@ -6,8 +6,7 @@ import dynamic from 'next/dynamic';
 import { useSpacetimeConnection } from '@/app/play/hooks/useSpacetimeConnection';
 import { SpacetimeProvider } from '@/app/play/lib/spacetimedb-provider';
 import { useSpectatorGameState } from '@/app/play/hooks/useGameState';
-import { SpectatorBar } from '@/app/play/components/SpectatorBar';
-import { SpectatorPregameView } from '@/app/play/components/PregameScreen';
+import { SpectatorPregameView, SpectatorPregameCeremonyOverlay } from '@/app/play/components/PregameScreen';
 import { CardPreviewProvider } from '@/app/goldfish/state/CardPreviewContext';
 import { useSpacetimeDB } from 'spacetimedb/react';
 import { showGameToast } from '@/app/shared/components/GameToast';
@@ -190,7 +189,26 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
   const { chatScale } = useChatScale();
 
   // Card preview — needed for unread tracking
-  const { isLoupeVisible } = useCardPreview();
+  const { isLoupeVisible, toggleLoupe } = useCardPreview();
+
+  // Tab toggles the preview pane (matches player-side hotkey in useGameHotkeys)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+      e.preventDefault();
+      toggleLoupe();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [toggleLoupe]);
 
   // Unread chat count — increments while panel is collapsed
   const [unreadChatCount, setUnreadChatCount] = useState(0);
@@ -262,7 +280,6 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
   }
 
   // lifecycle === 'watching' — render based on game.status
-  const spectatorCount = gameState.spectators.length;
   const game = (gameState.allGames ?? []).find(
     (g: any) => g.code === code && g.status !== 'finished',
   ) ?? (gameState.allGames ?? []).find((g: any) => g.code === code);
@@ -282,15 +299,7 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
         backgroundPosition: 'center',
       }}
     >
-      {/* SpectatorBar — fixed overlay at top */}
-      <SpectatorBar
-        code={code}
-        spectatorCount={spectatorCount}
-        gameId={gameId ?? 0n}
-      />
-
-      {/* Main content column — below the SpectatorBar (40px) */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingTop: 40 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {gameId === null || !game ? (
           <div className="flex h-full items-center justify-center">
             <div className="text-center">
@@ -313,13 +322,16 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
               )}
             </div>
           </div>
-        ) : status === 'pregame' ? (
+        ) : status === 'pregame' && game.pregamePhase !== 'rolling' && game.pregamePhase !== 'choosing' && game.pregamePhase !== 'revealing' ? (
+          // Pre-deal stage (deck selection / ready-up). No hands dealt yet,
+          // so the canvas would be empty — show the simple status card.
           <div className="flex h-full items-center justify-center px-4">
             <SpectatorPregameView game={game} />
           </div>
         ) : (
-          // status === 'playing' — RightPanel spans full height alongside
-          // a (TurnIndicator + canvas) column, matching the player layout.
+          // status === 'playing' / 'finished', or pregame ceremony phase.
+          // Render the full board so spectators see zones and hands; the
+          // ceremony overlay floats on top during rolling/choosing/revealing.
           <div style={{ flex: 1, display: 'flex', flexDirection: 'row', overflow: 'hidden' }}>
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
               <div style={{ flexShrink: 0, height: 48 }}>
@@ -336,6 +348,11 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
                   opponentScore={opponentScore}
                   timerDisplay={gameTimer.formatted}
                   timerVisible={gameTimer.isTimerVisible}
+                  onRequestHandReveal={
+                    gameId !== null && conn
+                      ? () => conn.reducers.requestSpectatorHandReveal({ gameId })
+                      : undefined
+                  }
                 />
               </div>
               <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
@@ -344,6 +361,13 @@ function SpectatorInner({ code, isConnected, displayName }: SpectatorInnerProps)
                   viewerKind="spectator"
                   getImage={getImage}
                 />
+                {status === 'pregame' && (
+                  <SpectatorPregameCeremonyOverlay
+                    game={game}
+                    seat0Player={(gameState as any).seat0Player}
+                    seat1Player={(gameState as any).seat1Player}
+                  />
+                )}
               </div>
             </div>
             <RightPanel

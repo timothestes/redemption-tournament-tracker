@@ -5889,7 +5889,11 @@ export default function MultiplayerCanvas({ gameId, onLoadDeck, undoStack, onSea
               lineHeight: 1,
             }}
           >
-            {gameState.isMyTurn
+            {viewerKind === 'spectator'
+              ? gameState.isMyTurn
+                ? `${gameState.myPlayer.displayName ?? 'Player 1'}'s turn`
+                : `${gameState.opponentPlayer?.displayName ?? 'Player 2'}'s turn`
+              : gameState.isMyTurn
               ? `${gameState.myPlayer.displayName ?? 'You'}'s turn (you)`
               : `${gameState.opponentPlayer?.displayName ?? 'Opponent'}'s turn`}
           </span>
